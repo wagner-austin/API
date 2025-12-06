@@ -1,0 +1,22 @@
+# This is the centralized configuration for the monorepo guards.
+# By default, we apply the strictest rules to all services to ensure
+# consistency and prevent configuration drift.
+
+[guards]
+directories = ["src", "scripts", "tests"]
+exclude_parts = [
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "node_modules",
+]
+forbid_pyi = true
+allow_print_in_tests = false
+
+# Ban dataclasses in all "src" directories to enforce the use of TypedDict
+# for data structures, especially those deserialized from external sources.
+dataclass_ban_segments = [
+    ["src"],
+]

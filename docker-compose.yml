@@ -1,0 +1,50 @@
+# =============================================================================
+# Root Docker Compose - Shared Infrastructure
+# =============================================================================
+# Start this FIRST, then start individual services from their directories.
+#
+# Usage:
+#   docker compose up -d                    # Start Redis + create network
+#   cd services/data-bank-api && docker compose up -d   # Then start services
+#
+# Or use Makefile:
+#   make infra                              # Start Redis
+#   make up-trainer                         # Start Redis + Model-Trainer
+#   make up SERVICE=data-bank-api           # Start Redis + specific service
+#
+# Port map:
+#   - 6379:  Redis (this file)
+#   - 8000:  turkic-api
+#   - 8001:  data-bank-api
+#   - 8002:  qr-api
+#   - 8003:  transcript-api
+#   - 8004:  handwriting-ai
+#   - 8005:  Model-Trainer
+#   - 8006:  music-wrapped-api
+# =============================================================================
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    driver: bridge
+    name: platform-network
+
+volumes:
+  redis-data:
