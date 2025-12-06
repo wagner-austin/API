@@ -1,0 +1,91 @@
+# Kyrgyz → IPA transliteration rules (ky_ipa.rules)
+#
+# Source: McCollum, A. G. (2020). "Vowel harmony and positional variation in Kyrgyz".
+#         Laboratory Phonology, 11(1): article 25.
+#         DOI: https://doi.org/10.5334/labphon.247
+#
+# Features: Includes long vowel representations (double letters → ː)
+# License: CC-BY 4.0 (source article)
+
+$V  = [ɑeiouøyɯ];            # vowel macro: Kyrgyz short vowels
+$VL = [ɑːeːiːoːøːuːyːɯː];    # vowel macro: Kyrgyz long vowels  ◄ NEW
+
+# ---------------------------------------------------------------------------
+# /je/ only after another vowel
+$V } Е > je ;
+$V } е > je ;
+
+# ---------------------------------------------------------------------------
+# digraph affricates (loans)
+ДЖ > ʤ ;  дж > ʤ ;
+
+# ---------------------------------------------------------------------------
+# long vowels written with double letters  ◄ NEW
+АА > ɑː ; аа > ɑː ;
+ЕЕ > eː ; ее > eː ;
+ИИ > iː ; ии > iː ;
+ОО > oː ; оо > oː ;
+ӨӨ > øː ; өө > øː ;
+УУ > uː ; уу > uː ;
+ҮҮ > yː ; үү > yː ;
+ЫЫ > ɯː ; ыы > ɯː ;
+
+# ---------------------------------------------------------------------------
+# One-to-one grapheme → phone map
+А > ɑ ;  а > ɑ ;
+Б > b ;  б > b ;
+В > v ;  в > v ;
+Г > ɡ ;  г > ɡ ;
+Ғ > ʁ ;  ғ > ʁ ;
+Д > d ;  д > d ;
+Е > e ;  е > e ;
+Ё > jo ; ё > jo ;
+Ж > ʒ ;  ж > ʒ ;
+З > z ;  з > z ;
+И > i ;  и > i ;
+Й > j ;  й > j ;
+К > k ;  к > k ;
+Қ > q ;  қ > q ;
+Л > l ;  л > l ;
+М > m ;  м > m ;
+Н > n ;  н > n ;
+Ң > ŋ ;  ң > ŋ ;
+О > o ;  о > o ;
+Ө > ø ;  ө > ø ;
+П > p ;  п > p ;
+Р > r ;  р > r ;
+С > s ;  с > s ;
+Т > t ;  т > t ;
+У > u ;  у > u ;
+Ү > y ;  ү > y ;
+Ф > f ;  ф > f ;
+Х > x ;  х > x ;
+Ц > ʦ ; ц > ʦ ;
+Ч > ʧ ;  ч > ʧ ;
+Ш > ʃ ;  ш > ʃ ;
+Щ > ɕː ; щ > ɕː ;          # Russian loan phoneme  ◄ CHANGED
+Ъ > ʔ ;  ъ > ʔ ;
+Ы > ɯ ;  ы > ɯ ;
+Ь > ʲ ;  ь > ʲ ;
+Э > e ;  э > e ;
+Ю > ju ; ю > ju ;
+Я > ja ; я > ja ;
+Ў > w ;  ў > w ;
+
+# ---------------------------------------------------------------------------
+# /w/ between vowels
+$V } У > w ;
+$V } у > w ;
+
+# ---------------------------------------------------------------------------
+# ADDITIONS 2025-12-02: Missing chars found in OSCAR corpus audit
+# See docs/ipa-rules-refactor.md
+# ---------------------------------------------------------------------------
+
+# Archaic/variant Cyrillic letters (appear in OSCAR data)
+Ѳ > θ ;  ѳ > θ ;    # FITA - Greek theta loans
+Ҥ > ŋ ;  ҥ > ŋ ;    # EN WITH TAIL - velar nasal
+
+# ---------------------------------------------------------------------------
+
+:: NFC ;

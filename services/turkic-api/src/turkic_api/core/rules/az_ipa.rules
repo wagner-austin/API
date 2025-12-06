@@ -1,0 +1,61 @@
+# Azerbaijani (North) → IPA transliteration rules (az_ipa.rules)
+#
+# Source: Ghaffarvand Mokari, P. & Werner, S. (2017). "Azerbaijani".
+#         Journal of the International Phonetic Association, 47(2): 207–212.
+#         DOI: https://doi.org/10.1017/S0025100317000184
+#
+# Additional reference: Standard Baku-oriented descriptions of orthography & pronunciation
+#                       (e.g., Siegel, Essentials of Azerbaijani).
+#
+# Simplified: no vowel length, no stress, no aspiration marking, no dental vs. alveolar
+# distinctions, no automatic final devoicing, no systematic palatal/velar allophony.
+
+# ---------------------------------------------------------------------------
+
+# 0. MACROS  (IPA target symbols; used in contexts below)
+
+$V   = [ i y e œ æ ɑ o u ɯ ];   # all vowels
+$BV  = [ ɑ o u ɯ ];             # back vowels
+$FV  = [ i y e œ æ ];           # front vowels
+$RV  = [ o œ u y ];             # rounded vowels
+
+# ---------------------------------------------------------------------------
+
+# 1. ONE-TO-ONE GRAPHEME → IPA MAP  (Latin script → segmental IPA)
+
+A > ɑ ;  a > ɑ ;
+B > b ;  b > b ;
+C > d͡ʒ ;  c > d͡ʒ ;
+Ç > t͡ʃ ;  ç > t͡ʃ ;
+D > d ;  d > d ;
+E > e ;  e > e ;
+Ə > æ ;  ə > æ ;
+F > f ;  f > f ;
+G > ɟ ;  g > ɟ ;
+Ğ > ɣ ;  ğ > ɣ ;
+H > h ;  h > h ;
+X > x ;  x > x ;
+I > ɯ ;  ı > ɯ ;
+İ > i ;  i > i ;
+J > ʒ ;  j > ʒ ;
+K > k ;  k > k ;
+Q > ɡ ;  q > ɡ ;
+L > l ;  l > l ;
+M > m ;  m > m ;
+N > n ;  n > n ;
+O > o ;  o > o ;
+Ö > œ ;  ö > œ ;
+P > p ;  p > p ;
+R > ɾ ;  r > ɾ ;
+S > s ;  s > s ;
+Ş > ʃ ;  ş > ʃ ;
+T > t ;  t > t ;
+U > u ;  u > u ;
+Ü > y ;  ü > y ;
+V > v ;  v > v ;
+Y > j ;  y > j ;
+Z > z ;  z > z ;
+
+# ---------------------------------------------------------------------------
+
+:: NFC ;

@@ -1,0 +1,27 @@
+# VCS
+.git
+.gitignore
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+
+# Local data and artifacts
+htmlcov/
+dist/
+build/
+
+# Tests (not needed in runtime image)
+tests/
+
+# OS junk
+.DS_Store
+Thumbs.db
+

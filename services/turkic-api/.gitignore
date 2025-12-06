@@ -1,0 +1,90 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+# Local data directory (corpus, logs, etc)
+data/
+*.bz2
+/cronjob/
+
+# Cache directories
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Package files
+*.whl
+*.egg-info/
+dist/
+spm/*.model
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+/build/
+build/
+dist/
+*.egg-info/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+*.egg
+
+# Virtual environments
+env/
+venv/
+ENV/
+
+# Local development files
+*.log
+*.pot
+*.pyc
+local_settings.py
+.env
+.venv
+
+# IDE files
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# Project specific
+# Ignore SentencePiece test models
+mini.*
+
+# Documentation files that shouldn't be tracked
+Setup Commands for Conda env with dependencies.txt
+Why pip install pyicu fails on Windows.txt
+pyicu-*.whl
+temp.txt
+src/turkic_translit/lid.176.ftz
+src/turkic_translit/lid.176.bin
+src/turkic_translit/lid218e.bin
+ 
+# Prevent accidental reserved filename on Windows
+nul
+
+# Local debug artifacts (not part of source)
+cov*.txt
+err*.txt
+out*.txt
+.tmp*.py
+tmp_jobs/
+tmp_show/
+patch.diff
+temp_*.txt
+*.json

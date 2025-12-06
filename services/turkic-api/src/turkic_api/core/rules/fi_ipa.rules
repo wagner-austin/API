@@ -1,0 +1,256 @@
+# Finnish → IPA transliteration rules (fi_ipa.rules)
+#
+# Source: Suomi, K., Toivanen, J., & Ylitalo, R. (2008).
+#         Finnish sound structure: Phonetics, phonology, phonotactics and prosody.
+#         Studia Humaniora Ouluensia 9. Oulu: Oulu University Press.
+#         ISBN: 978-951-42-8984-2
+#         Available at: https://urn.fi/URN:ISBN:9789514289842
+#
+# Simplified: segmental phonemes only, no allophonic rules (like [h x ç] allophones,
+# vowel centralisation, or sandhi / glottalisation). Quantity is handled purely
+# by doubled letters → long segments (ː).
+
+# 0.  MACROS  (symbols in the source alphabet, case-sensitive)
+
+$V = [ a ä e i o ö u y A Ä E I O Ö U Y ];          # orthographic vowels
+$C = [ b c d f g h j k l m n p q r s t v w x z
+       B C D F G H J K L M N P Q R S T V W X Z
+       š Š ž Ž ' ];
+
+# consonant letters & apostrophe
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1.  CONTEXT-SENSITIVE RULES
+#     Applied before the one-to-one grapheme → phoneme map.
+
+
+# 1.1 NASAL + K/G  →  [ŋ] / [ŋː]
+#     Very simplified treatment:
+#       nk  → ŋk      (e.g. kenkä)
+#       ng  → ŋː      (e.g. kengän, sangen)
+
+n } k > ŋ ;      N } K > ŋ ;
+
+ng > ŋː ;
+NG > ŋː ;
+
+
+# 1.2 V / W → [ʋ]
+#     <w> is used only in names / stylistic contexts, pronounced like <v>.
+
+v  > ʋ ;
+V  > ʋ ;
+w  > ʋ ;
+W  > ʋ ;
+
+# NOTE: Because of the rules above, we do not use a separate fallback v/w rule
+# below; v/w always go to ʋ.
+
+
+# 1.3 POSTALVEOLAR FRICATIVE
+#     Standard orthography uses <š>. Many texts use <sh>; we map both to /ʃ/.
+#     Note: š/Š geminates are handled in section 2.2
+
+s h > ʃ ;
+S h > ʃ ;
+s H > ʃ ;
+S H > ʃ ;
+
+
+# 1.4 GLOTTAL STOP
+#     Apostrophe <'> marks a glottal stop in forms like <vaa'an>.
+
+\' > ʔ ;
+
+
+# 1.5 APPROXIMATE HANDLING OF FOREIGN LETTERS
+#     These are crude defaults; edit as needed for the corpus.
+
+c  > k ;
+C  > k ;
+
+q  > k ;
+Q  > k ;
+
+x  > k s ;
+X  > k s ;
+
+z  > s ;
+Z  > s ;
+
+å  > o ;
+Å  > o ;
+
+
+# ---------------------------------------------------------------------------
+
+# 2.  ONE-TO-ONE GRAPHEME → SEGMENT MAP
+#     Long segments (double letters) are mapped to IPA Vː / Cː.
+#     NOTE: Some long consonants (bb, dd, ff, gg, šš) only occur in loans,
+#     but we include them for completeness.
+
+
+# 2.1 VOWELS
+
+# Long vowels (double letters) - MUST come before short vowels
+
+aa > ɑː ;
+AA > ɑː ;
+
+ää > æː ;
+ÄÄ > æː ;
+
+ee > eː ;
+EE > eː ;
+
+ii > iː ;
+II > iː ;
+
+oo > oː ;
+OO > oː ;
+
+öö > øː ;
+ÖÖ > øː ;
+
+uu > uː ;
+UU > uː ;
+
+yy > yː ;
+YY > yː ;
+
+
+# Short vowels
+
+a  > ɑ ;
+A  > ɑ ;
+
+ä  > æ ;
+Ä  > æ ;
+
+e  > e ;
+E  > e ;
+
+i  > i ;
+I  > i ;
+
+o  > o ;
+O  > o ;
+
+ö  > ø ;
+Ö  > ø ;
+
+u  > u ;
+U  > u ;
+
+y  > y ;
+Y  > y ;
+
+
+# 2.2 CONSONANTS
+
+# Long consonants (geminates) - MUST come before short consonants
+
+pp  > pː ;
+PP  > pː ;
+
+tt  > tː ;
+TT  > tː ;
+
+kk  > kː ;
+KK  > kː ;
+
+bb  > bː ;
+BB  > bː ;
+
+dd  > dː ;
+DD  > dː ;
+
+gg  > ɡː ;
+GG  > ɡː ;
+
+mm  > mː ;
+MM  > mː ;
+
+nn  > nː ;
+NN  > nː ;
+
+ll  > lː ;
+LL  > lː ;
+
+rr  > rː ;
+RR  > rː ;
+
+ss  > sː ;
+SS  > sː ;
+
+ff  > fː ;
+FF  > fː ;
+
+hh  > hː ;
+HH  > hː ;
+
+šš  > ʃː ;
+ŠŠ  > ʃː ;
+
+jj  > jː ;    # geminate /j/ only in some dialects / expressive forms
+
+
+# Short consonants
+
+# Core plosives
+p   > p ;
+P   > p ;
+
+t   > t ;
+T   > t ;
+
+k   > k ;
+K   > k ;
+
+# Marginal voiced plosives (mainly in loans)
+b   > b ;
+B   > b ;
+
+d   > d ;
+D   > d ;
+
+g   > ɡ ;
+G   > ɡ ;
+
+# Nasals
+m   > m ;
+M   > m ;
+
+n   > n ;
+N   > n ;
+
+# Liquids
+l   > l ;
+L   > l ;
+
+r   > r ;
+R   > r ;
+
+# Fricatives
+s   > s ;
+S   > s ;
+
+f   > f ;
+F   > f ;
+
+h   > h ;
+H   > h ;
+
+# Postalveolar (from <š>, <sh> above)
+# ʃ mapping already handled context-sensitively; duplicates here are harmless:
+š   > ʃ ;
+Š   > ʃ ;
+
+# Approximants / glides
+j   > j ;
+J   > j ;
+
+# /ʋ/ already handled as v/w in section 1.2.
+
+:: NFC ;

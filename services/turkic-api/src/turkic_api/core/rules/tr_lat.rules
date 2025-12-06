@@ -1,0 +1,22 @@
+# Turkish → ASCII-Latin transliteration rules (tr_lat.rules)
+#
+# Sources:
+#   - Arslan, A. (2016). "DeASCIIfication approach to handle diacritics in Turkish information retrieval".
+#     Information Processing & Management, 52(2): 326-339.
+#     DOI: https://doi.org/10.1016/j.ipm.2015.08.004
+#
+#   - Torunoğlu, D. & Eryiğit, G. (2014). "A Cascaded Approach for Social Media Text Normalization of Turkish".
+#     Proceedings of the 5th Workshop on Language Analysis for Social Media (LASM), pp. 62-70.
+#
+# One-to-one, case-preserving fold of Turkish diacritic letters to plain Latin;
+# all other ASCII letters map to themselves.
+
+Ç > C ;  ç > c ;
+Ğ > G ;  ğ > g ;
+İ > I ;  i > i ;   # dotted I/i keep ASCII shape
+I > I ;  ı > i ;   # dotless ı becomes ASCII i
+Ö > O ;  ö > o ;
+Ş > S ;  ş > s ;
+Ü > U ;  ü > u ;
+
+:: NFC ;

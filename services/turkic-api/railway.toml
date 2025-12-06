@@ -1,0 +1,15 @@
+# Railway configuration for turkic-api
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/readyz"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# API service uses the default Docker CMD (api target).
+# For a dedicated worker service, set the build target to `worker`
+# and startCommand to `turkic-rq-worker`.

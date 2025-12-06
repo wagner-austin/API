@@ -1,0 +1,123 @@
+# Uzbek (Cyrillic) → IPA transliteration rules (uzc_ipa.rules)
+#
+# Source: Ido, S. (2025). "Uzbek".
+#         Journal of the International Phonetic Association, 55(1-2): 152-168.
+#         DOI: https://doi.org/10.1017/S0025100324000148
+#
+# Basis: Standard/Tashkent Uzbek, modern Cyrillic orthography.
+# Ў = oʻ, Ғ = gʻ. Russian-only letters kept minimal; hard/soft signs treated phonemically.
+
+# ---------------------------------------------------------------------------
+# Macros (orthographic)
+# ---------------------------------------------------------------------------
+
+$V_cyr = [А Е Ё И О Ў У Э Ю Я а е ё и о ў у э ю я] ;
+
+# ---------------------------------------------------------------------------
+# Digraphs / multi-letter sequences
+# ---------------------------------------------------------------------------
+
+# ‹нг› is usually /ŋ/ in Uzbek (native and many loans)
+нг > ŋ ;
+НГ > ŋ ;
+Нг > ŋ ;
+нГ > ŋ ;
+
+# ‹тс› often realized as /t͡s/ in loans
+тс > t͡s ;
+ТС > t͡s ;
+Тс > t͡s ;
+тС > t͡s ;
+
+ч > t͡ʃ ;
+Ч > t͡ʃ ;
+
+ш > ʃ ;
+Ш > ʃ ;
+
+# ---------------------------------------------------------------------------
+# ‹Е е›: je vs e (word-initial / after vowel / Ъ / Ь)
+# ---------------------------------------------------------------------------
+
+# Word-initial
+^ Е > je ;
+^ е > je ;
+
+# After vowels
+$V_cyr } Е > je ;
+$V_cyr } е > je ;
+
+# After hard/soft signs
+Ъ } Е > je ;
+ъ } Е > je ;
+Ь } Е > je ;
+ь } Е > je ;
+
+# Default
+Е > e ;
+е > e ;
+
+# ---------------------------------------------------------------------------
+# Other iotated vowels
+# ---------------------------------------------------------------------------
+
+Ё > jo ;  ё > jo ;
+Ю > ju ;  ю > ju ;
+Я > ja ;  я > ja ;
+
+# ---------------------------------------------------------------------------
+# Core letters
+# ---------------------------------------------------------------------------
+
+А > a ;  а > a ;
+Б > b ;  б > b ;
+В > v ;  в > v ;
+Г > ɡ ;  г > ɡ ;
+Ғ > ʁ ;  ғ > ʁ ;      # gʻ
+Д > d ;  д > d ;
+
+# ‹Ж ж› corresponds to Latin ‹j›, phonemic affricate
+Ж > d͡ʃ ; ж > d͡ʃ ;
+
+З > z ;  з > z ;
+
+# И writes both /i/ and more central [ɘ ~ ɨ]; we map to [i] by default.
+И > i ;  и > i ;
+
+Й > j ;  й > j ;
+К > k ;  к > k ;
+Қ > q ;  қ > q ;
+Л > l ;  л > l ;
+М > m ;  м > m ;
+Н > n ;  н > n ;
+
+# ‹О› ≈ /O/ (open-mid, weak rounding); here [ɔ]
+О > ɔ ;  о > ɔ ;
+
+# Ў = oʻ, close-mid back rounded /o/
+Ў > o ;  ў > o ;
+
+П > p ;  п > p ;
+Р > r ;  р > r ;
+С > s ;  с > s ;
+Т > t ;  т > t ;
+У > u ;  у > u ;
+Ф > f ;  ф > f ;
+
+# /X/ – voiceless (velar/uvular) fricative
+Х > x ;  х > x ;
+
+# /h/ – glottal fricative
+Ҳ > h ;  ҳ > h ;
+
+Ц > t͡s ; ц > t͡s ;
+
+# ---------------------------------------------------------------------------
+# Hard/soft signs and loan punctuation letters
+# ---------------------------------------------------------------------------
+
+Ъ > ʔ ;  ъ > ʔ ;      # treated as glottal stop in loans / boundary marker
+Ь > ʲ ;  ь > ʲ ;      # palatalization marker in some loans
+Э > e ;  э > e ;
+
+:: NFC ;

@@ -1,0 +1,126 @@
+# Uzbek (Latin) → IPA transliteration rules (uz_ipa.rules)
+#
+# Source: Ido, S. (2025). "Uzbek".
+#         Journal of the International Phonetic Association, 55(1-2): 152-168.
+#         DOI: https://doi.org/10.1017/S0025100324000148
+#
+# Basis: Standard/Tashkent Uzbek.
+# Segmental only: no stress, no vowel deletion, no automatic /i ~ ɘ/ split.
+# Orthography: Official Uzbek Latin (sh, ch, ng, gʻ, oʻ).
+
+# ---------------------------------------------------------------------------
+# Macros (orthographic)
+# ---------------------------------------------------------------------------
+
+$Apo    = [ʼ ' ‘ ’ ʻ ʾ] ;          # apostrophe-like marks used in oʻ, gʻ, loans
+$V_orth = [a e i o oʻ u] ;         # Latin vowel letters (for contexts only)
+
+# ---------------------------------------------------------------------------
+# Multi-character sequences and digraphs
+# ---------------------------------------------------------------------------
+
+# ng, sh, ch, ts are treated as single segments
+
+ng  > ŋ ;
+NG  > ŋ ;
+Ng  > ŋ ;
+nG  > ŋ ;
+
+sh  > ʃ ;
+SH  > ʃ ;
+Sh  > ʃ ;
+sH  > ʃ ;
+
+ch  > t͡ʃ ;
+CH  > t͡ʃ ;
+Ch  > t͡ʃ ;
+cH  > t͡ʃ ;
+
+ts  > t͡s ;
+TS  > t͡s ;
+Ts  > t͡s ;
+tS  > t͡s ;
+
+# ---------------------------------------------------------------------------
+# ‹yo / yu / ya / ye› sequences (mostly in loans)
+# ---------------------------------------------------------------------------
+
+yo  > jo ;
+Yo  > jo ;
+YO  > jo ;
+
+yu  > ju ;
+Yu  > ju ;
+YU  > ju ;
+
+ya  > ja ;
+Ya  > ja ;
+YA  > ja ;
+
+ye  > je ;
+Ye  > je ;
+YE  > je ;
+
+# ---------------------------------------------------------------------------
+# Letters with apostrophe: oʻ, gʻ
+# ---------------------------------------------------------------------------
+
+# oʻ (written o + apostrophe) – close-mid back rounded /o/
+o $Apo  > o ;
+O $Apo  > o ;
+
+# gʻ – voiced uvular fricative
+g $Apo  > ʁ ;
+G $Apo  > ʁ ;
+
+# ---------------------------------------------------------------------------
+# Vowels (simple one-to-one mapping)
+# ---------------------------------------------------------------------------
+
+a > a ;    A > a ;
+e > e ;    E > e ;
+
+# ‹o› is /O/, typically open-mid, often somewhat backed; here simplified to [ɔ]
+o > ɔ ;    O > ɔ ;
+
+u > u ;    U > u ;
+
+# ‹i› writes both /i/ and /ɘ ~ ɨ/. We keep [i] as the neutral phonemic value.
+i > i ;    I > i ;
+
+# ---------------------------------------------------------------------------
+# Consonants
+# ---------------------------------------------------------------------------
+
+b > b ;    B > b ;
+v > v ;    V > v ;
+g > ɡ ;    G > ɡ ;         # plain g (not gʻ)
+d > d ;    D > d ;
+
+# ‹j› = alveolopalatal affricate (dpý) – here rendered [d͡ʒ]
+j > d͡ʒ ;  J > d͡ʒ ;
+
+z > z ;    Z > z ;
+
+# ‹y› is the palatal glide /j/
+y > j ;    Y > j ;
+
+k > k ;    K > k ;
+q > q ;    Q > q ;
+l > l ;    L > l ;
+m > m ;    M > m ;
+n > n ;    N > n ;
+p > p ;    P > p ;
+r > r ;    R > r ;
+s > s ;    S > s ;
+t > t ;    T > t ;
+f > f ;    F > f ;
+
+# /X/ – voiceless velar (often slightly uvular) fricative
+x > x ;    X > x ;
+
+# /h/ – glottal fricative (often [x]-like in casual Tashkent speech)
+h > h ;    H > h ;
+
+
+:: NFC ;

@@ -1,0 +1,80 @@
+# Turkish → IPA transliteration rules (tr_ipa.rules)
+#
+# Source: Zimmer, K. & Orgun, O. (1992). "Turkish".
+#         Journal of the International Phonetic Association, 22(1-2): 43-45.
+#         DOI: https://doi.org/10.1017/S0025100300004588
+#
+# Additional reference: Berkeley TELL transcription sheet
+#
+# NFC output (Normalized Form Composed)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 0.  MACROS  (letters in the *source* alphabet, case-sensitive)
+$Vsrc  = [a e ı i o ö u ü A E I İ O Ö U Ü];   # all vowels
+$BVsrc = [a ı o u A I O U];                   # back  vowels
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1.  SOFT-G  (Ğ/ğ   "yumuşak g")
+# Per TELL: "vowel length when syllable-final and silence when syllable-initial"
+
+# 1 a. syllable-final lengthening (after vowel)
+$Vsrc { ğ } > ː ;
+$Vsrc { Ğ } > ː ;
+
+# 1 c. (optional) word-initial deletion  – leave OFF to keep single-letter test
+# ^ğ > ;
+# ^Ğ > ;
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2.  DIRECT ORTHOGRAPHY → IPA MAP  (one-to-one segmental rules)
+
+A > a ;  a > a ;
+B > b ;  b > b ;
+C > d͡ʒ ; c > d͡ʒ ;
+Ç > t͡ʃ ; ç > t͡ʃ ;
+D > d ;  d > d ;
+E > e ;  e > e ;
+F > f ;  f > f ;
+G > ɡ ;  g > ɡ ;
+Ğ > ː ;  ğ > ː ;            # overridden by soft-g rules above
+H > h ;  h > h ;
+I > ɯ ;  ı > ɯ ;
+İ > i ;  i > i ;
+J > ʒ ;  j > ʒ ;
+K > k ;  k > k ;
+L > l ;  l > l ;
+M > m ;  m > m ;
+N > n ;  n > n ;
+O > o ;  o > o ;
+Ö > ø ;  ö > ø ;
+P > p ;  p > p ;
+R > ɾ ;  r > ɾ ;
+S > s ;  s > s ;
+Ş > ʃ ;  ş > ʃ ;
+T > t ;  t > t ;
+U > u ;  u > u ;
+Ü > y ;  ü > y ;
+V > v ;  v > v ;
+Y > j ;  y > j ;
+Z > z ;  z > z ;
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3.  OPTIONAL PHONETIC REFINEMENTS  (uncomment if desired)
+
+# { l } $BVsrc > ɫ ;   # dark l next to back vowels
+# { L } $BVsrc > ɫ ;
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADDITIONS 2025-12-02: Missing chars found in OSCAR corpus audit
+# See docs/ipa-rules-refactor.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Circumflex vowels (Arabic/Persian loans, older orthography)
+# Indicate length or palatalization of preceding consonant
+Â > aː ;  â > aː ;
+Î > iː ;  î > iː ;
+Û > uː ;  û > uː ;
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+:: NFC ;

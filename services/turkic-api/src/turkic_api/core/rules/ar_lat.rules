@@ -1,0 +1,22 @@
+# Uyghur Arabic Script → Latin transliteration rules (ar_lat.rules)
+#
+# Source: Standard Uyghur Arabic-to-Latin romanization
+#         Based on Uyghur Yëngi Yeziq (ULY - Uyghur Latin Alphabet)
+#
+# Purpose: Converts Uyghur text written in Arabic script to Latin romanization
+
+# consonants
+ب > b ;  پ > p ;  ت > t ;  ج > j ;  چ > ch ;
+ح > h ;  خ > x ;  د > d ;  ر > r ;  ز > z ;  س > s ;
+ش > sh ; ص > s ;  ط > t ;  غ > gh ;
+ف > f ;  ق > q ;  ك > k ;  گ > g ;  ل > l ;  م > m ;  ن > n ;
+ه > h ;  ھ > h ;  ژ > zh ;  ڭ > ng ;  ۋ > w ;
+
+# vowels  (hamza carrier ئ can be dropped or mapped to ')
+ا > a ;   ە > e ;   ۆ > ö ;   و > o ;
+ۇ > u ;   ۈ > ü ;   ى > i ;   ې > ë ;
+
+# glottals
+ء > ' ;   ع > ' ;   ئ > ;
+
+:: NFC ;
