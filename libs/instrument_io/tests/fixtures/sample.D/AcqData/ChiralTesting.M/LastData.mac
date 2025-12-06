@@ -1,0 +1,6 @@
+﻿Name LastDataFile
+  LastDataPath$ = "F:\Celia\Emerson\" 
+  LastDataFile$ = "922524_Celia_Emerson.D" 
+  LastDataSize  = 8885502
+  remove LastDataFile
+  return

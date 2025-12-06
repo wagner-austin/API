@@ -1,0 +1,123 @@
+"""Plain text file reader implementation.
+
+Provides typed reading of plain text files with encoding detection.
+All methods raise exceptions on failure - no recovery or fallbacks.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from instrument_io._exceptions import TXTReadError
+
+
+def _is_txt_file(path: Path) -> bool:
+    """Check if path is a text file."""
+    return path.is_file() and path.suffix.lower() == ".txt"
+
+
+def _detect_encoding(path: Path) -> str:
+    """Detect file encoding by trying common encodings.
+
+    Args:
+        path: Path to text file.
+
+    Returns:
+        Detected encoding name. Always succeeds because latin-1 accepts all bytes.
+
+    Note:
+        latin-1 accepts all byte values (0x00-0xFF), making it the guaranteed fallback.
+    """
+    # Try preferred encodings first (may fail with UnicodeDecodeError)
+    preferred_encodings = ["utf-8", "utf-16", "utf-16-le", "utf-16-be", "cp1252"]
+
+    for encoding in preferred_encodings:
+        try:
+            with path.open("r", encoding=encoding) as f:
+                f.read()
+            return encoding
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+
+    # latin-1 accepts all byte values (0x00-0xFF), guaranteed to succeed
+    return "latin-1"
+
+
+class TXTReader:
+    """Reader for plain text files.
+
+    Provides typed access to text file content with automatic encoding detection.
+    All methods raise exceptions on failure - no recovery or fallbacks.
+    """
+
+    def supports_format(self, path: Path) -> bool:
+        """Check if path is a text file.
+
+        Args:
+            path: Path to check.
+
+        Returns:
+            True if path is a text file (.txt).
+        """
+        return _is_txt_file(path)
+
+    def read_text(self, path: Path, encoding: str | None = None) -> str:
+        """Read full text content from file.
+
+        Args:
+            path: Path to text file.
+            encoding: Optional encoding name. If None, auto-detects encoding.
+
+        Returns:
+            Full text content.
+
+        Raises:
+            TXTReadError: If reading fails.
+        """
+        if not path.exists():
+            raise TXTReadError(str(path), "File does not exist")
+
+        if not _is_txt_file(path):
+            raise TXTReadError(str(path), "Not a text file")
+
+        detected_encoding = encoding if encoding else _detect_encoding(path)
+
+        try:
+            with path.open("r", encoding=detected_encoding) as f:
+                return f.read()
+        except OSError as e:
+            raise TXTReadError(str(path), f"Failed to read file: {e}") from e
+
+    def read_lines(self, path: Path, encoding: str | None = None) -> list[str]:
+        """Read text file as list of lines.
+
+        Newline characters are stripped from line endings.
+
+        Args:
+            path: Path to text file.
+            encoding: Optional encoding name. If None, auto-detects encoding.
+
+        Returns:
+            List of text lines (newlines stripped).
+
+        Raises:
+            TXTReadError: If reading fails.
+        """
+        if not path.exists():
+            raise TXTReadError(str(path), "File does not exist")
+
+        if not _is_txt_file(path):
+            raise TXTReadError(str(path), "Not a text file")
+
+        detected_encoding = encoding if encoding else _detect_encoding(path)
+
+        try:
+            with path.open("r", encoding=detected_encoding) as f:
+                return [line.rstrip("\r\n") for line in f]
+        except OSError as e:
+            raise TXTReadError(str(path), f"Failed to read file: {e}") from e
+
+
+__all__ = [
+    "TXTReader",
+]

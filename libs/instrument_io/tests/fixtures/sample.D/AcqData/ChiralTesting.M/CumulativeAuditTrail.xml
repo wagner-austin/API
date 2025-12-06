@@ -1,0 +1,332 @@
+<?xml version="1.0" standalone="yes"?>
+<AuditTrailDataSet xmlns="http://tempuri.org/AuditTrailDataSet.xsd">
+  <AuditTrailEntry>
+    <ID>0</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>DESKTOP-9PKHS1F\Cfaiola</User>
+    <TimeStamp>2024-12-10T15:07:07.1091837-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Created New Method: Ambient.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>1</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2024-12-10T16:01:16.6091728-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated Method Information for Ambient.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>2</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2024-12-10T16:01:17.0686072-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\GCMS\1\methods\Ambient.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>3</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2024-12-17T10:51:59.2631564-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated Method Information for ChiralTesting.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>4</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2024-12-17T10:51:59.7397353-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\GCMS\1\methods\ChiralTesting.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>5</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2024-12-17T10:51:59.7456907-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\GCMS\1\methods\ChiralTesting.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>6</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2025-01-09T13:32:55.8634533-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated Method Information for ChiralTesting.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>7</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2025-01-09T13:32:55.9329493-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment />
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <AuditTrailEntry>
+    <ID>8</ID>
+    <ComputerName>DESKTOP-9PKHS1F</ComputerName>
+    <User>system</User>
+    <TimeStamp>2025-01-09T13:32:56.2421225-08:00</TimeStamp>
+    <Reason>none defined</Reason>
+    <Comment>Updated the GC method settings for D:\MassHunter\GCMS\1\methods\ChiralTesting.M</Comment>
+    <Approved>false</Approved>
+  </AuditTrailEntry>
+  <LoggableModification>
+    <AuditLogEntryID>0</AuditLogEntryID>
+    <LoggableModificationID>0</LoggableModificationID>
+    <ChangeDescription>Initial Version</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>1</AuditLogEntryID>
+    <LoggableModificationID>1</LoggableModificationID>
+    <ChangeDescription>Method Comment changed from Same as original VOC.m with no solvent delay to reduced ramp, extended run for ambient sample peak separation</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>2</LoggableModificationID>
+    <ChangeDescription>Oven Program changed: 40 °C for 2 min -&gt; 35 °C for 2 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>3</LoggableModificationID>
+    <ChangeDescription>Oven Program[1] changed: then 10 °C/min to 210 °C for 0 min -&gt; then 5 °C/min to 100 °C for 0 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>4</LoggableModificationID>
+    <ChangeDescription>Oven Program[2] changed: then 30 °C/min to 275 °C for 2 min -&gt; then 15 °C/min to 275 °C for 2 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>5</LoggableModificationID>
+    <ChangeDescription>Column #1 (Initial) changed: 40 °C -&gt; 35 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>6</LoggableModificationID>
+    <ChangeDescription>Column #1 Pressure changed: 6.1073 psi -&gt; 5.8279 psi.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>7</LoggableModificationID>
+    <ChangeDescription>Column #1 Average Velocity changed: 56.834 cm/sec -&gt; 56.688 cm/sec.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>8</LoggableModificationID>
+    <ChangeDescription>Column #1 Holdup Time changed: 0.87976 min -&gt; 0.88203 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>2</AuditLogEntryID>
+    <LoggableModificationID>9</LoggableModificationID>
+    <ChangeDescription>Front SS Inlet He Pressure changed: On 6.1073 psi -&gt; On 5.8279 psi.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>3</AuditLogEntryID>
+    <LoggableModificationID>10</LoggableModificationID>
+    <ChangeDescription>Method Comment changed from reduced ramp, extended run for ambient sample peak separation to chiral column installation and testing</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>11</LoggableModificationID>
+    <ChangeDescription>Oven Max Temperature changed: 325 °C -&gt; 230 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>12</LoggableModificationID>
+    <ChangeDescription>Oven Maximum Temperature Override changed: Disabled -&gt; Enabled.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>13</LoggableModificationID>
+    <ChangeDescription>Oven Program changed: 35 °C for 2 min -&gt; 35 °C for 0 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>14</LoggableModificationID>
+    <ChangeDescription>Oven Program[1] changed: then 5 °C/min to 100 °C for 0 min -&gt; then 8 °C/min to 220 °C for 60 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>15</LoggableModificationID>
+    <ChangeDescription>Oven Program[2] deleted.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>16</LoggableModificationID>
+    <ChangeDescription>Column #1 Name changed: Agilent 19091J-413 -&gt; Agilent 24304.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>17</LoggableModificationID>
+    <ChangeDescription>Column #1 Description changed: HP-5 -&gt; Supe.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>18</LoggableModificationID>
+    <ChangeDescription>Column #1 Temperature Range changed: -60 °C—325 °C (350 °C) -&gt; -60 °C—230 °C (230 °C).</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>19</LoggableModificationID>
+    <ChangeDescription>Column #1 Pressure changed: 5.8279 psi -&gt; 10 psi.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>20</LoggableModificationID>
+    <ChangeDescription>Column #1 Flow changed: 2.4565 mL/min -&gt; 3.5567 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>21</LoggableModificationID>
+    <ChangeDescription>Column #1 Average Velocity changed: 56.688 cm/sec -&gt; 68.211 cm/sec.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>22</LoggableModificationID>
+    <ChangeDescription>Column #1 Holdup Time changed: 0.88203 min -&gt; 0.73302 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>23</LoggableModificationID>
+    <ChangeDescription>Column #1 Flow changed: 2.4565 mL/min for 0 min -&gt; 3.5567 mL/min for 0 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>24</LoggableModificationID>
+    <ChangeDescription>Front SS Inlet He Pressure changed: On 5.8279 psi -&gt; On 10 psi.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>4</AuditLogEntryID>
+    <LoggableModificationID>25</LoggableModificationID>
+    <ChangeDescription>Front SS Inlet He Total Flow changed: On 17.556 mL/min -&gt; On 18.657 mL/min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>5</AuditLogEntryID>
+    <LoggableModificationID>26</LoggableModificationID>
+    <ChangeDescription>Oven Max Temperature changed: 325 °C -&gt; 230 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>5</AuditLogEntryID>
+    <LoggableModificationID>27</LoggableModificationID>
+    <ChangeDescription>Column #1 Name changed: Agilent 19091J-413 -&gt; Agilent 24304.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>5</AuditLogEntryID>
+    <LoggableModificationID>28</LoggableModificationID>
+    <ChangeDescription>Column #1 Description changed: HP-5 -&gt; Supe.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>5</AuditLogEntryID>
+    <LoggableModificationID>29</LoggableModificationID>
+    <ChangeDescription>Column #1 Temperature Range changed: -60 °C—325 °C (350 °C) -&gt; -60 °C—230 °C (230 °C).</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>6</AuditLogEntryID>
+    <LoggableModificationID>30</LoggableModificationID>
+    <ChangeDescription>Method Comment changed from chiral column installation and testing to chiral column installation and testingusing paramaters from Shan's chiral paper SI</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>31</LoggableModificationID>
+    <ChangeDescription>Aux-2 Temperature Label changed from &lt;empty string&gt; to Aux-2 Temperature</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>32</LoggableModificationID>
+    <ChangeDescription>Column-1 Flow Calc. Label changed from &lt;empty string&gt; to Column-1 Flow Calc.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>33</LoggableModificationID>
+    <ChangeDescription>Inlet-F Pressure Label changed from &lt;empty string&gt; to Inlet-F Pressure</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>34</LoggableModificationID>
+    <ChangeDescription>Inlet-F Temperature Label changed from &lt;empty string&gt; to Inlet-F Temperature</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>35</LoggableModificationID>
+    <ChangeDescription>Inlet-F Total Flow Label changed from &lt;empty string&gt; to Inlet-F Total Flow</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>36</LoggableModificationID>
+    <ChangeDescription>Oven Temperature Label changed from &lt;empty string&gt; to Oven Temperature</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>37</LoggableModificationID>
+    <ChangeDescription>Filament Label changed from &lt;empty string&gt; to Filament</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>38</LoggableModificationID>
+    <ChangeDescription>MS Quad Label changed from &lt;empty string&gt; to MS Quad</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>7</AuditLogEntryID>
+    <LoggableModificationID>39</LoggableModificationID>
+    <ChangeDescription>MS Source Label changed from &lt;empty string&gt; to MS Source</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>40</LoggableModificationID>
+    <ChangeDescription>Oven Program changed: 35 °C for 0 min -&gt; 55 °C for 5 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>41</LoggableModificationID>
+    <ChangeDescription>Oven Program[1] changed: then 8 °C/min to 220 °C for 60 min -&gt; then 1 °C/min to 90 °C for 0 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>42</LoggableModificationID>
+    <ChangeDescription>Oven Program[2] added. then 3 °C/min to 105 °C for 0 min</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>43</LoggableModificationID>
+    <ChangeDescription>Oven Program[3] added. then 20 °C/min to 220 °C for 0 min</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>44</LoggableModificationID>
+    <ChangeDescription>Column #1 (Initial) changed: 35 °C -&gt; 55 °C.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>45</LoggableModificationID>
+    <ChangeDescription>Column #1 Pressure changed: 10 psi -&gt; 11.34 psi.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>46</LoggableModificationID>
+    <ChangeDescription>Column #1 Average Velocity changed: 68.211 cm/sec -&gt; 68.901 cm/sec.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>47</LoggableModificationID>
+    <ChangeDescription>Column #1 Holdup Time changed: 0.73302 min -&gt; 0.72568 min.</ChangeDescription>
+  </LoggableModification>
+  <LoggableModification>
+    <AuditLogEntryID>8</AuditLogEntryID>
+    <LoggableModificationID>48</LoggableModificationID>
+    <ChangeDescription>Front SS Inlet He Pressure changed: On 10 psi -&gt; On 11.34 psi.</ChangeDescription>
+  </LoggableModification>
+  <Globals>
+    <AuditTargetDescription>Method Ambient.M</AuditTargetDescription>
+  </Globals>
+</AuditTrailDataSet>

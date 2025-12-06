@@ -1,0 +1,57 @@
+﻿<SequenceTableDataSet SchemaVersion="1.0" SequenceComment="Emerson Oaks Sabbatical Samples" SequenceOperator="Celia F" SequenceSeqPathFileName="F:\Celia\Emerson\" SequencePreSeqAcqCommand="" SequencePostSeqAcqCommand="" SequencePreSeqDACommand="" SequencePostSeqDACommand="" SequenceReProcessing="False" SequenceInjectBarCodeMismatch="DoNotAnalyzeBarcode" SequenceOverwriteExistingData="False" SequenceDecoupleDataAnalysis="False" SequenceDelayECMUpload="False" SequenceModifiedTimeStamp="" SequenceFileECMPath="" SequenceRecurringKeyword="" SequenceRecurringInterval="0" SequenceRecurringType="0" SequenceRecurringKeywordString="">
+  <Sequence>
+    <SequenceID>0</SequenceID>
+    <SampleID>0</SampleID>
+    <AcqMethodFileName>ChiralTesting</AcqMethodFileName>
+    <AcqMethodPathName>D:\MassHunter\GCMS\1\methods\</AcqMethodPathName>
+    <Comment />
+    <Completed>false</Completed>
+    <DAMethodFileName />
+    <DAMethodPathName />
+    <DAReportPathFileName />
+    <DataFileName>368954_Celia_Emerson</DataFileName>
+    <DataPathName>F:\Celia\Emerson\</DataPathName>
+    <Dilution>1</Dilution>
+    <DualInjector>false</DualInjector>
+    <DualInjectorExpectedBarcode />
+    <DualInjectorVial>15</DualInjectorVial>
+    <DualInjectorVolume>0</DualInjectorVolume>
+    <EquilibrationTime>0</EquilibrationTime>
+    <ExpectedBarcode />
+    <InjectionsPerPosition>1</InjectionsPerPosition>
+    <InjectorVolume>0</InjectorVolume>
+    <InstrumentName>UCI MassHunter</InstrumentName>
+    <InstrumentType>SingleQuadrupole</InstrumentType>
+    <Keyword />
+    <KeywordString />
+    <LevelName />
+    <MatrixSpikeGroup />
+    <Locked>false</Locked>
+    <PlateCode />
+    <PlatePosition>0</PlatePosition>
+    <RackCode />
+    <SampleGroup />
+    <SampleInformation />
+    <SampleName>368954</SampleName>
+    <SamplePosition>dummy</SamplePosition>
+    <SamplePrepFileName />
+    <SamplePrepPathName />
+    <SampleType>Sample</SampleType>
+    <TrayName />
+    <UpdateResponseFactor>None</UpdateResponseFactor>
+    <UpdateRetentionTime>None</UpdateRetentionTime>
+    <UpdateQualifierRatios>None</UpdateQualifierRatios>
+    <UpdateMassAssignments>None</UpdateMassAssignments>
+    <UserDefined />
+    <UserDefined1 />
+    <UserDefined2 />
+    <UserDefined3 />
+    <UserDefined4 />
+    <UserDefined5 />
+    <UserDefined6 />
+    <UserDefined7 />
+    <UserDefined8 />
+    <UserDefined9 />
+    <Vial>15</Vial>
+  </Sequence>
+</SequenceTableDataSet>

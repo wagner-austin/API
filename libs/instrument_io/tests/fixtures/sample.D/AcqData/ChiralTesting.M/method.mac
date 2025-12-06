@@ -1,0 +1,9 @@
+NAME METHINFO
+  EditMethPanel 1,1,1
+  MethInfoPanel 1,0,1,0,0,,,,,,
+  METHCOMMENT0$ = "chiral column installation and testing"
+  METHCOMMENT1$ = "using paramaters from Shan's chiral paper SI"
+  IF CHECK("Command", "LOADTOPMETHOD") = 1
+    LOADTOPMETHOD
+  ENDIF
+  REMOVE METHINFO

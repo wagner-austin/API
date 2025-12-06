@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzML xmlns="http://psi.hupo.org/ms/mzml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" version="1.1.0">
+  <cvList count="2">
+    <cv id="MS" fullName="Mass spectrometry ontology" version="4.1.0" URI="https://raw.githubusercontent.com/HUPO-PSI/psi-ms-CV/master/psi-ms.obo"/>
+    <cv id="UO" fullName="Unit Ontology" version="releases/2020-03-10" URI="https://raw.githubusercontent.com/bio-ontology-research-group/unit-ontology/master/unit.obo"/>
+  </cvList>
+  <fileDescription>
+    <fileContent>
+      <cvParam cvRef="MS" accession="MS:1000579" name="MS1 spectrum"/>
+    </fileContent>
+  </fileDescription>
+  <softwareList count="1">
+    <software id="test" version="1.0">
+      <cvParam cvRef="MS" accession="MS:1000799" name="custom unreleased software tool"/>
+    </software>
+  </softwareList>
+  <instrumentConfigurationList count="1">
+    <instrumentConfiguration id="IC1">
+      <cvParam cvRef="MS" accession="MS:1000031" name="instrument model"/>
+    </instrumentConfiguration>
+  </instrumentConfigurationList>
+  <dataProcessingList count="1">
+    <dataProcessing id="dp1">
+      <processingMethod order="0" softwareRef="test">
+        <cvParam cvRef="MS" accession="MS:1000544" name="Conversion to mzML"/>
+      </processingMethod>
+    </dataProcessing>
+  </dataProcessingList>
+  <run id="empty_run" defaultInstrumentConfigurationRef="IC1">
+    <spectrumList count="0" defaultDataProcessingRef="dp1">
+    </spectrumList>
+  </run>
+</mzML>
