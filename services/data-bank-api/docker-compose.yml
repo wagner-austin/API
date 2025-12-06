@@ -1,0 +1,53 @@
+# Docker Compose for local development
+# Usage: docker compose up -d
+# NOTE: Requires root docker-compose to be running first (provides platform-redis)
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/data-bank-api/Dockerfile
+      target: api
+    container_name: databank-api
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - DATA_ROOT=/data/files
+    volumes:
+      - ./data:/data/files
+      - ./logs:/data/logs
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - platform-network
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/data-bank-api/Dockerfile
+      target: worker
+    container_name: databank-worker
+    command: ["databank-rq-worker"]
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - DATA_ROOT=/data/files
+    volumes:
+      - ./data:/data/files
+      - ./logs:/data/logs
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true

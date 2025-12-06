@@ -1,0 +1,34 @@
+﻿# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtualenv
+.venv/
+
+# Test/coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local data
+/data/
+
+# Cluade code sections
+.claude
+
+# Environment files
+.env
+.env.*
