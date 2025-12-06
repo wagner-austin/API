@@ -1,0 +1,46 @@
+# Codex CLI configuration for the API monorepo.
+# By default, we grant full permissions within this development environment
+# and enforce strict code standards to ensure reliability and prevent drift.
+
+[codex]
+# Grant full permissions - no approval required for development workflow
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+# Allow network access for API development and testing
+[sandbox_workspace_write]
+network_access = true
+
+# Project documentation settings
+[project]
+# Codex will read AGENTS.md from the repository root and any subdirectories
+doc_fallback_filenames = ["AGENTS.md", "AGENTS.override.md", "README.md"]
+doc_max_bytes = 65536  # 64 KiB for comprehensive instructions
+
+# Code quality enforcement
+[standards]
+# Strict typing: no Any, cast, type: ignore, .pyi, or noqa
+forbid_any = true
+forbid_cast = true
+forbid_type_ignore = true
+forbid_pyi = true
+forbid_noqa = true
+
+# No fallbacks, shims, or best-effort patterns
+forbid_fallbacks = true
+forbid_shims = true
+forbid_try_except_passthrough = true
+
+# Dataclasses banned in src/; use TypedDict/Protocol instead
+ban_dataclasses_in_src = true
+
+# Testing and validation
+[validation]
+# Always run make check before completing tasks
+run_make_check = true
+
+# Target 100% test coverage for statements and branches
+coverage_target = 100
+
+# Ensure all changes include proper unit and integration tests
+require_tests = true
