@@ -1,0 +1,21 @@
+# Railway configuration (Docker builder)
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/readyz"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[variables]
+APP__ARTIFACTS_ROOT = "/data/artifacts"
+APP__RUNS_ROOT = "/data/runs"
+APP__LOGS_ROOT = "/data/logs"
+HF_HOME = "/hf-cache"
+
+# API service uses the Docker CMD (api target).
+# For a dedicated worker service, set the build target to `worker`
+# and startCommand to `modeltrainer-rq-worker`.

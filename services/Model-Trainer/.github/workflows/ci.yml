@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install deps
+        run: |
+          poetry lock
+          poetry install --with dev --no-interaction --no-ansi --sync
+      - name: Ruff
+        run: poetry run ruff check . --output-format=github
+      - name: Ruff format check
+        run: poetry run ruff format --check .
+      - name: Mypy
+        run: poetry run mypy .
+      - name: Guards
+        run: python scripts/guard.py
+      - name: Tests
+        run: poetry run pytest -q
