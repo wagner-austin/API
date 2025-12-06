@@ -1,0 +1,69 @@
+# Docker Compose for local development
+# Usage: docker compose up -d
+# NOTE: Requires root docker-compose to be running first (provides platform-redis + network)
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/handwriting-ai/Dockerfile
+      target: api
+    container_name: handwriting-api
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - HANDWRITING_DATA_ROOT=/data
+      - HANDWRITING_ARTIFACTS_ROOT=/data/artifacts
+      - HANDWRITING_LOGS_ROOT=/data/logs
+      - HANDWRITING_MODEL_DIR=/data/digits/models
+      - HANDWRITING_MODEL_ID=${HANDWRITING_MODEL_ID:-mnist_resnet18_v1}
+      - HANDWRITING_API_KEY=${HANDWRITING_API_KEY:-test-handwriting-key}
+    volumes:
+      - ./data:/data
+      - ./config:/app/config:ro
+      - ./artifacts:/data/artifacts
+      - ./logs:/data/logs
+      - ./models:/data/digits/models
+    ports:
+      - "8004:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - platform-network
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/handwriting-ai/Dockerfile
+      target: worker
+    container_name: handwriting-worker
+    command: ["handwriting-rq-worker"]
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - HANDWRITING_DATA_ROOT=/data
+      - HANDWRITING_ARTIFACTS_ROOT=/data/artifacts
+      - HANDWRITING_LOGS_ROOT=/data/logs
+      - HANDWRITING_MODEL_DIR=/data/digits/models
+      - HANDWRITING_MODEL_ID=${HANDWRITING_MODEL_ID:-mnist_resnet18_v1}
+      - HANDWRITING_API_KEY=${HANDWRITING_API_KEY:-test-handwriting-key}
+    volumes:
+      - ./data:/data
+      - ./config:/app/config:ro
+      - ./artifacts:/data/artifacts
+      - ./logs:/data/logs
+      - ./models:/data/digits/models
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true

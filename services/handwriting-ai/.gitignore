@@ -1,0 +1,51 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Poetry / packaging
+*.egg-info/
+dist/
+build/
+
+# Coverage / test caches
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!/.env.example
+.claude/
+
+# Service artifacts and logs
+logs/
+corpus/
+data/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Node (if present)
+node_modules/
+
+
+artifacts/
+models/
+
+# Windows reserved device file sometimes appears as untracked on Windows
+# Ignore to avoid false-positive NUL entry in `git status`.
+NUL
+
