@@ -1,0 +1,36 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage
+.coverage
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Poetry
+poetry.lock
+
+# macOS
+.DS_Store
+
+
+.claude/
+
+
+nul
+
+
+# Local cookies (never commit)
+youtube-cookies.txt

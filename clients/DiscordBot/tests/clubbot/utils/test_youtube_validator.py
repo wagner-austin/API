@@ -1,0 +1,37 @@
+import logging
+
+import pytest
+from platform_core.errors import AppError
+
+from clubbot.utils.youtube import extract_video_id, validate_youtube_url
+
+
+def test_extract_video_id_variants() -> None:
+    vid = "dQw4w9WgXcQ"
+    assert extract_video_id(f"https://www.youtube.com/watch?v={vid}") == vid
+    assert extract_video_id(f"https://youtu.be/{vid}") == vid
+    assert extract_video_id(f"https://www.youtube.com/shorts/{vid}") == vid
+    assert extract_video_id(f"www.youtube.com/watch?v={vid}") == vid
+
+
+def test_validate_not_youtube() -> None:
+    with pytest.raises(AppError):
+        validate_youtube_url("https://example.com/watch?v=abc")
+
+
+def test_invalid_id() -> None:
+    with pytest.raises(AppError):
+        extract_video_id("https://youtu.be/too_short")
+
+
+def test_invalid_id_for_shorts_and_live() -> None:
+    with pytest.raises(AppError):
+        extract_video_id("https://www.youtube.com/shorts/too_short")
+
+
+def test_invalid_id_for_live() -> None:
+    with pytest.raises(AppError):
+        extract_video_id("https://www.youtube.com/live/too_short")
+
+
+logger = logging.getLogger(__name__)

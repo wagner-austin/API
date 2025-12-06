@@ -1,0 +1,2 @@
+bot: python -m clubbot.main
+worker: poetry run rq worker transcript --with-scheduler

@@ -1,0 +1,17 @@
+# Railway configuration for DiscordBot
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Bot service uses the default Docker CMD (bot target).
+# For a dedicated worker service, create a separate Railway service
+# with build target set to `worker` in the Railway UI.
+#
+# Required environment variables (set in Railway UI):
+# - DISCORD_BOT_TOKEN
+# - REDIS_URL (for worker queue)

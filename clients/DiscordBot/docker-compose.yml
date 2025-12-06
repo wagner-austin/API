@@ -1,0 +1,40 @@
+# Docker Compose for local development
+# Usage: docker compose up -d
+# NOTE: Requires root docker-compose to be running first (provides platform-redis + network)
+
+services:
+  bot:
+    build:
+      context: ../..
+      dockerfile: clients/DiscordBot/Dockerfile
+      target: bot
+    container_name: discord-bot
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: clients/DiscordBot/Dockerfile
+      target: worker
+    container_name: discord-worker
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true
