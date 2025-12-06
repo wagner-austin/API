@@ -9,6 +9,16 @@ from .manifest import (
     from_path_manifest_v2,
 )
 from .tarball import TarballError, create_tarball, extract_tarball
+from .wandb_publisher import WandbPublisher, WandbUnavailableError
+from .wandb_types import (
+    WandbEpochMetrics,
+    WandbFinalMetrics,
+    WandbInitResult,
+    WandbPublisherConfig,
+    WandbRunConfig,
+    WandbStepMetrics,
+    WandbTableRow,
+)
 
 __all__ = [
     "MANIFEST_SCHEMA_VERSION",
@@ -17,6 +27,15 @@ __all__ = [
     "ModelManifestV2",
     "TarballError",
     "TrainingRunMetadata",
+    "WandbEpochMetrics",
+    "WandbFinalMetrics",
+    "WandbInitResult",
+    "WandbPublisher",
+    "WandbPublisherConfig",
+    "WandbRunConfig",
+    "WandbStepMetrics",
+    "WandbTableRow",
+    "WandbUnavailableError",
     "create_tarball",
     "extract_tarball",
     "from_json_manifest_v2",
