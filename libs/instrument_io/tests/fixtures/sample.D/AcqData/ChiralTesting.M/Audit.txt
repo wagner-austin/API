@@ -1,0 +1,217 @@
+﻿D:\MassHunter\GCMS\1\METHODS\DEFAULT.M\Audit.txt 
+Created Wed May 29 08:02:47 2019
+
+
+ Modified : Wed May 29 08:02:47 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\DEFAULT.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed May 29 09:42:36 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\Test.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed May 29 09:46:49 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\Test.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Thu May 30 10:19:07 2019
+ Event    :  GC Scale Factor changed; no cal table modification
+ Message  : New scale factor: 1
+ Severity : 2
+
+
+ Modified : Thu May 30 11:50:57 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\Test.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Jun 04 17:45:09 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\PowersFVOCs5975.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Jun 04 17:50:30 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\PowersFVOCs5975.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Fri Jun 21 12:11:43 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\METHODS\PowersFVOCs5975.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Fri Jun 21 12:27:52 2019
+ Event    : Save Method
+ Message  : Save Method D:\MassHunter\GCMS\1\METHODS\PowersFVOCs5975.M from DA menu.
+ Severity : 1
+
+
+ Modified : Fri Jun 21 14:36:16 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\PowersFVOCs5975&FID.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Dec 04 16:22:44 2019
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\PowersFVOCs5975_CF.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Feb 26 16:48:39 2020
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\PowersFVOCs5975_CF.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Feb 26 17:06:00 2020
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\PowersFVOCs5975_CF.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Sep 14 18:07:08 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Sep 14 18:09:37 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Sep 14 18:12:04 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Sep 14 19:21:37 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Sep 14 19:34:08 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Sep 15 09:42:18 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Sep 15 10:31:21 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Sun Oct 10 15:10:01 2021
+ Event    : Clear Responses
+ Message  : Responses Cleared 
+ Severity : 0
+
+
+ Modified : Tue Nov 23 11:31:43 2021
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\Juan.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Oct 19 14:27:33 2022
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Dec 20 11:34:33 2022
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Dec 20 11:35:02 2022
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC_WSL_Ugo.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Thu Apr 13 16:37:26 2023
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Wed Jul 26 09:13:09 2023
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Thu Jan 25 15:20:35 2024
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\VOC.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Dec 10 15:07:03 2024
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\Ambient.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Tue Dec 10 16:01:15 2024
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\Ambient.M
+ Why      : Instrument Control method save
+ Severity : 1
+
+
+ Modified : Thu Jan 09 13:32:54 2025
+ Event    : Save Method
+ Message  : Save Method to D:\MassHunter\GCMS\1\methods\ChiralTesting.M
+ Why      : Instrument Control method save
+ Severity : 1
+

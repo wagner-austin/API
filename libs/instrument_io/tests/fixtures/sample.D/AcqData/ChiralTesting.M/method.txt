@@ -1,0 +1,17 @@
+﻿Additional Information for Test.M
+File created Wed May 29 09:42:36 2019
+
+Method : D:\MassHunter\GCMS\1\METHODS\DEFAULT.M
+Renamed: D:\MassHunter\GCMS\1\METHODS\Test.M
+Wed May 29 09:42:38 2019
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\METHODS\Test.M
+Renamed: D:\MassHunter\GCMS\1\METHODS\PowersFVOCs5975.M
+Tue Jun 04 17:45:11 2019
+-----------------------------------------
+
+Method : D:\MassHunter\GCMS\1\methods\VOC_NODELAY.M
+Renamed: D:\MassHunter\GCMS\1\methods\Ambient.M
+Tue Dec 10 15:07:05 2024
+-----------------------------------------
