@@ -52,6 +52,7 @@ def test_job_context_progress_message_optional() -> None:
     assert "message" not in first
     assert _is_progress(second)
     assert second["message"] == "processing"
+    redis.assert_only_called({"publish"})
 
 
 def test_job_context_started_and_completed_and_failed() -> None:
@@ -81,3 +82,4 @@ def test_job_context_started_and_completed_and_failed() -> None:
     assert _is_failed(failed)
     assert failed["error_kind"] == "user"
     assert failed["message"] == "msg"
+    redis.assert_only_called({"publish"})
