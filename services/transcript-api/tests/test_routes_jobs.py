@@ -109,7 +109,7 @@ def _cleanup_providers() -> None:
 
 def test_create_stt_job_success() -> None:
     """Test POST /v1/stt/jobs with valid input."""
-    client, _redis, queue, logger = _make_test_client()
+    client, redis, queue, logger = _make_test_client()
     try:
         payload: dict[str, str | int] = {"url": "https://youtu.be/dQw4w9WgXcQ", "user_id": 42}
         resp = client.post("/v1/stt/jobs", json=payload)
@@ -124,13 +124,14 @@ def test_create_stt_job_success() -> None:
         assert queue.jobs[0].func == "transcript_api.jobs.process_stt"
         assert len(logger.records) == 1
         assert logger.records[0].level == "info"
+        redis.assert_only_called({"hset", "expire"})
     finally:
         _cleanup_providers()
 
 
 def test_create_stt_job_invalid_json() -> None:
     """Test POST /v1/stt/jobs with non-object JSON."""
-    client, _, _, _ = _make_test_client()
+    client, redis, _, _ = _make_test_client()
     try:
         resp = client.post(
             "/v1/stt/jobs",
@@ -138,27 +139,30 @@ def test_create_stt_job_invalid_json() -> None:
             headers={"Content-Type": "application/json"},
         )
         assert resp.status_code == 400
+        redis.assert_only_called(set())
     finally:
         _cleanup_providers()
 
 
 def test_create_stt_job_missing_url() -> None:
     """Test POST /v1/stt/jobs with missing url."""
-    client, _, _, _ = _make_test_client()
+    client, redis, _, _ = _make_test_client()
     try:
         payload: dict[str, int] = {"user_id": 42}
         resp = client.post("/v1/stt/jobs", json=payload)
         assert resp.status_code == 400
+        redis.assert_only_called(set())
     finally:
         _cleanup_providers()
 
 
 def test_get_stt_job_status_not_found() -> None:
     """Test GET /v1/stt/jobs/{job_id} when job doesn't exist."""
-    client, _, _, _ = _make_test_client()
+    client, redis, _, _ = _make_test_client()
     try:
         resp = client.get("/v1/stt/jobs/nonexistent-job")
         assert resp.status_code == 404
+        redis.assert_only_called({"hgetall"})
     finally:
         _cleanup_providers()
 
@@ -192,6 +196,7 @@ def test_get_stt_job_status_found() -> None:
         assert data["status"] == "processing"
         assert data["progress"] == 50
         assert "text" not in data  # Not completed, so no text
+        redis.assert_only_called({"hset", "expire", "hgetall"})
     finally:
         _cleanup_providers()
 
@@ -222,5 +227,6 @@ def test_get_stt_job_status_completed_includes_text() -> None:
         data: dict[str, str | int | None] = resp.json()
         assert data["status"] == "completed"
         assert data["text"] == "Hello world transcript"
+        redis.assert_only_called({"hset", "expire", "hgetall"})
     finally:
         _cleanup_providers()
