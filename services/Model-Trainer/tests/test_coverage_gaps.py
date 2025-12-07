@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_workers.testing import FakeRedis
+from platform_workers.testing import FakeRedis, FakeRedisNonRedisError
 
 from model_trainer.core.config.settings import Settings, load_settings
 from model_trainer.core.infra.paths import tokenizer_logs_path
@@ -63,28 +63,30 @@ def test_narrow_log_level_unknown_defaults_to_info() -> None:
 # --- redis_utils.py coverage: lines 18, 35 (non-Redis error re-raises) ---
 
 
-class _NonRedisErrorClient(FakeRedis):
-    """FakeRedis that raises a non-Redis exception on get/set."""
-
-    def set(self, key: str, value: str) -> bool:
-        raise ValueError("not a redis error")
-
-    def get(self, key: str) -> str | None:
-        raise ValueError("not a redis error")
-
-
-def test_redis_utils_get_non_redis_error_reraises() -> None:
+def test_redis_utils_get_non_redis_error_reraises(monkeypatch: pytest.MonkeyPatch) -> None:
     """Cover redis_utils.py line 18 (non-Redis error re-raises in get_with_retry)."""
-    client = _NonRedisErrorClient()
+    client = FakeRedis()
+
+    def raise_non_redis(key: str) -> str | None:
+        raise ValueError("not a redis error")
+
+    monkeypatch.setattr(client, "get", raise_non_redis)
     with pytest.raises(ValueError, match="not a redis error"):
         get_with_retry(client, "key", attempts=3)
+    client.assert_only_called(set())  # get is monkeypatched
 
 
-def test_redis_utils_set_non_redis_error_reraises() -> None:
+def test_redis_utils_set_non_redis_error_reraises(monkeypatch: pytest.MonkeyPatch) -> None:
     """Cover redis_utils.py line 35 (non-Redis error re-raises in set_with_retry)."""
-    client = _NonRedisErrorClient()
+    client = FakeRedis()
+
+    def raise_non_redis(key: str, value: str) -> bool:
+        raise ValueError("not a redis error")
+
+    monkeypatch.setattr(client, "set", raise_non_redis)
     with pytest.raises(ValueError, match="not a redis error"):
         set_with_retry(client, "key", "value", attempts=3)
+    client.assert_only_called(set())  # set is monkeypatched
 
 
 # --- corpus.py coverage: branch 15->14 (non-.txt files skipped) ---
@@ -139,13 +141,6 @@ def test_container_wrong_queue_name_raises(monkeypatch: pytest.MonkeyPatch) -> N
 # --- health.py coverage: line 57 (non-Redis error re-raises in readyz) ---
 
 
-class _NonRedisExceptionClient(FakeRedis):
-    """FakeRedis that raises a non-Redis exception on ping."""
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        raise TypeError("not a redis error")
-
-
 def test_health_readyz_non_redis_error_reraises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -158,17 +153,21 @@ def test_health_readyz_non_redis_error_reraises(
     from model_trainer.api.main import create_app
     from model_trainer.core.services import container as container_mod
 
-    # Monkeypatch redis_for_kv to return our failing client
-    def _fake_redis_for_kv(url: str) -> _NonRedisExceptionClient:
-        return _NonRedisExceptionClient()
+    # Use shared stub that raises non-Redis error on ping
+    fr = FakeRedisNonRedisError()
+
+    def _fake_redis_for_kv(url: str) -> FakeRedisNonRedisError:
+        return fr
 
     monkeypatch.setattr(container_mod, "redis_for_kv", _fake_redis_for_kv)
 
     app = create_app()
     client = TestClient(app, raise_server_exceptions=True)
 
-    with pytest.raises(TypeError, match="not a redis error"):
+    with pytest.raises(RuntimeError, match="simulated non-Redis failure"):
         client.get("/readyz")
+
+    fr.assert_only_called({"ping"})
 
 
 # --- tokenizer_worker.py coverage: line 24 (empty Redis URL raises) ---
@@ -195,3 +194,99 @@ def test_tokenizer_worker_empty_redis_url_raises(monkeypatch: pytest.MonkeyPatch
 # This is covered via integration tests in test_training_worker_error_handling.py
 # The pattern requires triggering a non-Redis error during _handle_train_error after
 # a training failure, which is tested through the full worker flow.
+
+
+# --- train_job.py coverage: lines 58-65 (_create_wandb_publisher branches) ---
+
+
+def test_create_wandb_publisher_enabled_returns_publisher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover train_job.py lines 58-62 (wandb enabled branch)."""
+    from platform_ml import wandb_publisher as wandb_pub_mod
+
+    from model_trainer.worker.train_job import _create_wandb_publisher
+
+    settings = load_settings()
+    # Enable wandb in settings
+    enabled_settings: Settings = {
+        **settings,
+        "wandb": {
+            "enabled": True,
+            "project": "test-project",
+        },
+    }
+
+    # Create a mock wandb module
+    class _MockWandbRun:
+        @property
+        def id(self) -> str:
+            return "mock-run-id"
+
+    class _MockWandbConfig:
+        def update(self, d: dict[str, float | int | str | bool | None]) -> None:
+            pass
+
+    class _MockWandModule:
+        @property
+        def run(self) -> _MockWandbRun:
+            return _MockWandbRun()
+
+        @property
+        def config(self) -> _MockWandbConfig:
+            return _MockWandbConfig()
+
+        def init(self, *, project: str, name: str) -> _MockWandbRun:
+            return _MockWandbRun()
+
+        def log(self, data: dict[str, float | int | str | bool | None]) -> None:
+            pass
+
+        def finish(self) -> None:
+            pass
+
+    # Mock _load_wandb_module to return our mock module
+    def _mock_load_wandb_module() -> _MockWandModule:
+        return _MockWandModule()
+
+    monkeypatch.setattr(wandb_pub_mod, "_load_wandb_module", _mock_load_wandb_module)
+
+    result = _create_wandb_publisher(enabled_settings, "run-123", "gpt2")
+
+    # Strong assertion: check the publisher was created and is enabled
+    # First narrow the type - result must not be None when enabled
+    if result is None:
+        raise AssertionError("Expected WandbPublisher but got None")
+    init_result = result.get_init_result()
+    assert init_result["status"] == "enabled"
+
+
+def test_create_wandb_publisher_unavailable_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover train_job.py lines 63-65 (WandbUnavailableError branch)."""
+    from platform_ml import wandb_publisher as wandb_pub_mod
+    from platform_ml.wandb_publisher import WandbUnavailableError
+
+    from model_trainer.worker.train_job import _create_wandb_publisher
+
+    settings = load_settings()
+    # Enable wandb in settings
+    enabled_settings: Settings = {
+        **settings,
+        "wandb": {
+            "enabled": True,
+            "project": "test-project",
+        },
+    }
+
+    # Make _load_wandb_module raise WandbUnavailableError
+    def _raise_unavailable() -> None:
+        raise WandbUnavailableError("wandb not installed")
+
+    monkeypatch.setattr(wandb_pub_mod, "_load_wandb_module", _raise_unavailable)
+
+    result = _create_wandb_publisher(enabled_settings, "run-456", "char_lstm")
+
+    # Result should be None when wandb is unavailable
+    assert result is None
