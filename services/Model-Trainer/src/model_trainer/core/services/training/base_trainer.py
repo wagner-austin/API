@@ -22,6 +22,7 @@ from typing import Final, Literal, Protocol
 import torch
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
+from platform_ml.wandb_publisher import WandbPublisher
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetConfig
@@ -155,6 +156,7 @@ class BaseTrainer:
     Provides a unified training loop that works with any LM backend.
     Handles dataset loading, training loop, progress reporting, and model saving.
     Now includes early stopping, validation, test evaluation, and gradient norm logging.
+    Optionally integrates with Weights & Biases for experiment tracking.
     """
 
     _prepared: PreparedLMModel
@@ -167,12 +169,14 @@ class BaseTrainer:
         Callable[[int, int, float, float, float, float, float | None, float | None], None] | None
     )
     _service_name: str
+    _wandb: WandbPublisher | None
     # New instance state for enhanced training
     _device: torch.device
     _es_state: EarlyStoppingState
     _best_checkpoint_path: Path | None
     _val_loader: DataLoader | None
     _test_loader: DataLoader | None
+    _epoch_summaries: list[tuple[int, float, float, float, float]]
 
     def __init__(
         self: BaseTrainer,
@@ -188,6 +192,7 @@ class BaseTrainer:
             | None
         ) = None,
         service_name: str = "base-trainer",
+        wandb_publisher: WandbPublisher | None = None,
     ) -> None:
         """Initialize the trainer.
 
@@ -201,6 +206,7 @@ class BaseTrainer:
             progress: Optional callback for progress updates
                 (step, epoch, loss, ppl, grad_norm, samples_per_sec, val_loss, val_ppl).
             service_name: Service name for logging.
+            wandb_publisher: Optional WandbPublisher for experiment tracking.
         """
         self._prepared = prepared
         self._cfg = cfg
@@ -210,6 +216,8 @@ class BaseTrainer:
         self._cancelled = cancelled
         self._progress = progress
         self._service_name = service_name
+        self._wandb = wandb_publisher
+        self._epoch_summaries: list[tuple[int, float, float, float, float]] = []
 
     def train(self: BaseTrainer) -> TrainOutcome:
         """Execute the training loop with early stopping and validation.
@@ -229,6 +237,9 @@ class BaseTrainer:
 
         # 3. Build data loaders (UPDATED - now builds train/val/test)
         train_loader, self._val_loader, self._test_loader = self._build_all_loaders()
+
+        # Log config to wandb at start of training
+        self._log_wandb_config()
 
         model = self._prepared.model
         model.train()
@@ -288,6 +299,15 @@ class BaseTrainer:
             best_val_loss=best_val_loss,
             early_stopped=early_stopped,
         )
+
+        # Log final metrics and epoch table to wandb
+        self._log_wandb_final(
+            test_loss=test_loss,
+            test_ppl=test_ppl,
+            early_stopped=early_stopped,
+        )
+        self._log_wandb_epoch_table()
+        self._finish_wandb()
 
         ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
         return TrainOutcome(
@@ -506,9 +526,11 @@ class BaseTrainer:
                     },
                 )
 
+                # Calculate train_ppl for progress and wandb logging
+                train_ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
+
                 # Emit progress with validation metrics at epoch boundary
                 if self._progress is not None:
-                    train_ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
                     self._progress(
                         step,
                         epoch,
@@ -519,6 +541,22 @@ class BaseTrainer:
                         val_metrics["val_loss"],
                         val_metrics["val_ppl"],
                     )
+
+                # Log epoch metrics to wandb
+                self._log_wandb_epoch(
+                    epoch=epoch,
+                    train_loss=last_loss,
+                    train_ppl=train_ppl,
+                    val_loss=val_metrics["val_loss"],
+                    val_ppl=val_metrics["val_ppl"],
+                    best_val_loss=self._es_state["best_val_loss"],
+                    epochs_no_improve=self._es_state["epochs_no_improve"],
+                )
+
+                # Track epoch summary for final table
+                self._epoch_summaries.append(
+                    (epoch, last_loss, train_ppl, val_metrics["val_loss"], val_metrics["val_ppl"])
+                )
 
                 # Check for improvement (NEW)
                 if val_metrics["val_loss"] < self._es_state["best_val_loss"]:
@@ -637,9 +675,11 @@ class BaseTrainer:
             elapsed = _time.time() - epoch_start_time
             samples_per_sec = samples_processed / max(elapsed, 0.001)
 
+            # Compute train ppl once for both progress and wandb
+            train_ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
+
             if self._progress is not None:
                 # Per-step progress: no val metrics (those come at epoch end)
-                train_ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
                 self._progress(
                     step,
                     epoch,
@@ -650,6 +690,17 @@ class BaseTrainer:
                     None,
                     None,
                 )
+
+            # Log step metrics to wandb
+            self._log_wandb_step(
+                step=step,
+                epoch=epoch,
+                train_loss=last_loss,
+                train_ppl=train_ppl,
+                grad_norm=grad_norm,
+                samples_per_sec=samples_per_sec,
+            )
+
             if step % 10 == 0:
                 self._redis_hb(_time.time())
 
@@ -775,6 +826,122 @@ class BaseTrainer:
         }
 
         Path(out_dir).joinpath("manifest.json").write_text(dump_json_str(full), encoding="utf-8")
+
+    def _log_wandb_config(self: BaseTrainer) -> None:
+        """Log training configuration to wandb at start of training."""
+        if self._wandb is None:
+            return
+        self._wandb.log_config(
+            {
+                "run_id": self._run_id,
+                "model_family": self._cfg["model_family"],
+                "model_size": self._cfg["model_size"],
+                "num_epochs": self._cfg["num_epochs"],
+                "batch_size": self._cfg["batch_size"],
+                "learning_rate": self._cfg["learning_rate"],
+                "device": self._cfg["device"],
+                "precision": self._cfg["precision"],
+                "optimizer": self._cfg["optimizer"],
+                "gradient_clipping": self._cfg["gradient_clipping"],
+                "freeze_embed": self._cfg["freeze_embed"],
+                "early_stopping_patience": self._cfg["early_stopping_patience"],
+                "seed": self._cfg["seed"],
+                "max_seq_len": self._cfg["max_seq_len"],
+                "tokenizer_id": self._cfg["tokenizer_id"],
+                "corpus_path": self._cfg["corpus_path"],
+                "holdout_fraction": self._cfg["holdout_fraction"],
+                "test_split_ratio": self._cfg["test_split_ratio"],
+                "pretrained_run_id": self._cfg["pretrained_run_id"],
+                "finetune_lr_cap": self._cfg["finetune_lr_cap"],
+            }
+        )
+
+    def _log_wandb_step(
+        self: BaseTrainer,
+        *,
+        step: int,
+        epoch: int,
+        train_loss: float,
+        train_ppl: float,
+        grad_norm: float,
+        samples_per_sec: float,
+    ) -> None:
+        """Log per-step training metrics to wandb."""
+        if self._wandb is None:
+            return
+        self._wandb.log_step(
+            {
+                "global_step": step,
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_ppl": train_ppl,
+                "grad_norm": grad_norm,
+                "samples_per_sec": samples_per_sec,
+            }
+        )
+
+    def _log_wandb_epoch(
+        self: BaseTrainer,
+        *,
+        epoch: int,
+        train_loss: float,
+        train_ppl: float,
+        val_loss: float,
+        val_ppl: float,
+        best_val_loss: float,
+        epochs_no_improve: int,
+    ) -> None:
+        """Log epoch-end metrics with validation results to wandb."""
+        if self._wandb is None:
+            return
+        self._wandb.log_epoch(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_ppl": train_ppl,
+                "val_loss": val_loss,
+                "val_ppl": val_ppl,
+                "best_val_loss": best_val_loss,
+                "epochs_no_improve": epochs_no_improve,
+            }
+        )
+
+    def _log_wandb_final(
+        self: BaseTrainer,
+        *,
+        test_loss: float | None,
+        test_ppl: float | None,
+        early_stopped: bool,
+    ) -> None:
+        """Log final training metrics and finish wandb run."""
+        if self._wandb is None:
+            return
+        # Build final metrics dict - only include non-None values
+        final_metrics: dict[str, float | int | bool] = {"early_stopped": early_stopped}
+        if test_loss is not None:
+            final_metrics["test_loss"] = test_loss
+        if test_ppl is not None:
+            final_metrics["test_ppl"] = test_ppl
+        self._wandb.log_final(final_metrics)
+
+    def _log_wandb_epoch_table(self: BaseTrainer) -> None:
+        """Log epoch summary table to wandb."""
+        if self._wandb is None:
+            return
+        if not self._epoch_summaries:
+            return
+        columns = ["epoch", "train_loss", "train_ppl", "val_loss", "val_ppl"]
+        data: list[list[float | int]] = [
+            [epoch, train_loss, train_ppl, val_loss, val_ppl]
+            for epoch, train_loss, train_ppl, val_loss, val_ppl in self._epoch_summaries
+        ]
+        self._wandb.log_table("epoch_summary", columns, data)
+
+    def _finish_wandb(self: BaseTrainer) -> None:
+        """Finish wandb run after logging all data."""
+        if self._wandb is None:
+            return
+        self._wandb.finish()
 
 
 class _GradScalerProto(Protocol):
