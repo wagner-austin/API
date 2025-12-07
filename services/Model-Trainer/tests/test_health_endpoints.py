@@ -10,17 +10,17 @@ from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.container import ServiceContainer
 
 
-def _client_and_container() -> tuple[TestClient, ServiceContainer]:
+def _client_and_container() -> tuple[TestClient, ServiceContainer, FakeRedis]:
     app = create_app(load_settings())
     fake = FakeRedis()
     # replace container redis with fake
     container: ServiceContainer = app.state.container
     container.redis = fake
-    return TestClient(app), container
+    return TestClient(app), container, fake
 
 
 def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
-    client, _ = _client_and_container()
+    client, _, fake = _client_and_container()
     resp = client.get("/readyz")
     assert resp.status_code == 503
     obj_raw = load_json_str(resp.text)
@@ -30,10 +30,11 @@ def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
     reason = obj.get("reason")
     assert isinstance(status, str) and status == "degraded"
     assert isinstance(reason, str) and reason in ("no-worker", "redis no-pong", "redis error")
+    fake.assert_only_called({"ping", "scard"})
 
 
 def test_readyz_ready_with_worker(monkeypatch: MonkeyPatch) -> None:
-    client, container = _client_and_container()
+    client, container, fake = _client_and_container()
     # Simulate a worker registered in RQ registry set
     container.redis.sadd("rq:workers", "worker:1")
     resp = client.get("/readyz")
@@ -43,3 +44,4 @@ def test_readyz_ready_with_worker(monkeypatch: MonkeyPatch) -> None:
     obj2: dict[str, JSONValue] = obj2_raw
     st2 = obj2.get("status")
     assert isinstance(st2, str) and st2 == "ready"
+    fake.assert_only_called({"ping", "scard", "sadd"})
