@@ -74,6 +74,7 @@ def test_auth_spotify_start(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(body, dict):
         raise AssertionError("response must be an object")
     assert "auth_url" in body and "state" in body
+    fr.assert_only_called({"hset", "expire"})
 
 
 def test_auth_spotify_callback_success(monkeypatch: MonkeyPatch) -> None:
@@ -109,6 +110,7 @@ def test_auth_spotify_callback_success(monkeypatch: MonkeyPatch) -> None:
     assert isinstance(tid, str) and len(tid) == 32
     stored = fr.hgetall(f"spotify:session:{tid}")
     assert stored.get("access_token") == "at"
+    fr.assert_only_called({"hset", "expire", "hgetall", "delete"})
 
 
 def test_auth_spotify_callback_invalid_state(monkeypatch: MonkeyPatch) -> None:
@@ -117,8 +119,10 @@ def test_auth_spotify_callback_invalid_state(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "csec")
     import music_wrapped_api.routes.wrapped as routes
 
+    fr = FakeRedis()
+
     def _rf(url: str) -> FakeRedis:
-        return FakeRedis()
+        return fr
 
     monkeypatch.setattr(routes, "redis_for_kv", _rf)
     client = TestClient(create_app())
@@ -126,6 +130,7 @@ def test_auth_spotify_callback_invalid_state(monkeypatch: MonkeyPatch) -> None:
         "/v1/wrapped/auth/spotify/callback?code=abc&state=bad&callback=http://localhost/cb"
     )
     assert r.status_code == 400
+    fr.assert_only_called({"hgetall"})
 
 
 def test_auth_spotify_callback_invalid_json(monkeypatch: MonkeyPatch) -> None:
@@ -152,6 +157,7 @@ def test_auth_spotify_callback_invalid_json(monkeypatch: MonkeyPatch) -> None:
         f"/v1/wrapped/auth/spotify/callback?code=ax&state={st}&callback=http://localhost/cb"
     )
     assert r.status_code == 502
+    fr.assert_only_called({"hset", "expire", "hgetall", "delete"})
 
 
 def test_auth_spotify_callback_invalid_fields(monkeypatch: MonkeyPatch) -> None:
@@ -178,3 +184,4 @@ def test_auth_spotify_callback_invalid_fields(monkeypatch: MonkeyPatch) -> None:
         f"/v1/wrapped/auth/spotify/callback?code=ay&state={st}&callback=http://localhost/cb"
     )
     assert r.status_code == 502
+    fr.assert_only_called({"hset", "expire", "hgetall", "delete"})
