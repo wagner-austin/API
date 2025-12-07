@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
+from platform_ml.wandb_publisher import WandbPublisher
 
 from ...config.settings import Settings
 from ...contracts.model import (
@@ -86,6 +87,7 @@ class UnavailableBackend(ModelBackend):
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         raise AppError(
             ModelTrainerErrorCode.UNSUPPORTED_BACKEND,
