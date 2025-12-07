@@ -31,10 +31,11 @@ def test_readyz_degraded_when_missing_and_not_writable(
     client = _client(tmp_path)
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    fake_redis.sadd("rq:workers", "worker-1")
+
     def _rf(url: str) -> FakeRedis:
-        r = FakeRedis()
-        r.sadd("rq:workers", "worker-1")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _rf)
 
@@ -46,6 +47,7 @@ def test_readyz_degraded_when_missing_and_not_writable(
     assert r.status_code == 503
 
     assert "storage not writable" in r.text
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
 
 
 def test_readyz_degraded_when_exists_but_not_writable(
@@ -54,10 +56,11 @@ def test_readyz_degraded_when_exists_but_not_writable(
     client = _client(tmp_path)
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    fake_redis.sadd("rq:workers", "worker-1")
+
     def _rf2(url: str) -> FakeRedis:
-        r = FakeRedis()
-        r.sadd("rq:workers", "worker-1")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _rf2)
 
@@ -70,16 +73,18 @@ def test_readyz_degraded_when_exists_but_not_writable(
     assert r.status_code == 503
 
     assert "storage not writable" in r.text
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
 
 
 def test_readyz_degraded_when_low_disk(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     client = _client(tmp_path, min_free_gb=10)
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    fake_redis.sadd("rq:workers", "worker-1")
+
     def _rf3(url: str) -> FakeRedis:
-        r = FakeRedis()
-        r.sadd("rq:workers", "worker-1")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _rf3)
 
@@ -91,3 +96,4 @@ def test_readyz_degraded_when_low_disk(tmp_path: Path, monkeypatch: MonkeyPatch)
     assert r.status_code == 503
 
     assert "low disk" in r.text
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
