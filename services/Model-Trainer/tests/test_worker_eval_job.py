@@ -235,6 +235,7 @@ def test_eval_job_success(
     process_eval_job(payload)
     raw = fake.get(eval_key(run_id))
     _verify_eval_result(raw)
+    fake.assert_only_called({"set", "get"})
 
 
 def test_eval_job_missing_manifest(
@@ -343,6 +344,7 @@ def test_eval_job_missing_manifest(
     obj2: dict[str, JSONValue] = obj2_raw
     st2 = obj2.get("status")
     assert isinstance(st2, str) and st2 == "failed"
+    fake.assert_only_called({"set", "get"})
 
 
 def test_eval_job_destination_exists(
@@ -417,6 +419,7 @@ def test_eval_job_destination_exists(
     }
     with pytest.raises(AppError, match="destination already exists"):
         process_eval_job(payload)
+    fake.assert_only_called({"set", "get"})
 
 
 def test_eval_job_artifact_pointer_missing(
@@ -455,3 +458,4 @@ def test_eval_job_artifact_pointer_missing(
     }
     with pytest.raises(AppError, match="artifact pointer not found"):
         process_eval_job(payload)
+    fake.assert_only_called({"set", "get"})
