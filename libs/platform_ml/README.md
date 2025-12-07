@@ -112,6 +112,93 @@ except TarballError as e:
     print(f"Extraction failed: {e}")
 ```
 
+## WandbPublisher
+
+Protocol-based Weights & Biases integration for experiment tracking across ML services.
+
+```python
+from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
+
+# Create publisher (requires wandb package installed)
+try:
+    publisher = WandbPublisher(
+        project="my-ml-project",
+        run_name="gpt2-run-001",
+        enabled=True,
+    )
+except WandbUnavailableError:
+    # wandb not installed, continue without tracking
+    publisher = None
+
+# Log training config at start
+if publisher:
+    publisher.log_config({
+        "model_family": "gpt2",
+        "batch_size": 8,
+        "learning_rate": 0.001,
+    })
+
+# Log per-step metrics during training
+if publisher:
+    publisher.log_step({
+        "global_step": step,
+        "train_loss": loss,
+        "train_ppl": ppl,
+        "grad_norm": grad_norm,
+    })
+
+# Log epoch-end validation metrics
+if publisher:
+    publisher.log_epoch({
+        "epoch": epoch,
+        "val_loss": val_loss,
+        "val_ppl": val_ppl,
+        "best_val_loss": best_val_loss,
+    })
+
+# Log final test metrics
+if publisher:
+    publisher.log_final({
+        "test_loss": test_loss,
+        "test_ppl": test_ppl,
+        "early_stopped": early_stopped,
+    })
+
+# Log summary table
+if publisher:
+    publisher.log_table(
+        "epoch_summary",
+        columns=["epoch", "train_loss", "val_loss"],
+        data=[[0, 2.5, 2.3], [1, 1.8, 1.7]],
+    )
+
+# Finish run
+if publisher:
+    publisher.finish()
+```
+
+### WandbPublisher Methods
+
+| Method | Description |
+|--------|-------------|
+| `log_config(config)` | Log training configuration dict |
+| `log_step(metrics)` | Log per-step training metrics |
+| `log_epoch(metrics)` | Log epoch-end validation metrics |
+| `log_final(metrics)` | Log final test metrics |
+| `log_table(name, columns, data)` | Log summary table |
+| `finish()` | Close the wandb run |
+| `get_init_result()` | Get status and run_id |
+| `is_enabled` | Property: whether wandb is active |
+
+### Disabled Mode
+
+When `enabled=False`, all methods are no-ops (safe to call without checks):
+
+```python
+publisher = WandbPublisher(project="x", run_name="y", enabled=False)
+publisher.log_step({"loss": 1.0})  # No-op, no error
+```
+
 ## Development
 
 ```bash
