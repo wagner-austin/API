@@ -4,6 +4,7 @@ import secrets
 from datetime import UTC, datetime
 
 import pytest
+from platform_workers.testing import FakeRedisPublishError
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai.inference.engine import build_fresh_state_dict
@@ -16,14 +17,6 @@ from handwriting_ai.training.train_config import (
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 pytestmark = pytest.mark.usefixtures("digits_redis")
-
-
-class _RaisingRedis:
-    def publish(self, channel: str, message: str) -> int:
-        raise OSError("fail")
-
-    def close(self) -> None:
-        return None
 
 
 def _quick_training(cfg: TrainConfig) -> TrainingResult:
@@ -53,8 +46,10 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
 def test_process_train_job_publish_failures_raise_after_logging(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def _redis_for_kv(_: str) -> _RaisingRedis:
-        return _RaisingRedis()
+    fr = FakeRedisPublishError()
+
+    def _redis_for_kv(_: str) -> FakeRedisPublishError:
+        return fr
 
     monkeypatch.setattr(dj, "redis_for_kv", _redis_for_kv, raising=True)
     monkeypatch.setattr(dj, "_run_training", _quick_training, raising=True)
@@ -73,5 +68,6 @@ def test_process_train_job_publish_failures_raise_after_logging(
     }
 
     # Should raise when publisher fails during started event
-    with pytest.raises(OSError, match="fail"):
+    with pytest.raises(OSError, match="publish failure"):
         dj._decode_and_process_train_job(payload)
+    fr.assert_only_called({"publish", "close"})
