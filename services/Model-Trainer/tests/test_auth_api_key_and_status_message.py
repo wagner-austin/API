@@ -125,3 +125,4 @@ def test_api_key_unauthorized_and_authorized(
     message_o: JSONValue = obj_status.get("message")
     assert isinstance(status_o, str) and status_o == "failed"
     assert isinstance(message_o, str) and message_o == "boom"
+    fake.assert_only_called({"hset", "hgetall", "get"})
