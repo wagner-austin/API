@@ -76,3 +76,4 @@ def test_tokenizer_worker_uses_settings_artifacts_root(
     out_dir = artifacts / "tokenizers" / "tok-worker"
     assert (out_dir / "tokenizer.json").exists()
     assert (out_dir / "manifest.json").exists()
+    fake.assert_only_called({"set", "get", "publish"})
