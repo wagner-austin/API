@@ -16,7 +16,7 @@ def _with_tmp_root(
     monkeypatch: MonkeyPatch,
     *,
     workers: int = 1,
-) -> TestClient:
+) -> tuple[TestClient, FakeRedis]:
     root = tmp_path / "files"
     s: Settings = {
         "redis_url": "redis://ignored",
@@ -31,18 +31,19 @@ def _with_tmp_root(
     # Patch redis_for_kv to return a fake client
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    for i in range(workers):
+        fake_redis.sadd("rq:workers", f"worker-{i}")
+
     def _fake(url: str) -> FakeRedis:
-        r = FakeRedis()
-        for i in range(workers):
-            r.sadd("rq:workers", f"worker-{i}")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _fake)
-    return TestClient(create_app(s))
+    return TestClient(create_app(s)), fake_redis
 
 
 def test_healthz_ok(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    client = _with_tmp_root(tmp_path, monkeypatch)
+    client, fake_redis = _with_tmp_root(tmp_path, monkeypatch)
     r = client.get("/healthz")
     assert r.status_code == 200
     body_raw = load_json_str(r.text)
@@ -50,10 +51,11 @@ def test_healthz_ok(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
         raise AssertionError("expected dict")
     body = body_raw
     assert body["status"] == "ok"
+    fake_redis.assert_only_called({"sadd"})
 
 
 def test_readyz_ready_when_writable(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    client = _with_tmp_root(tmp_path, monkeypatch, workers=1)
+    client, fake_redis = _with_tmp_root(tmp_path, monkeypatch, workers=1)
     r = client.get("/readyz")
     assert r.status_code == 200
     body2_raw = load_json_str(r.text)
@@ -61,10 +63,11 @@ def test_readyz_ready_when_writable(tmp_path: Path, monkeypatch: MonkeyPatch) ->
         raise AssertionError("expected dict")
     body2 = body2_raw
     assert body2["status"] == "ready"
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
 
 
 def test_readyz_degraded_no_worker(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
-    client = _with_tmp_root(tmp_path, monkeypatch, workers=0)
+    client, fake_redis = _with_tmp_root(tmp_path, monkeypatch, workers=0)
     r = client.get("/readyz")
     assert r.status_code == 503
     body_raw = load_json_str(r.text)
@@ -73,6 +76,7 @@ def test_readyz_degraded_no_worker(tmp_path: Path, monkeypatch: MonkeyPatch) -> 
     body = body_raw
     assert body["status"] == "degraded"
     assert body["reason"] == "no-worker"
+    fake_redis.assert_only_called({"ping", "scard", "close"})
 
 
 def test_readyz_missing_storage_creates_and_is_ready(
@@ -91,15 +95,17 @@ def test_readyz_missing_storage_creates_and_is_ready(
     }
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    fake_redis.sadd("rq:workers", "worker-1")
+
     def _fake2(url: str) -> FakeRedis:
-        r = FakeRedis()
-        r.sadd("rq:workers", "worker-1")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _fake2)
     client = TestClient(create_app(s))
     r = client.get("/readyz")
     assert r.status_code == 200
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
 
 
 def test_readyz_degraded_low_disk(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
@@ -116,10 +122,11 @@ def test_readyz_degraded_low_disk(tmp_path: Path, monkeypatch: MonkeyPatch) -> N
     }
     from data_bank_api.api.routes import health as health_route_mod
 
+    fake_redis = FakeRedis()
+    fake_redis.sadd("rq:workers", "worker-1")
+
     def _fake_redis(url: str) -> FakeRedis:
-        r = FakeRedis()
-        r.sadd("rq:workers", "worker-1")
-        return r
+        return fake_redis
 
     monkeypatch.setattr(health_route_mod, "redis_for_kv", _fake_redis)
     client = TestClient(create_app(s))
@@ -137,3 +144,4 @@ def test_readyz_degraded_low_disk(tmp_path: Path, monkeypatch: MonkeyPatch) -> N
         raise AssertionError("expected dict")
     obj: dict[str, JSONValue] = obj_raw
     assert obj.get("reason") == "low disk"
+    fake_redis.assert_only_called({"sadd", "ping", "scard", "close"})
