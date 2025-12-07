@@ -11,6 +11,7 @@ import torch
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, generate_key, score_key
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -231,6 +232,7 @@ class _FakeBackendWithTopk:
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,
@@ -326,6 +328,7 @@ class _FakeBackendNoTopk:
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             loss=0.5,
@@ -478,6 +481,7 @@ class TestProcessScoreJob:
         assert isinstance(obj, dict) and obj.get("status") == "completed"
         assert obj.get("loss") == 1.5
         assert obj.get("perplexity") == 4.5
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_score_job_no_artifact_pointer_fails(
         self,
@@ -521,6 +525,7 @@ class TestProcessScoreJob:
         assert isinstance(cached, str) and len(cached) > 0
         obj = load_json_str(cached)
         assert isinstance(obj, dict) and obj.get("status") == "failed"
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_score_job_no_topk_or_surprisal(
         self,
@@ -583,6 +588,7 @@ class TestProcessScoreJob:
         assert obj.get("surprisal") is None
         assert obj.get("topk") is None
         assert obj.get("tokens") is None
+        fake_redis.assert_only_called({"set", "get"})
 
 
 class TestProcessGenerateJob:
@@ -652,6 +658,7 @@ class TestProcessGenerateJob:
         assert obj.get("outputs") == ["generated text here"]
         assert obj.get("steps") == 10
         assert obj.get("eos_terminated") == [True]
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_generate_job_no_artifact_pointer_fails(
         self,
@@ -700,6 +707,7 @@ class TestProcessGenerateJob:
         assert isinstance(cached, str) and len(cached) > 0
         obj = load_json_str(cached)
         assert isinstance(obj, dict) and obj.get("status") == "failed"
+        fake_redis.assert_only_called({"set", "get"})
 
 
 class _FakeArtifactStore:
@@ -806,6 +814,7 @@ class TestArtifactDownloadPaths:
         assert isinstance(cached, str) and len(cached) > 0
         result = load_json_str(cached)
         assert isinstance(result, dict) and result.get("status") == "completed"
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_score_job_missing_manifest_after_download(
         self,
@@ -861,6 +870,7 @@ class TestArtifactDownloadPaths:
 
         with pytest.raises(AppError, match="manifest missing"):
             score_job.process_score_job(payload)
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_generate_job_with_download(
         self,
@@ -935,6 +945,7 @@ class TestArtifactDownloadPaths:
         assert isinstance(cached, str) and len(cached) > 0
         result = load_json_str(cached)
         assert isinstance(result, dict) and result.get("status") == "completed"
+        fake_redis.assert_only_called({"set", "get"})
 
     def test_generate_job_missing_manifest_after_download(
         self,
@@ -994,3 +1005,4 @@ class TestArtifactDownloadPaths:
 
         with pytest.raises(AppError, match="manifest missing"):
             generate_job.process_generate_job(payload)
+        fake_redis.assert_only_called({"set", "get"})
