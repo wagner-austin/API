@@ -118,3 +118,4 @@ def test_worker_eval_backend_raises(tmp_path: Path, monkeypatch: MonkeyPatch) ->
         process_eval_job(payload)
     raw = fake.get(f"{EVAL_KEY_PREFIX}run-err")
     assert isinstance(raw, str) and len(raw) > 0
+    fake.assert_only_called({"set", "get"})
