@@ -66,6 +66,11 @@ class ModelTrainerSecurityConfig(TypedDict, total=True):
     api_key: str
 
 
+class ModelTrainerWandbConfig(TypedDict, total=True):
+    enabled: bool
+    project: str
+
+
 class ModelTrainerSettings(TypedDict, total=True):
     app_env: Literal["dev", "prod"]
     logging: ModelTrainerLoggingConfig
@@ -73,6 +78,7 @@ class ModelTrainerSettings(TypedDict, total=True):
     rq: ModelTrainerRQConfig
     app: ModelTrainerAppConfig
     security: ModelTrainerSecurityConfig
+    wandb: ModelTrainerWandbConfig
 
 
 def load_model_trainer_settings() -> ModelTrainerSettings:
@@ -147,6 +153,11 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "api_key": _parse_str("SECURITY__API_KEY", ""),
     }
 
+    wandb_cfg: ModelTrainerWandbConfig = {
+        "enabled": _parse_bool("WANDB__ENABLED", False),
+        "project": _parse_str("WANDB__PROJECT", "model-trainer"),
+    }
+
     app_env_str = _parse_str("APP_ENV", "dev")
     app_env: Literal["dev", "prod"] = "prod" if app_env_str == "prod" else "dev"
 
@@ -157,6 +168,7 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "rq": rq_cfg,
         "app": app_cfg,
         "security": security_cfg,
+        "wandb": wandb_cfg,
     }
 
 
@@ -170,5 +182,6 @@ __all__ = [
     "ModelTrainerSecurityConfig",
     "ModelTrainerSettings",
     "ModelTrainerTokenizerCleanupConfig",
+    "ModelTrainerWandbConfig",
     "load_model_trainer_settings",
 ]
