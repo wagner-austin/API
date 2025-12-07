@@ -69,3 +69,4 @@ def test_tokenizer_worker_sentencepiece_missing_cli(
     monkeypatch.setattr(shutil, "which", _which_none)
     tkw.process_tokenizer_train_job(payload)
     assert fake.get("tokenizer:t1:status") == "failed"
+    fake.assert_only_called({"set", "get", "publish"})
