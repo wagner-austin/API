@@ -15,20 +15,10 @@ from platform_workers.testing import FakeRedis
 import transcript_api.events as tev
 
 
-class _TrackingRedis(FakeRedis):
-    def __init__(self) -> None:
-        super().__init__()
-        self.closed = False
-
-    def close(self) -> None:
-        self.closed = True
-        # Preserve published messages for assertions
-
-
 def test_publish_completed_and_failed(monkeypatch: pytest.MonkeyPatch) -> None:
-    stub = _TrackingRedis()
+    stub = FakeRedis()
 
-    def _redis_loader(url: str) -> _TrackingRedis:
+    def _redis_loader(url: str) -> FakeRedis:
         return stub
 
     monkeypatch.setenv("REDIS_URL", "redis://unit")
@@ -59,12 +49,13 @@ def test_publish_completed_and_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ev1["error_kind"] == "user"
     assert _is_failed(ev2)
     assert ev2["error_kind"] == "system"
+    stub.assert_only_called({"publish", "close"})
 
 
 def test_publish_failed_rejects_invalid_kind(monkeypatch: pytest.MonkeyPatch) -> None:
-    stub = _TrackingRedis()
+    stub = FakeRedis()
 
-    def _redis_loader(url: str) -> _TrackingRedis:
+    def _redis_loader(url: str) -> FakeRedis:
         return stub
 
     monkeypatch.setenv("REDIS_URL", "redis://unit")
@@ -72,6 +63,7 @@ def test_publish_failed_rejects_invalid_kind(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(ValueError):
         _ = tev._ensure_error_kind("other")
+    stub.assert_only_called(set())
 
 
 def _require_event(payload: str) -> JobEventV1:
