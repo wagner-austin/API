@@ -13,70 +13,7 @@ from platform_workers.job_store import (
     parse_optional_str,
     parse_status,
 )
-from platform_workers.redis import RedisStrProto
-
-
-class _InMemoryRedis(RedisStrProto):
-    def __init__(self) -> None:
-        self._hashes: dict[str, dict[str, str]] = {}
-        self._strings: dict[str, str] = {}
-        self._sets: dict[str, set[str]] = {}
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        self._strings[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        return self._strings.get(key)
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._hashes[key] = dict(mapping)
-        return 1
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self._hashes.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self, key: str) -> int:
-        return len(self._sets.get(key, set()))
-
-    def sadd(self, key: str, member: str) -> int:
-        bucket = self._sets.setdefault(key, set())
-        before = len(bucket)
-        bucket.add(member)
-        return 1 if len(bucket) > before else 0
-
-    def sismember(self, key: str, member: str) -> bool:
-        return member in self._sets.get(key, set())
-
-    def delete(self, key: str) -> int:
-        removed = 0
-        if key in self._strings:
-            del self._strings[key]
-            removed += 1
-        if key in self._hashes:
-            del self._hashes[key]
-            removed += 1
-        if key in self._sets:
-            del self._sets[key]
-            removed += 1
-        return removed
-
-    def expire(self, key: str, time: int) -> bool:
-        return key in self._strings or key in self._hashes or key in self._sets
-
-    def close(self) -> None:
-        self._hashes.clear()
-        self._strings.clear()
-        self._sets.clear()
+from platform_workers.testing import FakeRedis
 
 
 class _SampleStatus(BaseJobStatus):
@@ -111,7 +48,7 @@ class _SampleEncoder(JobStoreEncoder[_SampleStatus]):
 
 
 def test_base_job_store_round_trip() -> None:
-    redis = _InMemoryRedis()
+    redis = FakeRedis()
     encoder = _SampleEncoder()
     store: BaseJobStore[_SampleStatus] = BaseJobStore(
         redis=redis,
@@ -135,6 +72,8 @@ def test_base_job_store_round_trip() -> None:
     loaded = store.load("job-1")
     assert loaded == status
     assert store.load("missing") is None
+
+    redis.assert_only_called({"hset", "expire", "hgetall"})
 
 
 @pytest.mark.parametrize(
