@@ -39,6 +39,7 @@ def test_build_payload_spotify_token_and_full(monkeypatch: MonkeyPatch) -> None:
     }
     out_full = routes._build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "spotify"
+    fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_build_payload_apple_token_and_full(monkeypatch: MonkeyPatch) -> None:
@@ -71,6 +72,7 @@ def test_build_payload_apple_token_and_full(monkeypatch: MonkeyPatch) -> None:
     }
     out_full = routes._build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "apple_music"
+    fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_build_payload_youtube_token_and_full(monkeypatch: MonkeyPatch) -> None:
@@ -102,6 +104,7 @@ def test_build_payload_youtube_token_and_full(monkeypatch: MonkeyPatch) -> None:
     }
     out_full = routes._build_payload_for_service(doc_full, redis_url="redis://ignored")
     assert out_full["service"] == "youtube_music"
+    fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_build_payload_unsupported_and_year_invalid(monkeypatch: MonkeyPatch) -> None:
@@ -255,6 +258,7 @@ def test_build_payload_token_not_found_and_invalid_full(monkeypatch: MonkeyPatch
             {"year": 2024, "service": "spotify", "credentials": 1},
             redis_url="redis://ignored",
         )
+    fr.assert_only_called({"hgetall"})
 
 
 def test_decode_wrapped_generate_and_store_edge_cases() -> None:
