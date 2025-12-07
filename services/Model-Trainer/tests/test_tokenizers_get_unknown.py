@@ -14,7 +14,8 @@ def test_tokenizers_get_unknown_status_and_no_stats() -> None:
     app = create_app(load_settings())
     container: ServiceContainer = app.state.container
     # Use isolated fake redis with no keys set
-    container.redis = FakeRedis()
+    fake = FakeRedis()
+    container.redis = fake
     client = TestClient(app)
 
     tok_id = "tok-unknown"
@@ -49,3 +50,4 @@ def test_tokenizers_get_unknown_status_and_no_stats() -> None:
     assert body["tokenizer_id"] == tok_id
     assert body["status"] == "unknown"
     assert body["coverage"] is None and body["oov_rate"] is None and body["token_count"] is None
+    fake.assert_only_called({"get"})
