@@ -106,3 +106,4 @@ def test_tokenizer_worker_spm_success(
     assert fake.get("tokenizer:tok-spm-succ:status") == "completed"
     stats_json = fake.get("tokenizer:tok-spm-succ:stats")
     assert isinstance(stats_json, str) and "oov_rate" in stats_json
+    fake.assert_only_called({"set", "get", "publish"})
