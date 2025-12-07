@@ -8,6 +8,7 @@ import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.testing import FakeRedis
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
@@ -40,49 +41,6 @@ class _MockDataBankClient:
             "content_type": "text/plain",
             "created_at": "2024-01-01T00:00:00Z",
         }
-
-
-class _RedisStub:
-    def __init__(self) -> None:
-        self.hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        cur = self.hashes.get(key, {})
-        cur.update(mapping)
-        self.hashes[key] = cur
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.hashes.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        pass
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.hashes.get(key, {}))
 
 
 def test_process_spec_type_errors() -> None:
@@ -135,7 +93,7 @@ def test_invalid_source_or_language() -> None:
 
 
 def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -184,11 +142,12 @@ def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     result = jobs_mod.process_corpus_impl(
         "p1", params, redis=redis, settings=settings, logger=logger
     )
-    h = redis.hashes.get(turkic_job_key("p1"))
+    h = redis._hashes.get(turkic_job_key("p1"))
     if h is None:
         pytest.fail("expected job hash")
     assert h.get("status") == "completed"
     assert result["status"] == "completed"
+    redis.assert_only_called({"hset", "expire", "publish"})
 
 
 def test_invalid_script_type_raises() -> None:
@@ -272,37 +231,13 @@ def test_normalize_script_with_none() -> None:
 
 
 def test_get_redis_client_returns_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Client:
-        def __init__(self) -> None:
-            self.closed = False
+    stub_client = FakeRedis()
 
-        def hset(self, key: str, mapping: dict[str, str]) -> int:
-            return len(mapping)
-
-        def hgetall(self, key: str) -> dict[str, str]:
-            return {}
-
-        def publish(self, channel: str, message: str) -> int:
-            return 1
-
-        def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-            return True
-
-        def set(self, key: str, value: str) -> bool:
-            return True
-
-        def get(self, key: str) -> str | None:
-            return None
-
-        def close(self) -> None:
-            self.closed = True
-
-    stub_client = _Client()
-
-    def fake_for_kv(url: str) -> _Client:
+    def fake_for_kv(url: str) -> FakeRedis:
         assert url == "redis://example"
         return stub_client
 
     monkeypatch.setattr(jobs_mod, "redis_for_kv", fake_for_kv)
     client = jobs_mod._get_redis_client("redis://example")
-    assert type(client).__name__ == "_Client"
+    assert type(client).__name__ == "FakeRedis"
+    stub_client.assert_only_called(set())
