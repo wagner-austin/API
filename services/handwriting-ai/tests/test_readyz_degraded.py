@@ -5,44 +5,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_workers.testing import FakeRedis
 
 from handwriting_ai.api.app import create_app
 from handwriting_ai.config import Settings, ensure_settings
-
-
-class _FakeRedisNoWorker:
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool | str | None:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        return len(mapping)
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return {}
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self, key: str) -> int:
-        return 0
-
-    def sadd(self, key: str, member: str) -> int:
-        return 1
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        pass
 
 
 def _mk_settings(tmp_dir: Path) -> Settings:
@@ -74,8 +40,10 @@ def test_readyz_degraded_no_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     monkeypatch.setenv("REDIS_URL", "redis://ignored")
     import handwriting_ai.api.routes.health as health_mod
 
-    def _rf(url: str) -> _FakeRedisNoWorker:
-        return _FakeRedisNoWorker()
+    fr = FakeRedis()
+
+    def _rf(url: str) -> FakeRedis:
+        return fr
 
     monkeypatch.setattr(health_mod, "redis_for_kv", _rf)
     app = create_app(settings=_mk_settings(tmp_path))
@@ -87,3 +55,4 @@ def test_readyz_degraded_no_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         raise AssertionError("expected dict")
     obj: dict[str, JSONValue] = obj_raw
     assert obj.get("status") == "degraded"
+    fr.assert_only_called({"ping", "scard", "close"})
