@@ -88,3 +88,4 @@ def test_tokenizer_worker_char_success(
         and "token_count" in stats_json
         and "char_coverage" in stats_json
     )
+    fake.assert_only_called({"set", "get", "publish"})
