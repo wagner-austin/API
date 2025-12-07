@@ -136,6 +136,7 @@ def test_jobs_uploads_to_data_bank_and_sets_file_id(
     assert not any(is_failed(ev) for ev in events)
     # function result reflects completion
     assert out["status"] == "completed"
+    r.assert_only_called({"publish", "hset", "expire", "hgetall"})
 
 
 def test_jobs_upload_handles_missing_file_id_raises(
@@ -208,6 +209,7 @@ def test_jobs_upload_handles_missing_file_id_raises(
     assert any(is_progress(ev) for ev in events)
     assert any(is_failed(ev) for ev in events)
     assert not any(is_completed(ev) for ev in events)
+    r.assert_only_called({"publish"})
 
 
 def test_jobs_upload_config_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -258,3 +260,4 @@ def test_jobs_upload_config_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_
     assert any(is_failed(ev) for ev in events)
     assert not any(is_completed(ev) for ev in events)
     assert not any(is_progress(ev) for ev in events)
+    r.assert_only_called({"publish"})
