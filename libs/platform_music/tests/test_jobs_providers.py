@@ -68,6 +68,7 @@ def test_process_wrapped_job_spotify_success(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(data_sp, dict):
         raise AssertionError("expected dict json")
     assert data_sp.get("service") == "spotify"
+    fake_redis.assert_only_called({"set", "get", "publish"})
 
 
 def test_process_wrapped_job_apple_success(monkeypatch: MonkeyPatch) -> None:
@@ -110,6 +111,7 @@ def test_process_wrapped_job_apple_success(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(data_ap, dict):
         raise AssertionError("expected dict json")
     assert data_ap.get("service") == "apple_music"
+    fake_redis.assert_only_called({"set", "get", "publish"})
 
 
 def test_process_wrapped_job_youtube_success(monkeypatch: MonkeyPatch) -> None:
@@ -156,3 +158,4 @@ def test_process_wrapped_job_youtube_success(monkeypatch: MonkeyPatch) -> None:
     # Verify events include completed for one of them at least
     types = [decode_job_event(p.payload)["type"] for p in fake_redis.published]
     assert any(t.endswith("completed.v1") for t in types)
+    fake_redis.assert_only_called({"set", "get", "publish"})
