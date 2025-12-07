@@ -131,13 +131,16 @@ def test_result_not_found(monkeypatch: MonkeyPatch) -> None:
 
     import music_wrapped_api.routes.wrapped as routes
 
+    fr = FakeRedis()
+
     def _rf(url: str) -> FakeRedis:
-        return FakeRedis()
+        return fr
 
     monkeypatch.setattr(routes, "redis_for_kv", _rf)
     client = TestClient(create_app())
     r = client.get("/v1/wrapped/result/foo")
     assert r.status_code == 404
+    fr.assert_only_called({"get"})
 
 
 def test_result_ok(monkeypatch: MonkeyPatch) -> None:
@@ -170,6 +173,7 @@ def test_result_ok(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(body, dict):
         raise AssertionError("response must be an object")
     assert body.get("year") == 2024
+    fr.assert_only_called({"set", "expire", "get"})
 
 
 def test_wrapped_route_wrappers(monkeypatch: MonkeyPatch) -> None:
