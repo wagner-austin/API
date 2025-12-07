@@ -20,3 +20,4 @@ def test_cancel_endpoint_sets_flag() -> None:
     assert r.status_code == 200
     v: str | int | bool | None = fake.get(f"runs:{run_id}:cancelled")
     assert isinstance(v, str) and v == "1"
+    fake.assert_only_called({"set", "get"})
