@@ -39,21 +39,24 @@ def test_decode_progress_float_variants() -> None:
         epoch=1,
         total_epochs=2,
         step=10,
-        loss=1.0,
+        train_loss=1.0,
+        train_ppl=2.72,
+        grad_norm=0.1,
+        samples_per_sec=50.0,
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))
     if out is None:
         raise AssertionError("expected decoded event")
     assert is_progress(out)
-    assert type(out["loss"]) is float
+    assert type(out["train_loss"]) is float
 
 
 def test_decode_completed_fields() -> None:
     ev = make_completed_metrics_event(
         job_id="r",
         user_id=1,
-        loss=1.0,
-        perplexity=2.0,
+        test_loss=1.0,
+        test_ppl=2.0,
         artifact_path="/x",
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))
