@@ -2,51 +2,13 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from platform_workers.testing import FakeRedis, FakeRedisNoPong
 
 from turkic_api.api.config import Settings
 from turkic_api.api.main import RedisCombinedProtocol, create_app
 from turkic_api.api.models import parse_job_response_json
 from turkic_api.api.types import QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
 from turkic_api.core.models import UnknownJson
-
-
-class _RedisStub:
-    def __init__(self) -> None:
-        self._store: dict[str, dict[str, str]] = {}
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def close(self) -> None:
-        pass
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._store[key] = {**mapping}
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self._store.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return 1
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
 
 
 class _QueueStub:
@@ -72,8 +34,20 @@ class _QueueStub:
         return _Job()
 
 
+# Capture created FakeRedis instances for assertion
+_created_redis: list[FakeRedis] = []
+
+
 def _redis_provider(settings: Settings) -> RedisCombinedProtocol:
-    return _RedisStub()
+    redis = FakeRedis()
+    # Register a fake worker so health checks pass
+    redis.sadd("rq:workers", "test-worker-1")
+    _created_redis.append(redis)
+    return redis
+
+
+def _clear_redis_instances() -> None:
+    _created_redis.clear()
 
 
 def _queue_provider() -> QueueProtocol:
@@ -82,16 +56,20 @@ def _queue_provider() -> QueueProtocol:
 
 def test_healthz_always_ok() -> None:
     """Test /healthz liveness endpoint always returns ok."""
+    _clear_redis_instances()
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
     resp = client.get("/healthz")
     assert resp.status_code == 200
     body: dict[str, str] = resp.json()
     assert body == {"status": "ok"}
+    for r in _created_redis:
+        r.assert_only_called({"sadd", "close"})
 
 
 def test_readyz_degraded_when_volume_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test /readyz returns degraded when data volume is missing."""
+    _clear_redis_instances()
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
     from pathlib import Path
@@ -105,9 +83,12 @@ def test_readyz_degraded_when_volume_missing(monkeypatch: pytest.MonkeyPatch) ->
     data: dict[str, str | None] = resp.json()
     assert data["status"] == "degraded"
     assert data["reason"] == "data volume not found"
+    for r in _created_redis:
+        r.assert_only_called({"sadd", "ping", "scard", "close"})
 
 
 def test_create_job_enqueues_and_returns_id() -> None:
+    _clear_redis_instances()
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
     payload = {
@@ -124,10 +105,13 @@ def test_create_job_enqueues_and_returns_id() -> None:
     assert jr["status"] == "queued"
     assert type(jr["job_id"]) is str
     assert jr["job_id"]
+    for r in _created_redis:
+        r.assert_only_called({"sadd", "hset", "expire", "close"})
 
 
 def test_readyz_ready_and_degraded_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test /readyz ready when healthy, degraded when Redis fails."""
+    _clear_redis_instances()
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
     # Ready: redis True, volume True
@@ -142,13 +126,18 @@ def test_readyz_ready_and_degraded_paths(monkeypatch: pytest.MonkeyPatch) -> Non
     ready_body: dict[str, str | None] = resp.json()
     assert ready_body["status"] == "ready"
 
+    # Assert first part
+    for r in _created_redis:
+        r.assert_only_called({"sadd", "ping", "scard", "close"})
+
     # Degraded: redis ping returns False
-    class _RedisFalse(_RedisStub):
-        def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-            return False
+    _clear_redis_instances()
+    degraded_redis: list[FakeRedis] = []
 
     def _redis_false(settings: Settings) -> RedisCombinedProtocol:
-        return _RedisFalse()
+        r = FakeRedisNoPong()
+        degraded_redis.append(r)
+        return r
 
     app2 = create_app(redis_provider=_redis_false, queue_provider=_queue_provider)
     with TestClient(app2) as alt:
@@ -157,3 +146,5 @@ def test_readyz_ready_and_degraded_paths(monkeypatch: pytest.MonkeyPatch) -> Non
         degraded_body: dict[str, str | None] = r2.json()
         assert degraded_body["status"] == "degraded"
         assert degraded_body["reason"] == "redis no-pong"
+    for r in degraded_redis:
+        r.assert_only_called({"ping", "close"})
