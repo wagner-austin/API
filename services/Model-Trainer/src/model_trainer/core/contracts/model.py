@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Literal, Protocol, TypedDict
 
+from platform_ml.wandb_publisher import WandbPublisher
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder
@@ -216,6 +218,7 @@ class ModelBackend(Protocol):
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome: ...
 
     def evaluate(
