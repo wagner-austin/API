@@ -58,3 +58,4 @@ def test_tokenizers_get_status_and_stats() -> None:
     assert body["oov_rate"] == 0.1
     assert body["token_count"] == 1000
     assert body["char_coverage"] == 0.8
+    fake.assert_only_called({"set", "get"})
