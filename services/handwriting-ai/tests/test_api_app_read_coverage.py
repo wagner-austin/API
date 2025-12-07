@@ -29,6 +29,7 @@ def _settings(tmp: Path, *, api_key_enabled: bool) -> Settings:
     # Keep small limits for fast tests
     dig_cfg: DigitsConfig = {
         "model_dir": tmp / "models",
+        "seed_root": tmp / "seed",  # Isolated seed path (empty = no seeding)
         "active_model": "m",
         "tta": False,
         "uncertain_threshold": 0.2,
