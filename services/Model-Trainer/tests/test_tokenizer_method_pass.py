@@ -66,3 +66,4 @@ def test_tokenizer_enqueue_passes_method(monkeypatch: MonkeyPatch) -> None:
         "job_id": str(obj.get("job_id", "")),
     }
     assert captured.get("method") == "bpe"
+    fake.assert_only_called({"set"})
