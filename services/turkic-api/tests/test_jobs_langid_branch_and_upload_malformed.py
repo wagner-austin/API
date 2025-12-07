@@ -7,53 +7,11 @@ from typing import BinaryIO
 import pytest
 from platform_core.data_bank_client import DataBankClientError
 from platform_core.logging import get_logger
+from platform_workers.testing import FakeRedis
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
 from turkic_api.core.langid import LangIdModel
-
-
-class _RedisStub:
-    def __init__(self) -> None:
-        self.hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        cur = self.hashes.get(key, {})
-        cur.update(mapping)
-        self.hashes[key] = cur
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.hashes.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        pass
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.hashes.get(key, {}))
 
 
 def _seed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -115,7 +73,7 @@ def test_langid_branch_and_malformed_file_id(
 
     monkeypatch.setattr(jobs_mod, "DataBankClient", _MockClient)
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -141,3 +99,4 @@ def test_langid_branch_and_malformed_file_id(
             settings=settings,
             logger=logger,
         )
+    redis.assert_only_called({"hset", "expire", "publish"})
