@@ -53,3 +53,4 @@ def test_tokenizer_worker_sentencepiece_unavailable_sets_failed(monkeypatch: Mon
     monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     process_tokenizer_train_job(payload)
     assert fake.get("tokenizer:tok-spm:status") == "failed"
+    fake.assert_only_called({"set", "get", "publish"})
