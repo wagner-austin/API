@@ -33,11 +33,14 @@ def _png_bytes() -> bytes:
     return buf.getvalue()
 
 
-def _settings(tmp: Path, *, max_mb: int = 2, api_key: str = "") -> Settings:
+def _settings(
+    tmp: Path, *, max_mb: int = 2, api_key: str = "", seed_root: Path | None = None
+) -> Settings:
     return {
         "app": {"threads": 0, "port": 8081},
         "digits": {
             "model_dir": tmp / "models",
+            "seed_root": seed_root if seed_root is not None else tmp / "seed",
             "active_model": "m",
             "tta": False,
             "uncertain_threshold": 0.70,
@@ -189,17 +192,19 @@ def test_read_raises_on_timeout_and_cancels_future(
 
 
 def test_seed_startup_copies_seed_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = _settings(tmp_path)
+    # Use tmp_path for seed_root to isolate from other tests
+    seed_base = tmp_path / "seed"
+    settings = _settings(tmp_path, seed_root=seed_base)
 
-    seed_root = Path("/app/seed/digits/models/m")
-    seed_root.mkdir(parents=True, exist_ok=True)
+    seed_model_dir = seed_base / "m"
+    seed_model_dir.mkdir(parents=True, exist_ok=True)
     valid_manifest = (
         '{"schema_version":"v1","model_id":"m","arch":"resnet18","n_classes":10,'
         '"version":"1.0.0","created_at":"2025-01-01T00:00:00Z","preprocess_hash":"h",'
         '"val_acc":0.9,"temperature":1.0}'
     )
-    (seed_root / "model.pt").write_bytes(b"model-bytes")
-    (seed_root / "manifest.json").write_text(valid_manifest, encoding="utf-8")
+    (seed_model_dir / "model.pt").write_bytes(b"model-bytes")
+    (seed_model_dir / "manifest.json").write_text(valid_manifest, encoding="utf-8")
 
     app = create_app(
         settings,
@@ -216,23 +221,21 @@ def test_seed_startup_copies_seed_files(tmp_path: Path, monkeypatch: pytest.Monk
 
     assert (dest / "model.pt").read_bytes() == b"model-bytes"
     assert (dest / "manifest.json").read_text(encoding="utf-8") == valid_manifest
-    # Cleanup seeded files to avoid polluting host filesystem
-    (dest / "model.pt").unlink(missing_ok=True)
-    (dest / "manifest.json").unlink(missing_ok=True)
-    (seed_root / "model.pt").unlink(missing_ok=True)
-    (seed_root / "manifest.json").unlink(missing_ok=True)
+    # No manual cleanup needed - tmp_path is automatically cleaned up by pytest
 
 
 def test_seed_eager_then_engine_loads_and_ready(tmp_path: Path) -> None:
-    settings = _settings(tmp_path)
+    # Use tmp_path for seed_root to isolate from other tests
+    seed_base = tmp_path / "seed"
+    settings = _settings(tmp_path, seed_root=seed_base)
 
     # Prepare valid seed artifacts for model id "m"
-    seed_root = Path("/app/seed/digits/models/m")
-    seed_root.mkdir(parents=True, exist_ok=True)
+    seed_model_dir = seed_base / "m"
+    seed_model_dir.mkdir(parents=True, exist_ok=True)
     sd = build_fresh_state_dict("resnet18", 10)
     import torch
 
-    torch.save(sd, (seed_root / "model.pt").as_posix())
+    torch.save(sd, (seed_model_dir / "model.pt").as_posix())
     manifest = {
         "schema_version": "v1.1",
         "model_id": "m",
@@ -246,7 +249,7 @@ def test_seed_eager_then_engine_loads_and_ready(tmp_path: Path) -> None:
     }
     from platform_core.json_utils import dump_json_str, load_json_bytes
 
-    (seed_root / "manifest.json").write_text(dump_json_str(manifest), encoding="utf-8")
+    (seed_model_dir / "manifest.json").write_text(dump_json_str(manifest), encoding="utf-8")
 
     app = create_app(settings, enforce_api_key=False)
     from fastapi.testclient import TestClient
@@ -263,21 +266,17 @@ def test_seed_eager_then_engine_loads_and_ready(tmp_path: Path) -> None:
         if type(body_active) is not dict:
             raise AssertionError("expected dict")
         assert body_active.get("model_loaded") is True and body_active.get("model_id") == "m"
-
-    # Cleanup host seed and destination
-    dest = settings["digits"]["model_dir"] / "m"
-    (dest / "model.pt").unlink(missing_ok=True)
-    (dest / "manifest.json").unlink(missing_ok=True)
-    (seed_root / "model.pt").unlink(missing_ok=True)
-    (seed_root / "manifest.json").unlink(missing_ok=True)
+    # No manual cleanup needed - tmp_path is automatically cleaned up by pytest
 
 
 def test_seed_noop_when_destination_exists(tmp_path: Path) -> None:
-    settings = _settings(tmp_path)
+    # Use tmp_path for seed_root to isolate from other tests
+    seed_base = tmp_path / "seed"
+    settings = _settings(tmp_path, seed_root=seed_base)
 
     # Create both seed and destination files; helper should be a no-op
-    seed_root = Path("/app/seed/digits/models/m")
-    seed_root.mkdir(parents=True, exist_ok=True)
+    seed_model_dir = seed_base / "m"
+    seed_model_dir.mkdir(parents=True, exist_ok=True)
     dest = settings["digits"]["model_dir"] / "m"
     dest.mkdir(parents=True, exist_ok=True)
 
@@ -286,8 +285,8 @@ def test_seed_noop_when_destination_exists(tmp_path: Path) -> None:
         '"version":"1.0.0","created_at":"2025-01-01T00:00:00Z","preprocess_hash":"h",'
         '"val_acc":0.9,"temperature":1.0}'
     )
-    (seed_root / "model.pt").write_bytes(b"seed")
-    (seed_root / "manifest.json").write_text(valid_manifest, encoding="utf-8")
+    (seed_model_dir / "model.pt").write_bytes(b"seed")
+    (seed_model_dir / "manifest.json").write_text(valid_manifest, encoding="utf-8")
 
     (dest / "model.pt").write_bytes(b"dest")
     (dest / "manifest.json").write_text(valid_manifest, encoding="utf-8")
@@ -301,9 +300,4 @@ def test_seed_noop_when_destination_exists(tmp_path: Path) -> None:
 
     assert (dest / "model.pt").read_bytes() == b"dest"
     assert (dest / "manifest.json").read_text(encoding="utf-8").startswith("{")
-
-    # Cleanup
-    (dest / "model.pt").unlink(missing_ok=True)
-    (dest / "manifest.json").unlink(missing_ok=True)
-    (seed_root / "model.pt").unlink(missing_ok=True)
-    (seed_root / "manifest.json").unlink(missing_ok=True)
+    # No manual cleanup needed - tmp_path is automatically cleaned up by pytest
