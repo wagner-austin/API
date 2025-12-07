@@ -47,3 +47,4 @@ def test_tokenizers_get_with_invalid_stats_json_returns_none_fields() -> None:
     assert obj["oov_rate"] is None
     assert obj["token_count"] is None
     assert obj["char_coverage"] is None
+    fake.assert_only_called({"set", "get"})
