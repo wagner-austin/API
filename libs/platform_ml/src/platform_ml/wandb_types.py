@@ -85,9 +85,14 @@ class WandbPublisherConfig(TypedDict):
 
 
 class WandbInitResult(TypedDict):
-    """Result of wandb initialization."""
+    """Result of wandb initialization.
 
-    status: Literal["enabled", "disabled", "unavailable"]
+    Status is either:
+    - "enabled": wandb is active with a valid run_id
+    - "disabled": publisher was created with enabled=False
+    """
+
+    status: Literal["enabled", "disabled"]
     run_id: str | None
 
 
