@@ -79,3 +79,4 @@ def test_tokenizer_worker_bpe_success(
     assert fake.get("tokenizer:tok-bpe:status") == "completed"
     stats_json = fake.get("tokenizer:tok-bpe:stats")
     assert isinstance(stats_json, str) and "coverage" in stats_json
+    fake.assert_only_called({"set", "get", "publish"})
