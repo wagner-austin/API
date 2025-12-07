@@ -1249,3 +1249,384 @@ def test_build_all_loaders_raises_when_no_train_data(
 
     with pytest.raises(RuntimeError, match="No training data available"):
         _ = trainer._build_all_loaders()
+
+
+# ===== WandB Integration Tests =====
+
+
+class _WandbTestState:
+    """Shared state for fake wandb publisher tests."""
+
+    def __init__(self: _WandbTestState) -> None:
+        self.config_calls: list[dict[str, str | int | float | bool | None]] = []
+        self.step_calls: list[dict[str, float | int]] = []
+        self.epoch_calls: list[dict[str, float | int]] = []
+        self.final_calls: list[dict[str, float | int | bool]] = []
+        self.table_calls: list[tuple[str, list[str], list[list[float | int]]]] = []
+        self.finish_called = False
+
+
+def _make_fake_wandb_publisher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> _WandbTestState:
+    """Create a monkeypatched WandbPublisher that tracks calls.
+
+    Returns _WandbTestState with tracked calls.
+    """
+    from collections.abc import Mapping
+
+    from platform_core.json_utils import JSONValue
+    from platform_ml.wandb_publisher import WandbPublisher
+    from platform_ml.wandb_types import WandbInitResult
+
+    state = _WandbTestState()
+
+    def fake_init(
+        self: WandbPublisher, *, project: str, run_name: str, enabled: bool = True
+    ) -> None:
+        object.__setattr__(self, "_enabled", enabled)
+        object.__setattr__(self, "_wandb", None)
+        object.__setattr__(self, "_run_id", "fake-run-id")
+
+    def fake_get_init_result(self: WandbPublisher) -> WandbInitResult:
+        return WandbInitResult(status="disabled", run_id=None)
+
+    def fake_log_config(self: WandbPublisher, config: Mapping[str, JSONValue]) -> None:
+        converted: dict[str, str | int | float | bool | None] = {
+            k: v for k, v in config.items() if v is None or isinstance(v, (str, int, float, bool))
+        }
+        state.config_calls.append(converted)
+
+    def fake_log_step(self: WandbPublisher, metrics: Mapping[str, float | int]) -> None:
+        state.step_calls.append(dict(metrics))
+
+    def fake_log_epoch(self: WandbPublisher, metrics: Mapping[str, float | int]) -> None:
+        state.epoch_calls.append(dict(metrics))
+
+    def fake_log_final(self: WandbPublisher, metrics: Mapping[str, float | int | bool]) -> None:
+        state.final_calls.append(dict(metrics))
+
+    def fake_log_table(
+        self: WandbPublisher,
+        name: str,
+        columns: list[str],
+        data: list[list[float | int]],
+    ) -> None:
+        state.table_calls.append((name, columns, data))
+
+    def fake_finish(self: WandbPublisher) -> None:
+        state.finish_called = True
+
+    def fake_is_enabled(self: WandbPublisher) -> bool:
+        return True
+
+    monkeypatch.setattr(WandbPublisher, "__init__", fake_init)
+    monkeypatch.setattr(WandbPublisher, "get_init_result", fake_get_init_result)
+    monkeypatch.setattr(WandbPublisher, "log_config", fake_log_config)
+    monkeypatch.setattr(WandbPublisher, "log_step", fake_log_step)
+    monkeypatch.setattr(WandbPublisher, "log_epoch", fake_log_epoch)
+    monkeypatch.setattr(WandbPublisher, "log_final", fake_log_final)
+    monkeypatch.setattr(WandbPublisher, "log_table", fake_log_table)
+    monkeypatch.setattr(WandbPublisher, "finish", fake_finish)
+    monkeypatch.setattr(WandbPublisher, "is_enabled", property(fake_is_enabled))
+
+    return state
+
+
+def test_log_wandb_config_called_when_publisher_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_config logs config when wandb publisher is provided."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-config",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._log_wandb_config()
+
+    assert len(state.config_calls) == 1
+    config = state.config_calls[0]
+    assert config["run_id"] == "test-wandb-config"
+    assert config["model_family"] == "char_lstm"
+
+
+def test_log_wandb_step_called_when_publisher_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_step logs step metrics when wandb publisher is provided."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-step",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._log_wandb_step(
+        step=10,
+        epoch=0,
+        train_loss=0.5,
+        train_ppl=1.65,
+        grad_norm=0.1,
+        samples_per_sec=100.0,
+    )
+
+    assert len(state.step_calls) == 1
+    metrics = state.step_calls[0]
+    assert metrics["global_step"] == 10
+    assert metrics["train_loss"] == 0.5
+
+
+def test_log_wandb_epoch_called_when_publisher_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_epoch logs epoch metrics when wandb publisher is provided."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-epoch",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._log_wandb_epoch(
+        epoch=1,
+        train_loss=0.3,
+        train_ppl=1.35,
+        val_loss=0.4,
+        val_ppl=1.5,
+        best_val_loss=0.35,
+        epochs_no_improve=0,
+    )
+
+    assert len(state.epoch_calls) == 1
+    metrics = state.epoch_calls[0]
+    assert metrics["epoch"] == 1
+    assert metrics["train_loss"] == 0.3
+    assert metrics["train_ppl"] == 1.35
+    assert metrics["val_loss"] == 0.4
+
+
+def test_log_wandb_final_called_when_publisher_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_final logs final metrics when publisher is provided."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-final",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._log_wandb_final(
+        test_loss=0.25,
+        test_ppl=1.28,
+        early_stopped=True,
+    )
+
+    assert len(state.final_calls) == 1
+    metrics = state.final_calls[0]
+    assert metrics["test_loss"] == 0.25
+    assert metrics["early_stopped"] is True
+    # Note: finish is NOT called by _log_wandb_final - see _finish_wandb
+
+
+def test_log_wandb_final_skips_none_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_final only includes non-None test metrics."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-final-none",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._log_wandb_final(
+        test_loss=None,
+        test_ppl=None,
+        early_stopped=False,
+    )
+
+    assert len(state.final_calls) == 1
+    metrics = state.final_calls[0]
+    assert "test_loss" not in metrics
+    assert "test_ppl" not in metrics
+    assert metrics["early_stopped"] is False
+
+
+def test_log_wandb_epoch_table_skips_when_no_publisher() -> None:
+    """Test _log_wandb_epoch_table does nothing when no wandb publisher."""
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-no-wandb-table",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=None,
+    )
+
+    # Should not raise
+    trainer._log_wandb_epoch_table()
+
+
+def test_log_wandb_epoch_table_skips_when_no_summaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_epoch_table does nothing when epoch_summaries is empty."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-table-empty",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    # Ensure epoch_summaries is empty
+    trainer._epoch_summaries = []
+    trainer._log_wandb_epoch_table()
+
+    assert len(state.table_calls) == 0
+
+
+def test_log_wandb_epoch_table_logs_data_when_summaries_exist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _log_wandb_epoch_table logs table when epoch_summaries has data."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-table-data",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    # Add epoch summaries: (epoch, train_loss, train_ppl, val_loss, val_ppl)
+    trainer._epoch_summaries = [
+        (1, 0.5, 1.65, 0.4, 1.49),
+        (2, 0.3, 1.35, 0.25, 1.28),
+    ]
+    trainer._log_wandb_epoch_table()
+
+    assert len(state.table_calls) == 1
+    name, columns, data = state.table_calls[0]
+    assert name == "epoch_summary"
+    assert columns == ["epoch", "train_loss", "train_ppl", "val_loss", "val_ppl"]
+    assert len(data) == 2
+    assert data[0] == [1, 0.5, 1.65, 0.4, 1.49]
+    assert data[1] == [2, 0.3, 1.35, 0.25, 1.28]
+
+
+def test_finish_wandb_skips_when_no_publisher() -> None:
+    """Test _finish_wandb does nothing when no wandb publisher."""
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-no-wandb-finish",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=None,
+    )
+
+    # Should not raise
+    trainer._finish_wandb()
+
+
+def test_finish_wandb_calls_finish_when_publisher_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test _finish_wandb calls finish when wandb publisher is provided."""
+    from platform_ml.wandb_publisher import WandbPublisher
+
+    state = _make_fake_wandb_publisher(monkeypatch)
+    fake_wandb = WandbPublisher(project="test", run_name="test", enabled=True)
+
+    trainer = bt.BaseTrainer(
+        _make_prepared(),
+        _make_cfg(),
+        _make_settings(),
+        run_id="test-wandb-finish",
+        redis_hb=lambda _: None,
+        cancelled=lambda: False,
+        progress=None,
+        service_name="char-lstm-train",
+        wandb_publisher=fake_wandb,
+    )
+
+    trainer._finish_wandb()
+
+    assert state.finish_called is True
