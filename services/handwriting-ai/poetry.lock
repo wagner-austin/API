@@ -1558,6 +1558,9 @@ develop = true
 [package.dependencies]
 platform-core = {path = "../platform_core", develop = true}
 
+[package.extras]
+wandb = ["wandb (>=0.18,<0.19)"]
+
 [package.source]
 type = "directory"
 url = "../../libs/platform_ml"
