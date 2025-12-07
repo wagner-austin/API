@@ -6,6 +6,7 @@ from typing import Literal, Protocol
 
 from platform_core.json_utils import dump_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis as _FakeRedis
 from pytest import MonkeyPatch
 
@@ -82,6 +83,7 @@ class _StubBackend(ModelBackend):
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         raise NotImplementedError
 
@@ -227,3 +229,4 @@ def test_eval_job_uses_manifest_family_and_path_override(
     # Result cached
     raw = fake.get(eval_key(run_id))
     assert isinstance(raw, str) and "completed" in raw
+    fake.assert_only_called({"set", "get"})
