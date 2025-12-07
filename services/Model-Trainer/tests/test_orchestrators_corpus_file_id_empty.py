@@ -46,6 +46,7 @@ def test_tokenizer_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> 
         _ = orch.enqueue_training(req)
     exc: AppError[ModelTrainerErrorCode] = ei.value
     assert exc.code == ModelTrainerErrorCode.CORPUS_NOT_FOUND
+    r.assert_only_called(set())
 
 
 def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> None:
@@ -81,3 +82,4 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         _ = orch.enqueue_training(req)
     exc2: AppError[ModelTrainerErrorCode] = ei2.value
     assert exc2.code == ModelTrainerErrorCode.CORPUS_NOT_FOUND
+    r.assert_only_called(set())
