@@ -152,3 +152,4 @@ def test_training_cancellation_with_redis(
     assert status is not None and status["status"] == "failed"  # cancelled leads to failure status
     hb = fake.get(heartbeat_key(run_id))
     assert hb is not None and isinstance(hb, (str, int, float))
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
