@@ -28,7 +28,7 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-def _mk_app(tmp: Path, settings_factory: _SettingsFactory) -> TestClient:
+def _mk_app(tmp: Path, settings_factory: _SettingsFactory) -> tuple[TestClient, FakeRedis]:
     settings = settings_factory(
         artifacts_root=str(tmp / "artifacts"),
         runs_root=str(tmp / "runs"),
@@ -40,13 +40,13 @@ def _mk_app(tmp: Path, settings_factory: _SettingsFactory) -> TestClient:
     fake = FakeRedis()
     container.redis = fake
     container.training_orchestrator._redis = fake
-    return TestClient(app)
+    return TestClient(app), fake
 
 
 def test_runs_train_missing_corpus_file_id_returns_400(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    client = _mk_app(tmp_path, settings_factory)
+    client, fake = _mk_app(tmp_path, settings_factory)
     body = {
         "model_family": "gpt2",
         "model_size": "small",
@@ -62,12 +62,13 @@ def test_runs_train_missing_corpus_file_id_returns_400(
     # Validator returns 400 for missing required fields
     assert r.status_code == 400
     assert "corpus_file_id" in r.text
+    fake.assert_only_called(set())
 
 
 def test_runs_train_extra_field_corpus_path_forbidden_returns_422(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    client = _mk_app(tmp_path, settings_factory)
+    client, fake = _mk_app(tmp_path, settings_factory)
     body = {
         "model_family": "gpt2",
         "model_size": "small",
@@ -83,3 +84,4 @@ def test_runs_train_extra_field_corpus_path_forbidden_returns_422(
     r = client.post("/runs/train", json=body)
     assert r.status_code == 422
     assert "extra fields not allowed" in r.text.lower()
+    fake.assert_only_called(set())
