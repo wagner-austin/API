@@ -75,3 +75,4 @@ def test_training_worker_failed_event_publish_branch(
     status = TrainerJobStore(fake).load("run-err")
     assert status is not None and status["status"] == "failed"
     assert status["message"] is not None and "boom during container creation" in status["message"]
+    fake.assert_only_called({"set", "hset", "hgetall", "publish"})
