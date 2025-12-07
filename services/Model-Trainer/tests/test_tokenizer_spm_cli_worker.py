@@ -115,7 +115,8 @@ def test_sentencepiece_orchestrator_fails_without_cli(monkeypatch: MonkeyPatch) 
     monkeypatch.setattr(shutil, "which", _which, raising=True)
     app = create_app()
     container: ServiceContainer = app.state.container
-    container.redis = FakeRedis()
+    fake = FakeRedis()
+    container.redis = fake
     client = TestClient(app)
     body = {
         "method": "sentencepiece",
@@ -127,6 +128,7 @@ def test_sentencepiece_orchestrator_fails_without_cli(monkeypatch: MonkeyPatch) 
     }
     r = client.post("/tokenizers/train", json=body)
     assert r.status_code == 400
+    fake.assert_only_called(set())
 
 
 def test_sentencepiece_worker_trains_and_writes_artifacts_with_mocked_cli(
@@ -188,3 +190,4 @@ def test_sentencepiece_worker_trains_and_writes_artifacts_with_mocked_cli(
     out_dir = artifacts / "tokenizers" / "tok-spm"
     assert (out_dir / "tokenizer.model").exists()
     assert (out_dir / "manifest.json").exists()
+    fake.assert_only_called({"set", "get", "publish"})
