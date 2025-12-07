@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQJobLike, RQRetryLike
+from platform_workers.testing import FakeJob, FakeRedisBytesClient, FakeRetry
 from pytest import MonkeyPatch
 
 from model_trainer.core.contracts.queue import (
@@ -11,15 +12,6 @@ from model_trainer.core.contracts.queue import (
 )
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 
-
-class _FakeJob(RQJobLike):
-    def __init__(self, job_id: str) -> None:
-        self._id = job_id
-
-    def get_id(self) -> str:
-        return self._id
-
-
 # Recursive JSON type matching rq_harness
 _JsonValue = dict[str, "_JsonValue"] | list["_JsonValue"] | str | int | float | bool | None
 
@@ -27,7 +19,9 @@ _JsonValue = dict[str, "_JsonValue"] | list["_JsonValue"] | str | int | float | 
 _KwargsDict = dict[str, int | str | None]
 
 
-class _FakeQueue(RQClientQueue):
+class _TrackingQueue(RQClientQueue):
+    """Queue that tracks enqueue calls for test assertions."""
+
     def __init__(self) -> None:
         self.last: tuple[str, _JsonValue, _KwargsDict] | None = None
 
@@ -51,39 +45,21 @@ class _FakeQueue(RQClientQueue):
         }
         self.last = (func_ref, payload, kwargs)
         desc_str = description if description is not None else "job"
-        return _FakeJob(f"id:{desc_str}")
+        return FakeJob(f"id:{desc_str}")
 
 
-class _FakeRetry(RQRetryLike):
-    """Fake Retry class matching RQ's interface."""
-
-    def __init__(self, max_retries: int, intervals: list[int]) -> None:
-        self.max_retries = max_retries
-        self.intervals = intervals
-
-
-class _FakeRedisBytesClient(RedisBytesProto):
-    """Fake Redis client implementing RedisBytesProto."""
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def close(self) -> None:
-        pass
-
-
-def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, _FakeQueue]) -> None:
-    fake_queue = _FakeQueue()
+def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, _TrackingQueue]) -> None:
+    fake_queue = _TrackingQueue()
     queue_holder["q"] = fake_queue
 
     def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> RQClientQueue:
         return fake_queue
 
     def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
-        return _FakeRetry(max_retries=max_retries, intervals=intervals)
+        return FakeRetry(max=max_retries, interval=intervals)
 
     def _fake_redis_raw_for_rq(url: str) -> RedisBytesProto:
-        return _FakeRedisBytesClient()
+        return FakeRedisBytesClient()
 
     # Patch at the import location in rq_adapter module
     monkeypatch.setattr("model_trainer.core.services.queue.rq_adapter.rq_queue", _fake_rq_queue)
@@ -94,7 +70,7 @@ def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, _FakeQueue]
 
 
 def test_rq_enqueuer_methods(monkeypatch: MonkeyPatch) -> None:
-    holder: dict[str, _FakeQueue] = {}
+    holder: dict[str, _TrackingQueue] = {}
     _install_fakes(monkeypatch, holder)
 
     settings = RQSettings(
