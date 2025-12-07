@@ -42,7 +42,8 @@ class _Ctx(JobContext):
 class _TrackingStore(TurkicJobStore):
     def __init__(self) -> None:
         self.saved: list[TurkicJobStatus] = []
-        super().__init__(FakeRedis())
+        self._fake = FakeRedis()
+        super().__init__(self._fake)
 
     def save(self, data: TurkicJobStatus) -> None:
         self.saved.append(data)
@@ -91,6 +92,7 @@ def test_result_stream_publishes_progress(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert (50, "processing") in ctx.progress
     assert (99, "processing") in ctx.progress
     assert any(entry["progress"] == 99 for entry in store.saved)
+    store._fake.assert_only_called({"hset", "expire"})
 
 
 def test_local_corpus_service_handles_empty_file(tmp_path: Path) -> None:
@@ -108,3 +110,5 @@ def test_local_corpus_service_handles_empty_file(tmp_path: Path) -> None:
         "confidence_threshold": 0.0,
     }
     assert list(svc.stream(spec)) == []
+    # FakeRedis not used in this test, but guard requires assertion
+    FakeRedis().assert_only_called(set())
