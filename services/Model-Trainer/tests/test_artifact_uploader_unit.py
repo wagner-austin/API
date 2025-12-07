@@ -35,7 +35,8 @@ class _SettingsFactory(Protocol):
 def test_upload_and_persist_pointer_config_missing(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    r: RedisStrProto = FakeRedis()
+    fake = FakeRedis()
+    r: RedisStrProto = fake
     settings = settings_factory(
         data_bank_api_url="",
         data_bank_api_key="",
@@ -47,6 +48,7 @@ def test_upload_and_persist_pointer_config_missing(
             run_id="rid",
             out_dir=str(tmp_path),
         )
+    fake.assert_only_called(set())
 
 
 def test_upload_and_persist_pointer_missing_dir(
@@ -90,6 +92,7 @@ def test_upload_and_persist_pointer_missing_dir(
         out_dir=str(base),
     )
     assert r.get(artifact_file_id_key("run-missing")) == "fid"
+    r.assert_only_called({"set", "get"})
 
 
 def test_upload_and_persist_pointer_success(
@@ -135,6 +138,7 @@ def test_upload_and_persist_pointer_success(
         out_dir=str(base),
     )
     assert r.get(artifact_file_id_key("run1")) == "deadbeef"
+    r.assert_only_called({"set", "get"})
 
 
 def test_upload_and_persist_pointer_store_error(
@@ -161,7 +165,8 @@ def test_upload_and_persist_pointer_store_error(
 
     monkeypatch.setattr("platform_ml.ArtifactStore", _StoreBad)
 
-    r: RedisStrProto = FakeRedis()
+    fake = FakeRedis()
+    r: RedisStrProto = fake
     settings = settings_factory(
         data_bank_api_url="http://db.local",
         data_bank_api_key="secret",
@@ -173,6 +178,7 @@ def test_upload_and_persist_pointer_store_error(
             run_id="run2",
             out_dir=str(base),
         )
+    fake.assert_only_called(set())
 
 
 def test_artifact_store_init_and_proxy() -> None:
