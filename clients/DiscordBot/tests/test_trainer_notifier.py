@@ -72,7 +72,10 @@ def _progress() -> TrainerProgressMetricsV1:
         epoch=1,
         total_epochs=1,
         step=10,
-        loss=1.0,
+        train_loss=1.0,
+        train_ppl=2.72,
+        grad_norm=0.1,
+        samples_per_sec=50.0,
     )
 
 
@@ -80,8 +83,8 @@ def _completed() -> TrainerCompletedMetricsV1:
     return make_completed_metrics_event(
         job_id="r",
         user_id=1,
-        loss=0.5,
-        perplexity=2.0,
+        test_loss=0.5,
+        test_ppl=2.0,
         artifact_path="/x",
     )
 
