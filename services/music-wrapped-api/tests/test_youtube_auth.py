@@ -33,6 +33,7 @@ def test_auth_youtube_store_success(monkeypatch: MonkeyPatch) -> None:
     assert len(tok) == 32
     stored = fr.hgetall(f"ytmusic:session:{tok}")
     assert stored.get("sapisid") == "sid"
+    fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_auth_youtube_store_invalid(monkeypatch: MonkeyPatch) -> None:
@@ -49,3 +50,4 @@ def test_auth_youtube_store_invalid(monkeypatch: MonkeyPatch) -> None:
     bad_json: dict[str, JSONValue] = {"sapisid": 1}
     r = client.post("/v1/wrapped/auth/youtube/store", json=bad_json)
     assert r.status_code == 400
+    fr.assert_only_called(set())
