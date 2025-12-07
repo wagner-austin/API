@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from platform_ml.wandb_publisher import WandbPublisher
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, PreparedLMModel, TrainOutcome
 from model_trainer.core.services.training.base_trainer import BaseTrainer
@@ -22,6 +24,7 @@ def train_prepared_gpt2(
     redis_hb: Callable[[float], None],
     cancelled: Callable[[], bool],
     progress: ProgressCallback | None = None,
+    wandb_publisher: WandbPublisher | None = None,
 ) -> TrainOutcome:
     """Train a prepared GPT2 model.
 
@@ -34,6 +37,7 @@ def train_prepared_gpt2(
         cancelled: Callback to check if training was cancelled.
         progress: Optional callback for progress updates
             (step, epoch, loss, grad_norm, samples_per_sec, val_loss, val_ppl).
+        wandb_publisher: Optional wandb publisher for experiment tracking.
 
     Returns:
         TrainOutcome with loss, perplexity, steps, output directory, and
@@ -48,5 +52,6 @@ def train_prepared_gpt2(
         cancelled=cancelled,
         progress=progress,
         service_name="gpt2-train",
+        wandb_publisher=wandb_publisher,
     )
     return trainer.train()
