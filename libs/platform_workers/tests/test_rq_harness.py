@@ -16,54 +16,6 @@ from platform_workers.rq_harness import (
 )
 
 
-class _FakeRedis:
-    def __init__(self) -> None:
-        self.published: list[tuple[str, str]] = []
-        self._kv: dict[str, str] = {}
-        self._hash: dict[str, dict[str, str]] = {}
-        self._sets: dict[str, set[str]] = {}
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool | str:
-        self._kv[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        return self._kv.get(key)
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        bucket = self._hash.setdefault(key, {})
-        bucket.update(mapping)
-        return len(mapping)
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self._hash.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self._hash.get(key, {}).copy()
-
-    def scard(self, key: str) -> int:
-        return len(self._sets.get(key, set()))
-
-    def sadd(self, key: str, member: str) -> int:
-        bucket = self._sets.setdefault(key, set())
-        before = len(bucket)
-        bucket.add(member)
-        return 1 if len(bucket) > before else 0
-
-    def sismember(self, key: str, member: str) -> bool:
-        return member in self._sets.get(key, set())
-
-    def close(self) -> None:
-        return None
-
-
 def _make_rq_mock(fake_module: ModuleType) -> Callable[[str], ModuleType]:
     """Create a mock for __import__ that returns fake_module for 'rq'."""
     real_import: Callable[[str], ModuleType] = __import__
