@@ -40,6 +40,7 @@ def test_runs_artifact_pointer_not_found(tmp_path: Path) -> None:
     # Missing pointer returns 404
     r = client.get("/runs/run-xyz/artifact")
     assert r.status_code == 404
+    fake.assert_only_called({"get"})
 
 
 def test_tokenizers_stats_branch(tmp_path: Path) -> None:
@@ -62,3 +63,4 @@ def test_tokenizers_stats_branch(tmp_path: Path) -> None:
     # Combine isinstance with value checks
     assert isinstance(obj2_raw, dict) and obj2_raw.get("status") == "completed"
     assert isinstance(obj2_raw, dict) and obj2_raw.get("token_count") == 1
+    fake.assert_only_called({"set", "get"})
