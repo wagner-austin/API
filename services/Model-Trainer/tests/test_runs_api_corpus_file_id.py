@@ -76,3 +76,4 @@ def test_runs_train_with_corpus_file_id(
     assert captured, "payload should be captured"
     req: TrainRequestPayload = captured[0]["request"]
     assert req["corpus_file_id"] == "deadbeef"
+    fake.assert_only_called({"hset"})
