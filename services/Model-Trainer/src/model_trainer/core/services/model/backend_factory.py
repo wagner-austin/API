@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, TypedDict
 
+from platform_ml.wandb_publisher import WandbPublisher
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetBuilder
 from model_trainer.core.contracts.model import (
@@ -70,6 +72,7 @@ class TrainFn(Protocol):
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome: ...
 
 
@@ -181,6 +184,7 @@ class _FactoryBackend:
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         return self._funcs["train"](
             prepared,
@@ -190,6 +194,7 @@ class _FactoryBackend:
             redis_hb=heartbeat,
             cancelled=cancelled,
             progress=progress,
+            wandb_publisher=wandb_publisher,
         )
 
     def evaluate(
