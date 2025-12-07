@@ -8,7 +8,7 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
 from platform_core.logging import stdlib_logging
-from platform_workers.redis import RedisStrProto
+from platform_workers.testing import FakeRedis
 
 from transcript_api.jobs import (
     STTConfig,
@@ -17,47 +17,6 @@ from transcript_api.jobs import (
     process_stt_impl,
 )
 from transcript_api.types import SubtitleResultTD, VerboseResponseTD, YtInfoTD
-
-
-class _RedisStub(RedisStrProto):
-    def __init__(self) -> None:
-        self._hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._hashes[key] = dict(mapping)
-        return 1
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self._hashes.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def scard(self, key: str) -> int:
-        return 0
-
-    def sadd(self, key: str, member: str) -> int:
-        return 1
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        return None
 
 
 class _StubSTTClient:
@@ -113,7 +72,7 @@ def test_process_stt_impl_roundtrip_publishes_events_and_saves(
         ) -> list[Mapping[str, JSONValue]]:
             return [{"text": "hello", "start": 0.0, "duration": 1.0}]
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     params: STTJobParams = {"url": "https://youtu.be/dQw4w9WgXcQ", "user_id": 5}
     config: STTConfig = {
         "max_video_seconds": 1,
@@ -154,6 +113,7 @@ def test_process_stt_impl_roundtrip_publishes_events_and_saves(
     assert saved["status"] == "completed"
     assert saved["progress"] == "100"
     assert saved["video_id"] != ""
+    redis.assert_only_called({"publish", "hset", "expire"})
 
 
 def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -185,7 +145,7 @@ def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch)
         ) -> list[Mapping[str, JSONValue]]:
             return [{"text": "hi", "start": 0.0, "duration": 1.0}]
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     stt_client = _StubSTTClient()
     probe_client = _StubProbeClient()
     config: STTConfig = {
@@ -215,6 +175,7 @@ def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch)
             config=config,
             logger=logger,
         )
+    redis.assert_only_called({"publish"})
 
 
 def test_load_stt_config_returns_typed_dict(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -308,13 +269,15 @@ def test_decode_stt_params_raises_on_non_int_user_id() -> None:
 
 
 _redis_url_captured: list[str] = []
+_redis_instance_captured: list[FakeRedis] = []
 
 
-class _TestRedisClient:
-    """Mock Redis that captures URL."""
-
-    def __init__(self, url: str) -> None:
-        _redis_url_captured.append(url)
+def _capturing_redis_factory(url: str) -> FakeRedis:
+    """Factory that captures URL and returns FakeRedis."""
+    _redis_url_captured.append(url)
+    redis = FakeRedis()
+    _redis_instance_captured.append(redis)
+    return redis
 
 
 def test_get_redis_client(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -322,9 +285,11 @@ def test_get_redis_client(monkeypatch: pytest.MonkeyPatch) -> None:
     import transcript_api.jobs as jobs_mod
 
     _redis_url_captured.clear()
-    monkeypatch.setattr(jobs_mod, "redis_for_kv", _TestRedisClient)
+    _redis_instance_captured.clear()
+    monkeypatch.setattr(jobs_mod, "redis_for_kv", _capturing_redis_factory)
     jobs_mod._get_redis_client("redis://localhost:6379")
     assert _redis_url_captured == ["redis://localhost:6379"]
+    _redis_instance_captured[0].assert_only_called(set())
 
 
 _stt_api_key_captured: list[str] = []
@@ -385,49 +350,7 @@ def test_build_probe_client(monkeypatch: pytest.MonkeyPatch) -> None:
     assert type(client).__name__ == "_MockAdapter"
 
 
-_decode_close_called: dict[str, bool] = {"value": False}
-
-
-class _DecodeTestRedis:
-    """Mock Redis for decode_process_stt test."""
-
-    def __init__(self, url: str) -> None:
-        self.url = url
-        self._hashes: dict[str, dict[str, str]] = {}
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._hashes[key] = dict(mapping)
-        return 1
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self._hashes.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self, key: str) -> int:
-        return 0
-
-    def sadd(self, key: str, member: str) -> int:
-        return 1
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        _decode_close_called["value"] = True
+_decode_redis_captured: list[FakeRedis] = []
 
 
 class _DecodeTestSTTClient:
@@ -451,15 +374,17 @@ class _DecodeTestProvider:
         return [{"text": "hello", "start": 0.0, "duration": 1.0}]
 
 
-def _make_decode_redis(url: str) -> _DecodeTestRedis:
-    return _DecodeTestRedis(url)
+def _make_decode_redis(url: str) -> FakeRedis:
+    redis = FakeRedis()
+    _decode_redis_captured.append(redis)
+    return redis
 
 
 def test_decode_process_stt_integration(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test _decode_process_stt loads deps and processes job."""
     import transcript_api.jobs as jobs_mod
 
-    _decode_close_called["value"] = False
+    _decode_redis_captured.clear()
 
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
@@ -479,7 +404,8 @@ def test_decode_process_stt_integration(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert result["job_id"] == "job-123"
     assert result["status"] == "completed"
-    assert _decode_close_called["value"]
+    assert _decode_redis_captured[0].closed
+    _decode_redis_captured[0].assert_only_called({"publish", "hset", "expire", "close"})
 
 
 def test_process_stt_delegates_to_decode(monkeypatch: pytest.MonkeyPatch) -> None:
