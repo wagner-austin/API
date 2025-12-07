@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 import pytest
 from platform_core.job_types import job_key
 from platform_core.trainer_keys import cancel_key
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -61,6 +62,7 @@ class _Backend:
         cancelled: str,
         prepared: str,
         progress: str,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             cancelled=False,
@@ -242,3 +244,4 @@ def test_training_cancel_race_avoids_upload(
     assert status_data["status"] == "failed"
     assert status_data["message"] == "Training cancelled"
     assert len(upload_calls) == 0
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
