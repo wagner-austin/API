@@ -76,3 +76,4 @@ def test_tokenizer_worker_respects_threads_env_branch(
     monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     process_tokenizer_train_job(payload)
     assert fake.get("tokenizer:tok-thr:status") == "completed"
+    fake.assert_only_called({"set", "get", "publish"})
