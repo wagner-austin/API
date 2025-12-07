@@ -21,6 +21,8 @@ def test_get_with_retry_succeeds_after_retry(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(fake, "get", flaky_get)
     v = get_with_retry(fake, "k", attempts=2)
     assert v == "v"
+    # get is monkeypatched so no calls recorded
+    fake.assert_only_called(set())
 
 
 def test_set_with_retry_exhausts_and_raises(monkeypatch: MonkeyPatch) -> None:
@@ -36,3 +38,5 @@ def test_set_with_retry_exhausts_and_raises(monkeypatch: MonkeyPatch) -> None:
 
     with pytest.raises(RedisError):
         set_with_retry(fake, "k", "v", attempts=2)
+    # set is monkeypatched so no calls recorded
+    fake.assert_only_called(set())
