@@ -24,9 +24,12 @@ def test_queue_enqueue_calls_underlying(monkeypatch: pytest.MonkeyPatch) -> None
     import turkic_api.api.dependencies as deps
 
     created_queue: list[FakeQueue] = []
+    created_redis: list[FakeRedis] = []
 
     def _fake_redis_raw(url: str) -> FakeRedis:
-        return FakeRedis()
+        r = FakeRedis()
+        created_redis.append(r)
+        return r
 
     def _fake_rq_queue(name: str, connection: FakeRedis) -> RQClientQueue:
         queue = FakeQueue(job_id="job-id")
@@ -55,3 +58,5 @@ def test_queue_enqueue_calls_underlying(monkeypatch: pytest.MonkeyPatch) -> None
     assert job.description == "test job"
     assert job.result_ttl is None
     assert job.failure_ttl is None
+    for r in created_redis:
+        r.assert_only_called(set())
