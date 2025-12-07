@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import redis
 from fastapi import FastAPI
 from platform_core.json_utils import load_json_str
 from platform_workers.redis import RedisStrProto
-from platform_workers.testing import FakeRedis
-from pytest import MonkeyPatch
+from platform_workers.testing import FakeRedis, FakeRedisError, FakeRedisNoPong
 from starlette.testclient import TestClient
-from typing_extensions import TypedDict
 
 from model_trainer.api.routes import health
 from model_trainer.core.config.settings import Settings, load_settings
@@ -55,15 +52,10 @@ def _build_app(container: ServiceContainer) -> TestClient:
     return TestClient(app)
 
 
-def test_readyz_redis_no_pong(monkeypatch: MonkeyPatch) -> None:
+def test_readyz_redis_no_pong() -> None:
     s = load_settings()
-    r = FakeRedis()
+    r = FakeRedisNoPong()
 
-    # Fake .ping() returning False
-    def _no_pong(**kwargs: str | int | float | bool | None) -> bool:
-        return False
-
-    monkeypatch.setattr(r, "ping", _no_pong)
     client = _build_app(_make_container(s, r))
     res = client.get("/readyz")
     assert res.status_code == 503
@@ -71,16 +63,12 @@ def test_readyz_redis_no_pong(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(obj_raw, dict):
         raise AssertionError("Response must be a dict")
     assert obj_raw["status"] == "degraded"
+    r.assert_only_called({"ping"})
 
 
-def test_readyz_no_worker(monkeypatch: MonkeyPatch) -> None:
+def test_readyz_no_worker() -> None:
     s = load_settings()
     r = FakeRedis()
-
-    def _pong(**kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    monkeypatch.setattr(r, "ping", _pong)
 
     client = _build_app(_make_container(s, r))
     res = client.get("/readyz")
@@ -89,19 +77,13 @@ def test_readyz_no_worker(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(obj2_raw, dict):
         raise AssertionError("Response must be a dict")
     assert obj2_raw["status"] == "degraded"
+    r.assert_only_called({"ping", "scard"})
 
 
-def test_readyz_redis_error(monkeypatch: MonkeyPatch) -> None:
+def test_readyz_redis_error() -> None:
     s = load_settings()
-    r = FakeRedis()
+    r = FakeRedisError()
 
-    class _E(redis.exceptions.RedisError):
-        pass
-
-    def _raise(**kwargs: str | int | float | bool | None) -> bool:
-        raise _E()
-
-    monkeypatch.setattr(r, "ping", _raise)
     client = _build_app(_make_container(s, r))
     res = client.get("/readyz")
     assert res.status_code == 503
@@ -109,16 +91,12 @@ def test_readyz_redis_error(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(obj3_raw, dict):
         raise AssertionError("Response must be a dict")
     assert obj3_raw["status"] == "degraded"
+    r.assert_only_called({"ping"})
 
 
-def test_readyz_ready(monkeypatch: MonkeyPatch) -> None:
+def test_readyz_ready() -> None:
     s = load_settings()
     r = FakeRedis()
-
-    def _pong(**kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    monkeypatch.setattr(r, "ping", _pong)
 
     # Simulate presence of one worker in RQ registry set
     r.sadd("rq:workers", "worker:1")
@@ -129,8 +107,4 @@ def test_readyz_ready(monkeypatch: MonkeyPatch) -> None:
     if not isinstance(obj4_raw, dict):
         raise AssertionError("Response must be a dict")
     assert obj4_raw["status"] == "ready"
-
-
-class Readyz(TypedDict):
-    status: str
-    reason: str | None
+    r.assert_only_called({"ping", "sadd", "scard"})
