@@ -42,22 +42,25 @@ def test_decode_progress_roundtrip() -> None:
         epoch=1,
         total_epochs=5,
         step=10,
-        loss=1.23,
+        train_loss=1.23,
+        train_ppl=3.42,
+        grad_norm=0.5,
+        samples_per_sec=100.0,
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))
     if out is None:
         raise AssertionError("expected decoded event")
     assert is_progress(out)
     assert out["epoch"] == 1
-    assert out["loss"] == 1.23
+    assert out["train_loss"] == 1.23
 
 
 def test_decode_completed_roundtrip() -> None:
     ev = make_completed_metrics_event(
         job_id="r1",
         user_id=123,
-        loss=0.5,
-        perplexity=2.0,
+        test_loss=0.5,
+        test_ppl=2.0,
         artifact_path="/data/artifacts/models/run1",
     )
     out = decode_trainer_event(encode_trainer_metrics_event(ev))
