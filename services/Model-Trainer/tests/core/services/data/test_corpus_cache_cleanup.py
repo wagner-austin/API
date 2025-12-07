@@ -64,6 +64,7 @@ def _settings_with_cache_cleanup(cfg: CorpusCacheCleanupConfig, data_root: Path)
         "rq": rq,
         "app": app,
         "security": security,
+        "wandb": {"enabled": False, "project": "test"},
     }
     return settings
 
