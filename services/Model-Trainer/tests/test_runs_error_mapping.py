@@ -34,3 +34,4 @@ def test_run_status_not_found_maps_to_app_error() -> None:
     assert msg and "not found" in str(msg).lower(), (
         f"Expected message to contain 'not found', got {msg}"
     )
+    fake.assert_only_called({"hgetall"})
