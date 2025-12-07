@@ -1,22 +1,7 @@
-# =============================================================================
-# Root Makefile - API Monorepo
-# =============================================================================
-# Orchestrates shared infrastructure and services
-#
-# Usage:
-#   make infra              # Start Redis + network
-#   make up-databank        # Start Redis + data-bank-api
-#   make up-trainer         # Start Redis + Model-Trainer
-#   make up-all             # Start Redis + all services
-#   make down               # Stop everything
-#   make status             # Show running containers
-#   make logs               # Tail logs from all containers
-# =============================================================================
-
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-discord up-all down status logs clean check-all test-all lint-all
+.PHONY: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-discord up-all down clean status logs lint test check
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -61,7 +46,7 @@ up-all: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turki
 # Stop/Cleanup
 # ---------------------------------------------------------------------------
 down:
-	$$dirs = @("services/data-bank-api", "services/Model-Trainer", "services/handwriting-ai", "services/qr-api", "services/transcript-api", "services/turkic-api", "services/music-wrapped-api", "clients/DiscordBot"); foreach ($$d in $$dirs) { if (Test-Path "$$d/docker-compose.yml") { Set-Location $$d; docker compose down; Set-Location ../.. } }; docker compose down
+	$$dirs = @("services/data-bank-api", "services/Model-Trainer", "services/handwriting-ai", "services/qr-api", "services/transcript-api", "services/turkic-api", "services/music-wrapped-api", "clients/DiscordBot"); foreach ($$d in $$dirs) { if (Test-Path "$$d/docker-compose.yml") { Push-Location $$d; docker compose down; Pop-Location } }; docker compose down
 
 clean: down
 	docker system prune -f
@@ -77,13 +62,13 @@ logs:
 	docker compose logs -f
 
 # ---------------------------------------------------------------------------
-# Development (run checks across all libs/services)
+# Development: lint, test, check across all libs/services/clients
 # ---------------------------------------------------------------------------
-check-all:
-	$$dirs = Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }; foreach ($$d in $$dirs) { Write-Host "`n=== Checking $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make check; Set-Location $$PSScriptRoot }
+lint:
+	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll lint passed" -ForegroundColor Green }
 
-lint-all:
-	$$dirs = Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }; foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; Set-Location $$PSScriptRoot }
+test:
+	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll tests passed" -ForegroundColor Green }
 
-test-all:
-	$$dirs = Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }; foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; Set-Location $$PSScriptRoot }
+check:
+	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Checking $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make check; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll checks passed" -ForegroundColor Green }
