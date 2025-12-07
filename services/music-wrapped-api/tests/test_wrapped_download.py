@@ -13,13 +13,16 @@ def test_download_not_found(monkeypatch: MonkeyPatch) -> None:
 
     import music_wrapped_api.routes.wrapped as routes
 
+    fr = FakeRedis()
+
     def _rf(url: str) -> FakeRedis:
-        return FakeRedis()
+        return fr
 
     monkeypatch.setattr(routes, "redis_for_kv", _rf)
     client = TestClient(create_app())
     r = client.get("/v1/wrapped/download/missing")
     assert r.status_code == 404
+    fr.assert_only_called({"get"})
 
 
 def test_download_ok(monkeypatch: MonkeyPatch) -> None:
@@ -52,6 +55,7 @@ def test_download_ok(monkeypatch: MonkeyPatch) -> None:
     assert r.status_code == 200
     # PNG signature
     assert r.content.startswith(b"\x89PNG\r\n\x1a\n")
+    fr.assert_only_called({"set", "expire", "get"})
 
 
 def test_download_invalid_shape(monkeypatch: MonkeyPatch) -> None:
@@ -69,3 +73,4 @@ def test_download_invalid_shape(monkeypatch: MonkeyPatch) -> None:
     client = TestClient(create_app())
     r = client.get(f"/v1/wrapped/download/{rid}")
     assert r.status_code == 400
+    fr.assert_only_called({"set", "expire", "get"})
