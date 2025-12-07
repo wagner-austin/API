@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from platform_workers.testing import (
     EnqueuedJob,
     FakeJob,
@@ -9,8 +11,13 @@ from platform_workers.testing import (
     FakeQueue,
     FakeRedis,
     FakeRedisBytesClient,
+    FakeRedisClient,
+    FakeRedisHsetError,
+    FakeRedisHsetRedisError,
+    FakeRedisPublishError,
     FakeRetry,
     LogRecord,
+    MethodCall,
     Published,
 )
 
@@ -112,6 +119,37 @@ class TestFakeRedis:
         assert redis.hgetall("hash") == {}
         assert redis.scard("set") == 0
 
+    def test_calls_tracks_method_calls(self) -> None:
+        redis = FakeRedis()
+        redis.ping()
+        redis.scard("key")
+        assert len(redis.calls) == 2
+        assert redis.calls[0] == MethodCall("ping", ())
+        assert redis.calls[1] == MethodCall("scard", ("key",))
+
+    def test_assert_only_called_passes(self) -> None:
+        redis = FakeRedis()
+        redis.ping()
+        redis.scard("key")
+        redis.assert_only_called({"ping", "scard"})  # Should not raise
+
+    def test_assert_only_called_fails(self) -> None:
+        redis = FakeRedis()
+        redis.ping()
+        redis.hset("key", {"a": "1"})
+        with pytest.raises(AssertionError, match="Unexpected methods called"):
+            redis.assert_only_called({"ping"})
+
+    def test_get_calls_filters_by_method(self) -> None:
+        redis = FakeRedis()
+        redis.ping()
+        redis.scard("key1")
+        redis.scard("key2")
+        scard_calls = redis.get_calls("scard")
+        assert len(scard_calls) == 2
+        assert scard_calls[0] == MethodCall("scard", ("key1",))
+        assert scard_calls[1] == MethodCall("scard", ("key2",))
+
 
 class TestFakeRedisBytesClient:
     def test_ping_returns_true(self) -> None:
@@ -121,6 +159,115 @@ class TestFakeRedisBytesClient:
     def test_close_is_noop(self) -> None:
         client = FakeRedisBytesClient()
         client.close()  # Should not raise
+
+
+class TestFakeRedisPublishError:
+    def test_publish_raises_os_error(self) -> None:
+        redis = FakeRedisPublishError()
+        with pytest.raises(OSError, match="simulated publish failure"):
+            redis.publish("channel", "message")
+        redis.assert_only_called({"publish"})
+
+
+class TestFakeRedisHsetError:
+    def test_hset_raises_runtime_error(self) -> None:
+        redis = FakeRedisHsetError()
+        with pytest.raises(RuntimeError, match="simulated hset failure"):
+            redis.hset("key", {"field": "value"})
+        redis.assert_only_called({"hset"})
+
+
+class TestFakeRedisHsetRedisError:
+    def test_hset_raises_redis_error(self) -> None:
+        redis = FakeRedisHsetRedisError()
+        from platform_workers.redis import _load_redis_error_class
+
+        error_cls = _load_redis_error_class()
+        with pytest.raises(error_cls, match="simulated Redis hset failure"):
+            redis.hset("key", {"field": "value"})
+        redis.assert_only_called({"hset"})
+
+
+class TestFakeRedisClient:
+    """Tests for FakeRedisClient (internal _RedisStrClient protocol)."""
+
+    def test_ping_returns_true(self) -> None:
+        client = FakeRedisClient()
+        assert client.ping() is True
+
+    def test_set_and_get(self) -> None:
+        client = FakeRedisClient()
+        assert client.set("name", "value") is True
+        assert client.get("name") == "value"
+        assert client.get("missing") is None
+
+    def test_delete_variadic_from_string(self) -> None:
+        client = FakeRedisClient()
+        client.set("key1", "val1")
+        client.set("key2", "val2")
+        assert client.delete("key1", "key2") == 2
+        assert client.get("key1") is None
+        assert client.get("key2") is None
+
+    def test_delete_from_hash(self) -> None:
+        client = FakeRedisClient()
+        client.hset("hash", {"a": "1"})
+        assert client.delete("hash") == 1
+        assert client.hgetall("hash") == {}
+
+    def test_delete_from_set(self) -> None:
+        client = FakeRedisClient()
+        client.sadd("myset", "member")
+        assert client.delete("myset") == 1
+        assert client.scard("myset") == 0
+
+    def test_delete_missing(self) -> None:
+        client = FakeRedisClient()
+        assert client.delete("missing") == 0
+
+    def test_expire(self) -> None:
+        client = FakeRedisClient()
+        client.set("name", "value")
+        assert client.expire("name", 60) is True
+        assert client.expire("missing", 60) is False
+
+    def test_hset_hget_hgetall(self) -> None:
+        client = FakeRedisClient()
+        assert client.hset("hash", {"a": "1", "b": "2"}) == 2
+        assert client.hget("hash", "a") == "1"
+        assert client.hget("hash", "missing") is None
+        assert client.hgetall("hash") == {"a": "1", "b": "2"}
+        assert client.hgetall("missing") == {}
+
+    def test_publish(self) -> None:
+        client = FakeRedisClient()
+        assert client.publish("channel", "msg") == 1
+
+    def test_set_operations(self) -> None:
+        client = FakeRedisClient()
+        assert client.scard("myset") == 0
+        assert client.sadd("myset", "a") == 1
+        assert client.sadd("myset", "a") == 0  # Already exists
+        assert client.sismember("myset", "a") is True
+        assert client.sismember("myset", "b") is False
+        assert client.scard("myset") == 1
+
+    def test_close(self) -> None:
+        client = FakeRedisClient()
+        client.close()  # Should not raise
+
+    def test_assert_only_called_passes(self) -> None:
+        client = FakeRedisClient()
+        client.ping()
+        client.scard("key")
+        client.assert_only_called({"ping", "scard"})  # Should not raise
+
+    def test_assert_only_called_fails(self) -> None:
+        client = FakeRedisClient()
+        client.ping()
+        client.hset("key", {"a": "1"})
+        with pytest.raises(AssertionError, match="Unexpected methods called"):
+            client.assert_only_called({"ping"})
 
 
 class TestFakeJob:
@@ -221,6 +368,14 @@ class TestNamedTuples:
         p = Published("ch", "msg")
         assert p.channel == "ch"
         assert p.payload == "msg"
+
+    def test_method_call_fields(self) -> None:
+        m = MethodCall("ping", ())
+        assert m.method == "ping"
+        assert m.args == ()
+        m2 = MethodCall("scard", ("key",))
+        assert m2.method == "scard"
+        assert m2.args == ("key",)
 
     def test_enqueued_job_fields(self) -> None:
         e = EnqueuedJob("func", ("a",), 60, 3600, 86400, "desc")
