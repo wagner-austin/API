@@ -90,9 +90,7 @@ def _seed_initial_model_if_needed(settings: Settings) -> bool:
 
     Returns True when a seed was copied; False when no action was needed.
     """
-    from pathlib import Path
-
-    seed_root = Path("/app/seed/digits/models")
+    seed_root = settings["digits"]["seed_root"]
     model_id = settings["digits"]["active_model"]
     model_dir = settings["digits"]["model_dir"]
     dest = model_dir / model_id
