@@ -23,6 +23,7 @@ def test_get_with_retry_succeeds_after_transient(monkeypatch: MonkeyPatch) -> No
     monkeypatch.setattr(client, "get", flaky_get, raising=True)
     val = get_with_retry(client, "a")
     assert val == "b"
+    client.assert_only_called({"set", "get"})
 
 
 def test_set_with_retry_succeeds_after_transient(monkeypatch: MonkeyPatch) -> None:
@@ -41,3 +42,4 @@ def test_set_with_retry_succeeds_after_transient(monkeypatch: MonkeyPatch) -> No
     set_with_retry(client, "a", "b")
     v_after = client.get("a")
     assert v_after == "b"
+    client.assert_only_called({"set", "get"})
