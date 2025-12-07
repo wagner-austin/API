@@ -73,3 +73,4 @@ def test_orchestrator_threads_user_id(monkeypatch: MonkeyPatch) -> None:
     )
     out = orch.enqueue_training(req)
     assert out["run_id"] and seen.get("user_id") == 42
+    r.assert_only_called({"hset"})
