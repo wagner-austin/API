@@ -21,7 +21,8 @@ from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 def test_trainer_job_store_initial_status() -> None:
     """Test TrainerJobStore.initial_status helper method."""
-    store = TrainerJobStore(FakeRedis())
+    fake = FakeRedis()
+    store = TrainerJobStore(fake)
     status = store.initial_status(
         job_id="run-init", user_id=42, message="initializing", status="queued"
     )
@@ -34,6 +35,7 @@ def test_trainer_job_store_initial_status() -> None:
     assert status["artifact_file_id"] is None
     assert status["created_at"].year >= 2020 and status["created_at"] <= datetime.utcnow()
     assert status["updated_at"].year >= 2020 and status["updated_at"] <= datetime.utcnow()
+    fake.assert_only_called(set())
 
 
 def _save_status(
@@ -102,6 +104,7 @@ def test_orchestrator_unsupported_model_raises() -> None:
     )
     with pytest.raises(AppError):
         _ = orch.enqueue_training(req)
+    fake.assert_only_called(set())
 
 
 def test_orchestrator_status_missing() -> None:
@@ -114,6 +117,7 @@ def test_orchestrator_status_missing() -> None:
     )
     with pytest.raises(AppError):
         _ = orch.get_status("no-run")
+    fake.assert_only_called({"hgetall"})
 
 
 def test_orchestrator_eval_missing_run_returns_failed() -> None:
@@ -126,6 +130,7 @@ def test_orchestrator_eval_missing_run_returns_failed() -> None:
     )
     out = orch.enqueue_evaluation("no-run", EvaluateRequest(split="validation"))
     assert out["status"] == "failed"
+    fake.assert_only_called({"hgetall"})
 
 
 def test_orchestrator_status_queued() -> None:
@@ -139,6 +144,7 @@ def test_orchestrator_status_queued() -> None:
     )
     res = orch.get_status("run-q")
     assert res["status"] == "queued"
+    fake.assert_only_called({"hset", "hgetall", "get"})
 
 
 def test_orchestrator_status_running() -> None:
@@ -152,6 +158,7 @@ def test_orchestrator_status_running() -> None:
     )
     res = orch.get_status("run-r")
     assert res["status"] == "running"
+    fake.assert_only_called({"hset", "hgetall", "get"})
 
 
 def test_orchestrator_status_completed() -> None:
@@ -165,6 +172,7 @@ def test_orchestrator_status_completed() -> None:
     )
     res = orch.get_status("run-c")
     assert res["status"] == "completed"
+    fake.assert_only_called({"hset", "hgetall", "get"})
 
 
 def test_orchestrator_status_failed() -> None:
@@ -178,6 +186,7 @@ def test_orchestrator_status_failed() -> None:
     )
     res = orch.get_status("run-f")
     assert res["status"] == "failed"
+    fake.assert_only_called({"hset", "hgetall", "get"})
 
 
 def test_orchestrator_eval_enqueues_and_sets_cache() -> None:
@@ -201,6 +210,7 @@ def test_orchestrator_eval_enqueues_and_sets_cache() -> None:
         raise AssertionError(f"Expected cached_eval to be dict, got {type(cached_eval)}")
     assert cached_eval["status"] == "queued"
     assert cached_eval["split"] == "validation"
+    fake.assert_only_called({"hset", "hgetall", "set", "get"})
 
 
 @pytest.mark.parametrize(
@@ -231,3 +241,4 @@ def test_orchestrator_get_evaluation_status_variants(status_value: str, expected
     )
     out = orch.get_evaluation("run-status")
     assert out["status"] == expected
+    fake.assert_only_called({"set", "get"})
