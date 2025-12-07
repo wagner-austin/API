@@ -7,6 +7,7 @@ import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.testing import FakeRedis
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
@@ -40,54 +41,10 @@ class _MockDataBankClient:
         }
 
 
-class _RedisStub:
-    def __init__(self) -> None:
-        self.hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        # Merge mapping into existing hash to mimic Redis semantics
-        cur = self.hashes.get(key, {})
-        cur.update(mapping)
-        self.hashes[key] = cur
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.hashes.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        pass
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.hashes.get(key, {}))
-
-
 def test_process_corpus_impl_creates_file_and_updates_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -133,9 +90,10 @@ def test_process_corpus_impl_creates_file_and_updates_status(
     assert not out.exists()
 
     # Redis status updated
-    h = redis.hashes.get(turkic_job_key("w1"))
+    h = redis._hashes.get(turkic_job_key("w1"))
     if h is None:
         pytest.fail("expected job hash")
     assert h.get("status") == "completed"
     assert h.get("progress") == "100"
     assert result["status"] == "completed"
+    redis.assert_only_called({"hset", "publish"})
