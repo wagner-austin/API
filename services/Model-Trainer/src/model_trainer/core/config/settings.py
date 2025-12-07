@@ -10,6 +10,7 @@ from platform_core.config import (
     ModelTrainerSecurityConfig,
     ModelTrainerSettings,
     ModelTrainerTokenizerCleanupConfig,
+    ModelTrainerWandbConfig,
     load_model_trainer_settings,
 )
 
@@ -22,6 +23,7 @@ CorpusCacheCleanupConfig = ModelTrainerCorpusCacheCleanupConfig
 TokenizerCleanupConfig = ModelTrainerTokenizerCleanupConfig
 AppConfig = ModelTrainerAppConfig
 SecurityConfig = ModelTrainerSecurityConfig
+WandbConfig = ModelTrainerWandbConfig
 Settings = ModelTrainerSettings
 
 
@@ -40,5 +42,6 @@ __all__ = [
     "SecurityConfig",
     "Settings",
     "TokenizerCleanupConfig",
+    "WandbConfig",
     "load_settings",
 ]
