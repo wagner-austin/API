@@ -5,53 +5,13 @@ from datetime import datetime
 import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.turkic_jobs import TurkicJobStatus, turkic_job_key
+from platform_workers.testing import FakeRedis
 
 from turkic_api.api.job_store import TurkicJobStore
 
 
-class _RedisStub:
-    def __init__(self) -> None:
-        self.store: dict[str, dict[str, str]] = {}
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        cur = self.store.get(key, {})
-        cur.update(mapping)
-        self.store[key] = cur
-        return len(mapping)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.store.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        return 0
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def close(self) -> None:
-        return None
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.store.get(key, {}))
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self.store.get(key, {}).get(field)
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-
 def test_job_store_roundtrip() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     store = TurkicJobStore(r)
     now = datetime.utcnow()
     status: TurkicJobStatus = {
@@ -74,11 +34,12 @@ def test_job_store_roundtrip() -> None:
     assert loaded["job_id"] == "abc"
     assert loaded["user_id"] == 42
     assert loaded["status"] == "queued"
-    assert turkic_job_key("abc") in r.store
+    assert turkic_job_key("abc") in r._hashes
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_invalid_status_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("bad")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -93,10 +54,11 @@ def test_job_store_invalid_status_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("bad")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_handles_failed_and_non_numeric_progress() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("f1")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -111,10 +73,11 @@ def test_job_store_handles_failed_and_non_numeric_progress() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("f1")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_upload_metadata_roundtrip() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     store = TurkicJobStore(r)
     meta: FileUploadResponse = {
         "file_id": "fid",
@@ -126,10 +89,11 @@ def test_upload_metadata_roundtrip() -> None:
     store.save_upload_metadata("job1", meta)
     loaded = store.load_upload_metadata("job1")
     assert loaded == meta
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_upload_metadata_allows_null_created_at() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     store = TurkicJobStore(r)
     meta: FileUploadResponse = {
         "file_id": "fid2",
@@ -141,10 +105,11 @@ def test_upload_metadata_allows_null_created_at() -> None:
     store.save_upload_metadata("job2", meta)
     loaded = store.load_upload_metadata("job2")
     assert loaded["created_at"] is None
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_missing_progress_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("mp")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -158,10 +123,11 @@ def test_job_store_missing_progress_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("mp")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_missing_created_at_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("mc")
     r.hset(
         key,
@@ -174,10 +140,11 @@ def test_job_store_missing_created_at_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("mc")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_invalid_upload_status_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("us")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -193,17 +160,19 @@ def test_job_store_invalid_upload_status_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("us")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_load_upload_metadata_missing() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("missing")
+    r.assert_only_called({"hgetall"})
 
 
 def test_job_store_load_upload_metadata_invalid_size() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('bad')}:file"
     r.hset(
         key,
@@ -218,10 +187,11 @@ def test_job_store_load_upload_metadata_invalid_size() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("bad")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_upload_metadata_invalid_file_id() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('badfid')}:file"
     r.hset(
         key,
@@ -236,10 +206,11 @@ def test_job_store_upload_metadata_invalid_file_id() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("badfid")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_missing_status_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("nostat")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -253,10 +224,11 @@ def test_job_store_missing_status_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("nostat")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_progress_wrong_type_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("ptype")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -271,10 +243,11 @@ def test_job_store_progress_wrong_type_raises() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load("ptype")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_optional_field_wrong_type_raises() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = turkic_job_key("optbad")
     now = datetime.utcnow().isoformat()
     r.hset(
@@ -293,10 +266,11 @@ def test_job_store_optional_field_wrong_type_raises() -> None:
     if loaded is None:
         pytest.fail("expected loaded job")
     assert loaded["error"] is None
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_upload_metadata_missing_content_type() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('nocontent')}:file"
     r.hset(
         key,
@@ -311,10 +285,11 @@ def test_job_store_upload_metadata_missing_content_type() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("nocontent")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_upload_metadata_missing_created_at() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('nocreated')}:file"
     r.hset(
         key,
@@ -328,10 +303,11 @@ def test_job_store_upload_metadata_missing_created_at() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("nocreated")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_upload_metadata_invalid_sha256() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('badsha')}:file"
     r.hset(
         key,
@@ -346,10 +322,11 @@ def test_job_store_upload_metadata_invalid_sha256() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("badsha")
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_store_upload_metadata_invalid_created_at_type() -> None:
-    r = _RedisStub()
+    r = FakeRedis()
     key = f"{turkic_job_key('badcat')}:file"
     r.hset(
         key,
@@ -364,3 +341,4 @@ def test_job_store_upload_metadata_invalid_created_at_type() -> None:
     store = TurkicJobStore(r)
     with pytest.raises(ValueError):
         store.load_upload_metadata("badcat")
+    r.assert_only_called({"hset", "expire", "hgetall"})
