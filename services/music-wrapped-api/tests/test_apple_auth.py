@@ -33,6 +33,7 @@ def test_auth_apple_store_success(monkeypatch: MonkeyPatch) -> None:
     assert len(tok) == 32
     stored = fr.hgetall(f"apple:session:{tok}")
     assert stored.get("music_user_token") == "apple-user-token"
+    fr.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_auth_apple_store_invalid(monkeypatch: MonkeyPatch) -> None:
@@ -49,3 +50,4 @@ def test_auth_apple_store_invalid(monkeypatch: MonkeyPatch) -> None:
     bad: dict[str, JSONValue] = {"music_user_token": 1}
     r = client.post("/v1/wrapped/auth/apple/store", json=bad)
     assert r.status_code == 400
+    fr.assert_only_called(set())
