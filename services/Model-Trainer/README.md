@@ -9,6 +9,7 @@ Strictly typed, modular system for training and evaluating small language models
 - **Mixed-Precision Training**: FP16/BF16 with automatic loss scaling for faster training
 - **Durable Jobs**: Redis + RQ with heartbeats, cancellation, retry logic
 - **Artifact Management**: Deterministic manifests, model weights, evaluation metrics
+- **Weights & Biases Integration**: Optional experiment tracking with full metrics logging
 - **Discord Integration**: Training notifications via Redis pub/sub
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
@@ -129,6 +130,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `LOGGING__LEVEL` | string | `INFO` | Log level |
 | `HF_HOME` | string | `/hf-cache` | Hugging Face cache |
 | `SECURITY__API_KEY` | string | - | Optional API key |
+| `WANDB__ENABLED` | bool | `false` | Enable Weights & Biases logging |
+| `WANDB__PROJECT` | string | `model-trainer` | Wandb project name |
 
 ### Example .env
 
@@ -528,6 +531,45 @@ services:
 | `pytest-xdist` | Parallel tests |
 | `mypy` | Type checking |
 | `ruff` | Linting/formatting |
+
+---
+
+## Weights & Biases Integration
+
+Optional experiment tracking via [Weights & Biases](https://wandb.ai). When enabled, training runs automatically log:
+
+### Logged Metrics
+
+**Per-Step (every batch):**
+- `train_loss`, `train_ppl` - Training loss and perplexity
+- `grad_norm` - Gradient norm before clipping
+- `samples_per_sec` - Training throughput
+- `global_step`, `epoch` - Progress tracking
+
+**Per-Epoch (after validation):**
+- `val_loss`, `val_ppl` - Validation metrics
+- `best_val_loss`, `epochs_no_improve` - Early stopping state
+
+**Final (end of training):**
+- `test_loss`, `test_ppl` - Test set evaluation
+- `early_stopped` - Whether training stopped early
+- `epoch_summary` - Table with all epoch metrics
+
+### Configuration
+
+```bash
+# Enable wandb logging
+WANDB__ENABLED=true
+WANDB__PROJECT=my-project
+
+# Authenticate (set in environment or via wandb login)
+WANDB_API_KEY=your-api-key
+```
+
+### Requirements
+
+- Install wandb: `pip install wandb` (optional dependency)
+- If `WANDB__ENABLED=true` but wandb is not installed, training continues without logging (warning emitted)
 
 ---
 
