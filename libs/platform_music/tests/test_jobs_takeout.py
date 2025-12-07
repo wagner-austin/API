@@ -56,6 +56,7 @@ def test_process_import_youtube_takeout_success(monkeypatch: MonkeyPatch) -> Non
         raise AssertionError("result must be object")
     assert doc.get("service") == "youtube_music"
     assert doc.get("year") == 2024
+    fr.assert_only_called({"set", "get", "publish", "delete"})
 
 
 def test_process_import_youtube_takeout_missing(monkeypatch: MonkeyPatch) -> None:
@@ -83,3 +84,4 @@ def test_process_import_youtube_takeout_missing(monkeypatch: MonkeyPatch) -> Non
     with pytest.raises(AppError) as excinfo:
         process_import_youtube_takeout(payload)
     assert excinfo.value.http_status == 404
+    fr.assert_only_called({"get", "publish"})
