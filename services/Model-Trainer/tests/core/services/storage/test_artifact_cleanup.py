@@ -81,6 +81,7 @@ def _settings_with_cleanup(
         "rq": rq,
         "app": app,
         "security": security,
+        "wandb": {"enabled": False, "project": "test"},
     }
     return settings
 
@@ -118,6 +119,7 @@ def test_cleanup_disabled_returns_not_deleted(tmp_path: Path) -> None:
     assert result.deleted is False
     assert result.reason == "cleanup_disabled"
     assert artifact_dir.exists()
+    r.assert_only_called(set())
 
 
 def test_cleanup_directory_not_found_returns_not_deleted(tmp_path: Path) -> None:
@@ -130,6 +132,7 @@ def test_cleanup_directory_not_found_returns_not_deleted(tmp_path: Path) -> None
 
     assert result.deleted is False
     assert result.reason == "directory_not_found"
+    r.assert_only_called(set())
 
 
 def test_cleanup_no_file_id_in_redis_skips_deletion(tmp_path: Path) -> None:
@@ -146,6 +149,7 @@ def test_cleanup_no_file_id_in_redis_skips_deletion(tmp_path: Path) -> None:
     assert result.deleted is False
     assert result.reason == "upload_not_verified"
     assert artifact_dir.exists()
+    r.assert_only_called({"hset", "get"})
 
 
 def test_cleanup_verify_upload_disabled_skips_redis_check(tmp_path: Path) -> None:
@@ -161,6 +165,7 @@ def test_cleanup_verify_upload_disabled_skips_redis_check(tmp_path: Path) -> Non
     assert result.deleted is True
     assert result.reason is None
     assert not artifact_dir.exists()
+    r.assert_only_called({"hset", "hgetall"})
 
 
 def test_cleanup_skips_when_run_not_terminal(tmp_path: Path) -> None:
@@ -177,6 +182,7 @@ def test_cleanup_skips_when_run_not_terminal(tmp_path: Path) -> None:
     assert result.deleted is False
     assert result.reason == "run_not_terminal"
     assert artifact_dir.exists()
+    r.assert_only_called({"set", "hset", "get", "hgetall"})
 
 
 def test_cleanup_dry_run_does_not_delete(tmp_path: Path) -> None:
@@ -195,6 +201,7 @@ def test_cleanup_dry_run_does_not_delete(tmp_path: Path) -> None:
     assert result.deleted is False
     assert result.reason == "dry_run"
     assert artifact_dir.exists()
+    r.assert_only_called({"set", "hset", "get", "hgetall"})
 
 
 def test_cleanup_success_deletes_directory(tmp_path: Path) -> None:
@@ -218,6 +225,7 @@ def test_cleanup_success_deletes_directory(tmp_path: Path) -> None:
     assert not artifact_dir.exists()
     assert result.files_deleted == 2
     assert result.bytes_freed >= 10
+    r.assert_only_called({"set", "hset", "get", "hgetall"})
 
 
 def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -244,6 +252,7 @@ def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert delete_called[0] is True
     assert artifact_dir.exists()
+    r.assert_only_called({"set", "hset", "get", "hgetall"})
 
 
 def test_cleanup_grace_period_delays_before_delete(
@@ -275,6 +284,7 @@ def test_cleanup_grace_period_delays_before_delete(
     assert result.deleted is True
     assert not artifact_dir.exists()
     assert sleep_called == [1.0]
+    r.assert_only_called({"hset", "hgetall"})
 
 
 def test_calculate_size_and_count_handle_errors(tmp_path: Path) -> None:
@@ -292,3 +302,4 @@ def test_calculate_size_and_count_handle_errors(tmp_path: Path) -> None:
 
     assert size > 0
     assert count == 1
+    r.assert_only_called({"set", "hset"})
