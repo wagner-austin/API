@@ -185,8 +185,7 @@ class WandbPublisher:
         """
         if not self._enabled:
             return WandbInitResult(status="disabled", run_id=None)
-        if self._wandb is None:
-            return WandbInitResult(status="unavailable", run_id=None)
+        # When enabled=True, _wandb is always set (constructor raises if unavailable)
         return WandbInitResult(status="enabled", run_id=self._run_id)
 
     def log_config(self, config: Mapping[str, JSONValue]) -> None:
