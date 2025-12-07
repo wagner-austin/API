@@ -39,3 +39,4 @@ def test_tokenizer_enqueue_with_corpus_file_id(tmp_path: Path, monkeypatch: Monk
     r = client.post("/tokenizers/train", json=body)
     assert r.status_code == 200
     assert captured.get("corpus_file_id") == "deadbeef"
+    fake.assert_only_called({"set"})
