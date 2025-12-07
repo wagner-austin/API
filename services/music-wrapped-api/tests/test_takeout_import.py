@@ -76,6 +76,7 @@ def test_import_youtube_takeout_json_success(monkeypatch: MonkeyPatch) -> None:
         raise AssertionError("expected list of plays")
     assert len(arr) == 2
     assert fq.jobs and fq.jobs[0].func == "platform_music.jobs.process_import_youtube_takeout"
+    fr.assert_only_called({"set", "expire", "get"})
 
 
 def test_import_youtube_takeout_zip_success(monkeypatch: MonkeyPatch) -> None:
@@ -119,6 +120,7 @@ def test_import_youtube_takeout_zip_success(monkeypatch: MonkeyPatch) -> None:
     saved = fr.get(f"ytmusic:takeout:{tok}")
     if saved is None:
         raise AssertionError("missing saved takeout")
+    fr.assert_only_called({"set", "expire", "get"})
 
 
 def test_import_youtube_takeout_invalid_fields(monkeypatch: MonkeyPatch) -> None:
@@ -131,8 +133,10 @@ def test_import_youtube_takeout_invalid_fields(monkeypatch: MonkeyPatch) -> None
     def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
         return FakeQueue(job_id="takeout-3")
 
+    fr = FakeRedis()
+
     def _rf(url: str) -> FakeRedis:
-        return FakeRedis()
+        return fr
 
     monkeypatch.setattr(routes, "_rq_conn", _conn)
     monkeypatch.setattr(routes, "_rq_queue", _queue)
@@ -167,6 +171,7 @@ def test_import_youtube_takeout_invalid_fields(monkeypatch: MonkeyPatch) -> None
         data={"year": "2024"},
     )
     assert r3.status_code == 400
+    fr.assert_only_called(set())
 
 
 def test_import_youtube_takeout_invalid_year(monkeypatch: MonkeyPatch) -> None:
@@ -179,8 +184,10 @@ def test_import_youtube_takeout_invalid_year(monkeypatch: MonkeyPatch) -> None:
     def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
         return FakeQueue(job_id="takeout-4")
 
+    fr = FakeRedis()
+
     def _rf(url: str) -> FakeRedis:
-        return FakeRedis()
+        return fr
 
     monkeypatch.setattr(routes, "_rq_conn", _conn)
     monkeypatch.setattr(routes, "_rq_queue", _queue)
@@ -195,3 +202,4 @@ def test_import_youtube_takeout_invalid_year(monkeypatch: MonkeyPatch) -> None:
         data={"year": "oops"},
     )
     assert r.status_code == 400
+    fr.assert_only_called(set())
