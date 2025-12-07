@@ -5,6 +5,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.trainer_keys import artifact_file_id_key
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -54,6 +55,7 @@ class _Backend:
         cancelled: str,
         prepared: str,
         progress: str,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         # Exercise the worker's progress callback wrapper so that the
         # training_worker._progress closure is covered.
@@ -213,3 +215,4 @@ def test_training_worker_spm_artifact_and_completed(
     assert artifact_id == "deadbeef"
     # Cleanup enabled by default: local artifact directory should be removed
     assert not out_dir.exists()
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
