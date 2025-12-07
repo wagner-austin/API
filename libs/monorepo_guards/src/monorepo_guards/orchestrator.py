@@ -12,6 +12,7 @@ from monorepo_guards.dataclass_rules import DataclassRule
 from monorepo_guards.env_rules import EnvRule
 from monorepo_guards.error_rules import ErrorsRule
 from monorepo_guards.exceptions_rules import ExceptionsRule
+from monorepo_guards.fake_redis_rules import FakeRedisRule
 from monorepo_guards.httpx_rules import HttpxRule
 from monorepo_guards.imports_rules import ImportsRule
 from monorepo_guards.json_rules import JsonRule
@@ -55,6 +56,7 @@ def _run_with_config(config: GuardConfig) -> int:
         WorkerImportsRule(),
         WeakAssertionRule(),
         MLTestQualityRule(),
+        FakeRedisRule(),
     ]
     if config.dataclass_ban_segments:
         rules.append(DataclassRule(config))
