@@ -75,3 +75,4 @@ def test_training_worker_sets_status_message_on_exception(
     assert status_data["status"] == "failed"
     msg = status_data.get("error", "")
     assert "Tokenizer artifact not found" in msg
+    fake.assert_only_called({"set", "hset", "hgetall", "publish"})
