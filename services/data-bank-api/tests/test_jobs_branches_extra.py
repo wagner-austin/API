@@ -183,6 +183,7 @@ def test_jobs_upload_handles_client_error(monkeypatch: pytest.MonkeyPatch, tmp_p
             logger=_Log(),
         )
     assert r.hgetall(job_key("databank", "job-xx")) == {}
+    r.assert_only_called({"publish", "hgetall"})
 
 
 def test_process_corpus_upload_server_error_raises(
@@ -267,3 +268,4 @@ def test_process_corpus_upload_server_error_raises(
     assert any(is_failed(ev) for ev in events)
     assert any(is_progress(ev) for ev in events)
     assert not any(is_completed(ev) for ev in events)
+    r.assert_only_called({"publish"})
