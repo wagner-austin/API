@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from redis.exceptions import ConnectionError as RedisConnectionError
+from platform_workers.redis import _load_redis_error_class
+from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TrainJobPayload
@@ -30,66 +31,13 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-class _FakeRedisNonRedisErrorOnSet:
-    """Fake Redis that raises a non-Redis error on set after status is set to running."""
-
-    def __init__(self: _FakeRedisNonRedisErrorOnSet) -> None:
-        self._kv: dict[str, str] = {}
-        self._hashes: dict[str, dict[str, str]] = {}
-        self._sets: dict[str, set[str]] = {}
-        self._set_call_count = 0
-
-    def ping(self: _FakeRedisNonRedisErrorOnSet, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self: _FakeRedisNonRedisErrorOnSet, key: str, value: str) -> bool | str:
-        self._set_call_count += 1
-        self._kv[key] = value
-        return True
-
-    def get(self: _FakeRedisNonRedisErrorOnSet, key: str) -> str | None:
-        return self._kv.get(key)
-
-    def hset(self: _FakeRedisNonRedisErrorOnSet, key: str, mapping: dict[str, str]) -> int:
-        # Fail with non-Redis error when trying to record error status
-        if mapping.get("status") == "failed":
-            raise KeyError("not a redis error - simulating non-Redis failure")
-        cur = self._hashes.setdefault(key, {})
-        cur.update(mapping)
-        return len(mapping)
-
-    def hgetall(self: _FakeRedisNonRedisErrorOnSet, key: str) -> dict[str, str]:
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self: _FakeRedisNonRedisErrorOnSet, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self: _FakeRedisNonRedisErrorOnSet, key: str) -> int:
-        return len(self._sets.get(key, set()))
-
-    def sadd(self: _FakeRedisNonRedisErrorOnSet, key: str, member: str) -> int:
-        s = self._sets.setdefault(key, set())
-        before = len(s)
-        s.add(member)
-        return 1 if len(s) > before else 0
-
-    def hget(self: _FakeRedisNonRedisErrorOnSet, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self: _FakeRedisNonRedisErrorOnSet, key: str, member: str) -> bool:
-        return False
-
-    def close(self: _FakeRedisNonRedisErrorOnSet) -> None:
-        pass
-
-
 def test_process_train_job_reraises_non_redis_error_on_handle_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    """Cover training_worker.py line 559 (non-Redis error re-raises during error handling).
+    """Cover training_worker.py line 421 (non-Redis error re-raises during error handling).
 
     When training fails and then recording the error also fails with a non-Redis error,
-    the non-Redis error should be re-raised (line 559).
+    the non-Redis error should be re-raised (line 421).
     """
     artifacts_root = tmp_path / "artifacts"
     runs_root = tmp_path / "runs"
@@ -144,15 +92,26 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
     monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     (corpus_root / "a.txt").write_text("hello\n", encoding="utf-8")
 
-    # Use our fake Redis that raises non-Redis error when recording error
-    client = _FakeRedisNonRedisErrorOnSet()
+    # Use FakeRedis with conditional hset - only fail when status == "failed"
+    # This allows the initial save (status=processing) to succeed, then fails
+    # when _handle_train_error saves with status=failed
+    client = FakeRedis()
+    original_hset = client.hset
 
-    def _fake_redis(settings: Settings) -> _FakeRedisNonRedisErrorOnSet:
+    def conditional_hset(key: str, mapping: dict[str, str]) -> int:
+        if mapping.get("status") == "failed":
+            client._record("hset", key, mapping)
+            raise RuntimeError("non-redis error during error handling")
+        return original_hset(key, mapping)
+
+    monkeypatch.setattr(client, "hset", conditional_hset)
+
+    def _fake_redis(settings: Settings) -> FakeRedis:
         return client
 
     monkeypatch.setattr(train_job, "redis_client", _fake_redis)
 
-    # Force training to fail so we enter the error handling path (line 553)
+    # Force training to fail so we enter the error handling path
     class _C:
         @staticmethod
         def from_settings(_: Settings) -> None:
@@ -160,60 +119,11 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
 
     monkeypatch.setattr(train_job, "ServiceContainer", _C)
 
-    # The non-Redis error during error handling should be re-raised (line 559)
-    with pytest.raises(KeyError, match="not a redis error"):
+    # The non-Redis error during error handling should be re-raised (line 421)
+    with pytest.raises(RuntimeError, match="non-redis error during error handling"):
         train_job.process_train_job(payload)
 
-
-class _FakeRedisRedisErrorOnSet:
-    """Fake Redis that raises a Redis error when recording error status."""
-
-    def __init__(self: _FakeRedisRedisErrorOnSet) -> None:
-        self._kv: dict[str, str] = {}
-        self._hashes: dict[str, dict[str, str]] = {}
-        self._sets: dict[str, set[str]] = {}
-
-    def ping(self: _FakeRedisRedisErrorOnSet, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self: _FakeRedisRedisErrorOnSet, key: str, value: str) -> bool | str:
-        self._kv[key] = value
-        return True
-
-    def get(self: _FakeRedisRedisErrorOnSet, key: str) -> str | None:
-        return self._kv.get(key)
-
-    def hset(self: _FakeRedisRedisErrorOnSet, key: str, mapping: dict[str, str]) -> int:
-        # Fail with Redis error when trying to record error status
-        if mapping.get("status") == "failed":
-            raise RedisConnectionError("simulated redis connection failure")
-        cur = self._hashes.setdefault(key, {})
-        cur.update(mapping)
-        return len(mapping)
-
-    def hgetall(self: _FakeRedisRedisErrorOnSet, key: str) -> dict[str, str]:
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self: _FakeRedisRedisErrorOnSet, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self: _FakeRedisRedisErrorOnSet, key: str) -> int:
-        return len(self._sets.get(key, set()))
-
-    def sadd(self: _FakeRedisRedisErrorOnSet, key: str, member: str) -> int:
-        s = self._sets.setdefault(key, set())
-        before = len(s)
-        s.add(member)
-        return 1 if len(s) > before else 0
-
-    def hget(self: _FakeRedisRedisErrorOnSet, key: str, field: str) -> str | None:
-        return None
-
-    def sismember(self: _FakeRedisRedisErrorOnSet, key: str, member: str) -> bool:
-        return False
-
-    def close(self: _FakeRedisRedisErrorOnSet) -> None:
-        pass
+    client.assert_only_called({"hset", "publish", "set"})
 
 
 def test_process_train_job_logs_redis_error_on_handle_error(
@@ -277,10 +187,20 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     (corpus_root / "a.txt").write_text("hello\n", encoding="utf-8")
 
-    # Use our fake Redis that raises Redis error when recording error
-    client = _FakeRedisRedisErrorOnSet()
+    # Use FakeRedis with conditional hset - only fail when status == "failed"
+    client = FakeRedis()
+    original_hset = client.hset
+    redis_error_cls = _load_redis_error_class()
 
-    def _fake_redis(settings: Settings) -> _FakeRedisRedisErrorOnSet:
+    def conditional_hset(key: str, mapping: dict[str, str]) -> int:
+        if mapping.get("status") == "failed":
+            client._record("hset", key, mapping)
+            raise redis_error_cls("simulated redis connection failure")
+        return original_hset(key, mapping)
+
+    monkeypatch.setattr(client, "hset", conditional_hset)
+
+    def _fake_redis(settings: Settings) -> FakeRedis:
         return client
 
     monkeypatch.setattr(train_job, "redis_client", _fake_redis)
@@ -297,3 +217,5 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     # The Redis error is logged as a warning (line 678)
     with pytest.raises(RuntimeError, match="training failed"):
         train_job.process_train_job(payload)
+
+    client.assert_only_called({"hset", "publish", "set"})
