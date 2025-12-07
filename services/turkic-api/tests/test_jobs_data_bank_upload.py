@@ -9,52 +9,10 @@ from platform_core.data_bank_client import DataBankClientError
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
+from platform_workers.testing import FakeRedis
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
-
-
-class _RedisStub:
-    def __init__(self) -> None:
-        self.hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def hset(self, name: str, mapping: dict[str, str]) -> int:
-        cur = self.hashes.get(name, {})
-        cur.update(mapping)
-        self.hashes[name] = cur
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.hashes.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def close(self) -> None:
-        return None
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.hashes.get(key, {}))
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self.hashes.get(key, {}).get(field)
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
 
 
 def _seed_processing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -121,7 +79,7 @@ def test_upload_success_records_file_id(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     monkeypatch.setattr(jobs_mod, "DataBankClient", _MockClient)
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -147,13 +105,14 @@ def test_upload_success_records_file_id(monkeypatch: pytest.MonkeyPatch, tmp_pat
         logger=logger,
     )
     assert out["status"] == "completed"
-    h = redis.hashes.get(turkic_job_key("jid1"), {})
+    h = redis._hashes.get(turkic_job_key("jid1"), {})
     assert h.get("file_id") == "deadbeef"
     assert h.get("upload_status") == "uploaded"
-    meta = redis.hashes.get(f"{turkic_job_key('jid1')}:file", {})
+    meta = redis._hashes.get(f"{turkic_job_key('jid1')}:file", {})
     assert meta.get("size") == "10"
     assert meta.get("sha256") == "abc"
     assert meta.get("created_at") == "2024-01-01T00:00:00Z"
+    redis.assert_only_called({"hset", "expire", "publish"})
 
 
 @pytest.mark.parametrize("error_msg", ["HTTP 400", "HTTP 401", "HTTP 403", "HTTP 500"])
@@ -184,7 +143,7 @@ def test_upload_failure_breaks_job(
 
     monkeypatch.setattr(jobs_mod, "DataBankClient", _MockClient)
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -210,6 +169,7 @@ def test_upload_failure_breaks_job(
             settings=settings,
             logger=logger,
         )
+    redis.assert_only_called({"hset", "expire", "publish"})
 
 
 def test_upload_missing_file_id_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -237,7 +197,7 @@ def test_upload_missing_file_id_raises(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     monkeypatch.setattr(jobs_mod, "DataBankClient", _MockClient)
 
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -263,6 +223,7 @@ def test_upload_missing_file_id_raises(monkeypatch: pytest.MonkeyPatch, tmp_path
             settings=settings,
             logger=logger,
         )
+    redis.assert_only_called({"hset", "expire", "publish"})
 
 
 def test_upload_config_missing_marks_job_failed(
@@ -271,7 +232,7 @@ def test_upload_config_missing_marks_job_failed(
     _seed_processing(monkeypatch, tmp_path)
 
     # Leave data_bank_api_url and key empty to trigger config error
-    redis = _RedisStub()
+    redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
         data_dir=str(tmp_path),
@@ -298,9 +259,10 @@ def test_upload_config_missing_marks_job_failed(
             logger=logger,
         )
 
-    h = redis.hashes.get(turkic_job_key("jid_cfg"))
+    h = redis._hashes.get(turkic_job_key("jid_cfg"))
     if h is None:
         pytest.fail("expected job hash")
     assert h.get("status") == "failed"
     assert h.get("message") == "upload_failed"
     assert h.get("error") == "config_missing"
+    redis.assert_only_called({"hset", "expire", "publish"})
