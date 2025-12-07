@@ -61,3 +61,4 @@ def test_get_eval_returns_artifact_pointer() -> None:
     assert body["status"] == "completed"
     expected_suffix = "/models/run-eval/eval/metrics.json"
     assert body["artifact_path"] and body["artifact_path"].endswith(expected_suffix)
+    fake.assert_only_called({"set", "get"})
