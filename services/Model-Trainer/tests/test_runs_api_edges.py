@@ -41,18 +41,19 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-def _fake_redis_for_kv(url: str) -> RedisStrProto:
-    return FakeRedis()
-
-
 def _mk_app(
     tmp: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> tuple[TestClient, Settings]:
+) -> tuple[TestClient, Settings, FakeRedis]:
     s = settings_factory(
         artifacts_root=str(tmp / "artifacts"),
         runs_root=str(tmp / "runs"),
         logs_root=str(tmp / "logs"),
     )
+
+    fake = FakeRedis()
+
+    def _fake_redis_for_kv(url: str) -> RedisStrProto:
+        return fake
 
     monkeypatch.setattr("model_trainer.core.services.container.redis_for_kv", _fake_redis_for_kv)
 
@@ -66,32 +67,34 @@ def _mk_app(
     monkeypatch.setattr(RQEnqueuer, "enqueue_train", _enq_train)
     monkeypatch.setattr(RQEnqueuer, "enqueue_eval", _enq_eval)
     app = create_app(s)
-    return TestClient(app), s
+    return TestClient(app), s, fake
 
 
 def test_runs_logs_not_found(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, _ = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     res = client.get("/runs/unknown/logs")
     assert res.status_code == 404
+    fake.assert_only_called(set())
 
 
 def test_runs_logs_read_failure(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, s = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     log_dir = Path(s["app"]["artifacts_root"]) / "models" / "r1"
     log_dir.mkdir(parents=True, exist_ok=True)
     (log_dir / "logs.jsonl").mkdir(parents=True, exist_ok=True)
     res = client.get("/runs/r1/logs")
     assert res.status_code == 500
+    fake.assert_only_called(set())
 
 
 def test_runs_logs_tail_content(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, s = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     run_dir = Path(s["app"]["artifacts_root"]) / "models" / "r2"
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "logs.jsonl"
@@ -99,20 +102,22 @@ def test_runs_logs_tail_content(
     res = client.get("/runs/r2/logs?tail=2")
     assert res.status_code == 200
     assert res.text.strip().splitlines() == ["b", "c"]
+    fake.assert_only_called(set())
 
 
 def test_runs_logs_stream_not_found(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, _ = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     res = client.get("/runs/nope/logs/stream")
     assert res.status_code == 404
+    fake.assert_only_called(set())
 
 
 def test_runs_logs_stream_follow_false(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, s = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     run_dir = Path(s["app"]["artifacts_root"]) / "models" / "r3"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "logs.jsonl").write_text("x\n" * 3, encoding="utf-8")
@@ -123,15 +128,17 @@ def test_runs_logs_stream_follow_false(
     lines = [ln for ln in body.split(b"\n\n") if ln]
     assert len(lines) == 2
     assert lines[0].startswith(b"data: ")
+    fake.assert_only_called(set())
 
 
 def test_runs_eval_result_not_found(
     tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
 ) -> None:
-    client, _ = _mk_app(tmp_path, monkeypatch, settings_factory)
+    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
     res = client.get("/runs/unknown/eval")
     # Exception handler maps to 404
     assert res.status_code == 404
+    fake.assert_only_called({"get"})
 
 
 def test_runs_eval_result_cache_corrupt(
@@ -154,6 +161,7 @@ def test_runs_eval_result_cache_corrupt(
     res = client.get(f"/runs/{run_id}/eval")
     # AppError(DATA_NOT_FOUND) is mapped to 404 by handlers
     assert res.status_code == 404
+    fake.assert_only_called({"set", "get"})
 
 
 def test_runs_train_unsupported_backend_maps_400(
@@ -165,8 +173,6 @@ def test_runs_train_unsupported_backend_maps_400(
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
     )
-
-    monkeypatch.setattr("model_trainer.core.services.container.redis_for_kv", _fake_redis_for_kv)
 
     # Enqueue methods
     def _enq_train(self: RQEnqueuer, payload: TrainJobPayload) -> str:
@@ -215,3 +221,4 @@ def test_runs_train_unsupported_backend_maps_400(
     }
     res = client.post("/runs/train", json=payload)
     assert res.status_code == 400
+    r.assert_only_called(set())
