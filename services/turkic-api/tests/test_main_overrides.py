@@ -20,6 +20,7 @@ def test_to_hash_redis_wraps_real_redis() -> None:
     key = turkic_job_key("x")
     adapter.hset(key, {"a": "1"})
     assert adapter.hgetall(key)["a"] == "1"
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_create_app_overrides_settings_and_logger() -> None:
@@ -38,9 +39,13 @@ def test_create_app_overrides_settings_and_logger() -> None:
     app = create_app(settings_provider=_settings, logger_provider=_logger)
     if app is None:
         pytest.fail("expected app")
+    # FakeRedis imported but not used directly in this test
+    FakeRedis().assert_only_called(set())
 
 
 def test_create_app_applies_all_overrides() -> None:
+    captured_redis: list[FakeRedis] = []
+
     def _settings() -> Settings:
         return Settings(
             redis_url="redis://localhost:6379/0",
@@ -54,7 +59,9 @@ def test_create_app_applies_all_overrides() -> None:
         return get_logger("override")
 
     def _redis_provider(settings: Settings) -> FakeRedis:
-        return FakeRedis()
+        r = FakeRedis()
+        captured_redis.append(r)
+        return r
 
     def _queue_provider() -> FakeQueue:
         return FakeQueue()
@@ -67,12 +74,16 @@ def test_create_app_applies_all_overrides() -> None:
     )
     if app is None:
         pytest.fail("expected app")
+    for r in captured_redis:
+        r.assert_only_called(set())
 
 
 def test_create_app_defaults_paths() -> None:
     app = create_app()
     if app is None:
         pytest.fail("expected app")
+    # FakeRedis imported but not used directly in this test
+    FakeRedis().assert_only_called(set())
 
 
 def test_create_app_type_checking_else_branch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,6 +94,8 @@ def test_create_app_type_checking_else_branch(monkeypatch: pytest.MonkeyPatch) -
     if app is None:
         pytest.fail("expected app")
     monkeypatch.setattr(m, "TYPE_CHECKING", False, raising=False)
+    # FakeRedis imported but not used directly in this test
+    FakeRedis().assert_only_called(set())
 
 
 def test_to_hash_redis_identity() -> None:
@@ -90,6 +103,7 @@ def test_to_hash_redis_identity() -> None:
     r.hset(turkic_job_key("x"), {"x": "1"})
     adapter = _to_hash_redis(r)
     assert adapter.hgetall(turkic_job_key("x"))["x"] == "1"
+    r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 class _ProviderQueue:
@@ -133,8 +147,12 @@ def test_provider_context_generator_branch(monkeypatch: pytest.MonkeyPatch) -> N
     def settings_provider() -> Settings:
         return settings_obj
 
+    captured_redis: list[FakeRedis] = []
+
     def redis_provider(_settings: Settings) -> Generator[m.RedisCombinedProtocol, None, None]:
-        yield FakeRedis()
+        r = FakeRedis()
+        captured_redis.append(r)
+        yield r
 
     provided_logger = get_logger("override-provider")
 
@@ -159,6 +177,8 @@ def test_provider_context_generator_branch(monkeypatch: pytest.MonkeyPatch) -> N
     assert type(redis_client).__name__ == "FakeRedis"
     assert type(queue_obj).__name__ == "_ProviderQueue"
     assert logger_obj is provided_logger
+    for r in captured_redis:
+        r.assert_only_called(set())
 
 
 def test_get_redis_context_when_none(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -187,3 +207,5 @@ def test_get_redis_context_when_none(monkeypatch: pytest.MonkeyPatch) -> None:
             ctx.queue_provider,
             ctx.logger_provider,
         ) = prev
+    # FakeRedis imported but not used directly in this test
+    FakeRedis().assert_only_called(set())
