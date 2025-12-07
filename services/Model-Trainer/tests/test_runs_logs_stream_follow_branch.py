@@ -15,8 +15,10 @@ def test_runs_logs_stream_follow_none_max_loops_exercises_else_branch(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     # Real container instance with patched redis_for_kv to use _FakeRedis
+    fake = FakeRedis()
+
     def _fake_redis_for_kv(url: str) -> RedisStrProto:
-        return FakeRedis()
+        return fake
 
     monkeypatch.setattr("model_trainer.core.services.container.redis_for_kv", _fake_redis_for_kv)
     s = load_settings()
@@ -43,3 +45,4 @@ def test_runs_logs_stream_follow_none_max_loops_exercises_else_branch(
     assert first.startswith(b"data: ")
     second = next(it)  # after sleep/appended line ("two")
     assert second.startswith(b"data: ")
+    fake.assert_only_called(set())
