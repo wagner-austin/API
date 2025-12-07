@@ -105,9 +105,10 @@ def _stub_data_bank(
 
 
 def test_job_status_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client, _ = _make_client(tmp_path, monkeypatch)
+    client, redis = _make_client(tmp_path, monkeypatch)
     resp = client.get("/api/v1/jobs/doesnotexist")
     assert resp.status_code == 404
+    redis.assert_only_called({"hgetall"})
 
 
 def test_job_status_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,6 +120,7 @@ def test_job_status_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     assert status["job_id"] == "abc"
     assert status["status"] == "processing"
     assert status["progress"] in range(101)
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -126,6 +128,7 @@ def test_job_result_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     _seed_job(rstub, "j1", "queued", tmp_path)
     resp = client.get("/api/v1/jobs/j1/result")
     assert resp.status_code == 425
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -140,6 +143,7 @@ def test_job_result_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     cd = headers.get("content-disposition") or ""
     assert "attachment;" in cd
     assert "hello" in resp.text
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_missing_file_is_expired(
@@ -163,6 +167,7 @@ def test_job_result_missing_file_is_expired(
     )
     resp = client.get("/api/v1/jobs/j3/result")
     assert resp.status_code == 410
+    redis_stub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_data_bank_config_missing(
@@ -173,6 +178,7 @@ def test_job_result_data_bank_config_missing(
     _seed_job(rstub, "j4", "completed", tmp_path)
     resp = client.get("/api/v1/jobs/j4/result")
     assert resp.status_code == 500
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_head_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -181,6 +187,7 @@ def test_job_result_head_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     _stub_data_bank(monkeypatch, head_status=404)
     resp = client.get("/api/v1/jobs/j5/result")
     assert resp.status_code == 410
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_head_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -189,6 +196,7 @@ def test_job_result_head_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     _stub_data_bank(monkeypatch, head_status=500)
     resp = client.get("/api/v1/jobs/j6/result")
     assert resp.status_code == 502
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_stream_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -197,6 +205,7 @@ def test_job_result_stream_404(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     _stub_data_bank(monkeypatch, stream_status=404)
     resp = client.get("/api/v1/jobs/j7/result")
     assert resp.status_code == 410
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_job_result_stream_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -205,3 +214,4 @@ def test_job_result_stream_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     _stub_data_bank(monkeypatch, stream_status=500)
     resp = client.get("/api/v1/jobs/j8/result")
     assert resp.status_code == 502
+    rstub.assert_only_called({"hset", "expire", "hgetall"})
