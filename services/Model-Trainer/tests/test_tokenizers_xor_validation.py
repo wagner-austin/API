@@ -51,3 +51,4 @@ def test_tokenizers_requires_corpus_file_id_and_forbids_extra(monkeypatch: Monke
     r2 = client.post("/tokenizers/train", json=body2)
     assert r2.status_code == 422
     assert calls == []
+    fake.assert_only_called(set())
