@@ -6,46 +6,9 @@ from typing import BinaryIO
 
 import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_workers.testing import FakeRedis
 
 import turkic_api.api.jobs as jobs_mod
-
-
-class _RedisStub:
-    def __init__(self) -> None:
-        self.closed = False
-        self.hashes: dict[str, dict[str, str]] = {}
-        self.published: list[tuple[str, str]] = []
-
-    def close(self) -> None:
-        self.closed = True
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        cur = self.hashes.get(key, {})
-        cur.update(mapping)
-        self.hashes[key] = cur
-        return 1
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self.hashes.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self.published.append((channel, message))
-        return 1
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        return True
-
-    def get(self, key: str) -> str | None:
-        return None
-
-    def sadd(self, key: str, *values: str) -> int:
-        return len(values)
-
-    def scard(self, key: str) -> int:
-        return len(self.hashes.get(key, {}))
 
 
 class _MockDataBankClient:
@@ -82,9 +45,9 @@ def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "k")
 
     # Stub _get_redis_client
-    stub = _RedisStub()
+    stub = FakeRedis()
 
-    def _get_client(_url: str) -> _RedisStub:
+    def _get_client(_url: str) -> FakeRedis:
         return stub
 
     monkeypatch.setattr(jobs_mod, "_get_redis_client", _get_client)
@@ -139,6 +102,7 @@ def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert stub.closed is True
     # With streaming upload, no local result file is written.
     assert not (tmp_path / "results" / "e1.txt").exists()
+    stub.assert_only_called({"hset", "expire", "publish", "close"})
 
 
 def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -149,9 +113,9 @@ def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "k")
 
     # Stub _get_redis_client
-    stub = _RedisStub()
+    stub = FakeRedis()
 
-    def _get_client(_url: str) -> _RedisStub:
+    def _get_client(_url: str) -> FakeRedis:
         return stub
 
     monkeypatch.setattr(jobs_mod, "_get_redis_client", _get_client)
@@ -205,3 +169,4 @@ def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     result = jobs_mod.process_corpus("e2", params)
     assert result["status"] == "completed"
     assert stub.closed is True
+    stub.assert_only_called({"hset", "expire", "publish", "close"})
