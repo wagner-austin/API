@@ -3,176 +3,7 @@ from __future__ import annotations
 from _pytest.monkeypatch import MonkeyPatch
 
 from platform_workers import redis as mod
-
-
-class _KV:
-    def ping(self, **kw: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, name: str, value: str) -> bool | str:
-        return True
-
-    def get(self, name: str) -> str | None:
-        return None
-
-    def delete(self, name: str) -> int:
-        return 0
-
-    def expire(self, name: str, time: int) -> bool:
-        return False
-
-    def hset(self, name: str, mapping: dict[str, str]) -> int:
-        return len(mapping)
-
-    def hget(self, key: str, field: str) -> str | None:
-        return None
-
-    def hgetall(self, name: str) -> dict[str, str]:
-        return {}
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self, name: str) -> int:
-        return 0
-
-    def sadd(self, name: str, value: str) -> int:
-        return 1
-
-    def sismember(self, key: str, member: str) -> bool:
-        return False
-
-    def close(self) -> None:
-        pass
-
-
-class _FakeRedisClient:
-    def __init__(self) -> None:
-        self._kv: dict[str, str] = {}
-        self._hash: dict[str, dict[str, str]] = {}
-        self._set: dict[str, set[str]] = {}
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, name: str, value: str) -> bool | str:
-        self._kv[name] = value
-        return True
-
-    def get(self, name: str) -> str | None:
-        return self._kv.get(name)
-
-    def delete(self, *names: str) -> int:
-        removed = 0
-        for name in names:
-            if name in self._kv:
-                del self._kv[name]
-                removed += 1
-            if name in self._hash:
-                del self._hash[name]
-                removed += 1
-            if name in self._set:
-                del self._set[name]
-                removed += 1
-        return removed
-
-    def expire(self, name: str, time: int) -> bool:
-        return name in self._kv or name in self._hash or name in self._set
-
-    def hset(self, name: str, mapping: dict[str, str]) -> int:
-        d = self._hash.setdefault(name, {})
-        for k, v in mapping.items():
-            d[k] = v
-        return len(mapping)
-
-    def hget(self, name: str, key: str) -> str | None:
-        return self._hash.get(name, {}).get(key)
-
-    def hgetall(self, name: str) -> dict[str, str]:
-        return self._hash.get(name, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        return 1
-
-    def scard(self, name: str) -> int:
-        return len(self._set.get(name, set()))
-
-    def sadd(self, name: str, value: str) -> int:
-        s = self._set.setdefault(name, set())
-        before = len(s)
-        s.add(value)
-        return 1 if len(s) > before else 0
-
-    def sismember(self, name: str, value: str) -> bool | int:
-        return value in self._set.get(name, set())
-
-    def close(self) -> None:
-        pass
-
-
-class _FakeRedisStr:
-    def __init__(self) -> None:
-        self._pub: list[tuple[str, str]] = []
-        self._kv: dict[str, str] = {}
-        self._hash: dict[str, dict[str, str]] = {}
-        self._set: dict[str, set[str]] = {}
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def set(self, key: str, value: str) -> bool | str:
-        self._kv[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        return self._kv.get(key)
-
-    def delete(self, key: str) -> int:
-        removed = 0
-        if key in self._kv:
-            del self._kv[key]
-            removed += 1
-        if key in self._hash:
-            del self._hash[key]
-            removed += 1
-        if key in self._set:
-            del self._set[key]
-            removed += 1
-        return removed
-
-    def expire(self, key: str, time: int) -> bool:
-        return key in self._kv or key in self._hash or key in self._set
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        d = self._hash.setdefault(key, {})
-        for k, v in mapping.items():
-            d[k] = v
-        return len(mapping)
-
-    def hget(self, key: str, field: str) -> str | None:
-        return self._hash.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        return self._hash.get(key, {}).copy()
-
-    def publish(self, channel: str, message: str) -> int:
-        self._pub.append((channel, message))
-        return 1
-
-    def scard(self, key: str) -> int:
-        return len(self._set.get(key, set()))
-
-    def sadd(self, key: str, member: str) -> int:
-        s = self._set.setdefault(key, set())
-        before = len(s)
-        s.add(member)
-        return 1 if len(s) > before else 0
-
-    def sismember(self, key: str, member: str) -> bool:
-        return member in self._set.get(key, set())
-
-    def close(self) -> None:
-        pass
+from platform_workers.testing import FakeRedis, FakeRedisClient
 
 
 class _FakeRedisBytes:
@@ -187,7 +18,7 @@ class _FakeRedisBytes:
 
 
 def test_redis_for_kv_factory(monkeypatch: MonkeyPatch) -> None:
-    fake = _FakeRedisStr()
+    fake = FakeRedis()
 
     def _factory(_url: str) -> mod.RedisStrProto:
         return fake
@@ -204,6 +35,9 @@ def test_redis_for_kv_factory(monkeypatch: MonkeyPatch) -> None:
     assert r.sadd("set1", "m1") == 1
     assert r.scard("set1") == 1
     r.close()
+    fake.assert_only_called(
+        {"ping", "get", "set", "hset", "hgetall", "publish", "sadd", "scard", "close"}
+    )
 
 
 def test_redis_for_rq_factory(monkeypatch: MonkeyPatch) -> None:
@@ -219,15 +53,18 @@ def test_redis_for_rq_factory(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_redis_runtime_import_kv(monkeypatch: MonkeyPatch) -> None:
+    fake = FakeRedis()
+
     def _fake_from_url(
         url: str,
         **kwargs: str | int | float | bool | None,
     ) -> mod.RedisStrProto:
-        return _KV()
+        return fake
 
     monkeypatch.setattr("platform_workers.redis.redis.from_url", _fake_from_url, raising=True)
     kv = mod.redis_for_kv("redis://kv")
     assert kv.ping()
+    fake.assert_only_called({"ping"})
 
 
 def test_redis_runtime_import_rq(monkeypatch: MonkeyPatch) -> None:
@@ -250,7 +87,7 @@ def test_redis_runtime_import_rq(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_redis_str_adapter_comprehensive() -> None:
-    fake = _FakeRedisClient()
+    fake = FakeRedisClient()
     adapter = mod._RedisStrAdapter(fake)
     assert adapter.ping()
     assert adapter.get("missing") is None
@@ -267,10 +104,13 @@ def test_redis_str_adapter_comprehensive() -> None:
     assert adapter.sismember("set1", "member1")
     assert not adapter.sismember("set1", "notamember")
     adapter.close()
+    fake.assert_only_called(
+        {"ping", "get", "set", "hset", "hget", "hgetall", "publish", "sadd", "sismember", "close"}
+    )
 
 
 def test_redis_str_adapter_delete_and_expire() -> None:
-    fake = _FakeRedisClient()
+    fake = FakeRedisClient()
     adapter = mod._RedisStrAdapter(fake)
     # Test delete
     adapter.set("key1", "val1")
@@ -282,6 +122,7 @@ def test_redis_str_adapter_delete_and_expire() -> None:
     adapter.set("key2", "val2")
     result = adapter.expire("key2", 60)
     assert result is True or result is False  # Must be a bool
+    fake.assert_only_called({"set", "get", "delete", "expire"})
 
 
 def test_redis_bytes_adapter_comprehensive() -> None:
@@ -292,6 +133,8 @@ def test_redis_bytes_adapter_comprehensive() -> None:
 
 
 def test_redis_for_kv_runtime_module(monkeypatch: MonkeyPatch) -> None:
+    fake = FakeRedisClient()
+
     class _Module:
         def from_url(
             self,
@@ -302,14 +145,14 @@ def test_redis_for_kv_runtime_module(monkeypatch: MonkeyPatch) -> None:
             socket_connect_timeout: float,
             socket_timeout: float,
             retry_on_timeout: bool,
-        ) -> _KV:
+        ) -> FakeRedisClient:
             assert url == "redis://kv-runtime"
             assert encoding == "utf-8"
             assert decode_responses
             assert socket_connect_timeout == 1.0
             assert socket_timeout == 1.0
             assert retry_on_timeout
-            return _KV()
+            return fake
 
     monkeypatch.setattr(mod, "_load_redis_str_module", lambda: _Module(), raising=True)
     kv = mod.redis_for_kv("redis://kv-runtime")
@@ -319,6 +162,7 @@ def test_redis_for_kv_runtime_module(monkeypatch: MonkeyPatch) -> None:
     assert kv.hset("h1", {"f": "v"}) == 1
     assert kv.sadd("s1", "m1") in (0, 1)
     assert kv.scard("s1") in (0, 1)
+    fake.assert_only_called({"ping", "get", "set", "hset", "sadd", "scard"})
 
 
 def test_redis_for_rq_runtime_module(monkeypatch: MonkeyPatch) -> None:
