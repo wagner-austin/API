@@ -63,6 +63,8 @@ def test_process_wrapped_job_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert any(t.endswith("started.v1") for t in types)
     assert any(t.endswith("completed.v1") for t in types)
 
+    fake_redis.assert_only_called({"set", "get", "publish"})
+
 
 def test__redis_client_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
     # Ensure wrapper calls underlying factory and returns it
@@ -78,6 +80,7 @@ def test__redis_client_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(jobs_mod, "redis_for_kv", _rf)
     out = jobs_mod._redis_client("redis://ignored")
     assert out is fake
+    fake.assert_only_called(set())
 
 
 def test_process_wrapped_job_unsupported_service(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -108,6 +111,7 @@ def test_process_wrapped_job_unsupported_service(monkeypatch: pytest.MonkeyPatch
     # Verify failed event was published
     events = [decode_job_event(p.payload) for p in fake_redis.published]
     assert any(is_failed(e) for e in events)
+    fake_redis.assert_only_called({"publish"})
 
 
 def test_process_wrapped_job_invalid_lastfm_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,6 +147,7 @@ def test_process_wrapped_job_invalid_lastfm_credentials(monkeypatch: pytest.Monk
 
     events = [decode_job_event(p.payload) for p in fake_redis.published]
     assert any(is_failed(e) for e in events)
+    fake_redis.assert_only_called({"publish"})
 
 
 def test_process_wrapped_job_invalid_apple_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -179,6 +184,7 @@ def test_process_wrapped_job_invalid_apple_credentials(monkeypatch: pytest.Monke
 
     events = [decode_job_event(p.payload) for p in fake_redis.published]
     assert any(is_failed(e) for e in events)
+    fake_redis.assert_only_called({"publish"})
 
 
 def test_process_wrapped_job_invalid_youtube_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -214,3 +220,4 @@ def test_process_wrapped_job_invalid_youtube_credentials(monkeypatch: pytest.Mon
 
     events = [decode_job_event(p.payload) for p in fake_redis.published]
     assert any(is_failed(e) for e in events)
+    fake_redis.assert_only_called({"publish"})
