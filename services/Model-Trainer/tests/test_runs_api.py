@@ -126,3 +126,4 @@ def test_runs_train_and_status_and_logs(
     logs = client.get(f"/runs/{run_id}/logs", params={"tail": 10})
     assert logs.status_code == 200
     assert "hello" in logs.text
+    fake.assert_only_called({"hset", "hgetall", "get"})
