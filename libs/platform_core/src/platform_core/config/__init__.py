@@ -44,6 +44,7 @@ from .model_trainer import (
     ModelTrainerSecurityConfig,
     ModelTrainerSettings,
     ModelTrainerTokenizerCleanupConfig,
+    ModelTrainerWandbConfig,
     load_model_trainer_settings,
 )
 from .turkic_api import TurkicApiSettings, load_turkic_api_settings
@@ -69,6 +70,7 @@ __all__ = [
     "ModelTrainerSecurityConfig",
     "ModelTrainerSettings",
     "ModelTrainerTokenizerCleanupConfig",
+    "ModelTrainerWandbConfig",
     "QRConfig",
     "RedisConfig",
     "TranscriptConfig",
