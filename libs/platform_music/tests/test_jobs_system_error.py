@@ -47,3 +47,4 @@ def test_process_wrapped_job_system_error(monkeypatch: pytest.MonkeyPatch) -> No
 
     events = [decode_job_event(p.payload) for p in fake_redis.published]
     assert any(is_failed(e) for e in events)
+    fake_redis.assert_only_called({"publish"})
