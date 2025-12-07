@@ -95,6 +95,7 @@ def ensure_settings(settings: Settings, *, create_dirs: bool) -> Settings:
     app_cfg.setdefault("port", DEFAULT_PORT)
 
     digits_cfg.setdefault("model_dir", (Path.cwd() / ".handwriting-ai" / "models").resolve())
+    digits_cfg.setdefault("seed_root", Path("/app/seed/digits/models"))
     digits_cfg.setdefault("active_model", "default")
     digits_cfg.setdefault("tta", False)
     digits_cfg.setdefault("uncertain_threshold", DEFAULT_UNCERTAIN_THRESHOLD)
