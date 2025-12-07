@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from platform_workers.redis import _load_redis_error_class
 from platform_workers.testing import FakeRedis
 
@@ -11,74 +12,59 @@ from model_trainer.core.infra.redis_utils import get_with_retry, set_with_retry
 _RedisError: type[BaseException] = _load_redis_error_class()
 
 
-class _Flaky(FakeRedis):
-    """FakeRedis that fails on first get/set call, succeeds on retry."""
+def test_redis_utils_retry_branches(monkeypatch: MonkeyPatch) -> None:
+    """Test retry logic using monkeypatched FakeRedis."""
+    f = FakeRedis()
+    set_calls: dict[str, int] = {"n": 0}
+    get_calls: dict[str, int] = {"n": 0}
+    original_set = f.set
+    original_get = f.get
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._set_calls = 0
-        self._get_calls = 0
-
-    def set(self, key: str, value: str) -> bool:
-        self._set_calls += 1
-        if self._set_calls == 1:
+    def flaky_set(key: str, value: str) -> bool:
+        set_calls["n"] += 1
+        if set_calls["n"] == 1:
             raise _RedisError("transient")
-        return super().set(key, value)
+        return original_set(key, value)
 
-    def get(self, key: str) -> str | None:
-        self._get_calls += 1
-        if self._get_calls == 1:
+    def flaky_get(key: str) -> str | None:
+        get_calls["n"] += 1
+        if get_calls["n"] == 1:
             raise _RedisError("transient")
-        return super().get(key)
+        return original_get(key)
 
-
-class _AlwaysFails(FakeRedis):
-    """FakeRedis that always raises RedisError on get/set."""
-
-    def set(self, key: str, value: str) -> bool:
-        raise _RedisError("always fails")
-
-    def get(self, key: str) -> str | None:
-        raise _RedisError("always fails")
-
-
-class _NoopGetRaises(FakeRedis):
-    """FakeRedis that raises if get is called - for testing zero-attempt paths."""
-
-    def get(self, key: str) -> str | None:
-        raise AssertionError("get should not be called when attempts=0")
-
-
-class _NoopSetRaises(FakeRedis):
-    """FakeRedis that raises if set is called - for testing zero-attempt paths."""
-
-    def set(self, key: str, value: str) -> bool:
-        raise AssertionError("set should not be called when attempts=0")
-
-
-def test_redis_utils_retry_branches() -> None:
-    f = _Flaky()
+    monkeypatch.setattr(f, "set", flaky_set)
+    monkeypatch.setattr(f, "get", flaky_get)
     set_with_retry(f, "k", "v", attempts=2)
     out = get_with_retry(f, "k", attempts=2)
     assert out == "v"
+    f.assert_only_called({"set", "get"})  # Both methods called via wrappers
 
 
-def test_redis_utils_get_exhausts_retries_and_raises() -> None:
+def test_redis_utils_get_exhausts_retries_and_raises(monkeypatch: MonkeyPatch) -> None:
     """Test get_with_retry raises after exhausting all retry attempts - covers line 24."""
-    client = _AlwaysFails()
+    client = FakeRedis()
+
+    def always_fail_get(key: str) -> str | None:
+        raise _RedisError("always fails")
+
+    monkeypatch.setattr(client, "get", always_fail_get)
     with pytest.raises(_RedisError, match="always fails"):
         get_with_retry(client, "key", attempts=3)
+    client.assert_only_called(set())
 
 
 def test_redis_utils_get_zero_attempts_returns_none() -> None:
-    out = get_with_retry(_NoopGetRaises(), "k", attempts=0)
+    f = FakeRedis()
+    out = get_with_retry(f, "k", attempts=0)
     assert out is None
+    f.assert_only_called(set())  # No calls when attempts=0
 
 
 def test_redis_utils_set_success_first_attempt() -> None:
     s = FakeRedis()
     set_with_retry(s, "a", "b", attempts=3)
     assert s.get("a") == "b"
+    s.assert_only_called({"set", "get"})
 
 
 def test_redis_utils_get_success_first_attempt() -> None:
@@ -86,11 +72,14 @@ def test_redis_utils_get_success_first_attempt() -> None:
     s.set("k", "v")
     out = get_with_retry(s, "k", attempts=3)
     assert out == "v"
+    s.assert_only_called({"set", "get"})
 
 
 def test_redis_utils_set_zero_attempts_noop() -> None:
+    f = FakeRedis()
     # Should not raise; function returns None
-    set_with_retry(_NoopSetRaises(), "k", "v", attempts=0)
+    set_with_retry(f, "k", "v", attempts=0)
+    f.assert_only_called(set())  # No calls when attempts=0
 
 
 def test_settings_env_int_invalid_uses_default(monkeypatch: pytest.MonkeyPatch) -> None:
