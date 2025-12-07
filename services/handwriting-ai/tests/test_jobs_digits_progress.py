@@ -7,7 +7,7 @@ import pytest
 from PIL import Image
 from platform_core.job_events import JobEventV1, decode_job_event, is_progress
 from platform_core.json_utils import JSONValue, load_json_str
-from platform_workers.testing import FakeRedis
+from platform_workers.testing import FakeRedis, FakeRedisPublishError
 
 import handwriting_ai.jobs.digits as dj
 import handwriting_ai.training.mnist_train as mt
@@ -56,14 +56,6 @@ class _TinyBase:
             for x in range(12, 16):
                 img.putpixel((x, y), 255)
         return img, idx % 10
-
-
-class _RaisingRedis:
-    def publish(self, channel: str, message: str) -> int:
-        raise OSError("fail")
-
-    def close(self) -> None:
-        return None
 
 
 def test_process_train_job_emits_progress(
@@ -146,8 +138,10 @@ def test_process_train_job_emitters_with_bad_publisher_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     # Use a Redis stub that raises to exercise error paths inside the emitters
-    def _redis_for_kv(_: str) -> _RaisingRedis:
-        return _RaisingRedis()
+    fr = FakeRedisPublishError()
+
+    def _redis_for_kv(_: str) -> FakeRedisPublishError:
+        return fr
 
     monkeypatch.setattr(dj, "redis_for_kv", _redis_for_kv, raising=True)
 
@@ -194,5 +188,6 @@ def test_process_train_job_emitters_with_bad_publisher_raises(
     }
 
     # Should raise when publisher fails during started event
-    with pytest.raises(OSError, match="fail"):
+    with pytest.raises(OSError, match="publish failure"):
         dj._decode_and_process_train_job(payload)
+    fr.assert_only_called({"publish", "close"})
