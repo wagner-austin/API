@@ -28,6 +28,7 @@ class HandwritingAiAppConfig(TypedDict, total=False):
 
 class HandwritingAiDigitsConfig(TypedDict, total=False):
     model_dir: Path
+    seed_root: Path
     active_model: str
     tta: bool
     uncertain_threshold: float
