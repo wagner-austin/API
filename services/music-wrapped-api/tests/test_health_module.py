@@ -16,3 +16,4 @@ def test_readyz_endpoint_ready() -> None:
     r.sadd("rq:workers", "worker-a")
     res = readyz_endpoint(r)
     assert res["status"] == "ready"
+    r.assert_only_called({"sadd", "ping", "scard"})
