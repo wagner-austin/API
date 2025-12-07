@@ -6,6 +6,7 @@ from typing import Literal, Protocol
 
 import pytest
 from platform_core.job_types import job_key
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -53,6 +54,7 @@ class _Backend:
         cancelled: Callable[[], bool],
         prepared: str,
         progress: Callable[[int, int, float], None] | None = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         return TrainOutcome(
             cancelled=True,
@@ -178,3 +180,4 @@ def test_process_train_job_cancelled_block(
     assert status_data["status"] == "failed"
     assert status_data["message"] == "Training cancelled"
     assert loss_final <= loss_initial
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
