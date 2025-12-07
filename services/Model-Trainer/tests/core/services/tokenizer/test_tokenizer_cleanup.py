@@ -69,6 +69,7 @@ def _settings_with_tokenizer_cleanup(cfg: TokenizerCleanupConfig, artifacts_root
         "rq": rq,
         "app": app,
         "security": security,
+        "wandb": {"enabled": False, "project": "test"},
     }
     return settings
 
