@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
+from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.testing import FakeRedis
 
 from model_trainer.core.config.settings import Settings
@@ -78,6 +79,7 @@ class _BackendWithLoad:
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         # Simulate training progress with decreasing loss
         # Args: step, epoch, loss, train_ppl, grad_norm, samples_per_sec, val_loss, val_ppl
@@ -254,6 +256,7 @@ def test_training_worker_loads_pretrained_model(
             Callable[[int, int, float, float, float, float, float | None, float | None], None]
             | None
         ) = None,
+        wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         # Use our tracking callback
         return original_train(
@@ -316,3 +319,4 @@ def test_training_worker_loads_pretrained_model(
     # Verify status is completed
     status = TrainerJobStore(fake).load("run-finetune")
     assert status is not None and status["status"] == "completed"
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
