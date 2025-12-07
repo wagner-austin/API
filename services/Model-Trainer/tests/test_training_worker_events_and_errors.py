@@ -90,6 +90,7 @@ def test_emit_metrics_helpers_publish() -> None:
     job_utils.emit_completed_metrics(
         r, run_id, 123, test_loss=0.9, test_ppl=1.5, artifact_path="/a"
     )
+    r.assert_only_called({"publish"})
 
 
 def test_process_train_job_sets_status_message_on_exception(
@@ -160,3 +161,4 @@ def test_process_train_job_sets_status_message_on_exception(
     status = TrainerJobStore(client).load("run-exc")
     assert status is not None and status["status"] == "failed"
     assert status["error"] is not None and "container creation failed" in status["error"]
+    client.assert_only_called({"set", "hset", "hgetall", "publish"})
