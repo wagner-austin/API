@@ -7,6 +7,7 @@ from typing import Protocol
 
 import pytest
 from platform_core.errors import AppError, ErrorCode
+from platform_workers.testing import FakeRedis
 
 from handwriting_ai.api.dependencies import (
     _get_redis_url,
@@ -89,17 +90,10 @@ def test_get_redis_yields_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test get_redis() yields Redis client and closes on teardown."""
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
 
-    closed = {"value": False}
+    redis_instance = FakeRedis()
 
-    class _FakeRedis:
-        def close(self) -> None:
-            closed["value"] = True
-
-        def ping(self) -> bool:
-            return True
-
-    def _fake_redis_for_kv(url: str) -> _FakeRedis:
-        return _FakeRedis()
+    def _fake_redis_for_kv(url: str) -> FakeRedis:
+        return redis_instance
 
     monkeypatch.setattr(
         "handwriting_ai.api.dependencies.redis_for_kv", _fake_redis_for_kv, raising=True
@@ -109,12 +103,13 @@ def test_get_redis_yields_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
     client = next(gen)
     if client is None:
         raise AssertionError("expected redis client")
-    assert not closed["value"]
+    assert not redis_instance.closed
 
     # Exhaust the generator to trigger finally block using gen.close()
     gen.close()
 
-    assert closed["value"]
+    assert redis_instance.closed
+    redis_instance.assert_only_called({"close"})
 
 
 def test_get_request_logger_returns_logger(monkeypatch: pytest.MonkeyPatch) -> None:
