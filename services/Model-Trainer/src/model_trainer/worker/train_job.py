@@ -12,6 +12,7 @@ from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key, cancel_key, heartbeat_key
+from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
 from platform_workers.job_context import JobContext, make_job_context
 from platform_workers.redis import RedisStrProto, is_redis_error
 
@@ -35,6 +36,33 @@ from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 _log = get_logger(__name__)
 _TRAINER_DOMAIN: JobDomain = "trainer"
+
+
+def _create_wandb_publisher(
+    settings: Settings, run_id: str, model_family: str
+) -> WandbPublisher | None:
+    """Create a wandb publisher from settings.
+
+    Args:
+        settings: Application settings with wandb configuration.
+        run_id: Training run identifier.
+        model_family: Model family name (char_lstm, gpt2).
+
+    Returns:
+        WandbPublisher if enabled and wandb installed, None otherwise.
+    """
+    wandb_cfg = settings["wandb"]
+    if not wandb_cfg["enabled"]:
+        return None
+
+    project = wandb_cfg["project"]
+    run_name = f"{model_family}-{run_id}"
+
+    try:
+        return WandbPublisher(project=project, run_name=run_name, enabled=True)
+    except WandbUnavailableError:
+        _log.warning("wandb enabled but not installed, skipping wandb logging")
+        return None
 
 
 def _handle_train_error(
@@ -266,6 +294,10 @@ def _execute_training(
         prepared = backend.load(pretrained_dir, settings, tokenizer=tok_handle)
     else:
         prepared = backend.prepare(cfg, settings, tokenizer=tok_handle)
+
+    # Create wandb publisher if enabled via settings
+    wandb_pub = _create_wandb_publisher(settings, run_id, cfg["model_family"])
+
     result = backend.train(
         cfg,
         settings,
@@ -274,6 +306,7 @@ def _execute_training(
         cancelled=cancelled_fn,
         prepared=prepared,
         progress=_progress,
+        wandb_publisher=wandb_pub,
     )
     if result["cancelled"]:
         now = datetime.utcnow()
