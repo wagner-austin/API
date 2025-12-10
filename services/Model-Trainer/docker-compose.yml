@@ -25,6 +25,13 @@ services:
       - hf-cache:/hf-cache
     ports:
       - "8005:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trainer.rule=PathPrefix(`/trainer`)"
+      - "traefik.http.routers.trainer.middlewares=trainer-strip"
+      - "traefik.http.middlewares.trainer-strip.stripprefix.prefixes=/trainer"
+      - "traefik.http.services.trainer.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
