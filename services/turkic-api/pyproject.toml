@@ -34,7 +34,7 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 
 [tool.poetry.scripts]
-turkic-rq-worker = "turkic_api.api.worker_entry:main"
+turkic-rq-worker = "turkic_api.worker_entry:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
