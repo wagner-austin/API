@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Final, TypedDict
 
-from ._utils import _optional_env_str, _require_env_csv, _require_env_str
+from ._utils import _optional_env_str, _parse_str, _require_env_csv, _require_env_str
 
 DEFAULT_PORT: Final[int] = 8000
 DEFAULT_THREADS: Final[int] = 0
@@ -120,8 +120,11 @@ def _apply_app_env(app: HandwritingAiAppConfig) -> HandwritingAiAppConfig:
         if port <= 0 or port > 65535:
             raise RuntimeError("port out of range")
         out["port"] = port
-    if (v := _optional_env_str("APP__DATA_BANK_API_URL")) is not None:
-        out["data_bank_api_url"] = v
+    gateway_url = _parse_str("API_GATEWAY_URL", "")
+    direct_url = _optional_env_str("APP__DATA_BANK_API_URL")
+    data_bank_url = f"{gateway_url}/data-bank" if gateway_url else direct_url
+    if data_bank_url is not None:
+        out["data_bank_api_url"] = data_bank_url
     if (v := _optional_env_str("APP__DATA_BANK_API_KEY")) is not None:
         out["data_bank_api_key"] = v
     return out

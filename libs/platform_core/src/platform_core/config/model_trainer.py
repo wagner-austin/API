@@ -135,6 +135,10 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "min_unused_days": _parse_int("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", 30),
     }
 
+    gateway_url = _parse_str("API_GATEWAY_URL", "")
+    direct_url = _parse_str("APP__DATA_BANK_API_URL", "")
+    data_bank_url = f"{gateway_url}/data-bank" if gateway_url else direct_url
+
     app_cfg: ModelTrainerAppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "artifacts_root": _parse_str("APP__ARTIFACTS_ROOT", "/data/artifacts"),
@@ -142,7 +146,7 @@ def load_model_trainer_settings() -> ModelTrainerSettings:
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
         "threads": _parse_int("APP__THREADS", 0),
         "tokenizer_sample_max_lines": _parse_int("APP__TOKENIZER_SAMPLE_MAX_LINES", 10000),
-        "data_bank_api_url": _parse_str("APP__DATA_BANK_API_URL", ""),
+        "data_bank_api_url": data_bank_url,
         "data_bank_api_key": _parse_str("APP__DATA_BANK_API_KEY", ""),
         "cleanup": cleanup_cfg,
         "corpus_cache_cleanup": corpus_cache_cleanup_cfg,

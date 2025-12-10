@@ -95,6 +95,10 @@ class ModelTrainerConfig(TypedDict, total=True):
     rate_window_seconds: int
 
 
+class GatewayConfig(TypedDict, total=True):
+    api_url: str
+
+
 class DiscordbotSettings(TypedDict, total=True):
     discord: DiscordConfig
     qr: QRConfig
@@ -103,6 +107,7 @@ class DiscordbotSettings(TypedDict, total=True):
     handwriting: HandwritingConfig
     digits: DigitsConfig
     model_trainer: ModelTrainerConfig
+    gateway: GatewayConfig
 
 
 def load_discordbot_settings() -> DiscordbotSettings:
@@ -134,8 +139,11 @@ def load_discordbot_settings() -> DiscordbotSettings:
         "commands_sync_global": _parse_bool("COMMANDS_SYNC_GLOBAL", False),
     }
 
+    # --- Gateway URL ---
+    gateway_base_url = _parse_str("API_GATEWAY_URL", "")
+
     qr_cfg: QRConfig = {
-        "api_url": _parse_str("QR_API_URL", ""),
+        "api_url": f"{gateway_base_url}/qr" if gateway_base_url else _parse_str("QR_API_URL", ""),
         "rate_limit": _parse_int("QRCODE_RATE_LIMIT", 1),
         "rate_window_seconds": _parse_int("QRCODE_RATE_WINDOW_SECONDS", 1),
         "default_error_correction": _parse_str("QR_DEFAULT_ERROR_CORRECTION", "M").upper(),
@@ -146,8 +154,9 @@ def load_discordbot_settings() -> DiscordbotSettings:
         "public_responses": _parse_bool("QR_PUBLIC_RESPONSES", True),
     }
 
+    transcript_direct_url = _parse_str("TRANSCRIPT_API_URL", "http://localhost:8000")
     transcript_cfg: TranscriptConfig = {
-        "api_url": _parse_str("TRANSCRIPT_API_URL", "http://localhost:8000"),
+        "api_url": f"{gateway_base_url}/transcript" if gateway_base_url else transcript_direct_url,
         "provider": _parse_str("TRANSCRIPT_PROVIDER", "api").strip().lower(),
         "public_responses": _parse_bool("TRANSCRIPT_PUBLIC_RESPONSES", False),
         "rate_limit": _parse_int("TRANSCRIPT_RATE_LIMIT", 2),
@@ -185,8 +194,9 @@ def load_discordbot_settings() -> DiscordbotSettings:
         "rq_transcript_retry_intervals_sec": retry_intervals,
     }
 
+    hw_direct_url = _optional_env_str("HANDWRITING_API_URL")
     handwriting_cfg: HandwritingConfig = {
-        "api_url": _optional_env_str("HANDWRITING_API_URL"),
+        "api_url": f"{gateway_base_url}/handwriting" if gateway_base_url else hw_direct_url,
         "api_key": _optional_env_str("HANDWRITING_API_KEY"),
         "api_timeout_seconds": _parse_int("HANDWRITING_API_TIMEOUT_SECONDS", 5),
         "api_max_retries": _parse_int("HANDWRITING_API_MAX_RETRIES", 1),
@@ -199,13 +209,18 @@ def load_discordbot_settings() -> DiscordbotSettings:
         "max_image_mb": _parse_int("DIGITS_MAX_IMAGE_MB", 2),
     }
 
+    model_trainer_direct_url = _optional_env_str("MODEL_TRAINER_API_URL")
     model_trainer_cfg: ModelTrainerConfig = {
-        "api_url": _optional_env_str("MODEL_TRAINER_API_URL"),
+        "api_url": f"{gateway_base_url}/trainer" if gateway_base_url else model_trainer_direct_url,
         "api_key": _optional_env_str("MODEL_TRAINER_API_KEY"),
         "api_timeout_seconds": _parse_int("MODEL_TRAINER_API_TIMEOUT_SECONDS", 10),
         "api_max_retries": _parse_int("MODEL_TRAINER_API_MAX_RETRIES", 1),
         "rate_limit": _parse_int("MODEL_TRAINER_RATE_LIMIT", 1),
         "rate_window_seconds": _parse_int("MODEL_TRAINER_RATE_WINDOW_SECONDS", 10),
+    }
+
+    gateway_cfg: GatewayConfig = {
+        "api_url": gateway_base_url,
     }
 
     return {
@@ -216,6 +231,7 @@ def load_discordbot_settings() -> DiscordbotSettings:
         "handwriting": handwriting_cfg,
         "digits": digits_cfg,
         "model_trainer": model_trainer_cfg,
+        "gateway": gateway_cfg,
     }
 
 
@@ -228,6 +244,7 @@ __all__ = [
     "DigitsConfig",
     "DiscordConfig",
     "DiscordbotSettings",
+    "GatewayConfig",
     "HandwritingConfig",
     "LogLevel",
     "ModelTrainerConfig",
