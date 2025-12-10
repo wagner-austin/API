@@ -9,10 +9,10 @@ from platform_core.json_utils import (
 from platform_core.logging import setup_logging
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
+from ..settings import load_default_options_from_env
+from ..validators import Defaults
 from .routes import health as routes_health
 from .routes import qr as routes_qr
-from .settings import load_default_options_from_env
-from .validators import Defaults
 
 
 def create_app(defaults: Defaults | None = None) -> FastAPI:

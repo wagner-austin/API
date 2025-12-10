@@ -4,9 +4,9 @@ from fastapi import APIRouter, Request
 from platform_core.json_utils import load_json_bytes
 from starlette.responses import Response
 
-from ..generator import generate_png
-from ..types import QROptions
-from ..validators import Defaults, _decode_qr_payload
+from ...generator import generate_png
+from ...types import QROptions
+from ...validators import Defaults, _decode_qr_payload
 
 
 def build_router(defaults: Defaults) -> APIRouter:

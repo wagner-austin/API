@@ -1,18 +1,36 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
+
+from qr_api.api import _test_hooks
 
 
 @pytest.fixture(autouse=True)
-def _readyz_redis(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Provide typed Redis stub and REDIS_URL for /readyz in tests."""
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import qr_api.app as app_mod
+def _restore_hooks() -> Generator[None, None, None]:
+    """Restore all hooks after each test."""
+    original_redis = _test_hooks.redis_factory
+    original_env = _test_hooks.get_env
+    yield
+    _test_hooks.redis_factory = original_redis
+    _test_hooks.get_env = original_env
 
-    def _rf(url: str) -> FakeRedis:
+
+@pytest.fixture(autouse=True)
+def _readyz_redis() -> None:
+    """Provide typed Redis stub for /readyz in tests."""
+    _env_values: dict[str, str] = {"REDIS_URL": "redis://ignored"}
+
+    def _fake_env(key: str) -> str | None:
+        return _env_values.get(key)
+
+    def _rf(url: str) -> RedisStrProto:
         r = FakeRedis()
         r.sadd("rq:workers", "worker-1")  # Simulate one worker
         return r
 
-    monkeypatch.setattr(app_mod, "redis_for_kv", _rf)
+    _test_hooks.get_env = _fake_env
+    _test_hooks.redis_factory = _rf

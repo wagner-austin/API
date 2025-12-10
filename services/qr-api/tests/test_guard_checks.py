@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
-from pytest import MonkeyPatch, raises
+import pytest
+from pytest import raises
 
 
 def _project_root() -> Path:
@@ -98,15 +100,25 @@ def test_guard_main_unknown_flag_is_ignored(tmp_path: Path) -> None:
     assert rc == 0
 
 
+@pytest.fixture()
+def _restore_guard_hooks() -> Generator[None, None, None]:
+    """Restore guard hooks after each test."""
+    from scripts import guard as guard_mod
+
+    original_is_dir = guard_mod._is_dir_hook
+    yield
+    guard_mod._is_dir_hook = original_is_dir
+
+
 def test_guard_find_monorepo_root_errors_when_missing_libs(
-    tmp_path: Path, monkeypatch: MonkeyPatch
+    tmp_path: Path, _restore_guard_hooks: None
 ) -> None:
     from scripts import guard as guard_mod
 
-    def _always_false(self: Path) -> bool:
+    def _always_false(path: Path) -> bool:
         return False
 
-    monkeypatch.setattr(Path, "is_dir", _always_false)
+    guard_mod._is_dir_hook = _always_false
 
     with raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
         guard_mod._find_monorepo_root(tmp_path)

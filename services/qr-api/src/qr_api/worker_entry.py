@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from platform_core.config import _require_env_str
 from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.logging import get_logger, setup_logging
 from platform_core.queues import QR_QUEUE
@@ -39,7 +38,9 @@ def _get_default_runner() -> WorkerRunnerProtocol:
 
 def _build_config() -> WorkerConfig:
     """Build worker configuration from environment variables."""
-    redis_url = _require_env_str("REDIS_URL")
+    redis_url = _test_hooks.get_env("REDIS_URL")
+    if redis_url is None:
+        raise RuntimeError("REDIS_URL environment variable is required")
     return {
         "redis_url": redis_url,
         "queue_name": QR_QUEUE,

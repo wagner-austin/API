@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from importlib import import_module
 from types import ModuleType
 from typing import BinaryIO, Protocol, TypeGuard
@@ -27,12 +28,16 @@ class _SegnoModule(Protocol):
         """Create a QR code object."""
 
 
+# Hook for testing - allows injecting a fake module loader.
+_import_module: Callable[[str], ModuleType] = import_module
+
+
 def _is_segno_module(candidate: ModuleType) -> TypeGuard[_SegnoModule]:
     return hasattr(candidate, "make")
 
 
 def _load_segno_module() -> _SegnoModule:
-    module = import_module("segno")
+    module = _import_module("segno")
     if not _is_segno_module(module):
         raise RuntimeError("segno module does not expose make()")
     return module

@@ -3,30 +3,31 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
-from pytest import MonkeyPatch
 
-from qr_api.app import create_app
+from qr_api.api import _test_hooks
+from qr_api.api.main import create_app
 from qr_api.settings import load_default_options_from_env
 
 
-def _client(monkeypatch: MonkeyPatch, *, workers: int) -> tuple[TestClient, FakeRedis]:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    from qr_api import app as app_mod
+def _client(*, workers: int) -> tuple[TestClient, FakeRedis]:
+    env_values = {"REDIS_URL": "redis://ignored"}
+    _test_hooks.get_env = lambda key: env_values.get(key)
 
     fake_redis = FakeRedis()
     for i in range(workers):
         fake_redis.sadd("rq:workers", f"worker-{i}")
 
-    def _fake(url: str) -> FakeRedis:
+    def _fake(url: str) -> RedisStrProto:
         return fake_redis
 
-    monkeypatch.setattr(app_mod, "redis_for_kv", _fake)
+    _test_hooks.redis_factory = _fake
     return TestClient(create_app(load_default_options_from_env())), fake_redis
 
 
-def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
-    client, fake_redis = _client(monkeypatch, workers=0)
+def test_readyz_degraded_without_worker() -> None:
+    client, fake_redis = _client(workers=0)
     r = client.get("/readyz")
     assert r.status_code == 503
     body_raw = load_json_str(r.text)
@@ -38,8 +39,8 @@ def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
     fake_redis.assert_only_called({"ping", "scard", "close"})
 
 
-def test_readyz_ready_with_worker(monkeypatch: MonkeyPatch) -> None:
-    client, fake_redis = _client(monkeypatch, workers=1)
+def test_readyz_ready_with_worker() -> None:
+    client, fake_redis = _client(workers=1)
     r = client.get("/readyz")
     assert r.status_code == 200
     body_raw = load_json_str(r.text)

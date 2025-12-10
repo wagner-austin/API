@@ -5,7 +5,7 @@ from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import InvalidJsonError, load_json_str, register_json_error_handler
 from starlette.requests import Request
 
-from qr_api.app import create_app
+from qr_api.api.main import create_app
 from qr_api.settings import load_default_options_from_env
 from qr_api.validators import _decode_qr_payload
 
