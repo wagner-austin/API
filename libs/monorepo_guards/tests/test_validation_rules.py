@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from monorepo_guards.validation_rules import ValidationRule
 
 
@@ -43,23 +41,3 @@ def test_validation_rule_requires_import_in_service_validators(tmp_path: Path) -
     )
     violations = rule.run([svc_path])
     assert violations == []
-
-
-def test_validation_rule_raises_on_read_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    target = tmp_path / "services/foo/src/foo/validators.py"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("def _decode_int_range(x, y):\n    return 1\n", encoding="utf-8")
-
-    original_read = Path.read_text
-
-    def _raise_read(self: Path, *args: str | None, **kwargs: str | None) -> str:
-        if self == target:
-            raise OSError("boom")
-        return original_read(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", _raise_read)
-    rule = ValidationRule()
-    with pytest.raises(RuntimeError):
-        rule.run([target])

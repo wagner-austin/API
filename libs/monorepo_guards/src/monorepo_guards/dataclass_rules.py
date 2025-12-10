@@ -5,6 +5,7 @@ from pathlib import Path
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
+from monorepo_guards.util import read_lines
 
 
 class DataclassRule:
@@ -18,12 +19,8 @@ class DataclassRule:
         for path in files:
             if not self._is_banned_path(path):
                 continue
-            try:
-                text = path.read_text(encoding="utf-8", errors="strict")
-            except OSError as exc:
-                raise RuntimeError(f"failed to read {path}: {exc}") from exc
-            for idx, raw in enumerate(text.splitlines(), start=1):
-                line = raw.rstrip("\n")
+            lines = read_lines(path)
+            for idx, line in enumerate(lines, start=1):
                 if re.match(r"^\s*@dataclass\b", line):
                     out.append(
                         Violation(

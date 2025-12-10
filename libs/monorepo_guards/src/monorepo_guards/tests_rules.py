@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from monorepo_guards import Rule, Violation
+from monorepo_guards.util import read_lines
 
 
 class PolicyTestsRule(Rule):
@@ -14,10 +15,8 @@ class PolicyTestsRule(Rule):
             as_posix = path.as_posix()
             if "/tests/" not in as_posix:
                 continue
-            try:
-                text = path.read_text(encoding="utf-8", errors="strict")
-            except OSError as exc:
-                raise RuntimeError(f"failed to read {as_posix}: {exc}") from exc
+            lines = read_lines(path)
+            text = "\n".join(lines)
             if "SimpleNamespace(" in text:
                 out.append(
                     Violation(

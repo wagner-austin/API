@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from monorepo_guards.tests_rules import PolicyTestsRule
 
@@ -52,17 +49,3 @@ def test_tests_rule_ignores_non_tests_paths(tmp_path: Path) -> None:
     rule = PolicyTestsRule()
     violations = rule.run([path])
     assert not violations
-
-
-def test_tests_rule_raises_on_os_error(tmp_path: Path) -> None:
-    root = tmp_path
-    tests_dir = root / "pkg" / "tests"
-    path = tests_dir / "bad.py"
-    _write(path, "x = 1\n")
-
-    rule = PolicyTestsRule()
-    with (
-        patch.object(Path, "read_text", side_effect=OSError("Read error")),
-        pytest.raises(RuntimeError, match=r"failed to read.*bad\.py"),
-    ):
-        rule.run([path])

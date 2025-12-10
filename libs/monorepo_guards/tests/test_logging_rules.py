@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from monorepo_guards.logging_rules import LoggingRule
 
@@ -23,18 +20,6 @@ def test_logging_rule_flags_print_and_basicconfig(tmp_path: Path) -> None:
     kinds = {v.kind for v in violations}
     assert "print" in kinds
     assert "logging-basicConfig" in kinds
-
-
-def test_logging_rule_raises_on_os_error(tmp_path: Path) -> None:
-    path = tmp_path / "file.py"
-    path.write_text("x = 1\n", encoding="utf-8")
-
-    rule = LoggingRule()
-    with (
-        patch.object(Path, "read_text", side_effect=OSError("Read error")),
-        pytest.raises(RuntimeError, match=r"failed to read.*file\.py"),
-    ):
-        rule.run([path])
 
 
 def test_logging_rule_skips_platform_core_logging_module(tmp_path: Path) -> None:

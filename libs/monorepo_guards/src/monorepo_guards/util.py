@@ -21,11 +21,8 @@ def iter_py_files(config: GuardConfig) -> list[Path]:
 
 
 def read_lines(path: Path) -> list[str]:
-    try:
-        # utf-8-sig ensures an optional BOM is stripped before parsing.
-        text = path.read_text(encoding="utf-8-sig", errors="strict")
-    except OSError as exc:
-        raise RuntimeError(f"failed to read {path}: {exc}") from exc
+    # utf-8-sig ensures an optional BOM is stripped before parsing.
+    text = path.read_text(encoding="utf-8-sig", errors="strict")
     return text.splitlines()
 
 

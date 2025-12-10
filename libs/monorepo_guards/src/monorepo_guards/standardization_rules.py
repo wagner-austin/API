@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 
 from monorepo_guards import Rule, Violation
+from monorepo_guards.util import read_lines
 
 
 class StandardizationRule(Rule):
@@ -34,7 +35,7 @@ class StandardizationRule(Rule):
                 continue
 
             # RequestIdMiddleware must come from platform_core (allow adapters with adapter names).
-            text = self._read_text(path, as_posix)
+            text = self._read_text(path)
             if self._has_duplicate_request_id_middleware(text, as_posix):
                 out.append(
                     Violation(
@@ -96,11 +97,9 @@ class StandardizationRule(Rule):
 
         return out
 
-    def _read_text(self, path: Path, as_posix: str) -> str:
-        try:
-            return path.read_text(encoding="utf-8", errors="strict")
-        except OSError as exc:
-            raise RuntimeError(f"failed to read {as_posix}: {exc}") from exc
+    def _read_text(self, path: Path) -> str:
+        lines = read_lines(path)
+        return "\n".join(lines)
 
     def _has_duplicate_request_id_middleware(self, text: str, as_posix: str) -> bool:
         return (

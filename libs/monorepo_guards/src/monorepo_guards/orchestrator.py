@@ -17,6 +17,7 @@ from monorepo_guards.httpx_rules import HttpxRule
 from monorepo_guards.imports_rules import ImportsRule
 from monorepo_guards.json_rules import JsonRule
 from monorepo_guards.logging_rules import LoggingRule
+from monorepo_guards.mock_rules import MockBanRule
 from monorepo_guards.pattern_rules import PatternRule
 from monorepo_guards.redis_rules import RedisRule
 from monorepo_guards.request_context_rules import RequestContextRule
@@ -57,6 +58,7 @@ def _run_with_config(config: GuardConfig) -> int:
         WeakAssertionRule(),
         MLTestQualityRule(),
         FakeRedisRule(),
+        MockBanRule(),
     ]
     if config.dataclass_ban_segments:
         rules.append(DataclassRule(config))

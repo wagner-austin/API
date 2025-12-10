@@ -7,6 +7,7 @@ from typing import ClassVar
 
 from monorepo_guards import Violation
 from monorepo_guards.config import GuardConfig
+from monorepo_guards.util import read_lines
 
 
 class PatternRule:
@@ -45,12 +46,8 @@ class PatternRule:
                     )
                 )
                 continue
-            try:
-                text = path.read_text(encoding="utf-8", errors="strict")
-            except OSError as exc:
-                raise RuntimeError(f"failed to read {path}: {exc}") from exc
-            for idx, raw in enumerate(text.splitlines(), start=1):
-                line = raw.rstrip("\n")
+            lines = read_lines(path)
+            for idx, line in enumerate(lines, start=1):
                 for name, pattern in self._patterns.items():
                     if pattern.search(line):
                         out.append(

@@ -87,26 +87,6 @@ def test_standardization_rule_skips_allowed_locations(tmp_path: Path) -> None:
     assert violations == []
 
 
-def test_standardization_rule_raises_on_read_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    target = tmp_path / "services/foo/src/foo/request_context.py"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("class RequestIdMiddleware: pass", encoding="utf-8")
-
-    original_read = Path.read_text
-
-    def _raise_read(self: Path, *args: str | None, **kwargs: str | None) -> str:
-        if self == target:
-            raise OSError("boom")
-        return original_read(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "read_text", _raise_read)
-    rule = StandardizationRule()
-    with pytest.raises(RuntimeError):
-        rule.run([target])
-
-
 def test_standardization_rule_flags_missing_request_id_middleware(tmp_path: Path) -> None:
     rule = StandardizationRule()
     service_path = _write(

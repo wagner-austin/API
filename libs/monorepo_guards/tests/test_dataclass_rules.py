@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.dataclass_rules import DataclassRule
@@ -52,26 +49,3 @@ def test_dataclass_rule_non_banned_path_noop(tmp_path: Path) -> None:
     rule = DataclassRule(cfg)
     violations = rule.run([target])
     assert violations == []
-
-
-def test_dataclass_rule_raises_on_os_error(tmp_path: Path) -> None:
-    root = tmp_path
-    target = root / "model_trainer" / "core" / "contracts" / "types.py"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text("x = 1\n", encoding="utf-8")
-
-    cfg = GuardConfig(
-        root=root,
-        directories=(".",),
-        exclude_parts=(),
-        forbid_pyi=False,
-        allow_print_in_tests=False,
-        dataclass_ban_segments=(("model_trainer", "core", "contracts"),),
-    )
-
-    rule = DataclassRule(cfg)
-    with (
-        patch.object(Path, "read_text", side_effect=OSError("Read error")),
-        pytest.raises(RuntimeError, match=r"failed to read.*types\.py"),
-    ):
-        rule.run([target])

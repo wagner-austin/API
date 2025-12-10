@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from monorepo_guards import Violation
+from monorepo_guards.util import read_lines
 
 
 class LoggingRule:
@@ -138,11 +139,6 @@ class LoggingRule:
             if self._should_skip_file(path):
                 continue
 
-            try:
-                text = path.read_text(encoding="utf-8", errors="strict")
-            except OSError as exc:
-                raise RuntimeError(f"failed to read {path}: {exc}") from exc
-
             if path.name == "logging.py":
                 out.append(
                     Violation(
@@ -154,7 +150,7 @@ class LoggingRule:
                 )
                 continue
 
-            lines = text.splitlines()
+            lines = read_lines(path)
             module_aliases, func_aliases, import_violations = self._extract_logging_aliases(
                 path, lines
             )

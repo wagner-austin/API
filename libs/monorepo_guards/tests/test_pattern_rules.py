@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from monorepo_guards.config import GuardConfig
 from monorepo_guards.pattern_rules import PatternRule
@@ -73,25 +70,3 @@ def test_pattern_rule_flags_pyi_when_forbidden(tmp_path: Path) -> None:
     violations = rule.run([path])
     kinds = {v.kind for v in violations}
     assert "pyi-disallowed" in kinds
-
-
-def test_pattern_rule_raises_on_os_error(tmp_path: Path) -> None:
-    root = tmp_path
-    path = root / "file.py"
-    path.write_text("x = 1\n", encoding="utf-8")
-
-    cfg = GuardConfig(
-        root=root,
-        directories=(".",),
-        exclude_parts=(),
-        forbid_pyi=False,
-        allow_print_in_tests=False,
-        dataclass_ban_segments=(),
-    )
-
-    rule = PatternRule(cfg)
-    with (
-        patch.object(Path, "read_text", side_effect=OSError("Read error")),
-        pytest.raises(RuntimeError, match=r"failed to read.*file\.py"),
-    ):
-        rule.run([path])

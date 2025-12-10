@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from monorepo_guards import Rule, Violation
+from monorepo_guards.util import read_lines
 
 
 class ValidationRule(Rule):
@@ -32,11 +33,8 @@ class ValidationRule(Rule):
                 # platform_core is canonical for shared validators; allow local helpers there
                 continue
 
-            try:
-                text = path.read_text(encoding="utf-8", errors="strict")
-            except OSError as exc:
-                raise RuntimeError(f"failed to read {as_posix}: {exc}") from exc
-
+            lines = read_lines(path)
+            text = "\n".join(lines)
             is_platform_validators = self._PLATFORM_VALIDATORS in as_posix
 
             # Prevent redefinition of validator helpers outside platform_core.
