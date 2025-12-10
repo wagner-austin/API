@@ -102,7 +102,7 @@ def test_qr_route_rejects_invalid_json() -> None:
         parsed_body = parsed_body_raw
         assert parsed_body["code"] == "INVALID_INPUT"
         assert parsed_body["message"] == "Invalid JSON body"
-        assert "request_id" in parsed_body
+        assert parsed_body["request_id"] == ""  # empty in test context without middleware
 
 
 def test_json_error_handler_reraises_non_jsondecodeerror() -> None:

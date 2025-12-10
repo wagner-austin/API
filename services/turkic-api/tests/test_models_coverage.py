@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError
+from platform_core.json_utils import JSONTypeError
 
 from turkic_api.api import models
 
@@ -105,13 +106,13 @@ def test_parse_job_create_with_list_values() -> None:
 
 def test_parse_job_response_json_not_dict() -> None:
     # Test line 260 - JSON is not a dict
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(JSONTypeError, match="Expected JSON object"):
         models.parse_job_response_json('"not a dict"')
 
 
 def test_parse_job_response_json_invalid_status() -> None:
     # Test line 272 - invalid job status value
-    with pytest.raises(ValueError, match="Invalid job status"):
+    with pytest.raises(JSONTypeError, match="Invalid job status"):
         models.parse_job_response_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, '
             '"created_at": "2024-01-01T00:00:00"}'
@@ -120,13 +121,13 @@ def test_parse_job_response_json_invalid_status() -> None:
 
 def test_parse_job_status_json_not_dict() -> None:
     # Test line 288 - JSON is not a dict
-    with pytest.raises(ValueError, match="Expected JSON object"):
+    with pytest.raises(JSONTypeError, match="Expected JSON object"):
         models.parse_job_status_json("123")
 
 
 def test_parse_job_status_json_invalid_status() -> None:
     # Test line 320 - invalid job status value in result
-    with pytest.raises(ValueError, match="Invalid job status"):
+    with pytest.raises(JSONTypeError, match="Invalid job status"):
         models.parse_job_status_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, "progress": 0, '
             '"created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:00:00"}'
@@ -211,7 +212,7 @@ def test_decode_job_create_from_unknown_user_id_none() -> None:
 
 def test_parse_job_response_json_user_id_not_int() -> None:
     """Cover line 269: user_id must be an integer in parse_job_response_json."""
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_response_json(
             '{"job_id": "x", "user_id": "42", "status": "queued", '
             '"created_at": "2024-01-01T00:00:00"}'
@@ -220,7 +221,7 @@ def test_parse_job_response_json_user_id_not_int() -> None:
 
 def test_parse_job_response_json_user_id_null() -> None:
     """Cover line 269: user_id null is not an integer."""
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_response_json(
             '{"job_id": "x", "user_id": null, "status": "queued", '
             '"created_at": "2024-01-01T00:00:00"}'
@@ -229,7 +230,7 @@ def test_parse_job_response_json_user_id_null() -> None:
 
 def test_parse_job_status_json_user_id_not_int() -> None:
     """Cover line 301: user_id must be an integer in parse_job_status_json."""
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_status_json(
             '{"job_id": "x", "user_id": "42", "status": "queued", "progress": 0, '
             '"created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:00:00"}'
@@ -238,7 +239,7 @@ def test_parse_job_status_json_user_id_not_int() -> None:
 
 def test_parse_job_status_json_user_id_null() -> None:
     """Cover line 301: user_id null is not an integer."""
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_status_json(
             '{"job_id": "x", "user_id": null, "status": "queued", "progress": 0, '
             '"created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:00:00"}'

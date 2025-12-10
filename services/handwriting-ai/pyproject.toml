@@ -22,8 +22,8 @@ priority = "explicit"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.121.1"
-hypercorn = "^0.17.3"
+fastapi = "^0.124"
+hypercorn = "^0.18"
 Pillow = "^10.4.0"
 numpy = ">=1.26,<3"
 python-multipart = "^0.0.20"
@@ -31,9 +31,9 @@ typing-extensions = "^4.12.2"
 # Torch CPU only (explicit CPU wheels)
 torch = {version = "==2.4.1+cpu", source = "pytorch-cpu", markers = "platform_system != 'Darwin' or platform_machine != 'arm64'"}
 torchvision = {version = "==0.19.1+cpu", source = "pytorch-cpu", markers = "platform_system != 'Darwin' or platform_machine != 'arm64'"}
-redis = "^5.2.0"
-rq = "^2.0.0"
-httpx = "^0.28.1"
+redis = "^7.1"
+rq = "^2.3"
+httpx = "^0.28"
 threadpoolctl = "^3.5.0"
 psutil = "^7.1.3"
 platform-core = { path = "../../libs/platform_core", develop = true }
@@ -50,7 +50,6 @@ pytest-cov = "^7.0.0"
 pytest-xdist = "^3.6.1"
 mypy = "^1.13.0"
 ruff = "^0.14.4"
-black = "^25.11.0"
 yamllint = "^1.37.1"
 types-psutil = "^7.0.0.20251111"
 
@@ -62,25 +61,19 @@ exclude = [".venv"]
 
 [tool.ruff.lint]
 select = [
-  "E",  # pycodestyle errors
-  "F",  # pyflakes
-  "I",  # isort
-  "B",  # bugbear
-  "BLE",# blind except
-  "UP", # pyupgrade
-  "N",  # pep8-naming
-  "C4", # flake8-comprehensions
-  "SIM",# flake8-simplify
-  "RET",# flake8-return
-  "C90",# mccabe complexity
-  "RUF",# ruff-specific
+  "E","F","I","B","BLE","UP","N","C4","SIM","RET","C90","RUF","ANN"
 ]
 ignore = []
 fixable = ["ALL"]
 
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = false
+mypy-init-return = true
+
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.mypy]
 python_version = "3.11"

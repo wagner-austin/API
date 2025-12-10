@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine
@@ -53,7 +54,7 @@ def test_download_remote_manifest_read_error(tmp_path: Path) -> None:
 
 
 def test_download_remote_manifest_not_object(tmp_path: Path) -> None:
-    """Cover engine.py:176 - ValueError when manifest is not a JSON object."""
+    """Cover engine.py:176 - JSONTypeError when manifest is not a JSON object."""
     s = _settings(tmp_path)
     model_dir = s["digits"]["model_dir"] / "m"
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -61,7 +62,7 @@ def test_download_remote_manifest_not_object(tmp_path: Path) -> None:
     manifest_path.write_text('"just a string"', encoding="utf-8")
 
     engine = InferenceEngine(s)
-    with pytest.raises(ValueError, match="manifest must be a JSON object"):
+    with pytest.raises(JSONTypeError, match="manifest must be a JSON object"):
         engine._download_remote_if_needed(model_dir, manifest_path)
 
 

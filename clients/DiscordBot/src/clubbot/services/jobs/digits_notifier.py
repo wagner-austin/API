@@ -17,6 +17,7 @@ from platform_core.digits_metrics_events import (
     DigitsPruneV1,
     DigitsUploadV1,
     JobFailedV1,
+    decode_digits_event,
     is_digits_artifact,
     is_digits_batch,
     is_digits_best,
@@ -26,9 +27,8 @@ from platform_core.digits_metrics_events import (
     is_digits_job_failed,
     is_digits_prune,
     is_digits_upload,
-    try_decode_digits_event,
 )
-from platform_core.json_utils import InvalidJsonError
+from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_discord.bot_subscriber import BotEventSubscriber
 from platform_discord.handwriting.runtime import (
     DigitsRuntime,
@@ -54,8 +54,8 @@ _EVENT_TASK_NAME: Final[str] = "digits-event-subscriber"
 def _decode_digits_safe(payload: str) -> DigitsEventV1 | None:
     """Decode digits event, returning None on decode failure."""
     try:
-        return try_decode_digits_event(payload)
-    except (InvalidJsonError, ValueError) as exc:
+        return decode_digits_event(payload)
+    except (InvalidJsonError, JSONTypeError) as exc:
         from platform_core.logging import get_logger
 
         get_logger(__name__).debug("Failed to decode digits event: %s", exc)

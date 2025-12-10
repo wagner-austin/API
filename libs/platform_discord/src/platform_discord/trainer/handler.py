@@ -20,6 +20,7 @@ from platform_core.job_events import (
     decode_job_event,
     is_failed,
 )
+from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_core.logging import get_logger
 from platform_core.trainer_metrics_events import (
     TrainerCompletedMetricsV1,
@@ -59,7 +60,7 @@ def _try_decode_metrics(payload: str) -> TrainerMetricsEventV1 | None:
     """Attempt to decode as trainer metrics event, returning None on failure."""
     try:
         return decode_trainer_metrics_event(payload)
-    except ValueError:
+    except (InvalidJsonError, JSONTypeError):
         _logger.debug("Payload is not a trainer metrics event, trying job event")
         return None
 
@@ -72,7 +73,7 @@ def _try_decode_job_failed(payload: str) -> JobFailedV1 | None:
         if is_failed(ev) and ev["domain"] == "trainer":
             return ev
         return None
-    except ValueError:
+    except (InvalidJsonError, JSONTypeError):
         _logger.debug("Payload is not a recognized trainer event")
         return None
 

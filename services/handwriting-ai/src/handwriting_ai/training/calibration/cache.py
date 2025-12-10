@@ -5,6 +5,7 @@ from pathlib import Path
 
 from platform_core.json_utils import (
     InvalidJsonError,
+    JSONTypeError,
     JSONValue,
     dump_json_str,
     load_json_str,
@@ -39,7 +40,7 @@ def _decode_int(d: dict[str, JSONValue], key: str, default: int) -> int:
             return int(v)
         except ValueError as exc:
             _LOGGER.error("calib_parse_int_failed key=%s value=%s error=%s", key, v, exc)
-            raise
+            raise JSONTypeError(f"{key}: invalid int") from exc
     return default
 
 
@@ -54,7 +55,7 @@ def _decode_float(d: dict[str, JSONValue], key: str, default: float) -> float:
             return float(v)
         except ValueError as exc:
             _LOGGER.error("calib_parse_float_failed key=%s value=%s error=%s", key, v, exc)
-            raise
+            raise JSONTypeError(f"{key}: invalid float") from exc
     return default
 
 
@@ -69,12 +70,12 @@ def _read_cache(path: Path) -> tuple[CalibrationSignature, CalibrationResult, fl
         raise
     root = _decode_obj_dict(parsed)
     if root is None:
-        raise ValueError("calibration cache root must be an object")
+        raise JSONTypeError("calibration cache root must be an object")
     sig_raw = _decode_obj_dict(root.get("signature"))
     res_raw = _decode_obj_dict(root.get("result"))
     ts_raw = root.get("created_at_ts")
     if sig_raw is None or res_raw is None or not isinstance(ts_raw, int | float):
-        raise ValueError("calibration cache missing required fields")
+        raise JSONTypeError("calibration cache missing required fields")
     mem_v = sig_raw.get("mem_bytes")
     mem_parsed = _decode_int(sig_raw, "mem_bytes", 0) if mem_v is not None else None
     sig: CalibrationSignature = {

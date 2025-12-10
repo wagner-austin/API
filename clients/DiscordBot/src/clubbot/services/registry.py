@@ -14,7 +14,7 @@ from platform_core.digits_metrics_events import (
     DigitsEventV1,
     DigitsPruneV1,
     DigitsUploadV1,
-    try_decode_digits_event,
+    decode_digits_event,
 )
 from platform_core.job_events import (
     JobEventV1,
@@ -22,7 +22,7 @@ from platform_core.job_events import (
     decode_job_event,
     default_events_channel,
 )
-from platform_core.json_utils import InvalidJsonError
+from platform_core.json_utils import InvalidJsonError, JSONTypeError
 from platform_discord.trainer.handler import TrainerEventV1, decode_trainer_event
 
 # Event data can be a dict with string keys, or None if decode fails
@@ -64,8 +64,8 @@ def _decode_trainer_safe(payload: str) -> TrainerEventV1 | None:
 def _decode_digits_safe(payload: str) -> DigitsEventV1 | None:
     """Decode digits event, returning None on decode failure."""
     try:
-        return try_decode_digits_event(payload)
-    except (InvalidJsonError, ValueError) as exc:
+        return decode_digits_event(payload)
+    except (InvalidJsonError, JSONTypeError) as exc:
         from platform_core.logging import get_logger
 
         get_logger(__name__).debug("Failed to decode digits event: %s", exc)

@@ -13,6 +13,7 @@ from platform_core.job_events import (
     make_completed_event,
     make_failed_event,
 )
+from platform_core.json_utils import JSONTypeError
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
 _TRANSCRIPT_DOMAIN: JobDomain = "transcript"
@@ -30,7 +31,7 @@ def _ensure_error_kind(raw: str) -> ErrorKind:
         return "user"
     if raw == "system":
         return "system"
-    raise ValueError("invalid error_kind")
+    raise JSONTypeError("invalid error_kind")
 
 
 def publish_completed(*, request_id: str, user_id: int, url: str, text: str) -> None:

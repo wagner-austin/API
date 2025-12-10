@@ -13,7 +13,7 @@ from instrument_io._exceptions import WriterError
 from instrument_io._protocols.openpyxl import (
     WorkbookProtocol,
     WorksheetProtocol,
-    _create_styled_table,
+    _create_table,
     _create_workbook,
     _get_column_letter,
 )
@@ -129,7 +129,7 @@ def _add_table_to_sheet(
     ref = f"A1:{end_col}{end_row}"
 
     # Create and add table
-    table = _create_styled_table(table_name, ref)
+    table = _create_table(table_name, ref)
     ws.add_table(table)
 
 

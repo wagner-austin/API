@@ -1,0 +1,211 @@
+"""ML prediction and training endpoints."""
+
+from __future__ import annotations
+
+from typing import Literal, Protocol, TypedDict
+
+from covenant_domain import DealId
+from covenant_domain.features import (
+    LoanFeatures,
+    classify_risk_tier,
+    extract_features,
+)
+from covenant_ml.predictor import predict_probabilities
+from covenant_ml.types import TrainConfig, XGBModelProtocol
+from covenant_persistence import (
+    CovenantResultRepository,
+    DealRepository,
+    MeasurementRepository,
+)
+from fastapi import APIRouter, Request, Response
+from platform_core.json_utils import JSONValue, dump_json_str
+from platform_workers.rq_harness import RQClientQueue
+
+from ..decode import PredictResponse, TrainResponse, parse_predict_request, parse_train_request
+
+
+class ModelInfo(TypedDict, total=True):
+    """Information about the active ML model."""
+
+    model_id: str
+    model_path: str
+    is_loaded: bool
+
+
+class ContainerProtocol(Protocol):
+    """Protocol for service container with ML dependencies."""
+
+    def deal_repo(self) -> DealRepository: ...
+
+    def measurement_repo(self) -> MeasurementRepository: ...
+
+    def covenant_result_repo(self) -> CovenantResultRepository: ...
+
+    def rq_queue(self) -> RQClientQueue: ...
+
+    def get_model(self) -> XGBModelProtocol: ...
+
+    def get_model_info(self) -> ModelInfo: ...
+
+    def get_sector_encoder(self) -> dict[str, int]: ...
+
+    def get_region_encoder(self) -> dict[str, int]: ...
+
+
+def build_router(get_container: ContainerProtocol) -> APIRouter:
+    """Build FastAPI router for ML operations.
+
+    Args:
+        get_container: Container instance with ML dependencies.
+
+    Returns:
+        Configured router with prediction and training endpoints.
+    """
+    router = APIRouter(prefix="/ml", tags=["ml"])
+
+    async def _predict(request: Request) -> Response:
+        """Predict breach risk for a deal.
+
+        Request body:
+            deal_id: Deal UUID string
+
+        Returns:
+            JSON object with probability and risk_tier.
+
+        Raises:
+            KeyError: Deal not found or required metrics missing
+        """
+        body_bytes = await request.body()
+        req = parse_predict_request(body_bytes)
+
+        deal_id = DealId(value=req["deal_id"])
+
+        deal_repo = get_container.deal_repo()
+        measurement_repo = get_container.measurement_repo()
+        result_repo = get_container.covenant_result_repo()
+
+        deal = deal_repo.get(deal_id)
+        measurements = measurement_repo.list_for_deal(deal_id)
+
+        # Get recent covenant results for near-breach count
+        recent_results = result_repo.list_for_deal(deal_id)
+
+        # Build metric dictionaries from measurements
+        # Group measurements by period and find current/historical periods
+        periods: dict[str, dict[str, int]] = {}
+        for m in measurements:
+            period_key = f"{m['period_start_iso']}_{m['period_end_iso']}"
+            if period_key not in periods:
+                periods[period_key] = {}
+            periods[period_key][m["metric_name"]] = m["metric_value_scaled"]
+
+        # Sort periods and get current, 1 period ago, 4 periods ago
+        sorted_periods = sorted(periods.keys(), reverse=True)
+
+        metrics_current = periods[sorted_periods[0]] if len(sorted_periods) > 0 else {}
+        metrics_1p = periods[sorted_periods[1]] if len(sorted_periods) > 1 else {}
+        metrics_4p = periods[sorted_periods[4]] if len(sorted_periods) > 4 else {}
+
+        features = extract_features(
+            deal=deal,
+            metrics_current=metrics_current,
+            metrics_1p_ago=metrics_1p,
+            metrics_4p_ago=metrics_4p,
+            recent_results=list(recent_results),
+            sector_encoder=get_container.get_sector_encoder(),
+            region_encoder=get_container.get_region_encoder(),
+        )
+
+        model = get_container.get_model()
+        features_list: list[LoanFeatures] = [features]
+        probabilities = predict_probabilities(model, features_list)
+        probability = probabilities[0]
+
+        risk_tier: Literal["LOW", "MEDIUM", "HIGH"] = classify_risk_tier(probability)
+
+        response = PredictResponse(
+            deal_id=req["deal_id"],
+            probability=probability,
+            risk_tier=risk_tier,
+        )
+
+        body: dict[str, JSONValue] = {
+            "deal_id": response["deal_id"],
+            "probability": response["probability"],
+            "risk_tier": response["risk_tier"],
+        }
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+        )
+
+    async def _train(request: Request) -> Response:
+        """Enqueue a model training job.
+
+        Request body:
+            learning_rate: float
+            max_depth: int
+            n_estimators: int
+            subsample: float
+            colsample_bytree: float
+            random_state: int
+
+        Returns:
+            JSON object with job_id and status.
+        """
+        body_bytes = await request.body()
+        config: TrainConfig = parse_train_request(body_bytes)
+
+        queue = get_container.rq_queue()
+        config_json = dump_json_str(
+            {
+                "learning_rate": config["learning_rate"],
+                "max_depth": config["max_depth"],
+                "n_estimators": config["n_estimators"],
+                "subsample": config["subsample"],
+                "colsample_bytree": config["colsample_bytree"],
+                "random_state": config["random_state"],
+            }
+        )
+        job = queue.enqueue(
+            "covenant_radar_api.worker.train_job.run_training",
+            config_json,
+            job_timeout=3600,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description="Covenant ML model training",
+        )
+
+        response = TrainResponse(job_id=job.get_id(), status="queued")
+        body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
+    def _get_model_info() -> Response:
+        """Get information about the active ML model.
+
+        Returns:
+            JSON object with model_id, model_path, is_loaded.
+        """
+        info = get_container.get_model_info()
+        body: dict[str, JSONValue] = {
+            "model_id": info["model_id"],
+            "model_path": info["model_path"],
+            "is_loaded": info["is_loaded"],
+        }
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+        )
+
+    router.add_api_route("/predict", _predict, methods=["POST"], response_model=None)
+    router.add_api_route("/train", _train, methods=["POST"], response_model=None)
+    router.add_api_route("/models/active", _get_model_info, methods=["GET"], response_model=None)
+
+    return router
+
+
+__all__ = ["ModelInfo", "build_router"]

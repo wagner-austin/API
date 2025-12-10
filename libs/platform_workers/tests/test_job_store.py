@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 from platform_core.job_types import BaseJobStatus, JobStatusLiteral
+from platform_core.json_utils import JSONTypeError
 
 from platform_workers.job_store import (
     BaseJobStore,
@@ -84,7 +85,7 @@ def test_base_job_store_round_trip() -> None:
     ],
 )
 def test_parse_status_errors(raw: dict[str, str], message: str) -> None:
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(JSONTypeError) as excinfo:
         parse_status(raw)
     assert message in str(excinfo.value)
 
@@ -105,19 +106,21 @@ def test_parse_status_success(value: str, expected: JobStatusLiteral) -> None:
 def test_parse_int_field_validates() -> None:
     assert parse_int_field({"value": "10"}, "value") == 10
     assert parse_int_field({"value": "-5"}, "value") == -5
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         parse_int_field({}, "value")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         parse_int_field({"value": "abc"}, "value")
 
 
 def test_parse_datetime_field_validates() -> None:
     ts = datetime.utcnow().isoformat()
     assert parse_datetime_field({"created": ts}, "created") == datetime.fromisoformat(ts)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         parse_datetime_field({}, "created")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         parse_datetime_field({"created": ""}, "created")
+    with pytest.raises(JSONTypeError):
+        parse_datetime_field({"created": "not-a-date"}, "created")
 
 
 def test_parse_optional_str_handles_missing_and_empty() -> None:

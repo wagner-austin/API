@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai.training.calibration.cache import _decode_float, _decode_int, _read_cache
 
@@ -27,7 +28,7 @@ def test_decode_int_logs_and_raises_on_invalid(
         "handwriting_ai.training.calibration.cache._LOGGER",
         _LogStub(called),
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _decode_int({"bad": "x"}, "bad", 0)
     assert called, "expected logger.error to be invoked"
 
@@ -38,7 +39,7 @@ def test_decode_float_logs_and_raises_on_invalid(monkeypatch: pytest.MonkeyPatch
         "handwriting_ai.training.calibration.cache._LOGGER",
         _LogStub(called),
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _decode_float({"bad": "x"}, "bad", 0.0)
     assert called, "expected logger.error to be invoked"
 
@@ -46,7 +47,7 @@ def test_decode_float_logs_and_raises_on_invalid(monkeypatch: pytest.MonkeyPatch
 def test_read_cache_missing_required_fields_raises(tmp_path: Path) -> None:
     p = tmp_path / "cache.json"
     p.write_text("{}", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _read_cache(p)
 
 

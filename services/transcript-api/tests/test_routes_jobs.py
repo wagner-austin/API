@@ -115,7 +115,8 @@ def test_create_stt_job_success() -> None:
         resp = client.post("/v1/stt/jobs", json=payload)
         assert resp.status_code == 202
         data: dict[str, str | int] = resp.json()
-        assert "job_id" in data
+        job_id = data["job_id"]
+        assert isinstance(job_id, str) and len(job_id) > 0
         assert data["user_id"] == 42
         assert data["status"] == "queued"
         url_val = data["url"]

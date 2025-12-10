@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 from platform_music.services.decoders import (
-    DecoderError,
     _decode_lastfm_scrobble,
     _decode_spotify_play,
 )
@@ -54,7 +53,7 @@ _ERR_UTS = "date.uts must be an integer or numeric string"
     ],
 )
 def test_decode_lastfm_scrobble_invalid(raw: JSONValue, msg: str) -> None:
-    with pytest.raises(DecoderError) as excinfo:
+    with pytest.raises(JSONTypeError) as excinfo:
         _decode_lastfm_scrobble(raw)
     assert msg in str(excinfo.value)
 
@@ -142,6 +141,6 @@ _ERR_PLAYED_AT = "played_at must be a non-empty string"
     ],
 )
 def test_decode_spotify_play_invalid(raw: JSONValue, msg: str) -> None:
-    with pytest.raises(DecoderError) as excinfo:
+    with pytest.raises(JSONTypeError) as excinfo:
         _decode_spotify_play(raw)
     assert msg in str(excinfo.value)

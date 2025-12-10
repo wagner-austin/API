@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from model_trainer.worker import manifest
 
@@ -11,7 +11,7 @@ def test_as_model_family_variants_and_invalid() -> None:
     assert manifest.as_model_family("llama") == "llama"
     assert manifest.as_model_family("qwen") == "qwen"
     assert manifest.as_model_family("char_lstm") == "char_lstm"
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = manifest.as_model_family("bert")
 
 
@@ -64,7 +64,7 @@ def _manifest_unknown() -> _ManifestDict:
 
 
 def test_load_manifest_from_text_invalid_json() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = manifest.load_manifest_from_text("[]")
 
 
@@ -72,7 +72,7 @@ def test_load_manifest_from_text_invalid_versions_system() -> None:
     bad = _base_manifest()
     bad["versions"] = "oops"
     txt = dump_json_str(bad)
-    with pytest.raises(ValueError, match="invalid manifest JSON: versions"):
+    with pytest.raises(JSONTypeError, match="versions"):
         _ = manifest.load_manifest_from_text(txt)
 
 
@@ -80,19 +80,19 @@ def test_load_manifest_from_text_expect_str_error() -> None:
     bad = _base_manifest()
     bad["model_family"] = 123  # not a string
     txt = dump_json_str(bad)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = manifest.load_manifest_from_text(txt)
 
 
 def test_load_manifest_from_text_expect_int_and_num_errors() -> None:
     bad1 = _base_manifest()
     bad1["epochs"] = "one"
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = manifest.load_manifest_from_text(dump_json_str(bad1))
 
     bad2 = _base_manifest()
     bad2["learning_rate"] = "fast"
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = manifest.load_manifest_from_text(dump_json_str(bad2))
 
 
@@ -116,7 +116,7 @@ def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
         "versions": versions,
     }
     txt = dump_json_str(bad_manifest)
-    with pytest.raises(ValueError, match=f"versions\\.{field}"):
+    with pytest.raises(JSONTypeError, match=field):
         _ = manifest.load_manifest_from_text(txt)
 
 
@@ -126,7 +126,7 @@ def test_load_manifest_system_not_dict() -> None:
         **base,
         "system": "oops",
     }
-    with pytest.raises(ValueError, match="invalid manifest JSON: system"):
+    with pytest.raises(JSONTypeError, match="system"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
@@ -149,7 +149,7 @@ def test_load_manifest_system_field_types(field: str, value: str | int, message:
         **base,
         "system": system,
     }
-    with pytest.raises(ValueError, match=message):
+    with pytest.raises(JSONTypeError, match=field):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
@@ -158,7 +158,7 @@ def test_load_manifest_loss_must_be_number() -> None:
         **_manifest_unknown(),
         "loss": "high",
     }
-    with pytest.raises(ValueError, match="loss"):
+    with pytest.raises(JSONTypeError, match="loss"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
@@ -168,7 +168,7 @@ def test_load_manifest_pretrained_run_id_must_be_str_or_null() -> None:
         **_base_manifest(),
         "pretrained_run_id": 123,  # should be str or null, not int
     }
-    with pytest.raises(ValueError, match="pretrained_run_id must be str or null"):
+    with pytest.raises(JSONTypeError, match="pretrained_run_id"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
@@ -187,7 +187,7 @@ def test_as_optimizer_variants_and_invalid() -> None:
     assert manifest.as_optimizer("adamw") == "adamw"
     assert manifest.as_optimizer("adam") == "adam"
     assert manifest.as_optimizer("sgd") == "sgd"
-    with pytest.raises(ValueError, match="invalid optimizer"):
+    with pytest.raises(JSONTypeError, match="optimizer"):
         _ = manifest.as_optimizer("rmsprop")
 
 
@@ -195,7 +195,7 @@ def test_as_device_variants_and_invalid() -> None:
     """Cover manifest.py as_device branches (lines 42-46)."""
     assert manifest.as_device("cpu") == "cpu"
     assert manifest.as_device("cuda") == "cuda"
-    with pytest.raises(ValueError, match="invalid device"):
+    with pytest.raises(JSONTypeError, match="device"):
         _ = manifest.as_device("tpu")
 
 
@@ -204,7 +204,7 @@ def test_as_precision_variants_and_invalid() -> None:
     assert manifest.as_precision("fp32") == "fp32"
     assert manifest.as_precision("fp16") == "fp16"
     assert manifest.as_precision("bf16") == "bf16"
-    with pytest.raises(ValueError, match="invalid precision"):
+    with pytest.raises(JSONTypeError, match="precision"):
         _ = manifest.as_precision("int8")
 
 
@@ -214,7 +214,7 @@ def test_load_manifest_freeze_embed_must_be_bool() -> None:
         **_base_manifest(),
         "freeze_embed": "yes",  # should be bool, not string
     }
-    with pytest.raises(ValueError, match="freeze_embed must be bool"):
+    with pytest.raises(JSONTypeError, match="freeze_embed"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
 
 
@@ -224,5 +224,5 @@ def test_load_manifest_float_or_none_error_case() -> None:
         **_base_manifest(),
         "test_loss": "not-a-number",  # should be float or null
     }
-    with pytest.raises(ValueError, match="test_loss must be number or null"):
+    with pytest.raises(JSONTypeError, match="test_loss"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))

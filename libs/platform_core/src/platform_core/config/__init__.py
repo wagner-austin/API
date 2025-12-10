@@ -12,6 +12,7 @@ from ._utils import (
     _require_env_csv,
     _require_env_str,
 )
+from .covenant_radar import CovenantRadarSettings, load_covenant_radar_settings
 from .data_bank import DataBankSettings, load_data_bank_settings
 from .discordbot import (
     DigitsConfig,
@@ -50,6 +51,7 @@ from .model_trainer import (
 from .turkic_api import TurkicApiSettings, load_turkic_api_settings
 
 __all__ = [
+    "CovenantRadarSettings",
     "DataBankSettings",
     "DigitsConfig",
     "DiscordConfig",
@@ -86,6 +88,7 @@ __all__ = [
     "_require_env_csv",
     "_require_env_str",
     "limits_from_handwriting_ai_settings",
+    "load_covenant_radar_settings",
     "load_data_bank_settings",
     "load_discordbot_settings",
     "load_handwriting_ai_settings",

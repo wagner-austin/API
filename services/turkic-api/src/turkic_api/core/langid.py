@@ -4,7 +4,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final, Protocol
 
+import numpy as np
 import requests
+from numpy.typing import NDArray
 
 _MODEL_DIRNAME: Final[str] = "models"
 _URL_218E: Final[str] = "https://dl.fbaipublicfiles.com/nllb/lid/lid218e.bin"
@@ -66,33 +68,58 @@ def _parse_label(raw: str) -> tuple[str, str | None]:
         "ug": "ug",
         "fi": "fi",
         "az": "az",
+        # ISO 639-3 to 639-1 for common languages
+        "eng": "en",
+        "en": "en",
     }
     return mapping.get(lang_part, lang_part), script
 
 
 class LangIdModel(Protocol):
-    def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]: ...
+    """Protocol for language identification model with predict method."""
+
+    def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+        """Predict language labels and probabilities for the given text."""
+        ...
 
 
-class _FastTextModule(Protocol):
-    def load_model(self, path: str) -> LangIdModel: ...
+class _FastTextModelFactory(Protocol):
+    """Protocol for FastText model constructor callable."""
+
+    def __call__(self, *, model_path: str) -> LangIdModel:
+        """Construct a FastText model from a file path."""
+        ...
 
 
-def _get_fasttext() -> _FastTextModule:
-    import importlib
+def _get_fasttext_model_factory() -> _FastTextModelFactory:
+    """Get the FastText model constructor without triggering deprecation warnings.
 
-    return importlib.import_module("fasttext")
+    The fasttext.load_model wrapper prints a warning to stderr on every call.
+    We bypass it by directly accessing the underlying _FastText class from
+    fasttext.FastText module, which accepts model_path as a keyword argument.
+    """
+    ft_module = __import__("fasttext.FastText", fromlist=["_FastText"])
+    factory: _FastTextModelFactory = ft_module._FastText
+    return factory
 
 
 def load_langid_model(data_dir: str, prefer_218e: bool = True) -> LangIdModel:
     """Load a language-id model from local cache, downloading if missing.
 
     The underlying implementation uses fastText at runtime without exposing
-    untyped imports to the type checker.
+    untyped imports to the type checker. Uses the internal _FastText constructor
+    directly to avoid the deprecation warning from fasttext.load_model.
     """
     model_path = ensure_model_path(data_dir, prefer_218e=prefer_218e)
-    ft = _get_fasttext()
-    return ft.load_model(str(model_path))
+    factory = _get_fasttext_model_factory()
+    return factory(model_path=str(model_path))
+
+
+def _extract_prob(probs: NDArray[np.float64]) -> float:
+    """Extract the first probability as a float, or 0.0 if empty."""
+    if len(probs) == 0:
+        return 0.0
+    return float(probs.item(0))
 
 
 def build_lang_filter(
@@ -107,8 +134,8 @@ def build_lang_filter(
 
     def _keep(text: str) -> bool:
         labels, probs = model.predict(text.replace("\n", " "), k=1)
-        label = labels[0] if labels else ""
-        prob = probs[0] if probs else 0.0
+        label: str = labels[0] if labels else ""
+        prob = _extract_prob(probs)
         lang, _script = _parse_label(label)
         return lang == target_lang and prob >= threshold
 
@@ -134,8 +161,8 @@ def build_lang_script_filter(
 
     def _keep(text: str) -> bool:
         labels, probs = model.predict(text.replace("\n", " "), k=1)
-        label = labels[0] if labels else ""
-        prob = probs[0] if probs else 0.0
+        label: str = labels[0] if labels else ""
+        prob = _extract_prob(probs)
         lang, script_pred = _parse_label(label)
         if lang != target_lang:
             return False

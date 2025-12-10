@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict, TypeGuard
 
-from .json_utils import JSONValue, dump_json_str, load_json_str
+from .json_utils import (
+    JSONObject,
+    JSONTypeError,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_float,
+    require_int,
+    require_str,
+)
 
 TrainerMetricsEventType = Literal[
     "trainer.metrics.config.v1",
@@ -179,21 +188,11 @@ def make_completed_metrics_event(
     }
 
 
-DecodedObj = dict[str, JSONValue]
-
-
-def _decode_config_event(decoded: DecodedObj, job_id: str, user_id: int) -> TrainerConfigV1:
-    model_family = decoded.get("model_family")
-    model_size = decoded.get("model_size")
-    total_epochs = decoded.get("total_epochs")
-    queue = decoded.get("queue")
-    if (
-        not isinstance(model_family, str)
-        or not isinstance(model_size, str)
-        or not isinstance(total_epochs, int)
-        or not isinstance(queue, str)
-    ):
-        raise ValueError("config event requires model_family, model_size, total_epochs, queue")
+def _decode_config_event(decoded: JSONObject, job_id: str, user_id: int) -> TrainerConfigV1:
+    model_family = require_str(decoded, "model_family")
+    model_size = require_str(decoded, "model_size")
+    total_epochs = require_int(decoded, "total_epochs")
+    queue = require_str(decoded, "queue")
     event: TrainerConfigV1 = {
         "type": "trainer.metrics.config.v1",
         "job_id": job_id,
@@ -204,49 +203,36 @@ def _decode_config_event(decoded: DecodedObj, job_id: str, user_id: int) -> Trai
         "queue": queue,
     }
     cpu_cores = decoded.get("cpu_cores")
-    if isinstance(cpu_cores, int):
+    if isinstance(cpu_cores, int) and not isinstance(cpu_cores, bool):
         event["cpu_cores"] = cpu_cores
     memory_mb = decoded.get("memory_mb")
-    if isinstance(memory_mb, int):
+    if isinstance(memory_mb, int) and not isinstance(memory_mb, bool):
         event["memory_mb"] = memory_mb
     optimal_threads = decoded.get("optimal_threads")
-    if isinstance(optimal_threads, int):
+    if isinstance(optimal_threads, int) and not isinstance(optimal_threads, bool):
         event["optimal_threads"] = optimal_threads
     optimal_workers = decoded.get("optimal_workers")
-    if isinstance(optimal_workers, int):
+    if isinstance(optimal_workers, int) and not isinstance(optimal_workers, bool):
         event["optimal_workers"] = optimal_workers
     batch_size = decoded.get("batch_size")
-    if isinstance(batch_size, int):
+    if isinstance(batch_size, int) and not isinstance(batch_size, bool):
         event["batch_size"] = batch_size
     learning_rate = decoded.get("learning_rate")
-    if isinstance(learning_rate, int | float):
+    if isinstance(learning_rate, int | float) and not isinstance(learning_rate, bool):
         event["learning_rate"] = float(learning_rate)
     return event
 
 
 def _decode_progress_metrics_event(
-    decoded: DecodedObj, job_id: str, user_id: int
+    decoded: JSONObject, job_id: str, user_id: int
 ) -> TrainerProgressMetricsV1:
-    epoch = decoded.get("epoch")
-    total_epochs = decoded.get("total_epochs")
-    step = decoded.get("step")
-    train_loss = decoded.get("train_loss")
-    train_ppl = decoded.get("train_ppl")
-    grad_norm = decoded.get("grad_norm")
-    samples_per_sec = decoded.get("samples_per_sec")
-    if (
-        not isinstance(epoch, int)
-        or not isinstance(total_epochs, int)
-        or not isinstance(step, int)
-        or not isinstance(train_loss, int | float)
-        or not isinstance(train_ppl, int | float)
-        or not isinstance(grad_norm, int | float)
-        or not isinstance(samples_per_sec, int | float)
-    ):
-        raise ValueError(
-            "progress metrics event requires epoch, total_epochs, step, train_loss, "
-            "train_ppl, grad_norm, samples_per_sec"
-        )
+    epoch = require_int(decoded, "epoch")
+    total_epochs = require_int(decoded, "total_epochs")
+    step = require_int(decoded, "step")
+    train_loss = require_float(decoded, "train_loss")
+    train_ppl = require_float(decoded, "train_ppl")
+    grad_norm = require_float(decoded, "grad_norm")
+    samples_per_sec = require_float(decoded, "samples_per_sec")
     event: TrainerProgressMetricsV1 = {
         "type": "trainer.metrics.progress.v1",
         "job_id": job_id,
@@ -254,38 +240,32 @@ def _decode_progress_metrics_event(
         "epoch": epoch,
         "total_epochs": total_epochs,
         "step": step,
-        "train_loss": float(train_loss),
-        "train_ppl": float(train_ppl),
-        "grad_norm": float(grad_norm),
-        "samples_per_sec": float(samples_per_sec),
+        "train_loss": train_loss,
+        "train_ppl": train_ppl,
+        "grad_norm": grad_norm,
+        "samples_per_sec": samples_per_sec,
     }
     val_loss = decoded.get("val_loss")
-    if isinstance(val_loss, int | float):
+    if isinstance(val_loss, int | float) and not isinstance(val_loss, bool):
         event["val_loss"] = float(val_loss)
     val_ppl = decoded.get("val_ppl")
-    if isinstance(val_ppl, int | float):
+    if isinstance(val_ppl, int | float) and not isinstance(val_ppl, bool):
         event["val_ppl"] = float(val_ppl)
     return event
 
 
 def _decode_completed_metrics_event(
-    decoded: DecodedObj, job_id: str, user_id: int
+    decoded: JSONObject, job_id: str, user_id: int
 ) -> TrainerCompletedMetricsV1:
-    test_loss = decoded.get("test_loss")
-    test_ppl = decoded.get("test_ppl")
-    artifact_path = decoded.get("artifact_path")
-    if (
-        not isinstance(test_loss, int | float)
-        or not isinstance(test_ppl, int | float)
-        or not isinstance(artifact_path, str)
-    ):
-        raise ValueError("completed metrics event requires test_loss, test_ppl, artifact_path")
+    test_loss = require_float(decoded, "test_loss")
+    test_ppl = require_float(decoded, "test_ppl")
+    artifact_path = require_str(decoded, "artifact_path")
     return {
         "type": "trainer.metrics.completed.v1",
         "job_id": job_id,
         "user_id": user_id,
-        "test_loss": float(test_loss),
-        "test_ppl": float(test_ppl),
+        "test_loss": test_loss,
+        "test_ppl": test_ppl,
         "artifact_path": artifact_path,
     }
 
@@ -294,21 +274,13 @@ def decode_trainer_metrics_event(payload: str) -> TrainerMetricsEventV1:
     """Parse and validate a serialized trainer metrics event.
 
     Raises:
-        ValueError: if the payload is not a well-formed trainer metrics event.
+        JSONTypeError: if the payload is not a well-formed trainer metrics event.
     """
-    decoded_raw = load_json_str(payload)
-    if not isinstance(decoded_raw, dict):
-        raise ValueError("trainer metrics event payload must be an object")
-    decoded: DecodedObj = decoded_raw
+    decoded = narrow_json_to_dict(load_json_str(payload))
 
-    type_raw = decoded.get("type")
-    if not isinstance(type_raw, str):
-        raise ValueError("trainer metrics event type must be a string")
-
-    job_id = decoded.get("job_id")
-    user_id = decoded.get("user_id")
-    if not isinstance(job_id, str) or not isinstance(user_id, int):
-        raise ValueError("job_id and user_id are required in trainer metrics event")
+    type_raw = require_str(decoded, "type")
+    job_id = require_str(decoded, "job_id")
+    user_id = require_int(decoded, "user_id")
 
     if type_raw == "trainer.metrics.config.v1":
         return _decode_config_event(decoded, job_id, user_id)
@@ -316,7 +288,7 @@ def decode_trainer_metrics_event(payload: str) -> TrainerMetricsEventV1:
         return _decode_progress_metrics_event(decoded, job_id, user_id)
     if type_raw == "trainer.metrics.completed.v1":
         return _decode_completed_metrics_event(decoded, job_id, user_id)
-    raise ValueError("unknown trainer metrics event type")
+    raise JSONTypeError(f"Unknown trainer metrics event type: '{type_raw}'")
 
 
 def is_config(ev: TrainerMetricsEventV1) -> TypeGuard[TrainerConfigV1]:

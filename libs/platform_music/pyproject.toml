@@ -17,7 +17,7 @@ include = ["src/platform_music/py.typed"]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
 platform-workers = { path = "../platform_workers", develop = true }
-redis = "^5.2.0"
+redis = "^7.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
@@ -63,6 +63,7 @@ fixable = ["ALL"]
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = false

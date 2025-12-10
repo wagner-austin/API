@@ -5,7 +5,7 @@ from types import ModuleType
 from typing import Protocol
 
 import pytest
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 from transcript_api.adapters.youtube_client import (
     YouTubeTranscriptApiAdapter,
@@ -359,7 +359,7 @@ def test_get_transcript_rejects_invalid_items(
     monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
 
     adapter = YouTubeTranscriptApiAdapter()
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = adapter.get_transcript("vid", ["en"])
 
 

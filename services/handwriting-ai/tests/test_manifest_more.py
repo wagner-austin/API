@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import InvalidJsonError, JSONTypeError
 
 from handwriting_ai.inference.manifest import (
     _decode_manifest,
@@ -16,12 +17,12 @@ UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float
 
 
 def test_manifest_from_json_invalid_json_raises() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidJsonError):
         _ = from_json_manifest("{invalid}")
 
 
 def test_manifest_from_json_non_object_raises() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = from_json_manifest("[]")
 
 
@@ -37,7 +38,7 @@ def test_manifest_invalid_created_at_raises() -> None:
         "val_acc": 0.5,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -53,7 +54,7 @@ def test_manifest_invalid_n_classes_bound_raises() -> None:
         "val_acc": 0.5,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -69,7 +70,7 @@ def test_manifest_invalid_val_acc_raises() -> None:
         "val_acc": 2.0,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -85,7 +86,7 @@ def test_manifest_invalid_temperature_raises() -> None:
         "val_acc": 0.5,
         "temperature": 0.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -101,7 +102,7 @@ def test_manifest_required_fields_missing_schema_raises() -> None:
         "val_acc": 0.5,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -117,7 +118,7 @@ def test_manifest_unsupported_schema_version_raises() -> None:
         "val_acc": 0.5,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(d)
 
 
@@ -125,7 +126,7 @@ def test_manifest_from_path_invalid_json_raises() -> None:
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "manifest.json"
         p.write_text("{bad}", encoding="utf-8")
-        with pytest.raises(ValueError):
+        with pytest.raises(InvalidJsonError):
             _ = from_path_manifest(p)
 
 
@@ -134,5 +135,5 @@ def test_manifest_from_path_non_object_raises() -> None:
         p = Path(td) / "manifest.json"
         # Write a valid JSON that is not an object
         p.write_text("[]", encoding="utf-8")
-        with pytest.raises(ValueError):
+        with pytest.raises(JSONTypeError):
             _ = from_path_manifest(p)

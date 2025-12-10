@@ -1,0 +1,92 @@
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*.tmp
+
+# Git
+.git
+.gitignore
+
+# Build artifacts
+dist
+build
+*.egg-info
+
+# Node
+node_modules
+
+# Test files (not needed in container)
+**/tests
+**/fixtures
+**/*_test.py
+**/test_*.py
+**/conftest.py
+
+# Python caches in all directories
+**/__pycache__
+**/*.pyc
+
+# Virtual environments everywhere
+**/.venv
+**/venv
+
+# Tools directories
+**/tools
+
+# Documentation (not needed in container)
+docs
+*.md
+!README.md
+
+# Local data directories (service-specific data should be volume-mounted)
+# Use specific paths to avoid excluding Python packages named 'data'
+services/*/data
+services/*/logs
+libs/*/data
+clients/*/data
+**/logs
+**/*.log
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+
+# Docker compose files (not needed in build context)
+**/docker-compose*.yml
+
+# Large model/cache files
+**/.cache
+**/hf_cache
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.onnx
+**/*.safetensors
+
+# Temporary files
+*.bak
+*.orig
+*~

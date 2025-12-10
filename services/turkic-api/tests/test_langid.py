@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Generator
 from pathlib import Path
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
+from tests.conftest import make_probs
 
 import turkic_api.core.langid as lid
 
@@ -94,11 +97,11 @@ def test_ensure_model_path_176_branch(tmp_path: Path, monkeypatch: pytest.Monkey
 
 def test_build_lang_filter_with_threshold(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             # Return variants to hit mapping logic: __label__kk and kaz_Cyrl
             if "cyrl" in text.lower():
-                return (["__label__kaz_Cyrl"], [0.95])
-            return (["__label__kk"], [0.80])
+                return (("__label__kaz_Cyrl",), make_probs(0.95))
+            return (("__label__kk",), make_probs(0.80))
 
     model = _Model()
     keep = lid.build_lang_filter(target_lang="kk", threshold=0.90, model=model)
@@ -110,13 +113,13 @@ def test_build_lang_script_filter_match_and_mismatch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             t = text.lower()
             if "latn" in t:
-                return (["__label__kaz_Latn"], [0.99])
+                return (("__label__kaz_Latn",), make_probs(0.99))
             if "cyrl" in t:
-                return (["__label__kaz_Cyrl"], [0.99])
-            return (["__label__eng"], [0.99])
+                return (("__label__kaz_Cyrl",), make_probs(0.99))
+            return (("__label__eng",), make_probs(0.99))
 
     model = _Model()
     # Script normalized from lower-case
@@ -134,8 +137,8 @@ def test_build_lang_script_filter_blank_script_treated_as_none(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kaz_Latn"], [0.99])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__kaz_Latn",), make_probs(0.99))
 
     model = _Model()
     keep = lid.build_lang_script_filter(target_lang="kk", script="   ", threshold=0.5, model=model)
@@ -143,15 +146,41 @@ def test_build_lang_script_filter_blank_script_treated_as_none(
     assert keep("anything") is True
 
 
-def test_get_fasttext_import(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _FastTextStub:
-        def load_model(self, path: str) -> str:
-            return path
+def test_get_fasttext_model_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that _get_fasttext_model_factory returns the _FastText class."""
 
-    def fake_import(name: str) -> _FastTextStub:
-        assert name == "fasttext"
-        return _FastTextStub()
+    class _FakeModel:
+        def __init__(self, *, model_path: str) -> None:
+            self._model_path = model_path
 
-    monkeypatch.setattr("importlib.import_module", fake_import)
-    mod = lid._get_fasttext()
-    assert type(mod).__name__ == "_FastTextStub"
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__en",), make_probs(0.99))
+
+    class _FakeFastTextModule:
+        _FastText = _FakeModel
+
+    def fake_import(
+        name: str, globals_: dict[str, str] | None = None, fromlist: list[str] | None = None
+    ) -> _FakeFastTextModule:
+        assert name == "fasttext.FastText"
+        assert fromlist == ["_FastText"]
+        return _FakeFastTextModule()
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+    factory = lid._get_fasttext_model_factory()
+    model = factory(model_path="/fake/path.bin")
+    # Verify factory works by calling predict
+    labels, _probs = model.predict("test", k=1)
+    assert labels == ("__label__en",)
+
+
+def test_extract_prob_empty_array() -> None:
+    """Test _extract_prob returns 0.0 for empty arrays."""
+    empty_list: list[np.float64] = []
+    empty_probs: NDArray[np.float64] = np.array(empty_list, dtype=np.float64)
+    assert lid._extract_prob(empty_probs) == 0.0
+
+
+def test_extract_prob_with_value() -> None:
+    """Test _extract_prob returns the first value for non-empty arrays."""
+    assert lid._extract_prob(make_probs(0.95, 0.05)) == 0.95

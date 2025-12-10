@@ -32,14 +32,16 @@ class TestTinyPwizMzML:
         spectra = list(reader.iter_spectra(file))
         assert len(spectra) == 4
 
-        # All spectra have complete structure
+        # All spectra have complete structure - verify via value assertions
         for sp in spectra:
-            assert "meta" in sp
-            assert "data" in sp
-            assert "stats" in sp
+            # Verify meta exists and has expected ms_level
             assert sp["meta"]["ms_level"] >= 1
-            assert len(sp["data"]["mz_values"]) >= 0
-            assert len(sp["data"]["intensities"]) >= 0
+            # Verify data arrays exist and have expected length relationship
+            mz_len = len(sp["data"]["mz_values"])
+            int_len = len(sp["data"]["intensities"])
+            assert mz_len == int_len
+            # Verify stats exists by checking num_peaks
+            assert sp["stats"]["num_peaks"] >= 0
 
     def test_read_spectrum_first(self) -> None:
         """Test reading first spectrum by scan number."""
@@ -233,19 +235,17 @@ class TestMzXMLFiles:
         # test.mzXML has MS2 spectra - verify first one exists
         first_ms2 = ms2_spectra[0]
 
-        # Verify MS2 spectrum structure
-        assert "meta" in first_ms2
-        assert "data" in first_ms2
-        assert "precursor" in first_ms2
-        assert "stats" in first_ms2
-        # MS2 spectra should have precursor info
+        # Verify MS2 spectrum structure via value assertions
+        assert first_ms2["meta"]["ms_level"] == 2
+        assert len(first_ms2["data"]["mz_values"]) >= 0
         assert first_ms2["precursor"]["mz"] >= 0.0
+        assert first_ms2["stats"]["num_peaks"] >= 0
 
         # Verify all MS2 spectra have correct structure
         for sp in ms2_spectra:
-            assert "meta" in sp
-            assert "data" in sp
-            assert "precursor" in sp
+            assert sp["meta"]["ms_level"] == 2
+            assert len(sp["data"]["mz_values"]) >= 0
+            assert sp["precursor"]["mz"] >= 0.0
 
     def test_test_mzxml_count(self) -> None:
         """Test counting spectra in mzXML."""

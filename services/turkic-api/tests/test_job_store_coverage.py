@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
 
@@ -37,7 +38,7 @@ def test_parse_status_failed_branch() -> None:
 
 
 def test_parse_user_id_invalid_string() -> None:
-    """Cover line 47: invalid user_id in _parse_user_id (non-digit string)."""
+    """Cover invalid user_id in parse_int_field (non-digit string)."""
     r = FakeRedis()
     key = turkic_job_key("bad_user")
     now = datetime.utcnow().isoformat()
@@ -52,13 +53,13 @@ def test_parse_user_id_invalid_string() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="invalid user_id"):
+    with pytest.raises(JSONTypeError, match="invalid user_id"):
         store.load("bad_user")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_user_id_empty_string() -> None:
-    """Cover line 47: invalid user_id when empty string."""
+    """Cover invalid user_id when empty string."""
     r = FakeRedis()
     key = turkic_job_key("empty_user")
     now = datetime.utcnow().isoformat()
@@ -73,13 +74,13 @@ def test_parse_user_id_empty_string() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="invalid user_id"):
+    with pytest.raises(JSONTypeError, match="invalid user_id"):
         store.load("empty_user")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_status_missing_with_user_id() -> None:
-    """Cover line 29: missing status in _parse_status (with user_id present)."""
+    """Cover missing status in parse_status (with user_id present)."""
     r = FakeRedis()
     key = turkic_job_key("no_status")
     now = datetime.utcnow().isoformat()
@@ -93,13 +94,13 @@ def test_parse_status_missing_with_user_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="missing status"):
+    with pytest.raises(JSONTypeError, match="missing status"):
         store.load("no_status")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_progress_missing_with_user_id() -> None:
-    """Cover line 54: missing progress in _parse_progress (with user_id and status)."""
+    """Cover missing progress in parse_int_field (with user_id and status)."""
     r = FakeRedis()
     key = turkic_job_key("no_progress")
     now = datetime.utcnow().isoformat()
@@ -113,13 +114,13 @@ def test_parse_progress_missing_with_user_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="missing progress"):
+    with pytest.raises(JSONTypeError, match="missing progress"):
         store.load("no_progress")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_progress_invalid_with_user_id() -> None:
-    """Cover line 57: invalid progress in _parse_progress (non-digit string)."""
+    """Cover invalid progress in parse_int_field (non-digit string)."""
     r = FakeRedis()
     key = turkic_job_key("bad_progress")
     now = datetime.utcnow().isoformat()
@@ -134,13 +135,13 @@ def test_parse_progress_invalid_with_user_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="invalid progress"):
+    with pytest.raises(JSONTypeError, match="invalid progress"):
         store.load("bad_progress")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_datetime_missing_with_user_id() -> None:
-    """Cover line 64: missing datetime in _parse_datetime (empty created_at)."""
+    """Cover missing datetime in parse_datetime_field (empty created_at)."""
     r = FakeRedis()
     key = turkic_job_key("no_datetime")
     r.hset(
@@ -154,13 +155,13 @@ def test_parse_datetime_missing_with_user_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="missing created_at"):
+    with pytest.raises(JSONTypeError, match="missing created_at"):
         store.load("no_datetime")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
 
 def test_parse_upload_status_invalid_with_user_id() -> None:
-    """Cover line 74: invalid upload_status in _parse_upload_status."""
+    """Cover line 61: invalid upload_status raises JSONTypeError."""
     r = FakeRedis()
     key = turkic_job_key("bad_upload")
     now = datetime.utcnow().isoformat()
@@ -176,6 +177,6 @@ def test_parse_upload_status_invalid_with_user_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError, match="invalid upload_status"):
+    with pytest.raises(JSONTypeError, match="invalid upload_status"):
         store.load("bad_upload")
     r.assert_only_called({"hset", "expire", "hgetall"})

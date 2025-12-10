@@ -5,6 +5,7 @@
 - [Architecture](architecture.md) - System design and component interactions
 - [Services](services.md) - Detailed service documentation
 - [Development](development.md) - Development workflow and conventions
+- [Testing Patterns](testing-patterns.md) - Test hooks and 100% coverage patterns
 
 ## Planning & Refactoring
 

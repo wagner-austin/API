@@ -11,7 +11,7 @@ from typing import Literal, NotRequired
 
 from platform_core.errors import AppError
 from platform_core.errors import ErrorCode as PlatformErrorCode
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import JSONTypeError, load_json_str
 from typing_extensions import TypedDict
 
 from .types import JsonDict, UnknownJson
@@ -29,7 +29,7 @@ from .validators import (
 Status = Literal["queued", "processing", "completed", "failed"]
 Script = Literal["Latn", "Cyrl", "Arab"]
 Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az"]
+Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en"]
 ErrorCode = Literal[
     "INVALID_REQUEST",
     "JOB_NOT_FOUND",
@@ -90,7 +90,7 @@ class ErrorResponse(TypedDict):
 # Parse functions with explicit validation
 
 _SOURCE_VALUES = frozenset({"oscar", "wikipedia", "culturax"})
-_LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az"})
+_LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az", "en"})
 _SCRIPT_VALUES = frozenset({"Latn", "Cyrl", "Arab"})
 _SOURCE_MAP: dict[str, Source] = {
     "oscar": "oscar",
@@ -105,46 +105,33 @@ _LANGUAGE_MAP: dict[str, Language] = {
     "ug": "ug",
     "fi": "fi",
     "az": "az",
+    "en": "en",
 }
 _SCRIPT_MAP: dict[str, Script] = {"Latn": "Latn", "Cyrl": "Cyrl", "Arab": "Arab"}
 
 
 def _decode_source_literal(val: UnknownJson) -> Source:
     decoded = _decode_required_literal(val, "source", _SOURCE_VALUES)
-    if decoded == "oscar":
-        return "oscar"
-    if decoded == "wikipedia":
-        return "wikipedia"
-    if decoded == "culturax":
-        return "culturax"
-    raise AppError(
-        code=PlatformErrorCode.INVALID_INPUT,
-        message="Invalid source",
-        http_status=400,
-    )
+    source = _SOURCE_MAP.get(decoded)
+    if source is None:
+        raise AppError(
+            code=PlatformErrorCode.INVALID_INPUT,
+            message="Invalid source",
+            http_status=400,
+        )
+    return source
 
 
 def _decode_language_literal(val: UnknownJson) -> Language:
     decoded = _decode_required_literal(val, "language", _LANGUAGE_VALUES)
-    if decoded == "kk":
-        return "kk"
-    if decoded == "ky":
-        return "ky"
-    if decoded == "uz":
-        return "uz"
-    if decoded == "tr":
-        return "tr"
-    if decoded == "ug":
-        return "ug"
-    if decoded == "fi":
-        return "fi"
-    if decoded == "az":
-        return "az"
-    raise AppError(
-        code=PlatformErrorCode.INVALID_INPUT,
-        message="Invalid language",
-        http_status=400,
-    )
+    language = _LANGUAGE_MAP.get(decoded)
+    if language is None:
+        raise AppError(
+            code=PlatformErrorCode.INVALID_INPUT,
+            message="Invalid language",
+            http_status=400,
+        )
+    return language
 
 
 def _decode_script_literal(val: UnknownJson) -> Script | None:
@@ -262,11 +249,11 @@ def parse_job_response_json(s: str) -> JobResponse:
 
     obj: UnknownJson = load_json_str(s)
     if not isinstance(obj, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONTypeError("Expected JSON object")
 
     user_id_val = obj.get("user_id")
     if not isinstance(user_id_val, int):
-        raise ValueError("user_id must be an integer")
+        raise JSONTypeError("user_id must be an integer")
 
     status_val = _decode_str(obj.get("status"), "status")
     if status_val == "queued":
@@ -278,7 +265,7 @@ def parse_job_response_json(s: str) -> JobResponse:
     elif status_val == "failed":
         status = "failed"
     else:
-        raise ValueError("Invalid job status")
+        raise JSONTypeError("Invalid job status")
 
     return {
         "job_id": _decode_str(obj.get("job_id"), "job_id"),
@@ -294,11 +281,11 @@ def parse_job_status_json(s: str) -> JobStatus:
 
     obj: UnknownJson = load_json_str(s)
     if not isinstance(obj, dict):
-        raise ValueError("Expected JSON object")
+        raise JSONTypeError("Expected JSON object")
 
     user_id_val = obj.get("user_id")
     if not isinstance(user_id_val, int):
-        raise ValueError("user_id must be an integer")
+        raise JSONTypeError("user_id must be an integer")
 
     message_val = obj.get("message")
     message = _decode_str(message_val, "message") if message_val is not None else None
@@ -330,7 +317,7 @@ def parse_job_status_json(s: str) -> JobStatus:
     elif status_val == "failed":
         status = "failed"
     else:
-        raise ValueError("Invalid job status")
+        raise JSONTypeError("Invalid job status")
 
     return {
         "job_id": _decode_str(obj.get("job_id"), "job_id"),

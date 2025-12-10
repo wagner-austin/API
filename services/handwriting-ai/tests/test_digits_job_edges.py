@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 from handwriting_ai.jobs import digits
 
@@ -21,7 +21,7 @@ def test_get_env_returns_default_when_missing(monkeypatch: pytest.MonkeyPatch) -
 
 def test_decode_payload_rejects_invalid_types(monkeypatch: pytest.MonkeyPatch) -> None:
     bad_payload: dict[str, JSONValue] = {"type": "wrong"}
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = digits._decode_payload(bad_payload)
 
     bad_bool_payload: dict[str, JSONValue] = {
@@ -36,7 +36,7 @@ def test_decode_payload_rejects_invalid_types(monkeypatch: pytest.MonkeyPatch) -
         "augment": False,
         "notes": None,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = digits._decode_payload(bad_bool_payload)
 
 

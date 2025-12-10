@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import torch
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.logging import JsonFormatter, get_logger
 
 from handwriting_ai.config import (
@@ -175,7 +175,7 @@ def test_invalid_state_dict_variants_logged_and_raise() -> None:
             h.setFormatter(JsonFormatter(static_fields={}, extra_field_names=[]))
             logger.addHandler(h)
             try:
-                with pytest.raises(ValueError):
+                with pytest.raises(JSONTypeError):
                     eng.try_load_active()
             finally:
                 logger.removeHandler(h)

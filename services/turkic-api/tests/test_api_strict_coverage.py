@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from turkic_api.api import models
 from turkic_api.api.jobs import _decode_job_params
@@ -57,7 +57,7 @@ def test_decode_job_params_branches() -> None:
     )
     assert blank["script"] is None
 
-    with pytest.raises(ValueError, match="Invalid script"):
+    with pytest.raises(JSONTypeError, match="Invalid script"):
         _decode_job_params(
             {
                 "user_id": 42,
@@ -69,7 +69,7 @@ def test_decode_job_params_branches() -> None:
                 "confidence_threshold": 0.4,
             }
         )
-    with pytest.raises(ValueError, match="Invalid source or language"):
+    with pytest.raises(JSONTypeError, match="Invalid source or language"):
         _decode_job_params(
             {
                 "user_id": 42,
@@ -88,7 +88,7 @@ def test_decode_job_params_branches() -> None:
         "transliterate": True,
         "confidence_threshold": 0.4,
     }
-    with pytest.raises(TypeError):
+    with pytest.raises(JSONTypeError):
         _decode_job_params(payload_bad)
 
 

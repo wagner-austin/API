@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from typing import Literal
 
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import (
+    JSONObject,
+    JSONTypeError,
+    load_json_str,
+    narrow_json_to_dict,
+    require_bool,
+    require_dict,
+    require_float,
+    require_int,
+    require_str,
+)
 
 from model_trainer.infra.persistence.models import (
     TrainingManifest,
@@ -23,7 +33,7 @@ def as_model_family(s: str) -> Literal["gpt2", "llama", "qwen", "char_lstm"]:
         return "qwen"
     if s == "char_lstm":
         return "char_lstm"
-    raise ValueError("invalid model_family in manifest")
+    raise JSONTypeError(f"Invalid model_family: {s}")
 
 
 def as_optimizer(s: str) -> Literal["adamw", "adam", "sgd"]:
@@ -34,7 +44,7 @@ def as_optimizer(s: str) -> Literal["adamw", "adam", "sgd"]:
         return "adam"
     if s == "sgd":
         return "sgd"
-    raise ValueError("invalid optimizer in manifest")
+    raise JSONTypeError(f"Invalid optimizer: {s}")
 
 
 def as_device(s: str) -> Literal["cpu", "cuda"]:
@@ -43,7 +53,7 @@ def as_device(s: str) -> Literal["cpu", "cuda"]:
         return "cpu"
     if s == "cuda":
         return "cuda"
-    raise ValueError("invalid device in manifest")
+    raise JSONTypeError(f"Invalid device: {s}")
 
 
 def as_precision(s: str) -> Literal["fp32", "fp16", "bf16"]:
@@ -54,98 +64,46 @@ def as_precision(s: str) -> Literal["fp32", "fp16", "bf16"]:
         return "fp16"
     if s == "bf16":
         return "bf16"
-    raise ValueError("invalid precision in manifest")
+    raise JSONTypeError(f"Invalid precision: {s}")
 
 
-def _decode_manifest_versions(vers_o: JSONValue) -> TrainingManifestVersions:
-    if not isinstance(vers_o, dict):
-        raise ValueError("invalid manifest JSON: versions")
-    v_torch: JSONValue = vers_o.get("torch")
-    v_transformers: JSONValue = vers_o.get("transformers")
-    v_tokenizers: JSONValue = vers_o.get("tokenizers")
-    v_datasets: JSONValue = vers_o.get("datasets")
-    if not isinstance(v_torch, str):
-        raise ValueError("manifest field versions.torch must be str")
-    if not isinstance(v_transformers, str):
-        raise ValueError("manifest field versions.transformers must be str")
-    if not isinstance(v_tokenizers, str):
-        raise ValueError("manifest field versions.tokenizers must be str")
-    if not isinstance(v_datasets, str):
-        raise ValueError("manifest field versions.datasets must be str")
+def _decode_manifest_versions(obj: JSONObject) -> TrainingManifestVersions:
+    vers = require_dict(obj, "versions")
     return {
-        "torch": v_torch,
-        "transformers": v_transformers,
-        "tokenizers": v_tokenizers,
-        "datasets": v_datasets,
+        "torch": require_str(vers, "torch"),
+        "transformers": require_str(vers, "transformers"),
+        "tokenizers": require_str(vers, "tokenizers"),
+        "datasets": require_str(vers, "datasets"),
     }
 
 
-def _decode_manifest_system(sys_o: JSONValue) -> TrainingManifestSystem:
-    if not isinstance(sys_o, dict):
-        raise ValueError("invalid manifest JSON: system")
-    s_cpu: JSONValue = sys_o.get("cpu_count")
-    s_platform: JSONValue = sys_o.get("platform")
-    s_release: JSONValue = sys_o.get("platform_release")
-    s_machine: JSONValue = sys_o.get("machine")
-    if not isinstance(s_cpu, int):
-        raise ValueError("manifest field system.cpu_count must be int")
-    if not isinstance(s_platform, str):
-        raise ValueError("manifest field system.platform must be str")
-    if not isinstance(s_release, str):
-        raise ValueError("manifest field system.platform_release must be str")
-    if not isinstance(s_machine, str):
-        raise ValueError("manifest field system.machine must be str")
+def _decode_manifest_system(obj: JSONObject) -> TrainingManifestSystem:
+    sys = require_dict(obj, "system")
     return {
-        "cpu_count": s_cpu,
-        "platform": s_platform,
-        "platform_release": s_release,
-        "machine": s_machine,
+        "cpu_count": require_int(sys, "cpu_count"),
+        "platform": require_str(sys, "platform"),
+        "platform_release": require_str(sys, "platform_release"),
+        "machine": require_str(sys, "machine"),
     }
 
 
-def _decode_manifest_str(obj: dict[str, JSONValue], field: str) -> str:
-    val: JSONValue = obj.get(field)
-    if not isinstance(val, str):
-        raise ValueError(f"manifest field {field} must be str")
-    return val
-
-
-def _decode_manifest_int(obj: dict[str, JSONValue], field: str) -> int:
-    val: JSONValue = obj.get(field)
-    if not isinstance(val, int):
-        raise ValueError(f"manifest field {field} must be int")
-    return val
-
-
-def _decode_manifest_float(obj: dict[str, JSONValue], field: str) -> float:
-    val: JSONValue = obj.get(field)
-    if not isinstance(val, int | float):
-        raise ValueError(f"manifest field {field} must be number")
-    return float(val)
-
-
-def _decode_manifest_str_or_none(obj: dict[str, JSONValue], field: str) -> str | None:
-    val: JSONValue = obj.get(field)
+def _optional_str(obj: JSONObject, key: str) -> str | None:
+    """Extract optional string field."""
+    val = obj.get(key)
     if val is None:
         return None
     if not isinstance(val, str):
-        raise ValueError(f"manifest field {field} must be str or null")
+        raise JSONTypeError(f"Field '{key}' must be a string or null, got {type(val).__name__}")
     return val
 
 
-def _decode_manifest_bool(obj: dict[str, JSONValue], field: str) -> bool:
-    val: JSONValue = obj.get(field)
-    if not isinstance(val, bool):
-        raise ValueError(f"manifest field {field} must be bool")
-    return val
-
-
-def _decode_manifest_float_or_none(obj: dict[str, JSONValue], field: str) -> float | None:
-    val: JSONValue = obj.get(field)
+def _optional_float(obj: JSONObject, key: str) -> float | None:
+    """Extract optional float field."""
+    val = obj.get(key)
     if val is None:
         return None
-    if not isinstance(val, int | float):
-        raise ValueError(f"manifest field {field} must be number or null")
+    if isinstance(val, bool) or not isinstance(val, int | float):
+        raise JSONTypeError(f"Field '{key}' must be a number or null, got {type(val).__name__}")
     return float(val)
 
 
@@ -240,82 +198,47 @@ class _ManifestFields:
         self.early_stopped = early_stopped
 
 
-def _decode_manifest_fields(obj: dict[str, JSONValue]) -> _ManifestFields:
-    run_id = _decode_manifest_str(obj, "run_id")
-    model_family = _decode_manifest_str(obj, "model_family")
-    model_size = _decode_manifest_str(obj, "model_size")
-    tokenizer_id = _decode_manifest_str(obj, "tokenizer_id")
-    corpus_path = _decode_manifest_str(obj, "corpus_path")
-    optimizer = _decode_manifest_str(obj, "optimizer")
-    device = _decode_manifest_str(obj, "device")
-    precision = _decode_manifest_str(obj, "precision")
-
-    epochs = _decode_manifest_int(obj, "epochs")
-    batch_size = _decode_manifest_int(obj, "batch_size")
-    max_seq_len = _decode_manifest_int(obj, "max_seq_len")
-    steps = _decode_manifest_int(obj, "steps")
-    seed = _decode_manifest_int(obj, "seed")
-    early_stopping_patience = _decode_manifest_int(obj, "early_stopping_patience")
-
-    loss = _decode_manifest_float(obj, "loss")
-    learning_rate = _decode_manifest_float(obj, "learning_rate")
-    holdout_fraction = _decode_manifest_float(obj, "holdout_fraction")
-    gradient_clipping = _decode_manifest_float(obj, "gradient_clipping")
-    test_split_ratio = _decode_manifest_float(obj, "test_split_ratio")
-    finetune_lr_cap = _decode_manifest_float(obj, "finetune_lr_cap")
-
-    freeze_embed = _decode_manifest_bool(obj, "freeze_embed")
-    early_stopped = _decode_manifest_bool(obj, "early_stopped")
-
-    git_v: JSONValue = obj.get("git_commit")
-    git_commit = git_v if isinstance(git_v, str) else None
-
-    pretrained_run_id = _decode_manifest_str_or_none(obj, "pretrained_run_id")
-
-    test_loss = _decode_manifest_float_or_none(obj, "test_loss")
-    test_perplexity = _decode_manifest_float_or_none(obj, "test_perplexity")
-    best_val_loss = _decode_manifest_float_or_none(obj, "best_val_loss")
-
+def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
     return _ManifestFields(
-        run_id=run_id,
-        model_family=model_family,
-        model_size=model_size,
-        epochs=epochs,
-        batch_size=batch_size,
-        max_seq_len=max_seq_len,
-        steps=steps,
-        loss=loss,
-        learning_rate=learning_rate,
-        holdout_fraction=holdout_fraction,
-        tokenizer_id=tokenizer_id,
-        corpus_path=corpus_path,
-        optimizer=optimizer,
-        freeze_embed=freeze_embed,
-        gradient_clipping=gradient_clipping,
-        seed=seed,
-        git_commit=git_commit,
-        pretrained_run_id=pretrained_run_id,
-        device=device,
-        precision=precision,
-        early_stopping_patience=early_stopping_patience,
-        test_split_ratio=test_split_ratio,
-        finetune_lr_cap=finetune_lr_cap,
-        test_loss=test_loss,
-        test_perplexity=test_perplexity,
-        best_val_loss=best_val_loss,
-        early_stopped=early_stopped,
+        run_id=require_str(obj, "run_id"),
+        model_family=require_str(obj, "model_family"),
+        model_size=require_str(obj, "model_size"),
+        tokenizer_id=require_str(obj, "tokenizer_id"),
+        corpus_path=require_str(obj, "corpus_path"),
+        optimizer=require_str(obj, "optimizer"),
+        device=require_str(obj, "device"),
+        precision=require_str(obj, "precision"),
+        epochs=require_int(obj, "epochs"),
+        batch_size=require_int(obj, "batch_size"),
+        max_seq_len=require_int(obj, "max_seq_len"),
+        steps=require_int(obj, "steps"),
+        seed=require_int(obj, "seed"),
+        early_stopping_patience=require_int(obj, "early_stopping_patience"),
+        loss=require_float(obj, "loss"),
+        learning_rate=require_float(obj, "learning_rate"),
+        holdout_fraction=require_float(obj, "holdout_fraction"),
+        gradient_clipping=require_float(obj, "gradient_clipping"),
+        test_split_ratio=require_float(obj, "test_split_ratio"),
+        finetune_lr_cap=require_float(obj, "finetune_lr_cap"),
+        freeze_embed=require_bool(obj, "freeze_embed"),
+        early_stopped=require_bool(obj, "early_stopped"),
+        git_commit=_optional_str(obj, "git_commit"),
+        pretrained_run_id=_optional_str(obj, "pretrained_run_id"),
+        test_loss=_optional_float(obj, "test_loss"),
+        test_perplexity=_optional_float(obj, "test_perplexity"),
+        best_val_loss=_optional_float(obj, "best_val_loss"),
     )
 
 
 def load_manifest_from_text(text: str) -> TrainingManifest:
-    """Parse manifest JSON text into typed TrainingManifest."""
-    obj_raw = load_json_str(text)
-    if not isinstance(obj_raw, dict):
-        raise ValueError("invalid manifest JSON")
-    obj: dict[str, JSONValue] = obj_raw
+    """Parse manifest JSON text into typed TrainingManifest.
 
-    versions = _decode_manifest_versions(obj.get("versions"))
-    system = _decode_manifest_system(obj.get("system"))
+    Raises:
+        JSONTypeError: if the manifest is not a well-formed JSON object.
+    """
+    obj = narrow_json_to_dict(load_json_str(text))
+    versions = _decode_manifest_versions(obj)
+    system = _decode_manifest_system(obj)
     fields = _decode_manifest_fields(obj)
 
     return {

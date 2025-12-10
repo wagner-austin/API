@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.json_utils import JSONTypeError
 from platform_core.turkic_jobs import TurkicJobStatus, turkic_job_key
 from platform_workers.job_store import (
     BaseJobStore,
@@ -47,12 +48,17 @@ class _TurkicJobEncoder(JobStoreEncoder[TurkicJobStatus]):
 
 
 def _parse_upload_status(raw: dict[str, str]) -> Literal["uploaded"] | None:
+    """Parse upload_status field from Redis hash.
+
+    Raises:
+        JSONTypeError: If upload_status is not None, empty, or 'uploaded'.
+    """
     upload_raw = raw.get("upload_status")
     if upload_raw is None or upload_raw == "":
         return None
     if upload_raw == "uploaded":
         return "uploaded"
-    raise ValueError("invalid upload_status in redis store")
+    raise JSONTypeError("invalid upload_status in redis store")
 
 
 class TurkicJobStore:
@@ -75,10 +81,15 @@ class TurkicJobStore:
         self._redis.hset(key, _encode_upload_meta(meta))
 
     def load_upload_metadata(self, job_id: str) -> FileUploadResponse:
+        """Load upload metadata from Redis.
+
+        Raises:
+            JSONTypeError: If metadata is missing or malformed.
+        """
         key = f"{turkic_job_key(job_id)}:file"
         raw = self._redis.hgetall(key)
         if not raw:
-            raise ValueError("upload metadata missing")
+            raise JSONTypeError("upload metadata missing")
         return _decode_upload_meta(raw)
 
 
@@ -93,6 +104,11 @@ def _encode_upload_meta(meta: FileUploadResponse) -> dict[str, str]:
 
 
 def _decode_upload_meta(raw: dict[str, str]) -> FileUploadResponse:
+    """Decode upload metadata from Redis hash.
+
+    Raises:
+        JSONTypeError: If any required field is missing or invalid.
+    """
     file_id = raw.get("file_id")
     size_raw = raw.get("size")
     sha256 = raw.get("sha256")
@@ -100,15 +116,15 @@ def _decode_upload_meta(raw: dict[str, str]) -> FileUploadResponse:
     created_at_raw = raw.get("created_at")
 
     if not isinstance(file_id, str) or file_id.strip() == "":
-        raise ValueError("missing or invalid file_id in upload metadata")
+        raise JSONTypeError("missing or invalid file_id in upload metadata")
     if not isinstance(size_raw, str) or not size_raw.strip().isdigit():
-        raise ValueError("missing or invalid size in upload metadata")
+        raise JSONTypeError("missing or invalid size in upload metadata")
     if not isinstance(sha256, str) or sha256.strip() == "":
-        raise ValueError("missing or invalid sha256 in upload metadata")
+        raise JSONTypeError("missing or invalid sha256 in upload metadata")
     if not isinstance(content_type, str) or content_type.strip() == "":
-        raise ValueError("missing or invalid content_type in upload metadata")
+        raise JSONTypeError("missing or invalid content_type in upload metadata")
     if created_at_raw is None:
-        raise ValueError("missing created_at in upload metadata")
+        raise JSONTypeError("missing created_at in upload metadata")
 
     created_at: str | None
     if created_at_raw == "":
@@ -116,7 +132,7 @@ def _decode_upload_meta(raw: dict[str, str]) -> FileUploadResponse:
     elif isinstance(created_at_raw, str) and created_at_raw.strip() != "":
         created_at = created_at_raw
     else:
-        raise ValueError("missing or invalid created_at in upload metadata")
+        raise JSONTypeError("missing or invalid created_at in upload metadata")
 
     return {
         "file_id": file_id.strip(),

@@ -7,7 +7,7 @@ from typing import Final
 
 from platform_core.data_bank_client import DataBankClient, DataBankClientError
 from platform_core.job_events import default_events_channel
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TURKIC_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
@@ -46,7 +46,11 @@ class JobResult(TypedDict):
 
 
 def _parse_script_param(script_val: str | None) -> str | None:
-    """Parse and validate the optional script filter parameter."""
+    """Parse and validate the optional script filter parameter.
+
+    Raises:
+        JSONTypeError: If script value is not one of 'Latn', 'Cyrl', or 'Arab'.
+    """
     if script_val is None:
         return None
     s = script_val.strip()
@@ -54,15 +58,19 @@ def _parse_script_param(script_val: str | None) -> str | None:
         return None
     norm = s[0:1].upper() + s[1:].lower()
     if norm not in ("Latn", "Cyrl", "Arab"):
-        raise ValueError("Invalid script; expected 'Latn', 'Cyrl', or 'Arab'")
+        raise JSONTypeError("Invalid script; expected 'Latn', 'Cyrl', or 'Arab'")
     return norm
 
 
 def _decode_job_params(raw: dict[str, UnknownJson]) -> JobParams:
-    """Parse and validate job parameters from queue payload."""
+    """Parse and validate job parameters from queue payload.
+
+    Raises:
+        JSONTypeError: If required fields have wrong types or invalid values.
+    """
     user_id_val = raw.get("user_id")
     if not isinstance(user_id_val, int):
-        raise TypeError("user_id must be an int")
+        raise JSONTypeError("user_id must be an int")
 
     src_val = raw.get("source", "")
     lang_val = raw.get("language", "")
@@ -71,21 +79,21 @@ def _decode_job_params(raw: dict[str, UnknownJson]) -> JobParams:
     thr_val = raw.get("confidence_threshold", 0.95)
 
     if not isinstance(src_val, str) or not isinstance(lang_val, str):
-        raise TypeError("source and language must be strings")
+        raise JSONTypeError("source and language must be strings")
     if not isinstance(max_val, int):
-        raise TypeError("max_sentences must be int")
+        raise JSONTypeError("max_sentences must be int")
     if not isinstance(translit_val, bool):
-        raise TypeError("transliterate must be bool")
+        raise JSONTypeError("transliterate must be bool")
     if not isinstance(thr_val, (int, float)):
-        raise TypeError("confidence_threshold must be a number")
+        raise JSONTypeError("confidence_threshold must be a number")
 
     script_raw = raw.get("script")
     if script_raw is not None and not isinstance(script_raw, str):
-        raise TypeError("script must be a string or null")
+        raise JSONTypeError("script must be a string or null")
     script = _parse_script_param(script_raw)
 
     if not is_source(src_val.strip()) or not is_language(lang_val.strip()):
-        raise ValueError("Invalid source or language in job parameters")
+        raise JSONTypeError("Invalid source or language in job parameters")
 
     return {
         "user_id": user_id_val,

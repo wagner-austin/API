@@ -47,6 +47,7 @@ mypy-init-return = true
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.mypy]
 python_version = "3.11"

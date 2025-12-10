@@ -1,0 +1,95 @@
+"""CRUD endpoints for Deal resources."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Protocol
+
+from covenant_domain import Deal, DealId, encode_deal
+from covenant_persistence import DealRepository
+from fastapi import APIRouter, Request, Response, status
+from platform_core.json_utils import JSONValue, dump_json_str
+
+from ..decode import parse_deal_request, parse_update_deal_request
+
+
+class ContainerProtocol(Protocol):
+    """Protocol for service container with deal_repo method."""
+
+    def deal_repo(self) -> DealRepository: ...
+
+
+def build_router(get_container: ContainerProtocol) -> APIRouter:
+    """Build FastAPI router for deal CRUD operations.
+
+    Args:
+        get_container: Container instance with deal_repo method.
+
+    Returns:
+        Configured router with deal endpoints.
+    """
+    router = APIRouter(prefix="/deals", tags=["deals"])
+
+    def _list_deals() -> Response:
+        """List all deals."""
+        repo = get_container.deal_repo()
+        deals: Sequence[Deal] = repo.list_all()
+        body: list[dict[str, JSONValue]] = [encode_deal(d) for d in deals]
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+        )
+
+    async def _create_deal(request: Request) -> Response:
+        """Create a new deal."""
+        body_bytes = await request.body()
+        deal = parse_deal_request(body_bytes)
+        repo = get_container.deal_repo()
+        repo.create(deal)
+        return Response(
+            content=dump_json_str(encode_deal(deal)),
+            media_type="application/json",
+            status_code=201,
+        )
+
+    def _get_deal(deal_id: str) -> Response:
+        """Get a deal by ID."""
+        repo = get_container.deal_repo()
+        id_obj = DealId(value=deal_id)
+        deal = repo.get(id_obj)
+        return Response(
+            content=dump_json_str(encode_deal(deal)),
+            media_type="application/json",
+        )
+
+    async def _update_deal(deal_id: str, request: Request) -> Response:
+        """Update an existing deal."""
+        body_bytes = await request.body()
+        id_obj = DealId(value=deal_id)
+        deal = parse_update_deal_request(body_bytes, id_obj)
+        repo = get_container.deal_repo()
+        repo.update(deal)
+        return Response(
+            content=dump_json_str(encode_deal(deal)),
+            media_type="application/json",
+        )
+
+    def _delete_deal(deal_id: str) -> Response:
+        """Delete a deal by ID."""
+        repo = get_container.deal_repo()
+        id_obj = DealId(value=deal_id)
+        repo.delete(id_obj)
+        return Response(status_code=204)
+
+    router.add_api_route("", _list_deals, methods=["GET"], response_model=None)
+    router.add_api_route(
+        "", _create_deal, methods=["POST"], status_code=status.HTTP_201_CREATED, response_model=None
+    )
+    router.add_api_route("/{deal_id}", _get_deal, methods=["GET"], response_model=None)
+    router.add_api_route("/{deal_id}", _update_deal, methods=["PUT"], response_model=None)
+    router.add_api_route("/{deal_id}", _delete_deal, methods=["DELETE"], response_model=None)
+
+    return router
+
+
+__all__ = ["build_router"]

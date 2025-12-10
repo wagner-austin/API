@@ -6,7 +6,7 @@ from typing import BinaryIO
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import stdlib_logging
 from platform_workers.testing import FakeRedis
 
@@ -232,7 +232,7 @@ def test_decode_stt_params_raises_on_missing_url() -> None:
     """Test _decode_stt_params raises on missing url."""
     import transcript_api.jobs as jobs_mod
 
-    with pytest.raises(ValueError, match="url must be a non-empty string"):
+    with pytest.raises(JSONTypeError, match="url must be a non-empty string"):
         jobs_mod._decode_stt_params({"user_id": 1})
 
 
@@ -240,7 +240,7 @@ def test_decode_stt_params_raises_on_empty_url() -> None:
     """Test _decode_stt_params raises on empty url."""
     import transcript_api.jobs as jobs_mod
 
-    with pytest.raises(ValueError, match="url must be a non-empty string"):
+    with pytest.raises(JSONTypeError, match="url must be a non-empty string"):
         jobs_mod._decode_stt_params({"url": "   ", "user_id": 1})
 
 
@@ -248,7 +248,7 @@ def test_decode_stt_params_raises_on_non_string_url() -> None:
     """Test _decode_stt_params raises on non-string url."""
     import transcript_api.jobs as jobs_mod
 
-    with pytest.raises(ValueError, match="url must be a non-empty string"):
+    with pytest.raises(JSONTypeError, match="url must be a non-empty string"):
         jobs_mod._decode_stt_params({"url": 123, "user_id": 1})
 
 
@@ -256,7 +256,7 @@ def test_decode_stt_params_raises_on_missing_user_id() -> None:
     """Test _decode_stt_params raises on missing user_id."""
     import transcript_api.jobs as jobs_mod
 
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         jobs_mod._decode_stt_params({"url": "https://youtu.be/abc"})
 
 
@@ -264,7 +264,7 @@ def test_decode_stt_params_raises_on_non_int_user_id() -> None:
     """Test _decode_stt_params raises on non-integer user_id."""
     import transcript_api.jobs as jobs_mod
 
-    with pytest.raises(ValueError, match="user_id must be an integer"):
+    with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         jobs_mod._decode_stt_params({"url": "https://youtu.be/abc", "user_id": "42"})
 
 

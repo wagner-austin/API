@@ -86,8 +86,11 @@ def test_runs_evaluate_and_eval_result_logging(
     assert "status" in obj1, "Response must contain 'status' key"
     assert obj1["status"] == "queued", "Response status must be 'queued'"
     assert "loss" in obj1, "Response must contain 'loss' key"
+    assert obj1["loss"] is None, "Response loss must be None for queued status"
     assert "perplexity" in obj1, "Response must contain 'perplexity' key"
+    assert obj1["perplexity"] is None, "Response perplexity must be None for queued status"
     assert "artifact_path" in obj1, "Response must contain 'artifact_path' key"
+    assert obj1["artifact_path"] is None, "Response artifact_path must be None for queued status"
     r2 = client.get(f"/runs/{run_id}/eval")
     assert r2.status_code == 200
     obj2_raw = load_json_str(r2.text)
@@ -105,3 +108,4 @@ def test_runs_evaluate_and_eval_result_logging(
     assert "perplexity" in obj2, "Response must contain 'perplexity' key"
     assert obj2["perplexity"] == 2.0, "Response perplexity must be 2.0"
     assert "artifact_path" in obj2, "Response must contain 'artifact_path' key"
+    assert obj2["artifact_path"] is None, "Response artifact_path must be None"

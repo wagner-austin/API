@@ -5,7 +5,14 @@ from __future__ import annotations
 from instrument_io._json_bridge import (
     CellValue,
     JSONValue,
+    _df_get_cell_str,
+    _df_get_headers_from_row,
+    _df_get_row_values,
+    _df_json_to_row_dicts,
+    _df_slice_to_rows,
     _extract_row_from_dict,
+    _get_json_opt_str_value,
+    _get_json_str_value,
     _json_col_to_float_list,
     _json_col_to_int_list,
     _json_col_to_opt_float_list,
@@ -324,3 +331,240 @@ def test_json_col_to_opt_float_list_skips_non_dict() -> None:
     json_str = '[{"col": 1.5}, [1, 2], {"col": 2.5}]'
     result = _json_col_to_opt_float_list(json_str, "col")
     assert result == [1.5, 2.5]
+
+
+# Tests for _df_json_to_row_dicts
+def test_df_json_to_row_dicts_valid() -> None:
+    json_str = '[{"a": 1, "b": "test"}, {"a": 2, "b": "test2"}]'
+    result = _df_json_to_row_dicts(json_str)
+    assert len(result) == 2
+    assert result[0]["a"] == 1
+    assert result[0]["b"] == "test"
+    assert result[1]["a"] == 2
+
+
+def test_df_json_to_row_dicts_empty() -> None:
+    json_str = "[]"
+    result = _df_json_to_row_dicts(json_str)
+    assert result == []
+
+
+def test_df_json_to_row_dicts_not_array() -> None:
+    json_str = '{"a": 1}'
+    result = _df_json_to_row_dicts(json_str)
+    assert result == []
+
+
+def test_df_json_to_row_dicts_skips_non_dict() -> None:
+    json_str = '[{"a": 1}, "string", {"a": 2}]'
+    result = _df_json_to_row_dicts(json_str)
+    assert len(result) == 2
+
+
+# Tests for _get_json_str_value
+def test_get_json_str_value_string() -> None:
+    row: dict[str, JSONValue] = {"key": "value"}
+    result = _get_json_str_value(row, "key")
+    assert result == "value"
+
+
+def test_get_json_str_value_string_with_spaces() -> None:
+    row: dict[str, JSONValue] = {"key": "  value  "}
+    result = _get_json_str_value(row, "key")
+    assert result == "value"
+
+
+def test_get_json_str_value_empty_string_returns_none() -> None:
+    row: dict[str, JSONValue] = {"key": "   "}
+    result = _get_json_str_value(row, "key")
+    assert result is None
+
+
+def test_get_json_str_value_null() -> None:
+    row: dict[str, JSONValue] = {"key": None}
+    result = _get_json_str_value(row, "key")
+    assert result is None
+
+
+def test_get_json_str_value_missing_key() -> None:
+    row: dict[str, JSONValue] = {"other": "value"}
+    result = _get_json_str_value(row, "key")
+    assert result is None
+
+
+def test_get_json_str_value_number_converts_to_string() -> None:
+    row: dict[str, JSONValue] = {"key": 42}
+    result = _get_json_str_value(row, "key")
+    assert result == "42"
+
+
+def test_get_json_str_value_float_converts_to_string() -> None:
+    row: dict[str, JSONValue] = {"key": 3.14}
+    result = _get_json_str_value(row, "key")
+    assert result == "3.14"
+
+
+# Tests for _get_json_opt_str_value
+def test_get_json_opt_str_value_string() -> None:
+    row: dict[str, JSONValue] = {"key": "value"}
+    result = _get_json_opt_str_value(row, "key")
+    assert result == "value"
+
+
+def test_get_json_opt_str_value_preserves_whitespace() -> None:
+    row: dict[str, JSONValue] = {"key": "  value  "}
+    result = _get_json_opt_str_value(row, "key")
+    assert result == "  value  "
+
+
+def test_get_json_opt_str_value_null() -> None:
+    row: dict[str, JSONValue] = {"key": None}
+    result = _get_json_opt_str_value(row, "key")
+    assert result is None
+
+
+def test_get_json_opt_str_value_missing_key() -> None:
+    row: dict[str, JSONValue] = {"other": "value"}
+    result = _get_json_opt_str_value(row, "key")
+    assert result is None
+
+
+def test_get_json_opt_str_value_number_converts() -> None:
+    row: dict[str, JSONValue] = {"key": 42}
+    result = _get_json_opt_str_value(row, "key")
+    assert result == "42"
+
+
+# Tests for _df_get_row_values
+def test_df_get_row_values_valid() -> None:
+    json_str = '[{"a": "val1", "b": "val2"}, {"a": "val3", "b": "val4"}]'
+    result = _df_get_row_values(json_str, 0)
+    assert result == ["val1", "val2"]
+
+
+def test_df_get_row_values_second_row() -> None:
+    json_str = '[{"a": "val1"}, {"a": "val2"}]'
+    result = _df_get_row_values(json_str, 1)
+    assert result == ["val2"]
+
+
+def test_df_get_row_values_invalid_index_negative() -> None:
+    json_str = '[{"a": "val1"}]'
+    result = _df_get_row_values(json_str, -1)
+    assert result == []
+
+
+def test_df_get_row_values_invalid_index_too_large() -> None:
+    json_str = '[{"a": "val1"}]'
+    result = _df_get_row_values(json_str, 5)
+    assert result == []
+
+
+def test_df_get_row_values_converts_null_to_empty() -> None:
+    json_str = '[{"a": null, "b": "val"}]'
+    result = _df_get_row_values(json_str, 0)
+    assert result == ["", "val"]
+
+
+def test_df_get_row_values_converts_numbers() -> None:
+    json_str = '[{"a": 42, "b": 3.14}]'
+    result = _df_get_row_values(json_str, 0)
+    assert result == ["42", "3.14"]
+
+
+# Tests for _df_get_headers_from_row
+def test_df_get_headers_from_row_valid() -> None:
+    json_str = '[{"col_0": "Name", "col_1": "Value"}, {"col_0": "data", "col_1": "data2"}]'
+    columns = ["col_0", "col_1"]
+    result = _df_get_headers_from_row(json_str, 0, columns)
+    assert result == ["Name", "Value"]
+
+
+def test_df_get_headers_from_row_with_null_fallback() -> None:
+    json_str = '[{"col_0": null, "col_1": "Value"}]'
+    columns = ["col_0", "col_1"]
+    result = _df_get_headers_from_row(json_str, 0, columns)
+    assert result == ["col_0", "Value"]
+
+
+def test_df_get_headers_from_row_with_empty_fallback() -> None:
+    json_str = '[{"col_0": "   ", "col_1": "Value"}]'
+    columns = ["col_0", "col_1"]
+    result = _df_get_headers_from_row(json_str, 0, columns)
+    assert result == ["col_0", "Value"]
+
+
+def test_df_get_headers_from_row_invalid_index() -> None:
+    json_str = '[{"col_0": "Name"}]'
+    columns = ["col_0", "col_1"]
+    result = _df_get_headers_from_row(json_str, 5, columns)
+    assert result == ["col_0", "col_1"]
+
+
+def test_df_get_headers_from_row_converts_numbers() -> None:
+    json_str = '[{"col_0": 123, "col_1": "Value"}]'
+    columns = ["col_0", "col_1"]
+    result = _df_get_headers_from_row(json_str, 0, columns)
+    assert result == ["123", "Value"]
+
+
+# Tests for _df_get_cell_str
+def test_df_get_cell_str_valid() -> None:
+    json_str = '[{"a": "val1", "b": "val2"}, {"a": "val3", "b": "val4"}]'
+    result = _df_get_cell_str(json_str, 0, "a")
+    assert result == "val1"
+
+
+def test_df_get_cell_str_second_row() -> None:
+    json_str = '[{"a": "val1"}, {"a": "val2"}]'
+    result = _df_get_cell_str(json_str, 1, "a")
+    assert result == "val2"
+
+
+def test_df_get_cell_str_invalid_index() -> None:
+    json_str = '[{"a": "val1"}]'
+    result = _df_get_cell_str(json_str, 5, "a")
+    assert result is None
+
+
+def test_df_get_cell_str_missing_column() -> None:
+    json_str = '[{"a": "val1"}]'
+    result = _df_get_cell_str(json_str, 0, "b")
+    assert result is None
+
+
+def test_df_get_cell_str_null_value() -> None:
+    json_str = '[{"a": null}]'
+    result = _df_get_cell_str(json_str, 0, "a")
+    assert result is None
+
+
+# Tests for _df_slice_to_rows
+def test_df_slice_to_rows_valid() -> None:
+    json_str = '[{"a": "h1"}, {"a": "r1"}, {"a": "r2"}]'
+    result = _df_slice_to_rows(json_str, 1)
+    assert result == [["r1"], ["r2"]]
+
+
+def test_df_slice_to_rows_from_start() -> None:
+    json_str = '[{"a": "r1"}, {"a": "r2"}]'
+    result = _df_slice_to_rows(json_str, 0)
+    assert result == [["r1"], ["r2"]]
+
+
+def test_df_slice_to_rows_beyond_length() -> None:
+    json_str = '[{"a": "r1"}]'
+    result = _df_slice_to_rows(json_str, 5)
+    assert result == []
+
+
+def test_df_slice_to_rows_converts_null() -> None:
+    json_str = '[{"a": null, "b": "val"}]'
+    result = _df_slice_to_rows(json_str, 0)
+    assert result == [["", "val"]]
+
+
+def test_df_slice_to_rows_converts_numbers() -> None:
+    json_str = '[{"a": 42, "b": 3.14}]'
+    result = _df_slice_to_rows(json_str, 0)
+    assert result == [["42", "3.14"]]

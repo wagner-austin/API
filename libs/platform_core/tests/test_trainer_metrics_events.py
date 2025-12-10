@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from platform_core.json_utils import JSONTypeError
 from platform_core.trainer_metrics_events import (
     TrainerMetricsEventV1,
     decode_trainer_metrics_event,
@@ -180,41 +181,40 @@ def test_decode_completed_metrics_with_int_values() -> None:
 @pytest.mark.parametrize(
     ("payload", "expected_message"),
     [
-        ("[]", "trainer metrics event payload must be an object"),
-        ('{"type": 1}', "trainer metrics event type must be a string"),
+        ("[]", "Expected JSON object, got list"),
+        ('{"type": 1}', "Field 'type' must be a string"),
         (
             '{"type": "unknown.v1", "job_id": "j", "user_id": 1}',
-            "unknown trainer metrics event type",
+            "Unknown trainer metrics event type: 'unknown.v1'",
         ),
         (
             '{"type": "trainer.metrics.config.v1"}',
-            "job_id and user_id are required in trainer metrics event",
+            "Missing required field 'job_id'",
         ),
         (
             '{"type": "trainer.metrics.config.v1", "job_id": 1, "user_id": 1}',
-            "job_id and user_id are required in trainer metrics event",
+            "Field 'job_id' must be a string",
         ),
         (
             '{"type": "trainer.metrics.config.v1", "job_id": "j", "user_id": 1}',
-            "config event requires model_family, model_size, total_epochs, queue",
+            "Missing required field 'model_family'",
         ),
         (
             '{"type": "trainer.metrics.progress.v1", "job_id": "j", "user_id": 1}',
-            "progress metrics event requires epoch, total_epochs, step, train_loss, "
-            "train_ppl, grad_norm, samples_per_sec",
+            "Missing required field 'epoch'",
         ),
         (
             '{"type": "trainer.metrics.completed.v1", "job_id": "j", "user_id": 1}',
-            "completed metrics event requires test_loss, test_ppl, artifact_path",
+            "Missing required field 'test_loss'",
         ),
         (
             '{"type": "trainer.metrics.completed.v1", "job_id": "j", "user_id": 1, '
             '"test_loss": 1, "test_ppl": "x", "artifact_path": "/a"}',
-            "completed metrics event requires test_loss, test_ppl, artifact_path",
+            "Field 'test_ppl' must be a number",
         ),
     ],
 )
 def test_decode_trainer_metrics_event_invalid(payload: str, expected_message: str) -> None:
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_trainer_metrics_event(payload)
     assert expected_message in str(excinfo.value)

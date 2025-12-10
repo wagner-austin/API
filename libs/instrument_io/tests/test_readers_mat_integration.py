@@ -67,15 +67,13 @@ def test_read_all() -> None:
     reader = MATReader()
     data = reader.read_all(SAMPLE_MAT)
 
-    assert "scalar_value" in data
-    assert "vector" in data
-    assert "matrix" in data
-    assert "text" in data
-
     # MATLAB stores scalars as 1x1 arrays, vectors as row vectors
+    # Verify all expected keys exist by checking their actual values
     assert data["scalar_value"] == [[42.0]]
     assert data["vector"] == [[1, 2, 3, 4, 5]]
     assert data["text"] == ["hello"]
+    # Verify matrix has expected value (2x2 matrix)
+    assert data["matrix"] == [[1.1, 2.2], [3.3, 4.4]]
 
 
 def test_get_metadata() -> None:

@@ -47,11 +47,14 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 
+# Create HF cache directory with correct ownership before switching to app user
+RUN mkdir -p /hf-cache && chown -R app:app /hf-cache
+
 WORKDIR /workspace
 
 COPY --from=builder /workspace/services/Model-Trainer/dist/*.whl /workspace/dist/
 COPY --from=builder /workspace/libs /workspace/libs
-RUN pip install --extra-index-url ${TORCH_INDEX} /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_workers /workspace/libs/platform_ml \
+RUN pip install --default-timeout=1000 --extra-index-url ${TORCH_INDEX} /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_workers /workspace/libs/platform_ml \
     && rm -rf /workspace/dist /workspace/libs /root/.cache
 
 WORKDIR /app

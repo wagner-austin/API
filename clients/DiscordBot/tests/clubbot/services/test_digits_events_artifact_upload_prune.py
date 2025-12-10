@@ -4,12 +4,12 @@ import logging
 
 import pytest
 from platform_core.digits_metrics_events import (
+    decode_digits_event,
     is_digits_artifact,
     is_digits_prune,
     is_digits_upload,
-    try_decode_digits_event,
 )
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 
 def test_decode_artifact_valid_complete_payload() -> None:
@@ -22,9 +22,7 @@ def test_decode_artifact_valid_complete_payload() -> None:
             "path": "/artifacts/digits/models/mnist_resnet18_v1",
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_artifact(evt)
     assert evt["job_id"] == "r1"
     assert evt["user_id"] == 42
@@ -42,9 +40,7 @@ def test_decode_artifact_with_null_run_id() -> None:
             "path": "/path/to/artifact",
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert evt["type"] == "digits.metrics.artifact.v1"
 
 
@@ -58,8 +54,8 @@ def test_decode_artifact_missing_path_field_raises() -> None:
             # missing path
         }
     )
-    with pytest.raises(ValueError, match="artifact event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'path'"):
+        decode_digits_event(payload)
 
 
 def test_decode_artifact_path_wrong_type_raises() -> None:
@@ -72,8 +68,8 @@ def test_decode_artifact_path_wrong_type_raises() -> None:
             "path": 123,  # int instead of string
         }
     )
-    with pytest.raises(ValueError, match="artifact event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be a string"):
+        decode_digits_event(payload)
 
 
 def test_decode_upload_valid_complete_payload() -> None:
@@ -90,9 +86,7 @@ def test_decode_upload_valid_complete_payload() -> None:
             "file_sha256": "sha",
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_upload(evt)
     assert evt["job_id"] == "r1"
     assert evt["user_id"] == 42
@@ -116,9 +110,7 @@ def test_decode_upload_with_null_run_id() -> None:
             "file_sha256": "sha",
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert evt["type"] == "digits.metrics.upload.v1"
 
 
@@ -132,10 +124,12 @@ def test_decode_upload_missing_status_field_raises() -> None:
             # missing status
             "model_bytes": 100,
             "manifest_bytes": 50,
+            "file_id": "fid",
+            "file_sha256": "sha",
         }
     )
-    with pytest.raises(ValueError, match="upload event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'status'"):
+        decode_digits_event(payload)
 
 
 def test_decode_upload_status_wrong_type_raises() -> None:
@@ -148,10 +142,12 @@ def test_decode_upload_status_wrong_type_raises() -> None:
             "status": "200",  # string instead of int
             "model_bytes": 100,
             "manifest_bytes": 50,
+            "file_id": "fid",
+            "file_sha256": "sha",
         }
     )
-    with pytest.raises(ValueError, match="upload event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be an integer"):
+        decode_digits_event(payload)
 
 
 def test_decode_upload_model_bytes_wrong_type_raises() -> None:
@@ -164,10 +160,12 @@ def test_decode_upload_model_bytes_wrong_type_raises() -> None:
             "status": 200,
             "model_bytes": "100",  # string instead of int
             "manifest_bytes": 50,
+            "file_id": "fid",
+            "file_sha256": "sha",
         }
     )
-    with pytest.raises(ValueError, match="upload event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be an integer"):
+        decode_digits_event(payload)
 
 
 def test_decode_prune_valid_complete_payload() -> None:
@@ -180,9 +178,7 @@ def test_decode_prune_valid_complete_payload() -> None:
             "deleted_count": 3,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_prune(evt)
     assert evt["job_id"] == "r1"
     assert evt["user_id"] == 42
@@ -200,9 +196,7 @@ def test_decode_prune_with_null_run_id() -> None:
             "deleted_count": 0,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert evt["type"] == "digits.metrics.prune.v1"
 
 
@@ -216,8 +210,8 @@ def test_decode_prune_missing_deleted_count_field_raises() -> None:
             # missing deleted_count
         }
     )
-    with pytest.raises(ValueError, match="prune event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'deleted_count'"):
+        decode_digits_event(payload)
 
 
 def test_decode_prune_deleted_count_wrong_type_raises() -> None:
@@ -230,8 +224,8 @@ def test_decode_prune_deleted_count_wrong_type_raises() -> None:
             "deleted_count": "3",  # string instead of int
         }
     )
-    with pytest.raises(ValueError, match="prune event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be an integer"):
+        decode_digits_event(payload)
 
 
 logger = logging.getLogger(__name__)

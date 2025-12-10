@@ -302,14 +302,22 @@ class FakeRedisBytesClient(RedisBytesProto):
     """In-memory Redis bytes stub implementing RedisBytesProto.
 
     Minimal implementation for testing RQ-related code that needs
-    a bytes-mode Redis client.
+    a bytes-mode Redis client. Tracks whether close() was called.
     """
+
+    def __init__(self) -> None:
+        self._closed = False
 
     def ping(self, **kwargs: str | int | float | bool | None) -> bool:
         return True
 
     def close(self) -> None:
-        pass
+        self._closed = True
+
+    @property
+    def closed(self) -> bool:
+        """Check if close() was called."""
+        return self._closed
 
 
 class FakeRedisClient:

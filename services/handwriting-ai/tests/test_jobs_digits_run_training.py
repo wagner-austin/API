@@ -82,10 +82,14 @@ def test_run_training_with_valid_mnist_data(tmp_path: Path) -> None:
     result = _run_training(cfg)
 
     assert result["model_id"] == "test-model"
-    assert "state_dict" in result
-    assert "val_acc" in result
-    assert "metadata" in result
-    assert result["metadata"]["epochs"] == 1
+    state_dict = result["state_dict"]
+    # Verify expected ResNet keys exist with tensor values
+    assert "fc.weight" in state_dict and state_dict["fc.weight"].shape[0] == 10
+    assert "conv1.weight" in state_dict and state_dict["conv1.weight"].ndim == 4
+    val_acc = result["val_acc"]
+    assert 0.0 <= val_acc <= 1.0, f"val_acc {val_acc} must be in [0,1]"
+    metadata = result["metadata"]
+    assert metadata["epochs"] == 1
 
 
 def test_run_training_missing_train_data(tmp_path: Path) -> None:

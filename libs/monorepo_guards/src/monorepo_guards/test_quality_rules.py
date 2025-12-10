@@ -10,6 +10,7 @@ Violations:
 - weak-assertion-hasattr: Attribute exists, but what's its value?
 - weak-assertion-len-zero: `assert len(x) > 0` checks existence not content
 - weak-assertion-in-output: String matching in captured output is fragile
+- weak-assertion-key-in-dict: `assert "key" in d` checks key exists but not value
 - mock-without-assert-called-with: Mock verified called but not with what args
 - test-no-comparison: Test has no before/after or expected/actual comparison
 - ml-train-no-loss-comparison: ML training test without loss decrease check
@@ -34,6 +35,15 @@ def _is_patch_call(func: ast.expr) -> bool:
     return isinstance(func, ast.Name) and func.id == "patch"
 
 
+class _KeyInDictCheck:
+    """Tracks a key-in-dict assertion for later validation."""
+
+    def __init__(self, dict_name: str, key_value: str, line_no: int) -> None:
+        self.dict_name = dict_name
+        self.key_value = key_value
+        self.line_no = line_no
+
+
 class _AssertVisitor(ast.NodeVisitor):
     """Visitor to analyze assert statements in test functions."""
 
@@ -45,6 +55,8 @@ class _AssertVisitor(ast.NodeVisitor):
         self.function_has_comparison: bool = False
         self.function_mock_count: int = 0
         self.function_start_line: int = 0
+        self._key_in_dict_checks: list[_KeyInDictCheck] = []
+        self._verified_dict_keys: set[tuple[str, str]] = set()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if node.name.startswith("test_"):
@@ -61,13 +73,23 @@ class _AssertVisitor(ast.NodeVisitor):
         self.function_has_comparison = False
         self.function_mock_count = 0
         self.function_start_line = node.lineno
+        self._key_in_dict_checks = []
+        self._verified_dict_keys = set()
+        self._dict_like_vars: set[str] = set()
 
+        # First pass: identify dict-like variables (those accessed via subscript)
+        for child in ast.walk(node):
+            self._identify_dict_like_vars(child)
+
+        # Second pass: analyze assertions
         for child in ast.walk(node):
             self._check_assert(child)
             self._check_mock_usage(child)
             self._check_comparison(child)
+            self._track_dict_key_verification(child)
 
         self._check_function_level_issues(node)
+        self._check_unverified_key_in_dict()
 
     def _check_assert(self, node: ast.AST) -> None:
         """Check for weak assertion patterns."""
@@ -125,6 +147,13 @@ class _AssertVisitor(ast.NodeVisitor):
                     line=f"in {self.current_function}: string in output is fragile",
                 )
             )
+
+        key_in_dict = self._extract_key_in_dict(test)
+        if key_in_dict is not None:
+            dict_name, key_value = key_in_dict
+            # Only track if the variable is used as a dict elsewhere
+            if dict_name in self._dict_like_vars:
+                self._key_in_dict_checks.append(_KeyInDictCheck(dict_name, key_value, node.lineno))
 
     def _check_mock_usage(self, node: ast.AST) -> None:
         """Check for mock-related issues."""
@@ -279,6 +308,111 @@ class _AssertVisitor(ast.NodeVisitor):
         left_is_after = bool(left & {"loss", "after", "final"})
         right_is_before = any(bool(r & {"loss", "before", "initial"}) for r in rights)
         return left_is_after and right_is_before
+
+    def _extract_key_in_dict(self, node: ast.expr) -> tuple[str, str] | None:
+        """Extract (dict_name, key) from `assert "key" in dict_name`.
+
+        Returns None if the pattern doesn't match. Only matches simple Name
+        comparators (not chained subscripts or attributes).
+        """
+        if not isinstance(node, ast.Compare):
+            return None
+        # Single In op check - chained comparisons have multiple ops
+        if len(node.ops) != 1 or not isinstance(node.ops[0], ast.In):
+            return None
+        # Note: A single In op always has exactly 1 comparator in Python AST
+
+        # The key is the left side (e.g., "key" in `"key" in d`)
+        key_node = node.left
+        if not isinstance(key_node, ast.Constant):
+            return None
+        if not isinstance(key_node.value, str):
+            return None
+
+        # The dict is the comparator (e.g., d in `"key" in d`)
+        dict_node = node.comparators[0]
+        if not isinstance(dict_node, ast.Name):
+            return None
+
+        return (dict_node.id, key_node.value)
+
+    def _identify_dict_like_vars(self, node: ast.AST) -> None:
+        """Identify variables used with subscript access (dict-like behavior).
+
+        This helps distinguish between set membership checks (valid) and
+        dict key checks (potentially weak).
+        """
+        if not isinstance(node, ast.Subscript):
+            return
+
+        # Get the root variable name from the subscript
+        value_node = node.value
+        while isinstance(value_node, ast.Subscript):
+            value_node = value_node.value
+
+        if isinstance(value_node, ast.Name):
+            self._dict_like_vars.add(value_node.id)
+
+    def _track_dict_key_verification(self, node: ast.AST) -> None:
+        """Track dict[key] accesses in assert statements to mark keys as verified.
+
+        Matches patterns like:
+        - assert d["key"] == value
+        - assert d["outer"]["inner"] == value (tracks both levels)
+        """
+        if not isinstance(node, ast.Assert):
+            return
+
+        for child in ast.walk(node.test):
+            subscript_info = self._extract_subscript_access(child)
+            if subscript_info is not None:
+                dict_name, key_value = subscript_info
+                self._verified_dict_keys.add((dict_name, key_value))
+
+    def _extract_subscript_access(self, node: ast.AST) -> tuple[str, str] | None:
+        """Extract (dict_name, key) from d["key"] subscript access.
+
+        Also handles nested subscripts like d["outer"]["inner"] by extracting
+        both the outer access and the inner access.
+        """
+        if not isinstance(node, ast.Subscript):
+            return None
+
+        # Get the key
+        slice_node = node.slice
+        if not isinstance(slice_node, ast.Constant):
+            return None
+        if not isinstance(slice_node.value, str):
+            return None
+        key_value = slice_node.value
+
+        # Get the dict name - could be Name or another Subscript
+        value_node = node.value
+        if isinstance(value_node, ast.Name):
+            return (value_node.id, key_value)
+
+        # For nested subscripts like payload["request"]["device"],
+        # we return (payload, "request") for the outer level
+        # The inner level will be caught by the recursive walk
+        return None
+
+    def _check_unverified_key_in_dict(self) -> None:
+        """Report violations for key-in-dict checks without value verification."""
+        for check in self._key_in_dict_checks:
+            key_tuple = (check.dict_name, check.key_value)
+            if key_tuple not in self._verified_dict_keys:
+                msg = (
+                    f"in {self.current_function}: "
+                    f'assert "{check.key_value}" in {check.dict_name} checks existence only'
+                )
+                self.violations.append(
+                    Violation(
+                        file=self.path,
+                        line_no=check.line_no,
+                        kind="weak-assertion-key-in-dict",
+                        line=msg,
+                    )
+                )
 
 
 class WeakAssertionRule:

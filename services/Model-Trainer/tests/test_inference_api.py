@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Literal
 
 import pytest
@@ -463,7 +464,12 @@ class TestInferenceAPIRoutes:
             raise AssertionError("Response must be a dict")
         body: dict[str, JSONValue] = body_raw
         assert body["status"] == "queued"
-        assert "request_id" in body
+        # Verify request_id is a valid UUID4 string
+        request_id = body["request_id"]
+        if not isinstance(request_id, str):
+            raise AssertionError("request_id must be a string")
+        parsed_uuid = uuid.UUID(request_id)
+        assert parsed_uuid.version == 4
         r.assert_only_called({"set"})
 
     def test_get_score_not_found_route(self, monkeypatch: MonkeyPatch) -> None:
@@ -489,7 +495,12 @@ class TestInferenceAPIRoutes:
             raise AssertionError("Response must be a dict")
         body: dict[str, JSONValue] = body_raw
         assert body["status"] == "queued"
-        assert "request_id" in body
+        # Verify request_id is a valid UUID4 string
+        request_id = body["request_id"]
+        if not isinstance(request_id, str):
+            raise AssertionError("request_id must be a string")
+        parsed_uuid = uuid.UUID(request_id)
+        assert parsed_uuid.version == 4
         r.assert_only_called({"set"})
 
     def test_get_generate_not_found_route(self, monkeypatch: MonkeyPatch) -> None:

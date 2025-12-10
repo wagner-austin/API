@@ -4,10 +4,13 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import BinaryIO
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 from platform_core.data_bank_client import DataBankClientError
 from platform_core.logging import get_logger
 from platform_workers.testing import FakeRedis
+from tests.conftest import make_probs
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
@@ -43,8 +46,8 @@ def test_langid_branch_and_malformed_file_id(
     # Force non-test environment to load model, then stub loader
     def _load(_data_dir: str) -> LangIdModel:
         class _Model:
-            def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-                return (["__label__kk"], [1.0])
+            def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+                return (("__label__kk",), make_probs(1.0))
 
         return _Model()
 

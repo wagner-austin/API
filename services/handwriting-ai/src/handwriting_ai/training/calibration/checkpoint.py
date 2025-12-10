@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict
 
-from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
 
 from handwriting_ai.training.calibration.cache import _decode_float, _decode_int
 from handwriting_ai.training.calibration.measure import CalibrationResult
@@ -71,12 +71,12 @@ def _decode_checkpoint(d: dict[str, JSONValue]) -> CalibrationCheckpoint:
     seed_raw = d.get("seed")
 
     if not isinstance(stage_raw, str) or not isinstance(idx_raw, int):
-        raise ValueError("invalid checkpoint header")
+        raise JSONTypeError("invalid checkpoint header")
     stage = CalibrationStage(stage_raw)
 
     def _decode_result(x: JSONValue) -> CalibrationResult:
         if not isinstance(x, dict):
-            raise ValueError("invalid result entry")
+            raise JSONTypeError("invalid result entry")
         # Use direct keyed lookups to avoid iterating arbitrary keys,
         # preserving semantics and strict typing.
         it = _decode_int({"intra_threads": x.get("intra_threads")}, "intra_threads", 0)
@@ -123,7 +123,7 @@ def read_checkpoint(path: Path) -> CalibrationCheckpoint | None:
     raw = path.read_text(encoding="utf-8")
     data: JSONValue = load_json_str(raw)
     if not isinstance(data, dict):
-        raise ValueError("checkpoint must be an object")
+        raise JSONTypeError("checkpoint must be an object")
     return _decode_checkpoint(data)
 
 

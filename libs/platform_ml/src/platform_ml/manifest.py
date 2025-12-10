@@ -4,13 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final, Literal, NotRequired, TypedDict
 
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 
 
 def _require_nonempty_str(d: dict[str, JSONValue], key: str) -> str:
     v = str(d.get(key, "")).strip()
     if v == "":
-        raise ValueError(f"{key} must be non-empty str")
+        raise JSONTypeError(f"{key} must be non-empty str")
     return v
 
 
@@ -19,7 +19,7 @@ def _require_iso8601(d: dict[str, JSONValue], key: str) -> str:
     try:
         datetime.fromisoformat(s)
     except ValueError as exc:
-        raise ValueError(f"{key} must be ISO 8601") from exc
+        raise JSONTypeError(f"{key} must be ISO 8601") from exc
     return s
 
 
@@ -28,9 +28,9 @@ def _optional_int_ge(d: dict[str, JSONValue], key: str, *, min_value: int) -> in
         return None
     raw = d.get(key)
     if not isinstance(raw, int):
-        raise ValueError(f"{key} must be int")
+        raise JSONTypeError(f"{key} must be int")
     if raw < min_value:
-        raise ValueError(f"{key} must be >= {min_value}")
+        raise JSONTypeError(f"{key} must be >= {min_value}")
     return int(raw)
 
 
@@ -41,14 +41,14 @@ def _optional_float_range(
         return None
     raw = d.get(key)
     if not isinstance(raw, (int, float)):
-        raise ValueError(f"{key} must be number")
+        raise JSONTypeError(f"{key} must be number")
     val = float(raw)
     if max_value is None:
         if val < min_value:
-            raise ValueError(f"{key} must be >= {min_value}")
+            raise JSONTypeError(f"{key} must be >= {min_value}")
     else:
         if not (min_value <= val <= max_value):
-            raise ValueError(f"{key} must be within [{min_value},{max_value}]")
+            raise JSONTypeError(f"{key} must be within [{min_value},{max_value}]")
     return val
 
 
@@ -57,7 +57,7 @@ def _optional_nonempty_str(d: dict[str, JSONValue], key: str) -> str | None:
         return None
     s = str(d.get(key, "")).strip()
     if s == "":
-        raise ValueError(f"{key} must be non-empty if present")
+        raise JSONTypeError(f"{key} must be non-empty if present")
     return s
 
 
@@ -66,7 +66,7 @@ def _require_file_info(d: dict[str, JSONValue]) -> tuple[str, int, str]:
     size_raw = d.get("file_size")
     sha = _require_nonempty_str(d, "file_sha256")
     if not isinstance(size_raw, int) or size_raw <= 0:
-        raise ValueError("file_size must be positive int")
+        raise JSONTypeError("file_size must be positive int")
     return file_id, int(size_raw), sha
 
 
@@ -113,7 +113,7 @@ class ModelManifestV2(TypedDict):
 def from_path_manifest_v2(path: Path) -> ModelManifestV2:
     raw: JSONValue = load_json_str(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
-        raise ValueError("manifest must be a JSON object")
+        raise JSONTypeError("manifest must be a JSON object")
     data: dict[str, JSONValue] = {str(k): v for k, v in raw.items()}
     return _decode_manifest_v2(data)
 
@@ -121,7 +121,7 @@ def from_path_manifest_v2(path: Path) -> ModelManifestV2:
 def from_json_manifest_v2(s: str) -> ModelManifestV2:
     raw: JSONValue = load_json_str(s)
     if not isinstance(raw, dict):
-        raise ValueError("manifest must be a JSON object")
+        raise JSONTypeError("manifest must be a JSON object")
     data: dict[str, JSONValue] = {str(k): v for k, v in raw.items()}
     return _decode_manifest_v2(data)
 
@@ -129,11 +129,11 @@ def from_json_manifest_v2(s: str) -> ModelManifestV2:
 def _decode_manifest_v2(d: dict[str, JSONValue]) -> ModelManifestV2:
     schema_version = str(d.get("schema_version", "")).strip()
     if schema_version != MANIFEST_SCHEMA_VERSION:
-        raise ValueError("unsupported manifest schema version")
+        raise JSONTypeError("unsupported manifest schema version")
 
     model_type_str = str(d.get("model_type", "")).strip()
     if model_type_str not in ("resnet18", "gpt2"):
-        raise ValueError("unsupported model_type")
+        raise JSONTypeError("unsupported model_type")
 
     model_id = _require_nonempty_str(d, "model_id")
     created_at = _require_iso8601(d, "created_at")
@@ -149,7 +149,7 @@ def _decode_manifest_v2(d: dict[str, JSONValue]) -> ModelManifestV2:
 
     t_raw = d.get("training")
     if not isinstance(t_raw, dict):
-        raise ValueError("training must be object")
+        raise JSONTypeError("training must be object")
     training = _decode_training_metadata({str(k): v for (k, v) in t_raw.items()})
 
     # Narrow model_type to the expected Literal for strict typing
@@ -203,7 +203,7 @@ def _decode_training_metadata(d: dict[str, JSONValue]) -> TrainingRunMetadata:
         or not scheduler
         or not isinstance(augment, bool)
     ):
-        raise ValueError("invalid training metadata")
+        raise JSONTypeError("invalid training metadata")
 
     return {
         "run_id": run_id,

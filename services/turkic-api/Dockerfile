@@ -46,7 +46,7 @@ WORKDIR /workspace
 
 COPY --from=builder /workspace/services/turkic-api/dist/*.whl /workspace/dist/
 COPY --from=builder /workspace/libs /workspace/libs
-RUN pip install /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_workers \
+RUN pip install --default-timeout=1000 /workspace/dist/*.whl /workspace/libs/platform_core /workspace/libs/platform_workers \
     && rm -rf /workspace/dist /workspace/libs /root/.cache
 
 WORKDIR /app

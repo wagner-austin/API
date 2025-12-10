@@ -1,48 +1,129 @@
+"""Compare chemical inventory against standards list.
+
+This script cross-references the 2025 chemical inventory with the standards list
+to identify gaps and opportunities.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TypedDict
 
 import polars as pl
-import sys
-from pathlib import Path
-from rich.console import Console
-from rich.table import Table
+from platform_core.logging import get_logger, setup_logging
 
-# Fix Windows console encoding for Greek letters
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+from instrument_io._json_bridge import _json_col_to_opt_str_list
 
-def compare_inventory_and_standards():
-    base_path = Path(r"C:\Users\austi\PROJECTS\UC Irvine\Celia Louise Braun Faiola - FaiolaLab\Notebooks\Emily Truong Notebook")
-    inventory_excel_path = base_path / "Chemical_Inventory_List_2025.xlsx"
-    standards_excel_path = base_path / "Chemical_Standards_List_2025.xlsx"
+logger = get_logger(__name__)
 
-    # Load Data from Excel
-    console = Console(force_terminal=True, legacy_windows=False)
 
-    try:
-        df_inventory = pl.read_excel(source=inventory_excel_path, engine="openpyxl")
-        console.print(f"Loaded inventory from: {inventory_excel_path}")
-    except Exception as e:
-        console.print(f"[red]Error loading inventory Excel '{inventory_excel_path}': {e}[/red]")
-        return
-    
-    try:
-        df_standards = pl.read_excel(source=standards_excel_path, engine="openpyxl")
-        console.print(f"Loaded standards from: {standards_excel_path}")
-    except Exception as e:
-        console.print(f"[red]Error loading standards Excel '{standards_excel_path}': {e}[/red]")
-        return
+class InventoryRow(TypedDict):
+    """Row from inventory DataFrame."""
 
-    # Normalize Helper
-    def normalize(name):
-        if not name or not isinstance(name, str):
-            return ""
-        return name.strip().lower()
+    chemical_name: str
+    cas: str
 
-    # Extract chemical names from DataFrames and create sets for comparison
-    # Handle potential missing 'Chemical Name' column gracefully
-    inventory_chemicals_raw = df_inventory.get_column("Chemical Name").to_list() if "Chemical Name" in df_inventory.columns else []
-    standards_chemicals_raw = df_standards.get_column("Chemical Name").to_list() if "Chemical Name" in df_standards.columns else []
 
-    inv_map = {normalize(name): name for name in inventory_chemicals_raw if name}
-    std_map = {normalize(name): name for name in standards_chemicals_raw if name}
+class StandardRow(TypedDict):
+    """Row from standards DataFrame."""
+
+    chemical_name: str
+    source: str
+
+
+def _normalize(name: str | None) -> str:
+    """Normalize chemical name for comparison."""
+    if not name or not isinstance(name, str):
+        return ""
+    return name.strip().lower()
+
+
+def _load_inventory(path: Path) -> pl.DataFrame:
+    """Load inventory Excel file.
+
+    Args:
+        path: Path to inventory Excel file
+
+    Returns:
+        Polars DataFrame with inventory data
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        pl.exceptions.ComputeError: If file cannot be parsed
+    """
+    return pl.read_excel(source=path, engine="openpyxl")
+
+
+def _load_standards(path: Path) -> pl.DataFrame:
+    """Load standards Excel file.
+
+    Args:
+        path: Path to standards Excel file
+
+    Returns:
+        Polars DataFrame with standards data
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        pl.exceptions.ComputeError: If file cannot be parsed
+    """
+    return pl.read_excel(source=path, engine="openpyxl")
+
+
+def _extract_chemical_names(
+    df: pl.DataFrame,
+    column_name: str,
+) -> dict[str, str]:
+    """Extract chemical names from DataFrame.
+
+    Args:
+        df: Source DataFrame
+        column_name: Name of column containing chemical names
+
+    Returns:
+        Dict mapping normalized names to original names
+    """
+    if column_name not in df.columns:
+        return {}
+    raw_names = _json_col_to_opt_str_list(df.select(column_name).write_json(), column_name)
+    return {_normalize(name): name for name in raw_names if name}
+
+
+DEFAULT_BASE_PATH = Path(
+    r"C:\Users\austi\PROJECTS\UC Irvine\Celia Louise Braun Faiola - FaiolaLab"
+    r"\Notebooks\Emily Truong Notebook"
+)
+
+
+def compare_inventory_and_standards(
+    inventory_path: Path | None = None,
+    standards_path: Path | None = None,
+) -> int:
+    """Compare inventory against standards and report findings.
+
+    Args:
+        inventory_path: Path to inventory Excel file (uses default if None)
+        standards_path: Path to standards Excel file (uses default if None)
+
+    Returns:
+        Exit code (0 for success)
+    """
+    if inventory_path is None:
+        inventory_path = DEFAULT_BASE_PATH / "Chemical_Inventory_List_2025.xlsx"
+    if standards_path is None:
+        standards_path = DEFAULT_BASE_PATH / "Chemical_Standards_List_2025.xlsx"
+
+    # Load inventory
+    df_inventory = _load_inventory(inventory_path)
+    logger.info("Loaded inventory from: %s", inventory_path)
+
+    # Load standards
+    df_standards = _load_standards(standards_path)
+    logger.info("Loaded standards from: %s", standards_path)
+
+    # Extract and normalize chemical names
+    inv_map = _extract_chemical_names(df_inventory, "Chemical Name")
+    std_map = _extract_chemical_names(df_standards, "Chemical Name")
 
     inv_names = set(inv_map.keys())
     std_names = set(std_map.keys())
@@ -51,57 +132,45 @@ def compare_inventory_and_standards():
     common = inv_names.intersection(std_names)
     missing_in_inventory = std_names - inv_names
     no_standard = inv_names - std_names
-    
-    console.print(f"\n[bold blue]Cross-Reference Report[/bold blue]")
-    console.print(f"Total Inventory Items: {len(inv_names)}")
-    console.print(f"Total Standards: {len(std_names)}")
-    console.print(f"Matches found: {len(common)}\n")
 
-    # Table 1: Critical Gaps (Have Standard, No Inventory)
-    table_missing = Table(title="[red]CRITICAL: Standards Missing from Inventory[/red]")
-    table_missing.add_column("Chemical Name (Standard)", style="cyan")
-    table_missing.add_column("Source", style="magenta")
-    
-    for name_norm in sorted(missing_in_inventory):
-        # We need to find the original entry to get the source
-        original_entry = next((item for item in standards_chemicals_raw if normalize(item) == name_norm), None)
-        if original_entry:
-            # Find the full row data from the DataFrame using the original name
-            full_row_data = df_standards.filter(pl.col("Chemical Name") == original_entry).head(1)
-            source = full_row_data.get_column("Source").item() if "Source" in full_row_data.columns else "N/A"
-            table_missing.add_row(
-                original_entry,
-                source
-            )
-    
+    logger.info("Cross-Reference Report")
+    logger.info("Total Inventory Items: %d", len(inv_names))
+    logger.info("Total Standards: %d", len(std_names))
+    logger.info("Matches found: %d", len(common))
+
+    # Report: Standards missing from inventory (Critical)
     if missing_in_inventory:
-        console.print(table_missing)
+        logger.warning("CRITICAL: %d standards missing from inventory", len(missing_in_inventory))
+        for name_norm in sorted(missing_in_inventory):
+            original_name = std_map.get(name_norm, name_norm)
+            logger.warning("  Missing: %s", original_name)
     else:
-        console.print("[green]Good news! All standards have corresponding inventory entries.[/green]")
+        logger.info("All standards have corresponding inventory entries")
 
-    print("\n")
+    # Report: Inventory items without standards (Top 15)
+    if no_standard:
+        logger.info("Inventory items without standards: %d total", len(no_standard))
+        for i, name_norm in enumerate(sorted(no_standard)):
+            if i >= 15:
+                logger.info("  ... and %d more", len(no_standard) - 15)
+                break
+            original_name = inv_map.get(name_norm, name_norm)
+            logger.info("  No standard: %s", original_name)
 
-    # Table 2: Potential Opportunities (Have Inventory, No Standard)
-    # (Showing top 15 to avoid spamming)
-    table_opportunity = Table(title="[yellow]Inventory Items without Standards (Top 15)[/yellow]")
-    table_opportunity.add_column("Chemical Name (Inventory)", style="green")
-    table_opportunity.add_column("CAS", style="white")
-    
-    for i, name_norm in enumerate(sorted(no_standard)):
-        if i >= 15: break
-        # Find the original entry to get the CAS
-        original_entry = next((item for item in inventory_chemicals_raw if normalize(item) == name_norm), None)
-        if original_entry:
-            full_row_data = df_inventory.filter(pl.col("Chemical Name") == original_entry).head(1)
-            cas = full_row_data.get_column("CAS").item() if "CAS" in full_row_data.columns else "N/A"
-            table_opportunity.add_row(
-                original_entry,
-                str(cas) # Ensure CAS is string for display
-            )
-        
-    console.print(table_opportunity)
-    if len(no_standard) > 15:
-        console.print(f"... and {len(no_standard) - 15} more.")
+    return 0
+
+
+def main() -> int:
+    """Entry point for script."""
+    setup_logging(
+        level="INFO",
+        format_mode="text",
+        service_name="compare-inventory-standards",
+        instance_id=None,
+        extra_fields=None,
+    )
+    return compare_inventory_and_standards()
+
 
 if __name__ == "__main__":
-    compare_inventory_and_standards()
+    raise SystemExit(main())

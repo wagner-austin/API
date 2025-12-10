@@ -1,36 +1,42 @@
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
+import pytest
 
 from platform_core.data_bank_events import (
     DEFAULT_DATA_BANK_EVENTS_CHANNEL,
     CompletedV1,
-    EventV1,
     FailedV1,
     ProgressV1,
     StartedV1,
+    decode_event,
     encode_event,
     is_completed,
     is_failed,
     is_progress,
     is_started,
-    try_decode_event,
 )
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 
-def test_encode_decode_and_typeguards() -> None:
+def test_default_channel() -> None:
     assert DEFAULT_DATA_BANK_EVENTS_CHANNEL == "data_bank:events"
 
+
+def test_encode_decode_started() -> None:
     started: StartedV1 = {
         "type": "data_bank.job.started.v1",
         "job_id": "j1",
         "user_id": 42,
         "queue": "data_bank",
     }
-    dec0 = try_decode_event(encode_event(started))
-    assert dec0 is not None and is_started(dec0)
+    decoded = decode_event(encode_event(started))
+    assert is_started(decoded)
+    assert decoded["job_id"] == "j1"
+    assert decoded["user_id"] == 42
+    assert decoded["queue"] == "data_bank"
 
+
+def test_encode_decode_progress_with_message() -> None:
     progress: ProgressV1 = {
         "type": "data_bank.job.progress.v1",
         "job_id": "j1",
@@ -38,19 +44,26 @@ def test_encode_decode_and_typeguards() -> None:
         "progress": 10,
         "message": "ok",
     }
-    dec1 = try_decode_event(encode_event(progress))
-    assert dec1 is not None and is_progress(dec1)
+    decoded = decode_event(encode_event(progress))
+    assert is_progress(decoded)
+    assert decoded["progress"] == 10
+    assert decoded.get("message") == "ok"
 
-    # Progress without optional message exercises the alternate branch
+
+def test_encode_decode_progress_without_message() -> None:
     progress_min: ProgressV1 = {
         "type": "data_bank.job.progress.v1",
         "job_id": "j1",
         "user_id": 42,
         "progress": 0,
     }
-    dec1b = try_decode_event(encode_event(progress_min))
-    assert dec1b is not None and is_progress(dec1b)
+    decoded = decode_event(encode_event(progress_min))
+    assert is_progress(decoded)
+    assert decoded["progress"] == 0
+    assert "message" not in decoded
 
+
+def test_encode_decode_completed() -> None:
     done: CompletedV1 = {
         "type": "data_bank.job.completed.v1",
         "job_id": "j1",
@@ -58,9 +71,13 @@ def test_encode_decode_and_typeguards() -> None:
         "file_id": "fid-1",
         "upload_status": "uploaded",
     }
-    dec2 = try_decode_event(encode_event(done))
-    assert dec2 is not None and is_completed(dec2)
+    decoded = decode_event(encode_event(done))
+    assert is_completed(decoded)
+    assert decoded["file_id"] == "fid-1"
+    assert decoded["upload_status"] == "uploaded"
 
+
+def test_encode_decode_failed_system() -> None:
     failed: FailedV1 = {
         "type": "data_bank.job.failed.v1",
         "job_id": "j1",
@@ -68,10 +85,13 @@ def test_encode_decode_and_typeguards() -> None:
         "error_kind": "system",
         "message": "boom",
     }
-    dec3 = try_decode_event(encode_event(failed))
-    assert dec3 is not None and is_failed(dec3)
+    decoded = decode_event(encode_event(failed))
+    assert is_failed(decoded)
+    assert decoded["error_kind"] == "system"
+    assert decoded["message"] == "boom"
 
-    # Test user error_kind for completeness
+
+def test_encode_decode_failed_user() -> None:
     failed_user: FailedV1 = {
         "type": "data_bank.job.failed.v1",
         "job_id": "j2",
@@ -79,101 +99,107 @@ def test_encode_decode_and_typeguards() -> None:
         "error_kind": "user",
         "message": "bad input",
     }
-    dec4 = try_decode_event(encode_event(failed_user))
-    assert dec4 is not None and is_failed(dec4)
+    decoded = decode_event(encode_event(failed_user))
+    assert is_failed(decoded)
+    assert decoded["error_kind"] == "user"
 
 
-def test_decode_invalid_and_edge_paths() -> None:
-    # not json object
-    assert try_decode_event("[]") is None
-    assert try_decode_event("not-json") is None
-    bad_type: dict[str, str | int] = {"type": 123}
-    assert try_decode_event(dump_json_str(bad_type)) is None
+def test_decode_raises_for_non_object() -> None:
+    with pytest.raises(JSONTypeError, match="Expected JSON object"):
+        decode_event("[]")
 
-    # started: missing queue
+
+def test_decode_raises_for_invalid_json() -> None:
+    from platform_core.json_utils import InvalidJsonError
+
+    with pytest.raises(InvalidJsonError):
+        decode_event("not-json")
+
+
+def test_decode_raises_for_non_string_type() -> None:
+    bad_type: dict[str, str | int] = {"type": 123, "job_id": "j", "user_id": 1}
+    with pytest.raises(JSONTypeError, match="Field 'type' must be a string"):
+        decode_event(dump_json_str(bad_type))
+
+
+def test_decode_raises_for_missing_queue_in_started() -> None:
     d_started_missing: dict[str, str | int] = {
         "type": "data_bank.job.started.v1",
         "job_id": "j",
+        "user_id": 1,
     }
-    assert try_decode_event(dump_json_str(d_started_missing)) is None
+    with pytest.raises(JSONTypeError, match="Missing required field 'queue'"):
+        decode_event(dump_json_str(d_started_missing))
 
-    # progress: missing progress or wrong type
+
+def test_decode_raises_for_missing_progress() -> None:
     d_progress_missing: dict[str, str | int] = {
         "type": "data_bank.job.progress.v1",
         "job_id": "j",
+        "user_id": 1,
     }
-    assert try_decode_event(dump_json_str(d_progress_missing)) is None
+    with pytest.raises(JSONTypeError, match="Missing required field 'progress'"):
+        decode_event(dump_json_str(d_progress_missing))
+
+
+def test_decode_raises_for_wrong_progress_type() -> None:
     d_progress_wrong: dict[str, str | int] = {
         "type": "data_bank.job.progress.v1",
         "job_id": "j",
+        "user_id": 1,
         "progress": "10",
     }
-    assert try_decode_event(dump_json_str(d_progress_wrong)) is None
+    with pytest.raises(JSONTypeError, match="Field 'progress' must be an integer"):
+        decode_event(dump_json_str(d_progress_wrong))
 
-    # completed: wrong upload status
+
+def test_decode_raises_for_wrong_upload_status() -> None:
     d_completed_bad: dict[str, str | int] = {
         "type": "data_bank.job.completed.v1",
         "job_id": "j",
+        "user_id": 1,
         "file_id": "f",
         "upload_status": "nope",
     }
-    assert try_decode_event(dump_json_str(d_completed_bad)) is None
+    with pytest.raises(JSONTypeError, match="Invalid upload_status 'nope'"):
+        decode_event(dump_json_str(d_completed_bad))
 
-    # failed: wrong kind
+
+def test_decode_raises_for_invalid_error_kind() -> None:
     d_failed_bad: dict[str, str | int] = {
         "type": "data_bank.job.failed.v1",
         "job_id": "j",
+        "user_id": 1,
         "error_kind": "oops",
         "message": "m",
     }
-    assert try_decode_event(dump_json_str(d_failed_bad)) is None
+    with pytest.raises(JSONTypeError, match="Invalid error_kind 'oops'"):
+        decode_event(dump_json_str(d_failed_bad))
 
 
-def test_try_decode_non_string_keys() -> None:
-    # JSON with extra key "1" - tests decoder handles unexpected keys gracefully
+def test_decode_raises_for_unknown_event_type() -> None:
+    payload = '{"type":"data_bank.job.unknown.v1","job_id":"j","user_id":1}'
+    with pytest.raises(JSONTypeError, match="Unknown data bank event type"):
+        decode_event(payload)
+
+
+def test_decode_handles_extra_keys() -> None:
     payload = (
-        '{"1":"x","type":"data_bank.job.completed.v1",'
+        '{"extra_key":"x","type":"data_bank.job.completed.v1",'
         '"job_id":"j","user_id":42,"file_id":"f","upload_status":"uploaded"}'
     )
-    out: EventV1 | None = try_decode_event(payload)
-    assert out is not None and is_completed(out)
+    decoded = decode_event(payload)
+    assert is_completed(decoded)
 
 
-def test_data_bank_try_decode_json_loads_returns_non_dict(monkeypatch: MonkeyPatch) -> None:
-    import platform_core.data_bank_events as mod
-    import platform_core.json_utils as json_utils
-
-    def _fake_loads(_s: str) -> list[str]:
-        return ["not", "a", "dict"]
-
-    monkeypatch.setattr(json_utils, "load_json_str", _fake_loads, raising=True)
-    out = mod.try_decode_event("{}")
-    assert out is None
-
-
-def test_data_bank_try_decode_type_not_string_and_non_object_payload() -> None:
-    assert try_decode_event("[]") is None
-    assert try_decode_event('{"type":123,"job_id":"j"}') is None
-    from platform_core.data_bank_events import _load_json_dict
-
-    assert _load_json_dict("[]") is None
-
-
-def test_data_bank_try_decode_handler_returns_none() -> None:
-    invalid_payload = '{"type":"data_bank.job.started.v1","job_id":123,"ts":1,"queue":2}'
-    assert try_decode_event(invalid_payload) is None
-
-
-def test_data_bank_try_decode_parsed_none(monkeypatch: MonkeyPatch) -> None:
-    import platform_core.data_bank_events as mod
-
-    def _fake_load(_: str) -> list[str]:
-        return ["not", "a", "dict"]
-
-    monkeypatch.setattr(mod, "load_json_str", _fake_load, raising=True)
-    assert mod.try_decode_event('{"type":"data_bank.job.started.v1"}') is None
-
-
-def test_data_bank_unknown_event_type() -> None:
-    payload = '{"type":"data_bank.job.unknown.v1","job_id":"j"}'
-    assert try_decode_event(payload) is None
+def test_type_guards_return_false_for_non_matching() -> None:
+    started: StartedV1 = {
+        "type": "data_bank.job.started.v1",
+        "job_id": "j",
+        "user_id": 1,
+        "queue": "q",
+    }
+    assert is_started(started)
+    assert not is_progress(started)
+    assert not is_completed(started)
+    assert not is_failed(started)

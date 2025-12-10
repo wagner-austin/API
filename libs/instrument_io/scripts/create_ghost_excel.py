@@ -1,194 +1,290 @@
+"""Create ghost inventory report Excel file.
+
+This script identifies chemicals that were in the 2021 inventory but are
+missing from the 2025 inventory (ghost chemicals).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
 
 import polars as pl
-from pathlib import Path
-from rich.console import Console
-from rich.table import Table
-import os
-from datetime import datetime
-from openpyxl import Workbook
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.styles import PatternFill, Font, Alignment
+from platform_core.logging import get_logger, setup_logging
 
-def create_formatted_ghost_excel():
-    base_path = Path(r"C:\Users\austi\PROJECTS\UC Irvine\Celia Louise Braun Faiola - FaiolaLab")
-    
-    # 2021 Inventory - This was initially an Excel file, the doc mentioned it was structured.
-    inv_2021_path = base_path / "Important Docs/Chemical Inventory/02252021-Chemical Inventory.xlsx"
-    
-    # 2025 Inventory (the current one)
-    inv_2025_path = base_path / "Notebooks/Emily Truong Notebook/Chemical_Inventory_List_2025.xlsx"
-    
-    output_excel_path = base_path / "Notebooks/Emily Truong Notebook/Chemical_Ghost_Inventory_Report_2025.xlsx"
+from instrument_io._json_bridge import (
+    _df_json_to_row_dicts,
+    _get_json_str_value,
+    _json_col_to_str_list,
+)
+from instrument_io._protocols.openpyxl import (
+    _auto_adjust_column_widths,
+    _create_table,
+    _create_workbook,
+)
 
-    console = Console()
-    console.print(f"[bold blue]--- Generating Formatted Ghost Inventory Report ---[/bold blue]")
+logger = get_logger(__name__)
 
-    # --- Load 2021 Inventory ---
-    df_2021 = None
-    try:
-        # Explicitly try to read known sheet names since auto-discovery failed
-        known_sheets = ["CiBR-Trac", "428"]
-        df_2021_list = []
-        
-        for sheet in known_sheets:
-            try:
-                df_sheet = pl.read_excel(source=inv_2021_path, sheet_name=sheet, engine="openpyxl")
-                # Add source column
-                df_sheet = df_sheet.with_columns(pl.lit(sheet).alias("Original Sheet"))
-                df_2021_list.append(df_sheet)
-                console.print(f"Successfully read sheet '{sheet}'")
-            except Exception as e:
-                console.print(f"Could not read sheet '{sheet}': {e}")
 
-        if df_2021_list:
-            # For concatenation, we need matching columns. These sheets have different schemas.
-            # Strategy: Normalize column names (map to "Chemical Name") and select common/relevant cols.
-            
-            normalized_dfs = []
-            for df in df_2021_list:
-                # Check for Chemical Name column
-                cols = df.columns
-                # 2021 CiBR-Trac has "Chemical_Name", 2021 428 has "Chemical Name"
-                target_col = "Chemical_Name" # We will standardize to this
-                
-                if "Chemical_Name" in cols:
-                    pass # Good
-                elif "Chemical Name" in cols:
-                    df = df.rename({"Chemical Name": "Chemical_Name"})
-                
-                # Handle CAS
-                if "CAS" not in df.columns:
-                    df = df.with_columns(pl.lit(None).alias("CAS"))
-                
-                # Handle Physical State
-                # CiBR-Trac: "Chemical_Physical_State"
-                # 428: "Physical State"
-                if "Chemical_Physical_State" in df.columns:
-                    pass
-                elif "Physical State" in df.columns:
-                    df = df.rename({"Physical State": "Chemical_Physical_State"})
-                else:
-                    df = df.with_columns(pl.lit(None).alias("Chemical_Physical_State"))
+def _read_2021_inventory(inv_path: Path) -> pl.DataFrame:
+    """Read and normalize 2021 inventory from multiple sheets.
 
-                # Select only key columns to ensure schema compatibility for concat
-                selected_df = df.select([
-                    pl.col("Chemical_Name").cast(pl.Utf8),
-                    pl.col("CAS").cast(pl.Utf8),
-                    pl.col("Chemical_Physical_State").cast(pl.Utf8),
-                    pl.col("Original Sheet").cast(pl.Utf8)
-                ])
-                normalized_dfs.append(selected_df)
+    Args:
+        inv_path: Path to 2021 inventory Excel file
 
-            df_2021 = pl.concat(normalized_dfs, how="vertical").unique(subset=["Chemical_Name", "CAS"])
-            console.print(f"Loaded 2021 Inventory (combined): {len(df_2021)} unique entries")
-            
-        else:
-            # Fallback to default single sheet read if explicit names fail
-            console.print("Explicit sheet read failed. Trying default...")
-            df_2021 = pl.read_excel(source=inv_2021_path, engine="openpyxl")
-            df_2021 = df_2021.with_columns(pl.lit("Unknown Sheet").alias("Original Sheet"))
+    Returns:
+        Combined and normalized DataFrame
 
-    except Exception as e:
-        console.print(f"[red]Error loading 2021 Inventory '{inv_2021_path}': {e}[/red]")
-        return
-    
-    # --- Load 2025 Inventory ---
-    df_2025 = None
-    try:
-        df_2025 = pl.read_excel(source=inv_2025_path, engine="openpyxl")
-    except Exception as e:
-        console.print(f"[red]Error loading 2025 Inventory '{inv_2025_path}': {e}[/red]")
-        return
+    Raises:
+        FileNotFoundError: If file does not exist
+        RuntimeError: If no sheets can be read
+    """
+    known_sheets = ["CiBR-Trac", "428"]
+    df_list: list[pl.DataFrame] = []
 
-    if df_2021 is None or df_2025 is None:
-        console.print("[red]Cannot generate report: one or both inventories failed to load.[/red]")
-        return
+    for sheet in known_sheets:
+        try:
+            df_sheet = pl.read_excel(source=inv_path, sheet_name=sheet, engine="openpyxl")
+        except ValueError:
+            logger.warning("Sheet '%s' not found in file", sheet)
+            continue
+        df_sheet = df_sheet.with_columns(pl.lit(sheet).alias("Original Sheet"))
+        df_list.append(df_sheet)
+        logger.info("Successfully read sheet '%s'", sheet)
 
-    # --- Normalize Names ---
-    def normalize_name_polars(df, col_name, new_col_name):
-        if col_name in df.columns:
-            return df.with_columns(
-                pl.col(col_name).cast(pl.Utf8).str.strip_chars().str.to_lowercase().alias(new_col_name)
-            )
-        return df # Return original if column not found
+    if not df_list:
+        raise RuntimeError(f"No sheets could be read from {inv_path}")
 
-    df_2021 = normalize_name_polars(df_2021, "Chemical_Name", "Chemical_Name_normalized")
-    df_2025 = normalize_name_polars(df_2025, "Chemical Name", "Chemical Name_normalized")
+    # Normalize column names across sheets
+    normalized_dfs: list[pl.DataFrame] = []
+    for df in df_list:
+        cols = df.columns
 
-    df_2021_valid = df_2021.filter(pl.col("Chemical_Name_normalized").is_not_null() & (pl.col("Chemical_Name_normalized") != ""))
-    df_2025_valid = df_2025.filter(pl.col("Chemical Name_normalized").is_not_null() & (pl.col("Chemical Name_normalized") != ""))
+        # Normalize Chemical Name column
+        if "Chemical_Name" not in cols and "Chemical Name" in cols:
+            df = df.rename({"Chemical Name": "Chemical_Name"})
 
-    names_2021 = set(df_2021_valid["Chemical_Name_normalized"].to_list())
-    names_2025 = set(df_2025_valid["Chemical Name_normalized"].to_list())
+        # Handle CAS
+        if "CAS" not in df.columns:
+            df = df.with_columns(pl.lit(None).cast(pl.Utf8).alias("CAS"))
 
-    # --- Find Ghost Inventory (in 2021 but NOT in 2025) ---
-    ghost_chemicals_normalized = names_2021 - names_2025
+        # Handle Physical State
+        if "Chemical_Physical_State" not in df.columns:
+            if "Physical State" in df.columns:
+                df = df.rename({"Physical State": "Chemical_Physical_State"})
+            else:
+                df = df.with_columns(pl.lit(None).cast(pl.Utf8).alias("Chemical_Physical_State"))
 
-    if not ghost_chemicals_normalized:
-        console.print("[green]Good news! No 'ghost' chemicals found from 2021 inventory.[/green]")
-        return
+        # Cast column types
+        df = df.with_columns(
+            pl.col("Chemical_Name").cast(pl.Utf8),
+            pl.col("CAS").cast(pl.Utf8),
+            pl.col("Chemical_Physical_State").cast(pl.Utf8),
+            pl.col("Original Sheet").cast(pl.Utf8),
+        )
+        # Select only key columns
+        select_cols: list[str] = [
+            "Chemical_Name",
+            "CAS",
+            "Chemical_Physical_State",
+            "Original Sheet",
+        ]
+        selected_df = df.select(select_cols)
+        normalized_dfs.append(selected_df)
 
-    ghost_data_df = df_2021_valid.filter(pl.col("Chemical_Name_normalized").is_in(list(ghost_chemicals_normalized)))
+    combined = pl.concat(normalized_dfs, how="vertical").unique(subset=["Chemical_Name", "CAS"])
+    logger.info("Loaded 2021 Inventory (combined): %d unique entries", len(combined))
+    return combined
 
-    # --- Create Formatted Excel Report ---
-    wb = Workbook()
+
+def _read_2025_inventory(inv_path: Path) -> pl.DataFrame:
+    """Read 2025 inventory.
+
+    Args:
+        inv_path: Path to 2025 inventory Excel file
+
+    Returns:
+        DataFrame with 2025 inventory
+
+    Raises:
+        FileNotFoundError: If file does not exist
+    """
+    return pl.read_excel(source=inv_path, engine="openpyxl")
+
+
+def _normalize_name_column(df: pl.DataFrame, col_name: str, new_col_name: str) -> pl.DataFrame:
+    """Add normalized name column to DataFrame.
+
+    Args:
+        df: Source DataFrame
+        col_name: Name of column to normalize
+        new_col_name: Name for normalized column
+
+    Returns:
+        DataFrame with added normalized column
+    """
+    if col_name not in df.columns:
+        return df
+    return df.with_columns(
+        pl.col(col_name).cast(pl.Utf8).str.strip_chars().str.to_lowercase().alias(new_col_name)
+    )
+
+
+def _write_ghost_excel(ghost_df: pl.DataFrame, output_path: Path) -> None:
+    """Write ghost inventory to formatted Excel file.
+
+    Args:
+        ghost_df: DataFrame with ghost inventory
+        output_path: Output file path
+
+    Raises:
+        PermissionError: If file is open or cannot be written
+    """
+    # Add source column
+    ghost_df = ghost_df.with_columns(pl.lit("UCI Chemical Inventory (2021)").alias("Source (2021)"))
+
+    wb = _create_workbook()
     ws = wb.active
     ws.title = "Ghost Inventory Report"
 
-    # Headers for the Excel (from the ghost_data_df DataFrame)
-    excel_headers = ["Chemical Name (2021)", "CAS (2021)", "Chemical Physical State (2021)", "Original Sheet (2021)", "Source (2021)"]
-    
-    # Map DataFrame columns to desired Excel headers
-    df_cols_to_extract = ["Chemical_Name", "CAS", "Chemical_Physical_State", "Original Sheet"]
-    
-    # Add a fixed source for 2021 entries
-    ghost_data_df = ghost_data_df.with_columns(pl.lit("UCI Chemical Inventory (2021)").alias("Source (2021)"))
-    df_cols_to_extract.append("Source (2021)")
-
+    # Headers
+    excel_headers = [
+        "Chemical Name (2021)",
+        "CAS (2021)",
+        "Chemical Physical State (2021)",
+        "Original Sheet (2021)",
+        "Source (2021)",
+    ]
 
     for col_idx, header in enumerate(excel_headers, 1):
         ws.cell(row=1, column=col_idx, value=header)
 
-    # Write Data
+    # Write Data via JSON serialization to avoid Any types
     last_row = 1
-    for row_idx, row_data in enumerate(ghost_data_df.iter_rows(named=True), 2):
+    rows = _df_json_to_row_dicts(ghost_df.write_json())
+    for row_idx, row_data in enumerate(rows, 2):
         last_row = row_idx
-        ws.cell(row=row_idx, column=1, value=row_data.get("Chemical_Name"))
-        ws.cell(row=row_idx, column=2, value=str(row_data.get("CAS", "")))
-        ws.cell(row=row_idx, column=3, value=row_data.get("Chemical_Physical_State", ""))
-        ws.cell(row=row_idx, column=4, value=row_data.get("Original Sheet", ""))
-        ws.cell(row=row_idx, column=5, value=row_data.get("Source (2021)", ""))
+        chem_name = _get_json_str_value(row_data, "Chemical_Name")
+        ws.cell(row=row_idx, column=1, value=chem_name if chem_name else "")
+        cas_val = _get_json_str_value(row_data, "CAS")
+        ws.cell(row=row_idx, column=2, value=cas_val if cas_val else "")
+        phys_state = _get_json_str_value(row_data, "Chemical_Physical_State")
+        ws.cell(row=row_idx, column=3, value=phys_state if phys_state else "")
+        orig_sheet = _get_json_str_value(row_data, "Original Sheet")
+        ws.cell(row=row_idx, column=4, value=orig_sheet if orig_sheet else "")
+        source_val = _get_json_str_value(row_data, "Source (2021)")
+        ws.cell(row=row_idx, column=5, value=source_val if source_val else "")
 
-
-    # Create an Excel Table
-    if last_row > 1: # Only create table if there is data
-        last_col_letter = 'E' # Assuming 5 columns for now
+    # Create Excel Table
+    if last_row > 1:
+        last_col_letter = "E"
         ref = f"A1:{last_col_letter}{last_row}"
-        tab = Table(displayName="GhostInventory", ref=ref)
-        style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False,
-                               showLastColumn=False, showRowStripes=True, showColumnStripes=False)
-        tab.tableStyleInfo = style
+        tab = _create_table(
+            display_name="GhostInventory",
+            ref=ref,
+            style_name="TableStyleMedium9",
+            show_row_stripes=True,
+        )
         ws.add_table(tab)
 
     # Auto-adjust column widths
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        ws.column_dimensions[column].width = min(adjusted_width, 60)
+    _auto_adjust_column_widths(ws, max_width=60, padding=2)
 
-    # Save the workbook
-    try:
-        wb.save(output_excel_path)
-        console.print(f"\nFormatted Ghost Inventory Report saved to: {output_excel_path}")
-    except Exception as e:
-        console.print(f"[red]Error saving formatted Excel report: {e}[/red]")
+    wb.save(output_path)
+    logger.info("Formatted Ghost Inventory Report saved to: %s", output_path)
+
+
+DEFAULT_BASE_PATH = Path(r"C:\Users\austi\PROJECTS\UC Irvine\Celia Louise Braun Faiola - FaiolaLab")
+
+
+def create_formatted_ghost_excel(
+    inv_2021_path: Path | None = None,
+    inv_2025_path: Path | None = None,
+    output_path: Path | None = None,
+) -> int:
+    """Create the ghost inventory report.
+
+    Args:
+        inv_2021_path: Path to 2021 inventory Excel file (uses default if None)
+        inv_2025_path: Path to 2025 inventory Excel file (uses default if None)
+        output_path: Path to output Excel file (uses default if None)
+
+    Returns:
+        Exit code (0 for success)
+    """
+    if inv_2021_path is None:
+        inv_2021_path = (
+            DEFAULT_BASE_PATH / "Important Docs/Chemical Inventory/02252021-Chemical Inventory.xlsx"
+        )
+    if inv_2025_path is None:
+        inv_2025_path = (
+            DEFAULT_BASE_PATH / "Notebooks/Emily Truong Notebook/Chemical_Inventory_List_2025.xlsx"
+        )
+    if output_path is None:
+        output_path = (
+            DEFAULT_BASE_PATH
+            / "Notebooks/Emily Truong Notebook/Chemical_Ghost_Inventory_Report_2025.xlsx"
+        )
+
+    logger.info("--- Generating Formatted Ghost Inventory Report ---")
+
+    # Load inventories
+    df_2021 = _read_2021_inventory(inv_2021_path)
+    df_2025 = _read_2025_inventory(inv_2025_path)
+
+    # Normalize names
+    df_2021 = _normalize_name_column(df_2021, "Chemical_Name", "Chemical_Name_normalized")
+    df_2025 = _normalize_name_column(df_2025, "Chemical Name", "Chemical Name_normalized")
+
+    # Filter valid entries
+    df_2021_valid = df_2021.filter(
+        pl.col("Chemical_Name_normalized").is_not_null()
+        & (pl.col("Chemical_Name_normalized") != "")
+    )
+    df_2025_valid = df_2025.filter(
+        pl.col("Chemical Name_normalized").is_not_null()
+        & (pl.col("Chemical Name_normalized") != "")
+    )
+
+    names_2021: set[str] = set(
+        _json_col_to_str_list(
+            df_2021_valid.select("Chemical_Name_normalized").write_json(),
+            "Chemical_Name_normalized",
+        )
+    )
+    names_2025: set[str] = set(
+        _json_col_to_str_list(
+            df_2025_valid.select("Chemical Name_normalized").write_json(),
+            "Chemical Name_normalized",
+        )
+    )
+
+    # Find ghost inventory (in 2021 but NOT in 2025)
+    ghost_chemicals_normalized = names_2021 - names_2025
+
+    if not ghost_chemicals_normalized:
+        logger.info("Good news! No 'ghost' chemicals found from 2021 inventory.")
+        return 0
+
+    logger.info("Found %d ghost chemicals", len(ghost_chemicals_normalized))
+
+    ghost_list: list[str] = sorted(ghost_chemicals_normalized)
+    ghost_data_df = df_2021_valid.filter(pl.col("Chemical_Name_normalized").is_in(ghost_list))
+
+    _write_ghost_excel(ghost_data_df, output_path)
+    return 0
+
+
+def main() -> int:
+    """Entry point for script."""
+    setup_logging(
+        level="INFO",
+        format_mode="text",
+        service_name="create-ghost-excel",
+        instance_id=None,
+        extra_fields=None,
+    )
+    return create_formatted_ghost_excel()
+
 
 if __name__ == "__main__":
-    create_formatted_ghost_excel()
+    raise SystemExit(main())

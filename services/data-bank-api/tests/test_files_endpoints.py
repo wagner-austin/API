@@ -159,8 +159,8 @@ def test_upload_head_get_delete_roundtrip(tmp_path: Path) -> None:
     size_val = b5["size"]
     assert type(size_val) is int
     assert size_val == len(payload)
-    # info includes created_at
-    assert "created_at" in b5
+    # info includes created_at as non-empty string
+    assert b5["created_at"] != ""
 
     # delete
     r6 = client.delete(f"/files/{fid}")

@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.json_utils import JSONTypeError
 from platform_core.turkic_jobs import TurkicJobStatus, turkic_job_key
 from platform_workers.testing import FakeRedis
 
@@ -45,6 +46,7 @@ def test_job_store_invalid_status_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "unknown",
             "progress": "0",
             "created_at": now,
@@ -52,7 +54,7 @@ def test_job_store_invalid_status_raises() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid status"):
         store.load("bad")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -64,6 +66,7 @@ def test_job_store_handles_failed_and_non_numeric_progress() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "failed",
             "progress": "not-a-number",
             "created_at": now,
@@ -71,7 +74,7 @@ def test_job_store_handles_failed_and_non_numeric_progress() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid progress"):
         store.load("f1")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -115,13 +118,14 @@ def test_job_store_missing_progress_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "queued",
             "created_at": now,
             "updated_at": now,
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="missing progress"):
         store.load("mp")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -132,13 +136,14 @@ def test_job_store_missing_created_at_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "queued",
             "progress": "0",
             "updated_at": "2024-01-01T00:00:00",
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="missing created_at"):
         store.load("mc")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -150,6 +155,7 @@ def test_job_store_invalid_upload_status_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "processing",
             "progress": "10",
             "created_at": now,
@@ -158,7 +164,7 @@ def test_job_store_invalid_upload_status_raises() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid upload_status"):
         store.load("us")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -166,7 +172,7 @@ def test_job_store_invalid_upload_status_raises() -> None:
 def test_job_store_load_upload_metadata_missing() -> None:
     r = FakeRedis()
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="upload metadata missing"):
         store.load_upload_metadata("missing")
     r.assert_only_called({"hgetall"})
 
@@ -185,7 +191,7 @@ def test_job_store_load_upload_metadata_invalid_size() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid size"):
         store.load_upload_metadata("bad")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -204,7 +210,7 @@ def test_job_store_upload_metadata_invalid_file_id() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid file_id"):
         store.load_upload_metadata("badfid")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -216,13 +222,14 @@ def test_job_store_missing_status_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "progress": "0",
             "created_at": now,
             "updated_at": now,
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="missing status"):
         store.load("nostat")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -234,6 +241,7 @@ def test_job_store_progress_wrong_type_raises() -> None:
     r.hset(
         key,
         {
+            "user_id": "42",
             "status": "queued",
             "progress": "abc",
             "created_at": now,
@@ -241,7 +249,7 @@ def test_job_store_progress_wrong_type_raises() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid progress"):
         store.load("ptype")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -283,7 +291,7 @@ def test_job_store_upload_metadata_missing_content_type() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid content_type"):
         store.load_upload_metadata("nocontent")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -301,7 +309,7 @@ def test_job_store_upload_metadata_missing_created_at() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="missing created_at"):
         store.load_upload_metadata("nocreated")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -320,7 +328,7 @@ def test_job_store_upload_metadata_invalid_sha256() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid sha256"):
         store.load_upload_metadata("badsha")
     r.assert_only_called({"hset", "expire", "hgetall"})
 
@@ -339,6 +347,6 @@ def test_job_store_upload_metadata_invalid_created_at_type() -> None:
         },
     )
     store = TurkicJobStore(r)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError, match="invalid created_at"):
         store.load_upload_metadata("badcat")
     r.assert_only_called({"hset", "expire", "hgetall"})

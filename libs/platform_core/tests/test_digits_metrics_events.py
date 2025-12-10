@@ -373,73 +373,99 @@ class TestEncodeDecodeRoundtrip:
 
 class TestDecodeErrors:
     def test_non_object_payload_raises(self) -> None:
-        with pytest.raises(ValueError, match="must be an object"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Expected JSON object"):
             decode_digits_metrics_event("[]")
 
     def test_non_string_type_raises(self) -> None:
-        with pytest.raises(ValueError, match="type must be a string"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Field 'type' must be a string"):
             decode_digits_metrics_event('{"type": 123}')
 
     def test_missing_job_id_raises(self) -> None:
-        with pytest.raises(ValueError, match="job_id and user_id are required"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'job_id'"):
             decode_digits_metrics_event('{"type": "digits.metrics.config.v1", "user_id": 1}')
 
     def test_missing_user_id_raises(self) -> None:
-        with pytest.raises(ValueError, match="job_id and user_id are required"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'user_id'"):
             decode_digits_metrics_event('{"type": "digits.metrics.config.v1", "job_id": "j1"}')
 
     def test_unknown_type_raises(self) -> None:
+        from platform_core.json_utils import JSONTypeError
+
         payload = '{"type": "digits.metrics.unknown.v1", "job_id": "j1", "user_id": 1}'
-        with pytest.raises(ValueError, match="unknown digits metrics event type"):
+        with pytest.raises(JSONTypeError, match="Unknown digits metrics event type"):
             decode_digits_metrics_event(payload)
 
     def test_config_missing_required_raises(self) -> None:
-        with pytest.raises(ValueError, match="config event requires"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'model_id'"):
             decode_digits_metrics_event(
                 '{"type": "digits.metrics.config.v1", "job_id": "j1", "user_id": 1}'
             )
 
     def test_batch_missing_required_raises(self) -> None:
+        from platform_core.json_utils import JSONTypeError
+
         payload = (
             '{"type": "digits.metrics.batch.v1", "job_id": "j1", "user_id": 1, "model_id": "m1"}'
         )
-        with pytest.raises(ValueError, match="batch metrics event missing"):
+        with pytest.raises(JSONTypeError, match="Missing required field 'epoch'"):
             decode_digits_metrics_event(payload)
 
     def test_epoch_missing_required_raises(self) -> None:
+        from platform_core.json_utils import JSONTypeError
+
         payload = (
             '{"type": "digits.metrics.epoch.v1", "job_id": "j1", "user_id": 1, "model_id": "m1"}'
         )
-        with pytest.raises(ValueError, match="epoch metrics event missing"):
+        with pytest.raises(JSONTypeError, match="Missing required field 'epoch'"):
             decode_digits_metrics_event(payload)
 
     def test_best_missing_required_raises(self) -> None:
-        with pytest.raises(ValueError, match="best metrics event missing"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'epoch'"):
             decode_digits_metrics_event(
                 '{"type": "digits.metrics.best.v1", "job_id": "j1", "user_id": 1, "model_id": "m1"}'
             )
 
     def test_artifact_missing_required_raises(self) -> None:
-        with pytest.raises(ValueError, match="artifact event missing"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'model_id'"):
             decode_digits_metrics_event(
                 '{"type": "digits.metrics.artifact.v1", "job_id": "j1", "user_id": 1}'
             )
 
     def test_upload_missing_required_raises(self) -> None:
+        from platform_core.json_utils import JSONTypeError
+
         payload = (
             '{"type": "digits.metrics.upload.v1", "job_id": "j1", "user_id": 1, "model_id": "m1"}'
         )
-        with pytest.raises(ValueError, match="upload event missing"):
+        with pytest.raises(JSONTypeError, match="Missing required field 'status'"):
             decode_digits_metrics_event(payload)
 
     def test_prune_missing_required_raises(self) -> None:
-        with pytest.raises(ValueError, match="prune event missing"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'model_id'"):
             decode_digits_metrics_event(
                 '{"type": "digits.metrics.prune.v1", "job_id": "j1", "user_id": 1}'
             )
 
     def test_completed_missing_required_raises(self) -> None:
-        with pytest.raises(ValueError, match="completed metrics event missing"):
+        from platform_core.json_utils import JSONTypeError
+
+        with pytest.raises(JSONTypeError, match="Missing required field 'model_id'"):
             decode_digits_metrics_event(
                 '{"type": "digits.metrics.completed.v1", "job_id": "j1", "user_id": 1}'
             )
@@ -585,66 +611,32 @@ class TestIntCoercionToFloat:
         assert type(config_ev["aug_rotate"]) is float
 
 
-class TestTryDecodeDigitsMetricsEvent:
-    def test_returns_none_for_non_dict(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
+class TestDecodeDigitsEvent:
+    def test_raises_for_non_dict(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
-        assert try_decode_digits_metrics_event("[]") is None
+        with pytest.raises(JSONTypeError, match="Expected JSON object"):
+            decode_digits_event("[]")
 
-    def test_returns_none_for_non_string_type(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
+    def test_raises_for_non_string_type(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
-        assert try_decode_digits_metrics_event('{"type": 123}') is None
+        with pytest.raises(JSONTypeError, match="Field 'type' must be a string"):
+            decode_digits_event('{"type": 123}')
 
-    def test_returns_none_for_non_metrics_type(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
+    def test_raises_for_unknown_type(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
-        assert try_decode_digits_metrics_event('{"type": "digits.job.started.v1"}') is None
-
-    def test_returns_none_for_missing_job_id(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
-
-        payload = '{"type": "digits.metrics.config.v1", "user_id": 1}'
-        assert try_decode_digits_metrics_event(payload) is None
-
-    def test_returns_none_for_unknown_metrics_type(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
-
-        payload = '{"type": "digits.metrics.unknown.v1", "job_id": "j1", "user_id": 1}'
-        assert try_decode_digits_metrics_event(payload) is None
-
-    def test_decodes_valid_config_event(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_metrics_event
-
-        ev = make_config_event(job_id="j1", user_id=1, model_id="m", total_epochs=1, queue="q")
-        payload = encode_digits_metrics_event(ev)
-        decoded = try_decode_digits_metrics_event(payload)
-        if decoded is None:
-            pytest.fail("expected decoded event")
-        assert is_config(decoded)
-        assert decoded["type"] == "digits.metrics.config.v1"
-
-
-class TestTryDecodeDigitsEvent:
-    def test_returns_none_for_non_dict(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
-
-        assert try_decode_digits_event("[]") is None
-
-    def test_returns_none_for_non_string_type(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
-
-        assert try_decode_digits_event('{"type": 123}') is None
-
-    def test_returns_none_for_unknown_type(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
-
-        assert try_decode_digits_event('{"type": "unknown.event.v1"}') is None
+        with pytest.raises(JSONTypeError, match="Unknown digits event type"):
+            decode_digits_event('{"type": "unknown.event.v1", "job_id": "j", "user_id": 1}')
 
     def test_decodes_job_started_event(self) -> None:
         from platform_core.digits_metrics_events import (
+            decode_digits_event,
             is_digits_job_started,
-            try_decode_digits_event,
         )
 
         payload = """{
@@ -654,16 +646,14 @@ class TestTryDecodeDigitsEvent:
             "user_id": 1,
             "queue": "digits-training"
         }"""
-        ev = try_decode_digits_event(payload)
-        if ev is None:
-            pytest.fail("expected decoded event")
+        ev = decode_digits_event(payload)
         assert is_digits_job_started(ev)
         assert ev["type"] == "digits.job.started.v1"
 
     def test_decodes_job_completed_event(self) -> None:
         from platform_core.digits_metrics_events import (
+            decode_digits_event,
             is_digits_job_completed,
-            try_decode_digits_event,
         )
 
         payload = """{
@@ -674,16 +664,14 @@ class TestTryDecodeDigitsEvent:
             "result_id": "r1",
             "result_bytes": 1024
         }"""
-        ev = try_decode_digits_event(payload)
-        if ev is None:
-            pytest.fail("expected decoded event")
+        ev = decode_digits_event(payload)
         assert is_digits_job_completed(ev)
         assert ev["type"] == "digits.job.completed.v1"
 
     def test_decodes_job_failed_event_user(self) -> None:
         from platform_core.digits_metrics_events import (
+            decode_digits_event,
             is_digits_job_failed,
-            try_decode_digits_event,
         )
 
         payload = """{
@@ -694,16 +682,14 @@ class TestTryDecodeDigitsEvent:
             "error_kind": "user",
             "message": "Invalid input"
         }"""
-        ev = try_decode_digits_event(payload)
-        if ev is None:
-            pytest.fail("expected decoded event")
+        ev = decode_digits_event(payload)
         assert is_digits_job_failed(ev)
         assert ev["type"] == "digits.job.failed.v1"
 
     def test_decodes_job_failed_event_system(self) -> None:
         from platform_core.digits_metrics_events import (
+            decode_digits_event,
             is_digits_job_failed,
-            try_decode_digits_event,
         )
 
         payload = """{
@@ -714,28 +700,25 @@ class TestTryDecodeDigitsEvent:
             "error_kind": "system",
             "message": "Internal error"
         }"""
-        ev = try_decode_digits_event(payload)
-        if ev is None:
-            pytest.fail("expected decoded event")
+        ev = decode_digits_event(payload)
         assert is_digits_job_failed(ev)
         assert ev["type"] == "digits.job.failed.v1"
 
     def test_decodes_metrics_event(self) -> None:
         from platform_core.digits_metrics_events import (
+            decode_digits_event,
             is_digits_config,
-            try_decode_digits_event,
         )
 
         ev = make_config_event(job_id="j1", user_id=1, model_id="m", total_epochs=1, queue="q")
         payload = encode_digits_metrics_event(ev)
-        decoded = try_decode_digits_event(payload)
-        if decoded is None:
-            pytest.fail("expected decoded event")
+        decoded = decode_digits_event(payload)
         assert is_digits_config(decoded)
         assert decoded["type"] == "digits.metrics.config.v1"
 
-    def test_returns_none_for_wrong_domain(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_wrong_domain(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.started.v1",
@@ -744,10 +727,12 @@ class TestTryDecodeDigitsEvent:
             "user_id": 1,
             "queue": "q"
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Domain mismatch"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_missing_queue_in_started(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_missing_queue_in_started(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.started.v1",
@@ -755,10 +740,12 @@ class TestTryDecodeDigitsEvent:
             "job_id": "j1",
             "user_id": 1
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Missing required field 'queue'"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_missing_fields_in_completed(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_missing_fields_in_completed(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.completed.v1",
@@ -766,10 +753,12 @@ class TestTryDecodeDigitsEvent:
             "job_id": "j1",
             "user_id": 1
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Missing required field 'result_id'"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_missing_message_in_failed(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_missing_message_in_failed(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.failed.v1",
@@ -778,10 +767,12 @@ class TestTryDecodeDigitsEvent:
             "user_id": 1,
             "error_kind": "user"
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Missing required field 'message'"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_invalid_error_kind(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_invalid_error_kind(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.failed.v1",
@@ -791,10 +782,12 @@ class TestTryDecodeDigitsEvent:
             "error_kind": "invalid",
             "message": "msg"
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Invalid error_kind 'invalid'"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_unknown_job_event_suffix(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_unknown_job_event_suffix(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = """{
             "type": "digits.job.unknown.v1",
@@ -802,24 +795,24 @@ class TestTryDecodeDigitsEvent:
             "job_id": "j1",
             "user_id": 1
         }"""
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Unknown digits job event type"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_missing_job_id_in_metrics(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_missing_job_id(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
         payload = '{"type": "digits.metrics.config.v1", "user_id": 1}'
-        assert try_decode_digits_event(payload) is None
+        with pytest.raises(JSONTypeError, match="Missing required field 'job_id'"):
+            decode_digits_event(payload)
 
-    def test_returns_none_for_missing_job_id_in_job_event(self) -> None:
-        from platform_core.digits_metrics_events import try_decode_digits_event
+    def test_raises_for_unknown_metrics_type(self) -> None:
+        from platform_core.digits_metrics_events import decode_digits_event
+        from platform_core.json_utils import JSONTypeError
 
-        payload = """{
-            "type": "digits.job.started.v1",
-            "domain": "digits",
-            "user_id": 1,
-            "queue": "q"
-        }"""
-        assert try_decode_digits_event(payload) is None
+        payload = '{"type": "digits.metrics.unknown.v1", "job_id": "j1", "user_id": 1}'
+        with pytest.raises(JSONTypeError, match="Unknown digits metrics event type"):
+            decode_digits_event(payload)
 
 
 class TestCombinedTypeGuards:

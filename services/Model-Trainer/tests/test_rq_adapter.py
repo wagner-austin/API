@@ -116,9 +116,36 @@ def test_rq_enqueuer_methods(monkeypatch: MonkeyPatch) -> None:
     assert last is not None and len(last) == 3
     path, payload, kwargs = last
     assert path == "model_trainer.worker.train_job.process_train_job"
-    assert isinstance(payload, dict) and "run_id" in payload
-    assert "request" in payload and "user_id" in payload
-    assert payload.get("run_id") == "run-1"
+    # payload is typed as _JsonValue but we know it's a dict from the implementation
+    if not isinstance(payload, dict):
+        raise AssertionError("payload must be dict")
+    assert payload["run_id"] == "run-1"
+    assert payload["user_id"] == 1
+    # Verify all request fields are passed through
+    req = payload["request"]
+    if not isinstance(req, dict):
+        raise AssertionError("request must be dict")
+    assert req["model_family"] == "gpt2"
+    assert req["model_size"] == "s"
+    assert req["max_seq_len"] == 16
+    assert req["num_epochs"] == 1
+    assert req["batch_size"] == 1
+    assert req["learning_rate"] == 1e-3
+    assert req["corpus_file_id"] == "deadbeef"
+    assert req["tokenizer_id"] == "tok"
+    assert req["holdout_fraction"] == 0.01
+    assert req["seed"] == 42
+    assert req["pretrained_run_id"] is None
+    assert req["freeze_embed"] is False
+    assert req["gradient_clipping"] == 1.0
+    assert req["optimizer"] == "adamw"
+    assert req["device"] == "cpu"
+    assert req["precision"] == "auto"
+    assert req["data_num_workers"] is None
+    assert req["data_pin_memory"] is None
+    assert req["early_stopping_patience"] == 0
+    assert req["test_split_ratio"] == 0.0
+    assert req["finetune_lr_cap"] == 0.0
     assert kwargs["job_timeout"] == 60
 
     # Eval job
@@ -134,9 +161,11 @@ def test_rq_enqueuer_methods(monkeypatch: MonkeyPatch) -> None:
     assert last2 is not None and len(last2) == 3
     path2, payload2, _kwargs2 = last2
     assert path2 == "model_trainer.worker.eval_job.process_eval_job"
-    assert isinstance(payload2, dict) and "run_id" in payload2
-    assert "split" in payload2 and "path_override" in payload2
-    assert payload2.get("split") == "validation"
+    if not isinstance(payload2, dict):
+        raise AssertionError("payload2 must be dict")
+    assert payload2["run_id"] == "run-1"
+    assert payload2["split"] == "validation"
+    assert payload2["path_override"] is None
 
     # Tokenizer job
     holder["q"].last = None
@@ -155,6 +184,12 @@ def test_rq_enqueuer_methods(monkeypatch: MonkeyPatch) -> None:
     assert last3 is not None and len(last3) == 3
     path3, payload3, _kwargs3 = last3
     assert path3 == "model_trainer.worker.tokenizer_worker.process_tokenizer_train_job"
-    assert isinstance(payload3, dict) and "tokenizer_id" in payload3
-    assert "method" in payload3 and "vocab_size" in payload3
-    assert payload3.get("method") == "bpe"
+    if not isinstance(payload3, dict):
+        raise AssertionError("payload3 must be dict")
+    assert payload3["tokenizer_id"] == "tok-1"
+    assert payload3["method"] == "bpe"
+    assert payload3["vocab_size"] == 128
+    assert payload3["min_frequency"] == 1
+    assert payload3["corpus_file_id"] == "deadbeef"
+    assert payload3["holdout_fraction"] == 0.1
+    assert payload3["seed"] == 42

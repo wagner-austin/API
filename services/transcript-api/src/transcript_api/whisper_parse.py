@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from platform_core.json_utils import JSONTypeError
 from platform_core.logging import get_logger
 
 from .types import (
@@ -21,28 +22,28 @@ RawVerboseAny = RawVerboseBase | RawVerboseExtended
 def _coerce_verbose_response(raw: RawVerboseAny) -> VerboseResponseTD:
     """Validate and coerce a raw dict into a VerboseResponseTD.
 
-    Performs strict runtime validation - raises ValueError on any invalid structure.
+    Performs strict runtime validation - raises JSONTypeError on any invalid structure.
     """
     text_val = raw.get("text")
     if not isinstance(text_val, str):
-        raise ValueError("verbose response missing text")
+        raise JSONTypeError("verbose response missing text")
     segs_val = raw.get("segments")
     if not isinstance(segs_val, list):
-        raise ValueError("verbose response missing segments list")
+        raise JSONTypeError("verbose response missing segments list")
     segs: list[VerboseSegmentTD] = []
     for it in segs_val:
         if not isinstance(it, dict):
-            raise ValueError("segment must be object")
+            raise JSONTypeError("segment must be object")
         text = str(it.get("text", ""))
         # Do not filter empty text here; keep encoder pure
         start_any = it.get("start")
         end_any = it.get("end")
         if start_any is None or end_any is None:
-            raise ValueError("segment missing start/end")
+            raise JSONTypeError("segment missing start/end")
         if not isinstance(start_any, int | float | str):
-            raise ValueError("segment start must be numeric")
+            raise JSONTypeError("segment start must be numeric")
         if not isinstance(end_any, int | float | str):
-            raise ValueError("segment end must be numeric")
+            raise JSONTypeError("segment end must be numeric")
         start = _as_float(start_any)
         end = _as_float(end_any)
         segs.append({"text": text, "start": start, "end": end})
@@ -55,8 +56,8 @@ def to_verbose_dict(
     """Convert OpenAI SDK response into a strictly typed verbose response.
 
     Accepts dict-compatible payloads exposed by common SDKs via methods like
-    `to_dict_recursive()` or `model_dump()`; otherwise raises ValueError.
-    Validates input at runtime - any invalid structure raises ValueError.
+    `to_dict_recursive()` or `model_dump()`; otherwise raises JSONTypeError.
+    Validates input at runtime - any invalid structure raises JSONTypeError.
     """
     if isinstance(obj, SupportsToDictRecursive):
         return _coerce_verbose_response(obj.to_dict_recursive())
@@ -64,7 +65,7 @@ def to_verbose_dict(
         return _coerce_verbose_response(obj.model_dump())
     if isinstance(obj, dict):
         return _coerce_verbose_response(obj)
-    raise ValueError("Unsupported verbose object")
+    raise JSONTypeError("Unsupported verbose object")
 
 
 def convert_verbose_to_segments(data: VerboseResponseTD) -> list[TranscriptSegment]:

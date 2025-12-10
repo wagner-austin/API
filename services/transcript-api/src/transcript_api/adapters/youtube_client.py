@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 
 from ..provider import (
@@ -59,7 +59,7 @@ class _YTListing(TranscriptListing):
     def translate(self, language: str) -> TranscriptResource:
         try:
             res = self._inner.translate(language)
-        except (RuntimeError, ValueError) as exc:
+        except (RuntimeError, JSONTypeError) as exc:
             get_logger(__name__).info("translate failed: %s", exc)
             raise TranscriptTranslateUnavailableError(str(exc)) from None
         return _YTResource(res)
@@ -100,17 +100,17 @@ def _yt_get_transcript(video_id: str, languages: list[str]) -> list[RawTranscrip
         coerced_transcript: list[RawTranscriptItem] = []
         for item in raw_transcript_result:
             if not isinstance(item, dict):
-                raise ValueError("Expected dict in transcript item")
+                raise JSONTypeError("Expected dict in transcript item")
             text = item.get("text", "")
             start = item.get("start", 0.0)
             duration = item.get("duration", 0.0)
 
             if not isinstance(text, str):
-                raise ValueError("Expected string for 'text' in transcript item")
+                raise JSONTypeError("Expected string for 'text' in transcript item")
             if not isinstance(start, int | float):
-                raise ValueError("Expected int or float for 'start' in transcript item")
+                raise JSONTypeError("Expected int or float for 'start' in transcript item")
             if not isinstance(duration, int | float):
-                raise ValueError("Expected int or float for 'duration' in transcript item")
+                raise JSONTypeError("Expected int or float for 'duration' in transcript item")
 
             coerced_transcript.append(
                 {"text": text, "start": float(start), "duration": float(duration)}

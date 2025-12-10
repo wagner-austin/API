@@ -6,7 +6,10 @@ from collections.abc import Generator
 from pathlib import Path
 from types import ModuleType
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
+from tests.conftest import make_probs
 
 from turkic_api.core.corpus_download import (
     _stream_for_source,
@@ -167,8 +170,9 @@ def test_ensure_corpus_file_applies_lang_filter(
 
     # Provide a dummy LangId model and use the public filter builder
     class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kk"] if "keep" in text else ["__label__eng"], [1.0])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            label = "__label__kk" if "keep" in text else "__label__eng"
+            return ((label,), make_probs(1.0))
 
     spec = ProcessSpec(
         source="oscar",
@@ -193,13 +197,13 @@ def test_ensure_corpus_file_applies_script_filter(
 
     # Keep only 'Latn' script sentences
     class _Model:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
             t = text.strip()
             if t.startswith("LATN "):
-                return (["__label__kaz_Latn"], [1.0])
+                return (("__label__kaz_Latn",), make_probs(1.0))
             if t.startswith("CYRL "):
-                return (["__label__kaz_Cyrl"], [1.0])
-            return (["__label__eng"], [1.0])
+                return (("__label__kaz_Cyrl",), make_probs(1.0))
+            return (("__label__eng",), make_probs(1.0))
 
     spec = ProcessSpec(
         source="oscar",

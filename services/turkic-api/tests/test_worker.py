@@ -3,11 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import BinaryIO
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
+from tests.conftest import make_probs
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
@@ -64,8 +67,8 @@ def test_process_corpus_impl_creates_file_and_updates_status(
 
     # Provide a trivial langid model to satisfy filtering when threshold>0
     class _LangModel:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kk"], [1.0])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__kk",), make_probs(1.0))
 
     def _load_model(data_dir: str, prefer_218e: bool = True) -> _LangModel:
         return _LangModel()

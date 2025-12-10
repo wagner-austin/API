@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Generic, Protocol, TypeVar
 
 from platform_core.job_types import BaseJobStatus, JobStatusLiteral, job_key
+from platform_core.json_utils import JSONTypeError
 
 from platform_workers.redis import RedisStrProto
 
@@ -48,7 +49,7 @@ def parse_status(raw: dict[str, str]) -> JobStatusLiteral:
     """Parse a status field from a Redis hash."""
     status_raw = raw.get("status")
     if status_raw is None:
-        raise ValueError("missing status in redis store")
+        raise JSONTypeError("missing status in redis store")
     if status_raw == "queued":
         return "queued"
     if status_raw == "processing":
@@ -57,17 +58,17 @@ def parse_status(raw: dict[str, str]) -> JobStatusLiteral:
         return "completed"
     if status_raw == "failed":
         return "failed"
-    raise ValueError("invalid status in redis store")
+    raise JSONTypeError("invalid status in redis store")
 
 
 def parse_int_field(raw: dict[str, str], key: str) -> int:
     """Parse an integer field from a Redis hash."""
     value = raw.get(key)
     if value is None:
-        raise ValueError(f"missing {key} in redis store")
+        raise JSONTypeError(f"missing {key} in redis store")
     stripped = value.strip()
     if stripped == "" or not stripped.lstrip("-").isdigit():
-        raise ValueError(f"invalid {key} in redis store")
+        raise JSONTypeError(f"invalid {key} in redis store")
     return int(stripped)
 
 
@@ -75,8 +76,11 @@ def parse_datetime_field(raw: dict[str, str], key: str) -> datetime:
     """Parse an ISO 8601 datetime field from a Redis hash."""
     value = raw.get(key)
     if value is None or value.strip() == "":
-        raise ValueError(f"missing {key} in redis store")
-    return datetime.fromisoformat(value)
+        raise JSONTypeError(f"missing {key} in redis store")
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise JSONTypeError(f"invalid {key} in redis store: {exc}") from exc
 
 
 def parse_optional_str(raw: dict[str, str], key: str) -> str | None:

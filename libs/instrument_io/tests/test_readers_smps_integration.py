@@ -166,12 +166,13 @@ def test_read_complex_rps() -> None:
     """Test reading complex real RPS file from Faiola Lab."""
     reader = SMPSReader()
 
-    # Test reading metadata from complex file
+    # Test reading metadata from complex file - verify via value assertions
     metadata = reader.read_metadata(COMPLEX_RPS)
-    assert "timestamp" in metadata
-    assert "instrument" in metadata
-    assert "lower_voltage_limit" in metadata
     assert metadata["lower_voltage_limit"] > 0
+    # Verify timestamp contains expected format (has date separators)
+    assert "-" in metadata["timestamp"] or "/" in metadata["timestamp"]
+    # Verify instrument has typical identifier chars
+    assert metadata["instrument"][0].isalpha()
 
     # Test reading data from complex file
     data = reader.read_data(COMPLEX_RPS)

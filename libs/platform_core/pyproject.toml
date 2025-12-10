@@ -16,8 +16,8 @@ include = ["src/platform_core/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.121.1"
-httpx = "^0.28.1"
+fastapi = "^0.124"
+httpx = "^0.28"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
@@ -26,7 +26,6 @@ pytest-xdist = "^3.6.1"
 pytest-cov = "^7.0.0"
 mypy = "^1.13.0"
 ruff = "^0.14.4"
-black = "^25.11.0"
 
 [tool.mypy]
 python_version = "3.11"
@@ -65,6 +64,7 @@ fixable = ["ALL"]
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = false

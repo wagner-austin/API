@@ -17,13 +17,13 @@ readme = "README.md"
 python = "^3.11"
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
-fastapi = "^0.121.0"
-hypercorn = "^0.18.0"
+fastapi = "^0.124"
+hypercorn = "^0.18"
 typing-extensions = "^4.12.2"
 python-multipart = "^0.0.20"
-httpx = "^0.28.1"
-redis = "^5.2.0"
-rq = "^2.0.0"
+httpx = "^0.28"
+redis = "^7.1"
+rq = "^2.3"
 
 [tool.poetry.scripts]
 databank-rq-worker = "data_bank_api.worker_entry:main"
@@ -35,7 +35,6 @@ pytest-cov = "^7.0.0"
 pytest-timeout = "^2.3.1"
 mypy = "^1.13.0"
 ruff = "^0.14.4"
-black = "^25.11.0"
 types-requests = "^2.32.0.20241016"
 pytest-xdist = "^3.6.1"
 
@@ -80,6 +79,7 @@ mypy-init-return = true
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.coverage.run]
 source = ["src", "scripts"]

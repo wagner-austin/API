@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from platform_ml.manifest import from_json_manifest_v2, from_path_manifest_v2
 
@@ -40,7 +40,7 @@ def _make_valid_manifest() -> dict[str, JSONValue]:
 
 
 def test_manifest_v2_from_json_requires_object() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         from_json_manifest_v2("[]")
 
 
@@ -48,7 +48,7 @@ def test_manifest_v2_from_json_requires_object() -> None:
 def test_manifest_v2_n_classes_must_be_int() -> None:
     d = _make_valid_manifest()
     d["n_classes"] = "not-an-int"
-    with pytest.raises(ValueError, match="n_classes must be int"):
+    with pytest.raises(JSONTypeError, match="n_classes must be int"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -56,7 +56,7 @@ def test_manifest_v2_n_classes_must_be_int() -> None:
 def test_manifest_v2_n_classes_below_minimum() -> None:
     d = _make_valid_manifest()
     d["n_classes"] = 1  # min is 2
-    with pytest.raises(ValueError, match="n_classes must be >="):
+    with pytest.raises(JSONTypeError, match="n_classes must be >="):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -64,7 +64,7 @@ def test_manifest_v2_n_classes_below_minimum() -> None:
 def test_manifest_v2_val_acc_must_be_number() -> None:
     d = _make_valid_manifest()
     d["val_acc"] = "not-a-number"
-    with pytest.raises(ValueError, match="val_acc must be number"):
+    with pytest.raises(JSONTypeError, match="val_acc must be number"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -72,7 +72,7 @@ def test_manifest_v2_val_acc_must_be_number() -> None:
 def test_manifest_v2_val_loss_below_minimum() -> None:
     d = _make_valid_manifest()
     d["val_loss"] = -0.5  # val_loss has min=0.0, max=None (unbounded)
-    with pytest.raises(ValueError, match="val_loss must be >="):
+    with pytest.raises(JSONTypeError, match="val_loss must be >="):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -80,7 +80,7 @@ def test_manifest_v2_val_loss_below_minimum() -> None:
 def test_manifest_v2_val_acc_out_of_range() -> None:
     d = _make_valid_manifest()
     d["val_acc"] = 1.5  # val_acc must be in [0.0, 1.0]
-    with pytest.raises(ValueError, match="val_acc must be within"):
+    with pytest.raises(JSONTypeError, match="val_acc must be within"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -88,7 +88,7 @@ def test_manifest_v2_val_acc_out_of_range() -> None:
 def test_manifest_v2_preprocess_hash_non_empty_if_present() -> None:
     d = _make_valid_manifest()
     d["preprocess_hash"] = ""
-    with pytest.raises(ValueError, match="preprocess_hash must be non-empty if present"):
+    with pytest.raises(JSONTypeError, match="preprocess_hash must be non-empty if present"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -96,7 +96,7 @@ def test_manifest_v2_preprocess_hash_non_empty_if_present() -> None:
 def test_manifest_v2_training_must_be_object() -> None:
     d = _make_valid_manifest()
     d["training"] = []  # not an object
-    with pytest.raises(ValueError, match="training must be object"):
+    with pytest.raises(JSONTypeError, match="training must be object"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -135,7 +135,7 @@ def test_manifest_v2_vocab_size_must_be_int() -> None:
         "file_sha256": "abc123",
         "training": _make_valid_training(),
     }
-    with pytest.raises(ValueError, match="vocab_size must be int"):
+    with pytest.raises(JSONTypeError, match="vocab_size must be int"):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -171,5 +171,5 @@ def test_manifest_v2_from_path(tmp_path: Path) -> None:
 def test_manifest_v2_from_path_requires_object(tmp_path: Path) -> None:
     p = tmp_path / "bad.json"
     p.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = from_path_manifest_v2(p)

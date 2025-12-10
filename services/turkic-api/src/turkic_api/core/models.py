@@ -7,7 +7,7 @@ from typing_extensions import TypedDict
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az"]
+Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en"]
 
 
 class ProcessSpec(TypedDict):
@@ -23,4 +23,4 @@ def is_source(value: str) -> TypeGuard[Source]:
 
 
 def is_language(value: str) -> TypeGuard[Language]:
-    return value in ("kk", "ky", "uz", "tr", "ug", "fi", "az")
+    return value in ("kk", "ky", "uz", "tr", "ug", "fi", "az", "en")

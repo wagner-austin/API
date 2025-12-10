@@ -4,11 +4,11 @@ import logging
 
 import pytest
 from platform_core.digits_metrics_events import (
+    decode_digits_event,
     is_digits_batch,
     is_digits_best,
-    try_decode_digits_event,
 )
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 
 
 def test_decode_batch_valid_complete_payload() -> None:
@@ -36,9 +36,7 @@ def test_decode_batch_valid_complete_payload() -> None:
             "file_mb": 256,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_batch(evt)
     assert evt["type"] == "digits.metrics.batch.v1"
     assert evt["job_id"] == "r1"
@@ -87,9 +85,7 @@ def test_decode_batch_with_null_run_id() -> None:
             "file_mb": 50,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert evt["type"] == "digits.metrics.batch.v1"
 
 
@@ -118,8 +114,8 @@ def test_decode_batch_missing_batch_field_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'batch'"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_missing_total_batches_field_raises() -> None:
@@ -147,8 +143,8 @@ def test_decode_batch_missing_total_batches_field_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'total_batches'"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_batch_field_wrong_type_raises() -> None:
@@ -176,8 +172,8 @@ def test_decode_batch_batch_field_wrong_type_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be an integer"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_batch_loss_wrong_type_raises() -> None:
@@ -205,8 +201,8 @@ def test_decode_batch_batch_loss_wrong_type_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be a number"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_accepts_int_for_float_fields() -> None:
@@ -234,9 +230,7 @@ def test_decode_batch_accepts_int_for_float_fields() -> None:
             "file_mb": 50,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_batch(evt)
     assert evt["batch_loss"] == 1.0
     assert evt["batch_acc"] == 0.0
@@ -271,8 +265,8 @@ def test_decode_batch_missing_main_rss_mb_field_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'main_rss_mb'"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_missing_cgroup_pct_field_raises() -> None:
@@ -301,8 +295,8 @@ def test_decode_batch_missing_cgroup_pct_field_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'cgroup_pct'"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_main_rss_mb_wrong_type_raises() -> None:
@@ -331,8 +325,8 @@ def test_decode_batch_main_rss_mb_wrong_type_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be an integer"):
+        decode_digits_event(payload)
 
 
 def test_decode_batch_cgroup_pct_wrong_type_raises() -> None:
@@ -361,8 +355,8 @@ def test_decode_batch_cgroup_pct_wrong_type_raises() -> None:
             "file_mb": 50,
         }
     )
-    with pytest.raises(ValueError, match="batch metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be a number"):
+        decode_digits_event(payload)
 
 
 def test_decode_best_valid_complete_payload() -> None:
@@ -376,9 +370,7 @@ def test_decode_best_valid_complete_payload() -> None:
             "val_acc": 0.956,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_best(evt)
     assert evt["job_id"] == "r1"
     assert evt["user_id"] == 42
@@ -398,9 +390,7 @@ def test_decode_best_with_null_run_id() -> None:
             "val_acc": 0.9,
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert evt["type"] == "digits.metrics.best.v1"
 
 
@@ -415,8 +405,8 @@ def test_decode_best_missing_epoch_field_raises() -> None:
             "val_acc": 0.9,
         }
     )
-    with pytest.raises(ValueError, match="best metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'epoch'"):
+        decode_digits_event(payload)
 
 
 def test_decode_best_missing_val_acc_field_raises() -> None:
@@ -430,8 +420,8 @@ def test_decode_best_missing_val_acc_field_raises() -> None:
             # missing val_acc
         }
     )
-    with pytest.raises(ValueError, match="best metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="Missing required field 'val_acc'"):
+        decode_digits_event(payload)
 
 
 def test_decode_best_val_acc_wrong_type_raises() -> None:
@@ -445,8 +435,8 @@ def test_decode_best_val_acc_wrong_type_raises() -> None:
             "val_acc": "0.9",  # string instead of float
         }
     )
-    with pytest.raises(ValueError, match="best metrics event missing required fields"):
-        try_decode_digits_event(payload)
+    with pytest.raises(JSONTypeError, match="must be a number"):
+        decode_digits_event(payload)
 
 
 def test_decode_best_accepts_int_for_val_acc() -> None:
@@ -460,9 +450,7 @@ def test_decode_best_accepts_int_for_val_acc() -> None:
             "val_acc": 1,  # int coerced to float
         }
     )
-    evt = try_decode_digits_event(payload)
-    if evt is None:
-        raise AssertionError("expected decoded event")
+    evt = decode_digits_event(payload)
     assert is_digits_best(evt)
     assert evt["val_acc"] == 1.0
 

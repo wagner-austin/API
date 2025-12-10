@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai.inference.manifest import _decode_manifest
 
@@ -38,5 +39,5 @@ def test_manifest_from_dict_missing_raises() -> None:
         "val_acc": 0.98,
         "temperature": 1.0,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _decode_manifest(bad)

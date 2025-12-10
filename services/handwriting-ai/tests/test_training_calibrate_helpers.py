@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import torch
 from PIL import Image
+from platform_core.json_utils import JSONTypeError
 from torch.utils.data import DataLoader
 
 import handwriting_ai.training.calibrate as cal
@@ -31,15 +32,15 @@ def test_as_obj_dict_and_number_parsers() -> None:
     assert cal._decode_int({}, "k", 5) == 5
     assert cal._decode_int({"k": True}, "k", 5) == 5
     assert cal._decode_int({"k": "7"}, "k", 5) == 7
-    # Should raise ValueError for non-numeric string
-    with pytest.raises(ValueError):
+    # Should raise JSONTypeError for non-numeric string
+    with pytest.raises(JSONTypeError):
         cal._decode_int({"k": "bad"}, "k", 5)
 
     assert cal._decode_float({}, "k", 1.5) == 1.5
     assert cal._decode_float({"k": False}, "k", 1.5) == 1.5
     assert cal._decode_float({"k": "2.5"}, "k", 1.5) == 2.5
-    # Should raise ValueError for non-numeric string
-    with pytest.raises(ValueError):
+    # Should raise JSONTypeError for non-numeric string
+    with pytest.raises(JSONTypeError):
         cal._decode_float({"k": "not"}, "k", 1.5)
 
 

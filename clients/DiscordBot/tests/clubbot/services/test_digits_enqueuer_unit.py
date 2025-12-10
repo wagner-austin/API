@@ -133,15 +133,10 @@ def test_digits_enqueuer_builds_job_with_expected_args(monkeypatch: pytest.Monke
         notes="hello",
     )
     assert job_id == "jid1"
-    assert "queue_name" in CALLS
     assert CALLS["queue_name"] == "digits"
-    assert "connection" in CALLS
     assert type(CALLS["connection"]) is _FakeRedisConnection
-    assert "func_name" in CALLS
     assert CALLS["func_name"] == "handwriting_ai.jobs.digits.process_train_job"
-    assert "payload" in CALLS
     payload = CALLS["payload"]
-    assert type(payload) is dict
     assert payload["type"] == "digits.train.v1"
     assert payload["request_id"] == "r1"
     assert payload["user_id"] == 9
@@ -151,7 +146,6 @@ def test_digits_enqueuer_builds_job_with_expected_args(monkeypatch: pytest.Monke
     assert payload["lr"] == 0.001
     assert payload["seed"] == 42
     assert payload["augment"] is True
-    assert "opts" in CALLS
     opts = CALLS["opts"]
     retry_obj = opts["retry"]
     assert type(retry_obj) is _Retry

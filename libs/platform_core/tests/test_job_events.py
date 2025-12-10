@@ -20,6 +20,7 @@ from platform_core.job_events import (
     make_progress_event,
     make_started_event,
 )
+from platform_core.json_utils import JSONTypeError
 
 
 def _roundtrip(event: JobEventV1) -> JobEventV1:
@@ -114,54 +115,54 @@ def test_roundtrip_failed_event_user_kind() -> None:
 @pytest.mark.parametrize(
     ("payload", "expected_message"),
     [
-        ('{"type": 1}', "job event type must be a string"),
-        ('{"type": "x.y.z"}', "invalid job event type format"),
-        ('{"type": "unknown.job.started.v1"}', "invalid domain in job event"),
-        ('{"type": "turkic.job.invalid.v1"}', "invalid event suffix in job event"),
+        ('{"type": 1}', "Field 'type' must be a string"),
+        ('{"type": "x.y.z"}', "Invalid job event type format"),
+        ('{"type": "unknown.job.started.v1"}', "Invalid domain 'unknown'"),
+        ('{"type": "turkic.job.invalid.v1"}', "Invalid event suffix 'invalid'"),
         (
             '{"type": "turkic.job.started.v1", "domain": 1}',
-            "job event domain must be a string",
+            "Field 'domain' must be a string",
         ),
         (
             '{"type": "turkic.job.started.v1", "domain": "transcript"}',
-            "job event domain mismatch",
+            "Job event domain mismatch",
         ),
         (
             '{"type": "turkic.job.started.v1", "domain": "turkic", "job_id": 1, "user_id": 2}',
-            "job_id and user_id are required in job event",
+            "Field 'job_id' must be a string",
         ),
         (
             '{"type": "turkic.job.started.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
-            "queue is required in started event",
+            "Missing required field 'queue'",
         ),
         (
             '{"type": "turkic.job.progress.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
-            "progress must be an int in progress event",
+            "Missing required field 'progress'",
         ),
         (
             '{"type": "turkic.job.completed.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
-            "completed event requires result_id and result_bytes",
+            "Missing required field 'result_id'",
         ),
         (
             '{"type": "turkic.job.failed.v1", "domain": "turkic", '
             '"job_id": "j", "user_id": 1, "message": "x"}',
-            "failed event requires error_kind and message",
+            "Missing required field 'error_kind'",
         ),
         (
             '{"type": "turkic.job.failed.v1", "domain": "turkic", '
             '"job_id": "j", "user_id": 1, "error_kind": "oops", "message": "x"}',
-            "invalid error_kind in failed event",
+            "Invalid error_kind 'oops'",
         ),
     ],
 )
 def test_decode_job_event_invalid(payload: str, expected_message: str) -> None:
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(JSONTypeError) as excinfo:
         decode_job_event(payload)
     assert expected_message in str(excinfo.value)
 
 
 def test_decode_job_event_requires_object() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         decode_job_event("[]")
 
 
@@ -238,3 +239,14 @@ def test_is_failed_typeguard() -> None:
     assert is_failed(progress) is False
     assert is_failed(completed) is False
     assert is_failed(failed) is True
+
+
+def test_covenant_domain_event_type_and_channel() -> None:
+    assert make_event_type("covenant", "started") == "covenant.job.started.v1"
+    assert default_events_channel("covenant") == "covenant:events"
+
+
+def test_roundtrip_covenant_started_event() -> None:
+    event = make_started_event(domain="covenant", job_id="cov1", user_id=42, queue="covenant")
+    decoded = _roundtrip(event)
+    assert decoded == event

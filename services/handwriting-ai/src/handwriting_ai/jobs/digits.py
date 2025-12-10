@@ -18,7 +18,7 @@ from platform_core.digits_metrics_events import (
     make_upload_event,
 )
 from platform_core.job_events import JobDomain, default_events_channel
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import DIGITS_QUEUE as _DIGITS_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
@@ -130,27 +130,27 @@ def _summarize_training_exception(exc: BaseException) -> str:
 def _decode_int_field(payload: dict[str, JSONValue], key: str) -> int:
     raw = payload.get(key)
     if isinstance(raw, bool):
-        raise ValueError(f"{key}: bool not allowed")
+        raise JSONTypeError(f"{key}: bool not allowed")
     if isinstance(raw, str):
         return int(raw)
     if isinstance(raw, int):
         return raw
-    raise ValueError(f"{key}: invalid int")
+    raise JSONTypeError(f"{key}: invalid int")
 
 
 def _decode_float_field(payload: dict[str, JSONValue], key: str) -> float:
     raw = payload.get(key)
     if isinstance(raw, bool):
-        raise ValueError(f"{key}: bool not allowed")
+        raise JSONTypeError(f"{key}: bool not allowed")
     if isinstance(raw, (str, int, float)):
         return float(raw)
-    raise ValueError(f"{key}: invalid float")
+    raise JSONTypeError(f"{key}: invalid float")
 
 
 def _decode_payload(payload: dict[str, JSONValue]) -> DigitsTrainJobV1:
     typ = payload.get("type")
     if typ != "digits.train.v1":
-        raise ValueError("invalid job type")
+        raise JSONTypeError("invalid job type")
     return {
         "type": "digits.train.v1",
         "request_id": str(payload.get("request_id")),

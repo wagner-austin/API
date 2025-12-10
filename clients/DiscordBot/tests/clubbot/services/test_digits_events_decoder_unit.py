@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from platform_core.digits_metrics_events import try_decode_digits_event
+from platform_core.digits_metrics_events import decode_digits_event
 from platform_core.json_utils import JSONValue, dump_json_str
 
 
@@ -29,9 +29,7 @@ def test_decode_started_includes_augment_and_batch() -> None:
         "noise_prob": 0.2,
         "dots_prob": 0.1,
     }
-    ev = try_decode_digits_event(dump_json_str(payload))
-    if ev is None:
-        raise AssertionError("expected decoded event")
+    ev = decode_digits_event(dump_json_str(payload))
     assert ev["type"] == "digits.metrics.config.v1"
     # Ensure augmentation details are preserved
     assert ev.get("batch_size") == 64
@@ -51,9 +49,7 @@ def test_decode_started_omits_unknown_optionals() -> None:
         "total_epochs": 1,
         "queue": "digits",
     }
-    ev = try_decode_digits_event(dump_json_str(payload))
-    if ev is None:
-        raise AssertionError("expected decoded event")
+    ev = decode_digits_event(dump_json_str(payload))
     # None of these should be present when not sent by producer
     for k in (
         "batch_size",
@@ -83,9 +79,7 @@ def test_decode_started_learning_rate_as_int() -> None:
         "queue": "digits",
         "learning_rate": 1,  # int instead of float
     }
-    ev = try_decode_digits_event(dump_json_str(payload))
-    if ev is None:
-        raise AssertionError("expected decoded event")
+    ev = decode_digits_event(dump_json_str(payload))
     assert ev.get("learning_rate") == 1.0  # Should be converted to float
     assert type(ev.get("learning_rate")) is float
 

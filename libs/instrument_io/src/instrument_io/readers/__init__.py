@@ -40,7 +40,7 @@ __all__ = [
     "PPTXReader",
     "SMPSReader",
     "SpectrumReaderProtocol",
-    "ThermoReader",
     "TXTReader",
+    "ThermoReader",
     "WatersReader",
 ]

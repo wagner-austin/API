@@ -92,7 +92,7 @@ def test_split_audio_copy_then_reencode(monkeypatch: pytest.MonkeyPatch) -> None
     created = ch._split_audio(in_path, [1.0], total_duration=2.0)
     assert len(created) == 2
     assert calls and calls[0] == "copy"
-    assert "reencode" in calls
+    assert calls[1] == "reencode"
     try:
         os.remove(in_path)
     except OSError:

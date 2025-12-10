@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai.training.calibration.checkpoint import (
     CalibrationCheckpoint,
@@ -16,7 +17,7 @@ from handwriting_ai.training.calibration.measure import CalibrationResult
 def test_checkpoint_decode_invalid_header(tmp_path: Path) -> None:
     p = tmp_path / "bad1.json"
     p.write_text("{}", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         read_checkpoint(p)
 
 
@@ -29,7 +30,7 @@ def test_checkpoint_decode_invalid_result_entry(tmp_path: Path) -> None:
     p = tmp_path / "bad2.json"
     # stage present, index ok, results contains a non-dict
     p.write_text('{"stage":"A","index":0,"results":[1]}', encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         read_checkpoint(p)
 
 
@@ -77,7 +78,7 @@ def test_checkpoint_decode_minimal_fields(tmp_path: Path) -> None:
 def test_checkpoint_decode_nondict_raises(tmp_path: Path) -> None:
     p = tmp_path / "bad_list.json"
     p.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         read_checkpoint(p)
 
 

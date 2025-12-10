@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 import transcript_api.whisper_parse as wmod
 from transcript_api.types import JsonValue, VerboseResponseTD
@@ -83,7 +84,7 @@ def test_to_verbose_dict_missing_fields_raise() -> None:
         "text": "x",
         "segments": [{"text": "t", "start": 1.0}],
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(bad4)
 
 
@@ -102,19 +103,19 @@ def test_to_verbose_dict_strict_invalid_inputs() -> None:
         "text": 5,  # invalid type
         "segments": [],
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(bad_text)
 
     missing_segments: dict[
         str, str | int | float | bool | None | list[dict[str, str | int | float]]
     ] = {"text": "x"}
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(missing_segments)
 
     bad_segment_shape: dict[
         str, str | int | float | bool | None | list[dict[str, str | int | float]]
     ] = {"text": "x", "segments": [{"text": "only"}]}
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(bad_segment_shape)
 
     seg_missing_numbers: dict[
@@ -123,32 +124,32 @@ def test_to_verbose_dict_strict_invalid_inputs() -> None:
         "text": "x",
         "segments": [{"text": "a"}],
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(seg_missing_numbers)
 
 
 def test_coerce_verbose_response_rejects_invalid_segments() -> None:
     raw_int_segment: wmod.RawVerboseExtended = {"text": "x", "segments": [123]}
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod._coerce_verbose_response(raw_int_segment)
 
     raw_bad_numeric: wmod.RawVerboseExtended = {
         "text": "x",
         "segments": [{"text": "t", "start": {"k": 1}, "end": 1}],
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod._coerce_verbose_response(raw_bad_numeric)
 
     raw_bad_end: wmod.RawVerboseExtended = {
         "text": "x",
         "segments": [{"text": "t", "start": 1, "end": {"k": 2}}],
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod._coerce_verbose_response(raw_bad_end)
 
 
 def test_to_verbose_dict_invalid_protocol_returns() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = wmod.to_verbose_dict(["unsupported"])
 
 

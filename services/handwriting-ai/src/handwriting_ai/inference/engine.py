@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Final, NamedTuple, Protocol, Self, TypeGuard
 
 import torch
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
 from platform_ml import ArtifactStore
 from torch import Tensor
@@ -122,7 +122,7 @@ class InferenceEngine:
         try:
             _validate_state_dict(sd, manifest["arch"], int(manifest["n_classes"]))
             model.load_state_dict(sd)
-        except ValueError as exc:
+        except JSONTypeError as exc:
             self._logger.error("state_dict_invalid error=%s", exc)
             raise
         return model
@@ -171,7 +171,7 @@ class InferenceEngine:
             raise
         value: JSONValue = load_json_str(raw_text)
         if not isinstance(value, dict):
-            raise ValueError("manifest must be a JSON object for remote fetch")
+            raise JSONTypeError("manifest must be a JSON object for remote fetch")
         schema = str(value.get("schema_version", "")).strip()
         if schema != "v2.0":
             return  # Only v2 manifests support remote fetching
@@ -450,23 +450,23 @@ def _load_state_dict_file(path: Path) -> dict[str, Tensor]:
     loaded_raw = load_fn(path.as_posix(), map_location=torch.device("cpu"), weights_only=True)
     # Validate loaded is a dict
     if not isinstance(loaded_raw, dict):
-        raise ValueError("state dict file does not contain a dict")
+        raise JSONTypeError("state dict file does not contain a dict")
     if _is_wrapped_state_dict(loaded_raw):
         nested = loaded_raw["state_dict"]
         if not isinstance(nested, dict):
-            raise ValueError("state_dict wrapper must contain a dict")
+            raise JSONTypeError("state_dict wrapper must contain a dict")
         sd_source: LoadedStateDict = nested
     elif _is_flat_state_dict(loaded_raw):
         sd_source = loaded_raw
     else:
-        raise ValueError("state dict file does not contain tensors")
+        raise JSONTypeError("state dict file does not contain tensors")
     # Validate all entries are properly typed
     out: dict[str, Tensor] = {}
     for k, v in sd_source.items():
         if not isinstance(k, str):
-            raise ValueError("invalid state dict entry")
+            raise JSONTypeError("invalid state dict entry")
         if not hasattr(v, "shape") or not hasattr(v, "dtype"):
-            raise ValueError("invalid state dict entry")
+            raise JSONTypeError("invalid state dict entry")
         out[k] = v
     return out
 
@@ -475,28 +475,28 @@ def _validate_state_dict(sd: dict[str, Tensor], arch: str, n_classes: int) -> No
     w = sd.get("fc.weight")
     b = sd.get("fc.bias")
     if w is None or b is None:
-        raise ValueError("missing classifier weights in state dict")
+        raise JSONTypeError("missing classifier weights in state dict")
     if w.ndim != 2 or b.ndim != 1:
-        raise ValueError("invalid classifier tensor dimensions")
+        raise JSONTypeError("invalid classifier tensor dimensions")
     if int(w.shape[0]) != n_classes or int(b.shape[0]) != n_classes:
-        raise ValueError("classifier head size does not match n_classes")
+        raise JSONTypeError("classifier head size does not match n_classes")
     # ResNet-18 expected feature dimension
     expected_in = 512
     if int(w.shape[1]) != expected_in:
-        raise ValueError("classifier head in_features does not match backbone")
+        raise JSONTypeError("classifier head in_features does not match backbone")
     # Minimal backbone invariants for resnet18 CIFAR-style stem
     conv1 = sd.get("conv1.weight")
     if conv1 is None or conv1.ndim != 4:
-        raise ValueError("missing or invalid conv1.weight")
+        raise JSONTypeError("missing or invalid conv1.weight")
     if int(conv1.shape[0]) != 64 or int(conv1.shape[1]) != 1:
-        raise ValueError("unexpected conv1 shape for 1-channel stem")
+        raise JSONTypeError("unexpected conv1 shape for 1-channel stem")
     # Expect presence of top-level batch norm
     if "bn1.weight" not in sd or "bn1.bias" not in sd:
-        raise ValueError("missing bn1 parameters")
+        raise JSONTypeError("missing bn1 parameters")
     # Ensure main layers exist
     has_layers = all(any(k.startswith(f"layer{i}.") for k in sd) for i in range(1, 5))
     if not has_layers:
-        raise ValueError("missing resnet layer blocks")
+        raise JSONTypeError("missing resnet layer blocks")
 
 
 def _collect_artifact_mtimes(manifest_path: Path, model_path: Path) -> tuple[float, float]:

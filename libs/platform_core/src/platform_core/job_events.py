@@ -3,28 +3,39 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Final, Literal, NotRequired, TypedDict, TypeGuard
 
-from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import (
+    JSONObject,
+    JSONTypeError,
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_int,
+    require_str,
+)
 
 JobDomain = Literal[
-    "turkic",
-    "transcript",
-    "trainer",
-    "digits",
+    "covenant",
     "databank",
-    "qr",
+    "digits",
     "music_wrapped",
+    "qr",
+    "trainer",
+    "transcript",
+    "turkic",
 ]
 EventSuffix = Literal["started", "progress", "completed", "failed"]
 ErrorKind = Literal["user", "system"]
 
 _DOMAIN_VALUES: Final[tuple[JobDomain, ...]] = (
-    "turkic",
-    "transcript",
-    "trainer",
-    "digits",
+    "covenant",
     "databank",
-    "qr",
+    "digits",
     "music_wrapped",
+    "qr",
+    "trainer",
+    "transcript",
+    "turkic",
 )
 _SUFFIX_VALUES: Final[tuple[EventSuffix, ...]] = ("started", "progress", "completed", "failed")
 
@@ -163,35 +174,30 @@ def _parse_domain(raw: str) -> JobDomain:
     for value in _DOMAIN_VALUES:
         if raw == value:
             return value
-    raise ValueError("invalid domain in job event")
+    raise JSONTypeError(f"Invalid domain '{raw}' in job event")
 
 
 def _parse_suffix(raw: str) -> EventSuffix:
     for value in _SUFFIX_VALUES:
         if raw == value:
             return value
-    raise ValueError("invalid event suffix in job event")
+    raise JSONTypeError(f"Invalid event suffix '{raw}' in job event")
 
 
 def _parse_event_type(raw: str) -> tuple[JobDomain, EventSuffix]:
     segments = raw.split(".")
     if len(segments) != 4 or segments[1] != "job" or segments[3] != "v1":
-        raise ValueError("invalid job event type format")
+        raise JSONTypeError(f"Invalid job event type format: '{raw}'")
     domain_str, suffix_str = segments[0], segments[2]
     domain = _parse_domain(domain_str)
     suffix = _parse_suffix(suffix_str)
     return domain, suffix
 
 
-DecodedObj = dict[str, JSONValue]
-
-
 def _decode_started_event(
-    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: DecodedObj
+    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: JSONObject
 ) -> JobStartedV1:
-    queue = decoded.get("queue")
-    if not isinstance(queue, str):
-        raise ValueError("queue is required in started event")
+    queue = require_str(decoded, "queue")
     return {
         "type": type_raw,
         "domain": domain_value,
@@ -202,11 +208,9 @@ def _decode_started_event(
 
 
 def _decode_progress_event(
-    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: DecodedObj
+    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: JSONObject
 ) -> JobProgressV1:
-    progress = decoded.get("progress")
-    if not isinstance(progress, int):
-        raise ValueError("progress must be an int in progress event")
+    progress = require_int(decoded, "progress")
     event: JobProgressV1 = {
         "type": type_raw,
         "domain": domain_value,
@@ -223,12 +227,10 @@ def _decode_progress_event(
 
 
 def _decode_completed_event(
-    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: DecodedObj
+    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: JSONObject
 ) -> JobCompletedV1:
-    result_id = decoded.get("result_id")
-    result_bytes = decoded.get("result_bytes")
-    if not isinstance(result_id, str) or not isinstance(result_bytes, int):
-        raise ValueError("completed event requires result_id and result_bytes")
+    result_id = require_str(decoded, "result_id")
+    result_bytes = require_int(decoded, "result_bytes")
     return {
         "type": type_raw,
         "domain": domain_value,
@@ -240,18 +242,16 @@ def _decode_completed_event(
 
 
 def _decode_failed_event(
-    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: DecodedObj
+    type_raw: str, domain_value: JobDomain, job_id: str, user_id: int, decoded: JSONObject
 ) -> JobFailedV1:
-    error_kind_raw = decoded.get("error_kind")
-    message = decoded.get("message")
-    if not isinstance(error_kind_raw, str) or not isinstance(message, str):
-        raise ValueError("failed event requires error_kind and message")
+    error_kind_raw = require_str(decoded, "error_kind")
+    message = require_str(decoded, "message")
     if error_kind_raw == "user":
         kind: ErrorKind = "user"
     elif error_kind_raw == "system":
         kind = "system"
     else:
-        raise ValueError("invalid error_kind in failed event")
+        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": type_raw,
         "domain": domain_value,
@@ -266,34 +266,24 @@ def decode_job_event(payload: str) -> JobEventV1:
     """Parse and validate a serialized job event.
 
     Raises:
-        ValueError: if the payload is not a well-formed job event.
+        JSONTypeError: if the payload is not a well-formed job event.
     """
-    decoded_raw = load_json_str(payload)
-    if not isinstance(decoded_raw, dict):
-        raise ValueError("job event payload must be an object")
-    decoded: DecodedObj = decoded_raw
+    decoded = narrow_json_to_dict(load_json_str(payload))
 
-    type_raw_val = decoded.get("type")
-    if not isinstance(type_raw_val, str):
-        raise ValueError("job event type must be a string")
-    type_raw = type_raw_val
+    type_raw = require_str(decoded, "type")
     domain, suffix = _parse_event_type(type_raw)
 
-    domain_field = decoded.get("domain")
-    if not isinstance(domain_field, str):
-        raise ValueError("job event domain must be a string")
+    domain_field = require_str(decoded, "domain")
     domain_value = _parse_domain(domain_field)
     if domain_value != domain:
-        raise ValueError("job event domain mismatch")
+        raise JSONTypeError(
+            f"Job event domain mismatch: type says '{domain}', field says '{domain_value}'"
+        )
 
-    job_id_raw = decoded.get("job_id")
-    user_id_raw = decoded.get("user_id")
-    if not isinstance(job_id_raw, str) or not isinstance(user_id_raw, int):
-        raise ValueError("job_id and user_id are required in job event")
-    job_id = job_id_raw
-    user_id = user_id_raw
+    job_id = require_str(decoded, "job_id")
+    user_id = require_int(decoded, "user_id")
 
-    decoder_type = Callable[[str, JobDomain, str, int, DecodedObj], JobEventV1]
+    decoder_type = Callable[[str, JobDomain, str, int, JSONObject], JobEventV1]
     decoders: dict[EventSuffix, decoder_type] = {
         "started": _decode_started_event,
         "progress": _decode_progress_event,

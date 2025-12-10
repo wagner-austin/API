@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import torch
+from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
 from handwriting_ai.config import (
@@ -113,7 +114,7 @@ def test_load_state_dict_file_not_dict(monkeypatch: pytest.MonkeyPatch, tmp_path
     # Create a real file that torch.load will read as an int
     p = tmp_path / "model.pt"
     torch.save(123, p.as_posix())
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p)
 
 
@@ -123,7 +124,7 @@ def test_load_state_dict_file_invalid_entry(
     # Create a real file that torch.load will read as a dict with invalid values
     p = tmp_path / "model.pt"
     torch.save({"fc.weight": 5}, p.as_posix())
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p)
 
 
@@ -139,7 +140,7 @@ def test_validate_state_dict_invalid_dims_raises() -> None:
         "layer3.0.weight": torch.zeros((1,), dtype=torch.float32),
         "layer4.0.weight": torch.zeros((1,), dtype=torch.float32),
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _validate_state_dict(sd, "resnet18", 10)
 
 
@@ -151,5 +152,5 @@ def test_validate_state_dict_missing_blocks_raises() -> None:
         "bn1.weight": torch.zeros((64,), dtype=torch.float32),
         "bn1.bias": torch.zeros((64,), dtype=torch.float32),
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _validate_state_dict(sd, "resnet18", 10)

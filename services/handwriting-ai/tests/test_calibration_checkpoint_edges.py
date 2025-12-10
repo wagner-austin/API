@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from handwriting_ai.training.calibration.checkpoint import (
     CalibrationCheckpoint,
@@ -16,7 +17,7 @@ from handwriting_ai.training.calibration.measure import CalibrationResult
 def test_read_checkpoint_invalid_root_raises(tmp_path: Path) -> None:
     p = tmp_path / "ckpt.json"
     p.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = read_checkpoint(p)
 
 

@@ -6,6 +6,7 @@ from typing import BinaryIO
 
 import pytest
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.json_utils import JSONTypeError
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
@@ -45,15 +46,15 @@ class _MockDataBankClient:
 
 def test_process_spec_type_errors() -> None:
     # Test validation errors in _decode_job_params
-    with pytest.raises(TypeError, match="source and language"):
+    with pytest.raises(JSONTypeError, match="source and language"):
         jobs_mod._decode_job_params({"user_id": 42, "source": 1, "language": 2})
 
-    with pytest.raises(TypeError, match="max_sentences"):
+    with pytest.raises(JSONTypeError, match="max_sentences"):
         jobs_mod._decode_job_params(
             {"user_id": 42, "source": "oscar", "language": "kk", "max_sentences": "x"}
         )
 
-    with pytest.raises(TypeError, match="transliterate"):
+    with pytest.raises(JSONTypeError, match="transliterate"):
         jobs_mod._decode_job_params(
             {
                 "user_id": 42,
@@ -64,7 +65,7 @@ def test_process_spec_type_errors() -> None:
             }
         )
 
-    with pytest.raises(TypeError, match="confidence_threshold"):
+    with pytest.raises(JSONTypeError, match="confidence_threshold"):
         jobs_mod._decode_job_params(
             {
                 "user_id": 42,
@@ -79,7 +80,7 @@ def test_process_spec_type_errors() -> None:
 
 def test_invalid_source_or_language() -> None:
     # Test validation errors in _decode_job_params
-    with pytest.raises(ValueError, match="Invalid source or language"):
+    with pytest.raises(JSONTypeError, match="Invalid source or language"):
         jobs_mod._decode_job_params(
             {
                 "user_id": 42,
@@ -151,7 +152,7 @@ def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 
 def test_invalid_script_type_raises() -> None:
-    with pytest.raises(TypeError, match="script must be a string or null"):
+    with pytest.raises(JSONTypeError, match="script must be a string or null"):
         jobs_mod._decode_job_params(
             {
                 "user_id": 42,
@@ -166,7 +167,7 @@ def test_invalid_script_type_raises() -> None:
 
 
 def test_invalid_script_value_raises() -> None:
-    with pytest.raises(ValueError, match="Invalid script"):
+    with pytest.raises(JSONTypeError, match="Invalid script"):
         jobs_mod._decode_job_params(
             {
                 "user_id": 42,

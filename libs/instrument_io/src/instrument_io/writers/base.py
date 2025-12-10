@@ -11,6 +11,31 @@ from pathlib import Path
 from typing import Protocol
 
 from instrument_io.types.common import CellValue
+from instrument_io.types.document import DocumentContent
+
+
+class DocumentWriterProtocol(Protocol):
+    """Protocol for writing document files (Word, PDF).
+
+    Implementations must provide a method for writing structured
+    document content. All methods raise exceptions on failure.
+    """
+
+    def write_document(
+        self,
+        content: DocumentContent,
+        out_path: Path,
+    ) -> None:
+        """Write content to a document file.
+
+        Args:
+            content: List of document sections to write.
+            out_path: Output file path.
+
+        Raises:
+            WriterError: If writing fails.
+        """
+        ...
 
 
 class ExcelWriterProtocol(Protocol):
@@ -56,5 +81,6 @@ class ExcelWriterProtocol(Protocol):
 
 
 __all__ = [
+    "DocumentWriterProtocol",
     "ExcelWriterProtocol",
 ]

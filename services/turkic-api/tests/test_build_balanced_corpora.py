@@ -9,7 +9,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import Protocol
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
+from tests.conftest import make_probs
 
 import turkic_api.core.corpus_download as cd
 import turkic_api.core.langid as lid
@@ -62,8 +65,8 @@ def _stub_stream_fn(counts: dict[str, list[str]]) -> Callable[[str], Generator[s
 
 
 class _StubLID:
-    def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-        return ["__label__ug"], [1.0]
+    def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+        return (("__label__ug",), make_probs(1.0))
 
 
 def stub_load_langid_model(data_dir: str, prefer_218e: bool = True) -> LangIdModel:

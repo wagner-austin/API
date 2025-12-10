@@ -7,6 +7,7 @@ from typing import NoReturn
 import pytest
 import torch
 import torch.autograd
+from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 from torch.optim.sgd import SGD
 
@@ -82,10 +83,10 @@ def test_normalize_keys_rejects_non_strings() -> None:
 def test_load_state_dict_file_rejects_invalid_entries(tmp_path: Path) -> None:
     path = tmp_path / "bad.pt"
     torch.save({"fc.weight": "not_a_tensor"}, path)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(path)
     torch.save("not a dict", path)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(path)
 
 

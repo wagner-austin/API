@@ -33,7 +33,9 @@ def test_json_formatter_basic() -> None:
     assert parsed["level"] == "INFO"
     assert parsed["logger"] == "test.logger"
     assert parsed["message"] == "test message"
-    assert "timestamp" in parsed
+    timestamp = parsed["timestamp"]
+    assert type(timestamp) is str
+    assert timestamp.startswith("20")
 
 
 def test_json_formatter_with_static_fields() -> None:
@@ -231,7 +233,6 @@ def test_json_formatter_with_exception() -> None:
     parsed = load_json_str(output)
     assert type(parsed) is dict
 
-    assert "exc_info" in parsed
     exc_info_value = parsed["exc_info"]
     assert type(exc_info_value) is str
     assert "ValueError: test error" in exc_info_value
@@ -467,7 +468,6 @@ def test_setup_logging_auto_instance_id() -> None:
     assert type(parsed) is dict
 
     # Should have auto-generated instance_id
-    assert "instance_id" in parsed
     inst_id = parsed["instance_id"]
     assert type(inst_id) is str
     assert "-" in inst_id  # Format: hostname-pid

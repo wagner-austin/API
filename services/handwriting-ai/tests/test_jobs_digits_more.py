@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 import handwriting_ai.jobs.digits as dj
 from handwriting_ai.training.resources import ResourceLimits
@@ -71,7 +71,7 @@ def test_process_train_job_invalid_payload_fields_reraises(
         "augment": False,
         "notes": None,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         dj._decode_and_process_train_job(payload)
 
 
@@ -111,17 +111,17 @@ def test_decode_int_and_float_field_edges() -> None:
     # _decode_int_field
     assert dj._decode_int_field({"x": 7}, "x") == 7
     assert dj._decode_int_field({"x": "8"}, "x") == 8
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         dj._decode_int_field({"x": True}, "x")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         dj._decode_int_field({"x": None}, "x")
     # _decode_float_field
     assert dj._decode_float_field({"x": 1.5}, "x") == 1.5
     assert dj._decode_float_field({"x": 3}, "x") == 3.0
     assert dj._decode_float_field({"x": "4.5"}, "x") == 4.5
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         dj._decode_float_field({"x": False}, "x")
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         dj._decode_float_field({"x": None}, "x")
 
 

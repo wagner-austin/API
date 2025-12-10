@@ -24,6 +24,7 @@ polars = {version = "^1.0.0", extras = ["calamine"]}
 pdfplumber = "^0.11.8"
 python-docx = "^1.1.2"
 python-pptx = "^1.0.2"
+reportlab = "^4.2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
@@ -67,8 +68,15 @@ exclude = [".venv"]
 select = [
     "E","F","I","B","BLE","UP","N","C4","SIM","RET","C90","RUF","ANN"
 ]
-ignore = []
+ignore = ["RUF001"]  # Allow Greek letters - chemistry naming (α-Pinene, β-Pinene, γ-Terpinene)
 fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+# reportlab uses camelCase in its API - protocols must match external library
+"src/instrument_io/_protocols/reportlab.py" = ["N802", "N803", "N815"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20  # Data extraction scripts have complex parsing logic
 
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = false
@@ -77,6 +85,7 @@ mypy-init-return = true
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.coverage.run]
 source = ["src", "scripts"]

@@ -26,13 +26,6 @@ services:
     ports:
       - "8005:8000"
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
       interval: 15s
@@ -64,13 +57,6 @@ services:
       - ./logs:/data/logs
       - hf-cache:/hf-cache
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     networks:
       - platform-network
 

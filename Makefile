@@ -16,7 +16,7 @@ up-databank: infra
 	Set-Location services/data-bank-api; docker compose up -d --build
 
 up-trainer: infra
-	Set-Location services/Model-Trainer; docker compose up -d --build
+	Set-Location services/Model-Trainer; docker compose build --progress plain; docker compose up -d
 
 up-handwriting: infra
 	Set-Location services/handwriting-ai; docker compose up -d --build
@@ -65,10 +65,10 @@ logs:
 # Development: lint, test, check across all libs/services/clients
 # ---------------------------------------------------------------------------
 lint:
-	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll lint passed" -ForegroundColor Green }
+	$$root = Get-Location; $$dirs = @(); foreach ($$p in @("libs","services","clients")) { foreach ($$d in Get-ChildItem -Path $$p -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Linting $$d.Name ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make lint; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll lint passed" -ForegroundColor Green }
 
 test:
-	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll tests passed" -ForegroundColor Green }
+	$$root = Get-Location; $$dirs = @(); foreach ($$p in @("libs","services","clients")) { foreach ($$d in Get-ChildItem -Path $$p -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Testing $$d.Name ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make test; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll tests passed" -ForegroundColor Green }
 
 check:
-	$$root = Get-Location; $$dirs = @(Get-ChildItem -Path libs,services,clients -Directory | Where-Object { Test-Path "$$($_.FullName)/Makefile" }); $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Checking $$($_.Name) ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make check; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll checks passed" -ForegroundColor Green }
+	$$root = Get-Location; $$dirs = @(); foreach ($$p in @("libs","services","clients")) { foreach ($$d in Get-ChildItem -Path $$p -Directory) { if (Test-Path (Join-Path $$d.FullName "Makefile")) { $$dirs += $$d } } }; $$failed = @(); foreach ($$d in $$dirs) { Write-Host "`n=== Checking $$d.Name ===" -ForegroundColor Cyan; Set-Location $$d.FullName; make check; if ($$LASTEXITCODE -ne 0) { $$failed += $$d.Name }; Set-Location $$root }; if ($$failed.Count -gt 0) { Write-Host "`nFailed: $$($$failed -join ', ')" -ForegroundColor Red; exit 1 } else { Write-Host "`nAll checks passed" -ForegroundColor Green }

@@ -31,6 +31,33 @@ from instrument_io.types.common import (
     make_success,
 )
 
+# Document types (for Word/PDF writers)
+from instrument_io.types.document import (
+    PAGE_SIZES,
+    DocumentContent,
+    DocumentSection,
+    FigureContent,
+    HeadingContent,
+    ListContent,
+    PageBreakContent,
+    PageSize,
+    ParagraphContent,
+    TableContent,
+    is_figure,
+    is_heading,
+    is_list,
+    is_page_break,
+    is_paragraph,
+    is_table,
+)
+
+# Excel types
+from instrument_io.types.excel import (
+    ExcelRow,
+    ExcelRows,
+    ExcelSheets,
+)
+
 # Imaging types
 from instrument_io.types.imaging import (
     ImagingSpectrum,
@@ -74,6 +101,7 @@ from instrument_io.types.spectrum import (
 )
 
 __all__ = [
+    "PAGE_SIZES",
     "AcquisitionInfo",
     "AnnotatedMassPeak",
     "AnnotatedMassPeakList",
@@ -86,15 +114,23 @@ __all__ = [
     "ChromatogramStats",
     "DADData",
     "DADSlice",
+    "DocumentContent",
+    "DocumentSection",
     "EICData",
     "EICParams",
     "ErrorResult",
+    "ExcelRow",
+    "ExcelRows",
+    "ExcelSheets",
+    "FigureContent",
     "FileInfo",
+    "HeadingContent",
     "ImagingSpectrum",
     "ImagingSpectrumMeta",
     "ImzMLFileInfo",
     "InstrumentInfo",
     "JSONValue",
+    "ListContent",
     "MS2Spectrum",
     "MS3Spectrum",
     "MSLevel",
@@ -103,6 +139,9 @@ __all__ = [
     "MassPeakList",
     "MethodInfo",
     "OperationResult",
+    "PageBreakContent",
+    "PageSize",
+    "ParagraphContent",
     "PeakListMeta",
     "Polarity",
     "PrecursorInfo",
@@ -116,6 +155,13 @@ __all__ = [
     "SpectrumStats",
     "SuccessResult",
     "TICData",
+    "TableContent",
+    "is_figure",
+    "is_heading",
+    "is_list",
+    "is_page_break",
+    "is_paragraph",
+    "is_table",
     "make_error",
     "make_success",
 ]

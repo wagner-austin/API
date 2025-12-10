@@ -26,12 +26,28 @@ class FontProtocol(Protocol):
     color: str | None
 
 
+class ColorProtocol(Protocol):
+    """Protocol for openpyxl Color."""
+
+    rgb: str
+
+
+class PatternFillProtocol(Protocol):
+    """Protocol for openpyxl PatternFill."""
+
+    start_color: ColorProtocol
+    end_color: ColorProtocol
+    fill_type: str
+
+
 class CellProtocol(Protocol):
     """Protocol for openpyxl Cell."""
 
     alignment: AlignmentProtocol
     font: FontProtocol
+    fill: PatternFillProtocol
     value: str | int | float | bool | None
+    column_letter: str
 
 
 class ColumnDimensionProtocol(Protocol):
@@ -40,15 +56,17 @@ class ColumnDimensionProtocol(Protocol):
     width: float
 
 
-class _ExcelTable(Protocol):
-    """Protocol for openpyxl Table objects."""
+class _TableStyleInfoProtocol(Protocol):
+    """Protocol for openpyxl TableStyleInfo - internal use only."""
+
+    name: str
+
+
+class _TableProtocol(Protocol):
+    """Protocol for openpyxl Table - internal use only."""
 
     name: str
     ref: str
-
-
-class _ExcelTableStyle(Protocol):
-    """Opaque type for openpyxl TableStyleInfo objects."""
 
 
 class _GetColumnLetterFn(Protocol):
@@ -66,13 +84,32 @@ class WorksheetProtocol(Protocol):
         """Get or create cell at (row, column)."""
         ...
 
-    def add_table(self, table: _ExcelTable) -> None:
+    def add_table(self, table: _TableProtocol) -> None:
         """Add a table to the worksheet."""
+        ...
+
+    def __getitem__(self, key: int) -> tuple[CellProtocol, ...]:
+        """Get row by 1-based index."""
+        ...
+
+    @property
+    def columns(self) -> tuple[tuple[CellProtocol, ...], ...]:
+        """Return all columns as tuples of cells."""
         ...
 
     @property
     def column_dimensions(self) -> MutableMapping[str, ColumnDimensionProtocol]:
         """Return column dimensions mapping."""
+        ...
+
+    @property
+    def max_row(self) -> int:
+        """Return maximum row number with data."""
+        ...
+
+    @property
+    def tables(self) -> dict[str, _TableProtocol]:
+        """Return tables mapping."""
         ...
 
     @property
@@ -177,25 +214,32 @@ def _get_column_letter(col_idx: int) -> str:
     return fn(col_idx)
 
 
-def _create_styled_table(display_name: str, ref: str) -> _ExcelTable:
-    """Create openpyxl Table with default style.
+def _create_table(
+    display_name: str,
+    ref: str,
+    style_name: str = "TableStyleMedium2",
+    show_row_stripes: bool = True,
+) -> _TableProtocol:
+    """Create openpyxl Table with configurable style.
 
     Args:
         display_name: Table name (must be unique in workbook).
         ref: Cell range reference (e.g., "A1:D10").
+        style_name: Excel table style name.
+        show_row_stripes: Whether to show alternating row colors.
 
     Returns:
-        _ExcelTable with TableStyleMedium2 styling.
+        _TableProtocol with specified styling.
     """
     table_mod = __import__("openpyxl.worksheet.table", fromlist=["Table", "TableStyleInfo"])
-    style: _ExcelTableStyle = table_mod.TableStyleInfo(
-        name="TableStyleMedium2",
+    style: _TableStyleInfoProtocol = table_mod.TableStyleInfo(
+        name=style_name,
         showFirstColumn=False,
         showLastColumn=False,
-        showRowStripes=True,
+        showRowStripes=show_row_stripes,
         showColumnStripes=False,
     )
-    table: _ExcelTable = table_mod.Table(
+    table: _TableProtocol = table_mod.Table(
         displayName=display_name,
         ref=ref,
         tableStyleInfo=style,
@@ -237,7 +281,7 @@ def _create_font(
     Args:
         bold: Whether font is bold.
         size: Font size in points.
-        color: Font color as hex string (e.g., "FFFFFFFF").
+        color: Font color as hex string (e.g., "006100" for dark green).
 
     Returns:
         FontProtocol instance.
@@ -247,17 +291,99 @@ def _create_font(
     return font
 
 
+def _create_pattern_fill(
+    *,
+    start_color: str,
+    end_color: str | None = None,
+    fill_type: str = "solid",
+) -> PatternFillProtocol:
+    """Create openpyxl PatternFill.
+
+    Args:
+        start_color: Fill color as hex string (e.g., "C6EFCE" for light green).
+        end_color: End color for gradient fills. Defaults to start_color.
+        fill_type: Fill pattern type ("solid", "darkDown", etc.).
+
+    Returns:
+        PatternFillProtocol instance.
+    """
+    styles_mod = __import__("openpyxl.styles", fromlist=["PatternFill"])
+    actual_end_color = end_color if end_color is not None else start_color
+    fill: PatternFillProtocol = styles_mod.PatternFill(
+        start_color=start_color,
+        end_color=actual_end_color,
+        fill_type=fill_type,
+    )
+    return fill
+
+
+def _extract_header_strings(row: tuple[CellProtocol, ...]) -> list[str]:
+    """Extract header strings from a row of cells.
+
+    Converts cell values to strings. Non-string values are converted via str().
+    None values become empty strings.
+
+    Args:
+        row: Tuple of cells from worksheet row.
+
+    Returns:
+        List of header strings.
+    """
+    headers: list[str] = []
+    for cell in row:
+        val = cell.value
+        if val is None:
+            headers.append("")
+        elif isinstance(val, str):
+            headers.append(val)
+        else:
+            headers.append(str(val))
+    return headers
+
+
+def _auto_adjust_column_widths(
+    ws: WorksheetProtocol,
+    max_width: int = 60,
+    padding: int = 2,
+) -> None:
+    """Auto-adjust column widths based on content.
+
+    Args:
+        ws: Worksheet to adjust.
+        max_width: Maximum column width.
+        padding: Extra padding to add to calculated width.
+    """
+    for column_cells in ws.columns:
+        column_tuple = tuple(column_cells)
+        first_cell = column_tuple[0]
+        column_letter = first_cell.column_letter
+        max_length = 0
+        for cell in column_tuple:
+            cell_value = cell.value
+            if cell_value is not None:
+                cell_len = len(str(cell_value))
+                if cell_len > max_length:
+                    max_length = cell_len
+        adjusted_width = min(max_length + padding, max_width)
+        ws.column_dimensions[column_letter].width = float(adjusted_width)
+
+
 __all__ = [
     "AlignmentProtocol",
     "CellProtocol",
+    "ColorProtocol",
     "ColumnDimensionProtocol",
     "FontProtocol",
+    "PatternFillProtocol",
     "WorkbookProtocol",
     "WorksheetProtocol",
+    "_auto_adjust_column_widths",
     "_create_alignment",
     "_create_font",
-    "_create_styled_table",
+    "_create_pattern_fill",
+    "_create_table",
     "_create_workbook",
+    "_extract_header_strings",
     "_get_column_letter",
     "_load_workbook",
 ]

@@ -13,7 +13,7 @@ from platform_core.config import (
     _require_env_str,
 )
 from platform_core.job_events import default_events_channel
-from platform_core.json_utils import JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
@@ -80,10 +80,10 @@ def _decode_stt_params(raw: dict[str, JSONValue]) -> STTJobParams:
     """Parse and validate STT job parameters from queue payload."""
     url_val = raw.get("url")
     if not isinstance(url_val, str) or url_val.strip() == "":
-        raise ValueError("url must be a non-empty string")
+        raise JSONTypeError("url must be a non-empty string")
     user_id_val = raw.get("user_id")
     if not isinstance(user_id_val, int):
-        raise ValueError("user_id must be an integer")
+        raise JSONTypeError("user_id must be an integer")
     return {"url": url_val.strip(), "user_id": user_id_val}
 
 

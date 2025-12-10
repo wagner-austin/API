@@ -10,6 +10,7 @@ from platform_core.job_events import (
     decode_job_event,
     default_events_channel,
 )
+from platform_core.json_utils import JSONTypeError
 from platform_workers.testing import FakeRedis
 
 import transcript_api.events as tev
@@ -61,7 +62,7 @@ def test_publish_failed_rejects_invalid_kind(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("REDIS_URL", "redis://unit")
     monkeypatch.setattr(tev, "redis_for_kv", _redis_loader, raising=True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = tev._ensure_error_kind("other")
     stub.assert_only_called(set())
 

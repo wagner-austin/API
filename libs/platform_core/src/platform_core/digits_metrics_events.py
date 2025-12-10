@@ -30,7 +30,16 @@ from platform_core.job_events import (
     default_events_channel,
 )
 
-from .json_utils import JSONValue, dump_json_str, load_json_str
+from .json_utils import (
+    JSONObject,
+    JSONTypeError,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_float,
+    require_int,
+    require_str,
+)
 
 DigitsMetricsEventType = Literal[
     "digits.metrics.config.v1",
@@ -448,94 +457,62 @@ def make_completed_metrics_event(
 # Decoder functions
 # -----------------------------------------------------------------------------
 
-DecodedObj = dict[str, JSONValue]
 
-
-def _decode_optional_int(decoded: DecodedObj, key: str) -> int | None:
-    """Extract an optional int field from decoded dict."""
-    val = decoded.get(key)
-    return val if isinstance(val, int) else None
-
-
-def _decode_optional_str(decoded: DecodedObj, key: str) -> str | None:
-    """Extract an optional str field from decoded dict."""
-    val = decoded.get(key)
-    return val if isinstance(val, str) else None
-
-
-def _decode_optional_float(decoded: DecodedObj, key: str) -> float | None:
-    """Extract an optional float field from decoded dict (accepts int or float)."""
-    val = decoded.get(key)
-    return float(val) if isinstance(val, int | float) else None
-
-
-def _decode_optional_bool(decoded: DecodedObj, key: str) -> bool | None:
-    """Extract an optional bool field from decoded dict."""
-    val = decoded.get(key)
-    return val if isinstance(val, bool) else None
-
-
-def _decode_config_context(event: DigitsConfigV1, decoded: DecodedObj) -> None:
+def _decode_config_context(event: DigitsConfigV1, decoded: JSONObject) -> None:
     """Attach optional context fields to config event from decoded data."""
-    cpu_cores = _decode_optional_int(decoded, "cpu_cores")
-    if cpu_cores is not None:
+    cpu_cores = decoded.get("cpu_cores")
+    if isinstance(cpu_cores, int) and not isinstance(cpu_cores, bool):
         event["cpu_cores"] = cpu_cores
-    optimal_threads = _decode_optional_int(decoded, "optimal_threads")
-    if optimal_threads is not None:
+    optimal_threads = decoded.get("optimal_threads")
+    if isinstance(optimal_threads, int) and not isinstance(optimal_threads, bool):
         event["optimal_threads"] = optimal_threads
-    memory_mb = _decode_optional_int(decoded, "memory_mb")
-    if memory_mb is not None:
+    memory_mb = decoded.get("memory_mb")
+    if isinstance(memory_mb, int) and not isinstance(memory_mb, bool):
         event["memory_mb"] = memory_mb
-    optimal_workers = _decode_optional_int(decoded, "optimal_workers")
-    if optimal_workers is not None:
+    optimal_workers = decoded.get("optimal_workers")
+    if isinstance(optimal_workers, int) and not isinstance(optimal_workers, bool):
         event["optimal_workers"] = optimal_workers
-    max_batch_size = _decode_optional_int(decoded, "max_batch_size")
-    if max_batch_size is not None:
+    max_batch_size = decoded.get("max_batch_size")
+    if isinstance(max_batch_size, int) and not isinstance(max_batch_size, bool):
         event["max_batch_size"] = max_batch_size
-    device = _decode_optional_str(decoded, "device")
-    if device is not None:
+    device = decoded.get("device")
+    if isinstance(device, str):
         event["device"] = device
 
 
-def _decode_config_augment(event: DigitsConfigV1, decoded: DecodedObj) -> None:
+def _decode_config_augment(event: DigitsConfigV1, decoded: JSONObject) -> None:
     """Attach optional augmentation fields to config event from decoded data."""
-    batch_size = _decode_optional_int(decoded, "batch_size")
-    if batch_size is not None:
+    batch_size = decoded.get("batch_size")
+    if isinstance(batch_size, int) and not isinstance(batch_size, bool):
         event["batch_size"] = batch_size
-    learning_rate = _decode_optional_float(decoded, "learning_rate")
-    if learning_rate is not None:
-        event["learning_rate"] = learning_rate
-    augment = _decode_optional_bool(decoded, "augment")
-    if augment is not None:
+    learning_rate = decoded.get("learning_rate")
+    if isinstance(learning_rate, int | float) and not isinstance(learning_rate, bool):
+        event["learning_rate"] = float(learning_rate)
+    augment = decoded.get("augment")
+    if isinstance(augment, bool):
         event["augment"] = augment
-    aug_rotate = _decode_optional_float(decoded, "aug_rotate")
-    if aug_rotate is not None:
-        event["aug_rotate"] = aug_rotate
-    aug_translate = _decode_optional_float(decoded, "aug_translate")
-    if aug_translate is not None:
-        event["aug_translate"] = aug_translate
-    noise_prob = _decode_optional_float(decoded, "noise_prob")
-    if noise_prob is not None:
-        event["noise_prob"] = noise_prob
-    dots_prob = _decode_optional_float(decoded, "dots_prob")
-    if dots_prob is not None:
-        event["dots_prob"] = dots_prob
+    aug_rotate = decoded.get("aug_rotate")
+    if isinstance(aug_rotate, int | float) and not isinstance(aug_rotate, bool):
+        event["aug_rotate"] = float(aug_rotate)
+    aug_translate = decoded.get("aug_translate")
+    if isinstance(aug_translate, int | float) and not isinstance(aug_translate, bool):
+        event["aug_translate"] = float(aug_translate)
+    noise_prob = decoded.get("noise_prob")
+    if isinstance(noise_prob, int | float) and not isinstance(noise_prob, bool):
+        event["noise_prob"] = float(noise_prob)
+    dots_prob = decoded.get("dots_prob")
+    if isinstance(dots_prob, int | float) and not isinstance(dots_prob, bool):
+        event["dots_prob"] = float(dots_prob)
 
 
 def _decode_config_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsConfigV1:
-    model_id = decoded.get("model_id")
-    total_epochs = decoded.get("total_epochs")
-    queue = decoded.get("queue")
-    if (
-        not isinstance(model_id, str)
-        or not isinstance(total_epochs, int)
-        or not isinstance(queue, str)
-    ):
-        raise ValueError("config event requires model_id, total_epochs, queue")
+    model_id = require_str(decoded, "model_id")
+    total_epochs = require_int(decoded, "total_epochs")
+    queue = require_str(decoded, "queue")
     event: DigitsConfigV1 = {
         "type": "digits.metrics.config.v1",
         "job_id": job_id,
@@ -550,47 +527,27 @@ def _decode_config_event(
 
 
 def _decode_batch_metrics_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsBatchMetricsV1:
-    model_id = decoded.get("model_id")
-    epoch = decoded.get("epoch")
-    total_epochs = decoded.get("total_epochs")
-    batch = decoded.get("batch")
-    total_batches = decoded.get("total_batches")
-    batch_loss = decoded.get("batch_loss")
-    batch_acc = decoded.get("batch_acc")
-    avg_loss = decoded.get("avg_loss")
-    samples_per_sec = decoded.get("samples_per_sec")
-    main_rss_mb = decoded.get("main_rss_mb")
-    workers_rss_mb = decoded.get("workers_rss_mb")
-    worker_count = decoded.get("worker_count")
-    cgroup_usage_mb = decoded.get("cgroup_usage_mb")
-    cgroup_limit_mb = decoded.get("cgroup_limit_mb")
-    cgroup_pct = decoded.get("cgroup_pct")
-    anon_mb = decoded.get("anon_mb")
-    file_mb = decoded.get("file_mb")
-    if (
-        not isinstance(model_id, str)
-        or not isinstance(epoch, int)
-        or not isinstance(total_epochs, int)
-        or not isinstance(batch, int)
-        or not isinstance(total_batches, int)
-        or not isinstance(batch_loss, int | float)
-        or not isinstance(batch_acc, int | float)
-        or not isinstance(avg_loss, int | float)
-        or not isinstance(samples_per_sec, int | float)
-        or not isinstance(main_rss_mb, int)
-        or not isinstance(workers_rss_mb, int)
-        or not isinstance(worker_count, int)
-        or not isinstance(cgroup_usage_mb, int)
-        or not isinstance(cgroup_limit_mb, int)
-        or not isinstance(cgroup_pct, int | float)
-        or not isinstance(anon_mb, int)
-        or not isinstance(file_mb, int)
-    ):
-        raise ValueError("batch metrics event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    epoch = require_int(decoded, "epoch")
+    total_epochs = require_int(decoded, "total_epochs")
+    batch = require_int(decoded, "batch")
+    total_batches = require_int(decoded, "total_batches")
+    batch_loss = require_float(decoded, "batch_loss")
+    batch_acc = require_float(decoded, "batch_acc")
+    avg_loss = require_float(decoded, "avg_loss")
+    samples_per_sec = require_float(decoded, "samples_per_sec")
+    main_rss_mb = require_int(decoded, "main_rss_mb")
+    workers_rss_mb = require_int(decoded, "workers_rss_mb")
+    worker_count = require_int(decoded, "worker_count")
+    cgroup_usage_mb = require_int(decoded, "cgroup_usage_mb")
+    cgroup_limit_mb = require_int(decoded, "cgroup_limit_mb")
+    cgroup_pct = require_float(decoded, "cgroup_pct")
+    anon_mb = require_int(decoded, "anon_mb")
+    file_mb = require_int(decoded, "file_mb")
     return {
         "type": "digits.metrics.batch.v1",
         "job_id": job_id,
@@ -600,41 +557,32 @@ def _decode_batch_metrics_event(
         "total_epochs": total_epochs,
         "batch": batch,
         "total_batches": total_batches,
-        "batch_loss": float(batch_loss),
-        "batch_acc": float(batch_acc),
-        "avg_loss": float(avg_loss),
-        "samples_per_sec": float(samples_per_sec),
+        "batch_loss": batch_loss,
+        "batch_acc": batch_acc,
+        "avg_loss": avg_loss,
+        "samples_per_sec": samples_per_sec,
         "main_rss_mb": main_rss_mb,
         "workers_rss_mb": workers_rss_mb,
         "worker_count": worker_count,
         "cgroup_usage_mb": cgroup_usage_mb,
         "cgroup_limit_mb": cgroup_limit_mb,
-        "cgroup_pct": float(cgroup_pct),
+        "cgroup_pct": cgroup_pct,
         "anon_mb": anon_mb,
         "file_mb": file_mb,
     }
 
 
 def _decode_epoch_metrics_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsEpochMetricsV1:
-    model_id = decoded.get("model_id")
-    epoch = decoded.get("epoch")
-    total_epochs = decoded.get("total_epochs")
-    train_loss = decoded.get("train_loss")
-    val_acc = decoded.get("val_acc")
-    time_s = decoded.get("time_s")
-    if (
-        not isinstance(model_id, str)
-        or not isinstance(epoch, int)
-        or not isinstance(total_epochs, int)
-        or not isinstance(train_loss, int | float)
-        or not isinstance(val_acc, int | float)
-        or not isinstance(time_s, int | float)
-    ):
-        raise ValueError("epoch metrics event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    epoch = require_int(decoded, "epoch")
+    total_epochs = require_int(decoded, "total_epochs")
+    train_loss = require_float(decoded, "train_loss")
+    val_acc = require_float(decoded, "val_acc")
+    time_s = require_float(decoded, "time_s")
     return {
         "type": "digits.metrics.epoch.v1",
         "job_id": job_id,
@@ -642,45 +590,37 @@ def _decode_epoch_metrics_event(
         "model_id": model_id,
         "epoch": epoch,
         "total_epochs": total_epochs,
-        "train_loss": float(train_loss),
-        "val_acc": float(val_acc),
-        "time_s": float(time_s),
+        "train_loss": train_loss,
+        "val_acc": val_acc,
+        "time_s": time_s,
     }
 
 
 def _decode_best_metrics_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsBestMetricsV1:
-    model_id = decoded.get("model_id")
-    epoch = decoded.get("epoch")
-    val_acc = decoded.get("val_acc")
-    if (
-        not isinstance(model_id, str)
-        or not isinstance(epoch, int)
-        or not isinstance(val_acc, int | float)
-    ):
-        raise ValueError("best metrics event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    epoch = require_int(decoded, "epoch")
+    val_acc = require_float(decoded, "val_acc")
     return {
         "type": "digits.metrics.best.v1",
         "job_id": job_id,
         "user_id": user_id,
         "model_id": model_id,
         "epoch": epoch,
-        "val_acc": float(val_acc),
+        "val_acc": val_acc,
     }
 
 
 def _decode_artifact_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsArtifactV1:
-    model_id = decoded.get("model_id")
-    path = decoded.get("path")
-    if not isinstance(model_id, str) or not isinstance(path, str):
-        raise ValueError("artifact event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    path = require_str(decoded, "path")
     return {
         "type": "digits.metrics.artifact.v1",
         "job_id": job_id,
@@ -691,25 +631,16 @@ def _decode_artifact_event(
 
 
 def _decode_upload_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsUploadV1:
-    model_id = decoded.get("model_id")
-    status = decoded.get("status")
-    model_bytes = decoded.get("model_bytes")
-    manifest_bytes = decoded.get("manifest_bytes")
-    file_id = decoded.get("file_id")
-    file_sha256 = decoded.get("file_sha256")
-    if (
-        not isinstance(model_id, str)
-        or not isinstance(status, int)
-        or not isinstance(model_bytes, int)
-        or not isinstance(manifest_bytes, int)
-        or not isinstance(file_id, str)
-        or not isinstance(file_sha256, str)
-    ):
-        raise ValueError("upload event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    status = require_int(decoded, "status")
+    model_bytes = require_int(decoded, "model_bytes")
+    manifest_bytes = require_int(decoded, "manifest_bytes")
+    file_id = require_str(decoded, "file_id")
+    file_sha256 = require_str(decoded, "file_sha256")
     return {
         "type": "digits.metrics.upload.v1",
         "job_id": job_id,
@@ -724,14 +655,12 @@ def _decode_upload_event(
 
 
 def _decode_prune_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsPruneV1:
-    model_id = decoded.get("model_id")
-    deleted_count = decoded.get("deleted_count")
-    if not isinstance(model_id, str) or not isinstance(deleted_count, int):
-        raise ValueError("prune event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    deleted_count = require_int(decoded, "deleted_count")
     return {
         "type": "digits.metrics.prune.v1",
         "job_id": job_id,
@@ -742,26 +671,24 @@ def _decode_prune_event(
 
 
 def _decode_completed_metrics_event(
-    decoded: DecodedObj,
+    decoded: JSONObject,
     job_id: str,
     user_id: int,
 ) -> DigitsCompletedMetricsV1:
-    model_id = decoded.get("model_id")
-    val_acc = decoded.get("val_acc")
-    if not isinstance(model_id, str) or not isinstance(val_acc, int | float):
-        raise ValueError("completed metrics event missing required fields")
+    model_id = require_str(decoded, "model_id")
+    val_acc = require_float(decoded, "val_acc")
     return {
         "type": "digits.metrics.completed.v1",
         "job_id": job_id,
         "user_id": user_id,
         "model_id": model_id,
-        "val_acc": float(val_acc),
+        "val_acc": val_acc,
     }
 
 
 _DECODERS: dict[
     str,
-    Callable[[DecodedObj, str, int], DigitsMetricsEventV1],
+    Callable[[JSONObject, str, int], DigitsMetricsEventV1],
 ] = {
     "digits.metrics.config.v1": _decode_config_event,
     "digits.metrics.batch.v1": _decode_batch_metrics_event,
@@ -778,25 +705,17 @@ def decode_digits_metrics_event(payload: str) -> DigitsMetricsEventV1:
     """Parse and validate a serialized digits metrics event.
 
     Raises:
-        ValueError: if the payload is not a well-formed digits metrics event.
+        JSONTypeError: if the payload is not a well-formed digits metrics event.
     """
-    decoded_raw = load_json_str(payload)
-    if not isinstance(decoded_raw, dict):
-        raise ValueError("digits metrics event payload must be an object")
-    decoded: DecodedObj = decoded_raw
+    decoded = narrow_json_to_dict(load_json_str(payload))
 
-    type_raw = decoded.get("type")
-    if not isinstance(type_raw, str):
-        raise ValueError("digits metrics event type must be a string")
-
-    job_id = decoded.get("job_id")
-    user_id = decoded.get("user_id")
-    if not isinstance(job_id, str) or not isinstance(user_id, int):
-        raise ValueError("job_id and user_id are required in digits metrics event")
+    type_raw = require_str(decoded, "type")
+    job_id = require_str(decoded, "job_id")
+    user_id = require_int(decoded, "user_id")
 
     decoder = _DECODERS.get(type_raw)
     if decoder is None:
-        raise ValueError("unknown digits metrics event type")
+        raise JSONTypeError(f"Unknown digits metrics event type: '{type_raw}'")
     return decoder(decoded, job_id, user_id)
 
 
@@ -846,49 +765,6 @@ def is_completed(ev: DigitsMetricsEventV1) -> TypeGuard[DigitsCompletedMetricsV1
 
 
 # -----------------------------------------------------------------------------
-# Soft decoder for event routing (returns None instead of raising)
-# -----------------------------------------------------------------------------
-
-
-def _try_decode_metrics_event_impl(
-    decoded: DecodedObj, type_raw: str, job_id: str, user_id: int
-) -> DigitsMetricsEventV1 | None:
-    """Attempt to decode a metrics event. Returns None if type is not recognized."""
-    decoder = _DECODERS.get(type_raw)
-    if decoder is None:
-        return None
-    # Decoder validates fields and raises ValueError if invalid
-    return decoder(decoded, job_id, user_id)
-
-
-def try_decode_digits_metrics_event(payload: str) -> DigitsMetricsEventV1 | None:
-    """Try to decode a digits metrics event.
-
-    Returns None if the payload is not a valid digits metrics event.
-    Raises ValueError if the payload has the correct type but invalid fields.
-    """
-    decoded_raw = load_json_str(payload)
-    if not isinstance(decoded_raw, dict):
-        return None
-    decoded: DecodedObj = decoded_raw
-
-    type_raw = decoded.get("type")
-    if not isinstance(type_raw, str):
-        return None
-
-    # Only handle digits.metrics.* events
-    if not type_raw.startswith("digits.metrics."):
-        return None
-
-    job_id = decoded.get("job_id")
-    user_id = decoded.get("user_id")
-    if not isinstance(job_id, str) or not isinstance(user_id, int):
-        return None
-
-    return _try_decode_metrics_event_impl(decoded, type_raw, job_id, user_id)
-
-
-# -----------------------------------------------------------------------------
 # Combined event type for digits channel (job lifecycle + domain metrics)
 # -----------------------------------------------------------------------------
 
@@ -899,11 +775,9 @@ DigitsEventV1 = JobEventV1 | DigitsMetricsEventV1
 DEFAULT_DIGITS_EVENTS_CHANNEL: str = default_events_channel("digits")
 
 
-def _try_decode_started(decoded: DecodedObj, job_id: str, user_id: int) -> JobStartedV1 | None:
+def _decode_job_started(decoded: JSONObject, job_id: str, user_id: int) -> JobStartedV1:
     """Decode a started event."""
-    queue = decoded.get("queue")
-    if not isinstance(queue, str):
-        return None
+    queue = require_str(decoded, "queue")
     return {
         "type": "digits.job.started.v1",
         "domain": "digits",
@@ -913,12 +787,10 @@ def _try_decode_started(decoded: DecodedObj, job_id: str, user_id: int) -> JobSt
     }
 
 
-def _try_decode_completed(decoded: DecodedObj, job_id: str, user_id: int) -> JobCompletedV1 | None:
+def _decode_job_completed(decoded: JSONObject, job_id: str, user_id: int) -> JobCompletedV1:
     """Decode a completed event."""
-    result_id = decoded.get("result_id")
-    result_bytes = decoded.get("result_bytes")
-    if not isinstance(result_id, str) or not isinstance(result_bytes, int):
-        return None
+    result_id = require_str(decoded, "result_id")
+    result_bytes = require_int(decoded, "result_bytes")
     return {
         "type": "digits.job.completed.v1",
         "domain": "digits",
@@ -929,18 +801,16 @@ def _try_decode_completed(decoded: DecodedObj, job_id: str, user_id: int) -> Job
     }
 
 
-def _try_decode_failed(decoded: DecodedObj, job_id: str, user_id: int) -> JobFailedV1 | None:
+def _decode_job_failed(decoded: JSONObject, job_id: str, user_id: int) -> JobFailedV1:
     """Decode a failed event."""
-    error_kind_raw = decoded.get("error_kind")
-    message = decoded.get("message")
-    if not isinstance(message, str):
-        return None
+    error_kind_raw = require_str(decoded, "error_kind")
+    message = require_str(decoded, "message")
     if error_kind_raw == "user":
         error_kind: Literal["user", "system"] = "user"
     elif error_kind_raw == "system":
         error_kind = "system"
     else:
-        return None
+        raise JSONTypeError(f"Invalid error_kind '{error_kind_raw}' in failed event")
     return {
         "type": "digits.job.failed.v1",
         "domain": "digits",
@@ -951,57 +821,46 @@ def _try_decode_failed(decoded: DecodedObj, job_id: str, user_id: int) -> JobFai
     }
 
 
-def _try_decode_job_event_for_digits(decoded: DecodedObj, type_raw: str) -> JobEventV1 | None:
-    """Attempt to decode a job lifecycle event for digits domain."""
-    domain = decoded.get("domain")
-    if domain != "digits":
-        return None
-
-    job_id = decoded.get("job_id")
-    user_id = decoded.get("user_id")
-    if not isinstance(job_id, str) or not isinstance(user_id, int):
-        return None
-
-    if type_raw == "digits.job.started.v1":
-        return _try_decode_started(decoded, job_id, user_id)
-    if type_raw == "digits.job.completed.v1":
-        return _try_decode_completed(decoded, job_id, user_id)
-    if type_raw == "digits.job.failed.v1":
-        return _try_decode_failed(decoded, job_id, user_id)
-    return None
+_JOB_DECODERS: dict[str, Callable[[JSONObject, str, int], JobEventV1]] = {
+    "digits.job.started.v1": _decode_job_started,
+    "digits.job.completed.v1": _decode_job_completed,
+    "digits.job.failed.v1": _decode_job_failed,
+}
 
 
-def try_decode_digits_event(payload: str) -> DigitsEventV1 | None:
-    """Try to decode any event from the digits channel.
+def decode_digits_event(payload: str) -> DigitsEventV1:
+    """Parse and validate any event from the digits channel.
 
     Handles both job lifecycle events (digits.job.*.v1) and
     metrics events (digits.metrics.*.v1).
 
-    Returns None if the payload is not a valid digits event.
-    Raises ValueError if the payload has the correct type but invalid fields.
+    Raises:
+        JSONTypeError: if the payload is not a well-formed digits event.
     """
-    decoded_raw = load_json_str(payload)
-    if not isinstance(decoded_raw, dict):
-        return None
-    decoded: DecodedObj = decoded_raw
+    decoded = narrow_json_to_dict(load_json_str(payload))
 
-    type_raw = decoded.get("type")
-    if not isinstance(type_raw, str):
-        return None
+    type_raw = require_str(decoded, "type")
+    job_id = require_str(decoded, "job_id")
+    user_id = require_int(decoded, "user_id")
 
     # Check if it's a job lifecycle event (digits.job.*.v1)
     if type_raw.startswith("digits.job."):
-        return _try_decode_job_event_for_digits(decoded, type_raw)
+        domain = require_str(decoded, "domain")
+        if domain != "digits":
+            raise JSONTypeError(f"Domain mismatch: expected 'digits', got '{domain}'")
+        job_decoder = _JOB_DECODERS.get(type_raw)
+        if job_decoder is None:
+            raise JSONTypeError(f"Unknown digits job event type: '{type_raw}'")
+        return job_decoder(decoded, job_id, user_id)
 
     # Check if it's a metrics event (digits.metrics.*.v1)
     if type_raw.startswith("digits.metrics."):
-        job_id = decoded.get("job_id")
-        user_id = decoded.get("user_id")
-        if not isinstance(job_id, str) or not isinstance(user_id, int):
-            return None
-        return _try_decode_metrics_event_impl(decoded, type_raw, job_id, user_id)
+        metrics_decoder = _DECODERS.get(type_raw)
+        if metrics_decoder is None:
+            raise JSONTypeError(f"Unknown digits metrics event type: '{type_raw}'")
+        return metrics_decoder(decoded, job_id, user_id)
 
-    return None
+    raise JSONTypeError(f"Unknown digits event type: '{type_raw}'")
 
 
 # TypeGuard helpers for combined event type narrowing
@@ -1079,6 +938,7 @@ __all__ = [
     "JobCompletedV1",
     "JobFailedV1",
     "JobStartedV1",
+    "decode_digits_event",
     "decode_digits_metrics_event",
     "encode_digits_metrics_event",
     "is_artifact",
@@ -1108,6 +968,4 @@ __all__ = [
     "make_epoch_metrics_event",
     "make_prune_event",
     "make_upload_event",
-    "try_decode_digits_event",
-    "try_decode_digits_metrics_event",
 ]

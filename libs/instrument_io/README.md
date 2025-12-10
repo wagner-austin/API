@@ -120,7 +120,9 @@ spectrum = reader.read_spectrum(Path("tissue.imzML"), index=0)
 | Excel | `.xlsx`, `.xls`, `.xlsm` | openpyxl + polars |
 | CSV | `.csv` | stdlib |
 | PDF | `.pdf` | pdfplumber |
-| Word | `.docx` | python-docx |
+| Word (read) | `.docx` | python-docx |
+| Word (write) | `.docx` | python-docx |
+| PDF (write) | `.pdf` | reportlab |
 | PowerPoint | `.pptx`, `.pptm` | python-pptx |
 | MATLAB | `.mat` | scipy |
 | Plain Text | `.txt` | stdlib |
@@ -138,6 +140,58 @@ All methods return strictly-typed TypedDicts:
 | `EICData` | Extracted Ion Chromatogram |
 | `MSSpectrum` | Mass spectrum with m/z and intensities |
 | `DADData` | Diode Array Detector data (UV-Vis) |
+
+## Writers
+
+### Word Documents
+
+```python
+from pathlib import Path
+from instrument_io import WordWriter, DocumentContent
+
+content: DocumentContent = [
+    {"type": "heading", "text": "Research Report", "level": 1},
+    {"type": "paragraph", "text": "Introduction to the study.", "bold": False, "italic": False},
+    {"type": "heading", "text": "Methods", "level": 2},
+    {"type": "list", "items": ["Step 1", "Step 2", "Step 3"], "ordered": True},
+    {"type": "table", "headers": ["Sample", "Result"], "rows": [{"Sample": "A", "Result": 1.5}], "caption": "Table 1"},
+    {"type": "page_break"},
+    {"type": "heading", "text": "Conclusions", "level": 2},
+    {"type": "paragraph", "text": "Key findings summarized.", "bold": True, "italic": False},
+]
+
+writer = WordWriter(title="My Report", author="Lab Team")
+writer.write_document(content, Path("report.docx"))
+```
+
+### PDF Documents
+
+```python
+from pathlib import Path
+from instrument_io import PDFWriter, DocumentContent
+
+content: DocumentContent = [
+    {"type": "heading", "text": "Analysis Results", "level": 1},
+    {"type": "paragraph", "text": "Summary of findings.", "bold": False, "italic": False},
+    {"type": "table", "headers": ["Compound", "Concentration"], "rows": [{"Compound": "Caffeine", "Concentration": 125.4}], "caption": ""},
+]
+
+writer = PDFWriter(page_size="letter", margin_inches=1.0)
+writer.write_document(content, Path("results.pdf"))
+```
+
+### Document Content Types
+
+Both `WordWriter` and `PDFWriter` accept the same `DocumentContent` type:
+
+| Type | Fields |
+|------|--------|
+| `HeadingContent` | `type="heading"`, `text`, `level` (1-6) |
+| `ParagraphContent` | `type="paragraph"`, `text`, `bold`, `italic` |
+| `TableContent` | `type="table"`, `headers`, `rows`, `caption` |
+| `FigureContent` | `type="figure"`, `path`, `caption`, `width_inches` |
+| `ListContent` | `type="list"`, `items`, `ordered` |
+| `PageBreakContent` | `type="page_break"` |
 
 ## Error Handling
 

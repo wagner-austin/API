@@ -19,8 +19,8 @@ from __future__ import annotations
 from instrument_io._exceptions import (
     AgilentReadError,
     CSVReadError,
-    DOCXReadError,
     DecodingError,
+    DOCXReadError,
     ExcelReadError,
     ImzMLReadError,
     InstrumentIOError,
@@ -30,8 +30,8 @@ from instrument_io._exceptions import (
     PDFReadError,
     PPTXReadError,
     SMPSReadError,
-    TXTReadError,
     ThermoReadError,
+    TXTReadError,
     UnsupportedFormatError,
     WatersReadError,
     WriterError,
@@ -84,6 +84,19 @@ from instrument_io.types.common import (
     make_success,
 )
 
+# Types - Document
+from instrument_io.types.document import (
+    DocumentContent,
+    DocumentSection,
+    FigureContent,
+    HeadingContent,
+    ListContent,
+    PageBreakContent,
+    PageSize,
+    ParagraphContent,
+    TableContent,
+)
+
 # Types - Metadata
 from instrument_io.types.metadata import (
     AcquisitionInfo,
@@ -119,8 +132,11 @@ from instrument_io.types.spectrum import (
 
 # Writers
 from instrument_io.writers import (
+    DocumentWriterProtocol,
     ExcelWriter,
     ExcelWriterProtocol,
+    PDFWriter,
+    WordWriter,
 )
 
 __all__ = [
@@ -144,6 +160,9 @@ __all__ = [
     "DOCXReadError",
     "DOCXReader",
     "DecodingError",
+    "DocumentContent",
+    "DocumentSection",
+    "DocumentWriterProtocol",
     "EICData",
     "EICParams",
     "ErrorResult",
@@ -152,12 +171,15 @@ __all__ = [
     "ExcelReaderProtocol",
     "ExcelWriter",
     "ExcelWriterProtocol",
+    "FigureContent",
     "FileInfo",
+    "HeadingContent",
     "ImzMLReadError",
     "ImzMLReader",
     "InstrumentIOError",
     "InstrumentInfo",
     "JSONValue",
+    "ListContent",
     "MATReadError",
     "MATReader",
     "MGFReadError",
@@ -174,8 +196,12 @@ __all__ = [
     "OperationResult",
     "PDFReadError",
     "PDFReader",
+    "PDFWriter",
     "PPTXReadError",
     "PPTXReader",
+    "PageBreakContent",
+    "PageSize",
+    "ParagraphContent",
     "PeakListMeta",
     "Polarity",
     "PrecursorInfo",
@@ -192,11 +218,13 @@ __all__ = [
     "TICData",
     "TXTReadError",
     "TXTReader",
+    "TableContent",
     "ThermoReadError",
     "ThermoReader",
     "UnsupportedFormatError",
     "WatersReadError",
     "WatersReader",
+    "WordWriter",
     "WriterError",
     "make_error",
     "make_success",

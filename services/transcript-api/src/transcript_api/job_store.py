@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from platform_core.job_types import JobStatusLiteral, job_key
+from platform_core.json_utils import JSONTypeError
 from platform_workers.job_store import (
     BaseJobStore,
     JobStoreEncoder,
@@ -56,7 +57,7 @@ class _TranscriptJobEncoder(JobStoreEncoder[TranscriptJobStatus]):
     def decode(self, job_id: str, raw: dict[str, str]) -> TranscriptJobStatus:
         url = raw.get("url")
         if not isinstance(url, str) or url.strip() == "":
-            raise ValueError("missing url in redis store")
+            raise JSONTypeError("missing url in redis store")
 
         return {
             "job_id": job_id,

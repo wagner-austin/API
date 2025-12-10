@@ -4,9 +4,12 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import BinaryIO
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_workers.testing import FakeRedis
+from tests.conftest import make_probs
 
 import turkic_api.api.jobs as jobs_mod
 
@@ -75,8 +78,8 @@ def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
 
     # Mock langid model loader
     class _LangModel:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kk"], [1.0])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__kk",), make_probs(1.0))
 
     def _load_langid(data_dir: str, prefer_218e: bool = True) -> _LangModel:
         return _LangModel()
@@ -142,8 +145,8 @@ def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     # Mock langid model loader
     class _LangModel2:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kk"], [1.0])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__kk",), make_probs(1.0))
 
     def _load_langid2(data_dir: str, prefer_218e: bool = True) -> _LangModel2:
         return _LangModel2()

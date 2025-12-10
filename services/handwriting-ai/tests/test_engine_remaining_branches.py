@@ -7,6 +7,7 @@ from typing import Protocol, TypeGuard
 
 import pytest
 import torch
+from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
 import handwriting_ai.inference.engine as eng
@@ -145,13 +146,13 @@ def test_load_state_dict_file_invalid_wrapper_and_key(tmp_path: Path) -> None:
     # Wrapper present but nested is not a dict
     p1 = tmp_path / "model1.pt"
     torch.save({"state_dict": 123}, p1.as_posix())
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p1)
 
     # Invalid non-string key in state dict
     p2 = tmp_path / "model2.pt"
     torch.save({1: torch.zeros((1,), dtype=torch.float32)}, p2.as_posix())
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p2)
 
 
@@ -172,5 +173,5 @@ def test_load_state_dict_file_unreachable_else_via_monkeypatch(
 
     monkeypatch.setattr(eng, "_is_wrapped_state_dict", _always_false_wrapped, raising=True)
     monkeypatch.setattr(eng, "_is_flat_state_dict", _always_false_flat, raising=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p)

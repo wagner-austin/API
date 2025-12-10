@@ -75,6 +75,8 @@ disallow_subclassing_any = true
 fail_under = 100
 ```
 
+See [Testing Patterns](testing-patterns.md) for techniques to achieve 100% coverage without mocks.
+
 ### Linting
 
 Ruff handles linting and formatting:

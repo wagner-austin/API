@@ -1,0 +1,47 @@
+# Docker Compose for local development
+# Usage: docker compose up -d
+# NOTE: Requires root docker-compose to be running first (provides platform-redis, platform-postgres)
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/covenant-radar-api/Dockerfile
+      target: api
+    container_name: covenant-radar-api
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/covenant}
+    ports:
+      - "8007:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - platform-network
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/covenant-radar-api/Dockerfile
+      target: worker
+    container_name: covenant-radar-worker
+    command: ["covenant-rq-worker"]
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/covenant}
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true

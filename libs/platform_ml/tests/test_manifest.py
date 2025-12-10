@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 
 from platform_ml.manifest import MANIFEST_SCHEMA_VERSION, from_json_manifest_v2
 
@@ -70,7 +70,7 @@ def test_manifest_v2_field_validation_errors(key: str, new_val: JSONValue) -> No
     d = _base_manifest_dict()
     assert key in d
     d[key] = new_val
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         from_json_manifest_v2(dump_json_str(d))
 
 
@@ -88,5 +88,5 @@ def test_training_metadata_validation() -> None:
         "scheduler": "cosine",
         "augment": False,
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(JSONTypeError):
         from_json_manifest_v2(dump_json_str(d))

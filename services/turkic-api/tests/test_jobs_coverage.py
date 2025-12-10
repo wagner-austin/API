@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.json_utils import JSONTypeError
 
 from turkic_api.api.jobs import _decode_job_params
 
 
 def test_decode_job_params_user_id_not_int() -> None:
-    """Cover line 66: user_id must be an int TypeError."""
-    with pytest.raises(TypeError, match="user_id must be an int"):
+    """Cover user_id must be an int JSONTypeError."""
+    with pytest.raises(JSONTypeError, match="user_id must be an int"):
         _decode_job_params(
             {
                 "user_id": "42",  # string, not int
@@ -23,8 +24,8 @@ def test_decode_job_params_user_id_not_int() -> None:
 
 
 def test_decode_job_params_user_id_none() -> None:
-    """Cover line 66: user_id None is not an int."""
-    with pytest.raises(TypeError, match="user_id must be an int"):
+    """Cover user_id None is not an int."""
+    with pytest.raises(JSONTypeError, match="user_id must be an int"):
         _decode_job_params(
             {
                 "user_id": None,
@@ -38,8 +39,8 @@ def test_decode_job_params_user_id_none() -> None:
 
 
 def test_decode_job_params_user_id_float() -> None:
-    """Cover line 66: user_id as float is not an int."""
-    with pytest.raises(TypeError, match="user_id must be an int"):
+    """Cover user_id as float is not an int."""
+    with pytest.raises(JSONTypeError, match="user_id must be an int"):
         _decode_job_params(
             {
                 "user_id": 42.5,

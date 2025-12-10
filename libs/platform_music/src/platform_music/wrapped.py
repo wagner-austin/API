@@ -5,6 +5,12 @@ from datetime import UTC, datetime
 
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
+from platform_core.validators import (
+    load_json_dict,
+    validate_int_range,
+    validate_required_literal,
+    validate_str,
+)
 
 from platform_music.analytics.core.top_artists_by_month import compute_top_artists_by_month
 from platform_music.analytics.core.top_songs import compute_top_songs
@@ -20,6 +26,14 @@ from platform_music.models import (
     WrappedResult,
 )
 from platform_music.services.protocol import MusicServiceProto
+
+_SERVICE_VALUES = frozenset({"lastfm", "spotify", "apple_music", "youtube_music"})
+_SERVICE_MAP: dict[str, ServiceName] = {
+    "lastfm": "lastfm",
+    "spotify": "spotify",
+    "apple_music": "apple_music",
+    "youtube_music": "youtube_music",
+}
 
 
 def _iso_utc_now() -> str:
@@ -96,58 +110,59 @@ def decode_wrapped_result(doc: JSONValue) -> WrappedResult:
 
     Raises AppError on validation failure.
     """
-    if not isinstance(doc, dict):
-        raise AppError(
-            code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-            message="object required",
-            http_status=400,
-        )
-    service_val = doc.get("service")
-    if service_val == "lastfm":
-        service_name: ServiceName = "lastfm"
-    elif service_val == "spotify":
-        service_name = "spotify"
-    elif service_val == "apple_music":
-        service_name = "apple_music"
-    elif service_val == "youtube_music":
-        service_name = "youtube_music"
-    else:
-        raise AppError(
-            code=MusicWrappedErrorCode.INVALID_SERVICE,
-            message="invalid service",
-            http_status=400,
-        )
-    year = doc.get("year")
-    if not isinstance(year, int):
-        raise AppError(
-            code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-            message="year must be int",
-            http_status=400,
-        )
-    generated_at = doc.get("generated_at")
-    if not isinstance(generated_at, str) or len(generated_at) == 0:
+    d = load_json_dict(
+        doc,
+        error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+        message="object required",
+        http_status=400,
+    )
+
+    service_val = validate_required_literal(
+        d.get("service"),
+        "service",
+        _SERVICE_VALUES,
+        error_code=MusicWrappedErrorCode.INVALID_SERVICE,
+        http_status=400,
+    )
+    service_name = _SERVICE_MAP[service_val]
+
+    year = validate_int_range(
+        d.get("year"),
+        "year",
+        error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+        http_status=400,
+    )
+
+    generated_at = validate_str(
+        d.get("generated_at"),
+        "generated_at",
+        error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+        http_status=400,
+    )
+    if not generated_at:
         raise AppError(
             code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
             message="generated_at required",
             http_status=400,
         )
-    total_scrobbles = doc.get("total_scrobbles")
-    if not isinstance(total_scrobbles, int) or total_scrobbles < 0:
-        raise AppError(
-            code=MusicWrappedErrorCode.INSUFFICIENT_DATA,
-            message="invalid total_scrobbles",
-            http_status=400,
-        )
 
-    artists = _validate_top_artists(doc.get("top_artists"))
-    songs = _validate_top_songs(doc.get("top_songs"))
-    by_month = _validate_top_by_month(doc.get("top_by_month"))
+    total_scrobbles = validate_int_range(
+        d.get("total_scrobbles"),
+        "total_scrobbles",
+        ge=0,
+        error_code=MusicWrappedErrorCode.INSUFFICIENT_DATA,
+        http_status=400,
+    )
+
+    artists = _validate_top_artists(d.get("top_artists"))
+    songs = _validate_top_songs(d.get("top_songs"))
+    by_month = _validate_top_by_month(d.get("top_by_month"))
 
     out: WrappedResult = {
         "service": service_name,
-        "year": int(year),
+        "year": year,
         "generated_at": generated_at,
-        "total_scrobbles": int(total_scrobbles),
+        "total_scrobbles": total_scrobbles,
         "top_artists": artists,
         "top_songs": songs,
         "top_by_month": by_month,
@@ -164,21 +179,25 @@ def _validate_top_artists(val: JSONValue) -> list[TopArtist]:
         )
     out: list[TopArtist] = []
     for a in val:
-        if not isinstance(a, dict):
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid artist entry",
-                http_status=400,
-            )
-        name = a.get("artist_name")
-        plays = a.get("play_count")
-        if not isinstance(name, str) or not isinstance(plays, int):
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid artist fields",
-                http_status=400,
-            )
-        out.append({"artist_name": name, "play_count": int(plays)})
+        d = load_json_dict(
+            a,
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            message="invalid artist entry",
+            http_status=400,
+        )
+        name = validate_str(
+            d.get("artist_name"),
+            "artist_name",
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        plays = validate_int_range(
+            d.get("play_count"),
+            "play_count",
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        out.append({"artist_name": name, "play_count": plays})
     return out
 
 
@@ -191,22 +210,31 @@ def _validate_top_songs(val: JSONValue) -> list[TopSong]:
         )
     out: list[TopSong] = []
     for s in val:
-        if not isinstance(s, dict):
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid song entry",
-                http_status=400,
-            )
-        title = s.get("title")
-        artist = s.get("artist_name")
-        plays = s.get("play_count")
-        if not isinstance(title, str) or not isinstance(artist, str) or not isinstance(plays, int):
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid song fields",
-                http_status=400,
-            )
-        out.append({"title": title, "artist_name": artist, "play_count": int(plays)})
+        d = load_json_dict(
+            s,
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            message="invalid song entry",
+            http_status=400,
+        )
+        title = validate_str(
+            d.get("title"),
+            "title",
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        artist = validate_str(
+            d.get("artist_name"),
+            "artist_name",
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        plays = validate_int_range(
+            d.get("play_count"),
+            "play_count",
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        out.append({"title": title, "artist_name": artist, "play_count": plays})
     return out
 
 
@@ -219,19 +247,20 @@ def _validate_top_by_month(val: JSONValue) -> list[TopArtistsByMonthEntry]:
         )
     out: list[TopArtistsByMonthEntry] = []
     for e in val:
-        if not isinstance(e, dict):
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid month entry",
-                http_status=400,
-            )
-        month = e.get("month")
-        if not isinstance(month, int) or month < 1 or month > 12:
-            raise AppError(
-                code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
-                message="invalid month",
-                http_status=400,
-            )
-        top_artists = _validate_top_artists(e.get("top_artists"))
-        out.append({"month": int(month), "top_artists": top_artists})
+        d = load_json_dict(
+            e,
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            message="invalid month entry",
+            http_status=400,
+        )
+        month = validate_int_range(
+            d.get("month"),
+            "month",
+            ge=1,
+            le=12,
+            error_code=MusicWrappedErrorCode.INVALID_DATE_RANGE,
+            http_status=400,
+        )
+        top_artists = _validate_top_artists(d.get("top_artists"))
+        out.append({"month": month, "top_artists": top_artists})
     return out

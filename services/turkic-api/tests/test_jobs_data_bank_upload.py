@@ -4,12 +4,15 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import BinaryIO
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 from platform_core.data_bank_client import DataBankClientError
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
+from tests.conftest import make_probs
 
 import turkic_api.api.jobs as jobs_mod
 from turkic_api.api.config import Settings
@@ -38,8 +41,8 @@ def _seed_processing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
     # Mock langid model loader
     class _LangModel:
-        def predict(self, text: str, k: int = 1) -> tuple[list[str], list[float]]:
-            return (["__label__kk"], [1.0])
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            return (("__label__kk",), make_probs(1.0))
 
     def _load_langid(data_dir: str, prefer_218e: bool = True) -> _LangModel:
         return _LangModel()
