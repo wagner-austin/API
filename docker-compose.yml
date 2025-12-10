@@ -41,6 +41,28 @@ services:
     networks:
       - platform-network
 
+  gateway:
+    image: traefik/traefik:v2.10
+    container_name: traefik
+    command:
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      - --log.level=INFO
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=platform-network
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8080:8080" # The Traefik Web UI (Dashboard)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - platform-network
+    restart: unless-stopped
+
 networks:
   platform-network:
     driver: bridge
