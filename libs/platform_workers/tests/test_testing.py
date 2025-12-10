@@ -156,9 +156,11 @@ class TestFakeRedisBytesClient:
         client = FakeRedisBytesClient()
         assert client.ping() is True
 
-    def test_close_is_noop(self) -> None:
+    def test_close_sets_closed_flag(self) -> None:
         client = FakeRedisBytesClient()
-        client.close()  # Should not raise
+        assert client.closed is False
+        client.close()
+        assert client.closed is True
 
 
 class TestFakeRedisPublishError:
