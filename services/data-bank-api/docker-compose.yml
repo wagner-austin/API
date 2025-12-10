@@ -19,6 +19,13 @@ services:
       - ./logs:/data/logs
     ports:
       - "8001:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.databank.rule=PathPrefix(`/data-bank`)"
+      - "traefik.http.routers.databank.middlewares=databank-strip"
+      - "traefik.http.middlewares.databank-strip.stripprefix.prefixes=/data-bank"
+      - "traefik.http.services.databank.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
