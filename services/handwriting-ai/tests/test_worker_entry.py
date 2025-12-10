@@ -1,190 +1,220 @@
-from __future__ import annotations
+"""Tests for RQ worker entry point."""
 
-import types
-from collections.abc import Callable
-from typing import TypedDict
+from __future__ import annotations
 
 import pytest
 from platform_core.job_events import default_events_channel
 from platform_core.queues import DIGITS_QUEUE
+from platform_workers.rq_harness import WorkerConfig
 
-import handwriting_ai.worker_entry as entry
+from handwriting_ai import _test_hooks
+from handwriting_ai.worker_entry import (
+    _build_config,
+    _get_default_runner,
+    _run_worker,
+    main,
+)
 
 
-class _Logged(TypedDict):
-    message: str
-    extra: dict[str, str]
+class _RecordingLogger:
+    """Logger that records calls for testing."""
 
-
-class _Logger:
     def __init__(self) -> None:
-        self.logged: list[_Logged] = []
+        self.messages: list[tuple[str, dict[str, str]]] = []
 
     def info(self, message: str, *, extra: dict[str, str]) -> None:
-        self.logged.append({"message": message, "extra": extra})
+        """Record the log message."""
+        self.messages.append((message, extra))
 
 
-class _WorkerConfig(TypedDict):
-    redis_url: str
-    queue_name: str
-    events_channel: str
+class _RecordingRunner:
+    """Worker runner that records calls for testing."""
+
+    def __init__(self) -> None:
+        self.configs: list[WorkerConfig] = []
+
+    def __call__(self, config: WorkerConfig) -> None:
+        """Record the config."""
+        self.configs.append(config)
 
 
 def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://example")
-    cfg = entry._build_config()
-    assert cfg["redis_url"] == "redis://example"
+    """Test _build_config reads REDIS_URL and uses DIGITS_QUEUE."""
+    monkeypatch.setenv("REDIS_URL", "redis://test-host:6379/0")
+
+    cfg = _build_config()
+
+    assert cfg["redis_url"] == "redis://test-host:6379/0"
     assert cfg["queue_name"] == DIGITS_QUEUE
     assert cfg["events_channel"] == default_events_channel("digits")
 
 
-def test_main_invokes_worker_with_built_config(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Arrange environment and stubs
-    monkeypatch.setenv("REDIS_URL", "redis://example")
-    captured_cfg: list[_WorkerConfig] = []
+def test_build_config_requires_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test _build_config raises when REDIS_URL is missing."""
+    monkeypatch.delenv("REDIS_URL", raising=False)
 
-    def _fake_worker(cfg: _WorkerConfig) -> None:
-        captured_cfg.append(cfg)
+    with pytest.raises(RuntimeError, match="REDIS_URL"):
+        _build_config()
 
-    logger = _Logger()
 
-    def _fake_logger(_: str) -> _Logger:
-        return logger
-
-    def _fake_setup_logging(
-        *,
-        level: str,
-        format_mode: str,
-        service_name: str,
-        instance_id: str | None,
-        extra_fields: list[str] | None,
-    ) -> None:
-        return None
-
-    monkeypatch.setattr(entry, "run_rq_worker", _fake_worker)
-    monkeypatch.setattr(entry, "setup_logging", _fake_setup_logging)
-    monkeypatch.setattr(entry, "get_logger", _fake_logger)
-
-    # Act
-    entry.main()
-
-    # Assert worker invoked with expected config and log captured metadata
-    assert captured_cfg[0] == {
-        "redis_url": "redis://example",
+def test_run_worker_logs_and_calls_runner() -> None:
+    """Test _run_worker logs startup message and calls runner."""
+    config: WorkerConfig = {
+        "redis_url": "redis://test:6379/0",
         "queue_name": DIGITS_QUEUE,
         "events_channel": default_events_channel("digits"),
     }
-    assert any(
-        log["extra"]["queue"] == DIGITS_QUEUE
-        and log["extra"]["events_channel"] == default_events_channel("digits")
-        for log in logger.logged
-    )
+    logger = _RecordingLogger()
+    runner = _RecordingRunner()
+
+    _run_worker(config, logger, runner)
+
+    # Verify logger was called
+    assert len(logger.messages) == 1
+    msg, extra = logger.messages[0]
+    assert msg == "Starting RQ worker"
+    assert extra["queue"] == DIGITS_QUEUE
+    assert extra["events_channel"] == default_events_channel("digits")
+
+    # Verify runner was called with config
+    assert len(runner.configs) == 1
+    assert runner.configs[0] == config
 
 
-def _make_config_module(require_env: Callable[[str], str]) -> types.ModuleType:
-    class _ConfigModule(types.ModuleType):
-        def __init__(self) -> None:
-            super().__init__("platform_core.config")
-            self._require_env_str = require_env
+def test_main_with_injected_dependencies() -> None:
+    """Test main() with injected dependencies."""
+    config: WorkerConfig = {
+        "redis_url": "redis://injected:6379/0",
+        "queue_name": DIGITS_QUEUE,
+        "events_channel": default_events_channel("digits"),
+    }
+    logger = _RecordingLogger()
+    runner = _RecordingRunner()
 
-    return _ConfigModule()
+    main(config=config, logger=logger, runner=runner)
 
+    # Verify logger received startup message
+    assert len(logger.messages) == 1
+    assert logger.messages[0][0] == "Starting RQ worker"
 
-def _make_job_events_module() -> types.ModuleType:
-    class _JobEventsModule(types.ModuleType):
-        def __init__(self) -> None:
-            super().__init__("platform_core.job_events")
-
-        def default_events_channel(self, domain: str) -> str:
-            return "evt"
-
-    return _JobEventsModule()
-
-
-def _make_queues_module() -> types.ModuleType:
-    class _QueuesModule(types.ModuleType):
-        def __init__(self) -> None:
-            super().__init__("platform_core.queues")
-            self.DIGITS_QUEUE = "queue"
-
-    return _QueuesModule()
+    # Verify runner received config
+    assert len(runner.configs) == 1
+    assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def _make_logging_module(captured_cfg: list[_WorkerConfig]) -> tuple[types.ModuleType, _Logger]:
-    class _CapturingLogger(_Logger):
-        def info(self, message: str, *, extra: dict[str, str]) -> None:
-            super().info(message, extra=extra)
-            captured_cfg.append(
-                {
-                    "redis_url": "redis://example",
-                    "queue_name": extra["queue"],
-                    "events_channel": extra["events_channel"],
-                }
-            )
+def test_main_builds_config_from_env_when_not_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test main() builds config from environment when not provided."""
+    monkeypatch.setenv("REDIS_URL", "redis://from-env:6379/0")
 
-    logger = _CapturingLogger()
+    logger = _RecordingLogger()
+    runner = _RecordingRunner()
 
-    class _LoggingModule(types.ModuleType):
-        def __init__(self) -> None:
-            super().__init__("platform_core.logging")
+    # Pass logger and runner but not config - should build from env
+    main(config=None, logger=logger, runner=runner)
 
-        def get_logger(self, _: str) -> _Logger:
-            return logger
-
-        def setup_logging(
-            self,
-            *,
-            level: str,
-            format_mode: str,
-            service_name: str,
-            instance_id: str | None,
-            extra_fields: list[str] | None,
-        ) -> None:
-            assert level == "INFO"
-            assert format_mode == "json"
-            assert service_name == "handwriting-worker"
-
-    return _LoggingModule(), logger
+    assert len(runner.configs) == 1
+    assert runner.configs[0]["redis_url"] == "redis://from-env:6379/0"
+    assert runner.configs[0]["queue_name"] == DIGITS_QUEUE
 
 
-def _make_rq_module(captured_cfg: list[_WorkerConfig]) -> types.ModuleType:
-    class _RQModule(types.ModuleType):
-        def __init__(self) -> None:
-            super().__init__("platform_workers.rq_harness")
-            self.WorkerConfig = dict[str, str]
+def test_get_default_runner_returns_test_runner_when_set() -> None:
+    """Test _get_default_runner returns test_runner when set."""
 
-        def run_rq_worker(self, cfg: _WorkerConfig) -> None:
-            captured_cfg.append(cfg)
+    def _custom_runner(config: WorkerConfig) -> None:
+        pass
 
-    return _RQModule()
+    original = _test_hooks.test_runner
+    _test_hooks.test_runner = _custom_runner
+
+    result = _get_default_runner()
+
+    _test_hooks.test_runner = original
+
+    assert result is _custom_runner
 
 
-def test_main_guard_executes_when_run_as_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> None:
+    """Test _get_default_runner returns run_rq_worker when test_runner is None."""
+    from platform_workers.rq_harness import run_rq_worker
+
+    original = _test_hooks.test_runner
+    _test_hooks.test_runner = None
+
+    result = _get_default_runner()
+
+    _test_hooks.test_runner = original
+
+    assert result is run_rq_worker
+
+
+def test_main_uses_test_runner_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test main() uses test_runner when set in _test_hooks."""
+    monkeypatch.setenv("REDIS_URL", "redis://test-runner:6379/0")
+
+    received_configs: list[WorkerConfig] = []
+
+    def _recording_runner(config: WorkerConfig) -> None:
+        received_configs.append(config)
+
+    # Set the test runner in _test_hooks
+    original = _test_hooks.test_runner
+    _test_hooks.test_runner = _recording_runner
+
+    # Call main() with no args - should use test_runner
+    main()
+
+    # Restore
+    _test_hooks.test_runner = original
+
+    assert len(received_configs) == 1
+    assert received_configs[0]["redis_url"] == "redis://test-runner:6379/0"
+    assert received_configs[0]["queue_name"] == DIGITS_QUEUE
+
+
+def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the if __name__ == '__main__' guard executes main().
+
+    Uses runpy.run_module to actually execute the module as __main__.
+    Because _test_hooks is a separate module, our test_runner persists.
+    """
     import runpy
     import sys
 
-    monkeypatch.setenv("REDIS_URL", "redis://example")
-    captured_cfg: list[_WorkerConfig] = []
+    monkeypatch.setenv("REDIS_URL", "redis://runpy-guard-test:6379/0")
 
-    def _req_env(name: str) -> str:
-        if name != "REDIS_URL":
-            raise RuntimeError("unexpected env name")
-        return "redis://example"
+    received_configs: list[WorkerConfig] = []
 
-    monkeypatch.setitem(sys.modules, "platform_core.config", _make_config_module(_req_env))
-    monkeypatch.setitem(sys.modules, "platform_core.job_events", _make_job_events_module())
-    monkeypatch.setitem(sys.modules, "platform_core.queues", _make_queues_module())
+    def _recording_runner(config: WorkerConfig) -> None:
+        received_configs.append(config)
 
-    log_mod, _ = _make_logging_module(captured_cfg)
-    monkeypatch.setitem(sys.modules, "platform_core.logging", log_mod)
+    # Set the test runner in _test_hooks BEFORE running as __main__
+    original = _test_hooks.test_runner
+    _test_hooks.test_runner = _recording_runner
 
-    rq_mod = _make_rq_module(captured_cfg)
-    monkeypatch.setitem(sys.modules, "platform_workers.rq_harness", rq_mod)
+    # Remove the module from sys.modules to avoid the RuntimeWarning
+    # about the module being found in sys.modules prior to execution
+    module_name = "handwriting_ai.worker_entry"
+    saved_module = sys.modules.pop(module_name, None)
 
-    sys.modules.pop("handwriting_ai.worker_entry", None)
+    # Run the module as __main__ - this executes the guard
+    runpy.run_module(
+        module_name,
+        run_name="__main__",
+        alter_sys=False,
+    )
 
-    # Execute module under __main__ to hit guard
-    runpy.run_module("handwriting_ai.worker_entry", run_name="__main__")
+    # Restore module to sys.modules if it was there before
+    if saved_module is not None:
+        sys.modules[module_name] = saved_module
 
-    assert any(cfg["queue_name"] == "queue" for cfg in captured_cfg)
-    assert any(cfg["events_channel"] == "evt" for cfg in captured_cfg)
+    # Restore test runner
+    _test_hooks.test_runner = original
+
+    # The guard should have been triggered, calling main()
+    assert len(received_configs) == 1
+    assert received_configs[0]["redis_url"] == "redis://runpy-guard-test:6379/0"
+    assert received_configs[0]["queue_name"] == DIGITS_QUEUE
