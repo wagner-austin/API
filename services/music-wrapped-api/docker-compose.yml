@@ -15,6 +15,13 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
     ports:
       - "8006:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.music.rule=PathPrefix(`/music`)"
+      - "traefik.http.routers.music.middlewares=music-strip"
+      - "traefik.http.middlewares.music-strip.stripprefix.prefixes=/music"
+      - "traefik.http.services.music.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
