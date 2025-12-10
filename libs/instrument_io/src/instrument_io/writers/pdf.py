@@ -45,108 +45,108 @@ from instrument_io.types.document import (
 
 POINTS_PER_INCH = 72.0
 
-# MLA format constants
-MLA_FONT = "Times-Roman"
-MLA_FONT_BOLD = "Times-Bold"
-MLA_FONT_ITALIC = "Times-Italic"
-MLA_FONT_SIZE = 12.0
-MLA_LEADING = 24.0  # Double-spaced (12pt * 2)
-MLA_FIRST_INDENT = 36.0  # 0.5 inch first-line indent
-MLA_SPACE_AFTER = 0.0  # No extra space (double-spacing handles it)
-MLA_HEADING_SPACE_BEFORE = 12.0  # Space before headings
+# Research paper format constants
+BODY_FONT = "Times-Roman"
+BODY_FONT_BOLD = "Times-Bold"
+BODY_FONT_ITALIC = "Times-Italic"
+BODY_FONT_SIZE = 11.0
+BODY_LEADING = 14.0  # Single-spaced with comfortable line height
+PARAGRAPH_SPACE = 10.0  # Space between paragraphs
+HEADING_SPACE_BEFORE = 12.0  # Space before headings
+HEADING_SPACE_AFTER = 2.0  # Space after headings
 
 
-def _create_mla_styles() -> dict[str, ParagraphStyleProtocol]:
-    """Create MLA-format paragraph styles.
+def _create_research_styles() -> dict[str, ParagraphStyleProtocol]:
+    """Create research paper paragraph styles.
 
-    MLA format uses:
-    - Times New Roman 12pt
-    - Double-spaced (24pt leading)
-    - 0.5 inch first-line indent for body paragraphs
-    - Centered headings for title, left-aligned for section headings
+    Research format uses:
+    - Times Roman 11pt body text
+    - Single-spaced with space between paragraphs
+    - No first-line indent (block paragraphs)
+    - Centered title, left-aligned section headings
 
     Returns:
         Dictionary of style name to ParagraphStyleProtocol.
     """
-    # Title style - centered, bold, 14pt
+    # Title style - centered, bold, 16pt
     title = _create_paragraph_style(
         "Title",
-        font_name=MLA_FONT_BOLD,
-        font_size=14.0,
-        leading=28.0,
+        font_name=BODY_FONT_BOLD,
+        font_size=16.0,
+        leading=20.0,
         alignment=1,  # CENTER
         space_before=0.0,
-        space_after=MLA_LEADING,
+        space_after=18.0,
     )
 
     # Heading1 - bold, 14pt, left-aligned
     heading1 = _create_paragraph_style(
         "Heading1",
-        font_name=MLA_FONT_BOLD,
+        font_name=BODY_FONT_BOLD,
         font_size=14.0,
-        leading=MLA_LEADING,
+        leading=18.0,
         alignment=0,  # LEFT
-        space_before=MLA_HEADING_SPACE_BEFORE,
-        space_after=6.0,
+        space_before=HEADING_SPACE_BEFORE,
+        space_after=HEADING_SPACE_AFTER,
     )
 
     # Heading2 - bold, 12pt, left-aligned
     heading2 = _create_paragraph_style(
         "Heading2",
-        font_name=MLA_FONT_BOLD,
-        font_size=MLA_FONT_SIZE,
-        leading=MLA_LEADING,
+        font_name=BODY_FONT_BOLD,
+        font_size=12.0,
+        leading=16.0,
         alignment=0,  # LEFT
-        space_before=MLA_HEADING_SPACE_BEFORE,
-        space_after=6.0,
+        space_before=HEADING_SPACE_BEFORE,
+        space_after=HEADING_SPACE_AFTER,
     )
 
-    # Heading3 - bold italic, 12pt, left-aligned
+    # Heading3 - italic, 11pt, left-aligned
     heading3 = _create_paragraph_style(
         "Heading3",
-        font_name=MLA_FONT_ITALIC,
-        font_size=MLA_FONT_SIZE,
-        leading=MLA_LEADING,
+        font_name=BODY_FONT_ITALIC,
+        font_size=BODY_FONT_SIZE,
+        leading=BODY_LEADING,
         alignment=0,  # LEFT
-        space_before=MLA_HEADING_SPACE_BEFORE,
-        space_after=6.0,
+        space_before=12.0,
+        space_after=4.0,
     )
 
-    # Normal body text - 12pt, first-line indent
+    # Normal body text - no indent, space between paragraphs
     normal = _create_paragraph_style(
         "Normal",
-        font_name=MLA_FONT,
-        font_size=MLA_FONT_SIZE,
-        leading=MLA_LEADING,
+        font_name=BODY_FONT,
+        font_size=BODY_FONT_SIZE,
+        leading=BODY_LEADING,
         alignment=0,  # LEFT
-        first_line_indent=MLA_FIRST_INDENT,
+        first_line_indent=0.0,
         space_before=0.0,
-        space_after=MLA_SPACE_AFTER,
+        space_after=PARAGRAPH_SPACE,
     )
 
-    # Caption style - italic, centered, no indent
+    # Caption style - italic, centered
     caption = _create_paragraph_style(
         "Caption",
-        font_name=MLA_FONT_ITALIC,
+        font_name=BODY_FONT_ITALIC,
         font_size=10.0,
-        leading=14.0,
+        leading=12.0,
         alignment=1,  # CENTER
         first_line_indent=0.0,
         space_before=4.0,
-        space_after=MLA_LEADING,
+        space_after=12.0,
     )
 
-    # List item style - no first-line indent
+    # List item style - no first-line indent, slight left margin
     list_item = _create_paragraph_style(
         "ListItem",
-        font_name=MLA_FONT,
-        font_size=MLA_FONT_SIZE,
-        leading=MLA_LEADING,
+        font_name=BODY_FONT,
+        font_size=BODY_FONT_SIZE,
+        leading=BODY_LEADING,
         alignment=0,  # LEFT
         first_line_indent=0.0,
-        left_indent=MLA_FIRST_INDENT,
+        left_indent=18.0,
         space_before=0.0,
-        space_after=0.0,
+        space_after=2.0,
     )
 
     return {
@@ -305,7 +305,11 @@ def _render_figure_pdf(
         raise WriterError(str(image_path), "Image file not found")
 
     width_inches = content["width_inches"]
-    width_points = width_inches * POINTS_PER_INCH if width_inches > 0.0 else None
+    # Use specified width, or default to 5 inches for auto-sizing
+    if width_inches > 0.0:
+        width_points: float = width_inches * POINTS_PER_INCH
+    else:
+        width_points = 5.0 * POINTS_PER_INCH  # Default to 5 inches
 
     image = _create_image(image_path, width=width_points)
     flowables: list[FlowableProtocol] = [image]
@@ -440,10 +444,10 @@ class PDFWriter:
             self._margin_points,
             self._margin_points,
         )
-        doc = _create_simple_doc_template(actual_path, page_dims, margins)
+        doc, page_callback = _create_simple_doc_template(actual_path, page_dims, margins)
 
-        # Use MLA-format styles
-        styles = _create_mla_styles()
+        # Use research paper styles
+        styles = _create_research_styles()
 
         flowables: list[FlowableProtocol] = []
         first_heading_seen = False
@@ -460,13 +464,7 @@ class PDFWriter:
             )
             flowables.extend(section_flowables)
 
-            # Add appropriate spacing after each section
-            # Smaller spacing since MLA double-spacing handles most of it
-            if not is_heading(section):
-                spacer = _create_spacer(0, 6)
-                flowables.append(spacer)
-
-        doc.build(flowables)
+        doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
 
 
 __all__ = [

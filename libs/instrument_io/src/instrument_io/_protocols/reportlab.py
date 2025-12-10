@@ -36,6 +36,26 @@ class CanvasProtocol(Protocol):
         """Draw string at position."""
         ...
 
+    def drawCentredString(self, x: float, y: float, text: str) -> None:
+        """Draw string centered at position."""
+        ...
+
+    def saveState(self) -> None:
+        """Save current graphics state."""
+        ...
+
+    def restoreState(self) -> None:
+        """Restore saved graphics state."""
+        ...
+
+    def setFont(self, font_name: str, font_size: int) -> None:
+        """Set current font."""
+        ...
+
+    def getPageNumber(self) -> int:
+        """Get current page number."""
+        ...
+
 
 class StyleProtocol(Protocol):
     """Protocol for reportlab paragraph/table styles."""
@@ -74,10 +94,23 @@ class FlowableProtocol(Protocol):
         ...
 
 
+class PageCallbackProtocol(Protocol):
+    """Protocol for page callback functions used with onFirstPage/onLaterPages."""
+
+    def __call__(self, canvas: CanvasProtocol, doc: SimpleDocTemplateProtocol) -> None:
+        """Handle page rendering callback."""
+        ...
+
+
 class SimpleDocTemplateProtocol(Protocol):
     """Protocol for reportlab SimpleDocTemplate."""
 
-    def build(self, flowables: list[FlowableProtocol]) -> None:
+    def build(
+        self,
+        flowables: list[FlowableProtocol],
+        onFirstPage: PageCallbackProtocol | None = None,
+        onLaterPages: PageCallbackProtocol | None = None,
+    ) -> None:
         """Build PDF from flowables."""
         ...
 
@@ -143,6 +176,7 @@ class _ImageCtor(Protocol):
         filename: str | Path,
         width: float | None = None,
         height: float | None = None,
+        kind: str | None = None,
     ) -> FlowableProtocol:
         """Create Image."""
         ...
@@ -196,7 +230,10 @@ class _ListFlowableCtor(Protocol):
         self,
         flowables: list[FlowableProtocol],
         bulletType: str = "bullet",
+        bulletFormat: str | None = None,
+        bulletFontSize: int | None = None,
         start: int | None = None,
+        leftIndent: int | None = None,
     ) -> FlowableProtocol:
         """Create ListFlowable."""
         ...
@@ -240,20 +277,58 @@ class _ParagraphStyleCtor(Protocol):
 # Helper functions
 
 
+class PageNumberCallback:
+    """Callback class that draws page numbers at bottom center."""
+
+    def __init__(self, pagesize: tuple[float, float]) -> None:
+        """Initialize with page dimensions.
+
+        Args:
+            pagesize: (width, height) in points, used to center the page number.
+        """
+        self._page_width = pagesize[0]
+
+    def __call__(self, canvas: CanvasProtocol, doc: SimpleDocTemplateProtocol) -> None:
+        """Draw page number at bottom center."""
+        canvas.saveState()
+        page_num = canvas.getPageNumber()
+        text = f"Page {page_num}"
+        canvas.setFont("Times-Roman", 11)
+        canvas.drawCentredString(self._page_width / 2, 30, text)
+        canvas.restoreState()
+
+
+def _create_page_number_callback(
+    pagesize: tuple[float, float],
+) -> PageCallbackProtocol:
+    """Create a page callback that draws page numbers at bottom center.
+
+    Args:
+        pagesize: (width, height) in points, used to center the page number.
+
+    Returns:
+        PageCallbackProtocol that draws "Page N" centered at the bottom.
+    """
+    return PageNumberCallback(pagesize)
+
+
 def _create_simple_doc_template(
     filename: str | Path,
     pagesize: tuple[float, float],
     margins: tuple[float, float, float, float],
-) -> SimpleDocTemplateProtocol:
+    show_page_numbers: bool = True,
+) -> tuple[SimpleDocTemplateProtocol, PageCallbackProtocol | None]:
     """Create a SimpleDocTemplate with specified settings.
 
     Args:
         filename: Output file path.
         pagesize: (width, height) in points.
         margins: (left, right, top, bottom) in points.
+        show_page_numbers: Whether to include a page number callback.
 
     Returns:
-        SimpleDocTemplateProtocol for building the document.
+        Tuple of (SimpleDocTemplateProtocol, page_callback or None).
+        Use the callback with doc.build(flowables, onFirstPage=cb, onLaterPages=cb).
     """
     platypus_mod = __import__("reportlab.platypus", fromlist=["SimpleDocTemplate"])
     ctor: _SimpleDocTemplateCtor = platypus_mod.SimpleDocTemplate
@@ -266,7 +341,12 @@ def _create_simple_doc_template(
         topMargin=top,
         bottomMargin=bottom,
     )
-    return doc
+
+    page_callback: PageCallbackProtocol | None = None
+    if show_page_numbers:
+        page_callback = _create_page_number_callback(pagesize)
+
+    return doc, page_callback
 
 
 def _get_sample_stylesheet() -> StyleSheetProtocol:
@@ -427,7 +507,7 @@ def _create_image(
 
     Args:
         path: Path to image file.
-        width: Optional width in points.
+        width: Optional width in points (maintains aspect ratio if height not set).
         height: Optional height in points.
 
     Returns:
@@ -435,7 +515,11 @@ def _create_image(
     """
     platypus_mod = __import__("reportlab.platypus", fromlist=["Image"])
     ctor: _ImageCtor = platypus_mod.Image
-    img: FlowableProtocol = ctor(str(path), width=width, height=height)
+    # If only width is specified, use proportional with a large height bound
+    if width is not None and height is None:
+        img: FlowableProtocol = ctor(str(path), width=width, height=width, kind="proportional")
+    else:
+        img = ctor(str(path), width=width, height=height)
     return img
 
 
@@ -487,7 +571,10 @@ def _create_list_flowable(
     list_flow: FlowableProtocol = ctor(
         items,
         bulletType=bullet_type,
+        bulletFormat="%s." if ordered else None,
+        bulletFontSize=11,
         start=start,
+        leftIndent=6,
     )
     return list_flow
 

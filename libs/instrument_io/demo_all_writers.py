@@ -20,25 +20,47 @@ from instrument_io import (
 
 
 def create_sample_image(path: Path) -> None:
-    """Create a simple PNG image for figure demonstration.
+    """Create a realistic LC-MS/MS chromatogram image for figure demonstration."""
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-    Creates a valid 1x1 green pixel PNG.
-    """
-    # Valid 1x1 pixel PNG (green pixel)
-    png_bytes = (
-        b"\x89PNG\r\n\x1a\n"  # PNG signature
-        b"\x00\x00\x00\rIHDR"  # IHDR chunk
-        b"\x00\x00\x00\x01"  # width = 1
-        b"\x00\x00\x00\x01"  # height = 1
-        b"\x08\x02"  # bit depth = 8, color type = 2 (RGB)
-        b"\x00\x00\x00"  # compression, filter, interlace
-        b"\x90wS\xde"  # IHDR CRC
-        b"\x00\x00\x00\x0c"  # IDAT chunk length
-        b"IDATx\xdac\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00"  # IDAT data
-        b"\xf7\x03AC"  # IDAT CRC
-        b"\x00\x00\x00\x00IEND\xaeB`\x82"  # IEND chunk
-    )
-    path.write_bytes(png_bytes)
+    # Create time axis (0-10 minutes)
+    time = np.linspace(0, 10, 1000)
+
+    # Create gaussian peaks for different analytes
+    def gaussian_peak(t: np.ndarray, center: float, height: float, width: float) -> np.ndarray:
+        return height * np.exp(-((t - center) ** 2) / (2 * width**2))
+
+    # Baseline with slight drift
+    baseline = 1000 + 50 * np.sin(time * 0.5) + np.random.normal(0, 20, len(time))
+
+    # Add analyte peaks
+    signal = baseline.copy()
+    signal += gaussian_peak(time, 2.3, 45000, 0.08)  # Compound A
+    signal += gaussian_peak(time, 3.8, 62000, 0.10)  # Compound B
+    signal += gaussian_peak(time, 5.1, 38000, 0.07)  # Internal Std
+    signal += gaussian_peak(time, 6.9, 55000, 0.09)  # Compound C
+
+    # Create figure
+    _fig, ax = plt.subplots(figsize=(8, 4), dpi=150)
+    ax.plot(time, signal, "b-", linewidth=0.8)
+    ax.set_xlabel("Retention Time (min)", fontsize=10)
+    ax.set_ylabel("Intensity (cps)", fontsize=10)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 70000)
+
+    # Add peak labels
+    ax.annotate("Compound A", xy=(2.3, 46000), ha="center", fontsize=8)
+    ax.annotate("Compound B", xy=(3.8, 63000), ha="center", fontsize=8)
+    ax.annotate("IS", xy=(5.1, 39000), ha="center", fontsize=8)
+    ax.annotate("Compound C", xy=(6.9, 56000), ha="center", fontsize=8)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=150, bbox_inches="tight", facecolor="white")
+    plt.close()
 
 
 def demo_excel_writer(output_dir: Path) -> None:
@@ -386,10 +408,10 @@ def demo_pdf_writer(output_dir: Path, image_path: Path) -> None:
                 },
                 {
                     "Analyte": "Internal Std",
-                    "LLOQ (ng/mL)": None,
-                    "ULOQ (ng/mL)": None,
-                    "Slope": None,
-                    "R²": None,
+                    "LLOQ (ng/mL)": "-",
+                    "ULOQ (ng/mL)": "-",
+                    "Slope": "-",
+                    "R²": "-",
                 },
             ],
             "caption": "Table 1: Calibration curve regression parameters for target analytes",
@@ -406,7 +428,7 @@ def demo_pdf_writer(output_dir: Path, image_path: Path) -> None:
             "type": "figure",
             "path": image_path,
             "caption": "Figure 1: Representative LC-MS/MS chromatogram (MRM mode)",
-            "width_inches": 4.0,
+            "width_inches": 5.0,
         },
         # Page break before QC data
         {"type": "page_break"},
@@ -463,20 +485,19 @@ def demo_pdf_writer(output_dir: Path, image_path: Path) -> None:
             "type": "figure",
             "path": image_path,
             "caption": "Figure 2: Analyte stability under various storage conditions",
-            "width_inches": 3.0,
+            "width_inches": 5.0,
         },
-        # Figure without caption (width_inches=0 for auto)
         {
             "type": "paragraph",
-            "text": "Additional visualization (auto-sized):",
+            "text": "Additional visualization:",
             "bold": False,
             "italic": False,
         },
         {
             "type": "figure",
             "path": image_path,
-            "caption": "",
-            "width_inches": 0.0,
+            "caption": "Figure 3: Supplementary chromatogram data",
+            "width_inches": 5.0,
         },
         # Conclusions
         {"type": "page_break"},

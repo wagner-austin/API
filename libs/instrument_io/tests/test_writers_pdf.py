@@ -360,3 +360,16 @@ class TestPDFWriter:
         out_path = tmp_path / "table_none.pdf"
         writer.write_document(content, out_path)
         assert out_path.exists()
+
+    def test_write_document_heading1_not_title(self, tmp_path: Path) -> None:
+        """Test level-1 heading that is not the first heading (not styled as title)."""
+        writer = PDFWriter()
+        # First heading is level 2, so level 1 heading later is not treated as title
+        content: DocumentContent = [
+            {"type": "heading", "text": "Introduction", "level": 2},
+            {"type": "paragraph", "text": "Some content.", "bold": False, "italic": False},
+            {"type": "heading", "text": "Main Section", "level": 1},
+        ]
+        out_path = tmp_path / "heading1_not_title.pdf"
+        writer.write_document(content, out_path)
+        assert out_path.exists()

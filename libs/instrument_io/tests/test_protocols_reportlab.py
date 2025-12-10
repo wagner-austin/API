@@ -11,6 +11,7 @@ from instrument_io._protocols.reportlab import (
     _create_list_flowable,
     _create_list_item,
     _create_page_break,
+    _create_page_number_callback,
     _create_paragraph,
     _create_paragraph_style,
     _create_simple_doc_template,
@@ -130,7 +131,7 @@ def test_create_page_break_in_document(tmp_path: Path) -> None:
     out_path = tmp_path / "page_break_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     stylesheet = _get_sample_stylesheet()
     # Build document with page break between paragraphs
     flowables = [
@@ -138,7 +139,7 @@ def test_create_page_break_in_document(tmp_path: Path) -> None:
         _create_page_break(),
         _create_paragraph("Page 2 content", stylesheet["Normal"]),
     ]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
@@ -147,7 +148,7 @@ def test_create_list_item_in_list(tmp_path: Path) -> None:
     out_path = tmp_path / "list_item_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     stylesheet = _get_sample_stylesheet()
     style = stylesheet["Normal"]
     # Create list items and use them in a list flowable
@@ -157,7 +158,7 @@ def test_create_list_item_in_list(tmp_path: Path) -> None:
     ]
     list_flow = _create_list_flowable(items, ordered=False)
     flowables = [list_flow]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
@@ -166,7 +167,7 @@ def test_create_list_item_with_indent_in_list(tmp_path: Path) -> None:
     out_path = tmp_path / "list_item_indent_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     stylesheet = _get_sample_stylesheet()
     style = stylesheet["Normal"]
     # Create list items with custom indent
@@ -175,7 +176,7 @@ def test_create_list_item_with_indent_in_list(tmp_path: Path) -> None:
     ]
     list_flow = _create_list_flowable(items, ordered=True)
     flowables = [list_flow]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
@@ -184,7 +185,7 @@ def test_create_list_flowable_bulleted(tmp_path: Path) -> None:
     out_path = tmp_path / "list_bulleted_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     stylesheet = _get_sample_stylesheet()
     style = stylesheet["Normal"]
     items = [
@@ -193,7 +194,7 @@ def test_create_list_flowable_bulleted(tmp_path: Path) -> None:
     ]
     list_flow = _create_list_flowable(items, ordered=False)
     flowables = [list_flow]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
@@ -202,7 +203,7 @@ def test_create_list_flowable_numbered(tmp_path: Path) -> None:
     out_path = tmp_path / "list_numbered_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     stylesheet = _get_sample_stylesheet()
     style = stylesheet["Normal"]
     items = [
@@ -211,7 +212,7 @@ def test_create_list_flowable_numbered(tmp_path: Path) -> None:
     ]
     list_flow = _create_list_flowable(items, ordered=True)
     flowables = [list_flow]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
@@ -220,11 +221,11 @@ def test_create_simple_doc_template(tmp_path: Path) -> None:
     out_path = tmp_path / "test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
     # Verify doc has build method by building empty flowables
     stylesheet = _get_sample_stylesheet()
     flowables = [_create_paragraph("Test", stylesheet["Normal"])]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
     assert out_path.exists()
 
 
@@ -232,7 +233,7 @@ def test_create_simple_doc_template_and_build(tmp_path: Path) -> None:
     out_path = tmp_path / "test_build.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
 
     stylesheet = _get_sample_stylesheet()
     flowables = [
@@ -240,7 +241,7 @@ def test_create_simple_doc_template_and_build(tmp_path: Path) -> None:
         _create_spacer(0, 12),
         _create_paragraph("This is a test paragraph.", stylesheet["Normal"]),
     ]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
 
     assert out_path.exists()
     assert out_path.stat().st_size > 0
@@ -304,6 +305,14 @@ def test_create_table_style_from_commands5() -> None:
     assert width > 0
 
 
+def test_create_paragraph_style_name_only() -> None:
+    """Test creating a paragraph style with only the name (all defaults)."""
+    style = _create_paragraph_style("MinimalStyle")
+    assert style.name == "MinimalStyle"
+    # Style inherits defaults from reportlab
+    assert style.fontSize > 0
+
+
 def test_create_paragraph_style_basic() -> None:
     """Test creating a basic paragraph style with minimal options."""
     style = _create_paragraph_style(
@@ -351,7 +360,7 @@ def test_create_paragraph_style_in_document(tmp_path: Path) -> None:
     out_path = tmp_path / "custom_style_test.pdf"
     pagesize = (612.0, 792.0)
     margins = (72.0, 72.0, 72.0, 72.0)
-    doc = _create_simple_doc_template(out_path, pagesize, margins)
+    doc, page_callback = _create_simple_doc_template(out_path, pagesize, margins)
 
     # Create MLA-style paragraph
     mla_style = _create_paragraph_style(
@@ -368,7 +377,40 @@ def test_create_paragraph_style_in_document(tmp_path: Path) -> None:
     flowables = [
         _create_paragraph("This is a test paragraph in MLA style.", mla_style),
     ]
-    doc.build(flowables)
+    doc.build(flowables, onFirstPage=page_callback, onLaterPages=page_callback)
 
+    assert out_path.exists()
+    assert out_path.stat().st_size > 0
+
+
+def test_create_simple_doc_template_no_page_numbers(tmp_path: Path) -> None:
+    """Test creating a document without page numbers."""
+    out_path = tmp_path / "no_page_numbers.pdf"
+    pagesize = (612.0, 792.0)
+    margins = (72.0, 72.0, 72.0, 72.0)
+    doc, page_callback = _create_simple_doc_template(
+        out_path, pagesize, margins, show_page_numbers=False
+    )
+    assert page_callback is None
+    stylesheet = _get_sample_stylesheet()
+    flowables = [_create_paragraph("Content without page numbers", stylesheet["Normal"])]
+    doc.build(flowables)
+    assert out_path.exists()
+    assert out_path.stat().st_size > 0
+
+
+def test_create_page_number_callback(tmp_path: Path) -> None:
+    """Test creating and using a page number callback directly."""
+    pagesize = (612.0, 792.0)
+    callback = _create_page_number_callback(pagesize)
+    # Callback is callable
+    assert callable(callback)
+    # Use it in a document
+    out_path = tmp_path / "page_number_callback.pdf"
+    margins = (72.0, 72.0, 72.0, 72.0)
+    doc, _ = _create_simple_doc_template(out_path, pagesize, margins, show_page_numbers=False)
+    stylesheet = _get_sample_stylesheet()
+    flowables = [_create_paragraph("Page with number callback", stylesheet["Normal"])]
+    doc.build(flowables, onFirstPage=callback, onLaterPages=callback)
     assert out_path.exists()
     assert out_path.stat().st_size > 0
