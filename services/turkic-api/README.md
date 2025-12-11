@@ -8,7 +8,7 @@ Production-grade REST API for Turkic language corpus processing with **100% test
 - **Language Detection**: FastText-based language identification
 - **IPA Transliteration**: Convert text to International Phonetic Alphabet
 - **Script Support**: Cyrillic, Latin, and Arabic scripts
-- **Supported Languages**: Kazakh (kk), Kyrgyz (ky), Uzbek (uz), Turkish (tr), Uyghur (ug), Finnish (fi), Azerbaijani (az)
+- **Supported Languages**: Kazakh (kk), Kyrgyz (ky), Uzbek (uz), Turkish (tr), Uyghur (ug), Finnish (fi), Azerbaijani (az), English (en)
 
 ## Technology Stack
 
@@ -54,6 +54,23 @@ This runs:
 - Ruff (linting)
 - Mypy (strict type checking)
 - Pytest (100% coverage required)
+
+### Run the Service
+
+```bash
+# Development
+poetry run hypercorn 'turkic_api.api.main:create_app()' --bind 0.0.0.0:8000 --reload
+
+# Production
+poetry run hypercorn 'turkic_api.api.main:create_app()' --bind [::]:${PORT:-8000}
+```
+
+### Verify
+
+```bash
+curl http://localhost:8000/healthz
+# {"status": "ok"}
+```
 
 ### Development Commands
 
