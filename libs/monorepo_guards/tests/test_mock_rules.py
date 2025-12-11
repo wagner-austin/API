@@ -230,3 +230,50 @@ class TestMockBanRuleFileHandling:
         kinds = {v.kind for v in violations}
         assert "import-mock" in kinds
         assert "monkeypatch-banned" in kinds
+
+
+class TestMockBanRuleObjectSetattr:
+    """Tests for object.__setattr__ detection."""
+
+    def test_detects_object_setattr(self, tmp_path: Path) -> None:
+        code = "def test_x():\n    object.__setattr__(obj, 'attr', value)\n"
+        test_file = _write_test_file(tmp_path, code)
+
+        rule = MockBanRule()
+        violations = rule.run([test_file])
+
+        assert len(violations) == 1
+        assert violations[0].kind == "object-setattr-banned"
+        assert violations[0].line == "object.__setattr__"
+
+    def test_allows_other_dunder_methods(self, tmp_path: Path) -> None:
+        code = "def test_x():\n    object.__getattribute__(obj, 'attr')\n"
+        test_file = _write_test_file(tmp_path, code)
+
+        rule = MockBanRule()
+        violations = rule.run([test_file])
+
+        assert len(violations) == 0
+
+    def test_allows_instance_setattr(self, tmp_path: Path) -> None:
+        code = "def test_x():\n    instance.__setattr__('attr', value)\n"
+        test_file = _write_test_file(tmp_path, code)
+
+        rule = MockBanRule()
+        violations = rule.run([test_file])
+
+        assert len(violations) == 0
+
+    def test_detects_object_setattr_in_multiple_places(self, tmp_path: Path) -> None:
+        code = (
+            "def test_x():\n"
+            "    object.__setattr__(obj1, 'a', 1)\n"
+            "    object.__setattr__(obj2, 'b', 2)\n"
+        )
+        test_file = _write_test_file(tmp_path, code)
+
+        rule = MockBanRule()
+        violations = rule.run([test_file])
+
+        assert len(violations) == 2
+        assert all(v.kind == "object-setattr-banned" for v in violations)

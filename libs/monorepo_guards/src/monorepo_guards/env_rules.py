@@ -14,6 +14,7 @@ class EnvRule:
 
     _ALLOW_SUFFIXES: ClassVar[set[str]] = {
         "src/platform_core/config/_utils.py",
+        "src/platform_core/config/_test_hooks.py",
         "tests/test_config.py",
         "src/monorepo_guards/config_loader.py",
         "tests/test_config_loader.py",

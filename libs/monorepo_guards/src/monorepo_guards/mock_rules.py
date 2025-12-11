@@ -1,8 +1,13 @@
-"""Guard rule to ban unittest.mock imports and monkeypatching.
+"""Guard rule to ban unittest.mock imports, monkeypatching, and runtime patching.
 
-This rule enforces that NO mocking or monkeypatching is used in test suites.
+This rule enforces that NO mocking or runtime patching is used in test suites.
 Tests must use dependency injection via test hooks instead of runtime patching.
 Production code sets hooks to real implementations at startup, tests set them to fakes.
+
+Banned patterns:
+- unittest.mock imports
+- monkeypatch.setattr and similar pytest monkeypatch methods
+- object.__setattr__ (runtime patching workaround)
 """
 
 from __future__ import annotations
@@ -99,8 +104,36 @@ class MockBanRule:
 
         return violations
 
+    def _check_object_setattr_call(self, path: Path, node: ast.Call) -> list[Violation]:
+        """Check for object.__setattr__ calls (runtime patching workaround)."""
+        violations: list[Violation] = []
+
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            return violations
+
+        # Check for object.__setattr__(...) pattern
+        value = func.value
+        if not isinstance(value, ast.Name):
+            return violations
+        if value.id != "object":
+            return violations
+        if func.attr != "__setattr__":
+            return violations
+
+        violations.append(
+            Violation(
+                file=path,
+                line_no=node.lineno,
+                kind="object-setattr-banned",
+                line="object.__setattr__",
+            )
+        )
+
+        return violations
+
     def _check_ast(self, path: Path, tree: ast.AST) -> list[Violation]:
-        """Check an AST for mock import and monkeypatch violations."""
+        """Check an AST for mock import, monkeypatch, and object.__setattr__ violations."""
         violations: list[Violation] = []
 
         for node in ast.walk(tree):
@@ -110,6 +143,7 @@ class MockBanRule:
                 violations.extend(self._check_import_from_node(path, node))
             elif isinstance(node, ast.Call):
                 violations.extend(self._check_monkeypatch_call(path, node))
+                violations.extend(self._check_object_setattr_call(path, node))
 
         return violations
 

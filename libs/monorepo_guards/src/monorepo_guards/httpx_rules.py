@@ -23,16 +23,23 @@ class HttpxRule:
     _CANONICAL_PATH: ClassVar[str] = "libs/platform_core/src/platform_core/data_bank_client.py"
 
     # No service code should import httpx directly; use DataBankClient instead.
-    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset([])
+    # Exception: _test_hooks.py files need httpx types for dependency injection.
+    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset(["_test_hooks.py"])
 
     def _is_canonical(self, path: Path) -> bool:
         posix = path.as_posix()
         resolved = path.resolve().as_posix()
         return posix.endswith(self._CANONICAL_PATH) or resolved.endswith(self._CANONICAL_PATH)
 
+    def _is_allowed(self, path: Path) -> bool:
+        name = path.name
+        return name in self._ALLOWED_PATHS
+
     def _should_check(self, path: Path) -> bool:
         posix = path.as_posix()
         if "/tests/" in posix or "/scripts/" in posix:
+            return False
+        if self._is_allowed(path):
             return False
         return not self._is_canonical(path)
 

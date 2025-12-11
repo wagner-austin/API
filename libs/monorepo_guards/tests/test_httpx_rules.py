@@ -98,3 +98,16 @@ def test_httpx_rule_flags_turkic_jobs_disallowed(tmp_path: Path) -> None:
     rule = HttpxRule()
     violations = rule.run([bad])
     assert len(violations) == 1
+
+
+def test_httpx_rule_allows_test_hooks_file(tmp_path: Path) -> None:
+    """Test that _test_hooks.py files are allowed to import httpx.
+
+    Covers httpx_rules.py line 43 (_is_allowed branch).
+    """
+    hooks_file = tmp_path / "services" / "demo" / "src" / "demo" / "_test_hooks.py"
+    _write(hooks_file, "import httpx\n\ndef make_client(): pass\n")
+
+    rule = HttpxRule()
+    violations = rule.run([hooks_file])
+    assert violations == []

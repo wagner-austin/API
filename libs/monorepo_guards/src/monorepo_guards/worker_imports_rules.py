@@ -21,6 +21,7 @@ class WorkerImportsRule:
         "libs/platform_workers/src/platform_workers/redis.py",
         "libs/platform_workers/src/platform_workers/rq_harness.py",
         "libs/platform_workers/src/platform_workers/testing.py",
+        "libs/platform_workers/src/platform_workers/_fakes.py",
     }
 
     def _is_canonical(self, path: Path) -> bool:
