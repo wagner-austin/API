@@ -5,14 +5,15 @@ from hashlib import sha256
 from pathlib import Path
 from typing import BinaryIO, TypedDict
 
-import pytest
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import load_json_str
 
-from data_bank_api.app import create_app
+from data_bank_api import _test_hooks
+from data_bank_api.api.main import create_app
 from data_bank_api.config import Settings
-from data_bank_api.storage import Storage
+from data_bank_api.storage import FileMetadata
+from data_bank_api.testing import FakeStorage, make_fake_storage_factory
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
@@ -170,16 +171,28 @@ def test_upload_head_get_delete_roundtrip(tmp_path: Path) -> None:
     assert r7.status_code == 204
 
 
-def test_upload_400_bad_request_on_storage_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Monkeypatch Storage.save_stream to raise AppError with INVALID_INPUT
-    client = _client(tmp_path)
+def test_upload_400_bad_request_on_storage_error(tmp_path: Path) -> None:
+    # Configure FakeStorage.save_stream to raise AppError with INVALID_INPUT
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
 
-    def _boom(self: Storage, stream: BinaryIO, content_type: str) -> None:
+    def _boom(stream: BinaryIO, content_type: str) -> FileMetadata:
         raise AppError(ErrorCode.INVALID_INPUT, "boom", 400)
 
-    monkeypatch.setattr(Storage, "save_stream", _boom)
+    fake_storage.save_stream_override = _boom
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     resp = client.post(
         "/files",
         files={"file": ("x.txt", io.BytesIO(b"x"), "text/plain")},

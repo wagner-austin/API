@@ -5,5 +5,5 @@ __all__ = [
     "create_app",
 ]
 
-from .app import create_app
+from .api.main import create_app
 from .client import DataBankClient

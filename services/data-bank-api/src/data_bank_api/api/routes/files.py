@@ -10,8 +10,8 @@ from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError, ErrorCode
 from platform_core.request_context import request_id_var
 
+from ..._test_hooks import StorageProtocol
 from ...config import Settings
-from ...storage import Storage
 
 Permission = Literal["upload", "read", "delete"]
 
@@ -35,7 +35,7 @@ def _ensure_auth(cfg: Settings, perm: Permission, req: Request) -> None:
         raise AppError(ErrorCode.FORBIDDEN, "invalid API key for permission", 403)
 
 
-def _download_full(storage: Storage, file_id: str) -> StreamingResponse:
+def _download_full(storage: StorageProtocol, file_id: str) -> StreamingResponse:
     """Download full file. Raises AppError on failure."""
     meta = storage.head(file_id)
     it, start, last = storage.open_range(file_id, 0, None)
@@ -53,7 +53,7 @@ def _download_full(storage: Storage, file_id: str) -> StreamingResponse:
     )
 
 
-def _unsatisfiable_range_response(storage: Storage, file_id: str) -> JSONResponse:
+def _unsatisfiable_range_response(storage: StorageProtocol, file_id: str) -> JSONResponse:
     """Build 416 response with Content-Range header. Raises AppError if file not found."""
     total_size = storage.get_size(file_id)
     headers = {"Content-Range": f"bytes */{total_size}"}
@@ -67,7 +67,7 @@ def _unsatisfiable_range_response(storage: Storage, file_id: str) -> JSONRespons
 
 
 def _download_range(
-    storage: Storage, file_id: str, range_header: str
+    storage: StorageProtocol, file_id: str, range_header: str
 ) -> StreamingResponse | JSONResponse:
     """Download file range. Raises AppError on failure."""
     if not range_header.startswith("bytes="):
@@ -106,7 +106,7 @@ def _download_range(
     )
 
 
-def build_router(storage: Storage, cfg: Settings) -> APIRouter:
+def build_router(storage: StorageProtocol, cfg: Settings) -> APIRouter:
     """Build file storage router."""
     router = APIRouter()
 

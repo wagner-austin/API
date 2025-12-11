@@ -4,14 +4,14 @@ import io
 from pathlib import Path
 from typing import TypedDict
 
-import pytest
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import load_json_str
 
-from data_bank_api.app import create_app
+from data_bank_api import _test_hooks
+from data_bank_api.api.main import create_app
 from data_bank_api.config import Settings
-from data_bank_api.storage import Storage
+from data_bank_api.testing import FakeStorage, make_fake_storage_factory
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
@@ -182,14 +182,28 @@ def test_range_errors_and_headers(tmp_path: Path) -> None:
     assert g.headers["ETag"] == etag
 
 
-def test_upload_507_from_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_upload_507_from_guard(tmp_path: Path) -> None:
     # Force guard to raise at upload path
-    client = _client(tmp_path)
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
 
-    def _boom(self: Storage) -> None:
+    def _boom() -> None:
         raise AppError(ErrorCode.INSUFFICIENT_STORAGE, "x", 507)
 
-    monkeypatch.setattr(Storage, "_ensure_free_space", _boom)
+    fake_storage.ensure_free_space_override = _boom
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     r = client.post(
         "/files",
         files={"file": ("abcd1234", io.BytesIO(b"data"), "text/plain")},
@@ -243,10 +257,22 @@ def test_download_missing_file_full_and_range(tmp_path: Path) -> None:
     assert r2.status_code == 404
 
 
-def test_unsatisfiable_range_with_disappearing_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    client = _client(tmp_path)
+def test_unsatisfiable_range_with_disappearing_file(tmp_path: Path) -> None:
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     fid = "a1b2c3d4"
     # create a small file
     _ = client.post(
@@ -255,10 +281,10 @@ def test_unsatisfiable_range_with_disappearing_file(
     )
 
     # Simulate file disappearing when computing size after unsatisfiable detection
-    def _raise_get_size(self: Storage, _file_id: str) -> int:
+    def _raise_get_size(_file_id: str) -> int:
         raise AppError(ErrorCode.NOT_FOUND, "gone", 404)
 
-    monkeypatch.setattr(Storage, "get_size", _raise_get_size)
+    fake_storage.get_size_override = _raise_get_size
     r = client.get(f"/files/{fid}", headers={"Range": "bytes=999999-"})
     assert r.status_code == 404
 
@@ -287,79 +313,155 @@ def test_info_404_on_missing(tmp_path: Path) -> None:
     assert client.get("/files/deadbeef/info").status_code == 404
 
 
-def test_full_download_metadata_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _client(tmp_path)
+def test_full_download_metadata_error(tmp_path: Path) -> None:
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     fid = "abcd1234"
     _ = client.post(
         "/files",
         files={"file": (fid, io.BytesIO(b"hi"), "application/octet-stream")},
     )
 
-    def _raise_meta(self: Storage, _file_id: str) -> None:
+    from data_bank_api.storage import FileMetadata
+
+    def _raise_meta(_file_id: str) -> FileMetadata:
         raise AppError(ErrorCode.INVALID_INPUT, "meta bad", 400)
 
-    monkeypatch.setattr(Storage, "head", _raise_meta)
+    fake_storage.head_override = _raise_meta
     r = client.get(f"/files/{fid}")
     assert r.status_code == 400
     body = _decode_error_body(_decode_json(r.text))
     assert body["code"] == "INVALID_INPUT"
 
 
-def test_range_metadata_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _client(tmp_path)
+def test_range_metadata_error(tmp_path: Path) -> None:
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     fid = "abcd5678"
     _ = client.post(
         "/files",
         files={"file": (fid, io.BytesIO(b"hi"), "application/octet-stream")},
     )
 
-    def _raise_meta(self: Storage, _file_id: str) -> None:
+    from data_bank_api.storage import FileMetadata
+
+    def _raise_meta(_file_id: str) -> FileMetadata:
         raise AppError(ErrorCode.INVALID_INPUT, "meta bad", 400)
 
-    monkeypatch.setattr(Storage, "head", _raise_meta)
+    fake_storage.head_override = _raise_meta
     r = client.get(f"/files/{fid}", headers={"Range": "bytes=0-1"})
     assert r.status_code == 400
     body = _decode_error_body(_decode_json(r.text))
     assert body["code"] == "INVALID_INPUT"
 
 
-def test_head_metadata_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _client(tmp_path)
+def test_head_metadata_error(tmp_path: Path) -> None:
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     fid = "abcdefff"
     _ = client.post(
         "/files",
         files={"file": (fid, io.BytesIO(b"hi"), "application/octet-stream")},
     )
 
-    def _raise_meta(self: Storage, _file_id: str) -> None:
+    from data_bank_api.storage import FileMetadata
+
+    def _raise_meta(_file_id: str) -> FileMetadata:
         raise AppError(ErrorCode.INVALID_INPUT, "meta bad", 400)
 
-    monkeypatch.setattr(Storage, "head", _raise_meta)
+    fake_storage.head_override = _raise_meta
     r = client.head(f"/files/{fid}")
     assert r.status_code == 400
 
 
-def test_info_metadata_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _client(tmp_path)
+def test_info_metadata_error(tmp_path: Path) -> None:
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     fid = "abcdfff0"
     _ = client.post(
         "/files",
         files={"file": (fid, io.BytesIO(b"hi"), "application/octet-stream")},
     )
 
-    def _raise_meta(self: Storage, _file_id: str) -> None:
+    from data_bank_api.storage import FileMetadata
+
+    def _raise_meta(_file_id: str) -> FileMetadata:
         raise AppError(ErrorCode.INVALID_INPUT, "meta bad", 400)
 
-    monkeypatch.setattr(Storage, "head", _raise_meta)
+    fake_storage.head_override = _raise_meta
     r = client.get(f"/files/{fid}/info")
     assert r.status_code == 400
 
 
-def test_range_storage_error_then_get_size_not_found(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_range_storage_error_then_get_size_not_found(tmp_path: Path) -> None:
     # Cover app.py range error handling where get_size raises NotFound
-    client = _client(tmp_path)
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     # Upload a file first and get its actual file_id
     resp = client.post(
         "/files",
@@ -372,16 +474,16 @@ def test_range_storage_error_then_get_size_not_found(
 
     # Patch open_range to raise AppError with RANGE_NOT_SATISFIABLE
     def _raise_range_error(
-        self: Storage, file_id: str, start: int, end: int | None
+        file_id: str, start: int, end: int | None
     ) -> tuple[Generator[bytes, None, None], int, int]:
         raise AppError(ErrorCode.RANGE_NOT_SATISFIABLE, "simulated unsatisfiable", 416)
 
     # Patch get_size to raise AppError NOT_FOUND
-    def _raise_not_found(self: Storage, file_id: str) -> int:
+    def _raise_not_found(file_id: str) -> int:
         raise AppError(ErrorCode.NOT_FOUND, "file vanished", 404)
 
-    monkeypatch.setattr(Storage, "open_range", _raise_range_error)
-    monkeypatch.setattr(Storage, "get_size", _raise_not_found)
+    fake_storage.open_range_override = _raise_range_error
+    fake_storage.get_size_override = _raise_not_found
 
     # Make a range request that will trigger the range error path
     r = client.get(f"/files/{fid}", headers={"Range": "bytes=0-10"})
@@ -389,11 +491,23 @@ def test_range_storage_error_then_get_size_not_found(
     assert r.status_code == 404
 
 
-def test_range_open_range_non_416_error_reraises(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_range_open_range_non_416_error_reraises(tmp_path: Path) -> None:
     # Cover app.py line 125: when open_range raises AppError with status != 416
-    client = _client(tmp_path)
+    root = tmp_path / "files"
+    fake_storage = FakeStorage(root, 0, max_file_bytes=0)
+    _test_hooks.storage_factory = make_fake_storage_factory(fake_storage)
+
+    s: Settings = {
+        "redis_url": "redis://ignored",
+        "data_root": str(root),
+        "min_free_gb": 0,
+        "delete_strict_404": False,
+        "max_file_bytes": 0,
+        "api_upload_keys": frozenset(),
+        "api_read_keys": frozenset(),
+        "api_delete_keys": frozenset(),
+    }
+    client = TestClient(create_app(s))
     # Upload a file first and get its actual file_id
     resp = client.post(
         "/files",
@@ -406,11 +520,11 @@ def test_range_open_range_non_416_error_reraises(
 
     # Patch open_range to raise AppError with NOT_FOUND (404), not 416
     def _raise_not_found(
-        self: Storage, file_id: str, start: int, end: int | None
+        file_id: str, start: int, end: int | None
     ) -> tuple[Generator[bytes, None, None], int, int]:
         raise AppError(ErrorCode.NOT_FOUND, "file vanished mid-request", 404)
 
-    monkeypatch.setattr(Storage, "open_range", _raise_not_found)
+    fake_storage.open_range_override = _raise_not_found
 
     # Make a range request - should re-raise the non-416 error
     r = client.get(f"/files/{fid}", headers={"Range": "bytes=0-10"})

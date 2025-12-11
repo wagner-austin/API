@@ -8,6 +8,7 @@ from platform_core.queues import DATA_BANK_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
 from data_bank_api import _test_hooks
+from data_bank_api._test_hooks import _default_get_env
 from data_bank_api.worker_entry import (
     _build_config,
     _get_default_runner,
@@ -38,9 +39,10 @@ class _RecordingRunner:
         self.configs.append(config)
 
 
-def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_reads_env() -> None:
     """Test _build_config reads REDIS_URL and uses DATA_BANK_QUEUE."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-host:6379/0")
+    env_values: dict[str, str] = {"REDIS_URL": "redis://test-host:6379/0"}
+    _test_hooks.get_env = lambda key: env_values.get(key)
 
     cfg = _build_config()
 
@@ -49,9 +51,9 @@ def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["events_channel"] == default_events_channel("databank")
 
 
-def test_build_config_requires_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_requires_redis_url() -> None:
     """Test _build_config raises when REDIS_URL is missing."""
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    _test_hooks.get_env = lambda key: None
 
     with pytest.raises(RuntimeError, match="REDIS_URL"):
         _build_config()
@@ -102,11 +104,10 @@ def test_main_with_injected_dependencies() -> None:
     assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def test_main_builds_config_from_env_when_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_builds_config_from_env_when_not_provided() -> None:
     """Test main() builds config from environment when not provided."""
-    monkeypatch.setenv("REDIS_URL", "redis://from-env:6379/0")
+    env_values: dict[str, str] = {"REDIS_URL": "redis://from-env:6379/0"}
+    _test_hooks.get_env = lambda key: env_values.get(key)
 
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -125,12 +126,9 @@ def test_get_default_runner_returns_test_runner_when_set() -> None:
     def _custom_runner(config: WorkerConfig) -> None:
         pass
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _custom_runner
 
     result = _get_default_runner()
-
-    _test_hooks.test_runner = original
 
     assert result is _custom_runner
 
@@ -139,21 +137,17 @@ def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> Non
     """Test _get_default_runner returns run_rq_worker when test_runner is None."""
     from platform_workers.rq_harness import run_rq_worker
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = None
 
     result = _get_default_runner()
 
-    _test_hooks.test_runner = original
-
     assert result is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_uses_test_runner_when_set() -> None:
     """Test main() uses test_runner when set in _test_hooks."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-runner:6379/0")
+    env_values: dict[str, str] = {"REDIS_URL": "redis://test-runner:6379/0"}
+    _test_hooks.get_env = lambda key: env_values.get(key)
 
     received_configs: list[WorkerConfig] = []
 
@@ -161,30 +155,27 @@ def test_main_uses_test_runner_when_set(
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
-
-    # Restore
-    _test_hooks.test_runner = original
 
     assert len(received_configs) == 1
     assert received_configs[0]["redis_url"] == "redis://test-runner:6379/0"
     assert received_configs[0]["queue_name"] == DATA_BANK_QUEUE
 
 
-def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
-    Because _test_hooks is a separate module, our test_runner persists.
+    Because _test_hooks is a separate module, our test_runner and get_env persist.
     """
     import runpy
     import sys
 
-    monkeypatch.setenv("REDIS_URL", "redis://runpy-guard-test:6379/0")
+    env_values: dict[str, str] = {"REDIS_URL": "redis://runpy-guard-test:6379/0"}
+    _test_hooks.get_env = lambda key: env_values.get(key)
 
     received_configs: list[WorkerConfig] = []
 
@@ -192,7 +183,6 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
@@ -211,10 +201,16 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     if saved_module is not None:
         sys.modules[module_name] = saved_module
 
-    # Restore test runner
-    _test_hooks.test_runner = original
-
     # The guard should have been triggered, calling main()
     assert len(received_configs) == 1
     assert received_configs[0]["redis_url"] == "redis://runpy-guard-test:6379/0"
     assert received_configs[0]["queue_name"] == DATA_BANK_QUEUE
+
+
+def test_default_get_env_returns_env_value() -> None:
+    """Test _default_get_env reads from os.environ via platform_core."""
+    # This tests the default hook implementation by calling it directly.
+    # The function reads from os.environ; we test that it returns None for
+    # an unlikely key (won't exist in normal test environments).
+    result = _default_get_env("__DATA_BANK_API_TEST_KEY_UNLIKELY_TO_EXIST__")
+    assert result is None

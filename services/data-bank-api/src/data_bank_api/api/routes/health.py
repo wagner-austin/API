@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, status
 from platform_core.health import HealthResponse, ReadyResponse
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 from starlette.responses import Response
 
+from ... import _test_hooks
 from ...config import Settings
 from ...health import healthz_endpoint, readyz_endpoint
 
@@ -19,7 +20,7 @@ def build_router(cfg: Settings) -> APIRouter:
         return healthz_endpoint()
 
     def _readyz(resp: Response) -> ReadyResponse:
-        redis: RedisStrProto = redis_for_kv(cfg["redis_url"])
+        redis: RedisStrProto = _test_hooks.redis_factory(cfg["redis_url"])
         result = readyz_endpoint(
             redis=redis,
             data_root=cfg["data_root"],

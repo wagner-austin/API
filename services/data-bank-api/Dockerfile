@@ -59,7 +59,7 @@ FROM runtime-base AS api
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "exec hypercorn 'data_bank_api.app:create_app()' --bind [::]:${PORT:-8000}"]
+CMD ["sh", "-c", "exec hypercorn 'data_bank_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
 
 # ---------- Worker target ----------
 FROM runtime-base AS worker

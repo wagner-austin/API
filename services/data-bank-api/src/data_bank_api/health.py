@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from platform_core.health import HealthResponse, ReadyResponse, healthz
@@ -19,14 +20,23 @@ from platform_workers.redis import RedisStrProto
 _logger = get_logger(__name__)
 
 
-def _is_writable(path: Path) -> bool:
+def _default_mkstemp(prefix: str, dir_path: str) -> tuple[int, str]:
+    """Default implementation - calls tempfile.mkstemp."""
+    return tempfile.mkstemp(prefix=prefix, dir=dir_path)
+
+
+# Hook for testing - allows simulating mkstemp failures.
+_mkstemp: Callable[[str, str], tuple[int, str]] = _default_mkstemp
+
+
+def _default_is_writable(path: Path) -> bool:
     """Check if a path is writable by attempting to create a temp file.
 
     Returns False if the directory is not writable or a filesystem error occurs.
     """
     path.mkdir(parents=True, exist_ok=True)
     try:
-        fd, tmp = tempfile.mkstemp(prefix="probe_", dir=str(path))
+        fd, tmp = _mkstemp("probe_", str(path))
     except OSError:
         return False
     os.close(fd)
@@ -34,10 +44,15 @@ def _is_writable(path: Path) -> bool:
     return True
 
 
-def _free_gb(path: Path) -> float:
+def _default_free_gb(path: Path) -> float:
     """Return free disk space in GB for the given path."""
     usage = shutil.disk_usage(str(path))
     return usage.free / (1024**3)
+
+
+# Hooks for testing - allows injecting fakes for storage checks.
+_is_writable: Callable[[Path], bool] = _default_is_writable
+_free_gb: Callable[[Path], float] = _default_free_gb
 
 
 def healthz_endpoint() -> HealthResponse:

@@ -7,10 +7,10 @@ from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
 
-from .api.routes import files as routes_files
-from .api.routes import health as routes_health
-from .config import Settings, settings_from_env
-from .storage import Storage
+from .. import _test_hooks
+from ..config import Settings, settings_from_env
+from .routes import files as routes_files
+from .routes import health as routes_health
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -25,7 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="data-bank-api", version="0.1.0")
     install_request_id_middleware(app)
     install_exception_handlers_fastapi(app)
-    storage = Storage(
+    storage = _test_hooks.storage_factory(
         root=Path(cfg["data_root"]),
         min_free_gb=cfg["min_free_gb"],
         max_file_bytes=cfg["max_file_bytes"],

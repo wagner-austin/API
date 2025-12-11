@@ -4,13 +4,41 @@ import hashlib
 import os
 import shutil
 import tempfile
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO, TypedDict
 
 from platform_core.errors import AppError, ErrorCode
 from platform_core.logging import get_logger
+
+
+# =========================================================================
+# Test hooks for OS operations - tests can override to inject failures
+# =========================================================================
+def _default_os_replace(src: str, dst: str) -> None:
+    """Default implementation using os.replace."""
+    os.replace(src, dst)
+
+
+def _default_os_unlink(path: str) -> None:
+    """Default implementation using os.unlink."""
+    os.unlink(path)
+
+
+def _default_path_stat(path: Path) -> os.stat_result:
+    """Default implementation using path.stat()."""
+    return path.stat()
+
+
+# Hook for os.replace. Tests can inject failures.
+_os_replace: Callable[[str, str], None] = _default_os_replace
+
+# Hook for os.unlink. Tests can inject failures.
+_os_unlink: Callable[[str], None] = _default_os_unlink
+
+# Hook for Path.stat. Tests can inject fake stat results.
+_path_stat: Callable[[Path], os.stat_result] = _default_path_stat
 
 
 class FileMetadata(TypedDict):
@@ -109,7 +137,7 @@ class Storage:
             target = self._path_for(file_id)
             target_parent = target.parent
             target_parent.mkdir(parents=True, exist_ok=True)
-            os.replace(tmp, target)
+            _os_replace(tmp, str(target))
             created_at = datetime.now(tz=UTC).isoformat()
             # Write sidecar metadata atomically under the final directory
             meta_tmp_fd, meta_tmp = tempfile.mkstemp(prefix="meta_", dir=str(target_parent))
@@ -120,11 +148,11 @@ class Storage:
                     mf.write(f"created_at={created_at}\n")
                     mf.flush()
                     os.fsync(mf.fileno())
-                os.replace(meta_tmp, self._meta_path_for(file_id))
+                _os_replace(meta_tmp, str(self._meta_path_for(file_id)))
             finally:
                 try:
                     if os.path.exists(meta_tmp):
-                        os.unlink(meta_tmp)
+                        _os_unlink(meta_tmp)
                 except OSError as exc:
                     get_logger("data_bank_api").debug(
                         "meta_tmp_cleanup_failed path=%s error=%s", meta_tmp, exc
@@ -139,7 +167,7 @@ class Storage:
         finally:
             try:
                 if os.path.exists(tmp):
-                    os.unlink(tmp)
+                    _os_unlink(tmp)
             except OSError as exc:
                 get_logger("data_bank_api").debug("tmp_cleanup_failed path=%s error=%s", tmp, exc)
 
@@ -147,7 +175,7 @@ class Storage:
         path = self._path_for(file_id)
         if not path.exists() or not path.is_file():
             raise AppError(ErrorCode.NOT_FOUND, "file not found", 404)
-        size = path.stat().st_size
+        size = _path_stat(path).st_size
         sha, ctype, created_at = self._read_sidecar(file_id)
         return {
             "file_id": file_id.strip().lower(),
@@ -163,7 +191,7 @@ class Storage:
         path = self._path_for(file_id)
         if not path.exists() or not path.is_file():
             raise AppError(ErrorCode.NOT_FOUND, "file not found", 404)
-        size = path.stat().st_size
+        size = _path_stat(path).st_size
         if start < 0 or (end_inclusive is not None and end_inclusive < start):
             raise AppError(ErrorCode.RANGE_NOT_SATISFIABLE, "invalid range", 416)
         last = size - 1 if end_inclusive is None or end_inclusive > size - 1 else end_inclusive
@@ -204,4 +232,4 @@ class Storage:
         path = self._path_for(file_id)
         if not path.exists() or not path.is_file():
             raise AppError(ErrorCode.NOT_FOUND, "file not found", 404)
-        return int(path.stat().st_size)
+        return int(_path_stat(path).st_size)

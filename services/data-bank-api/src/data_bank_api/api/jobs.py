@@ -5,15 +5,15 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Final, Protocol, TypedDict
 
-from platform_core.data_bank_client import DataBankClient, DataBankClientError
+from platform_core.data_bank_client import DataBankClientError
 from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.job_types import job_key
 from platform_core.queues import DATA_BANK_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
 from platform_workers.redis import RedisStrProto
 
-from ..core.corpus_download import ensure_corpus_file
-from .config import Settings
+from .. import _test_hooks
+from .config import JobParams, Settings
 
 
 class _LogExtraDict(TypedDict, total=False):
@@ -24,14 +24,6 @@ class LoggerLike(Protocol):
     def info(self, msg: str, *, extra: _LogExtraDict | None = None) -> None: ...
 
     def error(self, msg: str, *, extra: _LogExtraDict | None = None) -> None: ...
-
-
-class JobParams(TypedDict):
-    source: str
-    language: str
-    max_sentences: int
-    transliterate: bool
-    confidence_threshold: float
 
 
 class StatusDict(TypedDict):
@@ -98,8 +90,8 @@ def process_corpus_impl(
     ctx.publish_started()
 
     try:
-        # Ensure corpus availability (tests monkeypatch this to a no-op)
-        ensure_corpus_file(
+        # Ensure corpus availability (tests override via _test_hooks)
+        _test_hooks.ensure_corpus_file(
             source=params["source"],
             language=params["language"],
             data_dir=settings["data_dir"],
@@ -108,20 +100,20 @@ def process_corpus_impl(
             confidence_threshold=params["confidence_threshold"],
         )
 
-        # Stream corpus into buffer
-        service = LocalCorpusService(settings["data_dir"])
+        # Stream corpus into buffer (tests override via _test_hooks)
+        service = _test_hooks.local_corpus_service_factory(settings["data_dir"])
         buffer = io.BytesIO()
         for line in service.stream(params):
             buffer.write(f"{line}\n".encode())
         buffer.seek(0)
 
-        # Upload to Data Bank API using DataBankClient
+        # Upload to Data Bank API using DataBankClient (tests override via _test_hooks)
         api_url = settings["data_bank_api_url"]
         api_key = settings["data_bank_api_key"]
         if api_url.strip() == "" or api_key.strip() == "":
             raise DataBankClientError("data-bank configuration missing")
 
-        client = DataBankClient(api_url, api_key, timeout_seconds=600.0)
+        client = _test_hooks.data_bank_client_factory(api_url, api_key, timeout_seconds=600.0)
         ctx.publish_progress(5, "uploading corpus")
         response = client.upload(
             file_id=f"{job_id}.txt",

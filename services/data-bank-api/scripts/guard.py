@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -10,10 +10,19 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
+def _default_is_dir(path: Path) -> bool:
+    """Default is_dir check using Path.is_dir()."""
+    return path.is_dir()
+
+
+# Hook for is_dir checks - tests can override to simulate missing directories.
+_is_dir: Callable[[Path], bool] = _default_is_dir
+
+
 def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
-        if (current / "libs").is_dir():
+        if _is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")

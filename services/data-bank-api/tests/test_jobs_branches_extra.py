@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from pathlib import Path
-from typing import BinaryIO, TypedDict
+from typing import BinaryIO, Protocol, TypedDict
 
 import pytest
 from platform_core.data_bank_client import DataBankClientError
@@ -17,6 +17,7 @@ from platform_core.job_events import (
 from platform_core.job_types import job_key
 from platform_workers.testing import FakeRedis
 
+from data_bank_api import _test_hooks
 from data_bank_api.api.config import Settings
 from data_bank_api.api.jobs import (
     JobParams,
@@ -37,6 +38,88 @@ def _settings(tmp_path: Path) -> Settings:
         data_bank_api_url="http://db",
         data_bank_api_key="K",
     )
+
+
+def _noop_ensure(
+    *,
+    source: str,
+    language: str,
+    data_dir: str,
+    max_sentences: int,
+    transliterate: bool,
+    confidence_threshold: float,
+) -> None:
+    """No-op corpus ensure function for testing."""
+    return
+
+
+class _FakeCorpusService:
+    """Fake corpus service that yields test lines."""
+
+    def __init__(self, data_dir: str) -> None:
+        pass
+
+    def stream(self, spec: JobParams) -> Generator[str, None, None]:
+        yield from ["one", "two"]
+
+
+class _FakeCorpusServiceSingle:
+    """Fake corpus service that yields a single test line."""
+
+    def __init__(self, data_dir: str) -> None:
+        pass
+
+    def stream(self, spec: JobParams) -> Generator[str, None, None]:
+        yield from ["x"]
+
+
+def _make_fake_corpus_factory(
+    service_class: type[_FakeCorpusService] | type[_FakeCorpusServiceSingle],
+) -> _test_hooks.LocalCorpusServiceFactoryProtocol:
+    """Create a factory function for the given corpus service class."""
+
+    def _factory(data_dir: str) -> _test_hooks.LocalCorpusServiceProtocol:
+        return service_class(data_dir)
+
+    return _factory
+
+
+class _DataBankClientProtocol(Protocol):
+    """Protocol for mock DataBankClient classes used in tests."""
+
+    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 60.0) -> None: ...
+
+    def upload(
+        self,
+        file_id: str,
+        stream: BinaryIO,
+        *,
+        content_type: str = "application/octet-stream",
+        request_id: str | None = None,
+    ) -> FileUploadResponse: ...
+
+
+def _make_mock_client_factory(
+    client_class: type[_DataBankClientProtocol],
+) -> _test_hooks.DataBankUploaderFactoryProtocol:
+    """Create a factory function for the given client class."""
+
+    def _factory(
+        api_url: str, api_key: str, *, timeout_seconds: float
+    ) -> _test_hooks.DataBankUploaderProtocol:
+        return client_class(api_url, api_key, timeout_seconds=timeout_seconds)
+
+    return _factory
+
+
+class _Log(LoggerLike):
+    """Simple logger stub for testing."""
+
+    def info(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
+        return None
+
+    def error(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
+        return None
 
 
 def test_local_corpus_service_defaults(tmp_path: Path) -> None:
@@ -109,29 +192,7 @@ def test_local_corpus_service_skips_empty_lines(tmp_path: Path) -> None:
     assert result == ["line1", "line2", "line3"]
 
 
-def test_jobs_upload_handles_client_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # Ensure corpus ensure is a no-op
-    def _noop_ensure(
-        *,
-        source: str,
-        language: str,
-        data_dir: str,
-        max_sentences: int,
-        transliterate: bool,
-        confidence_threshold: float,
-    ) -> None:
-        return None
-
-    monkeypatch.setattr("data_bank_api.core.corpus_download.ensure_corpus_file", _noop_ensure)
-
-    # Stream a small corpus
-    class _Svc:
-        def __init__(self, _data_dir: str) -> None:
-            pass
-
-        def stream(self, _spec: JobParams) -> Generator[str, None, None]:
-            yield from ["one", "two"]
-
+def test_jobs_upload_handles_client_error(tmp_path: Path) -> None:
     class _ErrorClient:
         def __init__(
             self,
@@ -152,21 +213,14 @@ def test_jobs_upload_handles_client_error(monkeypatch: pytest.MonkeyPatch, tmp_p
         ) -> FileUploadResponse:
             raise DataBankClientError("upload failed")
 
-    import data_bank_api.api.jobs as jobs_mod
-
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _ErrorClient)
+    # Configure hooks
+    _test_hooks.ensure_corpus_file = _noop_ensure
+    _test_hooks.local_corpus_service_factory = _make_fake_corpus_factory(_FakeCorpusService)
+    _test_hooks.data_bank_client_factory = _make_mock_client_factory(_ErrorClient)
 
     # Execute
     r = FakeRedis()
     s = _settings(tmp_path)
-
-    class _Log(LoggerLike):
-        def info(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
-            return None
-
-        def error(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
-            return None
 
     with pytest.raises(DataBankClientError, match="upload failed"):
         process_corpus_impl(
@@ -186,29 +240,7 @@ def test_jobs_upload_handles_client_error(monkeypatch: pytest.MonkeyPatch, tmp_p
     r.assert_only_called({"publish", "hgetall"})
 
 
-def test_process_corpus_upload_server_error_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    def _noop_ensure(
-        *,
-        source: str,
-        language: str,
-        data_dir: str,
-        max_sentences: int,
-        transliterate: bool,
-        confidence_threshold: float,
-    ) -> None:
-        return None
-
-    monkeypatch.setattr("data_bank_api.core.corpus_download.ensure_corpus_file", _noop_ensure)
-
-    class _Svc(LocalCorpusService):
-        def __init__(self, _data_dir: str) -> None:
-            super().__init__(_data_dir)
-
-        def stream(self, _spec: JobParams) -> Generator[str, None, None]:
-            yield from ["x"]
-
+def test_process_corpus_upload_server_error_raises(tmp_path: Path) -> None:
     class _ServerErrorClient:
         def __init__(
             self,
@@ -229,10 +261,10 @@ def test_process_corpus_upload_server_error_raises(
         ) -> FileUploadResponse:
             raise DataBankClientError("HTTP 500: Internal Server Error")
 
-    import data_bank_api.api.jobs as jobs_mod
-
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _ServerErrorClient)
+    # Configure hooks
+    _test_hooks.ensure_corpus_file = _noop_ensure
+    _test_hooks.local_corpus_service_factory = _make_fake_corpus_factory(_FakeCorpusServiceSingle)
+    _test_hooks.data_bank_client_factory = _make_mock_client_factory(_ServerErrorClient)
 
     r = FakeRedis()
     s: Settings = {
@@ -241,13 +273,6 @@ def test_process_corpus_upload_server_error_raises(
         "data_bank_api_url": "http://db",
         "data_bank_api_key": "K",
     }
-
-    class _Log(LoggerLike):
-        def info(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
-            return None
-
-        def error(self, msg: str, *, extra: _LogExtraDict | None = None) -> None:
-            return None
 
     with pytest.raises(DataBankClientError, match="HTTP 500"):
         process_corpus_impl(

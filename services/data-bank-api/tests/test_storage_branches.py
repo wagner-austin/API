@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import AppError, ErrorCode
 
+from data_bank_api import storage as storage_mod
 from data_bank_api.storage import Storage
 
 
@@ -68,10 +69,10 @@ def _raise_oserror_unlink(*_args: str, **_kwargs: str) -> None:
     raise OSError("unlink fail")
 
 
-def test_save_stream_cleanup_unlink(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_stream_cleanup_unlink(tmp_path: Path) -> None:
     s = _storage(tmp_path)
     # force os.replace to raise so tmp file remains for cleanup
-    monkeypatch.setattr(os, "replace", _raise_oserror_fail)
+    storage_mod._os_replace = _raise_oserror_fail
     with pytest.raises(OSError):
         s.save_stream(io.BytesIO(b"data"), "text/plain")
     # ensure no upload_* tmp files remain
@@ -79,16 +80,16 @@ def test_save_stream_cleanup_unlink(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert list(parts) == []
 
 
-def test_save_stream_cleanup_unlink_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_stream_cleanup_unlink_error(tmp_path: Path) -> None:
     s = _storage(tmp_path)
-    monkeypatch.setattr(os, "replace", _raise_oserror_fail)
+    storage_mod._os_replace = _raise_oserror_fail
     # make unlink also fail to exercise except branch in cleanup
-    monkeypatch.setattr(os, "unlink", _raise_oserror_unlink)
+    storage_mod._os_unlink = _raise_oserror_unlink
     with pytest.raises(OSError):
         s.save_stream(io.BytesIO(b"data"), "text/plain")
 
 
-def test_insufficient_space_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_insufficient_space_guard(tmp_path: Path) -> None:
     # configure high min_free to trigger guard
     s = Storage(root=tmp_path / "files", min_free_gb=1_000_000)
     with pytest.raises(AppError) as exc_info:
@@ -137,13 +138,11 @@ def test_meta_path_valid_return(tmp_path: Path) -> None:
     assert meta_path.exists()
 
 
-def test_sidecar_replace_and_cleanup_unlink_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sidecar_replace_and_cleanup_unlink_error(tmp_path: Path) -> None:
     s = _storage(tmp_path)
     # Patch os.replace and os.unlink to fail for meta temp files
-    real_replace = os.replace
-    real_unlink = os.unlink
+    real_replace = storage_mod._default_os_replace
+    real_unlink = storage_mod._default_os_unlink
 
     def _replace(src: str, dst: str) -> None:
         from pathlib import Path as PathMod
@@ -159,19 +158,17 @@ def test_sidecar_replace_and_cleanup_unlink_error(
             raise OSError("meta unlink fail")
         real_unlink(path)
 
-    monkeypatch.setattr(os, "replace", _replace)
-    monkeypatch.setattr(os, "unlink", _unlink)
+    storage_mod._os_replace = _replace
+    storage_mod._os_unlink = _unlink
     # Metadata writes are mandatory; save_stream should fail if metadata fails
     # Cleanup will also fail but should be silently handled
     with pytest.raises(OSError, match="meta replace fail"):
         s.save_stream(io.BytesIO(b"sidecar"), "text/plain")
 
 
-def test_sidecar_cleanup_unlink_error_after_successful_save(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sidecar_cleanup_unlink_error_after_successful_save(tmp_path: Path) -> None:
     s = _storage(tmp_path)
-    real_unlink = os.unlink
+    real_unlink = storage_mod._default_os_unlink
 
     def _unlink(path: str) -> None:
         from pathlib import Path as PathMod
@@ -180,7 +177,7 @@ def test_sidecar_cleanup_unlink_error_after_successful_save(
             raise OSError("meta unlink fail")
         real_unlink(path)
 
-    monkeypatch.setattr(os, "unlink", _unlink)
+    storage_mod._os_unlink = _unlink
     # Upload should succeed even if cleanup fails
     meta = s.save_stream(io.BytesIO(b"test"), "text/plain")
     assert len(meta["sha256"]) == 64
@@ -250,9 +247,7 @@ def test_delete_cleans_stale_sidecar(tmp_path: Path) -> None:
     assert not meta_path.exists()
 
 
-def test_open_range_early_break_on_empty_chunk(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_open_range_early_break_on_empty_chunk(tmp_path: Path) -> None:
     # Cover storage.py line 211: break when chunk is empty before all data read
     # This simulates a file that reports larger size but has less data
     s = _storage(tmp_path)
@@ -262,13 +257,11 @@ def test_open_range_early_break_on_empty_chunk(
     file_id = meta["file_id"]
     target_path = s._path_for(file_id)
 
-    # Monkeypatch Path.stat at class level to report inflated size for our file
-    original_stat_method = Path.stat
-
-    def fake_stat(self: Path) -> os.stat_result:
-        real_stat = original_stat_method(self)
+    # Create a fake stat function that reports inflated size for our file
+    def fake_stat(path: Path) -> os.stat_result:
+        real_stat = path.stat()
         # Only inflate size for our specific file
-        if self == target_path:
+        if path == target_path:
             return os.stat_result(
                 (
                     real_stat.st_mode,
@@ -285,7 +278,7 @@ def test_open_range_early_break_on_empty_chunk(
             )
         return real_stat
 
-    monkeypatch.setattr(Path, "stat", fake_stat)
+    storage_mod._path_stat = fake_stat
 
     # Request a range based on the fake size
     it, _start, _last = s.open_range(file_id, 0, 9999)

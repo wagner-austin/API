@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
 from fastapi.testclient import TestClient
+from platform_core.testing import make_fake_env
 
-from data_bank_api.app import create_app
+from data_bank_api.api.main import create_app
 
 
-def test_app_factory_and_health_endpoints(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("API_UPLOAD_KEYS", "u1")
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
+def test_app_factory_and_health_endpoints() -> None:
+    env = make_fake_env()
+    env.set("API_UPLOAD_KEYS", "u1")
+    env.set("REDIS_URL", "redis://ignored")
     app = create_app()
     client: TestClient = TestClient(app)
 
