@@ -65,8 +65,11 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe (checks Redis) |
 | `/v1/captions` | POST | Extract YouTube native captions |
-| `/v1/stt` | POST | Transcribe video audio via Whisper |
+| `/v1/stt` | POST | Transcribe video audio via Whisper (sync) |
+| `/v1/stt/jobs` | POST | Enqueue async STT job |
+| `/v1/stt/jobs/{job_id}` | GET | Get async STT job status |
 
 ---
 
