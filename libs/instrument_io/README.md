@@ -9,6 +9,25 @@ Strictly typed IO for analytical chemistry instrument data formats.
 instrument-io = { path = "../libs/instrument_io", develop = true }
 ```
 
+## Quick Start
+
+```python
+from pathlib import Path
+from instrument_io import AgilentReader, MzMLReader, ExcelReader, PDFWriter
+
+# Read mass spectrometry data
+reader = AgilentReader()
+tic = reader.read_tic(Path("sample.D"))
+
+# Read Excel workbooks
+excel = ExcelReader()
+rows = excel.read_sheet(Path("data.xlsx"), "Sheet1")
+
+# Write PDF reports
+writer = PDFWriter(page_size="letter", margin_inches=1.0)
+writer.write_document(content, Path("report.pdf"))
+```
+
 ## Readers
 
 ### Mass Spectrometry Vendors
@@ -38,13 +57,23 @@ for spectrum in reader.iter_spectra(Path("sample.raw")):
 ### Open Formats
 
 ```python
-from instrument_io import MzMLReader
+from instrument_io import MzMLReader, MGFReader, ImzMLReader
 
+# mzML files
 reader = MzMLReader()
 tic = reader.read_tic(Path("sample.mzML"))
 
 for spectrum in reader.iter_spectra(Path("sample.mzML")):
     print(spectrum["meta"]["ms_level"], spectrum["stats"]["base_peak_mz"])
+
+# MGF peak lists
+reader = MGFReader()
+spectra = list(reader.iter_spectra(Path("peaks.mgf")))
+
+# Imaging mass spectrometry
+reader = ImzMLReader()
+coordinates = reader.read_coordinates(Path("tissue.imzML"))
+spectrum = reader.read_spectrum(Path("tissue.imzML"), index=0)
 ```
 
 ### Document Formats
@@ -79,7 +108,7 @@ tables = reader.read_tables(Path("results.pptx"))
 ### Specialized Formats
 
 ```python
-from instrument_io import MATReader, TXTReader, SMPSReader, MGFReader, ImzMLReader
+from instrument_io import MATReader, TXTReader, SMPSReader
 
 # MATLAB data files
 reader = MATReader()
@@ -95,53 +124,25 @@ lines = reader.read_lines(Path("data.txt"))
 reader = SMPSReader()
 metadata = reader.read_metadata(Path("scan.rps"))
 data = reader.read_full(Path("scan.rps"))
-
-# MGF peak lists
-reader = MGFReader()
-spectra = list(reader.iter_spectra(Path("peaks.mgf")))
-
-# Imaging mass spectrometry
-reader = ImzMLReader()
-coordinates = reader.read_coordinates(Path("tissue.imzML"))
-spectrum = reader.read_spectrum(Path("tissue.imzML"), index=0)
 ```
 
-## Supported Formats
-
-| Format | Extension | Library |
-|--------|-----------|---------|
-| Agilent MassHunter/ChemStation | `.D` (directory) | rainbow-api |
-| Waters MassLynx | `.raw` (directory) | rainbow-api |
-| Thermo RAW | `.raw` (file) | ThermoRawFileParser |
-| mzML | `.mzML` | pyteomics |
-| mzXML | `.mzXML` | pyteomics |
-| MGF | `.mgf` | pyteomics |
-| imzML | `.imzML` + `.ibd` | pyimzml |
-| Excel | `.xlsx`, `.xls`, `.xlsm` | openpyxl + polars |
-| CSV | `.csv` | stdlib |
-| PDF | `.pdf` | pdfplumber |
-| Word (read) | `.docx` | python-docx |
-| Word (write) | `.docx` | python-docx |
-| PDF (write) | `.pdf` | reportlab |
-| PowerPoint | `.pptx`, `.pptm` | python-pptx |
-| MATLAB | `.mat` | scipy |
-| Plain Text | `.txt` | stdlib |
-| SMPS Particle Size | `.rps` | stdlib |
-
-See [FORMATS.md](FORMATS.md) for platform requirements and Docker support.
-
-## Return Types
-
-All methods return strictly-typed TypedDicts:
-
-| Type | Description |
-|------|-------------|
-| `TICData` | Total Ion Chromatogram |
-| `EICData` | Extracted Ion Chromatogram |
-| `MSSpectrum` | Mass spectrum with m/z and intensities |
-| `DADData` | Diode Array Detector data (UV-Vis) |
-
 ## Writers
+
+### PDF Documents
+
+```python
+from pathlib import Path
+from instrument_io import PDFWriter, DocumentContent
+
+content: DocumentContent = [
+    {"type": "heading", "text": "Analysis Results", "level": 1},
+    {"type": "paragraph", "text": "Summary of findings.", "bold": False, "italic": False},
+    {"type": "table", "headers": ["Compound", "Concentration"], "rows": [{"Compound": "Caffeine", "Concentration": 125.4}], "caption": ""},
+]
+
+writer = PDFWriter(page_size="letter", margin_inches=1.0)
+writer.write_document(content, Path("results.pdf"))
+```
 
 ### Word Documents
 
@@ -164,20 +165,17 @@ writer = WordWriter(title="My Report", author="Lab Team")
 writer.write_document(content, Path("report.docx"))
 ```
 
-### PDF Documents
+### Excel Workbooks
 
 ```python
 from pathlib import Path
-from instrument_io import PDFWriter, DocumentContent
+from instrument_io import ExcelWriter
 
-content: DocumentContent = [
-    {"type": "heading", "text": "Analysis Results", "level": 1},
-    {"type": "paragraph", "text": "Summary of findings.", "bold": False, "italic": False},
-    {"type": "table", "headers": ["Compound", "Concentration"], "rows": [{"Compound": "Caffeine", "Concentration": 125.4}], "caption": ""},
-]
-
-writer = PDFWriter(page_size="letter", margin_inches=1.0)
-writer.write_document(content, Path("results.pdf"))
+writer = ExcelWriter()
+writer.write_sheet(Path("output.xlsx"), "Results", rows=[
+    {"Sample": "A", "Value": 1.5},
+    {"Sample": "B", "Value": 2.3},
+])
 ```
 
 ### Document Content Types
@@ -193,16 +191,131 @@ Both `WordWriter` and `PDFWriter` accept the same `DocumentContent` type:
 | `ListContent` | `type="list"`, `items`, `ordered` |
 | `PageBreakContent` | `type="page_break"` |
 
+## Supported Formats
+
+| Format | Extension | Library |
+|--------|-----------|---------|
+| Agilent MassHunter/ChemStation | `.D` (directory) | rainbow-api |
+| Waters MassLynx | `.raw` (directory) | rainbow-api |
+| Thermo RAW | `.raw` (file) | ThermoRawFileParser |
+| mzML | `.mzML` | pyteomics |
+| mzXML | `.mzXML` | pyteomics |
+| MGF | `.mgf` | pyteomics |
+| imzML | `.imzML` + `.ibd` | pyimzml |
+| Excel | `.xlsx`, `.xls`, `.xlsm` | openpyxl + polars |
+| CSV | `.csv` | stdlib |
+| PDF (read) | `.pdf` | pdfplumber |
+| PDF (write) | `.pdf` | reportlab |
+| Word (read) | `.docx` | python-docx |
+| Word (write) | `.docx` | python-docx |
+| PowerPoint | `.pptx`, `.pptm` | python-pptx |
+| MATLAB | `.mat` | scipy |
+| Plain Text | `.txt` | stdlib |
+| SMPS Particle Size | `.rps` | stdlib |
+
+See [FORMATS.md](FORMATS.md) for platform requirements and Docker support.
+
+## Return Types
+
+All methods return strictly-typed TypedDicts:
+
+### Chromatogram Types
+
+| Type | Description |
+|------|-------------|
+| `TICData` | Total Ion Chromatogram |
+| `EICData` | Extracted Ion Chromatogram |
+| `DADData` | Diode Array Detector data (UV-Vis) |
+| `DADSlice` | Single wavelength slice |
+| `ChromatogramData` | Generic chromatogram |
+| `ChromatogramMeta` | Chromatogram metadata |
+| `ChromatogramStats` | Chromatogram statistics |
+| `EICParams` | EIC extraction parameters |
+
+### Spectrum Types
+
+| Type | Description |
+|------|-------------|
+| `MSSpectrum` | Mass spectrum with m/z and intensities |
+| `MS2Spectrum` | MS/MS spectrum with precursor |
+| `MS3Spectrum` | MS3 spectrum |
+| `SpectrumData` | Raw spectrum arrays |
+| `SpectrumMeta` | Spectrum metadata |
+| `SpectrumStats` | Spectrum statistics |
+| `PrecursorInfo` | Precursor ion information |
+
+### Peak List Types
+
+| Type | Description |
+|------|-------------|
+| `MassPeak` | Single mass peak |
+| `MassPeakList` | List of mass peaks |
+| `AnnotatedMassPeak` | Peak with annotation |
+| `AnnotatedMassPeakList` | Annotated peak list |
+| `ChromatogramPeak` | Chromatographic peak |
+| `ChromatogramPeakList` | List of chromatographic peaks |
+| `PeakListMeta` | Peak list metadata |
+
+### Metadata Types
+
+| Type | Description |
+|------|-------------|
+| `FileInfo` | File information |
+| `InstrumentInfo` | Instrument details |
+| `MethodInfo` | Method parameters |
+| `SampleInfo` | Sample information |
+| `AcquisitionInfo` | Acquisition settings |
+| `BatchInfo` | Batch information |
+| `RunInfo` | Run information |
+
+### Common Types
+
+| Type | Description |
+|------|-------------|
+| `CellValue` | Excel cell value type |
+| `JSONValue` | JSON-compatible value |
+| `MSLevel` | MS level (1, 2, 3) |
+| `Polarity` | Ion polarity |
+| `SignalType` | Signal type |
+| `PageSize` | PDF page size |
+| `OperationResult` | Success/error result |
+| `SuccessResult` | Success with value |
+| `ErrorResult` | Error with message |
+
+## Protocols
+
+| Protocol | Description |
+|----------|-------------|
+| `ChromatogramReaderProtocol` | Reader with `read_tic`, `read_eic` |
+| `SpectrumReaderProtocol` | Reader with `iter_spectra` |
+| `ExcelReaderProtocol` | Excel file reader |
+| `ExcelWriterProtocol` | Excel file writer |
+| `DocumentWriterProtocol` | Document writer (PDF/Word) |
+
 ## Error Handling
 
 Each reader has a dedicated exception type:
 
 ```python
 from instrument_io import (
-    AgilentReadError, WatersReadError, ThermoReadError,
-    MzMLReadError, ExcelReadError, PDFReadError,
-    DOCXReadError, PPTXReadError, MATReadError,
-    TXTReadError, SMPSReadError, MGFReadError, ImzMLReadError
+    InstrumentIOError,      # Base exception
+    AgilentReadError,
+    WatersReadError,
+    ThermoReadError,
+    MzMLReadError,
+    MGFReadError,
+    ImzMLReadError,
+    ExcelReadError,
+    CSVReadError,
+    PDFReadError,
+    DOCXReadError,
+    PPTXReadError,
+    MATReadError,
+    TXTReadError,
+    SMPSReadError,
+    WriterError,
+    DecodingError,
+    UnsupportedFormatError,
 )
 
 # Example: Instrument data
@@ -221,6 +334,16 @@ except DOCXReadError as e:
 ```
 
 No recovery or fallback behavior - methods either succeed or raise.
+
+## Helper Functions
+
+```python
+from instrument_io import make_success, make_error
+
+# Create typed results
+result = make_success(value=42)
+error = make_error(message="File not found")
+```
 
 ## Development
 
