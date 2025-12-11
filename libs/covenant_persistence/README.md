@@ -10,6 +10,32 @@ poetry add covenant-persistence
 
 Requires `covenant-domain` and `psycopg[binary,pool]` for runtime.
 
+## Quick Start
+
+```python
+from covenant_persistence import (
+    connect,
+    PostgresDealRepository,
+    PostgresCovenantRepository,
+)
+from covenant_domain import Deal, DealId
+
+# Connect to PostgreSQL
+conn = connect("postgresql://user:pass@localhost:5432/covenant")
+
+# Create repositories
+deal_repo = PostgresDealRepository(conn)
+
+# Use repositories
+deal: Deal = {
+    "id": DealId(value="abc-123"),
+    "name": "Tech Corp Credit Facility",
+    ...
+}
+deal_repo.save(deal)
+retrieved = deal_repo.get(DealId(value="abc-123"))
+```
+
 ## Repository Protocols
 
 Abstract repository interfaces that can be implemented with any storage backend:
@@ -85,6 +111,35 @@ from covenant_persistence import (
     ConnectCallable,
 )
 ```
+
+## API Reference
+
+### Repository Protocols
+
+| Protocol | Description |
+|----------|-------------|
+| `DealRepository` | CRUD for Deal entities |
+| `CovenantRepository` | CRUD for Covenant entities |
+| `MeasurementRepository` | Bulk save/list for Measurements |
+| `CovenantResultRepository` | Bulk save/list for CovenantResults |
+
+### PostgreSQL Implementations
+
+| Class | Description |
+|-------|-------------|
+| `PostgresDealRepository` | psycopg3 implementation for deals |
+| `PostgresCovenantRepository` | psycopg3 implementation for covenants |
+| `PostgresMeasurementRepository` | psycopg3 implementation for measurements |
+| `PostgresCovenantResultRepository` | psycopg3 implementation for results |
+
+### Connection Types
+
+| Type | Description |
+|------|-------------|
+| `ConnectionProtocol` | Database connection interface |
+| `CursorProtocol` | Database cursor interface |
+| `ConnectCallable` | Connection factory type |
+| `connect` | Create a psycopg connection |
 
 ## Testing
 
