@@ -2,30 +2,14 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
-from typing import Protocol, runtime_checkable
 
 from platform_core.json_utils import JSONValue
 from typing_extensions import TypedDict
 
+from .. import _test_hooks
+from .._test_hooks import YtDlpFactoryProto
 from ..stt_provider import ProbeDownloadClient
 from ..types import FormatTD, RequestedDownloadTD, SubtitleResultTD, YtInfoTD
-
-
-@runtime_checkable
-class _YtDlpProto(Protocol):
-    def extract_info(self, url: str, download: bool) -> dict[str, JSONValue]: ...
-    def prepare_filename(self, info: dict[str, JSONValue]) -> str: ...
-
-
-@runtime_checkable
-class _YtDlpContextProto(Protocol):
-    def __enter__(self) -> _YtDlpProto: ...
-    def __exit__(self, *args: str | int | None) -> None: ...
-
-
-@runtime_checkable
-class _YtDlpFactoryProto(Protocol):
-    def __call__(self, opts: dict[str, JSONValue]) -> _YtDlpContextProto: ...
 
 
 class _YtDlpOpts(TypedDict, total=False):
@@ -159,16 +143,13 @@ def _coerce_yt_info(raw: dict[str, JSONValue]) -> YtInfoTD:
     return out
 
 
-def _create_yt_dlp_factory() -> _YtDlpFactoryProto:
-    # Import and immediately assign to Protocol to bypass Any from untyped module
-    mod = __import__("yt_dlp")
-    # Direct assignment to Protocol type to override Any from getattr
-    factory: _YtDlpFactoryProto = mod.YoutubeDL
-    return factory
+def _get_yt_dlp_factory() -> YtDlpFactoryProto:
+    """Get the yt-dlp factory from test hooks."""
+    return _test_hooks.yt_dlp_factory
 
 
 def _yt_probe(url: str) -> YtInfoTD:
-    ydl_factory = _create_yt_dlp_factory()
+    ydl_factory = _get_yt_dlp_factory()
     opts_data: dict[str, JSONValue] = {
         "quiet": True,
         "no_warnings": True,
@@ -177,9 +158,7 @@ def _yt_probe(url: str) -> YtInfoTD:
     }
     with ydl_factory(opts_data) as ydl:
         info_raw = ydl.extract_info(url, download=False)
-        if isinstance(info_raw, dict):
-            return _coerce_yt_info(info_raw)
-        return YtInfoTD()
+        return _coerce_yt_info(info_raw)
 
 
 def _select_lang_from_dict(
@@ -221,7 +200,7 @@ def _find_subtitle_lang(
 
 
 def _yt_download(url: str, opts_dict: dict[str, JSONValue]) -> tuple[YtInfoTD, str]:
-    ydl_factory = _create_yt_dlp_factory()
+    ydl_factory = _get_yt_dlp_factory()
     with ydl_factory(opts_dict) as ydl:
         info_raw = ydl.extract_info(url, download=True)
         empty_dict: dict[str, JSONValue] = {}
@@ -229,10 +208,10 @@ def _yt_download(url: str, opts_dict: dict[str, JSONValue]) -> tuple[YtInfoTD, s
         path: str | None = None
 
         # Try to get path from requested_downloads first
+        # Note: _coerce_requested_downloads only includes entries with filepath
         if info_typed.get("requested_downloads"):
             first_req = info_typed["requested_downloads"][0]
-            if "filepath" in first_req:
-                path = first_req["filepath"]
+            path = first_req["filepath"]
 
         # If not found, prepare filename from info (only if we have valid info with id)
         if not path and isinstance(info_raw, dict) and info_raw.get("id"):
@@ -271,9 +250,7 @@ class YtDlpAdapter(ProbeDownloadClient):
         return _yt_probe(url)
 
     def download_audio(self, url: str, *, cookies_path: str | None) -> str:
-        import tempfile
-
-        tmpdir = tempfile.mkdtemp(prefix="ytstt_")
+        tmpdir = _test_hooks.mkdtemp("ytstt_", None)
         outtmpl = os.path.join(tmpdir, "audio.%(ext)s")
         opts: dict[str, JSONValue] = {
             "format": "bestaudio/best",
@@ -303,15 +280,12 @@ class YtDlpAdapter(ProbeDownloadClient):
         Returns None if no subtitles are available.
         """
         import glob as glob_module
-        import tempfile
 
-        tmpdir = tempfile.mkdtemp(prefix="ytsubs_")
-        ydl_factory = _create_yt_dlp_factory()
+        tmpdir = _test_hooks.mkdtemp("ytsubs_", None)
+        ydl_factory = _get_yt_dlp_factory()
 
         # First, extract info to check available subtitles
         info_raw = self._probe_subtitle_info(ydl_factory, url, cookies_path)
-        if info_raw is None:
-            return None
 
         # Find best language
         selected_lang, is_auto = _find_subtitle_lang(info_raw, preferred_langs)
@@ -334,10 +308,10 @@ class YtDlpAdapter(ProbeDownloadClient):
 
     def _probe_subtitle_info(
         self,
-        ydl_factory: _YtDlpFactoryProto,
+        ydl_factory: YtDlpFactoryProto,
         url: str,
         cookies_path: str | None,
-    ) -> dict[str, JSONValue] | None:
+    ) -> dict[str, JSONValue]:
         """Extract video info to check available subtitles."""
         probe_opts: dict[str, JSONValue] = {
             "quiet": True,
@@ -349,14 +323,11 @@ class YtDlpAdapter(ProbeDownloadClient):
             probe_opts["cookiefile"] = cookies_path
 
         with ydl_factory(probe_opts) as ydl:
-            info_raw = ydl.extract_info(url, download=False)
-            if isinstance(info_raw, dict):
-                return info_raw
-            return None
+            return ydl.extract_info(url, download=False)
 
     def _download_subtitle_file(
         self,
-        ydl_factory: _YtDlpFactoryProto,
+        ydl_factory: YtDlpFactoryProto,
         url: str,
         outtmpl: str,
         selected_lang: str,

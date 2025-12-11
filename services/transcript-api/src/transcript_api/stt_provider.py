@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import BinaryIO, Literal, Protocol, runtime_checkable
@@ -11,7 +10,7 @@ from platform_core.errors import AppError, TranscriptErrorCode
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
-from .chunker import AudioChunker
+from . import _test_hooks
 from .merger import TranscriptMerger
 from .parallel import ParallelTranscriber
 from .types import (
@@ -177,7 +176,7 @@ class STTTranscriptProvider:
         finally:
             if audio_path and self._should_cleanup(audio_path):
                 try:
-                    os.remove(audio_path)
+                    _test_hooks.os_remove(audio_path)
                 except OSError:
                     self._logger.exception("Failed to remove temporary audio file: %s", audio_path)
                     raise
@@ -204,11 +203,11 @@ class STTTranscriptProvider:
     def _download_or_error(self, url: str) -> tuple[str, int]:
         path = self._download_audio(url)
         try:
-            st = os.stat(path)
+            st = _test_hooks.os_stat(path)
         except OSError:
             self._logger.warning("Initial stat failed for %s; retrying", path)
             try:
-                st = os.stat(path)
+                st = _test_hooks.os_stat(path)
             except OSError as exc:
                 self._logger.exception("Failed to stat downloaded audio file: %s", exc)
                 raise AppError(
@@ -256,11 +255,7 @@ class STTTranscriptProvider:
         return convert_verbose_to_segments(resp)
 
     def _ffmpeg_available(self) -> bool:
-        from shutil import which
-
-        ffmpeg = which("ffmpeg")
-        ffprobe = which("ffprobe")
-        return bool(ffmpeg and ffprobe)
+        return _test_hooks.ffmpeg_available()
 
     def _should_cleanup(self, path: str) -> bool:
         if not isinstance(path, str) or not path:
@@ -278,13 +273,15 @@ class STTTranscriptProvider:
         if not self.enable_chunking:
             return False
         try:
-            size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+            size_mb = _test_hooks.os_path_getsize(audio_path) / (1024 * 1024)
         except OSError as exc:
             self._logger.warning("Failed to stat audio for chunking: %s", exc)
             return False
         return size_mb > float(self.chunk_threshold_mb)
 
     def _get_audio_duration(self, audio_path: str) -> float:
+        import subprocess
+
         from .json_util import parse_json_dict
 
         cmd = [
@@ -298,8 +295,10 @@ class STTTranscriptProvider:
             audio_path,
         ]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            parsed = parse_json_dict(result.stdout or "{}")
+            result = _test_hooks.subprocess_run(cmd, capture_output=True, text=True, timeout=30)
+            stdout_val = result.stdout
+            stdout_str = stdout_val if isinstance(stdout_val, str) else "{}"
+            parsed = parse_json_dict(stdout_str)
         except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
             self._logger.warning("ffprobe duration query failed: %s", exc)
             return 0.0
@@ -328,8 +327,8 @@ class STTTranscriptProvider:
                 400,
             )
         duration = self._get_audio_duration(audio_path)
-        size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-        chunker = AudioChunker(
+        size_mb = _test_hooks.os_path_getsize(audio_path) / (1024 * 1024)
+        chunker = _test_hooks.audio_chunker_factory(
             target_chunk_mb=float(self.target_chunk_mb),
             max_chunk_duration_seconds=float(self.max_chunk_duration),
             silence_threshold_db=float(self.silence_threshold_db),
@@ -366,7 +365,7 @@ class STTTranscriptProvider:
                 if os.path.abspath(c["path"]) == os.path.abspath(audio_path):
                     continue
                 if os.path.exists(c["path"]):
-                    os.remove(c["path"])
+                    _test_hooks.os_remove(c["path"])
                 else:
                     self._logger.warning("Chunk file missing during cleanup: %s", c["path"])
 
@@ -499,7 +498,7 @@ class YtDlpCaptionProvider:
 
         # Clean up the downloaded subtitle file
         try:
-            os.remove(subtitle_path)
+            _test_hooks.os_remove(subtitle_path)
             # Also remove the temp directory if empty
             parent_dir = os.path.dirname(subtitle_path)
             if os.path.isdir(parent_dir) and not os.listdir(parent_dir):

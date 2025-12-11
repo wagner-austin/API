@@ -4,12 +4,13 @@ from collections.abc import Mapping
 from types import TracebackType
 from typing import Protocol, runtime_checkable
 
+from platform_core.json_utils import JSONValue
 from platform_core.logging import get_logger
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
 from typing_extensions import TypedDict
 
-# Recursive type alias for JSON values (for parsing unknown JSON structures)
-JsonValue = dict[str, "JsonValue"] | list["JsonValue"] | str | int | float | bool | None
+# Re-export JSONValue for local convenience
+JsonValue = JSONValue
 
 # Public JSON type for API boundaries - non-recursive, one-level deep
 JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
@@ -166,19 +167,21 @@ class FormatTD(TypedDict, total=False):
     filesize_approx: int
 
 
-class YtInfoTD(TypedDict, total=False):
-    id: str
-    duration: float
-    formats: list[FormatTD]
-    requested_downloads: list[RequestedDownloadTD]
-
-
 class SubtitleTrackTD(TypedDict, total=False):
     """Single subtitle track metadata from yt-dlp."""
 
     ext: str
     url: str
     name: str
+
+
+class YtInfoTD(TypedDict, total=False):
+    id: str
+    duration: float
+    formats: list[FormatTD]
+    requested_downloads: list[RequestedDownloadTD]
+    subtitles: dict[str, list[SubtitleTrackTD]]
+    automatic_captions: dict[str, list[SubtitleTrackTD]]
 
 
 class SubtitleInfoTD(TypedDict, total=False):
@@ -273,6 +276,12 @@ class _TracebackProto(Protocol):
 
 @runtime_checkable
 class YtDlpProto(Protocol):
+    """Protocol for yt-dlp YoutubeDL instance.
+
+    Note: extract_info returns raw dict (JsonValue) since that's what yt-dlp returns.
+    The caller is responsible for coercing to YtInfoTD via _coerce_yt_info().
+    """
+
     def __enter__(self) -> YtDlpProto: ...
     def __exit__(
         self,
@@ -281,8 +290,8 @@ class YtDlpProto(Protocol):
         tb: _TracebackProto | None,
     ) -> None: ...
 
-    def extract_info(self, url: str, download: bool) -> YtInfoTD: ...
-    def prepare_filename(self, info: YtInfoTD) -> str: ...
+    def extract_info(self, url: str, download: bool) -> dict[str, JsonValue]: ...
+    def prepare_filename(self, info: dict[str, JsonValue]) -> str: ...
 
 
 logger = get_logger(__name__)

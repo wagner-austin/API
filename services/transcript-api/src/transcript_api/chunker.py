@@ -6,11 +6,11 @@ import re
 import shutil
 import subprocess
 import tempfile
-from subprocess import CompletedProcess
 
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
+from . import _test_hooks
 from .types import AudioChunk
 
 _SILENCE_START_RE = re.compile(r"silence_start:\s*(?P<ts>[0-9]+(?:\.[0-9]+)?)")
@@ -108,21 +108,18 @@ class AudioChunker:
         ]
         self._logger.debug("Running silencedetect: %s", " ".join(cmd))
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            proc = _test_hooks.subprocess_run(cmd, capture_output=True, text=True, timeout=90)
         except (subprocess.TimeoutExpired, OSError) as e:
             self._logger.warning("Silence detection failed to run: %s", e)
             return []
-        out = (proc.stdout or "") + (proc.stderr or "")
+        out = str(proc.stdout or "") + str(proc.stderr or "")
         points: list[float] = []
         for line in out.splitlines():
             m_end = _SILENCE_END_RE.search(line)
             if not m_end:
                 continue
-            ts_str = m_end.group("ts")
-            try:
-                ts = float(ts_str)
-            except ValueError:
-                continue
+            # Regex guarantees ts is numeric (digits with optional decimal)
+            ts = float(m_end.group("ts"))
             points.append(ts)
         self._logger.debug("Detected %d silence points in %.1fs audio", len(points), duration)
         return points
@@ -213,8 +210,8 @@ class AudioChunker:
             ]
             self._logger.debug("Creating chunk (copy): %s", " ".join(copy_cmd))
             try:
-                proc_copy: CompletedProcess[str] = subprocess.run(
-                    copy_cmd, check=True, capture_output=True, text=True, timeout=180
+                proc_copy = _test_hooks.subprocess_run(
+                    copy_cmd, capture_output=True, text=True, timeout=180, check=True
                 )
                 _ = proc_copy  # Mark as used
             except subprocess.CalledProcessError:
@@ -237,12 +234,12 @@ class AudioChunker:
                 ]
                 self._logger.debug("Creating chunk (reencode): %s", " ".join(reencode_cmd))
                 try:
-                    proc_reencode: CompletedProcess[str] = subprocess.run(
+                    proc_reencode = _test_hooks.subprocess_run(
                         reencode_cmd,
-                        check=True,
                         capture_output=True,
                         text=True,
                         timeout=300,
+                        check=True,
                     )
                     _ = proc_reencode  # Mark as used
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
@@ -344,11 +341,11 @@ class AudioChunker:
             audio_path,
         ]
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            proc = _test_hooks.subprocess_run(cmd, capture_output=True, text=True, timeout=30)
         except (subprocess.TimeoutExpired, OSError) as e:
             self._logger.warning("ffprobe failed: %s", e)
             return "", ""
-        stdout = proc.stdout or ""
+        stdout = str(proc.stdout or "")
         try:
             raw = self._load_ffprobe_json(stdout)
         except ValueError as e:

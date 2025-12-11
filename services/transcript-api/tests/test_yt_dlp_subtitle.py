@@ -8,6 +8,7 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
 
+from transcript_api import _test_hooks
 from transcript_api.adapters.yt_dlp_client import (
     _find_subtitle_lang,
     _select_lang_from_dict,
@@ -296,12 +297,8 @@ Hello world
         _, cookies_path, _ = stub.download_subtitles_calls[0]
         assert cookies_path is None
 
-    def test_cleanup_oserror_is_logged(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_cleanup_oserror_is_logged(self, tmp_path: Path) -> None:
         """Test that OSError during cleanup is caught and logged."""
-        import os as os_module
-
         # Create a VTT file
         sub_dir = tmp_path / "ytsubs_cleanup_error"
         sub_dir.mkdir()
@@ -313,11 +310,11 @@ Hello world
         )
         provider = YtDlpCaptionProvider(probe_client=stub)
 
-        # Make os.remove raise OSError to trigger the except branch
+        # Make os.remove raise OSError to trigger the except branch via hook
         def _failing_remove(path: str) -> None:
             raise OSError("Permission denied")
 
-        monkeypatch.setattr(os_module, "remove", _failing_remove)
+        _test_hooks.os_remove = _failing_remove
 
         opts: TranscriptOptions = {"preferred_langs": ["en"]}
         result = provider.fetch("vid123", opts)

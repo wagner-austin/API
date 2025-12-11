@@ -2,19 +2,10 @@ from __future__ import annotations
 
 from typing import BinaryIO
 
+from .. import _test_hooks
 from ..stt_provider import STTClient
 from ..types import OpenAIClientProto, VerboseResponseTD
 from ..whisper_parse import to_verbose_dict
-
-
-def _create_openai_client(*, api_key: str, timeout: float, max_retries: int) -> OpenAIClientProto:
-    # Import and immediately assign to Protocol to bypass Any from untyped module
-    mod = __import__("openai")
-    # Call constructor and assign result to Protocol type
-    client: OpenAIClientProto = mod.OpenAI(
-        api_key=api_key, timeout=timeout, max_retries=max_retries
-    )
-    return client
 
 
 class OpenAISttClient(STTClient):
@@ -35,7 +26,7 @@ class OpenAISttClient(STTClient):
         self._client = self._make_client()
 
     def _make_client(self) -> OpenAIClientProto:
-        return _create_openai_client(
+        return _test_hooks.openai_client_factory(
             api_key=self.api_key,
             timeout=self.timeout_seconds,
             max_retries=self.max_retries,

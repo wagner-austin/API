@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import sys
-from types import ModuleType
-from typing import Protocol
-
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
+from transcript_api import _test_hooks
+from transcript_api._test_hooks import YTApiProto, YTListingProto
 from transcript_api.adapters.youtube_client import (
     YouTubeTranscriptApiAdapter,
-    _YTListingProto,
     _YTResourceProto,
 )
 from transcript_api.provider import (
@@ -21,51 +18,50 @@ from transcript_api.provider import (
 from transcript_api.types import RawTranscriptItem
 
 
-class _ApiProto(Protocol):
-    @staticmethod
-    def get_transcript(
-        video_id: str,
-        languages: list[str],
-    ) -> (
-        list[RawTranscriptItem] | list[dict[str, JSONValue]] | list[int | dict[str, JSONValue]]
-    ): ...
+def _make_module_with_api(
+    api_cls: type[YTApiProto],
+    no_transcript_found: type[Exception],
+    transcripts_disabled: type[Exception],
+    video_unavailable: type[Exception],
+) -> None:
+    """Set up test hooks with the given API class and exception types."""
 
-    @staticmethod
-    def list_transcripts(video_id: str) -> _YTListingProto | str: ...
+    def _api_factory() -> YTApiProto:
+        # Return the class itself, as YTApiProto expects static methods
+        api: YTApiProto = api_cls
+        return api
+
+    def _exc_factory() -> tuple[type[Exception], type[Exception], type[Exception]]:
+        return (no_transcript_found, transcripts_disabled, video_unavailable)
+
+    _test_hooks.yt_api_factory = _api_factory
+    _test_hooks.yt_exceptions_factory = _exc_factory
 
 
-class _YTModule(ModuleType):
-    YouTubeTranscriptApi: _ApiProto
-    NoTranscriptFound: type[Exception]
-    TranscriptsDisabled: type[Exception]
-    VideoUnavailable: type[Exception]
+def test_get_transcript_success_and_direct_unavailable() -> None:
+    data: list[dict[str, JSONValue]] = [{"text": "hello", "start": 0.0, "duration": 1.0}]
 
-
-def test_get_transcript_success_and_direct_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    data: list[RawTranscriptItem] = [{"text": "hello", "start": 0.0, "duration": 1.0}]
+    class _NoTranscriptFoundError(Exception): ...
 
     class _API:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             assert video_id == "vid" and languages == ["en"]
             return data
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             raise RuntimeError
 
-    class _NoTranscriptFoundError(Exception): ...
-
-    mod = _YTModule("youtube_transcript_api")
-    mod.YouTubeTranscriptApi = _API
-    mod.NoTranscriptFound = _NoTranscriptFoundError
-    mod.TranscriptsDisabled = RuntimeError
-    mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", mod)
+    _make_module_with_api(_API, _NoTranscriptFoundError, RuntimeError, RuntimeError)
 
     adapter = YouTubeTranscriptApiAdapter()
     out = adapter.get_transcript("vid", ["en"])
-    assert out == data
+    # out is list[RawTranscriptItem], data is list[dict[str, JSONValue]]
+    # Compare as dicts
+    assert out[0]["text"] == "hello"
+    assert out[0]["start"] == 0.0
+    assert out[0]["duration"] == 1.0
 
     # Raise mapped error by replacing the module with a different API class
     class _MockListing:
@@ -77,24 +73,19 @@ def test_get_transcript_success_and_direct_unavailable(monkeypatch: pytest.Monke
 
     class _API2:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             raise _NoTranscriptFoundError("nope")
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _MockListing()
 
-    mod2 = _YTModule("youtube_transcript_api")
-    mod2.YouTubeTranscriptApi = _API2
-    mod2.NoTranscriptFound = _NoTranscriptFoundError
-    mod2.TranscriptsDisabled = RuntimeError
-    mod2.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", mod2)
+    _make_module_with_api(_API2, _NoTranscriptFoundError, RuntimeError, RuntimeError)
     with pytest.raises(DirectTranscriptUnavailableError):
         _ = adapter.get_transcript("vid", ["en"])
 
 
-def test_list_transcripts_and_wrapped_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_transcripts_and_wrapped_calls() -> None:
     class _Res:
         def __init__(self, payload: list[RawTranscriptItem]) -> None:
             self._payload = payload
@@ -115,19 +106,14 @@ def test_list_transcripts_and_wrapped_calls(monkeypatch: pytest.MonkeyPatch) -> 
 
     class _API:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return []
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _Listing()
 
-    mod3 = _YTModule("youtube_transcript_api")
-    mod3.YouTubeTranscriptApi = _API
-    mod3.NoTranscriptFound = KeyError  # mapped in adapter
-    mod3.TranscriptsDisabled = RuntimeError
-    mod3.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", mod3)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
 
     adapter = YouTubeTranscriptApiAdapter()
     listing = adapter.list_transcripts("vid")
@@ -137,7 +123,7 @@ def test_list_transcripts_and_wrapped_calls(monkeypatch: pytest.MonkeyPatch) -> 
         _ = listing.translate("en")
 
 
-def test_find_transcript_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_find_transcript_returns_none() -> None:
     class _MockResource:
         def fetch(self) -> list[RawTranscriptItem]:
             return []
@@ -151,26 +137,21 @@ def test_find_transcript_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class _API:
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _Listing()
 
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return []
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
     adapter = YouTubeTranscriptApiAdapter()
     listing = adapter.list_transcripts("vid")
     out = listing.find_transcript(["en"])  # returns None from adapter when inner returns None
     assert out is None
 
 
-def test_find_transcript_maps_no_transcript_found(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_find_transcript_maps_no_transcript_found() -> None:
     class _MockResource2:
         def fetch(self) -> list[RawTranscriptItem]:
             return []
@@ -184,26 +165,21 @@ def test_find_transcript_maps_no_transcript_found(monkeypatch: pytest.MonkeyPatc
 
     class _API:
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _Listing()
 
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return []
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
     adapter = YouTubeTranscriptApiAdapter()
     listing = adapter.list_transcripts("vid")
     with pytest.raises(TranscriptLanguageUnavailableError):
         _ = listing.find_transcript(["en"])
 
 
-def test_translate_success_and_get_transcript_non_list(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_translate_success_and_get_transcript_non_list() -> None:
     class _Res:
         def fetch(self) -> list[RawTranscriptItem]:
             return [{"text": "ok", "start": 0.0, "duration": 1.0}]
@@ -217,20 +193,15 @@ def test_translate_success_and_get_transcript_non_list(monkeypatch: pytest.Monke
 
     class _API:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             # Return non-list to exercise coercion to []
             return []
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _Listing()
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
     adapter = YouTubeTranscriptApiAdapter()
     out = adapter.get_transcript("vid", ["en"])
     assert out == []
@@ -239,7 +210,7 @@ def test_translate_success_and_get_transcript_non_list(monkeypatch: pytest.Monke
     assert res.fetch()[0]["text"] == "ok"
 
 
-def test_get_transcript_list_with_nondict_items(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_transcript_list_with_nondict_items() -> None:
     class _MockListing3:
         def find_transcript(self, languages: list[str]) -> _YTResourceProto | None:
             return None
@@ -249,25 +220,20 @@ def test_get_transcript_list_with_nondict_items(monkeypatch: pytest.MonkeyPatch)
 
     class _API:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return [{"text": "ok", "start": 0.0, "duration": 1.0}]
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _MockListing3()
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
     adapter = YouTubeTranscriptApiAdapter()
     out = adapter.get_transcript("vid", ["en"])
     assert out and out[0]["text"] == "ok"
 
 
-def test_list_transcripts_unexpected_type(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_transcripts_unexpected_type() -> None:
     # Test that valid protocol implementations work correctly
     class _MockListing4:
         def find_transcript(self, languages: list[str]) -> _YTResourceProto | None:
@@ -278,107 +244,89 @@ def test_list_transcripts_unexpected_type(monkeypatch: pytest.MonkeyPatch) -> No
 
     class _API:
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             return _MockListing4()
 
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return []
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
     adapter = YouTubeTranscriptApiAdapter()
     listing = adapter.list_transcripts("vid")
     if listing is None:
         pytest.fail("expected listing result")
 
 
-def test_list_transcripts_unavailable_maps_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_transcripts_unavailable_maps_error() -> None:
     class _API:
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
+        def list_transcripts(video_id: str) -> YTListingProto:
             raise RuntimeError("disabled")
 
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             return []
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    _mod.NoTranscriptFound = KeyError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    _make_module_with_api(_API, KeyError, RuntimeError, RuntimeError)
 
     adapter = YouTubeTranscriptApiAdapter()
     with pytest.raises(TranscriptListingError):
         _ = adapter.list_transcripts("vid")
 
 
+class _BadYTResourceForValidation:
+    """Fake resource for validation tests."""
+
+    def fetch(self) -> list[RawTranscriptItem]:
+        return []
+
+
+class _BadYTListingForValidation:
+    """Fake listing for validation tests."""
+
+    def find_transcript(self, languages: list[str]) -> _BadYTResourceForValidation | None:
+        return None
+
+    def translate(self, language: str) -> _BadYTResourceForValidation:
+        raise RuntimeError
+
+
 @pytest.mark.parametrize(
-    "payload",
+    ("payload", "error_field"),
     [
-        [123],
-        [{"text": 123, "start": 0.0, "duration": 1.0}],
-        [{"text": "t", "start": "bad", "duration": 1.0}],
-        [{"text": "t", "start": 0.0, "duration": "bad"}],
+        ({"text": 123, "start": 0.0, "duration": 1.0}, "text"),
+        ({"text": "t", "start": "bad", "duration": 1.0}, "start"),
+        ({"text": "t", "start": 0.0, "duration": "bad"}, "duration"),
     ],
 )
-def test_get_transcript_rejects_invalid_items(
-    monkeypatch: pytest.MonkeyPatch, payload: list[int | dict[str, str | int | float]]
+def test_get_transcript_rejects_invalid_field_types(
+    payload: dict[str, str | int | float],
+    error_field: str,
 ) -> None:
-    class _API:
+    """Test that get_transcript rejects items with wrong field types."""
+    out_dict: dict[str, JSONValue] = {}
+    for k, v in payload.items():
+        if isinstance(v, str | int | float):
+            out_dict[k] = v
+
+    class _BadAPI:
         @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[int | dict[str, JSONValue]]:
+        def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
             assert video_id == "vid" and languages == ["en"]
-            out: list[int | dict[str, JSONValue]] = []
-            for it in payload:
-                if isinstance(it, dict):
-                    d: dict[str, JSONValue] = {}
-                    for k, v in it.items():
-                        if isinstance(v, (str, int, float)):
-                            d[k] = v
-                    out.append(d)
-                else:
-                    out.append(int(it))
-            return out
+            return [out_dict]
 
         @staticmethod
-        def list_transcripts(video_id: str) -> _YTListingProto:
-            raise RuntimeError
+        def list_transcripts(video_id: str) -> YTListingProto:
+            return _BadYTListingForValidation()
 
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
+    def _api_factory() -> YTApiProto:
+        api: YTApiProto = _BadAPI
+        return api
+
+    _test_hooks.yt_api_factory = _api_factory
+    _test_hooks.yt_exceptions_factory = lambda: (KeyError, RuntimeError, RuntimeError)
 
     adapter = YouTubeTranscriptApiAdapter()
     with pytest.raises(JSONTypeError):
         _ = adapter.get_transcript("vid", ["en"])
-
-
-def test_list_transcripts_unexpected_type_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _API:
-        @staticmethod
-        def get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
-            return []
-
-        @staticmethod
-        def list_transcripts(video_id: str) -> str:
-            return "bad"
-
-    _mod = _YTModule("youtube_transcript_api")
-    _mod.YouTubeTranscriptApi = _API
-    _mod.NoTranscriptFound = KeyError
-    _mod.TranscriptsDisabled = RuntimeError
-    _mod.VideoUnavailable = RuntimeError
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _mod)
-    adapter = YouTubeTranscriptApiAdapter()
-    with pytest.raises(TranscriptListingError):
-        _ = adapter.list_transcripts("vid")

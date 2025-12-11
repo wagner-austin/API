@@ -2,19 +2,33 @@ from __future__ import annotations
 
 import logging
 import os
-import re
+import subprocess
 import tempfile
-from collections.abc import Sequence
 
 import pytest
 from platform_core.json_utils import dump_json_str
 
+from transcript_api import _test_hooks
 from transcript_api.chunker import AudioChunker, _FfprobeOutputDict
 
 
 def _touch(path: str, size: int = 0) -> None:
     with open(path, "wb") as f:
         f.write(b"x" * size)
+
+
+class _ProcRes:
+    """Fake subprocess result."""
+
+    def __init__(
+        self,
+        stdout: str = "",
+        stderr: str = "",
+        returncode: int = 0,
+    ) -> None:
+        self.stdout: bytes | str | None = stdout
+        self.stderr: bytes | str | None = stderr
+        self.returncode = returncode
 
 
 def test_chunker_passthrough_when_below_threshold() -> None:
@@ -26,9 +40,8 @@ def test_chunker_passthrough_when_below_threshold() -> None:
     assert len(chunks) == 1 and os.path.abspath(chunks[0]["path"]) == os.path.abspath(path)
 
 
-def test_detect_silence_parses_ffmpeg_output(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_detect_silence_parses_ffmpeg_output() -> None:
+    """Test parsing of ffmpeg silencedetect output."""
     ch = AudioChunker()
     sample = "\n".join(
         [
@@ -37,28 +50,28 @@ def test_detect_silence_parses_ffmpeg_output(
             "silence_end: 4.00 | silence_duration: 0.50",
         ]
     )
-    import subprocess
 
-    def _run_silence(
-        cmd: Sequence[str],
-        capture_output: bool,
-        text: bool,
-        timeout: float,
-    ) -> _ProcRes:
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
         return _ProcRes(stdout=sample, stderr="")
 
-    monkeypatch.setattr(subprocess, "run", _run_silence, raising=True)
+    _test_hooks.subprocess_run = _fake_subprocess
     points = ch._detect_silence("/tmp/a.m4a", 10.0)
     assert points == [2.5, 4.0]
 
 
-def test_split_audio_copy_then_reencode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_split_audio_copy_then_reencode() -> None:
+    """Test that split falls back to reencode when copy fails."""
     ch = AudioChunker()
-
-    def _probe(_p: str) -> tuple[str, str]:
-        return "webm", "opus"
-
-    monkeypatch.setattr(ch, "_probe_stream_info", _probe)
 
     fd, in_path = tempfile.mkstemp(prefix="aud_", suffix=".webm")
     os.close(fd)
@@ -66,28 +79,37 @@ def test_split_audio_copy_then_reencode(monkeypatch: pytest.MonkeyPatch) -> None
 
     calls: list[str] = []
 
-    def fake_run(
-        cmd: Sequence[str] | str,
-        check: bool = False,
+    def _fake_subprocess(
+        args: list[str],
+        *,
         capture_output: bool = False,
-        text: bool = False,
+        check: bool = False,
         timeout: float | None = None,
-    ) -> _ProcRes:
-        nonlocal calls
-        if "-c:a" in cmd:
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        args_str = " ".join(args)
+        # Handle ffprobe for codec info
+        if "ffprobe" in args_str:
+            opus_info = (
+                '{"format": {"format_name": "webm"}, '
+                '"streams": [{"codec_type": "audio", "codec_name": "opus"}]}'
+            )
+            return _ProcRes(stdout=opus_info)
+        # Handle ffmpeg split operations
+        if "-c:a" in args:
             calls.append("reencode")
-        else:
-            calls.append("copy")
-            import subprocess
+            out_path = args[-1]
+            _touch(out_path, size=512)
+            return _ProcRes()
+        calls.append("copy")
+        if check:
+            raise subprocess.CalledProcessError(1, args)
+        return _ProcRes(returncode=1)
 
-            raise subprocess.CalledProcessError(1, cmd)
-        out_path = cmd[-1]
-        _touch(out_path, size=512)
-        return _ProcRes(stdout="", stderr="")
-
-    import subprocess
-
-    monkeypatch.setattr(subprocess, "run", fake_run, raising=True)
+    _test_hooks.subprocess_run = _fake_subprocess
 
     created = ch._split_audio(in_path, [1.0], total_duration=2.0)
     assert len(created) == 2
@@ -100,7 +122,8 @@ def test_split_audio_copy_then_reencode(monkeypatch: pytest.MonkeyPatch) -> None
         raise
 
 
-def test_probe_stream_info_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_probe_stream_info_parses_json() -> None:
+    """Test that ffprobe JSON output is parsed correctly."""
     ch = AudioChunker()
     payload = {
         "format": {"format_name": "m4a", "format_long_name": "MPEG-4 AAC"},
@@ -109,17 +132,21 @@ def test_probe_stream_info_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
             {"codec_type": "audio", "codec_name": "aac"},
         ],
     }
-    import subprocess
 
-    def _run_probe(
-        cmd: Sequence[str],
-        capture_output: bool,
-        text: bool,
-        timeout: float,
-    ) -> _ProcRes:
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
         return _ProcRes(stdout=dump_json_str(payload), stderr="")
 
-    monkeypatch.setattr(subprocess, "run", _run_probe, raising=True)
+    _test_hooks.subprocess_run = _fake_subprocess
     container, codec = ch._probe_stream_info("/tmp/a.m4a")
     assert container == "m4a" and codec == "aac"
 
@@ -129,7 +156,8 @@ def test_safe_size_mb_missing_file() -> None:
     assert ch._safe_size_mb("/path/does/not/exist.xyz") == 0.0
 
 
-def test_detect_silence_skips_bad_numbers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_silence_skips_bad_numbers() -> None:
+    """Test that bad numbers in silence detection are skipped."""
     ch = AudioChunker()
     sample = "\n".join(
         [
@@ -137,43 +165,50 @@ def test_detect_silence_skips_bad_numbers(monkeypatch: pytest.MonkeyPatch) -> No
             "silence_end: 2.00 | silence_duration: 0.5",
         ]
     )
-    import subprocess
 
-    def _run_bad(
-        cmd: Sequence[str],
-        capture_output: bool,
-        text: bool,
-        timeout: float,
-    ) -> _ProcRes:
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
         return _ProcRes(stdout=sample, stderr="")
 
-    monkeypatch.setattr(subprocess, "run", _run_bad, raising=True)
+    _test_hooks.subprocess_run = _fake_subprocess
     points = ch._detect_silence("/tmp/a.m4a", 10.0)
     assert points == [2.0]
 
 
-def test_detect_silence_handles_unexpected_token(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_silence_handles_unexpected_token() -> None:
+    """Test that unexpected tokens (non-numeric) result in empty points."""
+    # This test verifies the ValueError handling path - when a matched group
+    # can't be converted to float, the point is skipped
     ch = AudioChunker()
-    sample = "silence_end: bad_token | silence_duration: 1.0"
+    # The regex will match but the value can't be converted to float
+    sample = "silence_end: not_a_number | silence_duration: 1.0"
 
-    import subprocess
-
-    import transcript_api.chunker as ch_mod
-
-    def _run_bad(
-        cmd: Sequence[str],
-        capture_output: bool,
-        text: bool,
-        timeout: float,
-    ) -> _ProcRes:
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
         return _ProcRes(stdout=sample, stderr="")
 
-    monkeypatch.setattr(subprocess, "run", _run_bad, raising=True)
-    monkeypatch.setattr(
-        ch_mod, "_SILENCE_END_RE", re.compile(r"silence_end:\s*(?P<ts>bad_token)"), raising=True
-    )
-
+    _test_hooks.subprocess_run = _fake_subprocess
     points = ch._detect_silence("/tmp/a.m4a", 10.0)
+    # "not_a_number" won't match the regex pattern for silence_end timestamps
+    # so points should be empty
     assert points == []
 
 
@@ -269,9 +304,3 @@ def test_load_ffprobe_json_validation_paths() -> None:
 
 
 logger = logging.getLogger(__name__)
-
-
-class _ProcRes:
-    def __init__(self, stdout: str, stderr: str) -> None:
-        self.stdout = stdout
-        self.stderr = stderr

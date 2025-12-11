@@ -7,9 +7,9 @@ from platform_core.errors import AppError
 from platform_core.logging import get_logger
 from platform_core.request_context import request_id_var
 
-from ..events import publish_completed, publish_failed
-from ..service import TranscriptService
-from ..types import CaptionsPayload, STTPayload, TranscriptOut
+from ...events import publish_completed, publish_failed
+from ...service import TranscriptService
+from ...types import CaptionsPayload, STTPayload, TranscriptOut
 
 
 def _require_request_id() -> str:

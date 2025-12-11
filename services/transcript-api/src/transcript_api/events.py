@@ -14,7 +14,9 @@ from platform_core.job_events import (
     make_failed_event,
 )
 from platform_core.json_utils import JSONTypeError
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
+
+from . import _test_hooks
 
 _TRANSCRIPT_DOMAIN: JobDomain = "transcript"
 _DEFAULT_CHANNEL = default_events_channel(_TRANSCRIPT_DOMAIN)
@@ -23,7 +25,7 @@ _DEFAULT_CHANNEL = default_events_channel(_TRANSCRIPT_DOMAIN)
 def _load_redis() -> RedisStrProto:
     """Load a Redis client for publishing events."""
     redis_url = _require_env_str("REDIS_URL")
-    return redis_for_kv(redis_url)
+    return _test_hooks.redis_factory(redis_url)
 
 
 def _ensure_error_kind(raw: str) -> ErrorKind:

@@ -3,17 +3,17 @@ from __future__ import annotations
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.request_context import install_request_id_middleware
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
-from .provider import YouTubeTranscriptClient
+from ..provider import YouTubeTranscriptClient
+from ..service import Clients, Config, TranscriptService
+from ..stt_provider import ProbeDownloadClient, STTClient
+from ..types import CaptionsPayload, STTPayload, TranscriptOut
 from .routes import health as routes_health
 from .routes import jobs as routes_jobs
 from .routes import transcripts as routes_transcripts
 from .routes.transcripts import build_captions_handler, build_stt_handler
-from .service import Clients, Config, TranscriptService
-from .stt_provider import ProbeDownloadClient, STTClient
-from .types import CaptionsPayload, STTPayload, TranscriptOut
 
 
 class AppDeps(TypedDict):
@@ -49,5 +49,4 @@ __all__ = [
     "build_captions_handler",
     "build_stt_handler",
     "create_app",
-    "redis_for_kv",
 ]

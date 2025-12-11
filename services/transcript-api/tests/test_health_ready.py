@@ -1,14 +1,19 @@
+"""Tests for transcript-api health endpoints."""
+
 from __future__ import annotations
 
 from typing import BinaryIO
 
 import pytest
 from fastapi.testclient import TestClient
+from platform_core.config import _test_hooks as platform_hooks
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.testing import make_fake_env
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis, FakeRedisNoPong
-from pytest import MonkeyPatch
 
-from transcript_api.app import AppDeps, create_app
+from transcript_api import _test_hooks
+from transcript_api.api.main import AppDeps, create_app
 from transcript_api.provider import TranscriptListing, TranscriptResource
 from transcript_api.service import Clients, Config
 from transcript_api.types import RawTranscriptItem, SubtitleResultTD, VerboseResponseTD, YtInfoTD
@@ -81,26 +86,25 @@ def _deps() -> AppDeps:
     return {"config": cfg, "clients": cls}
 
 
-def _client(
-    monkeypatch: MonkeyPatch, *, workers: int, pong: bool = True
-) -> tuple[TestClient, FakeRedis]:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    from transcript_api import app as app_mod
+def _client(*, workers: int, pong: bool = True) -> tuple[TestClient, FakeRedis]:
+    """Create a test client with fake redis."""
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://ignored"})
 
     fake_redis: FakeRedis = FakeRedisNoPong() if not pong else FakeRedis()
     if pong:
         for i in range(workers):
             fake_redis.sadd("rq:workers", f"worker-{i}")
 
-    def _fake(url: str) -> FakeRedis:
+    def _fake(url: str) -> RedisStrProto:
         return fake_redis
 
-    monkeypatch.setattr(app_mod, "redis_for_kv", _fake)
+    _test_hooks.redis_factory = _fake
     return TestClient(create_app(_deps())), fake_redis
 
 
-def test_healthz_ok(monkeypatch: MonkeyPatch) -> None:
-    client, fake_redis = _client(monkeypatch, workers=1)
+def test_healthz_ok() -> None:
+    """Test /healthz returns ok status."""
+    client, fake_redis = _client(workers=1)
     r = client.get("/healthz")
     assert r.status_code == 200
     body_raw = load_json_str(r.text)
@@ -111,8 +115,9 @@ def test_healthz_ok(monkeypatch: MonkeyPatch) -> None:
     fake_redis.assert_only_called({"sadd"})
 
 
-def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
-    client, fake_redis = _client(monkeypatch, workers=0)
+def test_readyz_degraded_without_worker() -> None:
+    """Test /readyz returns degraded when no workers."""
+    client, fake_redis = _client(workers=0)
     r = client.get("/readyz")
     assert r.status_code == 503
     body_raw = load_json_str(r.text)
@@ -124,8 +129,9 @@ def test_readyz_degraded_without_worker(monkeypatch: MonkeyPatch) -> None:
     fake_redis.assert_only_called({"ping", "scard", "close"})
 
 
-def test_readyz_ready_with_worker(monkeypatch: MonkeyPatch) -> None:
-    client, fake_redis = _client(monkeypatch, workers=1)
+def test_readyz_ready_with_worker() -> None:
+    """Test /readyz returns ready when workers present."""
+    client, fake_redis = _client(workers=1)
     r = client.get("/readyz")
     assert r.status_code == 200
     body_raw = load_json_str(r.text)

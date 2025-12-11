@@ -7,7 +7,7 @@ from fastapi import Depends
 from platform_core.config import _require_env_str
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
-from platform_workers.redis import RedisStrProto, redis_for_kv, redis_raw_for_rq
+from platform_workers.redis import RedisStrProto, redis_raw_for_rq
 from platform_workers.rq_harness import RQClientQueue, RQJobLike, RQRetryLike, rq_queue
 
 from transcript_api.types import (
@@ -16,6 +16,8 @@ from transcript_api.types import (
     QueueProtocol,
     _EnqCallable,
 )
+
+from . import _test_hooks
 
 # Provider types for dependency injection
 RedisProviderType = Callable[[], RedisStrProto]
@@ -46,7 +48,7 @@ def get_redis() -> Generator[RedisStrProto, None, None]:
         yield provider_context.redis_provider()
         return
     redis_url = _get_redis_url()
-    client = redis_for_kv(redis_url)
+    client = _test_hooks.redis_factory(redis_url)
     try:
         yield client
     finally:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from platform_core.logging import setup_logging
 
-from .app import AppDeps, create_app
+from .api.main import AppDeps, create_app
 from .settings import build_clients_from_env, build_config_from_env
 
 

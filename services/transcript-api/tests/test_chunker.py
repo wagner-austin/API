@@ -2,30 +2,60 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import tempfile
 
-import pytest
-
+from transcript_api import _test_hooks
 from transcript_api.chunker import AudioChunker
 
 
-def _fake_run_ok(*args: list[str], **kwargs: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.CompletedProcess(args=["ffmpeg"], returncode=0, stdout="", stderr="")
+class _FakeProc:
+    """Fake subprocess result for hook-based testing."""
+
+    def __init__(
+        self,
+        *,
+        returncode: int = 0,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> None:
+        self.returncode = returncode
+        self.stdout: bytes | str | None = stdout
+        self.stderr: bytes | str | None = stderr
 
 
-def test_chunker_selects_webm_for_opus(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chunker_selects_webm_for_opus() -> None:
+    """Test that opus audio uses webm container for chunks."""
     ch = AudioChunker()
 
-    def _probe(_p: str) -> tuple[str, str]:
-        return "matroska,webm", "opus"
+    # Create fake subprocess that returns opus codec info for ffprobe
+    # and succeeds for ffmpeg split operations
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        args_str = " ".join(args)
+        if "ffprobe" in args_str:
+            # Return opus codec info
+            opus_info = (
+                '{"format": {"format_name": "matroska,webm"}, '
+                '"streams": [{"codec_type": "audio", "codec_name": "opus"}]}'
+            )
+            return _FakeProc(stdout=opus_info)
+        if "silencedetect" in args_str:
+            # No silence points
+            return _FakeProc(stdout="", stderr="")
+        # ffmpeg split command - just succeed
+        return _FakeProc()
 
-    def _silence(_p: str, _d: float) -> list[float]:
-        return []
+    _test_hooks.subprocess_run = _fake_subprocess
 
-    monkeypatch.setattr(ch, "_probe_stream_info", _probe)
-    monkeypatch.setattr(ch, "_detect_silence", _silence)
-    monkeypatch.setattr("subprocess.run", _fake_run_ok)
     fd, audio_path = tempfile.mkstemp(prefix="chunker_in_", suffix=".webm")
     os.close(fd)
     try:
@@ -40,18 +70,38 @@ def test_chunker_selects_webm_for_opus(monkeypatch: pytest.MonkeyPatch) -> None:
     assert all(c["path"].endswith(".webm") for c in chunks)
 
 
-def test_chunker_selects_m4a_for_aac(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chunker_selects_m4a_for_aac() -> None:
+    """Test that aac audio uses m4a container for chunks."""
     ch = AudioChunker()
 
-    def _probe(_p: str) -> tuple[str, str]:
-        return "mp4", "aac"
+    # Create fake subprocess that returns aac codec info for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        args_str = " ".join(args)
+        if "ffprobe" in args_str:
+            # Return aac codec info
+            aac_info = (
+                '{"format": {"format_name": "mp4"}, '
+                '"streams": [{"codec_type": "audio", "codec_name": "aac"}]}'
+            )
+            return _FakeProc(stdout=aac_info)
+        if "silencedetect" in args_str:
+            # No silence points
+            return _FakeProc(stdout="", stderr="")
+        # ffmpeg split command - just succeed
+        return _FakeProc()
 
-    def _silence(_p: str, _d: float) -> list[float]:
-        return []
+    _test_hooks.subprocess_run = _fake_subprocess
 
-    monkeypatch.setattr(ch, "_probe_stream_info", _probe)
-    monkeypatch.setattr(ch, "_detect_silence", _silence)
-    monkeypatch.setattr("subprocess.run", _fake_run_ok)
     fd, audio_path = tempfile.mkstemp(prefix="chunker_in_", suffix=".m4a")
     os.close(fd)
     try:

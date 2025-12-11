@@ -11,9 +11,9 @@ from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.json_utils import JSONValue
 from platform_workers.testing import FakeLogger, FakeQueue, FakeRedis
 
+from transcript_api.api.routes.jobs import STTJobRequest, _parse_stt_job_request, build_router
 from transcript_api.dependencies import provider_context
 from transcript_api.job_store import transcript_job_key
-from transcript_api.routes.jobs import STTJobRequest, _parse_stt_job_request, build_router
 
 
 def test_stt_job_request_class() -> None:

@@ -5,10 +5,10 @@ from typing import Protocol, runtime_checkable
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 
+from .. import _test_hooks
 from ..provider import (
     TranscriptLanguageUnavailableError,
     TranscriptListing,
-    TranscriptListingError,
     TranscriptResource,
     TranscriptTranslateUnavailableError,
     YouTubeTranscriptClient,
@@ -74,20 +74,13 @@ class _YTApiProto(Protocol):
 
 
 def _create_yt_api() -> _YTApiProto:
-    # Import and immediately assign to Protocol to bypass Any from untyped module
-    mod = __import__("youtube_transcript_api")
-    # Direct assignment to Protocol type to override Any from getattr
-    api: _YTApiProto = mod.YouTubeTranscriptApi
-    return api
+    # Use hook for dependency injection
+    return _test_hooks.yt_api_factory()
 
 
 def _get_yt_transcript_exceptions() -> tuple[type[Exception], type[Exception], type[Exception]]:
-    """Get youtube_transcript_api exception classes dynamically."""
-    mod = __import__("youtube_transcript_api")
-    no_transcript: type[Exception] = mod.NoTranscriptFound
-    disabled: type[Exception] = mod.TranscriptsDisabled
-    unavailable: type[Exception] = mod.VideoUnavailable
-    return no_transcript, disabled, unavailable
+    """Get youtube_transcript_api exception classes via hook."""
+    return _test_hooks.yt_exceptions_factory()
 
 
 def _yt_get_transcript(video_id: str, languages: list[str]) -> list[RawTranscriptItem]:
@@ -99,8 +92,6 @@ def _yt_get_transcript(video_id: str, languages: list[str]) -> list[RawTranscrip
         raw_transcript_result = yt_api.get_transcript(video_id, languages=languages)
         coerced_transcript: list[RawTranscriptItem] = []
         for item in raw_transcript_result:
-            if not isinstance(item, dict):
-                raise JSONTypeError("Expected dict in transcript item")
             text = item.get("text", "")
             start = item.get("start", 0.0)
             duration = item.get("duration", 0.0)
@@ -123,11 +114,10 @@ def _yt_get_transcript(video_id: str, languages: list[str]) -> list[RawTranscrip
 
 
 def _get_yt_listing_exceptions() -> tuple[type[Exception], type[Exception]]:
-    """Get youtube_transcript_api listing exception classes dynamically."""
-    mod = __import__("youtube_transcript_api")
-    unavailable: type[Exception] = mod.VideoUnavailable
-    disabled: type[Exception] = mod.TranscriptsDisabled
-    return unavailable, disabled
+    """Get youtube_transcript_api listing exception classes via hook."""
+    exc = _test_hooks.yt_exceptions_factory()
+    # Return (VideoUnavailable, TranscriptsDisabled)
+    return (exc[2], exc[1])
 
 
 def _yt_list_transcripts(video_id: str) -> _YTListingProto:
@@ -155,6 +145,4 @@ class YouTubeTranscriptApiAdapter(YouTubeTranscriptClient):
     def list_transcripts(self, video_id: str) -> TranscriptListing:
         lt: _ListTranscriptsFn = _yt_list_transcripts
         listing_obj = lt(video_id)
-        if isinstance(listing_obj, _YTListingProto):
-            return _YTListing(listing_obj)
-        raise TranscriptListingError("unexpected listing type")
+        return _YTListing(listing_obj)

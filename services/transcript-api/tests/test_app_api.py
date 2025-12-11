@@ -12,7 +12,7 @@ from platform_core.errors import AppError, TranscriptErrorCode
 from platform_core.json_utils import load_json_str
 from platform_core.request_context import request_id_var
 
-from transcript_api.app import (
+from transcript_api.api.main import (
     AppDeps,
     CaptionsPayload,
     Clients,

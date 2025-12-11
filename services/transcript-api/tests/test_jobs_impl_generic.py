@@ -1,30 +1,48 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from datetime import datetime
+from collections.abc import Callable
 from typing import BinaryIO
 
 import pytest
+from platform_core.config import _test_hooks as platform_hooks
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import stdlib_logging
+from platform_core.testing import make_fake_env
 from platform_workers.testing import FakeRedis
 
+from transcript_api import _test_hooks
+from transcript_api._test_hooks import (
+    ProbeDownloadClientProto,
+    STTClientProto,
+    STTProviderFactoryProto,
+    STTProviderProto,
+)
 from transcript_api.jobs import (
     STTConfig,
     STTJobParams,
     STTJobResult,
     process_stt_impl,
 )
-from transcript_api.types import SubtitleResultTD, VerboseResponseTD, YtInfoTD
+from transcript_api.types import (
+    SubtitleResultTD,
+    TranscriptOptions,
+    TranscriptSegment,
+    VerboseResponseTD,
+    YtInfoTD,
+)
 
 
 class _StubSTTClient:
+    """Stub STT client implementing STTClientProto."""
+
     def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
         return {"text": "hello world", "segments": []}
 
 
 class _StubProbeClient:
+    """Stub probe client implementing ProbeDownloadClientProto."""
+
     def probe(self, url: str) -> YtInfoTD:
         return {"id": "vid", "duration": 1.0, "formats": [], "requested_downloads": []}
 
@@ -41,37 +59,74 @@ class _StubProbeClient:
         return None
 
 
-def test_process_stt_impl_roundtrip_publishes_events_and_saves(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class _StubProvider:
-        def __init__(
-            self,
-            *,
-            stt_client: _StubSTTClient,
-            probe_client: _StubProbeClient,
-            max_video_seconds: int,
-            max_file_mb: int,
-            enable_chunking: bool,
-            chunk_threshold_mb: float,
-            target_chunk_mb: float,
-            max_chunk_duration: float,
-            max_concurrent_chunks: int,
-            silence_threshold_db: float,
-            silence_duration: float,
-            stt_rtf: float,
-            dl_mib_per_sec: float,
-            cookies_text: str | None,
-        ) -> None:
-            self._stt_client = stt_client
-            self._probe_client = probe_client
-            self._created_at = datetime.utcnow()
+class _StubProvider:
+    """Stub STT provider implementing STTProviderProto."""
 
-        def fetch(
-            self, video_id: str, opts: Mapping[str, JSONValue]
-        ) -> list[Mapping[str, JSONValue]]:
-            return [{"text": "hello", "start": 0.0, "duration": 1.0}]
+    def __init__(
+        self,
+        *,
+        stt_client: STTClientProto,
+        probe_client: ProbeDownloadClientProto,
+        max_video_seconds: int,
+        max_file_mb: int,
+        enable_chunking: bool,
+        chunk_threshold_mb: float,
+        target_chunk_mb: float,
+        max_chunk_duration: float,
+        max_concurrent_chunks: int,
+        silence_threshold_db: float,
+        silence_duration: float,
+        stt_rtf: float,
+        dl_mib_per_sec: float,
+        cookies_text: str | None,
+    ) -> None:
+        pass
 
+    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        return [{"text": "hello", "start": 0.0, "duration": 1.0}]
+
+
+def _make_stub_provider_factory() -> STTProviderFactoryProto:
+    """Create a stub provider factory with correct signature."""
+
+    def factory(
+        *,
+        stt_client: STTClientProto,
+        probe_client: ProbeDownloadClientProto,
+        max_video_seconds: int,
+        max_file_mb: int,
+        enable_chunking: bool,
+        chunk_threshold_mb: float,
+        target_chunk_mb: float,
+        max_chunk_duration: float,
+        max_concurrent_chunks: int,
+        silence_threshold_db: float,
+        silence_duration: float,
+        stt_rtf: float,
+        dl_mib_per_sec: float,
+        cookies_text: str | None,
+    ) -> STTProviderProto:
+        return _StubProvider(
+            stt_client=stt_client,
+            probe_client=probe_client,
+            max_video_seconds=max_video_seconds,
+            max_file_mb=max_file_mb,
+            enable_chunking=enable_chunking,
+            chunk_threshold_mb=chunk_threshold_mb,
+            target_chunk_mb=target_chunk_mb,
+            max_chunk_duration=max_chunk_duration,
+            max_concurrent_chunks=max_concurrent_chunks,
+            silence_threshold_db=silence_threshold_db,
+            silence_duration=silence_duration,
+            stt_rtf=stt_rtf,
+            dl_mib_per_sec=dl_mib_per_sec,
+            cookies_text=cookies_text,
+        )
+
+    return factory
+
+
+def test_process_stt_impl_roundtrip_publishes_events_and_saves() -> None:
     redis = FakeRedis()
     params: STTJobParams = {"url": "https://youtu.be/dQw4w9WgXcQ", "user_id": 5}
     config: STTConfig = {
@@ -91,9 +146,9 @@ def test_process_stt_impl_roundtrip_publishes_events_and_saves(
     probe_client = _StubProbeClient()
     logger = stdlib_logging.getLogger("test-logger")
 
-    import transcript_api.jobs as jobs_mod
+    # Set the hook to use stub provider
+    _test_hooks.stt_provider_factory = _make_stub_provider_factory()
 
-    monkeypatch.setattr(jobs_mod, "STTTranscriptProvider", _StubProvider)
     result: STTJobResult = process_stt_impl(
         "job-xyz",
         params,
@@ -116,35 +171,7 @@ def test_process_stt_impl_roundtrip_publishes_events_and_saves(
     redis.assert_only_called({"publish", "hset", "expire"})
 
 
-def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _StubProvider:
-        def __init__(
-            self,
-            *,
-            stt_client: _StubSTTClient,
-            probe_client: _StubProbeClient,
-            max_video_seconds: int,
-            max_file_mb: int,
-            enable_chunking: bool,
-            chunk_threshold_mb: float,
-            target_chunk_mb: float,
-            max_chunk_duration: float,
-            max_concurrent_chunks: int,
-            silence_threshold_db: float,
-            silence_duration: float,
-            stt_rtf: float,
-            dl_mib_per_sec: float,
-            cookies_text: str | None,
-        ) -> None:
-            self._stt_client = stt_client
-            self._probe_client = probe_client
-            self._created_at = datetime.utcnow()
-
-        def fetch(
-            self, video_id: str, opts: Mapping[str, JSONValue]
-        ) -> list[Mapping[str, JSONValue]]:
-            return [{"text": "hi", "start": 0.0, "duration": 1.0}]
-
+def test_process_stt_impl_requires_url_and_user() -> None:
     redis = FakeRedis()
     stt_client = _StubSTTClient()
     probe_client = _StubProbeClient()
@@ -162,9 +189,10 @@ def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch)
         "dl_mib_per_sec": 1.0,
     }
     logger = stdlib_logging.getLogger("test-logger-bad")
-    import transcript_api.jobs as jobs_mod
 
-    monkeypatch.setattr(jobs_mod, "STTTranscriptProvider", _StubProvider)
+    # Set the hook to use stub provider
+    _test_hooks.stt_provider_factory = _make_stub_provider_factory()
+
     with pytest.raises(AppError):
         process_stt_impl(
             "job-bad",
@@ -178,21 +206,26 @@ def test_process_stt_impl_requires_url_and_user(monkeypatch: pytest.MonkeyPatch)
     redis.assert_only_called({"publish"})
 
 
-def test_load_stt_config_returns_typed_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_stt_config_returns_typed_dict() -> None:
     """Test _load_stt_config loads values from environment."""
     import transcript_api.jobs as jobs_mod
 
-    monkeypatch.setenv("TRANSCRIPT_MAX_VIDEO_SECONDS", "300")
-    monkeypatch.setenv("TRANSCRIPT_MAX_FILE_MB", "50")
-    monkeypatch.setenv("TRANSCRIPT_ENABLE_CHUNKING", "true")
-    monkeypatch.setenv("TRANSCRIPT_CHUNK_THRESHOLD_MB", "30.0")
-    monkeypatch.setenv("TRANSCRIPT_TARGET_CHUNK_MB", "25.0")
-    monkeypatch.setenv("TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS", "500.0")
-    monkeypatch.setenv("TRANSCRIPT_MAX_CONCURRENT_CHUNKS", "8")
-    monkeypatch.setenv("TRANSCRIPT_SILENCE_THRESHOLD_DB", "-30.0")
-    monkeypatch.setenv("TRANSCRIPT_SILENCE_DURATION_SECONDS", "0.3")
-    monkeypatch.setenv("TRANSCRIPT_STT_RTF", "0.4")
-    monkeypatch.setenv("TRANSCRIPT_DL_MIB_PER_SEC", "10.0")
+    platform_hooks.get_env = make_fake_env(
+        {
+            "REDIS_URL": "redis://test-redis",
+            "TRANSCRIPT_MAX_VIDEO_SECONDS": "300",
+            "TRANSCRIPT_MAX_FILE_MB": "50",
+            "TRANSCRIPT_ENABLE_CHUNKING": "true",
+            "TRANSCRIPT_CHUNK_THRESHOLD_MB": "30.0",
+            "TRANSCRIPT_TARGET_CHUNK_MB": "25.0",
+            "TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS": "500.0",
+            "TRANSCRIPT_MAX_CONCURRENT_CHUNKS": "8",
+            "TRANSCRIPT_SILENCE_THRESHOLD_DB": "-30.0",
+            "TRANSCRIPT_SILENCE_DURATION_SECONDS": "0.3",
+            "TRANSCRIPT_STT_RTF": "0.4",
+            "TRANSCRIPT_DL_MIB_PER_SEC": "10.0",
+        }
+    )
 
     config = jobs_mod._load_stt_config()
 
@@ -280,13 +313,13 @@ def _capturing_redis_factory(url: str) -> FakeRedis:
     return redis
 
 
-def test_get_redis_client(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_client() -> None:
     """Test _get_redis_client returns a redis client."""
     import transcript_api.jobs as jobs_mod
 
     _redis_url_captured.clear()
     _redis_instance_captured.clear()
-    monkeypatch.setattr(jobs_mod, "redis_for_kv", _capturing_redis_factory)
+    _test_hooks.redis_factory = _capturing_redis_factory
     jobs_mod._get_redis_client("redis://localhost:6379")
     assert _redis_url_captured == ["redis://localhost:6379"]
     _redis_instance_captured[0].assert_only_called(set())
@@ -296,81 +329,167 @@ _stt_api_key_captured: list[str] = []
 
 
 class _TestSTTClient:
-    """Mock STT client that captures API key."""
+    """Stub STT client that captures API key and implements STTClientProto."""
 
-    def __init__(self, *, api_key: str) -> None:
+    def __init__(self, api_key: str) -> None:
         _stt_api_key_captured.append(api_key)
 
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
+        return {"text": "", "segments": []}
 
-def test_build_stt_client_with_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+
+def _make_test_stt_client_builder() -> Callable[[str], STTClientProto]:
+    """Factory that creates _TestSTTClient with proper return type."""
+
+    def builder(api_key: str) -> STTClientProto:
+        return _TestSTTClient(api_key)
+
+    return builder
+
+
+def test_build_stt_client_with_openai_api_key() -> None:
     """Test _build_stt_client with OPENAI_API_KEY env var."""
     import transcript_api.jobs as jobs_mod
 
     _stt_api_key_captured.clear()
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-    monkeypatch.setattr("transcript_api.adapters.openai_client.OpenAISttClient", _TestSTTClient)
+    platform_hooks.get_env = make_fake_env(
+        {
+            "REDIS_URL": "redis://test-redis",
+            "OPENAI_API_KEY": "sk-test-key",
+        }
+    )
+
+    def stt_builder(key: str) -> STTClientProto:
+        return _TestSTTClient(key)
+
+    _test_hooks.stt_client_builder = stt_builder
     jobs_mod._build_stt_client()
     assert _stt_api_key_captured == ["sk-test-key"]
 
 
-def test_build_stt_client_with_alt_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_stt_client_with_alt_api_key() -> None:
     """Test _build_stt_client with OPEN_AI_API_KEY env var."""
     import transcript_api.jobs as jobs_mod
 
     _stt_api_key_captured.clear()
     # Unset OPENAI_API_KEY to force fallback to OPEN_AI_API_KEY
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setenv("OPEN_AI_API_KEY", "sk-alt-key")
-    monkeypatch.setattr("transcript_api.adapters.openai_client.OpenAISttClient", _TestSTTClient)
+    platform_hooks.get_env = make_fake_env(
+        {
+            "REDIS_URL": "redis://test-redis",
+            "OPEN_AI_API_KEY": "sk-alt-key",
+        }
+    )
+
+    def stt_builder(key: str) -> STTClientProto:
+        return _TestSTTClient(key)
+
+    _test_hooks.stt_client_builder = stt_builder
     jobs_mod._build_stt_client()
     assert _stt_api_key_captured == ["sk-alt-key"]
 
 
-def test_build_stt_client_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_stt_client_requires_api_key() -> None:
     """Test _build_stt_client raises when no API key is set."""
     import transcript_api.jobs as jobs_mod
 
     # Unset both API key env vars
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPEN_AI_API_KEY", raising=False)
+    platform_hooks.get_env = make_fake_env(
+        {
+            "REDIS_URL": "redis://test-redis",
+        }
+    )
 
     with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
         jobs_mod._build_stt_client()
 
 
-def test_build_probe_client(monkeypatch: pytest.MonkeyPatch) -> None:
+class _StubProbeClientForBuild:
+    """Stub probe client for build test implementing ProbeDownloadClientProto."""
+
+    def probe(self, url: str) -> YtInfoTD:
+        return {}
+
+    def download_audio(self, url: str, *, cookies_path: str | None) -> str:
+        return "/tmp/audio"
+
+    def download_subtitles(
+        self,
+        url: str,
+        *,
+        cookies_path: str | None,
+        preferred_langs: list[str],
+    ) -> SubtitleResultTD | None:
+        return None
+
+
+def test_build_probe_client() -> None:
     """Test _build_probe_client returns a probe client."""
     import transcript_api.jobs as jobs_mod
 
-    class _MockAdapter:
-        pass
+    def probe_builder() -> ProbeDownloadClientProto:
+        return _StubProbeClientForBuild()
 
-    monkeypatch.setattr("transcript_api.adapters.yt_dlp_client.YtDlpAdapter", _MockAdapter)
+    _test_hooks.probe_client_builder = probe_builder
     client = jobs_mod._build_probe_client()
-    assert type(client).__name__ == "_MockAdapter"
+    assert type(client).__name__ == "_StubProbeClientForBuild"
 
 
 _decode_redis_captured: list[FakeRedis] = []
 
 
 class _DecodeTestSTTClient:
-    """Mock STT client for decode test."""
+    """Stub STT client for decode test implementing STTClientProto."""
 
-    def __init__(self, *, api_key: str) -> None:
+    def __init__(self, api_key: str) -> None:
         self.api_key = api_key
+
+    def transcribe_verbose(self, *, file: BinaryIO, timeout: float | None) -> VerboseResponseTD:
+        return {"text": "", "segments": []}
 
 
 class _DecodeTestProbeClient:
-    """Mock probe client for decode test."""
+    """Stub probe client for decode test implementing ProbeDownloadClientProto."""
+
+    def probe(self, url: str) -> YtInfoTD:
+        return {}
+
+    def download_audio(self, url: str, *, cookies_path: str | None) -> str:
+        return "/tmp/audio"
+
+    def download_subtitles(
+        self,
+        url: str,
+        *,
+        cookies_path: str | None,
+        preferred_langs: list[str],
+    ) -> SubtitleResultTD | None:
+        return None
 
 
 class _DecodeTestProvider:
-    """Mock provider for decode test."""
+    """Stub provider for decode test implementing STTProviderProto."""
 
-    def __init__(self, **kwargs: str | int | float | bool | None) -> None:
+    def __init__(
+        self,
+        *,
+        stt_client: STTClientProto,
+        probe_client: ProbeDownloadClientProto,
+        max_video_seconds: int,
+        max_file_mb: int,
+        enable_chunking: bool,
+        chunk_threshold_mb: float,
+        target_chunk_mb: float,
+        max_chunk_duration: float,
+        max_concurrent_chunks: int,
+        silence_threshold_db: float,
+        silence_duration: float,
+        stt_rtf: float,
+        dl_mib_per_sec: float,
+        cookies_text: str | None,
+    ) -> None:
         pass
 
-    def fetch(self, video_id: str, opts: Mapping[str, JSONValue]) -> list[Mapping[str, JSONValue]]:
+    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
         return [{"text": "hello", "start": 0.0, "duration": 1.0}]
 
 
@@ -380,23 +499,69 @@ def _make_decode_redis(url: str) -> FakeRedis:
     return redis
 
 
-def test_decode_process_stt_integration(monkeypatch: pytest.MonkeyPatch) -> None:
+def _make_decode_provider_factory() -> STTProviderFactoryProto:
+    """Create a decode test provider factory with correct signature."""
+
+    def factory(
+        *,
+        stt_client: STTClientProto,
+        probe_client: ProbeDownloadClientProto,
+        max_video_seconds: int,
+        max_file_mb: int,
+        enable_chunking: bool,
+        chunk_threshold_mb: float,
+        target_chunk_mb: float,
+        max_chunk_duration: float,
+        max_concurrent_chunks: int,
+        silence_threshold_db: float,
+        silence_duration: float,
+        stt_rtf: float,
+        dl_mib_per_sec: float,
+        cookies_text: str | None,
+    ) -> STTProviderProto:
+        return _DecodeTestProvider(
+            stt_client=stt_client,
+            probe_client=probe_client,
+            max_video_seconds=max_video_seconds,
+            max_file_mb=max_file_mb,
+            enable_chunking=enable_chunking,
+            chunk_threshold_mb=chunk_threshold_mb,
+            target_chunk_mb=target_chunk_mb,
+            max_chunk_duration=max_chunk_duration,
+            max_concurrent_chunks=max_concurrent_chunks,
+            silence_threshold_db=silence_threshold_db,
+            silence_duration=silence_duration,
+            stt_rtf=stt_rtf,
+            dl_mib_per_sec=dl_mib_per_sec,
+            cookies_text=cookies_text,
+        )
+
+    return factory
+
+
+def test_decode_process_stt_integration() -> None:
     """Test _decode_process_stt loads deps and processes job."""
     import transcript_api.jobs as jobs_mod
 
     _decode_redis_captured.clear()
 
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    platform_hooks.get_env = make_fake_env(
+        {
+            "REDIS_URL": "redis://localhost:6379",
+            "OPENAI_API_KEY": "sk-test",
+        }
+    )
 
-    monkeypatch.setattr(jobs_mod, "redis_for_kv", _make_decode_redis)
-    monkeypatch.setattr(
-        "transcript_api.adapters.openai_client.OpenAISttClient", _DecodeTestSTTClient
-    )
-    monkeypatch.setattr(
-        "transcript_api.adapters.yt_dlp_client.YtDlpAdapter", _DecodeTestProbeClient
-    )
-    monkeypatch.setattr(jobs_mod, "STTTranscriptProvider", _DecodeTestProvider)
+    def stt_builder(key: str) -> STTClientProto:
+        return _DecodeTestSTTClient(key)
+
+    def probe_builder() -> ProbeDownloadClientProto:
+        return _DecodeTestProbeClient()
+
+    _test_hooks.redis_factory = _make_decode_redis
+    _test_hooks.stt_client_builder = stt_builder
+    _test_hooks.probe_client_builder = probe_builder
+    _test_hooks.stt_provider_factory = _make_decode_provider_factory()
 
     result = jobs_mod._decode_process_stt(
         "job-123", {"url": "https://youtu.be/dQw4w9WgXcQ", "user_id": 5}
@@ -408,21 +573,25 @@ def test_decode_process_stt_integration(monkeypatch: pytest.MonkeyPatch) -> None
     _decode_redis_captured[0].assert_only_called({"publish", "hset", "expire", "close"})
 
 
-def test_process_stt_delegates_to_decode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_stt_delegates_to_decode() -> None:
     """Test process_stt delegates to _decode_process_stt."""
     import transcript_api.jobs as jobs_mod
 
     call_args: dict[str, JSONValue] = {}
 
-    def mock_decode(job_id: str, params: dict[str, JSONValue]) -> jobs_mod.STTJobResult:
+    def stub_decode(job_id: str, params: dict[str, JSONValue]) -> jobs_mod.STTJobResult:
         call_args["job_id"] = job_id
         call_args["params"] = params
         return {"job_id": job_id, "status": "completed", "video_id": "vid", "text": "hi"}
 
-    monkeypatch.setattr(jobs_mod, "_decode_process_stt", mock_decode)
+    # Save original and set stub
+    original_decode = jobs_mod._decode_process_stt
+    jobs_mod._decode_process_stt = stub_decode
+    try:
+        result = jobs_mod.process_stt("job-456", {"url": "https://youtu.be/abc", "user_id": 10})
 
-    result = jobs_mod.process_stt("job-456", {"url": "https://youtu.be/abc", "user_id": 10})
-
-    assert result["job_id"] == "job-456"
-    assert call_args["job_id"] == "job-456"
-    assert call_args["params"] == {"url": "https://youtu.be/abc", "user_id": 10}
+        assert result["job_id"] == "job-456"
+        assert call_args["job_id"] == "job-456"
+        assert call_args["params"] == {"url": "https://youtu.be/abc", "user_id": 10}
+    finally:
+        jobs_mod._decode_process_stt = original_decode

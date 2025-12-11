@@ -1,57 +1,66 @@
 from __future__ import annotations
 
-import sys
-from typing import Protocol
+from platform_core.config import _test_hooks as platform_hooks
+from platform_core.json_utils import JSONValue
+from platform_core.testing import make_fake_env
 
-import pytest
-
+from transcript_api import _test_hooks
+from transcript_api._test_hooks import YTApiProto
 from transcript_api.startup import make_app_from_env
-from transcript_api.types import JsonValue
+from transcript_api.types import (
+    OpenAIClientProto,
+    RawTranscriptItem,
+    SupportsToDictRecursive,
+    YtDlpProto,
+    _AudioProto,
+    _BinaryFileProto,
+    _TracebackProto,
+    _TranscriptionsProto,
+)
 
 
-class _FileLike(Protocol):
-    pass
+class _FakeTranscriptionResult:
+    """Fake transcription result implementing SupportsToDictRecursive."""
+
+    def to_dict_recursive(
+        self,
+    ) -> dict[str, str | int | float | bool | None | list[dict[str, str | int | float]]]:
+        return {"text": "", "segments": []}
 
 
-class _TracebackLike(Protocol):
-    pass
+class _FakeTranscriptions:
+    """Fake transcriptions implementing _TranscriptionsProto."""
+
+    def create(
+        self,
+        *,
+        model: str,
+        file: _BinaryFileProto,
+        response_format: str,
+        timeout: float | None,
+    ) -> SupportsToDictRecursive:
+        return _FakeTranscriptionResult()
+
+
+class _FakeAudio:
+    @property
+    def transcriptions(self) -> _TranscriptionsProto:
+        return _FakeTranscriptions()
 
 
 class _FakeOpenAIClient:
-    def __init__(self, *, api_key: str, timeout: float, max_retries: int) -> None:
-        class _Transcriptions:
-            def create(
-                self,
-                *,
-                model: str,
-                file: _FileLike,
-                response_format: str,
-                timeout: float | None,
-            ) -> dict[str, JsonValue]:
-                return {}
-
-        class _Audio:
-            def __init__(self) -> None:
-                self.transcriptions = _Transcriptions()
-
-        self.audio = _Audio()
-
-
-class _FakeOpenAIMod:
-    @staticmethod
-    def _factory(*, api_key: str, timeout: float, max_retries: int) -> _FakeOpenAIClient:
-        return _FakeOpenAIClient(api_key=api_key, timeout=timeout, max_retries=max_retries)
-
-    OpenAI = staticmethod(_factory)
+    @property
+    def audio(self) -> _AudioProto:
+        return _FakeAudio()
 
 
 class _FakeYTResource:
-    def fetch(self) -> list[dict[str, JsonValue]]:
+    def fetch(self) -> list[RawTranscriptItem]:
         return []
 
 
 class _FakeYTListing:
-    def find_transcript(self, languages: list[str]) -> _FakeYTResource:
+    def find_transcript(self, languages: list[str]) -> _FakeYTResource | None:
         return _FakeYTResource()
 
     def translate(self, language: str) -> _FakeYTResource:
@@ -60,7 +69,7 @@ class _FakeYTListing:
 
 class _FakeYTApi:
     @staticmethod
-    def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JsonValue]]:
+    def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
         return []
 
     @staticmethod
@@ -68,48 +77,55 @@ class _FakeYTApi:
         return _FakeYTListing()
 
 
-class _FakeYTMod:
-    YouTubeTranscriptApi = _FakeYTApi
-    NoTranscriptFound = KeyError
-    TranscriptsDisabled = RuntimeError
-    VideoUnavailable = RuntimeError
-
-
 class _FakeYDL:
-    def __init__(self, opts: dict[str, JsonValue]) -> None:
+    def __init__(self, opts: dict[str, JSONValue]) -> None:
         self._opts = opts
 
-    def __enter__(self) -> _FakeYDL:
+    def __enter__(self) -> YtDlpProto:
         return self
 
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
-        tb: _TracebackLike | None,
+        tb: _TracebackProto | None,
     ) -> None:
         return None
 
-    def extract_info(self, url: str, download: bool) -> dict[str, JsonValue]:
+    def extract_info(self, url: str, download: bool) -> dict[str, JSONValue]:
         return {}
 
-    def prepare_filename(self, info: dict[str, JsonValue]) -> str:
+    def prepare_filename(self, info: dict[str, JSONValue]) -> str:
         return "audio.m4a"
 
 
-class _FakeYtDlpMod:
-    @staticmethod
-    def _factory(opts: dict[str, JsonValue]) -> _FakeYDL:
+def test_make_app_from_env() -> None:
+    # Set environment variables
+    platform_hooks.get_env = make_fake_env({"OPENAI_API_KEY": "k"})
+
+    # Set up hooks for OpenAI client
+    def _openai_factory(*, api_key: str, timeout: float, max_retries: int) -> OpenAIClientProto:
+        return _FakeOpenAIClient()
+
+    _test_hooks.openai_client_factory = _openai_factory
+
+    # Set up hooks for YouTube API
+    def _yt_api_factory() -> YTApiProto:
+        api: YTApiProto = _FakeYTApi
+        return api
+
+    def _yt_exc_factory() -> tuple[type[Exception], type[Exception], type[Exception]]:
+        return (KeyError, RuntimeError, RuntimeError)
+
+    _test_hooks.yt_api_factory = _yt_api_factory
+    _test_hooks.yt_exceptions_factory = _yt_exc_factory
+
+    # Set up hooks for yt-dlp
+    def _yt_dlp_factory(opts: dict[str, JSONValue]) -> YtDlpProto:
         return _FakeYDL(opts)
 
-    YoutubeDL = staticmethod(_factory)
+    _test_hooks.yt_dlp_factory = _yt_dlp_factory
 
-
-def test_make_app_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(sys.modules, "openai", _FakeOpenAIMod())
-    monkeypatch.setitem(sys.modules, "youtube_transcript_api", _FakeYTMod())
-    monkeypatch.setitem(sys.modules, "yt_dlp", _FakeYtDlpMod())
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
     app = make_app_from_env()
     # Basic sanity: app instance created with routes attached - access router directly
     _ = app.router

@@ -17,12 +17,13 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TRANSCRIPT_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
+from . import _test_hooks
 from .cleaner import clean_segments
 from .job_store import TranscriptJobStore
-from .stt_provider import ProbeDownloadClient, STTClient, STTTranscriptProvider
+from .stt_provider import ProbeDownloadClient, STTClient
 from .types import DEFAULT_TRANSCRIPT_LANGS, LoggerProtocol, TranscriptOptions
 from .youtube import canonicalize_youtube_url, extract_video_id
 
@@ -139,7 +140,7 @@ def process_stt_impl(
     logger.info("Starting STT job", extra={"job_id": job_id, "video_id": video_id})
 
     cookies_text = _optional_env_str("TRANSCRIPT_COOKIES_TEXT")
-    stt_provider = STTTranscriptProvider(
+    stt_provider = _test_hooks.stt_provider_factory(
         stt_client=stt_client,
         probe_client=probe_client,
         max_video_seconds=config["max_video_seconds"],
@@ -205,24 +206,20 @@ def process_stt_impl(
 
 
 def _get_redis_client(url: str) -> RedisStrProto:
-    return redis_for_kv(url)
+    return _test_hooks.redis_factory(url)
 
 
 def _build_stt_client() -> STTClient:
     """Build STT client from environment."""
-    from .adapters.openai_client import OpenAISttClient
-
     api_key = _optional_env_str("OPENAI_API_KEY") or _optional_env_str("OPEN_AI_API_KEY")
     if api_key is None:
         api_key = _require_env_str("OPENAI_API_KEY")
-    return OpenAISttClient(api_key=api_key)
+    return _test_hooks.stt_client_builder(api_key)
 
 
 def _build_probe_client() -> ProbeDownloadClient:
     """Build probe/download client from environment."""
-    from .adapters.yt_dlp_client import YtDlpAdapter
-
-    return YtDlpAdapter()
+    return _test_hooks.probe_client_builder()
 
 
 def _decode_process_stt(job_id: str, params: dict[str, JSONValue]) -> STTJobResult:

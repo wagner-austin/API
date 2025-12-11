@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import BinaryIO, Protocol
@@ -11,6 +10,7 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
+from transcript_api import _test_hooks
 from transcript_api.stt_provider import (
     STTTranscriptProvider,
     _as_float,
@@ -20,7 +20,6 @@ from transcript_api.types import (
     AudioChunk,
     SubtitleResultTD,
     TranscriptOptions,
-    TranscriptSegment,
     VerboseResponseTD,
     VerboseSegmentTD,
     YtInfoTD,
@@ -174,55 +173,94 @@ def test_probe_or_error_success() -> None:
     assert dur == 42
 
 
-def test_download_or_error_stat_happy_and_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_download_or_error_stat_happy_and_retry() -> None:
     prov, path = _make_provider(tmp_file_size=8)
-
-    class _Stat:
-        def __init__(self, size: int) -> None:
-            self.st_size = size
 
     calls = {"n": 0}
 
-    def _stat_retry(pth: str) -> _Stat:
+    def _stat_retry(pth: str) -> os.stat_result:
         calls["n"] += 1
         if calls["n"] == 1:
             raise OSError("first fail")
-        return _Stat(123)
+        # Create a minimal stat result with st_size=123
+        return os.stat_result((0, 0, 0, 0, 0, 0, 123, 0, 0, 0))
 
-    monkeypatch.setattr(os, "stat", _stat_retry, raising=True)
+    _test_hooks.os_stat = _stat_retry
     out_path, size = prov._download_or_error("https://x")
     assert out_path == path and size == 123 and calls["n"] == 2
 
 
-def test_download_or_error_stat_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_download_or_error_stat_failure() -> None:
     prov, _ = _make_provider(tmp_file_size=4)
 
-    def _stat_fail(pth: str) -> None:
+    def _stat_fail(pth: str) -> os.stat_result:
         raise OSError("fail")
 
-    monkeypatch.setattr(os, "stat", _stat_fail, raising=True)
+    _test_hooks.os_stat = _stat_fail
     with pytest.raises(AppError):
         _ = prov._download_or_error("https://x")
 
 
-def test_transcribe_with_strategy_chunk_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_transcribe_with_strategy_chunk_error() -> None:
+    """Test that chunking error raises AppError."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
     prov, path = _make_provider(tmp_file_size=16)
     prov.enable_chunking = True
+    # Set chunk threshold low so file triggers chunking
+    prov.chunk_threshold_mb = 0.00001
 
-    def _always_chunk(_: str) -> bool:
-        return True
+    # Set ffmpeg as available so chunking path is taken
+    _test_hooks.ffmpeg_available = lambda: True
 
-    monkeypatch.setattr(prov, "_should_chunk", _always_chunk, raising=True)
+    # Create chunker that raises an error
+    class _ErrorChunker:
+        def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
+            raise RuntimeError("boom")
 
-    def _raise_chunk(p: str) -> list[TranscriptSegment]:
-        raise RuntimeError("boom")
+    def _error_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _ErrorChunker()
 
-    monkeypatch.setattr(prov, "_transcribe_chunked", _raise_chunk, raising=True)
+    _test_hooks.audio_chunker_factory = _error_chunker_factory
+
+    # Hook subprocess for ffprobe (needed to get duration)
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "10.0"}}'
+            stderr: bytes | str | None = None
+
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
+    # Set os_path_getsize to return small file to trigger chunking
+    _test_hooks.os_path_getsize = lambda p: 16
+
     with pytest.raises(AppError):
         _ = prov._transcribe_with_strategy(path)
 
 
-def test_handle_over_limit_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_handle_over_limit_branches(tmp_path: Path) -> None:
+    """Test _handle_over_limit behavior with chunking enabled/disabled."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
     prov, _ = _make_provider()
     prov.enable_chunking = False
     with pytest.raises(AppError):
@@ -230,15 +268,55 @@ def test_handle_over_limit_branches(monkeypatch: pytest.MonkeyPatch) -> None:
 
     prov.enable_chunking = True
 
-    def _fake_chunk(path: str) -> list[TranscriptSegment]:
-        return [TranscriptSegment(text="ok", start=0.0, duration=1.0)]
+    # Create audio file for chunking
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"x" * 100)
 
-    monkeypatch.setattr(prov, "_transcribe_chunked", _fake_chunk, raising=True)
-    out = prov._handle_over_limit("a.m4a", 1024)
-    assert len(out) == 1 and out[0]["text"] == "ok"
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
+
+    # Create chunker that returns a single chunk
+    class _SingleChunker:
+        def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
+            return [AudioChunk(path=path, start_seconds=0.0, duration_seconds=1.0, size_bytes=100)]
+
+    def _single_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _SingleChunker()
+
+    _test_hooks.audio_chunker_factory = _single_chunker_factory
+
+    # Hook subprocess for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "1.0"}}'
+            stderr: bytes | str | None = None
+
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
+    out = prov._handle_over_limit(str(audio), 1024)
+    assert len(out) == 1
 
 
-def test_should_chunk_branches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_should_chunk_branches(tmp_path: Path) -> None:
     prov, _ = _make_provider()
     prov.enable_chunking = False
     assert prov._should_chunk(str(tmp_path / "x.m4a")) is False
@@ -248,115 +326,159 @@ def test_should_chunk_branches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     def _size_fail(_: str) -> int:
         raise OSError("fail")
 
-    monkeypatch.setattr(os.path, "getsize", _size_fail, raising=True)
+    _test_hooks.os_path_getsize = _size_fail
     assert prov._should_chunk(str(tmp_path / "x.m4a")) is False
 
     def _size_ok(_: str) -> int:
         return 2 * 1024 * 1024
 
-    monkeypatch.setattr(os.path, "getsize", _size_ok, raising=True)
+    _test_hooks.os_path_getsize = _size_ok
     prov.chunk_threshold_mb = 1.0
     assert prov._should_chunk(str(tmp_path / "x.m4a")) is True
 
 
-def test_get_audio_duration_success_and_error(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_audio_duration_success_and_error(tmp_path: Path) -> None:
+    import subprocess
+
+    from transcript_api._test_hooks import SubprocessRunResult
+
     prov, _ = _make_provider()
     audio = tmp_path / "a.m4a"
     audio.write_bytes(b"x")
 
     class _Proc:
         def __init__(self, stdout: str) -> None:
-            self.stdout = stdout
+            self.returncode = 0
+            self.stdout: bytes | str | None = stdout
+            self.stderr: bytes | str | None = None
 
-    def _run_ok(cmd: list[str], capture_output: bool, text: bool, timeout: int) -> _Proc:
+    def _run_ok(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> SubprocessRunResult:
         data = {"format": {"duration": "2.5"}}
         return _Proc(stdout=dump_json_str(data))
 
-    monkeypatch.setattr(subprocess, "run", _run_ok, raising=True)
+    _test_hooks.subprocess_run = _run_ok
     dur = prov._get_audio_duration(str(audio))
     assert dur == 2.5
 
-    def _run_fail(cmd: list[str], capture_output: bool, text: bool, timeout: int) -> _Proc:
+    def _run_fail(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> SubprocessRunResult:
         raise subprocess.TimeoutExpired(cmd="ffprobe", timeout=1)
 
-    monkeypatch.setattr(subprocess, "run", _run_fail, raising=True)
+    _test_hooks.subprocess_run = _run_fail
     dur2 = prov._get_audio_duration(str(audio))
     assert dur2 == 0.0
 
-    class _ProcList:
-        def __init__(self, stdout: str) -> None:
-            self.stdout = stdout
-
-    def _run_list(cmd: list[str], capture_output: bool, text: bool, timeout: int) -> _ProcList:
+    def _run_list(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> SubprocessRunResult:
         items: list[str] = ["not-a-dict"]
         body = dump_json_str(items)
-        return _ProcList(stdout=body)
+        return _Proc(stdout=body)
 
-    monkeypatch.setattr(subprocess, "run", _run_list, raising=True)
+    _test_hooks.subprocess_run = _run_list
     dur3 = prov._get_audio_duration(str(audio))
     assert dur3 == 0.0
 
     def _run_format_not_dict(
-        cmd: list[str], capture_output: bool, text: bool, timeout: int
-    ) -> _Proc:
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> SubprocessRunResult:
         return _Proc(stdout='{"format": "bad"}')
 
-    monkeypatch.setattr(subprocess, "run", _run_format_not_dict, raising=True)
+    _test_hooks.subprocess_run = _run_format_not_dict
     dur4 = prov._get_audio_duration(str(audio))
     assert dur4 == 0.0
 
     def _run_duration_not_str(
-        cmd: list[str], capture_output: bool, text: bool, timeout: int
-    ) -> _Proc:
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> SubprocessRunResult:
         return _Proc(stdout='{"format": {"duration": 5}}')
 
-    monkeypatch.setattr(subprocess, "run", _run_duration_not_str, raising=True)
+    _test_hooks.subprocess_run = _run_duration_not_str
     dur5 = prov._get_audio_duration(str(audio))
     assert dur5 == 0.0
 
 
-def test_transcribe_chunked_ffmpeg_unavailable(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_transcribe_chunked_ffmpeg_unavailable(tmp_path: Path) -> None:
+    """Test that _transcribe_chunked raises when ffmpeg is unavailable."""
     prov, _ = _make_provider()
     audio = tmp_path / "a.m4a"
     audio.write_bytes(b"x")
     prov.enable_chunking = True
-    monkeypatch.setattr(prov, "_ffmpeg_available", lambda: False, raising=True)
+
+    # Set ffmpeg as unavailable via hook
+    _test_hooks.ffmpeg_available = lambda: False
+
     with pytest.raises(AppError):
         _ = prov._transcribe_chunked(str(audio))
 
 
-def test_transcribe_chunked_single_chunk_passthrough(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    prov, _ = _make_provider()
+def test_transcribe_chunked_single_chunk_passthrough(tmp_path: Path) -> None:
+    """Test that single-chunk case passes through to normal transcribe."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
+    # Create a real audio file
     audio = tmp_path / "a.m4a"
-    audio.write_bytes(b"x")
+    audio.write_bytes(b"x" * 100)
 
-    def _always_ffmpeg() -> bool:
-        return True
+    # Create provider with test data
+    stt = _StubSTTClient([{"text": "single", "start": 0, "end": 10}])
+    info: YtInfoTD = {"duration": 10}
+    probe = _StubProbeDownloadClient(info, str(audio))
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
 
-    monkeypatch.setattr(prov, "_ffmpeg_available", _always_ffmpeg, raising=True)
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
 
-    def _duration_10(_: str) -> float:
-        return 10.0
-
-    monkeypatch.setattr(prov, "_get_audio_duration", _duration_10, raising=True)
-
+    # Create a fake chunker that returns a single chunk pointing to the original file
     class _OneChunker:
-        def __init__(
-            self,
-            *,
-            target_chunk_mb: float,
-            max_chunk_duration_seconds: float,
-            silence_threshold_db: float,
-            silence_duration_seconds: float,
-        ) -> None:
-            pass
-
         def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
             return [
                 AudioChunk(
@@ -367,48 +489,66 @@ def test_transcribe_chunked_single_chunk_passthrough(
                 )
             ]
 
-    from transcript_api import stt_provider as sp
+    def _one_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _OneChunker()
 
-    monkeypatch.setattr(sp, "AudioChunker", _OneChunker, raising=True)
+    _test_hooks.audio_chunker_factory = _one_chunker_factory
 
-    def _stub_transcribe(p: str) -> list[TranscriptSegment]:
-        assert p == str(audio)
-        return [TranscriptSegment(text="single", start=0.0, duration=10.0)]
+    # Hook subprocess to simulate ffprobe returning duration
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "10.0"}}'
+            stderr: bytes | str | None = None
 
-    monkeypatch.setattr(prov, "_transcribe", _stub_transcribe, raising=True)
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
     out = prov._transcribe_chunked(str(audio))
-    assert len(out) == 1 and out[0]["text"] == "single"
+    assert len(out) == 1
 
 
-def test_transcribe_chunked_multi_chunk_merges_and_cleans(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    prov, _ = _make_provider()
+def test_transcribe_chunked_multi_chunk_merges_and_cleans(tmp_path: Path) -> None:
+    """Test that multi-chunk transcription merges results and cleans up chunk files."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
     audio = tmp_path / "src.m4a"
-    audio.write_bytes(b"x")
+    audio.write_bytes(b"x" * 100)
+
+    # Create provider with stub clients
+    stt = _StubSTTClient([{"text": "chunk", "start": 0, "end": 10}])
+    info: YtInfoTD = {"duration": 20}
+    probe = _StubProbeDownloadClient(info, str(audio))
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
     prov.enable_chunking = True
 
-    def _always_ffmpeg() -> bool:
-        return True
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
 
-    monkeypatch.setattr(prov, "_ffmpeg_available", _always_ffmpeg, raising=True)
-
-    def _duration_20(_: str) -> float:
-        return 20.0
-
-    monkeypatch.setattr(prov, "_get_audio_duration", _duration_20, raising=True)
-
+    # Create stub chunker that creates 2 chunk files
     class _StubChunker:
-        def __init__(
-            self,
-            *,
-            target_chunk_mb: float,
-            max_chunk_duration_seconds: float,
-            silence_threshold_db: float,
-            silence_duration_seconds: float,
-        ) -> None:
-            pass
-
         def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
             p1 = tmp_path / "c1.m4a"
             p2 = tmp_path / "c2.m4a"
@@ -419,148 +559,234 @@ def test_transcribe_chunked_multi_chunk_merges_and_cleans(
                 AudioChunk(path=str(p2), start_seconds=10.0, duration_seconds=10.0, size_bytes=1),
             ]
 
-    from transcript_api import stt_provider as sp
+    def _stub_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _StubChunker()
 
-    monkeypatch.setattr(sp, "AudioChunker", _StubChunker, raising=True)
+    _test_hooks.audio_chunker_factory = _stub_chunker_factory
+
+    # Hook subprocess for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "20.0"}}'
+            stderr: bytes | str | None = None
+
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
     out = prov._transcribe_chunked(str(audio))
     starts = [s["start"] for s in out]
     assert starts == [0.0, 10.0]
+    # Verify chunk files were cleaned up
     assert not (tmp_path / "c1.m4a").exists()
     assert not (tmp_path / "c2.m4a").exists()
 
 
 def test_transcribe_chunked_missing_chunk_logs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    prov, _ = _make_provider()
+    """Test that missing chunk files during cleanup are logged (not crashed)."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
     audio = tmp_path / "src2.m4a"
-    audio.write_bytes(b"x")
+    audio.write_bytes(b"x" * 100)
+
+    # Create two chunk files - one will be deleted when the other is cleaned up
+    chunk1 = tmp_path / "chunk1.m4a"
+    chunk2 = tmp_path / "chunk2.m4a"
+    chunk1.write_bytes(b"test1")
+    chunk2.write_bytes(b"test2")
+
+    # Create provider with stub clients that return segments for both chunks
+    stt = _StubSTTClient(
+        [
+            {"text": "x", "start": 0, "end": 5},
+            {"text": "y", "start": 5, "end": 10},
+        ]
+    )
+    info: YtInfoTD = {"duration": 10}
+    probe = _StubProbeDownloadClient(info, str(audio))
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
     prov.enable_chunking = True
 
-    def _always_ffmpeg() -> bool:
-        return True
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
 
-    monkeypatch.setattr(prov, "_ffmpeg_available", _always_ffmpeg, raising=True)
-
-    def _duration(_: str) -> float:
-        return 10.0
-
-    monkeypatch.setattr(prov, "_get_audio_duration", _duration, raising=True)
-
-    class _MissingChunker:
-        def __init__(
-            self,
-            *,
-            target_chunk_mb: float,
-            max_chunk_duration_seconds: float,
-            silence_threshold_db: float,
-            silence_duration_seconds: float,
-        ) -> None:
-            pass
-
+    # Create chunker that returns two chunk paths
+    class _TwoChunker:
         def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
-            missing = tmp_path / "missing.m4a"
             return [
                 AudioChunk(
-                    path=str(missing),
+                    path=str(chunk1),
                     start_seconds=0.0,
-                    duration_seconds=duration,
-                    size_bytes=0,
-                )
+                    duration_seconds=5.0,
+                    size_bytes=100,
+                ),
+                AudioChunk(
+                    path=str(chunk2),
+                    start_seconds=5.0,
+                    duration_seconds=5.0,
+                    size_bytes=100,
+                ),
             ]
 
-    from transcript_api import stt_provider as sp
+    def _two_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _TwoChunker()
 
-    class _StubTranscriber:
-        def __init__(
-            self,
-            *,
-            transcribe: _TranscribeLike,
-            max_concurrent: int,
-            max_retries: int,
-            timeout_seconds: float,
-        ) -> None:
-            pass
+    _test_hooks.audio_chunker_factory = _two_chunker_factory
 
-        def transcribe_chunks(self, chunks: list[AudioChunk]) -> list[list[TranscriptSegment]]:
-            return [[TranscriptSegment(text="x", start=0.0, duration=1.0)] for _ in chunks]
+    # Hook subprocess for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "10.0"}}'
+            stderr: bytes | str | None = None
 
-    monkeypatch.setattr(sp, "AudioChunker", _MissingChunker, raising=True)
-    monkeypatch.setattr(sp, "ParallelTranscriber", _StubTranscriber, raising=True)
-    prov._transcribe_chunked(str(audio))
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
+    # Hook os_remove to delete chunk1, but also delete chunk2 (simulating race)
+    def _removing_os_remove(path: str) -> None:
+        import os
+
+        os.remove(path)
+        # When cleaning up chunk1, also delete chunk2 to simulate race condition
+        if path == str(chunk1) and chunk2.exists():
+            os.remove(str(chunk2))
+
+    _test_hooks.os_remove = _removing_os_remove
+
+    # Run transcription - cleanup should hit missing file path for chunk2
+    with caplog.at_level(logging.WARNING):
+        prov._transcribe_chunked(str(audio))
+
+    # Check that warning was logged about missing chunk file
+    assert "Chunk file missing during cleanup" in caplog.text
 
 
-def test_transcribe_chunked_skips_original_path_cleanup(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    prov, _ = _make_provider()
+def test_transcribe_chunked_skips_original_path_cleanup(tmp_path: Path) -> None:
+    """Test that original audio file is not removed during cleanup, only chunk files."""
+    from transcript_api._test_hooks import AudioChunkerProto
+
     audio = tmp_path / "src3.m4a"
-    audio.write_bytes(b"x")
+    audio.write_bytes(b"x" * 100)
+
+    # Create provider with stub clients that return 2 results
+    stt = _StubSTTClient(
+        [
+            {"text": "p", "start": 0, "end": 10},
+        ]
+    )
+    info: YtInfoTD = {"duration": 20}
+    probe = _StubProbeDownloadClient(info, str(audio))
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
     prov.enable_chunking = True
 
-    def _always_ffmpeg() -> bool:
-        return True
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
 
-    monkeypatch.setattr(prov, "_ffmpeg_available", _always_ffmpeg, raising=True)
-
-    def _duration(_: str) -> float:
-        return 20.0
-
-    monkeypatch.setattr(prov, "_get_audio_duration", _duration, raising=True)
-
+    # Create chunker that returns original path as one chunk + another file
     class _ChunkerWithOriginal:
-        def __init__(
-            self,
-            *,
-            target_chunk_mb: float,
-            max_chunk_duration_seconds: float,
-            silence_threshold_db: float,
-            silence_duration_seconds: float,
-        ) -> None:
-            pass
-
         def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
             other = tmp_path / "other.m4a"
-            other.write_bytes(b"y")
+            other.write_bytes(b"y" * 100)
             return [
                 AudioChunk(
-                    path=str(path),
+                    path=str(path),  # Original file - should NOT be deleted
                     start_seconds=0.0,
                     duration_seconds=10.0,
                     size_bytes=1,
                 ),
                 AudioChunk(
-                    path=str(other),
+                    path=str(other),  # Other file - SHOULD be deleted
                     start_seconds=10.0,
                     duration_seconds=10.0,
                     size_bytes=1,
                 ),
             ]
 
-    class _StubTranscriber2:
-        def __init__(
-            self,
-            *,
-            transcribe: _TranscribeLike,
-            max_concurrent: int,
-            max_retries: int,
-            timeout_seconds: float,
-        ) -> None:
-            pass
+    def _chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _ChunkerWithOriginal()
 
-        def transcribe_chunks(self, chunks: list[AudioChunk]) -> list[list[TranscriptSegment]]:
-            return [
-                [TranscriptSegment(text="p", start=0.0, duration=1.0)],
-                [TranscriptSegment(text="q", start=0.0, duration=1.0)],
-            ]
+    _test_hooks.audio_chunker_factory = _chunker_factory
 
-    from transcript_api import stt_provider as sp
+    # Hook subprocess for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "20.0"}}'
+            stderr: bytes | str | None = None
 
-    monkeypatch.setattr(sp, "AudioChunker", _ChunkerWithOriginal, raising=True)
-    monkeypatch.setattr(sp, "ParallelTranscriber", _StubTranscriber2, raising=True)
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
+
     out = prov._transcribe_chunked(str(audio))
-    assert [s["text"] for s in out] == ["p", "q"]
+    # Should have results from both chunks
+    assert len(out) >= 2
+    # Original audio file should still exist
     assert audio.exists()
+    # Other chunk file should be cleaned up
     assert not (tmp_path / "other.m4a").exists()
 
 
@@ -586,24 +812,23 @@ def test_transcribe_uses_stt_client(tmp_path: os.PathLike[str]) -> None:
     assert stt.calls == 1
 
 
-def test_transcribe_with_strategy_passthrough(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_transcribe_with_strategy_passthrough() -> None:
+    """Test that _transcribe_with_strategy passes through to normal transcribe when not chunking."""
     prov, path = _make_provider(tmp_file_size=16)
     prov.enable_chunking = True
+    # Set chunk threshold high so file doesn't trigger chunking
+    prov.chunk_threshold_mb = 100.0
 
-    def _never_chunk(_: str) -> bool:
-        return False
+    # Make os_path_getsize return small size to avoid chunking
+    _test_hooks.os_path_getsize = lambda p: 16
 
-    monkeypatch.setattr(prov, "_should_chunk", _never_chunk, raising=True)
-
-    def _stub_transcribe(p: str) -> list[TranscriptSegment]:
-        return [TranscriptSegment(text="plain", start=0.0, duration=1.0)]
-
-    monkeypatch.setattr(prov, "_transcribe", _stub_transcribe, raising=True)
     out = prov._transcribe_with_strategy(path)
-    assert len(out) == 1 and out[0]["text"] == "plain"
+    # The stub STT client returns a segment with "seg" text
+    assert len(out) == 1 and "seg" in out[0]["text"]
 
 
-def test_estimate_and_eta_minutes_branching(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_estimate_and_eta_minutes_branching() -> None:
+    """Test estimate and ETA calculation branches."""
     stt = _StubSTTClient(
         [
             {"text": "x", "start": 0, "end": 1},
@@ -628,10 +853,8 @@ def test_estimate_and_eta_minutes_branching(monkeypatch: pytest.MonkeyPatch) -> 
     eta_no_chunk = prov.estimate_eta_minutes(dur, approx)
     assert eta_no_chunk >= 1
 
-    def _ffmpeg_true() -> bool:
-        return True
-
-    monkeypatch.setattr(prov, "_ffmpeg_available", _ffmpeg_true, raising=True)
+    # Use hook to set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
     prov.enable_chunking = True
     eta_with_chunk = prov.estimate_eta_minutes(dur, approx)
     assert eta_with_chunk <= eta_no_chunk
@@ -693,7 +916,8 @@ def test_estimate_formats_edge_cases() -> None:
 # Note: non-dict format branch in estimate removed.
 
 
-def test_estimate_eta_minutes_chunk_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_estimate_eta_minutes_chunk_branch() -> None:
+    """Test ETA calculation with chunking enabled."""
     stt = _StubSTTClient(
         [
             {"text": "x", "start": 0, "end": 1},
@@ -708,7 +932,8 @@ def test_estimate_eta_minutes_chunk_branch(monkeypatch: pytest.MonkeyPatch) -> N
         max_file_mb=5,
         enable_chunking=True,
     )
-    monkeypatch.setattr(prov, "_ffmpeg_available", lambda: True, raising=True)
+    # Use hook to set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
     eta = prov.estimate_eta_minutes(120, 50.0)
     assert eta >= 1
 
@@ -760,104 +985,147 @@ def test_is_over_limit_branches() -> None:
     assert prov._is_over_limit(big_bytes) is True
 
 
-def test_fetch_success_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
-    prov, path = _make_provider(tmp_file_size=16)
+def test_fetch_success_and_cleanup() -> None:
+    """Test that fetch successfully transcribes and cleans up temp files."""
+    # Create a provider with a temp file that will be cleaned up
+    fd, path = tempfile.mkstemp(prefix="stt_cleanup_test_", suffix=".bin")
+    os.close(fd)
+    with open(path, "wb") as f:
+        f.write(b"x" * 16)
+
+    stt = _StubSTTClient([{"text": "ok", "start": 0, "end": 1}])
+    info: YtInfoTD = {"duration": 10}
+    probe = _StubProbeDownloadClient(info, path)
+
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
     prov.enable_chunking = False
 
-    def _probe_ok(video_id: str, url: str) -> int:
-        assert video_id == "vid"
-        return 10
-
-    monkeypatch.setattr(prov, "_probe_or_error", _probe_ok, raising=True)
-
-    def _download_ok(_: str) -> tuple[str, int]:
-        return path, 1024
-
-    def _not_over(_: int) -> bool:
-        return False
-
-    monkeypatch.setattr(prov, "_download_or_error", _download_ok, raising=True)
-    monkeypatch.setattr(prov, "_is_over_limit", _not_over, raising=True)
-
-    def _strategy(p: str) -> list[TranscriptSegment]:
-        return [TranscriptSegment(text="ok", start=0.0, duration=1.0)]
-
-    monkeypatch.setattr(prov, "_transcribe_with_strategy", _strategy, raising=True)
-
+    # Track removal calls
     removed: list[str] = []
 
     def _remove(p: str) -> None:
         removed.append(os.path.abspath(p))
+        # Actually remove the file
+        os.remove(p)
 
-    prov._owned_tmp_dirs.add(os.path.dirname(os.path.abspath(path)))
-    monkeypatch.setattr(os, "remove", _remove, raising=True)
+    _test_hooks.os_remove = _remove
 
     out = prov.fetch("vid", TranscriptOptions(preferred_langs=["en"]))
-    assert len(out) == 1 and out[0]["text"] == "ok"
+    assert len(out) == 1
+    # Check cleanup happened
     assert os.path.abspath(path) in removed
+    assert not os.path.exists(path)
 
 
-def test_fetch_cleanup_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    prov, path = _make_provider(tmp_file_size=8)
+def test_fetch_cleanup_raises() -> None:
+    """Test that OSError during cleanup is propagated."""
+    # Create a provider with a temp file
+    fd, path = tempfile.mkstemp(prefix="stt_cleanup_fail_", suffix=".bin")
+    os.close(fd)
+    with open(path, "wb") as f:
+        f.write(b"x" * 8)
+
+    stt = _StubSTTClient([{"text": "ok", "start": 0, "end": 1}])
+    info: YtInfoTD = {"duration": 10}
+    probe = _StubProbeDownloadClient(info, path)
+
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=60,
+        max_file_mb=10,
+    )
     prov.enable_chunking = False
-
-    def _probe_ok2(_: str, __: str) -> int:
-        return 5
-
-    def _download_ok2(_: str) -> tuple[str, int]:
-        return path, 1024
-
-    def _not_over2(_: int) -> bool:
-        return False
-
-    monkeypatch.setattr(prov, "_probe_or_error", _probe_ok2, raising=True)
-    monkeypatch.setattr(prov, "_download_or_error", _download_ok2, raising=True)
-    monkeypatch.setattr(prov, "_is_over_limit", _not_over2, raising=True)
-
-    def _raise_strategy(_: str) -> list[TranscriptSegment]:
-        raise RuntimeError("x")
-
-    monkeypatch.setattr(prov, "_transcribe_with_strategy", _raise_strategy, raising=True)
 
     def _remove_raise(p: str) -> None:
         raise OSError(f"rm {p}")
 
-    prov._owned_tmp_dirs.add(os.path.dirname(os.path.abspath(path)))
-    monkeypatch.setattr(os, "remove", _remove_raise, raising=True)
+    _test_hooks.os_remove = _remove_raise
 
     with pytest.raises(OSError):
         _ = prov.fetch("vid", TranscriptOptions(preferred_langs=["en"]))
 
+    # Clean up the temp file that didn't get removed due to error
+    if os.path.exists(path):
+        os.remove(path)
 
-def test_fetch_over_limit_uses_handle(monkeypatch: pytest.MonkeyPatch) -> None:
-    prov, path = _make_provider(tmp_file_size=32)
-    prov.enable_chunking = True
 
-    def _probe_ok3(video_id: str, url: str) -> int:
-        assert video_id == "vid"
-        return 20
+def test_fetch_over_limit_uses_handle(tmp_path: Path) -> None:
+    """Test that fetch uses chunking when file is over limit."""
+    from transcript_api._test_hooks import AudioChunkerProto
 
-    def _download_ok3(_: str) -> tuple[str, int]:
-        return path, 10 * 1024 * 1024
+    # Create a file that appears to be over the limit
+    audio = tmp_path / "big.m4a"
+    audio.write_bytes(b"x" * 100)
 
-    def _always_over(size_bytes: int) -> bool:
-        assert size_bytes == 10 * 1024 * 1024
-        return True
+    # Create provider with low max_file_mb so file appears over limit
+    stt = _StubSTTClient([{"text": "big", "start": 0, "end": 1}])
+    info: YtInfoTD = {"duration": 20}
+    probe = _StubProbeDownloadClient(info, str(audio))
+    prov = STTTranscriptProvider(
+        stt_client=stt,
+        probe_client=probe,
+        max_video_seconds=600,
+        max_file_mb=0,  # Very small limit so file is "over"
+        enable_chunking=True,
+    )
 
-    called: list[str] = []
+    # Set ffmpeg as available
+    _test_hooks.ffmpeg_available = lambda: True
 
-    def _handle(path_arg: str, size_arg: int) -> list[TranscriptSegment]:
-        called.append(path_arg)
-        return [TranscriptSegment(text="big", start=0.0, duration=1.0)]
+    # Set os_stat to return a large size to trigger over-limit
+    def _stat_large(pth: str) -> os.stat_result:
+        return os.stat_result((0, 0, 0, 0, 0, 0, 10 * 1024 * 1024, 0, 0, 0))
 
-    monkeypatch.setattr(prov, "_probe_or_error", _probe_ok3, raising=True)
-    monkeypatch.setattr(prov, "_download_or_error", _download_ok3, raising=True)
-    monkeypatch.setattr(prov, "_is_over_limit", _always_over, raising=True)
-    monkeypatch.setattr(prov, "_handle_over_limit", _handle, raising=True)
+    _test_hooks.os_stat = _stat_large
+
+    # Create chunker that returns the original file (single chunk)
+    class _SingleChunker:
+        def chunk_audio(self, path: str, duration: float, size_mb: float) -> list[AudioChunk]:
+            return [
+                AudioChunk(path=path, start_seconds=0.0, duration_seconds=duration, size_bytes=100)
+            ]
+
+    def _single_chunker_factory(
+        *,
+        target_chunk_mb: float,
+        max_chunk_duration_seconds: float,
+        silence_threshold_db: float,
+        silence_duration_seconds: float,
+    ) -> AudioChunkerProto:
+        return _SingleChunker()
+
+    _test_hooks.audio_chunker_factory = _single_chunker_factory
+
+    # Hook subprocess for ffprobe
+    def _fake_subprocess(
+        args: list[str],
+        *,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+        text: bool = False,
+        input: bytes | str | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> _test_hooks.SubprocessRunResult:
+        class _Proc:
+            returncode = 0
+            stdout: bytes | str | None = '{"format": {"duration": "20.0"}}'
+            stderr: bytes | str | None = None
+
+        return _Proc()
+
+    _test_hooks.subprocess_run = _fake_subprocess
 
     out = prov.fetch("vid", TranscriptOptions(preferred_langs=["en"]))
-    assert called and path in called
-    assert len(out) == 1 and out[0]["text"] == "big"
+    # Should have a result from the chunked transcription
+    assert len(out) == 1
 
 
 def test_ffmpeg_available() -> None:

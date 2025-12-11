@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.config import _test_hooks as platform_hooks
 from platform_core.job_events import default_events_channel
 from platform_core.queues import TRANSCRIPT_QUEUE
+from platform_core.testing import make_fake_env
 from platform_workers.rq_harness import WorkerConfig
 
 from transcript_api import _test_hooks
@@ -38,9 +40,9 @@ class _RecordingRunner:
         self.configs.append(config)
 
 
-def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_reads_env() -> None:
     """Test _build_config reads REDIS_URL and uses TRANSCRIPT_QUEUE."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-host:6379/0")
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://test-host:6379/0"})
 
     cfg = _build_config()
 
@@ -49,9 +51,9 @@ def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["events_channel"] == default_events_channel("transcript")
 
 
-def test_build_config_requires_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_requires_redis_url() -> None:
     """Test _build_config raises when REDIS_URL is missing."""
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    platform_hooks.get_env = make_fake_env({})
 
     with pytest.raises(RuntimeError, match="REDIS_URL"):
         _build_config()
@@ -102,11 +104,9 @@ def test_main_with_injected_dependencies() -> None:
     assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def test_main_builds_config_from_env_when_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_builds_config_from_env_when_not_provided() -> None:
     """Test main() builds config from environment when not provided."""
-    monkeypatch.setenv("REDIS_URL", "redis://from-env:6379/0")
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://from-env:6379/0"})
 
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -149,11 +149,9 @@ def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> Non
     assert result is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_uses_test_runner_when_set() -> None:
     """Test main() uses test_runner when set in _test_hooks."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-runner:6379/0")
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://test-runner:6379/0"})
 
     received_configs: list[WorkerConfig] = []
 
@@ -175,7 +173,7 @@ def test_main_uses_test_runner_when_set(
     assert received_configs[0]["queue_name"] == TRANSCRIPT_QUEUE
 
 
-def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
@@ -184,7 +182,7 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     import runpy
     import sys
 
-    monkeypatch.setenv("REDIS_URL", "redis://runpy-guard-test:6379/0")
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://runpy-guard-test:6379/0"})
 
     received_configs: list[WorkerConfig] = []
 

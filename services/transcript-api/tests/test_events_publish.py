@@ -1,8 +1,11 @@
+"""Tests for transcript_api.events publish functions."""
+
 from __future__ import annotations
 
 from typing import TypeGuard
 
 import pytest
+from platform_core.config import _test_hooks as platform_hooks
 from platform_core.job_events import (
     JobCompletedV1,
     JobEventV1,
@@ -11,19 +14,23 @@ from platform_core.job_events import (
     default_events_channel,
 )
 from platform_core.json_utils import JSONTypeError
+from platform_core.testing import make_fake_env
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
-import transcript_api.events as tev
+from transcript_api import _test_hooks
+from transcript_api import events as tev
 
 
-def test_publish_completed_and_failed(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_publish_completed_and_failed() -> None:
+    """Test publish_completed and publish_failed send correct events."""
     stub = FakeRedis()
 
-    def _redis_loader(url: str) -> FakeRedis:
+    def _redis_loader(url: str) -> RedisStrProto:
         return stub
 
-    monkeypatch.setenv("REDIS_URL", "redis://unit")
-    monkeypatch.setattr(tev, "redis_for_kv", _redis_loader, raising=True)
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://unit"})
+    _test_hooks.redis_factory = _redis_loader
 
     tev.publish_completed(request_id="r1", user_id=7, url="https://x", text="hello")
     tev.publish_failed(request_id="r2", user_id=9, error_kind="user", message="bad")
@@ -53,14 +60,15 @@ def test_publish_completed_and_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     stub.assert_only_called({"publish", "close"})
 
 
-def test_publish_failed_rejects_invalid_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_publish_failed_rejects_invalid_kind() -> None:
+    """Test _ensure_error_kind rejects invalid error kinds."""
     stub = FakeRedis()
 
-    def _redis_loader(url: str) -> FakeRedis:
+    def _redis_loader(url: str) -> RedisStrProto:
         return stub
 
-    monkeypatch.setenv("REDIS_URL", "redis://unit")
-    monkeypatch.setattr(tev, "redis_for_kv", _redis_loader, raising=True)
+    platform_hooks.get_env = make_fake_env({"REDIS_URL": "redis://unit"})
+    _test_hooks.redis_factory = _redis_loader
 
     with pytest.raises(JSONTypeError):
         _ = tev._ensure_error_kind("other")

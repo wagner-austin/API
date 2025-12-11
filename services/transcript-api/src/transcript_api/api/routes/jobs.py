@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_bytes
 
-from ..dependencies import LoggerDep, QueueDep, RedisDep
-from ..job_store import TranscriptJobStore
-from ..youtube import canonicalize_youtube_url, extract_video_id
+from ...dependencies import LoggerDep, QueueDep, RedisDep
+from ...job_store import TranscriptJobStore
+from ...youtube import canonicalize_youtube_url, extract_video_id
 
 
 class STTJobRequest:
