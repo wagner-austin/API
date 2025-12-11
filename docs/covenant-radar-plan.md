@@ -9,7 +9,8 @@
 | 3. covenant_persistence | ✅ Complete | 96 | 100% |
 | 4. Service Shell | ✅ Complete | - | 100% |
 | 5. CRUD Endpoints | ✅ Complete | 79 | 100% |
-| 6. ML Endpoints | 🔲 Pending | - | - |
+| 6. ML Endpoints | ✅ Complete | 146 | 100% |
+| 7. Documentation | ✅ Complete | - | - |
 
 ---
 
@@ -1424,28 +1425,39 @@ timeout_method = "thread"
 
 ---
 
-### Milestone 6: Evaluation and ML Endpoints
+### Milestone 6: Evaluation and ML Endpoints ✅ COMPLETE
 
 **Files:**
-- [ ] `src/covenant_radar_api/api/routes/evaluate.py`
-- [ ] `src/covenant_radar_api/api/routes/ml.py`
-- [ ] `src/covenant_radar_api/worker/train_job.py`
-- [ ] `src/covenant_radar_api/worker/evaluate_job.py`
-- [ ] `src/covenant_radar_api/worker/worker_entry.py`
+- [x] `src/covenant_radar_api/api/routes/evaluate.py`
+- [x] `src/covenant_radar_api/api/routes/ml.py`
+- [x] `src/covenant_radar_api/worker/train_job.py`
+- [x] `src/covenant_radar_api/worker/evaluate_job.py`
+- [x] `src/covenant_radar_api/worker_entry.py` (relocated to package root)
+- [x] `src/covenant_radar_api/_test_hooks.py` (worker runner injection)
+- [x] `src/covenant_radar_api/core/_test_hooks.py` (container/config hooks)
+- [x] `scripts/guard.py` (MockBanRule integration)
 
 **Tests (100% coverage):**
-- [ ] Training job tests
-- [ ] Prediction endpoint tests
+- [x] `tests/test_routes_evaluate.py` - Evaluation endpoint tests
+- [x] `tests/test_routes_ml.py` - Prediction and training endpoint tests
+- [x] `tests/test_train_job.py` - Training job integration tests
+- [x] `tests/test_evaluate_job.py` - Batch evaluation job tests
+- [x] `tests/test_worker_entry.py` - Worker entry point tests
+- [x] `tests/test_guard_checks.py` - Guard script tests
+
+**Verification:** `cd services/covenant-radar-api && make check` ✅ 146 tests, 100% coverage, 0 guard violations
 
 ---
 
-### Milestone 7: Documentation and Demo
+### Milestone 7: Documentation and Demo ✅ COMPLETE
 
 **Files:**
-- [ ] `services/covenant-radar-api/README.md`
-- [ ] `services/covenant-radar-api/scripts/seed.py`
-- [ ] Update `docs/services.md`
-- [ ] Update `docs/architecture.md`
+- [x] `services/covenant-radar-api/README.md` - Basic documentation
+- [x] Update `docs/services.md` - Added covenant-radar-api entry
+- [x] Update `docs/architecture.md` - Added to all sections
+
+**Optional (not required for completion):**
+- [ ] `services/covenant-radar-api/scripts/seed.py` - Demo data seeder (future enhancement)
 
 ---
 

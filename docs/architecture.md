@@ -35,7 +35,8 @@ C:\Users\austi\PROJECTS\API/
 │   ├── platform_ml/               # ML artifact handling (manifests, storage)
 │   ├── platform_music/            # Music analytics library
 │   └── platform_workers/          # Workers tooling (Redis helpers, RQ harness)
-├── services/                      # API microservices (7 services)
+├── services/                      # API microservices (8 services)
+│   ├── covenant-radar-api/        # Loan covenant monitoring & ML prediction
 │   ├── data-bank-api/             # Central file storage for artifacts
 │   ├── handwriting-ai/            # MNIST digit recognition (ResNet-18)
 │   ├── Model-Trainer/             # LLM training & tokenizer service
@@ -241,10 +242,11 @@ model-artifact.tar.xz
 |---------|:-------------:|:----------------:|:-----------:|:----------------:|:--------------:|
 | Model-Trainer | ✓ | ✓ | ✓ | | |
 | handwriting-ai | ✓ | | ✓ | | |
-| data-bank-api | ✓ | | | | |
-| turkic-api | ✓ | | | | |
-| transcript-api | ✓ | | | | |
-| qr-api | ✓ | | | | |
+| covenant-radar-api | ✓ | ✓ | ✓ | | |
+| data-bank-api | ✓ | ✓ | | | |
+| turkic-api | ✓ | ✓ | | | |
+| transcript-api | ✓ | ✓ | | | |
+| qr-api | ✓ | ✓ | | | |
 | music-wrapped-api | ✓ | | | | ✓ |
 | DiscordBot | ✓ | ✓ | | ✓ | |
 
@@ -445,12 +447,61 @@ POST /files (multipart) → SHA256 hash → Filesystem
 
 ---
 
+### covenant-radar-api
+
+**Purpose:** Loan covenant monitoring and breach prediction using XGBoost.
+
+**Architecture:**
+```
+src/covenant_radar_api/
+├── api/                          # FastAPI routes
+│   ├── routes/
+│   │   ├── health.py             # /healthz, /readyz
+│   │   ├── deals.py              # CRUD for loan deals
+│   │   ├── covenants.py          # CRUD for covenant rules
+│   │   ├── measurements.py       # Financial metric ingestion
+│   │   ├── evaluate.py           # Deterministic evaluation
+│   │   └── ml.py                 # Prediction & training
+│   └── decode.py                 # JSON request decoders
+├── core/
+│   ├── config.py                 # Settings re-export
+│   ├── container.py              # ServiceContainer for DI
+│   └── _test_hooks.py            # Container hooks for testing
+├── worker/
+│   ├── train_job.py              # XGBoost training job
+│   └── evaluate_job.py           # Batch evaluation job
+├── worker_entry.py               # RQ worker entry point
+└── _test_hooks.py                # Worker runner hooks
+```
+
+**Domain Libraries:**
+| Library | Purpose |
+|---------|---------|
+| `covenant_domain` | TypedDict models, formula parser, rule engine |
+| `covenant_ml` | XGBoost training and prediction |
+| `covenant_persistence` | PostgreSQL repositories |
+
+**Features:**
+- CRUD operations for deals and covenants
+- Deterministic covenant rule evaluation
+- XGBoost-based breach probability prediction
+- Background training jobs via RQ
+
+**Dependencies:**
+- `xgboost` ^3.1
+- `numpy` ^2.3
+- `psycopg` ^3.3
+- `platform-core`, `platform-workers`, `platform-ml`
+
+---
+
 ## ML Capabilities Summary
 
 | Service | ML Type | Framework | Model Architecture |
 |---------|---------|-----------|-------------------|
 | Model-Trainer | Sequence modeling | PyTorch | GPT-2, Char-LSTM |
 | handwriting-ai | Image classification | PyTorch | ResNet-18 |
+| covenant-radar-api | Tabular classification | XGBoost | Gradient boosted trees |
 
 **Model-Trainer is NOT suitable for:**
 - Tree-based models (XGBoost, LightGBM, Random Forest)
@@ -458,6 +509,11 @@ POST /files (multipart) → SHA256 hash → Filesystem
 - Non-sequence ML tasks
 
 **Reasoning:** Model-Trainer's contracts assume `torch.nn.Module` models with tokenization pipelines. The training loop is designed for gradient descent, not boosting iterations.
+
+**covenant-radar-api** handles tabular ML:
+- XGBoost gradient boosted trees for breach probability prediction
+- Standalone service with dedicated `covenant_ml` library
+- Uses `platform_workers` for background training jobs
 
 ---
 
@@ -511,6 +567,7 @@ Services communicate over `platform-network`:
 | handwriting-ai | 8004 | |
 | Model-Trainer | 8005 | ✓ |
 | music-wrapped-api | 8006 | |
+| covenant-radar-api | 8007 | |
 
 ---
 

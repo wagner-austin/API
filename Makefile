@@ -33,13 +33,16 @@ up-turkic: infra
 up-music: infra
 	Set-Location services/music-wrapped-api; docker compose up -d --build
 
+up-covenant: infra
+	Set-Location services/covenant-radar-api; docker compose up -d --build
+
 up-discord: infra
 	Set-Location clients/DiscordBot; docker compose up -d --build
 
 # ---------------------------------------------------------------------------
 # All Services
 # ---------------------------------------------------------------------------
-up-all: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-discord
+up-all: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-discord
 	Write-Host "All services started" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------

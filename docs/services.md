@@ -11,6 +11,7 @@
 | transcript-api | 8003 | YouTube transcription | No |
 | qr-api | 8002 | QR code generation | No |
 | music-wrapped-api | 8006 | Music analytics | No |
+| covenant-radar-api | 8007 | Loan covenant monitoring | No |
 
 ---
 
@@ -191,6 +192,38 @@ make up-music
 ```
 
 **Docs:** [README](../services/music-wrapped-api/README.md)
+
+---
+
+## covenant-radar-api
+
+Loan covenant monitoring and breach prediction service using XGBoost.
+
+**Features:**
+- CRUD operations for loan deals and covenant definitions
+- Financial measurement ingestion
+- Deterministic covenant rule evaluation
+- XGBoost-based breach risk prediction
+- Background training jobs via RQ
+
+**Key Endpoints:**
+```
+POST /deals              Create loan deal
+GET  /deals              List all deals
+POST /covenants          Create covenant rule
+POST /measurements       Add financial measurements
+POST /evaluate           Evaluate covenants for period
+POST /ml/predict         Predict breach probability
+POST /ml/train           Train new model (background job)
+GET  /ml/models/active   Get active model info
+```
+
+**Start:**
+```bash
+make up-covenant
+```
+
+**Docs:** [README](../services/covenant-radar-api/README.md)
 
 ---
 

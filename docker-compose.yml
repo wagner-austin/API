@@ -21,6 +21,7 @@
 #   - 8004:  handwriting-ai
 #   - 8005:  Model-Trainer
 #   - 8006:  music-wrapped-api
+#   - 8007:  covenant-radar-api
 # =============================================================================
 
 services:
@@ -41,8 +42,29 @@ services:
     networks:
       - platform-network
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: platform-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: covenant
+      POSTGRES_PASSWORD: covenant
+      POSTGRES_DB: covenant
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U covenant -d covenant"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - platform-network
+
   gateway:
-    image: traefik/traefik:v2.10
+    image: traefik:v3
     container_name: traefik
     command:
       - --global.checkNewVersion=false
@@ -70,3 +92,4 @@ networks:
 
 volumes:
   redis-data:
+  postgres-data:

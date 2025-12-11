@@ -7,8 +7,8 @@
 | **Author** | Platform Engineering |
 | **Created** | 2025-11-28 |
 | **Updated** | 2025-11-30 |
-| **Status** | IN_PROGRESS (infra + turkic/transcript + data‑bank + qr + trainer + digits migrated; finalize cleanup and metrics standardization) |
-| **Scope** | platform_core, platform_workers, clients/DiscordBot, and 6 services |
+| **Status** | COMPLETE (all 8 services migrated) |
+| **Scope** | platform_core, platform_workers, clients/DiscordBot, and 8 services |
 
 ---
 
@@ -24,6 +24,8 @@
 | 6 | qr-api | COMPLETE | Worker uses job_events channel; no lifecycle publishers today |
 | 7 | Model-Trainer | COMPLETE | Lifecycle via job_events; metrics remain domain-specific (trainer.metrics.*) |
 | 8 | handwriting-ai | COMPLETE | Lifecycle via job_events; metrics remain domain-specific (digits.metrics.*) |
+| 9 | covenant-radar-api | COMPLETE | Worker uses job_events channel (domain: covenant) |
+| 10 | music-wrapped-api | COMPLETE | Worker uses job_events channel (domain: music_wrapped) |
 
 ---
 
@@ -586,22 +588,33 @@ cd services/transcript-api && make check
 # 254 tests passed, 100% coverage
 ```
 
-### Phase 4: Migrate Model-Trainer ⏳ PENDING
+### Phase 4: Migrate Model-Trainer ✅ COMPLETE
 
-**Changes Required:**
+**Changes Made:**
 
-1. Use `platform_core.job_events` for lifecycle (started/progress/completed/failed) with domain `trainer`.
-2. Keep rich trainer metrics as domain-specific events published alongside lifecycle.
-3. Add a trainer job store via `platform_workers.job_store.BaseJobStore` for run status.
-4. Update worker entry points and tests to assert generic lifecycle payloads.
+1. Uses `platform_core.job_events` for lifecycle (started/progress/completed/failed) with domain `trainer`.
+2. Keeps rich trainer metrics as domain-specific events published alongside lifecycle.
+3. Worker entry uses `default_events_channel("trainer")`.
 
-### Phase 5: Migrate handwriting-ai ⏳ PENDING
+### Phase 5: Migrate handwriting-ai ✅ COMPLETE
 
-**Changes Required:**
+**Changes Made:**
 
-1. Publish lifecycle via `platform_core.job_events` + `platform_workers.job_context`.
-2. Add a digits job store via `BaseJobStore`.
-3. Keep specialized digits metrics events (BatchV1, EpochV1, BestV1, etc.) alongside lifecycle.
+1. Publishes lifecycle via `platform_core.job_events` + `platform_workers.job_context`.
+2. Worker entry uses `default_events_channel("digits")`.
+3. Keeps specialized digits metrics events (BatchV1, EpochV1, BestV1, etc.) alongside lifecycle.
+
+### Phase 8: Migrate covenant-radar-api ✅ COMPLETE
+
+**Changes Made:**
+
+1. Worker entry uses `default_events_channel("covenant")`.
+
+### Phase 9: Migrate music-wrapped-api ✅ COMPLETE
+
+**Changes Made:**
+
+1. Worker entry uses `default_events_channel("music_wrapped")`.
 
 ### Phase 6: Migrate data-bank-api ✅ COMPLETE
 
@@ -653,16 +666,18 @@ cd services/qr-api && make check
 | `platform_core` | Add `job_events.py`, `job_types.py`; deprecate domain-specific lifecycle files; retain strictly typed metrics modules |
 | `platform_workers` | Add `job_store.py`, `job_context.py`; update `rq_harness.py` |
 
-### Services (6)
+### Services (8)
 
-| Service | Status | Files Changed |
-|---------|--------|---------------|
-| `turkic-api` | ✅ COMPLETE | `api/jobs.py`, `worker_entry.py`, 8 test files |
-| `transcript-api` | ✅ COMPLETE | `jobs.py`, `worker_entry.py`, `routes/jobs.py`, 12 test files |
-| `data-bank-api` | ✅ COMPLETE | `worker_entry.py`, 6 test files |
-| `qr-api` | ✅ COMPLETE | 2 test files (worker already used generic) |
-| `Model-Trainer` | ⏳ PENDING | `worker/*.py`, orchestrators |
-| `handwriting-ai` | ⏳ PENDING | `jobs/digits.py`, `worker_entry.py` |
+| Service | Status | Domain | Files Changed |
+|---------|--------|--------|---------------|
+| `turkic-api` | ✅ COMPLETE | `turkic` | `api/jobs.py`, `worker_entry.py`, 8 test files |
+| `transcript-api` | ✅ COMPLETE | `transcript` | `jobs.py`, `worker_entry.py`, `routes/jobs.py`, 12 test files |
+| `data-bank-api` | ✅ COMPLETE | `databank` | `worker_entry.py`, 6 test files |
+| `qr-api` | ✅ COMPLETE | `qr` | 2 test files (worker already used generic) |
+| `Model-Trainer` | ✅ COMPLETE | `trainer` | `worker/*.py`, orchestrators |
+| `handwriting-ai` | ✅ COMPLETE | `digits` | `jobs/digits.py`, `worker_entry.py` |
+| `covenant-radar-api` | ✅ COMPLETE | `covenant` | `worker_entry.py` |
+| `music-wrapped-api` | ✅ COMPLETE | `music_wrapped` | `worker_entry.py` |
 
 ---
 
