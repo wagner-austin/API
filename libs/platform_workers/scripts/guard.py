@@ -10,10 +10,19 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
+def _path_is_dir(path: Path) -> bool:
+    """Check if path is a directory, using hook if set."""
+    from platform_workers.testing import hooks
+
+    if hooks.path_is_dir is not None:
+        return hooks.path_is_dir(str(path))
+    return path.is_dir()
+
+
 def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
-        if (current / "libs").is_dir():
+        if _path_is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")

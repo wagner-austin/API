@@ -130,15 +130,27 @@ class _RedisAsyncioModule(Protocol):
 
 
 def _load_redis_asyncio_module() -> _RedisAsyncioModule:
+    from .testing import hooks
+
+    if hooks.load_redis_asyncio_module is not None:
+        return hooks.load_redis_asyncio_module()
     mod: _RedisAsyncioModule = _importlib.import_module("redis.asyncio")
     return mod
 
 
 def _load_redis_bytes_module() -> _RedisBytesModule:
+    from .testing import hooks
+
+    if hooks.load_redis_bytes_module is not None:
+        return hooks.load_redis_bytes_module()
     return __import__("redis")
 
 
 def _load_redis_str_module() -> _RedisStrModule:
+    from .testing import hooks
+
+    if hooks.load_redis_str_module is not None:
+        return hooks.load_redis_str_module()
     return __import__("redis")
 
 

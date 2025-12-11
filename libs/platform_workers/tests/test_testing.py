@@ -190,6 +190,46 @@ class TestFakeRedisHsetRedisError:
         redis.assert_only_called({"hset"})
 
 
+class TestFakeRedisConditionalHsetError:
+    """Tests for FakeRedisConditionalHsetError (conditional RuntimeError on hset)."""
+
+    def test_hset_succeeds_when_status_does_not_match(self) -> None:
+        from platform_workers.testing import FakeRedisConditionalHsetError
+
+        redis = FakeRedisConditionalHsetError(fail_on_status="failed")
+        result = redis.hset("job:123", {"status": "running", "name": "test"})
+        assert result == 2
+        assert redis.hgetall("job:123") == {"status": "running", "name": "test"}
+
+    def test_hset_raises_runtime_error_when_status_matches(self) -> None:
+        from platform_workers.testing import FakeRedisConditionalHsetError
+
+        redis = FakeRedisConditionalHsetError(fail_on_status="failed")
+        with pytest.raises(RuntimeError, match="simulated hset failure on status=failed"):
+            redis.hset("job:123", {"status": "failed"})
+
+
+class TestFakeRedisConditionalHsetRedisError:
+    """Tests for FakeRedisConditionalHsetRedisError (conditional RedisError on hset)."""
+
+    def test_hset_succeeds_when_status_does_not_match(self) -> None:
+        from platform_workers.testing import FakeRedisConditionalHsetRedisError
+
+        redis = FakeRedisConditionalHsetRedisError(fail_on_status="failed")
+        result = redis.hset("job:456", {"status": "running", "name": "test"})
+        assert result == 2
+        assert redis.hgetall("job:456") == {"status": "running", "name": "test"}
+
+    def test_hset_raises_redis_error_when_status_matches(self) -> None:
+        from platform_workers.redis import _load_redis_error_class
+        from platform_workers.testing import FakeRedisConditionalHsetRedisError
+
+        redis = FakeRedisConditionalHsetRedisError(fail_on_status="failed")
+        error_cls = _load_redis_error_class()
+        with pytest.raises(error_cls, match="simulated Redis hset failure on status=failed"):
+            redis.hset("job:456", {"status": "failed"})
+
+
 class TestFakeRedisClient:
     """Tests for FakeRedisClient (internal _RedisStrClient protocol)."""
 
@@ -282,6 +322,31 @@ class TestFakeJob:
         assert job.get_id() == "custom-id"
 
 
+class TestFakeFetchedJob:
+    def test_default_values(self) -> None:
+        from platform_workers.testing import FakeFetchedJob
+
+        job = FakeFetchedJob()
+        assert job.get_id() == "test-job-id"
+        assert job.get_status() == "finished"
+        assert job.return_value() is None
+
+    def test_custom_values(self) -> None:
+        from platform_workers.testing import FakeFetchedJob
+
+        job = FakeFetchedJob(job_id="custom-123", status="queued", result={"key": "value"})
+        assert job.get_id() == "custom-123"
+        assert job.get_status() == "queued"
+        assert job.return_value() == {"key": "value"}
+
+    def test_all_status_types(self) -> None:
+        from platform_workers.testing import FakeFetchedJob
+
+        for status in ["queued", "started", "finished", "failed"]:
+            job = FakeFetchedJob(status=status)
+            assert job.get_status() == status
+
+
 class TestFakeRetry:
     def test_stores_config(self) -> None:
         retry = FakeRetry(max=3, interval=[1, 2, 4])
@@ -363,6 +428,109 @@ class TestFakeLogger:
         assert len(logger.records) == 4
         levels = [r.level for r in logger.records]
         assert levels == ["debug", "info", "warning", "error"]
+
+
+class TestFakePubSub:
+    """Tests for FakePubSub async Redis client."""
+
+    def test_subscribe_tracks_channels(self) -> None:
+        import asyncio
+
+        from platform_workers.testing import FakePubSub
+
+        async def run() -> list[str]:
+            pubsub = FakePubSub()
+            await pubsub.subscribe("channel1", "channel2")
+            return pubsub.subscriptions
+
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result == ["channel1", "channel2"]
+
+    def test_get_message_returns_none_when_empty(self) -> None:
+        import asyncio
+
+        from platform_workers.redis import PubSubMessage
+        from platform_workers.testing import FakePubSub
+
+        async def run() -> PubSubMessage | None:
+            pubsub = FakePubSub()
+            return await pubsub.get_message()
+
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result is None
+
+    def test_inject_message_and_get_message(self) -> None:
+        import asyncio
+
+        from platform_workers.redis import PubSubMessage
+        from platform_workers.testing import FakePubSub
+
+        async def run() -> PubSubMessage | None:
+            pubsub = FakePubSub()
+            pubsub.inject_message("test-channel", "test-data")
+            return await pubsub.get_message()
+
+        msg = asyncio.get_event_loop().run_until_complete(run())
+        assert type(msg) is dict
+        assert msg["channel"] == "test-channel"
+        assert msg["data"] == "test-data"
+        assert msg["type"] == "message"
+
+    def test_close_sets_closed_flag(self) -> None:
+        import asyncio
+
+        from platform_workers.testing import FakePubSub
+
+        async def run() -> bool:
+            pubsub = FakePubSub()
+            assert pubsub._closed is False
+            await pubsub.close()
+            return pubsub._closed
+
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result is True
+
+
+class TestFakeAsyncRedis:
+    """Tests for FakeAsyncRedis client."""
+
+    def test_pubsub_returns_fake_pubsub(self) -> None:
+        from platform_workers.testing import FakeAsyncRedis, FakePubSub
+
+        client = FakeAsyncRedis()
+        pubsub = client.pubsub()
+        assert type(pubsub) is FakePubSub
+
+
+class TestFactoryFunctions:
+    """Tests for factory helper functions."""
+
+    def test_fake_kv_store_factory(self) -> None:
+        from platform_workers.testing import FakeRedis, fake_kv_store_factory
+
+        result = fake_kv_store_factory("redis://test")
+        assert type(result) is FakeRedis
+
+    def test_fake_rq_connection_factory(self) -> None:
+        from platform_workers.testing import FakeRedisBytesClient, fake_rq_connection_factory
+
+        result = fake_rq_connection_factory("redis://test")
+        assert type(result) is FakeRedisBytesClient
+
+    def test_fake_rq_queue_factory(self) -> None:
+        from platform_workers.testing import FakeQueue, FakeRedisBytesClient, fake_rq_queue_factory
+
+        conn = FakeRedisBytesClient()
+        result = fake_rq_queue_factory("test-queue", conn)
+        assert type(result) is FakeQueue
+
+    def test_fake_rq_retry_factory(self) -> None:
+        from platform_workers.testing import FakeRetry, fake_rq_retry_factory
+
+        result = fake_rq_retry_factory(max_retries=3, intervals=[1, 2, 3])
+        assert type(result) is FakeRetry
+        assert result.max_retries == 3
+        assert result.intervals == [1, 2, 3]
 
 
 class TestNamedTuples:

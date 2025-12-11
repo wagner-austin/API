@@ -27,6 +27,7 @@ ruff = "^0.14.4"
 redis = "^7.1"
 rq = "^2.3"
 types-redis = "^4.6.0.20241004"
+fakeredis = "^2.32.1"
 
 [tool.mypy]
 python_version = "3.11"

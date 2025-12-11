@@ -2,652 +2,279 @@
 
 This module provides typed stubs for testing services that use platform_workers
 infrastructure. These stubs implement the public protocols with in-memory storage.
+
+It also provides a HooksContainer for dependency injection in tests. Production
+code sets hooks to real implementations at startup; tests set them to fakes.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from types import TracebackType
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
-from .redis import RedisBytesProto, RedisStrProto
-from .rq_harness import RQJobLike, RQRetryLike
+# Re-export all fakes from _fakes module
+from ._fakes import (
+    EnqueuedJob,
+    FakeAsyncRedis,
+    FakeFetchedJob,
+    FakeJob,
+    FakeLogger,
+    FakePubSub,
+    FakeQueue,
+    FakeRedis,
+    FakeRedisAsyncioModule,
+    FakeRedisBytesClient,
+    FakeRedisBytesModule,
+    FakeRedisClient,
+    FakeRedisConditionalHsetError,
+    FakeRedisConditionalHsetRedisError,
+    FakeRedisError,
+    FakeRedisHsetError,
+    FakeRedisHsetRedisError,
+    FakeRedisNonRedisError,
+    FakeRedisNonRedisScardError,
+    FakeRedisNoPong,
+    FakeRedisPublishError,
+    FakeRedisScardError,
+    FakeRedisStrModule,
+    FakeRetry,
+    FakeRQModule,
+    LoggerProtocol,
+    LogRecord,
+    MethodCall,
+    Published,
+    _FakeCurrentJob,
+    _FakeRQQueueInternal,
+    _FakeRQWorkerInternal,
+)
+from .redis import (
+    RedisBytesProto,
+    RedisStrProto,
+    _RedisBytesClient,
+)
+from .rq_harness import (
+    FetchedJobProto,
+    RQRetryLike,
+    _RQModuleProtocol,
+)
 
-# Recursive JSON type matching rq_harness._JsonValue
-_JsonValue = dict[str, "_JsonValue"] | list["_JsonValue"] | str | int | float | bool | None
+# =============================================================================
+# Hook Protocol Definitions
+# =============================================================================
 
 
-class Published(NamedTuple):
-    """Record of a published message."""
+class LoadStrModuleHook(Protocol):
+    """Protocol for loading the string-mode kv module."""
 
-    channel: str
-    payload: str
-
-
-class MethodCall(NamedTuple):
-    """Record of a method call on FakeRedis."""
-
-    method: str
-    args: tuple[str | int | dict[str, str], ...]
+    def __call__(self) -> FakeRedisStrModule: ...
 
 
-class FakeRedis(RedisStrProto):
-    """In-memory Redis stub implementing RedisStrProto.
+class LoadBytesModuleHook(Protocol):
+    """Protocol for loading the bytes-mode kv module."""
 
-    Stores data in dictionaries for testing. Tracks published messages
-    in `published` list for assertions. The `closed` attribute tracks
-    whether close() was called.
+    def __call__(self) -> FakeRedisBytesModule: ...
 
-    Call tracking:
-        All method calls are recorded in `calls` list. Use `assert_only_called()`
-        to verify that only expected methods were called during a test.
 
-    Example:
-        redis = FakeRedis()
-        # ... run code that uses redis ...
-        redis.assert_only_called({"ping", "scard"})  # Fails if other methods called
+class LoadAsyncModuleHook(Protocol):
+    """Protocol for loading the async kv module."""
+
+    def __call__(self) -> FakeRedisAsyncioModule: ...
+
+
+class LoadRQModuleHook(Protocol):
+    """Protocol for loading the RQ module."""
+
+    def __call__(self) -> _RQModuleProtocol: ...
+
+
+class PathIsDirHook(Protocol):
+    """Protocol for checking if a path is a directory."""
+
+    def __call__(self, path: str) -> bool: ...
+
+
+class FetchJobHook(Protocol):
+    """Protocol for fetching RQ jobs by ID."""
+
+    def __call__(self, job_id: str, connection: _RedisBytesClient) -> FetchedJobProto: ...
+
+
+# =============================================================================
+# Hooks Container for Dependency Injection
+# =============================================================================
+
+
+class HooksContainer:
+    """Container for dependency injection hooks in platform_workers.
+
+    Production code sets these hooks to real implementations at startup.
+    Tests set them to fakes to avoid external dependencies.
+
+    Attributes:
+        load_redis_str_module: Hook to load redis module for str clients.
+        load_redis_bytes_module: Hook to load redis module for bytes clients.
+        load_redis_asyncio_module: Hook to load redis.asyncio module.
+        load_rq_module: Hook to load rq module.
+        fetch_job: Hook for fetching RQ jobs by ID.
+        path_is_dir: Hook for Path.is_dir() calls.
     """
 
-    def __init__(self) -> None:
-        self.published: list[Published] = []
-        self._strings: dict[str, str] = {}
-        self._hashes: dict[str, dict[str, str]] = {}
-        self._sets: dict[str, set[str]] = {}
-        self.closed: bool = False
-        self.calls: list[MethodCall] = []
+    # Redis module loaders
+    load_redis_str_module: LoadStrModuleHook | None = None
+    load_redis_bytes_module: LoadBytesModuleHook | None = None
+    load_redis_asyncio_module: LoadAsyncModuleHook | None = None
 
-    def _record(self, method: str, *args: str | int | dict[str, str]) -> None:
-        """Record a method call for tracking."""
-        self.calls.append(MethodCall(method, args))
+    # RQ module loader
+    load_rq_module: LoadRQModuleHook | None = None
 
-    def assert_only_called(self, expected: set[str]) -> None:
-        """Assert that only the expected methods were called.
+    # RQ job fetch hook
+    fetch_job: FetchJobHook | None = None
 
-        Args:
-            expected: Set of method names that are allowed to have been called.
+    # Path checking for guard scripts
+    path_is_dir: PathIsDirHook | None = None
 
-        Raises:
-            AssertionError: If any method not in `expected` was called.
-        """
-        actual = {call.method for call in self.calls}
-        unexpected = actual - expected
-        if unexpected:
-            raise AssertionError(
-                f"Unexpected methods called: {unexpected}. "
-                f"Expected only: {expected}. Actual calls: {actual}"
-            )
-
-    def get_calls(self, method: str) -> list[MethodCall]:
-        """Get all calls to a specific method."""
-        return [c for c in self.calls if c.method == method]
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        self._record("ping")
-        return True
-
-    def set(self, key: str, value: str) -> bool:
-        self._record("set", key, value)
-        self._strings[key] = value
-        return True
-
-    def get(self, key: str) -> str | None:
-        self._record("get", key)
-        return self._strings.get(key)
-
-    def delete(self, key: str) -> int:
-        self._record("delete", key)
-        if key in self._strings:
-            del self._strings[key]
-            return 1
-        if key in self._hashes:
-            del self._hashes[key]
-            return 1
-        if key in self._sets:
-            del self._sets[key]
-            return 1
-        return 0
-
-    def expire(self, key: str, time: int) -> bool:
-        self._record("expire", key, time)
-        # FakeRedis doesn't actually implement TTL, just return True if key exists
-        return key in self._strings or key in self._hashes or key in self._sets
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._record("hset", key, mapping)
-        bucket = self._hashes.setdefault(key, {})
-        bucket.update(mapping)
-        return len(mapping)
-
-    def hget(self, key: str, field: str) -> str | None:
-        self._record("hget", key, field)
-        return self._hashes.get(key, {}).get(field)
-
-    def hgetall(self, key: str) -> dict[str, str]:
-        self._record("hgetall", key)
-        return dict(self._hashes.get(key, {}))
-
-    def publish(self, channel: str, message: str) -> int:
-        self._record("publish", channel, message)
-        self.published.append(Published(channel, message))
-        return 1
-
-    def scard(self, key: str) -> int:
-        self._record("scard", key)
-        return len(self._sets.get(key, set()))
-
-    def sadd(self, key: str, member: str) -> int:
-        self._record("sadd", key, member)
-        bucket = self._sets.setdefault(key, set())
-        before = len(bucket)
-        bucket.add(member)
-        return 1 if len(bucket) > before else 0
-
-    def sismember(self, key: str, member: str) -> bool:
-        self._record("sismember", key, member)
-        return member in self._sets.get(key, set())
-
-    def close(self) -> None:
-        self._record("close")
-        self.closed = True
-        self._strings.clear()
-        self._hashes.clear()
-        self._sets.clear()
+    @classmethod
+    def reset(cls) -> None:
+        """Reset all hooks to None (production defaults)."""
+        cls.load_redis_str_module = None
+        cls.load_redis_bytes_module = None
+        cls.load_redis_asyncio_module = None
+        cls.load_rq_module = None
+        cls.fetch_job = None
+        cls.path_is_dir = None
 
 
-class FakeRedisNoPong(FakeRedis):
-    """FakeRedis that returns False on ping (simulates unhealthy Redis).
+# Global hooks instance
+hooks = HooksContainer
 
-    Use this to test health check degraded paths when Redis is unreachable
-    but doesn't raise an exception.
 
-    Example:
-        redis = FakeRedisNoPong()
-        assert redis.ping() is False
-        redis.assert_only_called({"ping"})
+# =============================================================================
+# Factory Functions for Test Hooks Injection
+# =============================================================================
+
+
+def fake_kv_store_factory(url: str) -> RedisStrProto:
+    """Factory that returns a FakeRedis for kv_store_factory hook."""
+    return FakeRedis()
+
+
+def fake_rq_connection_factory(url: str) -> RedisBytesProto:
+    """Factory that returns a FakeRedisBytesClient for rq_connection_factory hook."""
+    return FakeRedisBytesClient()
+
+
+def fake_rq_queue_factory(name: str, connection: _RedisBytesClient) -> FakeQueue:
+    """Factory that returns a FakeQueue for rq_queue_factory hook."""
+    return FakeQueue()
+
+
+def fake_rq_retry_factory(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
+    """Factory that returns a FakeRetry for rq_retry_factory hook."""
+    return FakeRetry(max=max_retries, interval=intervals)
+
+
+# =============================================================================
+# Fake Factory Helpers for Hook Setup
+# =============================================================================
+
+
+def make_fake_load_redis_str_module(
+    client: FakeRedisClient,
+) -> tuple[LoadStrModuleHook, FakeRedisStrModule]:
+    """Create a hook function and module for str client testing."""
+    module = FakeRedisStrModule(client)
+
+    def _hook() -> FakeRedisStrModule:
+        return module
+
+    return _hook, module
+
+
+def make_fake_load_redis_bytes_module() -> tuple[LoadBytesModuleHook, FakeRedisBytesModule]:
+    """Create a hook function and module for bytes client testing."""
+    module = FakeRedisBytesModule()
+
+    def _hook() -> FakeRedisBytesModule:
+        return module
+
+    return _hook, module
+
+
+def make_fake_load_redis_asyncio_module() -> tuple[LoadAsyncModuleHook, FakeRedisAsyncioModule]:
+    """Create a hook function and module for async client testing."""
+    module = FakeRedisAsyncioModule()
+
+    def _hook() -> FakeRedisAsyncioModule:
+        return module
+
+    return _hook, module
+
+
+def make_fake_load_rq_module(
+    *, current_job: _FakeCurrentJob | None = None
+) -> tuple[LoadRQModuleHook, FakeRQModule]:
+    """Create a hook function and module for RQ testing."""
+    module = FakeRQModule(current_job=current_job)
+
+    def _hook() -> _RQModuleProtocol:
+        return module
+
+    return _hook, module
+
+
+def fake_path_is_dir_false(path: str) -> bool:
+    """Hook that always returns False for path_is_dir."""
+    return False
+
+
+def make_fake_fetch_job_found(job: FakeFetchedJob) -> FetchJobHook:
+    """Create a fetch_job hook that returns the given fake job.
+
+    Args:
+        job: The FakeFetchedJob to return.
+
+    Returns:
+        A hook function suitable for hooks.fetch_job.
     """
 
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        self._record("ping")
-        return False
+    def _hook(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto:
+        return job
+
+    return _hook
 
 
-class FakeRedisError(FakeRedis):
-    """FakeRedis that raises RedisError on ping (simulates Redis failure).
+def make_fake_fetch_job_not_found() -> FetchJobHook:
+    """Create a fetch_job hook that raises NoSuchJobError.
 
-    Use this to test health check error handling paths when Redis raises
-    an exception.
-
-    Example:
-        redis = FakeRedisError()
-        with pytest.raises(RedisError):
-            redis.ping()
-        redis.assert_only_called({"ping"})
+    Returns:
+        A hook function that raises NoSuchJobError when called.
     """
+    from .rq_harness import load_no_such_job_error
 
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        self._record("ping")
-        from .redis import _load_redis_error_class
+    exc_cls = load_no_such_job_error()
 
-        error_cls = _load_redis_error_class()
-        raise error_cls("simulated Redis failure")
+    def _hook(job_id: str, connection: _RedisBytesClient) -> FetchedJobProto:
+        raise exc_cls(f"Job {job_id} not found")
 
-
-class FakeRedisNonRedisError(FakeRedis):
-    """FakeRedis that raises a non-Redis error on ping.
-
-    Use this to test that non-Redis exceptions are properly propagated
-    rather than being caught as Redis errors.
-
-    Example:
-        redis = FakeRedisNonRedisError()
-        with pytest.raises(RuntimeError):
-            redis.ping()
-    """
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        self._record("ping")
-        raise RuntimeError("simulated non-Redis failure")
-
-
-class FakeRedisPublishError(FakeRedis):
-    """FakeRedis that raises on publish (simulates publish failure).
-
-    Use this to test error handling when Redis publish operations fail.
-
-    Example:
-        redis = FakeRedisPublishError()
-        with pytest.raises(OSError):
-            redis.publish("channel", "message")
-    """
-
-    def publish(self, channel: str, message: str) -> int:
-        self._record("publish", channel, message)
-        raise OSError("simulated publish failure")
-
-
-class FakeRedisScardError(FakeRedis):
-    """FakeRedis that raises RedisError on scard (simulates worker check failure).
-
-    Use this to test health check error handling when scard() fails but ping succeeds.
-
-    Example:
-        redis = FakeRedisScardError()
-        redis.ping()  # OK
-        with pytest.raises(RedisError):
-            redis.scard("rq:workers")
-    """
-
-    def scard(self, key: str) -> int:
-        self._record("scard", key)
-        from .redis import _load_redis_error_class
-
-        error_cls = _load_redis_error_class()
-        raise error_cls("simulated scard failure")
-
-
-class FakeRedisNonRedisScardError(FakeRedis):
-    """FakeRedis that raises non-Redis error on scard.
-
-    Use this to test that non-Redis exceptions on scard are properly propagated.
-
-    Example:
-        redis = FakeRedisNonRedisScardError()
-        redis.ping()  # OK
-        with pytest.raises(TypeError):
-            redis.scard("rq:workers")
-    """
-
-    def scard(self, key: str) -> int:
-        self._record("scard", key)
-        raise TypeError("simulated non-Redis scard failure")
-
-
-class FakeRedisHsetError(FakeRedis):
-    """FakeRedis that raises non-Redis error on hset.
-
-    Use this to test error handling when recording job status fails
-    with a non-Redis error that should be re-raised.
-
-    Example:
-        redis = FakeRedisHsetError()
-        with pytest.raises(RuntimeError):
-            redis.hset("job:123", {"status": "failed"})
-    """
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._record("hset", key, mapping)
-        raise RuntimeError("simulated hset failure")
-
-
-class FakeRedisHsetRedisError(FakeRedis):
-    """FakeRedis that raises RedisError on hset.
-
-    Use this to test error handling when recording job status fails
-    with a Redis error that should be logged and swallowed.
-
-    Example:
-        redis = FakeRedisHsetRedisError()
-        with pytest.raises(RedisError):
-            redis.hset("job:123", {"status": "failed"})
-    """
-
-    def hset(self, key: str, mapping: dict[str, str]) -> int:
-        self._record("hset", key, mapping)
-        from .redis import _load_redis_error_class
-
-        raise _load_redis_error_class()("simulated Redis hset failure")
-
-
-class FakeRedisBytesClient(RedisBytesProto):
-    """In-memory Redis bytes stub implementing RedisBytesProto.
-
-    Minimal implementation for testing RQ-related code that needs
-    a bytes-mode Redis client. Tracks whether close() was called.
-    """
-
-    def __init__(self) -> None:
-        self._closed = False
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        return True
-
-    def close(self) -> None:
-        self._closed = True
-
-    @property
-    def closed(self) -> bool:
-        """Check if close() was called."""
-        return self._closed
-
-
-class FakeRedisClient:
-    """In-memory Redis stub matching internal _RedisStrClient protocol.
-
-    This class matches the raw redis.Redis[str] interface used by _RedisStrAdapter.
-    Use this for testing internal adapter code. For testing public APIs,
-    use FakeRedis instead which implements RedisStrProto.
-
-    Call tracking:
-        All method calls are recorded in `calls` list. Use `assert_only_called()`
-        to verify that only expected methods were called during a test.
-    """
-
-    def __init__(self) -> None:
-        self._strings: dict[str, str] = {}
-        self._hashes: dict[str, dict[str, str]] = {}
-        self._sets: dict[str, set[str]] = {}
-        self.calls: list[MethodCall] = []
-
-    def _record(self, method: str, *args: str | int | dict[str, str]) -> None:
-        """Record a method call for tracking."""
-        self.calls.append(MethodCall(method, args))
-
-    def assert_only_called(self, expected: set[str]) -> None:
-        """Assert that only the expected methods were called."""
-        actual = {call.method for call in self.calls}
-        unexpected = actual - expected
-        if unexpected:
-            raise AssertionError(
-                f"Unexpected methods called: {unexpected}. "
-                f"Expected only: {expected}. Actual calls: {actual}"
-            )
-
-    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-        self._record("ping")
-        return True
-
-    def set(self, name: str, value: str) -> bool:
-        self._record("set", name, value)
-        self._strings[name] = value
-        return True
-
-    def get(self, name: str) -> str | None:
-        self._record("get", name)
-        return self._strings.get(name)
-
-    def delete(self, *names: str) -> int:
-        self._record("delete", *names)
-        removed = 0
-        for name in names:
-            if name in self._strings:
-                del self._strings[name]
-                removed += 1
-            if name in self._hashes:
-                del self._hashes[name]
-                removed += 1
-            if name in self._sets:
-                del self._sets[name]
-                removed += 1
-        return removed
-
-    def expire(self, name: str, time: int) -> bool:
-        self._record("expire", name, time)
-        return name in self._strings or name in self._hashes or name in self._sets
-
-    def hset(self, name: str, mapping: dict[str, str]) -> int:
-        self._record("hset", name, mapping)
-        bucket = self._hashes.setdefault(name, {})
-        bucket.update(mapping)
-        return len(mapping)
-
-    def hget(self, name: str, key: str) -> str | None:
-        self._record("hget", name, key)
-        return self._hashes.get(name, {}).get(key)
-
-    def hgetall(self, name: str) -> dict[str, str]:
-        self._record("hgetall", name)
-        return dict(self._hashes.get(name, {}))
-
-    def publish(self, channel: str, message: str) -> int:
-        self._record("publish", channel, message)
-        return 1
-
-    def scard(self, name: str) -> int:
-        self._record("scard", name)
-        return len(self._sets.get(name, set()))
-
-    def sadd(self, name: str, value: str) -> int:
-        self._record("sadd", name, value)
-        bucket = self._sets.setdefault(name, set())
-        before = len(bucket)
-        bucket.add(value)
-        return 1 if len(bucket) > before else 0
-
-    def sismember(self, name: str, value: str) -> bool:
-        self._record("sismember", name, value)
-        return value in self._sets.get(name, set())
-
-    def close(self) -> None:
-        self._record("close")
-
-
-class FakeJob(RQJobLike):
-    """Fake RQ job for testing."""
-
-    def __init__(self, job_id: str = "test-job-id") -> None:
-        self._id = job_id
-
-    def get_id(self) -> str:
-        return self._id
-
-
-class FakeRetry(RQRetryLike):
-    """Fake RQ Retry for testing.
-
-    Stores retry configuration without connecting to RQ.
-    """
-
-    def __init__(self, *, max: int, interval: list[int]) -> None:
-        self.max_retries = max
-        self.intervals = interval
-
-
-class _EnqCallable(Protocol):
-    """Protocol for callable that can be enqueued."""
-
-    def __call__(
-        self,
-        *args: _JsonValue,
-        job_timeout: int | None = None,
-        result_ttl: int | None = None,
-        failure_ttl: int | None = None,
-        retry: RQRetryLike | None = None,
-        description: str | None = None,
-    ) -> RQJobLike: ...
-
-
-class EnqueuedJob(NamedTuple):
-    """Record of an enqueued job."""
-
-    func: str
-    args: tuple[_JsonValue, ...]
-    job_timeout: int | None
-    result_ttl: int | None
-    failure_ttl: int | None
-    description: str | None
-
-
-class FakeQueue:
-    """Fake job queue for testing.
-
-    Tracks enqueued jobs in `jobs` list for assertions.
-    """
-
-    def __init__(self, job_id: str = "test-job-id") -> None:
-        self._job_id = job_id
-        self.jobs: list[EnqueuedJob] = []
-
-    def enqueue(
-        self,
-        func: str | _EnqCallable,
-        *args: _JsonValue,
-        job_timeout: int | None = None,
-        result_ttl: int | None = None,
-        failure_ttl: int | None = None,
-        retry: RQRetryLike | None = None,
-        description: str | None = None,
-    ) -> RQJobLike:
-        func_name = func if isinstance(func, str) else str(func)
-        self.jobs.append(
-            EnqueuedJob(
-                func=func_name,
-                args=args,
-                job_timeout=job_timeout,
-                result_ttl=result_ttl,
-                failure_ttl=failure_ttl,
-                description=description,
-            )
-        )
-        return FakeJob(self._job_id)
-
-
-class LoggerProtocol(Protocol):
-    """Protocol for a minimal structured logger interface."""
-
-    def debug(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None: ...
-
-    def info(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None: ...
-
-    def warning(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None: ...
-
-    def error(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None: ...
-
-
-class LogRecord(NamedTuple):
-    """Record of a log message."""
-
-    level: str
-    msg: str
-    args: tuple[_JsonValue, ...]
-    extra: Mapping[str, _JsonValue] | None
-
-
-class FakeLogger:
-    """Fake logger for testing.
-
-    Tracks log records in `records` list for assertions.
-    """
-
-    def __init__(self) -> None:
-        self.records: list[LogRecord] = []
-
-    def debug(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None:
-        self.records.append(LogRecord("debug", msg, args, extra))
-
-    def info(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None:
-        self.records.append(LogRecord("info", msg, args, extra))
-
-    def warning(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None:
-        self.records.append(LogRecord("warning", msg, args, extra))
-
-    def error(
-        self,
-        msg: str,
-        *args: _JsonValue,
-        exc_info: bool
-        | BaseException
-        | tuple[type[BaseException], BaseException, TracebackType | None]
-        | tuple[None, None, None]
-        | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        extra: Mapping[str, _JsonValue] | None = None,
-    ) -> None:
-        self.records.append(LogRecord("error", msg, args, extra))
+    return _hook
 
 
 __all__ = [
+    # Re-exported from _fakes
     "EnqueuedJob",
+    "FakeAsyncRedis",
+    "FakeFetchedJob",
     "FakeJob",
     "FakeLogger",
+    "FakePubSub",
     "FakeQueue",
+    "FakeRQModule",
     "FakeRedis",
+    "FakeRedisAsyncioModule",
     "FakeRedisBytesClient",
+    "FakeRedisBytesModule",
     "FakeRedisClient",
+    "FakeRedisConditionalHsetError",
+    "FakeRedisConditionalHsetRedisError",
     "FakeRedisError",
     "FakeRedisHsetError",
     "FakeRedisHsetRedisError",
@@ -656,9 +283,35 @@ __all__ = [
     "FakeRedisNonRedisScardError",
     "FakeRedisPublishError",
     "FakeRedisScardError",
+    "FakeRedisStrModule",
     "FakeRetry",
+    # Hook Protocols
+    "FetchJobHook",
+    # Hooks
+    "HooksContainer",
+    "LoadAsyncModuleHook",
+    "LoadBytesModuleHook",
+    "LoadRQModuleHook",
+    "LoadStrModuleHook",
     "LogRecord",
     "LoggerProtocol",
     "MethodCall",
+    "PathIsDirHook",
     "Published",
+    "_FakeCurrentJob",
+    "_FakeRQQueueInternal",
+    "_FakeRQWorkerInternal",
+    # Factory functions
+    "fake_kv_store_factory",
+    "fake_path_is_dir_false",
+    "fake_rq_connection_factory",
+    "fake_rq_queue_factory",
+    "fake_rq_retry_factory",
+    "hooks",
+    "make_fake_fetch_job_found",
+    "make_fake_fetch_job_not_found",
+    "make_fake_load_redis_asyncio_module",
+    "make_fake_load_redis_bytes_module",
+    "make_fake_load_redis_str_module",
+    "make_fake_load_rq_module",
 ]

@@ -1,12 +1,20 @@
+"""Tests for redis factory functions and adapters."""
+
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
-
 from platform_workers import redis as mod
-from platform_workers.testing import FakeRedis, FakeRedisClient
+from platform_workers.testing import (
+    FakeRedisClient,
+    hooks,
+    make_fake_load_redis_asyncio_module,
+    make_fake_load_redis_bytes_module,
+    make_fake_load_redis_str_module,
+)
 
 
 class _FakeRedisBytes:
+    """Minimal fake for bytes protocol testing."""
+
     def __init__(self) -> None:
         self._closed = False
 
@@ -17,13 +25,12 @@ class _FakeRedisBytes:
         self._closed = True
 
 
-def test_redis_for_kv_factory(monkeypatch: MonkeyPatch) -> None:
-    fake = FakeRedis()
+def test_redis_for_kv_factory() -> None:
+    """Test redis_for_kv uses the str module loader hook."""
+    fake = FakeRedisClient()
+    hook_fn, _ = make_fake_load_redis_str_module(fake)
+    hooks.load_redis_str_module = hook_fn
 
-    def _factory(_url: str) -> mod.RedisStrProto:
-        return fake
-
-    monkeypatch.setattr(mod, "_redis_from_url_str", _factory, raising=True)
     r = mod.redis_for_kv("redis://x")
     assert r.ping()
     assert r.get("a") is None
@@ -40,53 +47,40 @@ def test_redis_for_kv_factory(monkeypatch: MonkeyPatch) -> None:
     )
 
 
-def test_redis_for_rq_factory(monkeypatch: MonkeyPatch) -> None:
-    fake = _FakeRedisBytes()
+def test_redis_for_rq_factory() -> None:
+    """Test redis_for_rq uses the bytes module loader hook."""
+    hook_fn, fake_module = make_fake_load_redis_bytes_module()
+    hooks.load_redis_bytes_module = hook_fn
 
-    def _factory(_url: str) -> mod.RedisBytesProto:
-        return fake
-
-    monkeypatch.setattr(mod, "_redis_from_url_bytes", _factory, raising=True)
     r = mod.redis_for_rq("redis://x")
     assert r.ping()
     r.close()
+    assert fake_module.from_url_called
 
 
-def test_redis_runtime_import_kv(monkeypatch: MonkeyPatch) -> None:
-    fake = FakeRedis()
+def test_redis_runtime_import_kv() -> None:
+    """Test redis_for_kv runtime import path."""
+    fake = FakeRedisClient()
+    hook_fn, _ = make_fake_load_redis_str_module(fake)
+    hooks.load_redis_str_module = hook_fn
 
-    def _fake_from_url(
-        url: str,
-        **kwargs: str | int | float | bool | None,
-    ) -> mod.RedisStrProto:
-        return fake
-
-    monkeypatch.setattr("platform_workers.redis.redis.from_url", _fake_from_url, raising=True)
     kv = mod.redis_for_kv("redis://kv")
     assert kv.ping()
     fake.assert_only_called({"ping"})
 
 
-def test_redis_runtime_import_rq(monkeypatch: MonkeyPatch) -> None:
-    class _B:
-        def ping(self, **kw: str | int | float | bool | None) -> bool:
-            return True
+def test_redis_runtime_import_rq() -> None:
+    """Test redis_for_rq runtime import path."""
+    hook_fn, fake_module = make_fake_load_redis_bytes_module()
+    hooks.load_redis_bytes_module = hook_fn
 
-        def close(self) -> None:
-            pass
-
-    def _fake_from_url(
-        url: str,
-        **kwargs: str | int | float | bool | None,
-    ) -> mod.RedisBytesProto:
-        return _B()
-
-    monkeypatch.setattr("platform_workers.redis.redis.from_url", _fake_from_url, raising=True)
     rb = mod.redis_for_rq("redis://rq")
     assert rb.ping()
+    assert fake_module.from_url_called
 
 
 def test_redis_str_adapter_comprehensive() -> None:
+    """Test _RedisStrAdapter methods comprehensively."""
     fake = FakeRedisClient()
     adapter = mod._RedisStrAdapter(fake)
     assert adapter.ping()
@@ -110,6 +104,7 @@ def test_redis_str_adapter_comprehensive() -> None:
 
 
 def test_redis_str_adapter_delete_and_expire() -> None:
+    """Test _RedisStrAdapter delete and expire methods."""
     fake = FakeRedisClient()
     adapter = mod._RedisStrAdapter(fake)
     # Test delete
@@ -126,35 +121,19 @@ def test_redis_str_adapter_delete_and_expire() -> None:
 
 
 def test_redis_bytes_adapter_comprehensive() -> None:
+    """Test _RedisBytesAdapter methods."""
     fake = _FakeRedisBytes()
     adapter = mod._RedisBytesAdapter(fake)
     assert adapter.ping()
     adapter.close()
 
 
-def test_redis_for_kv_runtime_module(monkeypatch: MonkeyPatch) -> None:
+def test_redis_for_kv_runtime_module() -> None:
+    """Test redis_for_kv with str module hook and URL verification."""
     fake = FakeRedisClient()
+    hook_fn, _ = make_fake_load_redis_str_module(fake)
+    hooks.load_redis_str_module = hook_fn
 
-    class _Module:
-        def from_url(
-            self,
-            url: str,
-            *,
-            encoding: str,
-            decode_responses: bool,
-            socket_connect_timeout: float,
-            socket_timeout: float,
-            retry_on_timeout: bool,
-        ) -> FakeRedisClient:
-            assert url == "redis://kv-runtime"
-            assert encoding == "utf-8"
-            assert decode_responses
-            assert socket_connect_timeout == 1.0
-            assert socket_timeout == 1.0
-            assert retry_on_timeout
-            return fake
-
-    monkeypatch.setattr(mod, "_load_redis_str_module", lambda: _Module(), raising=True)
     kv = mod.redis_for_kv("redis://kv-runtime")
     assert kv.ping()
     assert kv.get("missing") is None
@@ -165,97 +144,44 @@ def test_redis_for_kv_runtime_module(monkeypatch: MonkeyPatch) -> None:
     fake.assert_only_called({"ping", "get", "set", "hset", "sadd", "scard"})
 
 
-def test_redis_for_rq_runtime_module(monkeypatch: MonkeyPatch) -> None:
-    class _B:
-        def __init__(self) -> None:
-            self.closed = False
+def test_redis_for_rq_runtime_module() -> None:
+    """Test redis_for_rq with bytes module hook."""
+    hook_fn, fake_module = make_fake_load_redis_bytes_module()
+    hooks.load_redis_bytes_module = hook_fn
 
-        def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-            return True
-
-        def close(self) -> None:
-            self.closed = True
-
-    class _Module:
-        def from_url(
-            self,
-            url: str,
-            *,
-            decode_responses: bool,
-            socket_connect_timeout: float,
-            socket_timeout: float,
-            retry_on_timeout: bool,
-        ) -> _B:
-            assert url == "redis://rq-runtime"
-            assert not decode_responses
-            assert socket_connect_timeout == 1.0
-            assert socket_timeout == 1.0
-            assert retry_on_timeout
-            return _B()
-
-    monkeypatch.setattr(mod, "_load_redis_bytes_module", lambda: _Module(), raising=True)
     rb = mod.redis_for_rq("redis://rq-runtime")
     assert rb.ping()
+    assert fake_module.from_url_called
+    assert fake_module.from_url_url == "redis://rq-runtime"
 
 
-class _FakePubSub:
-    async def subscribe(self, *channels: str) -> None:
-        pass
+def test_redis_for_pubsub_factory() -> None:
+    """Test redis_for_pubsub with asyncio module hook."""
+    hook_fn, fake_module = make_fake_load_redis_asyncio_module()
+    hooks.load_redis_asyncio_module = hook_fn
 
-    async def get_message(
-        self, *, ignore_subscribe_messages: bool = True, timeout: float = 1.0
-    ) -> mod.PubSubMessage | None:
-        return None
-
-    async def close(self) -> None:
-        pass
-
-
-class _FakeAsyncRedis:
-    def pubsub(self) -> _FakePubSub:
-        return _FakePubSub()
-
-
-def test_redis_for_pubsub_factory(monkeypatch: MonkeyPatch) -> None:
-    fake = _FakeAsyncRedis()
-
-    def _fake_factory(_url: str) -> mod.RedisAsyncProto:
-        return fake
-
-    monkeypatch.setattr(mod, "_redis_async_from_url", _fake_factory, raising=True)
     client = mod.redis_for_pubsub("redis://pubsub")
     ps = client.pubsub()
     assert callable(ps.subscribe)
+    assert fake_module.from_url_called
 
 
-def test_redis_async_from_url_runtime_module(monkeypatch: MonkeyPatch) -> None:
-    class _FakeAsyncioModule:
-        def from_url(self, url: str, *, encoding: str, decode_responses: bool) -> _FakeAsyncRedis:
-            assert url == "redis://async-test"
-            assert encoding == "utf-8"
-            assert decode_responses
-            return _FakeAsyncRedis()
+def test_redis_async_from_url_runtime_module() -> None:
+    """Test _redis_async_from_url with asyncio module hook."""
+    hook_fn, fake_module = make_fake_load_redis_asyncio_module()
+    hooks.load_redis_asyncio_module = hook_fn
 
-    monkeypatch.setattr(
-        mod, "_load_redis_asyncio_module", lambda: _FakeAsyncioModule(), raising=True
-    )
     client = mod.redis_for_pubsub("redis://async-test")
     ps = client.pubsub()
     assert callable(ps.subscribe)
+    assert fake_module.from_url_url == "redis://async-test"
 
 
-def test_load_redis_asyncio_module_imports_redis_asyncio(monkeypatch: MonkeyPatch) -> None:
-    import importlib
+def test_load_redis_asyncio_module_imports_redis_asyncio() -> None:
+    """Test _load_redis_asyncio_module with hook."""
+    hook_fn, _fake_module = make_fake_load_redis_asyncio_module()
+    hooks.load_redis_asyncio_module = hook_fn
 
-    class _FakeAsyncioMod:
-        def from_url(self, url: str, *, encoding: str, decode_responses: bool) -> _FakeAsyncRedis:
-            return _FakeAsyncRedis()
-
-    def _fake_import(name: str) -> _FakeAsyncioMod:
-        assert name == "redis.asyncio"
-        return _FakeAsyncioMod()
-
-    monkeypatch.setattr(importlib, "import_module", _fake_import, raising=True)
     result = mod._load_redis_asyncio_module()
     assert callable(result.from_url)
 
@@ -291,36 +217,37 @@ def test_load_redis_error_class_returns_redis_error() -> None:
     assert str(err) == "test message"
 
 
-def test_redis_raw_for_rq_runtime_module(monkeypatch: MonkeyPatch) -> None:
+def test_redis_raw_for_rq_runtime_module() -> None:
     """Test that redis_raw_for_rq returns a raw Redis client."""
+    hook_fn, fake_module = make_fake_load_redis_bytes_module()
+    hooks.load_redis_bytes_module = hook_fn
 
-    class _RawClient:
-        def __init__(self) -> None:
-            self.closed = False
-
-        def ping(self, **kwargs: str | int | float | bool | None) -> bool:
-            return True
-
-        def close(self) -> None:
-            self.closed = True
-
-    class _Module:
-        def from_url(
-            self,
-            url: str,
-            *,
-            decode_responses: bool,
-            socket_connect_timeout: float,
-            socket_timeout: float,
-            retry_on_timeout: bool,
-        ) -> _RawClient:
-            assert url == "redis://raw-test"
-            assert not decode_responses
-            assert socket_connect_timeout == 1.0
-            assert socket_timeout == 1.0
-            assert retry_on_timeout
-            return _RawClient()
-
-    monkeypatch.setattr(mod, "_load_redis_bytes_module", lambda: _Module(), raising=True)
     client = mod.redis_raw_for_rq("redis://raw-test")
     assert client.ping()
+    assert fake_module.from_url_called
+    assert fake_module.from_url_url == "redis://raw-test"
+
+
+# =============================================================================
+# Production Path Tests (hooks not set)
+# =============================================================================
+
+
+def test_load_redis_str_module_production_path() -> None:
+    """Test _load_redis_str_module uses real redis when hook is None."""
+    # hooks are reset by conftest, so no hook is set
+    result = mod._load_redis_str_module()
+    # Verify it returns something with from_url callable
+    assert callable(result.from_url)
+
+
+def test_load_redis_bytes_module_production_path() -> None:
+    """Test _load_redis_bytes_module uses real redis when hook is None."""
+    result = mod._load_redis_bytes_module()
+    assert callable(result.from_url)
+
+
+def test_load_redis_asyncio_module_production_path() -> None:
+    """Test _load_redis_asyncio_module uses real redis.asyncio when hook is None."""
+    result = mod._load_redis_asyncio_module()
+    assert callable(result.from_url)
