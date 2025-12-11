@@ -9,13 +9,8 @@ import numpy as np
 from covenant_domain.features import LoanFeatures
 from numpy.typing import NDArray
 
-from covenant_ml import (
-    TrainConfig,
-    load_model,
-    predict_probabilities,
-    save_model,
-    train_model,
-)
+from covenant_ml import load_model, predict_probabilities, save_model, train_model
+from covenant_ml.testing import make_train_config
 
 
 def _make_training_data(
@@ -40,14 +35,7 @@ def _make_training_data(
 def _train_and_save_model(model_path: str) -> None:
     """Train and save a model for testing."""
     x_features, y_labels = _make_training_data()
-    config: TrainConfig = {
-        "learning_rate": 0.1,
-        "max_depth": 3,
-        "n_estimators": 10,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "random_state": 42,
-    }
+    config = make_train_config(reg_alpha=1.0, reg_lambda=5.0)
     model = train_model(x_features, y_labels, config)
     save_model(model, model_path)
 
