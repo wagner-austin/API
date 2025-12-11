@@ -120,25 +120,51 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `REDIS_URL` | string | `redis://redis:6379/0` | Redis connection URL |
-| `RQ__QUEUE_NAME` | string | `training` | RQ queue name |
-| `RQ__JOB_TIMEOUT_SEC` | int | `3600` | Job timeout |
+| `REDIS__URL` | string | `redis://redis:6379/0` | Redis connection URL |
+| `REDIS__ENABLED` | bool | `true` | Enable Redis connection |
+| `RQ__QUEUE_NAME` | string | `trainer` | RQ queue name |
+| `RQ__JOB_TIMEOUT_SEC` | int | `86400` | Job timeout (24h) |
 | `RQ__RESULT_TTL_SEC` | int | `86400` | Result retention (24h) |
 | `RQ__FAILURE_TTL_SEC` | int | `604800` | Failure retention (7d) |
+| `RQ__RETRY_MAX` | int | `1` | Max retry attempts |
+| `RQ__RETRY_INTERVALS_SEC` | string | `300` | Retry interval in seconds |
+| `APP__DATA_ROOT` | string | `/data` | Base data directory |
 | `APP__ARTIFACTS_ROOT` | string | `/data/artifacts` | Artifact storage path |
-| `APP__PORT` | int | `8000` | API server port |
+| `APP__RUNS_ROOT` | string | `/data/runs` | Training runs directory |
+| `APP__LOGS_ROOT` | string | `/data/logs` | Logs directory |
+| `APP__THREADS` | int | `0` | Thread count (0=auto) |
+| `APP__TOKENIZER_SAMPLE_MAX_LINES` | int | `10000` | Max lines for tokenizer sampling |
+| `APP__DATA_BANK_API_URL` | string | - | Data bank API URL (or use `API_GATEWAY_URL`) |
+| `APP__DATA_BANK_API_KEY` | string | - | Data bank API key |
+| `API_GATEWAY_URL` | string | - | Gateway URL (auto-appends `/data-bank` for data bank) |
+| `APP_ENV` | string | `dev` | Environment (`dev` or `prod`) |
 | `LOGGING__LEVEL` | string | `INFO` | Log level |
 | `HF_HOME` | string | `/hf-cache` | Hugging Face cache |
 | `SECURITY__API_KEY` | string | - | Optional API key |
 | `WANDB__ENABLED` | bool | `false` | Enable Weights & Biases logging |
 | `WANDB__PROJECT` | string | `model-trainer` | Wandb project name |
 
+**Cleanup Settings:**
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `APP__CLEANUP__ENABLED` | bool | `true` | Enable post-upload cleanup |
+| `APP__CLEANUP__VERIFY_UPLOAD` | bool | `true` | Verify upload before cleanup |
+| `APP__CLEANUP__GRACE_PERIOD_SECONDS` | int | `0` | Wait time before cleanup |
+| `APP__CLEANUP__DRY_RUN` | bool | `false` | Log deletions without deleting |
+| `APP__CORPUS_CACHE_CLEANUP__ENABLED` | bool | `false` | Enable corpus cache cleanup |
+| `APP__CORPUS_CACHE_CLEANUP__MAX_BYTES` | int | `10737418240` | Max cache size (10GB) |
+| `APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES` | int | `2147483648` | Min free space (2GB) |
+| `APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY` | string | `lru` | `lru` or `oldest` |
+| `APP__TOKENIZER_CLEANUP__ENABLED` | bool | `false` | Enable tokenizer cleanup |
+| `APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS` | int | `30` | Days before cleanup |
+
 ### Example .env
 
 ```bash
-REDIS_URL=redis://redis:6379/0
-RQ__QUEUE_NAME=training
-RQ__JOB_TIMEOUT_SEC=7200
+REDIS__URL=redis://redis:6379/0
+RQ__QUEUE_NAME=trainer
+RQ__JOB_TIMEOUT_SEC=86400
 APP__ARTIFACTS_ROOT=/data/artifacts
 LOGGING__LEVEL=INFO
 HF_HOME=/hf-cache
@@ -465,7 +491,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS__URL=redis://redis:6379/0
       - APP__ARTIFACTS_ROOT=/data/artifacts
     volumes:
       - ./corpus:/data/corpus:ro
@@ -477,7 +503,7 @@ services:
     build: .
     command: modeltrainer-rq-worker
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS__URL=redis://redis:6379/0
       - APP__ARTIFACTS_ROOT=/data/artifacts
     volumes:
       - ./corpus:/data/corpus:ro
@@ -493,9 +519,9 @@ services:
 3. **Configure volumes** for artifacts
 4. **Set environment variables**:
    ```
-   REDIS_URL=${{Redis.REDIS_URL}}
+   REDIS__URL=${{Redis.REDIS_URL}}
    APP__ARTIFACTS_ROOT=/data/artifacts
-   RQ__QUEUE_NAME=training
+   RQ__QUEUE_NAME=trainer
    ```
 
 ### Health Checks
@@ -579,17 +605,34 @@ Training progress is published to Redis for Discord bot notifications:
 
 **Channel:** `trainer:events`
 
-**Event Types:**
-- `trainer.train.started.v1`
-- `trainer.train.progress.v1`
-- `trainer.train.completed.v1`
-- `trainer.train.failed.v1`
+**Event Types (Job Lifecycle):**
+- `trainer.job.started.v1`
+- `trainer.job.progress.v1`
+- `trainer.job.completed.v1`
+- `trainer.job.failed.v1`
+
+**Event Types (Training Metrics):**
+- `trainer.metrics.config.v1`
+- `trainer.metrics.progress.v1`
+- `trainer.metrics.completed.v1`
 
 **Event Schema:**
 ```json
 {
-  "type": "trainer.train.progress.v1",
-  "run_id": "gpt2-run-001",
+  "type": "trainer.job.progress.v1",
+  "job_id": "gpt2-run-001",
+  "user_id": 12345,
+  "queue": "trainer",
+  "progress": 66,
+  "message": "Training epoch 2/3"
+}
+```
+
+**Metrics Event Schema:**
+```json
+{
+  "type": "trainer.metrics.progress.v1",
+  "job_id": "gpt2-run-001",
   "user_id": 12345,
   "epoch": 2,
   "total_epochs": 3,
