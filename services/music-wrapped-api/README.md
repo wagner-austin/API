@@ -1,6 +1,6 @@
-# music-wrapped-api
+# Music Wrapped API
 
-Music listening analytics service that aggregates data from Spotify, Apple Music, YouTube Music, and Last.fm to generate yearly "Wrapped" reports.
+Music listening analytics service that aggregates data from Spotify, Apple Music, YouTube Music, and Last.fm to generate yearly "Wrapped" reports. Features OAuth integration, background job processing, and PNG export.
 
 ## Features
 
@@ -10,40 +10,109 @@ Music listening analytics service that aggregates data from Spotify, Apple Music
 - **YouTube Takeout Import**: Parse Google Takeout data for YouTube Music
 - **Background Processing**: RQ workers for async report generation
 - **PNG Export**: Visual wrapped cards via image rendering
+- **Type Safety**: mypy strict mode, zero `Any` types
+- **100% Test Coverage**: Statements and branches
 
 ## Quick Start
 
+### Prerequisites
+
+- Python 3.11+
+- Poetry 1.8+
+- Redis (for job queue and token storage)
+
+### Installation
+
 ```bash
-# Start infrastructure (from repo root)
+cd services/music-wrapped-api
+poetry install --with dev
+```
+
+### Start with Docker (from repository root)
+
+```bash
+# Start infrastructure
 make infra
 
 # Start the service
 cd services/music-wrapped-api
 docker compose up -d
 
-# Check health
+# Verify
 curl http://localhost:8006/healthz
+curl http://localhost:8006/readyz
 ```
+
+### Local Development
+
+```bash
+# Start Redis
+docker run -d -p 6379:6379 --name redis redis:7-alpine
+
+# Run API
+poetry run hypercorn music_wrapped_api.asgi:app --bind 0.0.0.0:8006
+
+# Run Worker (separate terminal)
+poetry run music-wrapped-worker
+```
+
+## API Reference
+
+For complete API documentation, see [docs/api.md](./docs/api.md).
+
+### Quick Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe (checks Redis) |
+| `/v1/wrapped/auth/spotify/start` | GET | Start Spotify OAuth flow |
+| `/v1/wrapped/auth/spotify/callback` | GET | Spotify OAuth callback |
+| `/v1/wrapped/auth/lastfm/start` | GET | Start Last.fm OAuth flow |
+| `/v1/wrapped/auth/lastfm/callback` | GET | Last.fm OAuth callback |
+| `/v1/wrapped/auth/youtube/store` | POST | Store YouTube Music credentials |
+| `/v1/wrapped/auth/apple/store` | POST | Store Apple Music token |
+| `/v1/wrapped/generate` | POST | Start wrapped generation job |
+| `/v1/wrapped/import/youtube-takeout` | POST | Import YouTube Takeout file |
+| `/v1/wrapped/status/{job_id}` | GET | Get job status and progress |
+| `/v1/wrapped/result/{result_id}` | GET | Get JSON result |
+| `/v1/wrapped/download/{result_id}` | GET | Download PNG image |
+| `/v1/wrapped/schema` | GET | Get WrappedResult JSON schema |
+
+---
 
 ## Configuration
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `REDIS_URL` | Yes | Redis connection string |
-| `LASTFM_API_KEY` | Yes | Last.fm API key |
-| `LASTFM_API_SECRET` | Yes | Last.fm API secret |
-| `SPOTIFY_CLIENT_ID` | Yes | Spotify app client ID |
-| `SPOTIFY_CLIENT_SECRET` | Yes | Spotify app client secret |
-| `APPLE_DEVELOPER_TOKEN` | Yes | Apple Music developer token |
-| `PORT` | No | Server port (default: 8000) |
+### Environment Variables
 
-Copy `.env.example` to `.env` and fill in values:
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `REDIS_URL` | string | **Required** | Redis connection string |
+| `LASTFM_API_KEY` | string | **Required** | Last.fm API key |
+| `LASTFM_API_SECRET` | string | **Required** | Last.fm API secret |
+| `SPOTIFY_CLIENT_ID` | string | **Required** | Spotify app client ID |
+| `SPOTIFY_CLIENT_SECRET` | string | **Required** | Spotify app client secret |
+| `APPLE_DEVELOPER_TOKEN` | string | **Required** | Apple Music developer token |
+| `PORT` | int | `8006` | Server port |
+| `LOGGING__LEVEL` | string | `INFO` | Log level |
+
+### Example .env
 
 ```bash
-cp .env.example .env
+REDIS_URL=redis://localhost:6379/0
+LASTFM_API_KEY=your-lastfm-api-key
+LASTFM_API_SECRET=your-lastfm-api-secret
+SPOTIFY_CLIENT_ID=your-spotify-client-id
+SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
+APPLE_DEVELOPER_TOKEN=your-apple-developer-token
+PORT=8006
 ```
 
+---
+
 ## Architecture
+
+### Component Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -65,170 +134,193 @@ cp .env.example .env
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Endpoints
+### Supported Services
 
-### Health
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/healthz` | Liveness probe |
-| GET | `/readyz` | Readiness probe (checks Redis) |
-
-### Authentication
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/v1/wrapped/auth/spotify/start` | Start Spotify OAuth flow |
-| GET | `/v1/wrapped/auth/spotify/callback` | Spotify OAuth callback |
-| GET | `/v1/wrapped/auth/lastfm/start` | Start Last.fm OAuth flow |
-| GET | `/v1/wrapped/auth/lastfm/callback` | Last.fm OAuth callback |
-| POST | `/v1/wrapped/auth/youtube/store` | Store YouTube Music credentials |
-| POST | `/v1/wrapped/auth/apple/store` | Store Apple Music token |
-
-### Wrapped Generation
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/v1/wrapped/generate` | Start wrapped generation job |
-| POST | `/v1/wrapped/import/youtube-takeout` | Import YouTube Takeout file |
-| GET | `/v1/wrapped/status/{job_id}` | Get job status and progress |
-| GET | `/v1/wrapped/result/{result_id}` | Get JSON result |
-| GET | `/v1/wrapped/download/{result_id}` | Download PNG image |
-| GET | `/v1/wrapped/schema` | Get WrappedResult JSON schema |
-
-## Usage Examples
-
-### Spotify OAuth Flow
-
-```bash
-# 1. Start OAuth (get auth URL)
-curl "http://localhost:8006/v1/wrapped/auth/spotify/start?callback=http://localhost:3000/callback"
-
-# Response: {"auth_url": "https://accounts.spotify.com/authorize?...", "state": "abc123"}
-
-# 2. User visits auth_url, authorizes, redirected to callback with code
-
-# 3. Exchange code for token
-curl "http://localhost:8006/v1/wrapped/auth/spotify/callback?code=AUTH_CODE&state=abc123&callback=http://localhost:3000/callback"
-
-# Response: {"token_id": "abc123def456...", "expires_in": 3600}
-```
-
-### Last.fm OAuth Flow
-
-```bash
-# 1. Start OAuth
-curl "http://localhost:8006/v1/wrapped/auth/lastfm/start?callback=http://localhost:3000/callback"
-
-# Response: {"auth_url": "https://www.last.fm/api/auth/?..."}
-
-# 2. User authorizes, callback receives token
-
-# 3. Exchange token
-curl "http://localhost:8006/v1/wrapped/auth/lastfm/callback?token=LASTFM_TOKEN"
-
-# Response: {"session_key": "abc123...", "username": "user123"}
-```
-
-### Store YouTube Music Credentials
-
-```bash
-curl -X POST http://localhost:8006/v1/wrapped/auth/youtube/store \
-  -H "Content-Type: application/json" \
-  -d '{"sapisid": "YOUR_SAPISID", "cookies": "YOUR_COOKIES"}'
-
-# Response: {"token_id": "abc123..."}
-```
-
-### Store Apple Music Token
-
-```bash
-curl -X POST http://localhost:8006/v1/wrapped/auth/apple/store \
-  -H "Content-Type: application/json" \
-  -d '{"music_user_token": "YOUR_MUSIC_USER_TOKEN"}'
-
-# Response: {"token_id": "abc123..."}
-```
-
-### Generate Wrapped Report
-
-```bash
-# Using stored token
-curl -X POST http://localhost:8006/v1/wrapped/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "year": 2024,
-    "service": "spotify",
-    "credentials": {"token_id": "abc123..."}
-  }'
-
-# Using full credentials (Last.fm)
-curl -X POST http://localhost:8006/v1/wrapped/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "year": 2024,
-    "service": "lastfm",
-    "credentials": {"session_key": "YOUR_SESSION_KEY"}
-  }'
-
-# Response: {"job_id": "job123...", "status": "queued"}
-```
-
-### Import YouTube Takeout
-
-```bash
-curl -X POST http://localhost:8006/v1/wrapped/import/youtube-takeout \
-  -F "file=@watch-history.json" \
-  -F "year=2024"
-
-# Response: {"job_id": "job123...", "status": "queued", "token_id": "abc..."}
-```
-
-### Check Job Status
-
-```bash
-curl http://localhost:8006/v1/wrapped/status/job123
-
-# Response:
-# {
-#   "job_id": "job123",
-#   "status": "finished",
-#   "progress": 100,
-#   "result_id": "result456..."
-# }
-```
-
-### Get Result
-
-```bash
-# JSON result
-curl http://localhost:8006/v1/wrapped/result/result456
-
-# PNG image
-curl http://localhost:8006/v1/wrapped/download/result456 -o wrapped.png
-```
-
-## Supported Services
-
-### Spotify
+#### Spotify
 - OAuth 2.0 authorization flow
 - Scopes: `user-read-recently-played`, `user-top-read`
 - Credentials: `access_token`, `refresh_token`, `expires_in`
 
-### Last.fm
+#### Last.fm
 - Web authentication flow
 - Credentials: `session_key` (optional: `api_key`, `api_secret` from env)
 
-### Apple Music
+#### Apple Music
 - Developer token + Music User Token
 - Credentials: `music_user_token`, `developer_token`
 
-### YouTube Music
+#### YouTube Music
 - Cookie-based authentication (SAPISID + cookies)
 - Credentials: `sapisid`, `cookies`
 - Also supports Google Takeout import
 
-## Error Codes
+---
+
+## Development
+
+### Commands
+
+```bash
+make install      # Install dependencies
+make install-dev  # Install with dev dependencies
+make lint         # Run guards + ruff + mypy
+make test         # Run pytest with coverage
+make check        # Run lint + test
+```
+
+### Quality Gates
+
+All code must pass:
+
+1. **Guard Scripts**: No `Any`, no `cast`, no `type: ignore`
+2. **Ruff**: Linting and formatting
+3. **Mypy**: Strict type checking
+4. **Pytest**: 100% statement and branch coverage
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run specific test file
+poetry run pytest tests/test_auth.py -v
+
+# Run with coverage report
+poetry run pytest --cov-report=html
+```
+
+---
+
+## Project Structure
+
+```
+music-wrapped-api/
+├── src/music_wrapped_api/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── main.py           # App factory and routes
+│   │   ├── auth.py           # OAuth flows
+│   │   ├── generate.py       # Wrapped generation
+│   │   └── schemas.py        # Request/response models
+│   ├── services/
+│   │   ├── spotify.py        # Spotify integration
+│   │   ├── lastfm.py         # Last.fm integration
+│   │   ├── apple.py          # Apple Music integration
+│   │   └── youtube.py        # YouTube Music integration
+│   ├── worker/
+│   │   └── jobs.py           # RQ job handlers
+│   └── worker_entry.py       # Worker entry point
+├── tests/
+├── scripts/
+│   └── guard.py
+├── docs/
+│   ├── api.md
+│   └── CONTRIBUTING.md
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+└── Makefile
+```
+
+---
+
+## Deployment
+
+### Docker
+
+```bash
+# Build
+docker build -t music-wrapped-api:latest .
+
+# Run
+docker run -p 8006:8006 \
+  -e REDIS_URL=redis://redis:6379/0 \
+  -e LASTFM_API_KEY=your-key \
+  -e LASTFM_API_SECRET=your-secret \
+  -e SPOTIFY_CLIENT_ID=your-client-id \
+  -e SPOTIFY_CLIENT_SECRET=your-client-secret \
+  -e APPLE_DEVELOPER_TOKEN=your-token \
+  music-wrapped-api:latest
+```
+
+### Docker Compose
+
+```yaml
+version: "3.8"
+services:
+  music-wrapped:
+    build: .
+    ports:
+      - "8006:8006"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  worker:
+    build: .
+    command: music-wrapped-worker
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+```
+
+Network: Requires `platform-network` and `platform-redis` from root docker-compose.
+
+### Railway
+
+```bash
+# Set environment variables in Railway dashboard
+railway up
+```
+
+**Health Check Path:** `/healthz`
+
+---
+
+## Dependencies
+
+### Runtime
+
+| Package | Purpose |
+|---------|---------|
+| `fastapi` | Web framework |
+| `hypercorn` | ASGI server |
+| `redis` | Token storage and job queue |
+| `rq` | Background job processing |
+| `python-multipart` | File upload handling |
+| `platform-core` | Logging, errors, config |
+| `platform-workers` | RQ worker harness |
+| `platform-music` | Music analytics library |
+
+### Development
+
+| Package | Purpose |
+|---------|---------|
+| `pytest` | Test runner |
+| `pytest-asyncio` | Async test support |
+| `pytest-cov` | Coverage reporting |
+| `pytest-xdist` | Parallel tests |
+| `mypy` | Type checking |
+| `ruff` | Linting/formatting |
+
+---
+
+## Error Handling
+
+All errors return JSON with consistent format:
+
+```json
+{
+  "code": "ERROR_CODE",
+  "message": "Human-readable description",
+  "request_id": "uuid-for-tracing"
+}
+```
+
+### Error Codes
 
 | HTTP | Code | Description |
 |------|------|-------------|
@@ -236,52 +328,18 @@ curl http://localhost:8006/v1/wrapped/download/result456 -o wrapped.png
 | 404 | `NOT_FOUND` | Token or result not found |
 | 502 | `EXTERNAL_SERVICE_ERROR` | OAuth provider error |
 
-## Worker
+---
 
-The worker processes wrapped generation jobs asynchronously:
+## Quality Standards
 
-```bash
-# Run worker
-poetry run music-wrapped-worker
-```
+- **Type Safety**: mypy strict mode, no `Any`, no `cast`
+- **Coverage**: 100% statements and branches
+- **Guard Rules**: Enforced via `scripts/guard.py`
+- **Logging**: Structured JSON via platform_core
+- **Errors**: Consistent `{code, message, request_id}` format
 
-Worker entry point: `music_wrapped_api.worker_entry:main`
+---
 
-## Development
+## License
 
-```bash
-# Install dependencies
-poetry install --with dev
-
-# Run checks
-make check
-
-# Run tests
-make test
-
-# Run linting
-make lint
-```
-
-## Docker
-
-```bash
-# Build and run
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop
-docker compose down
-```
-
-Network: Requires `platform-network` and `platform-redis` from root docker-compose.
-
-## Related
-
-- [API Documentation](docs/api.md) - Full endpoint specifications
-- [Contributing Guide](docs/CONTRIBUTING.md) - Development guidelines and test hooks pattern
-- [platform_music](../../libs/platform_music) - Core music analytics library
-- [platform_workers](../../libs/platform_workers) - RQ and Redis utilities
-- [platform_core](../../libs/platform_core) - Configuration and utilities
+Apache-2.0
