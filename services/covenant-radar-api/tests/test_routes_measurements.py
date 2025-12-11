@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from covenant_domain import DealId, Measurement
-from covenant_persistence import MeasurementRepository
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.json_utils import (
     load_json_str,
@@ -15,69 +13,13 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.api.routes.measurements import build_router
 
-
-class _InMemoryMeasurementStore:
-    """In-memory storage for measurements."""
-
-    def __init__(self) -> None:
-        self.measurements: list[Measurement] = []
+from .conftest import ContainerAndStore
 
 
-class _InMemoryMeasurementRepository:
-    """In-memory implementation of MeasurementRepository for testing."""
-
-    def __init__(self, store: _InMemoryMeasurementStore) -> None:
-        self._store = store
-
-    def add_many(self, measurements: Sequence[Measurement]) -> int:
-        """Insert measurements. Returns count inserted."""
-        count = 0
-        for m in measurements:
-            self._store.measurements.append(m)
-            count += 1
-        return count
-
-    def list_for_deal_and_period(
-        self,
-        deal_id: DealId,
-        period_start_iso: str,
-        period_end_iso: str,
-    ) -> Sequence[Measurement]:
-        """List measurements for deal and period."""
-        deal_key = deal_id["value"]
-        return [
-            m
-            for m in self._store.measurements
-            if m["deal_id"]["value"] == deal_key
-            and m["period_start_iso"] == period_start_iso
-            and m["period_end_iso"] == period_end_iso
-        ]
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[Measurement]:
-        """List all measurements for a deal."""
-        deal_key = deal_id["value"]
-        return [m for m in self._store.measurements if m["deal_id"]["value"] == deal_key]
-
-
-class _TestContainer:
-    """Test container with in-memory measurement repository."""
-
-    def __init__(self, store: _InMemoryMeasurementStore) -> None:
-        self._store = store
-
-    def measurement_repo(self) -> MeasurementRepository:
-        """Return in-memory measurement repository."""
-        repo: MeasurementRepository = _InMemoryMeasurementRepository(self._store)
-        return repo
-
-
-def _create_test_client(store: _InMemoryMeasurementStore) -> TestClient:
-    """Create test client with in-memory repository."""
-    from fastapi import FastAPI
-
+def _create_test_client(cas: ContainerAndStore) -> TestClient:
+    """Create test client with real container."""
     app = FastAPI()
-    container = _TestContainer(store)
-    router = build_router(container)
+    router = build_router(cas.container)
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
 
@@ -102,10 +44,9 @@ def _make_measurement(
 class TestListMeasurementsForDeal:
     """Tests for GET /measurements/by-deal/{deal_id}."""
 
-    def test_empty_list(self) -> None:
+    def test_empty_list(self, container_with_store: ContainerAndStore) -> None:
         """Test listing measurements when none exist for deal."""
-        store = _InMemoryMeasurementStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get("/measurements/by-deal/deal-123")
 
@@ -113,13 +54,13 @@ class TestListMeasurementsForDeal:
         data = load_json_str(response.text)
         assert data == []
 
-    def test_list_with_measurements(self) -> None:
+    def test_list_with_measurements(self, container_with_store: ContainerAndStore) -> None:
         """Test listing measurements when some exist for deal."""
-        store = _InMemoryMeasurementStore()
+        store = container_with_store.store
         store.measurements.append(_make_measurement("deal-123", "total_debt", 5000000000))
         store.measurements.append(_make_measurement("deal-123", "ebitda", 1500000000))
         store.measurements.append(_make_measurement("other-deal", "revenue", 2000000000))
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get("/measurements/by-deal/deal-123")
 
@@ -131,10 +72,9 @@ class TestListMeasurementsForDeal:
 class TestListMeasurementsForDealAndPeriod:
     """Tests for GET /measurements/by-deal/{deal_id}/period."""
 
-    def test_empty_list(self) -> None:
+    def test_empty_list(self, container_with_store: ContainerAndStore) -> None:
         """Test listing measurements when none exist for period."""
-        store = _InMemoryMeasurementStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get(
             "/measurements/by-deal/deal-123/period",
@@ -145,9 +85,9 @@ class TestListMeasurementsForDealAndPeriod:
         data = load_json_str(response.text)
         assert data == []
 
-    def test_list_with_matching_period(self) -> None:
+    def test_list_with_matching_period(self, container_with_store: ContainerAndStore) -> None:
         """Test listing measurements for matching period."""
-        store = _InMemoryMeasurementStore()
+        store = container_with_store.store
         store.measurements.append(
             _make_measurement("deal-123", "total_debt", 5000000000, "2024-01-01", "2024-03-31")
         )
@@ -157,7 +97,7 @@ class TestListMeasurementsForDealAndPeriod:
         store.measurements.append(
             _make_measurement("deal-123", "revenue", 2000000000, "2024-04-01", "2024-06-30")
         )
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get(
             "/measurements/by-deal/deal-123/period",
@@ -172,10 +112,9 @@ class TestListMeasurementsForDealAndPeriod:
 class TestAddMeasurements:
     """Tests for POST /measurements."""
 
-    def test_add_measurements_success(self) -> None:
+    def test_add_measurements_success(self, container_with_store: ContainerAndStore) -> None:
         """Test adding new measurements."""
-        store = _InMemoryMeasurementStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.post(
             "/measurements",
@@ -200,26 +139,24 @@ class TestAddMeasurements:
         )
 
         assert response.status_code == 201
-        assert len(store.measurements) == 2
+        assert len(container_with_store.store.measurements) == 2
         data = narrow_json_to_dict(load_json_str(response.text))
         assert data["count"] == 2
 
-    def test_add_empty_measurements(self) -> None:
+    def test_add_empty_measurements(self, container_with_store: ContainerAndStore) -> None:
         """Test adding empty measurements list."""
-        store = _InMemoryMeasurementStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.post("/measurements", content=b"""{"measurements": []}""")
 
         assert response.status_code == 201
-        assert len(store.measurements) == 0
+        assert len(container_with_store.store.measurements) == 0
         data = narrow_json_to_dict(load_json_str(response.text))
         assert data["count"] == 0
 
-    def test_add_measurements_invalid_json(self) -> None:
+    def test_add_measurements_invalid_json(self, container_with_store: ContainerAndStore) -> None:
         """Test adding measurements with invalid JSON."""
-        store = _InMemoryMeasurementStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.post("/measurements", content=b"not valid json")
 

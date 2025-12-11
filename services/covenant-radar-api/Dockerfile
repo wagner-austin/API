@@ -64,7 +64,7 @@ FROM runtime-base AS api
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "exec hypercorn 'covenant_radar_api.main:create_app()' --bind [::]:${PORT:-8000}"]
+CMD ["sh", "-c", "exec hypercorn 'covenant_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
 
 # ---------- Worker target ----------
 FROM runtime-base AS worker

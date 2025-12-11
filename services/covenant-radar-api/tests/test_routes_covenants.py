@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Literal
 
 from covenant_domain import Covenant, CovenantId, DealId
-from covenant_persistence import CovenantRepository
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.json_utils import (
     load_json_str,
@@ -16,66 +15,13 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.api.routes.covenants import build_router
 
-
-class _InMemoryCovenantStore:
-    """In-memory storage for covenants."""
-
-    def __init__(self) -> None:
-        self.covenants: dict[str, Covenant] = {}
+from .conftest import ContainerAndStore
 
 
-class _InMemoryCovenantRepository:
-    """In-memory implementation of CovenantRepository for testing."""
-
-    def __init__(self, store: _InMemoryCovenantStore) -> None:
-        self._store = store
-
-    def create(self, covenant: Covenant) -> None:
-        """Insert new covenant. Raises on duplicate ID."""
-        cov_id = covenant["id"]["value"]
-        if cov_id in self._store.covenants:
-            raise ValueError(f"Covenant already exists: {cov_id}")
-        self._store.covenants[cov_id] = covenant
-
-    def get(self, covenant_id: CovenantId) -> Covenant:
-        """Get covenant by ID. Raises KeyError if not found."""
-        key = covenant_id["value"]
-        if key not in self._store.covenants:
-            raise KeyError(f"Covenant not found: {key}")
-        return self._store.covenants[key]
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[Covenant]:
-        """List all covenants for a deal."""
-        deal_key = deal_id["value"]
-        return [c for c in self._store.covenants.values() if c["deal_id"]["value"] == deal_key]
-
-    def delete(self, covenant_id: CovenantId) -> None:
-        """Delete covenant. Raises KeyError if not found."""
-        key = covenant_id["value"]
-        if key not in self._store.covenants:
-            raise KeyError(f"Covenant not found: {key}")
-        del self._store.covenants[key]
-
-
-class _TestContainer:
-    """Test container with in-memory covenant repository."""
-
-    def __init__(self, store: _InMemoryCovenantStore) -> None:
-        self._store = store
-
-    def covenant_repo(self) -> CovenantRepository:
-        """Return in-memory covenant repository."""
-        repo: CovenantRepository = _InMemoryCovenantRepository(self._store)
-        return repo
-
-
-def _create_test_client(store: _InMemoryCovenantStore) -> TestClient:
-    """Create test client with in-memory repository."""
-    from fastapi import FastAPI
-
+def _create_test_client(cas: ContainerAndStore) -> TestClient:
+    """Create test client with real container."""
     app = FastAPI()
-    container = _TestContainer(store)
-    router = build_router(container)
+    router = build_router(cas.container)
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
 
@@ -102,10 +48,9 @@ def _make_covenant(
 class TestListCovenantsForDeal:
     """Tests for GET /covenants/by-deal/{deal_id}."""
 
-    def test_empty_list(self) -> None:
+    def test_empty_list(self, container_with_store: ContainerAndStore) -> None:
         """Test listing covenants when none exist for deal."""
-        store = _InMemoryCovenantStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get("/covenants/by-deal/deal-123")
 
@@ -113,13 +58,14 @@ class TestListCovenantsForDeal:
         data = load_json_str(response.text)
         assert data == []
 
-    def test_list_with_covenants(self) -> None:
+    def test_list_with_covenants(self, container_with_store: ContainerAndStore) -> None:
         """Test listing covenants when some exist for deal."""
-        store = _InMemoryCovenantStore()
+        store = container_with_store.store
         store.covenants["c1"] = _make_covenant("c1", "deal-123", "Covenant One")
         store.covenants["c2"] = _make_covenant("c2", "deal-123", "Covenant Two")
         store.covenants["c3"] = _make_covenant("c3", "other-deal", "Other Covenant")
-        client = _create_test_client(store)
+        store._covenant_order.extend(["c1", "c2", "c3"])
+        client = _create_test_client(container_with_store)
 
         response = client.get("/covenants/by-deal/deal-123")
 
@@ -131,10 +77,9 @@ class TestListCovenantsForDeal:
 class TestCreateCovenant:
     """Tests for POST /covenants."""
 
-    def test_create_covenant_success(self) -> None:
+    def test_create_covenant_success(self, container_with_store: ContainerAndStore) -> None:
         """Test creating a new covenant."""
-        store = _InMemoryCovenantStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.post(
             "/covenants",
@@ -150,14 +95,13 @@ class TestCreateCovenant:
         )
 
         assert response.status_code == 201
-        assert "new-cov" in store.covenants
+        assert "new-cov" in container_with_store.store.covenants
         data = narrow_json_to_dict(load_json_str(response.text))
         assert data["name"] == "Debt to EBITDA"
 
-    def test_create_covenant_gte_direction(self) -> None:
+    def test_create_covenant_gte_direction(self, container_with_store: ContainerAndStore) -> None:
         """Test creating a covenant with >= direction."""
-        store = _InMemoryCovenantStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.post(
             "/covenants",
@@ -173,6 +117,7 @@ class TestCreateCovenant:
         )
 
         assert response.status_code == 201
+        store = container_with_store.store
         assert store.covenants["cov-gte"]["threshold_direction"] == ">="
         assert store.covenants["cov-gte"]["frequency"] == "ANNUAL"
 
@@ -180,11 +125,11 @@ class TestCreateCovenant:
 class TestGetCovenant:
     """Tests for GET /covenants/{covenant_id}."""
 
-    def test_get_existing_covenant(self) -> None:
+    def test_get_existing_covenant(self, container_with_store: ContainerAndStore) -> None:
         """Test getting an existing covenant."""
-        store = _InMemoryCovenantStore()
+        store = container_with_store.store
         store.covenants["c1"] = _make_covenant("c1", "deal-123", "Test Covenant")
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get("/covenants/c1")
 
@@ -192,10 +137,9 @@ class TestGetCovenant:
         data = narrow_json_to_dict(load_json_str(response.text))
         assert data["name"] == "Test Covenant"
 
-    def test_get_nonexistent_covenant(self) -> None:
+    def test_get_nonexistent_covenant(self, container_with_store: ContainerAndStore) -> None:
         """Test getting a covenant that doesn't exist."""
-        store = _InMemoryCovenantStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.get("/covenants/nonexistent")
 
@@ -205,21 +149,20 @@ class TestGetCovenant:
 class TestDeleteCovenant:
     """Tests for DELETE /covenants/{covenant_id}."""
 
-    def test_delete_existing_covenant(self) -> None:
+    def test_delete_existing_covenant(self, container_with_store: ContainerAndStore) -> None:
         """Test deleting an existing covenant."""
-        store = _InMemoryCovenantStore()
+        store = container_with_store.store
         store.covenants["c1"] = _make_covenant("c1", "deal-123")
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.delete("/covenants/c1")
 
         assert response.status_code == 204
         assert "c1" not in store.covenants
 
-    def test_delete_nonexistent_covenant(self) -> None:
+    def test_delete_nonexistent_covenant(self, container_with_store: ContainerAndStore) -> None:
         """Test deleting a covenant that doesn't exist."""
-        store = _InMemoryCovenantStore()
-        client = _create_test_client(store)
+        client = _create_test_client(container_with_store)
 
         response = client.delete("/covenants/nonexistent")
 

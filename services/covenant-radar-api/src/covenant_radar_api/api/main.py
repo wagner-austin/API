@@ -7,24 +7,27 @@ from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
 from platform_core.request_context import install_request_id_middleware
 
-from .api.routes import covenants as routes_covenants
-from .api.routes import deals as routes_deals
-from .api.routes import evaluate as routes_evaluate
-from .api.routes import health as routes_health
-from .api.routes import measurements as routes_measurements
-from .api.routes import ml as routes_ml
-from .core.container import ServiceContainer
+from ..core.config import Settings, settings_from_env
+from ..core.container import ServiceContainer
+from .routes import covenants as routes_covenants
+from .routes import deals as routes_deals
+from .routes import evaluate as routes_evaluate
+from .routes import health as routes_health
+from .routes import measurements as routes_measurements
+from .routes import ml as routes_ml
 
 
-def create_app(container: ServiceContainer) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Args:
-        container: Service container with all dependencies.
+        settings: Service settings. If None, reads from environment variables.
 
     Returns:
         Configured FastAPI application instance.
     """
+    cfg = settings or settings_from_env()
+    container = ServiceContainer.from_settings(cfg)
     setup_logging(
         level="INFO",
         format_mode="json",

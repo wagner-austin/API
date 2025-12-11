@@ -13,7 +13,6 @@ from typing import TypedDict
 from covenant_ml.predictor import load_model
 from covenant_ml.types import XGBModelProtocol
 from covenant_persistence import (
-    ConnectCallable,
     ConnectionProtocol,
     CovenantRepository,
     CovenantResultRepository,
@@ -25,8 +24,8 @@ from covenant_persistence import (
     PostgresMeasurementRepository,
 )
 from platform_core.queues import COVENANT_QUEUE
-from platform_workers.redis import RedisStrProto, redis_for_kv
-from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient, redis_raw_for_rq, rq_queue
+from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
 
 from . import _test_hooks
 from .config import Settings
@@ -38,29 +37,6 @@ class ModelInfo(TypedDict, total=True):
     model_id: str
     model_path: str
     is_loaded: bool
-
-
-def _get_psycopg_connect(dsn: str) -> ConnectionProtocol:
-    """Get database connection using psycopg with typed interface."""
-    if _test_hooks.connection_factory is not None:
-        return _test_hooks.connection_factory(dsn)
-    psycopg = __import__("psycopg")
-    connect_fn: ConnectCallable = psycopg.connect
-    return connect_fn(dsn)
-
-
-def _get_redis_for_kv(url: str) -> RedisStrProto:
-    """Get Redis client for key-value operations."""
-    if _test_hooks.redis_factory is not None:
-        return _test_hooks.redis_factory(url)
-    return redis_for_kv(url)
-
-
-def _get_redis_raw_for_rq(url: str) -> _RedisBytesClient:
-    """Get Redis client for RQ operations."""
-    if _test_hooks.redis_rq_factory is not None:
-        return _test_hooks.redis_rq_factory(url)
-    return redis_raw_for_rq(url)
 
 
 class ServiceContainer:
@@ -143,9 +119,9 @@ class ServiceContainer:
         Returns:
             Fully initialized service container.
         """
-        redis: RedisStrProto = _get_redis_for_kv(settings["redis_url"])
-        db_conn = _get_psycopg_connect(settings["database_url"])
-        redis_rq = _get_redis_raw_for_rq(settings["redis_url"])
+        redis: RedisStrProto = _test_hooks.kv_factory(settings["redis_url"])
+        db_conn = _test_hooks.connection_factory(settings["database_url"])
+        redis_rq = _test_hooks.rq_client_factory(settings["redis_url"])
         output_dir = model_output_dir if model_output_dir is not None else Path("./models")
         default_sector_encoder: dict[str, int] = (
             sector_encoder if sector_encoder is not None else {}
@@ -192,7 +168,7 @@ class ServiceContainer:
 
     def rq_queue(self: ServiceContainer) -> RQClientQueue:
         """Get RQ queue client for enqueueing jobs."""
-        return rq_queue(COVENANT_QUEUE, self._redis_rq)
+        return _test_hooks.queue_factory(COVENANT_QUEUE, self._redis_rq)
 
     def get_model(self: ServiceContainer) -> XGBModelProtocol:
         """Get the XGBoost model, loading it if necessary.

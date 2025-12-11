@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -19,152 +18,46 @@ from covenant_persistence import (
     CovenantResultRepository,
     DealRepository,
     MeasurementRepository,
+    PostgresCovenantResultRepository,
+    PostgresDealRepository,
+    PostgresMeasurementRepository,
 )
-from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
+from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+from platform_core.json_utils import (
+    InvalidJsonError,
+    JSONTypeError,
+    dump_json_str,
+    narrow_json_to_dict,
+    require_float,
+    require_int,
+    require_str,
+)
 
 from covenant_radar_api.worker.train_job import run_training
 
 
-class _InMemoryStore:
-    """In-memory storage for training test data."""
+class _TrainingProvider:
+    """Training data provider using InMemoryConnection."""
 
-    def __init__(self) -> None:
-        self.deals: dict[str, Deal] = {}
-        self.covenants: dict[str, Covenant] = {}
-        self.measurements: list[Measurement] = []
-        self.results: list[CovenantResult] = []
-
-
-class _InMemoryDealRepository:
-    """In-memory implementation of DealRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def create(self, deal: Deal) -> None:
-        """Insert new deal."""
-        deal_id = deal["id"]["value"]
-        self._store.deals[deal_id] = deal
-
-    def get(self, deal_id: DealId) -> Deal:
-        """Get deal by ID."""
-        key = deal_id["value"]
-        if key not in self._store.deals:
-            raise KeyError(f"Deal not found: {key}")
-        return self._store.deals[key]
-
-    def list_all(self) -> Sequence[Deal]:
-        """List all deals."""
-        return list(self._store.deals.values())
-
-    def update(self, deal: Deal) -> None:
-        """Update existing deal."""
-        key = deal["id"]["value"]
-        self._store.deals[key] = deal
-
-    def delete(self, deal_id: DealId) -> None:
-        """Delete deal."""
-        key = deal_id["value"]
-        del self._store.deals[key]
-
-
-class _InMemoryMeasurementRepository:
-    """In-memory implementation of MeasurementRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def add_many(self, measurements: Sequence[Measurement]) -> int:
-        """Insert measurements."""
-        for m in measurements:
-            self._store.measurements.append(m)
-        return len(measurements)
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[Measurement]:
-        """List all measurements for a deal."""
-        result: list[Measurement] = []
-        for m in self._store.measurements:
-            if m["deal_id"]["value"] == deal_id["value"]:
-                result.append(m)
-        return result
-
-    def list_for_deal_and_period(
-        self,
-        deal_id: DealId,
-        period_start_iso: str,
-        period_end_iso: str,
-    ) -> Sequence[Measurement]:
-        """List measurements for deal and period."""
-        result: list[Measurement] = []
-        for m in self._store.measurements:
-            if (
-                m["deal_id"]["value"] == deal_id["value"]
-                and m["period_start_iso"] == period_start_iso
-                and m["period_end_iso"] == period_end_iso
-            ):
-                result.append(m)
-        return result
-
-
-class _InMemoryCovenantResultRepository:
-    """In-memory implementation of CovenantResultRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def save(self, result: CovenantResult) -> None:
-        """Save result."""
-        self._store.results.append(result)
-
-    def save_many(self, results: Sequence[CovenantResult]) -> int:
-        """Save multiple results."""
-        for r in results:
-            self._store.results.append(r)
-        return len(results)
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[CovenantResult]:
-        """List results for a deal's covenants."""
-        cov_ids: set[str] = set()
-        for cov in self._store.covenants.values():
-            if cov["deal_id"]["value"] == deal_id["value"]:
-                cov_ids.add(cov["id"]["value"])
-        result: list[CovenantResult] = []
-        for r in self._store.results:
-            if r["covenant_id"]["value"] in cov_ids:
-                result.append(r)
-        return result
-
-    def list_for_covenant(self, covenant_id: CovenantId) -> Sequence[CovenantResult]:
-        """List results for a covenant."""
-        result: list[CovenantResult] = []
-        for r in self._store.results:
-            if r["covenant_id"]["value"] == covenant_id["value"]:
-                result.append(r)
-        return result
-
-
-class _TestTrainingProvider:
-    """Test training data provider with real data."""
-
-    def __init__(self, store: _InMemoryStore, output_dir: Path) -> None:
-        self._store = store
+    def __init__(self, store: InMemoryStore, output_dir: Path) -> None:
+        self._conn = InMemoryConnection(store)
         self._output_dir = output_dir
         self._sector_encoder: dict[str, int] = {"Technology": 0, "Finance": 1, "Healthcare": 2}
         self._region_encoder: dict[str, int] = {"North America": 0, "Europe": 1, "Asia": 2}
 
     def deal_repo(self) -> DealRepository:
-        """Return in-memory deal repository."""
-        repo: DealRepository = _InMemoryDealRepository(self._store)
+        """Return deal repository."""
+        repo: DealRepository = PostgresDealRepository(self._conn)
         return repo
 
     def measurement_repo(self) -> MeasurementRepository:
-        """Return in-memory measurement repository."""
-        repo: MeasurementRepository = _InMemoryMeasurementRepository(self._store)
+        """Return measurement repository."""
+        repo: MeasurementRepository = PostgresMeasurementRepository(self._conn)
         return repo
 
     def covenant_result_repo(self) -> CovenantResultRepository:
-        """Return in-memory result repository."""
-        repo: CovenantResultRepository = _InMemoryCovenantResultRepository(self._store)
+        """Return result repository."""
+        repo: CovenantResultRepository = PostgresCovenantResultRepository(self._conn)
         return repo
 
     def get_sector_encoder(self) -> dict[str, int]:
@@ -180,7 +73,7 @@ class _TestTrainingProvider:
         return self._output_dir
 
 
-def _add_deal(store: _InMemoryStore, deal_id: str, sector: str, region: str) -> None:
+def _add_deal(store: InMemoryStore, deal_id: str, sector: str, region: str) -> None:
     """Add a deal to store."""
     store.deals[deal_id] = Deal(
         id=DealId(value=deal_id),
@@ -192,9 +85,10 @@ def _add_deal(store: _InMemoryStore, deal_id: str, sector: str, region: str) -> 
         currency="USD",
         maturity_date_iso="2025-12-31",
     )
+    store._deal_order.append(deal_id)
 
 
-def _add_measurements_for_deal(store: _InMemoryStore, deal_id: str) -> None:
+def _add_measurements_for_deal(store: InMemoryStore, deal_id: str) -> None:
     """Add measurements for multiple periods for a deal."""
     periods = [
         ("2024-01-01", "2024-03-31"),
@@ -224,7 +118,7 @@ def _add_measurements_for_deal(store: _InMemoryStore, deal_id: str) -> None:
 
 
 def _add_covenant_results_for_deal(
-    store: _InMemoryStore, deal_id: str, cov_id: str, has_breach: bool
+    store: InMemoryStore, deal_id: str, cov_id: str, has_breach: bool
 ) -> None:
     """Add covenant and results for a deal."""
     store.covenants[cov_id] = Covenant(
@@ -236,9 +130,10 @@ def _add_covenant_results_for_deal(
         threshold_direction="<=",
         frequency="QUARTERLY",
     )
+    store._covenant_order.append(cov_id)
 
     status: Literal["OK", "NEAR_BREACH", "BREACH"] = "BREACH" if has_breach else "OK"
-    store.results.append(
+    store.covenant_results.append(
         CovenantResult(
             covenant_id=CovenantId(value=cov_id),
             period_start_iso="2024-01-01",
@@ -254,7 +149,7 @@ class TestRunTraining:
 
     def test_train_with_valid_data(self, tmp_path: Path) -> None:
         """Test training with valid training data produces a model."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
 
         # Add multiple deals with varying outcomes
         _add_deal(store, "d1", "Technology", "North America")
@@ -273,7 +168,7 @@ class TestRunTraining:
         _add_measurements_for_deal(store, "d4")
         _add_covenant_results_for_deal(store, "d4", "c4", has_breach=True)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = dump_json_str(
             {
                 "learning_rate": 0.1,
@@ -288,28 +183,30 @@ class TestRunTraining:
         result = run_training(config_json, provider)
 
         assert result["status"] == "complete"
-        assert "model_id" in result
-        assert isinstance(result["model_id"], str)
-        assert "model_path" in result
         assert result["samples_trained"] == 4
 
-        # Verify model file was created
+        # Verify model file was created and has valid path
         model_path = Path(str(result["model_path"]))
         assert model_path.exists()
         assert model_path.suffix == ".ubj"
 
-        # Verify config is returned
-        config = result["config"]
-        assert isinstance(config, dict)
-        assert config["learning_rate"] == 0.1
-        assert config["max_depth"] == 3
+        # Verify model_id is a valid UUID
+        model_id = require_str(result, "model_id")
+        import uuid
+
+        uuid.UUID(model_id)  # Raises ValueError if invalid
+
+        # Verify config is returned with correct values
+        config = narrow_json_to_dict(result["config"])
+        assert require_float(config, "learning_rate") == 0.1
+        assert require_int(config, "max_depth") == 3
 
     def test_train_with_no_data_raises(self, tmp_path: Path) -> None:
         """Test training with no data raises ValueError."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         # Empty store - no deals
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = dump_json_str(
             {
                 "learning_rate": 0.1,
@@ -326,12 +223,12 @@ class TestRunTraining:
 
     def test_train_with_invalid_config_raises(self, tmp_path: Path) -> None:
         """Test training with invalid config JSON raises."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_deal(store, "d1", "Technology", "North America")
         _add_measurements_for_deal(store, "d1")
         _add_covenant_results_for_deal(store, "d1", "c1", has_breach=False)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = "not valid json"
 
         with pytest.raises(InvalidJsonError):
@@ -339,12 +236,12 @@ class TestRunTraining:
 
     def test_train_with_missing_config_field_raises(self, tmp_path: Path) -> None:
         """Test training with missing config field raises."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_deal(store, "d1", "Technology", "North America")
         _add_measurements_for_deal(store, "d1")
         _add_covenant_results_for_deal(store, "d1", "c1", has_breach=False)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = dump_json_str({"learning_rate": 0.1})  # Missing other fields
 
         with pytest.raises(JSONTypeError, match="Missing required field"):
@@ -352,12 +249,12 @@ class TestRunTraining:
 
     def test_train_with_config_not_object_raises(self, tmp_path: Path) -> None:
         """Test training with config that is not a JSON object raises."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_deal(store, "d1", "Technology", "North America")
         _add_measurements_for_deal(store, "d1")
         _add_covenant_results_for_deal(store, "d1", "c1", has_breach=False)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = "[1, 2, 3]"  # JSON array, not object
 
         with pytest.raises(JSONTypeError, match="config must be a JSON object"):
@@ -365,7 +262,7 @@ class TestRunTraining:
 
     def test_train_skips_deals_without_measurements(self, tmp_path: Path) -> None:
         """Test training skips deals that have no measurements."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
 
         # Deal with measurements
         _add_deal(store, "d1", "Technology", "North America")
@@ -381,7 +278,7 @@ class TestRunTraining:
         _add_measurements_for_deal(store, "d3")
         _add_covenant_results_for_deal(store, "d3", "c3", has_breach=True)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = dump_json_str(
             {
                 "learning_rate": 0.1,
@@ -400,7 +297,7 @@ class TestRunTraining:
 
     def test_train_model_file_has_unique_name(self, tmp_path: Path) -> None:
         """Test that each training run produces a uniquely named model file."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_deal(store, "d1", "Technology", "North America")
         _add_measurements_for_deal(store, "d1")
         _add_covenant_results_for_deal(store, "d1", "c1", has_breach=False)
@@ -409,7 +306,7 @@ class TestRunTraining:
         _add_measurements_for_deal(store, "d2")
         _add_covenant_results_for_deal(store, "d2", "c2", has_breach=True)
 
-        provider = _TestTrainingProvider(store, tmp_path)
+        provider = _TrainingProvider(store, tmp_path)
         config_json = dump_json_str(
             {
                 "learning_rate": 0.1,

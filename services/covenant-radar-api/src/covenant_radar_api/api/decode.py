@@ -107,7 +107,7 @@ class TrainResponse(TypedDict, total=True):
     status: Literal["queued"]
 
 
-def _load_json_dict(body: bytes) -> JSONObject:
+def _parse_body_as_dict(body: bytes) -> JSONObject:
     """Parse request body as JSON dict. Raises on invalid JSON or non-dict."""
     raw = load_json_str(body.decode("utf-8"))
     if not isinstance(raw, dict):
@@ -121,7 +121,7 @@ def parse_deal_request(body: bytes) -> Deal:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return decode_deal(data)
 
 
@@ -131,7 +131,7 @@ def parse_deal_id_request(body: bytes) -> DealId:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return decode_deal_id(data)
 
 
@@ -141,7 +141,7 @@ def parse_update_deal_request(body: bytes, deal_id: DealId) -> Deal:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return Deal(
         id=deal_id,
         name=require_str(data, "name"),
@@ -160,7 +160,7 @@ def parse_covenant_request(body: bytes) -> Covenant:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return decode_covenant(data)
 
 
@@ -170,7 +170,7 @@ def parse_covenant_id_request(body: bytes) -> CovenantId:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return decode_covenant_id(data)
 
 
@@ -182,7 +182,7 @@ def parse_measurements_request(body: bytes) -> list[Measurement]:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     raw_list = require_list(data, "measurements")
     result: list[Measurement] = []
     for item in raw_list:
@@ -198,7 +198,7 @@ def parse_evaluate_request(body: bytes) -> EvaluateRequest:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return EvaluateRequest(
         deal_id=require_str(data, "deal_id"),
         period_start_iso=require_str(data, "period_start_iso"),
@@ -213,7 +213,7 @@ def parse_predict_request(body: bytes) -> PredictRequest:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return PredictRequest(deal_id=require_str(data, "deal_id"))
 
 
@@ -223,7 +223,7 @@ def parse_train_request(body: bytes) -> TrainConfig:
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
-    data = _load_json_dict(body)
+    data = _parse_body_as_dict(body)
     return TrainConfig(
         learning_rate=require_float(data, "learning_rate"),
         max_depth=require_int(data, "max_depth"),

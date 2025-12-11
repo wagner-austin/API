@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Literal
 
 import pytest
 from covenant_domain import (
     Covenant,
     CovenantId,
-    CovenantResult,
     DealId,
     Measurement,
 )
@@ -17,152 +15,47 @@ from covenant_persistence import (
     CovenantRepository,
     CovenantResultRepository,
     MeasurementRepository,
+    PostgresCovenantRepository,
+    PostgresCovenantResultRepository,
+    PostgresMeasurementRepository,
 )
-from platform_core.json_utils import JSONTypeError, dump_json_str
+from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+from platform_core.json_utils import (
+    JSONTypeError,
+    dump_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_list,
+    require_int,
+    require_str,
+)
 
 from covenant_radar_api.worker.evaluate_job import run_batch_evaluation
 
 
-class _InMemoryStore:
-    """In-memory storage for evaluation test data."""
+class _RepoProvider:
+    """Repository provider using InMemoryConnection for batch evaluation tests."""
 
-    def __init__(self) -> None:
-        self.covenants: dict[str, Covenant] = {}
-        self.measurements: list[Measurement] = []
-        self.results: list[CovenantResult] = []
-
-
-class _InMemoryCovenantRepository:
-    """In-memory implementation of CovenantRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def create(self, covenant: Covenant) -> None:
-        """Insert new covenant."""
-        cov_id = covenant["id"]["value"]
-        self._store.covenants[cov_id] = covenant
-
-    def get(self, covenant_id: CovenantId) -> Covenant:
-        """Get covenant by ID."""
-        key = covenant_id["value"]
-        if key not in self._store.covenants:
-            raise KeyError(f"Covenant not found: {key}")
-        return self._store.covenants[key]
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[Covenant]:
-        """List covenants for a deal."""
-        result: list[Covenant] = []
-        for cov in self._store.covenants.values():
-            if cov["deal_id"]["value"] == deal_id["value"]:
-                result.append(cov)
-        return result
-
-    def delete(self, covenant_id: CovenantId) -> None:
-        """Delete covenant."""
-        key = covenant_id["value"]
-        del self._store.covenants[key]
-
-
-class _InMemoryMeasurementRepository:
-    """In-memory implementation of MeasurementRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def add_many(self, measurements: Sequence[Measurement]) -> int:
-        """Insert measurements."""
-        for m in measurements:
-            self._store.measurements.append(m)
-        return len(measurements)
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[Measurement]:
-        """List all measurements for a deal."""
-        result: list[Measurement] = []
-        for m in self._store.measurements:
-            if m["deal_id"]["value"] == deal_id["value"]:
-                result.append(m)
-        return result
-
-    def list_for_deal_and_period(
-        self,
-        deal_id: DealId,
-        period_start_iso: str,
-        period_end_iso: str,
-    ) -> Sequence[Measurement]:
-        """List measurements for deal and period."""
-        result: list[Measurement] = []
-        for m in self._store.measurements:
-            if (
-                m["deal_id"]["value"] == deal_id["value"]
-                and m["period_start_iso"] == period_start_iso
-                and m["period_end_iso"] == period_end_iso
-            ):
-                result.append(m)
-        return result
-
-
-class _InMemoryCovenantResultRepository:
-    """In-memory implementation of CovenantResultRepository."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
-
-    def save(self, result: CovenantResult) -> None:
-        """Save result."""
-        self._store.results.append(result)
-
-    def save_many(self, results: Sequence[CovenantResult]) -> int:
-        """Save multiple results."""
-        for r in results:
-            self._store.results.append(r)
-        return len(results)
-
-    def list_for_deal(self, deal_id: DealId) -> Sequence[CovenantResult]:
-        """List results for a deal's covenants."""
-        cov_ids: set[str] = set()
-        for cov in self._store.covenants.values():
-            if cov["deal_id"]["value"] == deal_id["value"]:
-                cov_ids.add(cov["id"]["value"])
-        result: list[CovenantResult] = []
-        for r in self._store.results:
-            if r["covenant_id"]["value"] in cov_ids:
-                result.append(r)
-        return result
-
-    def list_for_covenant(self, covenant_id: CovenantId) -> Sequence[CovenantResult]:
-        """List results for a covenant."""
-        result: list[CovenantResult] = []
-        for r in self._store.results:
-            if r["covenant_id"]["value"] == covenant_id["value"]:
-                result.append(r)
-        return result
-
-
-class _TestRepoProvider:
-    """Test repository provider for batch evaluation."""
-
-    def __init__(self, store: _InMemoryStore) -> None:
-        self._store = store
+    def __init__(self, store: InMemoryStore) -> None:
+        self._conn = InMemoryConnection(store)
 
     def covenant_repo(self) -> CovenantRepository:
-        """Return in-memory covenant repository."""
-        repo: CovenantRepository = _InMemoryCovenantRepository(self._store)
+        """Return covenant repository."""
+        repo: CovenantRepository = PostgresCovenantRepository(self._conn)
         return repo
 
     def measurement_repo(self) -> MeasurementRepository:
-        """Return in-memory measurement repository."""
-        repo: MeasurementRepository = _InMemoryMeasurementRepository(self._store)
+        """Return measurement repository."""
+        repo: MeasurementRepository = PostgresMeasurementRepository(self._conn)
         return repo
 
     def covenant_result_repo(self) -> CovenantResultRepository:
-        """Return in-memory result repository."""
-        repo: CovenantResultRepository = _InMemoryCovenantResultRepository(self._store)
+        """Return result repository."""
+        repo: CovenantResultRepository = PostgresCovenantResultRepository(self._conn)
         return repo
 
 
 def _add_covenant(
-    store: _InMemoryStore,
+    store: InMemoryStore,
     cov_id: str,
     deal_id: str,
     formula: str,
@@ -179,10 +72,11 @@ def _add_covenant(
         threshold_direction=direction,
         frequency="QUARTERLY",
     )
+    store._covenant_order.append(cov_id)
 
 
 def _add_measurement(
-    store: _InMemoryStore,
+    store: InMemoryStore,
     deal_id: str,
     period_start: str,
     period_end: str,
@@ -206,12 +100,12 @@ class TestRunBatchEvaluation:
 
     def test_evaluate_single_deal_single_covenant(self) -> None:
         """Test batch evaluation with one deal and one covenant."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_covenant(store, "c1", "d1", "debt / ebitda", 4_000_000, "<=")
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "debt", 10_000_000)
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "ebitda", 5_000_000)
 
-        provider = _TestRepoProvider(store)
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str(["d1"])
 
         result = run_batch_evaluation(
@@ -225,16 +119,19 @@ class TestRunBatchEvaluation:
         assert result["status"] == "complete"
         assert result["deals_evaluated"] == 1
         assert result["results_count"] == 1
-        assert isinstance(result["results"], list)
-        assert len(result["results"]) == 1
+        results_list = narrow_json_to_list(result["results"])
+        assert len(results_list) == 1
+        first_result = narrow_json_to_dict(results_list[0])
+        covenant_id = narrow_json_to_dict(first_result["covenant_id"])
+        assert require_str(covenant_id, "value") == "c1"
 
         # Verify result was saved
-        assert len(store.results) == 1
-        assert store.results[0]["status"] == "OK"
+        assert len(store.covenant_results) == 1
+        assert store.covenant_results[0]["status"] == "OK"
 
     def test_evaluate_multiple_deals(self) -> None:
         """Test batch evaluation with multiple deals."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
 
         # Deal 1 - will pass
         _add_covenant(store, "c1", "d1", "debt / ebitda", 4_000_000, "<=")
@@ -246,7 +143,7 @@ class TestRunBatchEvaluation:
         _add_measurement(store, "d2", "2024-01-01", "2024-03-31", "debt", 20_000_000)
         _add_measurement(store, "d2", "2024-01-01", "2024-03-31", "ebitda", 5_000_000)
 
-        provider = _TestRepoProvider(store)
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str(["d1", "d2"])
 
         result = run_batch_evaluation(
@@ -260,23 +157,23 @@ class TestRunBatchEvaluation:
         assert result["status"] == "complete"
         assert result["deals_evaluated"] == 2
         assert result["results_count"] == 2
-        assert len(store.results) == 2
+        assert len(store.covenant_results) == 2
 
         # Check both results were saved with correct statuses
-        statuses = {r["status"] for r in store.results}
+        statuses = {r["status"] for r in store.covenant_results}
         assert "OK" in statuses
         assert "BREACH" in statuses
 
     def test_evaluate_deal_with_multiple_covenants(self) -> None:
         """Test batch evaluation with one deal having multiple covenants."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_covenant(store, "c1", "d1", "debt / ebitda", 4_000_000, "<=")
         _add_covenant(store, "c2", "d1", "ebitda / interest", 2_000_000, ">=")
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "debt", 10_000_000)
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "ebitda", 5_000_000)
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "interest", 1_000_000)
 
-        provider = _TestRepoProvider(store)
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str(["d1"])
 
         result = run_batch_evaluation(
@@ -288,12 +185,12 @@ class TestRunBatchEvaluation:
         )
 
         assert result["results_count"] == 2
-        assert len(store.results) == 2
+        assert len(store.covenant_results) == 2
 
     def test_evaluate_empty_deal_list(self) -> None:
         """Test batch evaluation with empty deal list."""
-        store = _InMemoryStore()
-        provider = _TestRepoProvider(store)
+        store = InMemoryStore()
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str([])
 
         result = run_batch_evaluation(
@@ -307,15 +204,15 @@ class TestRunBatchEvaluation:
         assert result["status"] == "complete"
         assert result["deals_evaluated"] == 0
         assert result["results_count"] == 0
-        assert len(store.results) == 0
+        assert len(store.covenant_results) == 0
 
     def test_evaluate_deal_with_no_covenants(self) -> None:
         """Test batch evaluation with deal that has no covenants."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         # No covenants for d1
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "debt", 10_000_000)
 
-        provider = _TestRepoProvider(store)
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str(["d1"])
 
         result = run_batch_evaluation(
@@ -331,8 +228,8 @@ class TestRunBatchEvaluation:
 
     def test_evaluate_invalid_deal_id_type_raises(self) -> None:
         """Test that non-string deal IDs raise JSONTypeError."""
-        store = _InMemoryStore()
-        provider = _TestRepoProvider(store)
+        store = InMemoryStore()
+        provider = _RepoProvider(store)
         # JSON with integer instead of string
         deal_ids_json = "[123]"
 
@@ -347,12 +244,12 @@ class TestRunBatchEvaluation:
 
     def test_evaluate_results_contain_encoded_data(self) -> None:
         """Test that results contain properly encoded covenant result data."""
-        store = _InMemoryStore()
+        store = InMemoryStore()
         _add_covenant(store, "c1", "d1", "debt / ebitda", 4_000_000, "<=")
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "debt", 10_000_000)
         _add_measurement(store, "d1", "2024-01-01", "2024-03-31", "ebitda", 5_000_000)
 
-        provider = _TestRepoProvider(store)
+        provider = _RepoProvider(store)
         deal_ids_json = dump_json_str(["d1"])
 
         result = run_batch_evaluation(
@@ -363,11 +260,12 @@ class TestRunBatchEvaluation:
             repo_provider=provider,
         )
 
-        assert isinstance(result["results"], list)
-        encoded_result = result["results"][0]
-        assert isinstance(encoded_result, dict)
-        # Check encoded structure has expected keys
-        assert "covenant_id" in encoded_result
-        assert "period_start_iso" in encoded_result
-        assert "status" in encoded_result
-        assert "calculated_value_scaled" in encoded_result
+        results_list = narrow_json_to_list(result["results"])
+        assert len(results_list) == 1
+        encoded_result = narrow_json_to_dict(results_list[0])
+        # Check encoded structure has expected values
+        covenant_id = narrow_json_to_dict(encoded_result["covenant_id"])
+        assert require_str(covenant_id, "value") == "c1"
+        assert require_str(encoded_result, "period_start_iso") == "2024-01-01"
+        assert require_str(encoded_result, "status") == "OK"
+        assert require_int(encoded_result, "calculated_value_scaled") == 2_000_000

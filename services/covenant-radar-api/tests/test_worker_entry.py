@@ -5,10 +5,11 @@ from __future__ import annotations
 import pytest
 from platform_core.job_events import default_events_channel
 from platform_core.queues import COVENANT_QUEUE
+from platform_core.testing import make_fake_env
 from platform_workers.rq_harness import WorkerConfig
 
-from covenant_radar_api.worker import _test_hooks
-from covenant_radar_api.worker.worker_entry import (
+from covenant_radar_api import _test_hooks
+from covenant_radar_api.worker_entry import (
     _build_config,
     _get_default_runner,
     _run_worker,
@@ -38,9 +39,10 @@ class _RecordingRunner:
         self.configs.append(config)
 
 
-def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_reads_env() -> None:
     """Test _build_config reads REDIS_URL and uses COVENANT_QUEUE."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-host:6379/0")
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test-host:6379/0")
 
     cfg = _build_config()
 
@@ -49,9 +51,10 @@ def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["events_channel"] == default_events_channel("covenant")
 
 
-def test_build_config_requires_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_requires_redis_url() -> None:
     """Test _build_config raises when REDIS_URL is missing."""
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    env = make_fake_env()
+    _ = env  # No REDIS_URL set
 
     with pytest.raises(RuntimeError, match="REDIS_URL"):
         _build_config()
@@ -102,11 +105,10 @@ def test_main_with_injected_dependencies() -> None:
     assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def test_main_builds_config_from_env_when_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_builds_config_from_env_when_not_provided() -> None:
     """Test main() builds config from environment when not provided."""
-    monkeypatch.setenv("REDIS_URL", "redis://from-env:6379/0")
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://from-env:6379/0")
 
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -121,14 +123,33 @@ def test_main_builds_config_from_env_when_not_provided(
 
 def test_worker_entry_module_exports() -> None:
     """Test worker_entry module exports expected symbols."""
-    import covenant_radar_api.worker.worker_entry as entry
+    import covenant_radar_api.worker_entry as entry
 
-    assert hasattr(entry, "main")
-    assert hasattr(entry, "_build_config")
-    assert hasattr(entry, "_get_default_runner")
-    assert hasattr(entry, "_run_worker")
-    assert hasattr(entry, "LoggerProtocol")
-    assert hasattr(entry, "WorkerRunnerProtocol")
+    # Verify main is callable
+    assert callable(entry.main)
+
+    # Verify _build_config returns WorkerConfig with required keys
+    from platform_core.testing import make_fake_env
+
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test-export:6379/0")
+    cfg = entry._build_config()
+    assert "redis_url" in cfg
+    assert "queue_name" in cfg
+
+    # Verify _get_default_runner returns a callable
+    assert callable(entry._get_default_runner())
+
+    # Verify LoggerProtocol defines info method - call it on a test instance
+    class _TestLogger:
+        def info(self, message: str, *, extra: dict[str, str]) -> None:
+            pass
+
+    test_logger: entry.LoggerProtocol = _TestLogger()
+    test_logger.info("test", extra={"key": "value"})  # Should work if protocol is correct
+
+    # Verify WorkerRunnerProtocol is callable (has __call__)
+    assert "__call__" in dir(entry.WorkerRunnerProtocol)
 
 
 def test_get_default_runner_returns_test_runner_when_set() -> None:
@@ -137,12 +158,9 @@ def test_get_default_runner_returns_test_runner_when_set() -> None:
     def _custom_runner(config: WorkerConfig) -> None:
         pass
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _custom_runner
 
     result = _get_default_runner()
-
-    _test_hooks.test_runner = original
 
     assert result is _custom_runner
 
@@ -151,21 +169,17 @@ def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> Non
     """Test _get_default_runner returns run_rq_worker when test_runner is None."""
     from platform_workers.rq_harness import run_rq_worker
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = None
 
     result = _get_default_runner()
 
-    _test_hooks.test_runner = original
-
     assert result is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_uses_test_runner_when_set() -> None:
     """Test main() uses test_runner when set in _test_hooks."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-runner:6379/0")
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test-runner:6379/0")
 
     received_configs: list[WorkerConfig] = []
 
@@ -173,21 +187,17 @@ def test_main_uses_test_runner_when_set(
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
-
-    # Restore
-    _test_hooks.test_runner = original
 
     assert len(received_configs) == 1
     assert received_configs[0]["redis_url"] == "redis://test-runner:6379/0"
     assert received_configs[0]["queue_name"] == COVENANT_QUEUE
 
 
-def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
@@ -196,7 +206,8 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     import runpy
     import sys
 
-    monkeypatch.setenv("REDIS_URL", "redis://runpy-guard-test:6379/0")
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://runpy-guard-test:6379/0")
 
     received_configs: list[WorkerConfig] = []
 
@@ -204,12 +215,11 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution
-    module_name = "covenant_radar_api.worker.worker_entry"
+    module_name = "covenant_radar_api.worker_entry"
     saved_module = sys.modules.pop(module_name, None)
 
     # Run the module as __main__ - this executes line 95-96
@@ -222,9 +232,6 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     # Restore module to sys.modules if it was there before
     if saved_module is not None:
         sys.modules[module_name] = saved_module
-
-    # Restore test runner
-    _test_hooks.test_runner = original
 
     # The guard should have been triggered, calling main()
     assert len(received_configs) == 1
