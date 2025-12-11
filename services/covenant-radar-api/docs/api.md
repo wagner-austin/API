@@ -506,7 +506,7 @@ Add financial measurements for deals.
 }
 ```
 
-**Response (200):**
+**Response (201):**
 ```json
 {
   "count": 2
@@ -613,9 +613,9 @@ Predict breach risk for a deal.
 
 | Tier | Probability Range |
 |------|-------------------|
-| `LOW` | 0.0 - 0.33 |
-| `MEDIUM` | 0.33 - 0.66 |
-| `HIGH` | 0.66 - 1.0 |
+| `LOW` | 0.0 - 0.3 |
+| `MEDIUM` | 0.3 - 0.7 |
+| `HIGH` | 0.7 - 1.0 |
 
 ---
 
