@@ -28,16 +28,16 @@ poetry install --with dev
 
 ```bash
 # Development
-poetry run hypercorn qr_api.asgi:app --bind 0.0.0.0:8080 --reload
+poetry run hypercorn qr_api.asgi:app --bind 0.0.0.0:8000 --reload
 
 # Production
-poetry run hypercorn qr_api.asgi:app --bind [::]:${PORT:-8080}
+poetry run hypercorn qr_api.asgi:app --bind [::]:${PORT:-8000}
 ```
 
 ### Verify
 
 ```bash
-curl http://localhost:8080/healthz
+curl http://localhost:8000/healthz
 # {"status": "ok"}
 ```
 
@@ -50,6 +50,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe (checks Redis) |
 | `/v1/qr` | POST | Generate QR code PNG from URL |
 
 ---
@@ -60,7 +61,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `PORT` | int | `8080` | Server port |
+| `PORT` | int | `8000` | Server port |
+| `REDIS_URL` | string | - | Redis connection URL (required for /readyz) |
 | `QR_DEFAULT_ERROR_CORRECTION` | string | `"M"` | Default ECC level (L/M/Q/H) |
 | `QR_DEFAULT_BOX_SIZE` | int | `10` | Default pixels per module (5-20) |
 | `QR_DEFAULT_BORDER` | int | `1` | Default quiet zone width (1-10) |
