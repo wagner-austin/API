@@ -16,12 +16,9 @@ class LoggingRule:
     _pat_from_logging = re.compile(r"^\s*from\s+logging\s+import\s+(?P<imports>.+)$")
 
     # Paths that may use low-level stdlib logging for multiprocessing queue handlers.
-    # These need access to logging.handlers.QueueHandler/QueueListener for IPC logging.
-    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset(
-        [
-            "services/handwriting-ai/src/handwriting_ai/training/calibration/runner.py",
-        ]
-    )
+    # Queue handler/listener types are now in platform_core.logging, so this list
+    # should remain empty. Services import from platform_core.logging instead.
+    _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset()
 
     def _should_skip_file(self, path: Path) -> bool:
         """Check if file should be skipped from logging checks."""
