@@ -331,10 +331,24 @@ Score text using a trained model (calculate perplexity/loss).
   "request_id": "uuid",
   "status": "queued",
   "loss": null,
-  "ppl": null,
-  "per_position": null
+  "perplexity": null,
+  "surprisal": null,
+  "topk": null,
+  "tokens": null
 }
 ```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `request_id` | string | Request identifier |
+| `status` | string | `queued`, `running`, `completed`, `failed` |
+| `loss` | float\|null | Cross-entropy loss |
+| `perplexity` | float\|null | Perplexity score |
+| `surprisal` | float[]\|null | Per-position surprisal values |
+| `topk` | array\|null | Top-K tokens per position |
+| `tokens` | string[]\|null | Tokenized input |
 
 ---
 
@@ -348,8 +362,10 @@ Get scoring result.
   "request_id": "uuid",
   "status": "completed",
   "loss": 2.34,
-  "ppl": 10.4,
-  "per_position": null
+  "perplexity": 10.4,
+  "surprisal": [2.1, 3.2, 1.8],
+  "topk": null,
+  "tokens": ["Hello", ",", " world"]
 }
 ```
 
