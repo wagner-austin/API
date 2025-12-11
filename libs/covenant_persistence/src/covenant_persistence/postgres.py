@@ -51,8 +51,8 @@ class PostgresDealRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, name, borrower, sector, region,
-                   commitment_amount_cents, currency, maturity_date
+            SELECT id::text, name, borrower, sector, region,
+                   commitment_amount_cents, currency, maturity_date::text
             FROM deals WHERE id = %s
             """,
             (deal_id["value"],),
@@ -67,8 +67,8 @@ class PostgresDealRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, name, borrower, sector, region,
-                   commitment_amount_cents, currency, maturity_date
+            SELECT id::text, name, borrower, sector, region,
+                   commitment_amount_cents, currency, maturity_date::text
             FROM deals ORDER BY created_at DESC
             """
         )
@@ -141,7 +141,7 @@ class PostgresCovenantRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, deal_id, name, formula,
+            SELECT id::text, deal_id::text, name, formula,
                    threshold_value_scaled, threshold_direction, frequency
             FROM covenants WHERE id = %s
             """,
@@ -157,7 +157,7 @@ class PostgresCovenantRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, deal_id, name, formula,
+            SELECT id::text, deal_id::text, name, formula,
                    threshold_value_scaled, threshold_direction, frequency
             FROM covenants WHERE deal_id = %s ORDER BY created_at DESC
             """,
@@ -217,7 +217,8 @@ class PostgresMeasurementRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT deal_id, period_start, period_end, metric_name, metric_value_scaled
+            SELECT deal_id::text, period_start::text, period_end::text,
+                   metric_name, metric_value_scaled
             FROM measurements
             WHERE deal_id = %s AND period_start = %s AND period_end = %s
             ORDER BY metric_name
@@ -232,7 +233,8 @@ class PostgresMeasurementRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT deal_id, period_start, period_end, metric_name, metric_value_scaled
+            SELECT deal_id::text, period_start::text, period_end::text,
+                   metric_name, metric_value_scaled
             FROM measurements WHERE deal_id = %s
             ORDER BY period_start DESC, metric_name
             """,
@@ -286,7 +288,7 @@ class PostgresCovenantResultRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT cr.covenant_id, cr.period_start, cr.period_end,
+            SELECT cr.covenant_id::text, cr.period_start::text, cr.period_end::text,
                    cr.calculated_value_scaled, cr.status
             FROM covenant_results cr
             JOIN covenants c ON cr.covenant_id = c.id
@@ -303,7 +305,7 @@ class PostgresCovenantResultRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT covenant_id, period_start, period_end,
+            SELECT covenant_id::text, period_start::text, period_end::text,
                    calculated_value_scaled, status
             FROM covenant_results WHERE covenant_id = %s
             ORDER BY period_start DESC
