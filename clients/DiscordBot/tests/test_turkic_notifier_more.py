@@ -8,10 +8,9 @@ from platform_core.job_events import JobEventV1
 from platform_discord.discord_types import Embed as EmbedType
 from platform_discord.embed_helpers import EmbedData, EmbedFieldData
 from platform_discord.subscriber import MessageSource
-from platform_discord.task_runner import TaskRunner
-from tests.support.discord_fakes import FakeBot
 
 from clubbot.services.jobs.turkic_notifier import TurkicEventSubscriber
+from tests.support.discord_fakes import FakeBot, FakeMessageSource
 
 
 class _FakeSource(MessageSource):
@@ -131,12 +130,28 @@ async def test_turkic_notifier_runner_on_done_handles_exception() -> None:
 
 @pytest.mark.asyncio
 async def test_turkic_notifier_stop_without_task_closes_source() -> None:
-    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
-    # inject a source and ensure stop closes it when no task
-    src = _FakeSource()
-    object.__setattr__(sub, "_source", src)
+    """Test that stop closes source when task is not running."""
+    captured: list[FakeMessageSource] = []
+
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
+
+    sub = TurkicEventSubscriber(
+        bot=FakeBot(),
+        redis_url="redis://x",
+        source_factory=_factory,
+    )
+    # Start to create source, then stop immediately
+    sub.start()
+    await asyncio.sleep(0)
     await sub.stop()
-    assert src.closed is True
+
+    # Source should be closed
+    assert len(captured) == 1
+    assert captured[0].closed is True
 
 
 @pytest.mark.asyncio
@@ -147,17 +162,25 @@ async def test_turkic_notifier_maybe_notify_noop_when_no_embed() -> None:
 
 @pytest.mark.asyncio
 async def test_turkic_notifier_run_with_existing_subscriber() -> None:
-    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
-    called = {"n": 0}
+    """Test that _run() invokes run_once on the runner."""
+    captured: list[FakeMessageSource] = []
 
-    async def _once(self: TaskRunner) -> None:
-        called["n"] += 1
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
 
-    from platform_discord.task_runner import TaskRunner
-
-    monkeypatch = pytest.MonkeyPatch()  # local monkeypatch for binding
-    monkeypatch.setattr(TaskRunner, "run_once", _once, raising=True)
+    sub = TurkicEventSubscriber(
+        bot=FakeBot(),
+        redis_url="redis://x",
+        source_factory=_factory,
+    )
+    # Call _run() which should call run_once internally
     await sub._run()
+
+    # Source should have been created during run_once
+    assert len(captured) == 1
 
 
 @pytest.mark.asyncio

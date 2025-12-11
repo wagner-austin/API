@@ -4,8 +4,10 @@ import pytest
 from discord.ext import commands
 from platform_discord.embed_helpers import EmbedProto
 from platform_discord.protocols import FileProto, MessageProto, UserProto
+from tests.support.settings import build_settings
 
 import clubbot.cogs.transcript as mod
+from clubbot import _test_hooks
 
 
 class _Msg(MessageProto):
@@ -52,9 +54,12 @@ class _Bot(commands.Cog):
 
 
 @pytest.mark.asyncio
-async def test_setup_adds_cog_with_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TRANSCRIPT_PROVIDER", "api")
-    monkeypatch.setenv("TRANSCRIPT_API_URL", "http://localhost:8000")
+async def test_setup_adds_cog_with_env() -> None:
+    # Use hook to inject test settings instead of monkeypatch.setenv
+    _test_hooks.load_settings = lambda: build_settings(
+        transcript_provider="api",
+        transcript_api_url="http://localhost:8000",
+    )
     bot = _Bot()
     await mod.setup(bot)
     assert bot.added and bot.added[-1].__class__.__name__ == "TranscriptCog"

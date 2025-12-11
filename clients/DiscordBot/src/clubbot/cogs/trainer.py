@@ -5,14 +5,14 @@ from discord import app_commands
 from platform_core.errors import AppError, ErrorCode
 from platform_core.job_events import default_events_channel
 from platform_core.logging import get_logger
-from platform_core.model_trainer_client import HTTPModelTrainerClient, ModelTrainerAPIError
+from platform_core.model_trainer_client import ModelTrainerAPIError
 from platform_discord.embed_helpers import add_field, create_embed, set_footer
-from platform_discord.protocols import InteractionProto, UserProto, wrap_interaction
+from platform_discord.protocols import InteractionProto, UserProto
 from platform_discord.rate_limiter import RateLimiter
 
+from .. import _test_hooks
 from ..cogs.base import BaseCog, _BotProto
 from ..config import DiscordbotSettings
-from ..services.jobs.trainer_notifier import TrainerEventSubscriber
 
 
 class TrainerCog(BaseCog):
@@ -29,7 +29,7 @@ class TrainerCog(BaseCog):
         rl = int(self.config["model_trainer"]["rate_limit"])
         window = int(self.config["model_trainer"]["rate_window_seconds"])
         self.rate_limiter = RateLimiter(rl, window)
-        self._subscriber: TrainerEventSubscriber | None = None
+        self._subscriber: _test_hooks.TrainerEventSubscriberLike | None = None
         self._autostart_subscriber = autostart_subscriber
         if self._autostart_subscriber:
             b = self.bot
@@ -37,7 +37,7 @@ class TrainerCog(BaseCog):
                 redis_url = (self.config["redis"]["redis_url"] or "").strip()
                 if redis_url:
                     channel = default_events_channel("trainer")
-                    self._subscriber = TrainerEventSubscriber(
+                    self._subscriber = _test_hooks.trainer_event_subscriber_factory(
                         bot=b, redis_url=redis_url, events_channel=channel
                     )
                     self._subscriber.start()
@@ -52,13 +52,13 @@ class TrainerCog(BaseCog):
         if sub is not None:
             sub.start()
 
-    def _mk_client(self) -> HTTPModelTrainerClient:
+    def _mk_client(self) -> _test_hooks.TrainerApiClientLike:
         base = (self.config["model_trainer"]["api_url"] or "").strip()
         if not base:
             raise AppError(
                 ErrorCode.INVALID_INPUT, "Model Trainer API is not configured", http_status=400
             )
-        return HTTPModelTrainerClient(
+        return _test_hooks.trainer_api_client_factory(
             base_url=base,
             api_key=(self.config["model_trainer"]["api_key"] or None),
             timeout_seconds=int(self.config["model_trainer"]["api_timeout_seconds"]),
@@ -89,7 +89,7 @@ class TrainerCog(BaseCog):
         corpus_path: str,
         tokenizer_id: str,
     ) -> None:
-        wrapped: InteractionProto = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         await self._train_model_impl(
             wrapped,
             model_family=model_family,

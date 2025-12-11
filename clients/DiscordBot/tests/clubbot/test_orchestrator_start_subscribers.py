@@ -5,6 +5,7 @@ import logging
 from discord.ext import commands
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator
 from clubbot.services.qr.client import QRService
@@ -24,24 +25,28 @@ def test_orchestrator_starts_background_subscribers() -> None:
     cfg = build_settings()
     cont = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(cont)
-    bot = orch.build_bot()
+    _ = orch.build_bot()
 
     dg = _Cog()
     tr = _Cog()
 
-    original_get_cog = bot.get_cog
-
-    def fake_get_cog(name: str) -> commands.Cog | None:
+    def fake_get_cog(name: str) -> _test_hooks.CogLike | None:
         if name == "DigitsCog":
-            return dg
+            result: _test_hooks.CogLike = dg
+            return result
         if name == "TrainerCog":
-            return tr
-        return original_get_cog(name)
+            result2: _test_hooks.CogLike = tr
+            return result2
+        return None
 
-    object.__setattr__(bot, "get_cog", fake_get_cog)
-    orch.start_background_subscribers()
-    assert dg.n == 1
-    assert tr.n == 1
+    original = _test_hooks.orchestrator_get_cog_override
+    _test_hooks.orchestrator_get_cog_override = fake_get_cog
+    try:
+        orch.start_background_subscribers()
+        assert dg.n == 1
+        assert tr.n == 1
+    finally:
+        _test_hooks.orchestrator_get_cog_override = original
 
 
 logger = logging.getLogger(__name__)

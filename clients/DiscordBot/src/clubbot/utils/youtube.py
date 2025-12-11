@@ -4,6 +4,8 @@ import urllib.parse as _url
 from platform_core.errors import AppError, ErrorCode
 from platform_core.logging import get_logger
 
+from clubbot import _test_hooks
+
 _YT_HOSTS = {
     "youtube.com",
     "www.youtube.com",
@@ -38,7 +40,7 @@ def extract_video_id(url: str) -> str:
     if not raw:
         raise AppError(ErrorCode.INVALID_INPUT, "Please provide a YouTube URL", http_status=400)
     try:
-        parsed = _url.urlsplit(raw if "://" in raw else f"https://{raw}")
+        parsed = _test_hooks.urlsplit(raw if "://" in raw else f"https://{raw}")
     except ValueError as e:
         logger.exception("Invalid YouTube URL: %s", e)
         raise AppError(

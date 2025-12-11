@@ -4,8 +4,10 @@ from typing import TypedDict
 
 from monorepo_guards._types import UnknownJson
 from platform_core.errors import AppError, ErrorCode
-from platform_core.http_client import HttpxClient, JsonObject, build_client
+from platform_core.http_client import HttpxClient, JsonObject
 from platform_core.json_utils import JSONValue, load_json_str
+
+from clubbot import _test_hooks
 
 HttpJsonPayload = JsonObject
 
@@ -32,7 +34,7 @@ class TranscriptApiClient(TypedDict):
 
 def _post(client_dict: TranscriptApiClient, path: str, payload: HttpJsonPayload) -> _TranscriptOut:
     url = client_dict["base_url"].rstrip("/") + path
-    client: HttpxClient = build_client(client_dict["timeout_seconds"])
+    client: HttpxClient = _test_hooks.build_client(client_dict["timeout_seconds"])
     resp = client.post(url, json=payload, headers={})
     client.close()
     text = resp.text

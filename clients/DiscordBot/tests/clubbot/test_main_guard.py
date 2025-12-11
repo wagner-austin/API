@@ -1,44 +1,20 @@
 from __future__ import annotations
 
-from typing import Protocol
-
-import pytest
+from platform_core.logging import LogFormat, LogLevel
 from tests.support.settings import build_settings
 
-from clubbot.config import DiscordbotSettings
+from clubbot import _test_hooks
 
 
-class _ContainerProto(Protocol):
-    cfg: DiscordbotSettings
-
-
-class _FakeContainer:
-    def __init__(self, cfg: DiscordbotSettings) -> None:
-        self.cfg = cfg
-
-    @classmethod
-    def from_env(cls) -> _FakeContainer:
-        cfg = build_settings()
-        return cls(cfg=cfg)
-
-
-class _FakeOrchestrator:
-    def __init__(self, container: _ContainerProto) -> None:
-        self.container = container
-        self._ran = False
-
-    def run(self) -> None:
-        self._ran = True
-
-
-def test_main_executes_and_calls_setup_logging(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_executes_and_calls_setup_logging() -> None:
     called: dict[str, str] = {}
+    ran: dict[str, bool] = {"ok": False}
 
     def _fake_setup_logging(
         *,
-        level: str,
+        level: LogLevel,
         service_name: str,
-        format_mode: str | None = None,
+        format_mode: LogFormat,
         instance_id: str | None = None,
         extra_fields: list[str] | None = None,
     ) -> None:
@@ -46,16 +22,36 @@ def test_main_executes_and_calls_setup_logging(monkeypatch: pytest.MonkeyPatch) 
         called["level"] = level
         called["service_name"] = service_name
 
-    ran: dict[str, bool] = {"ok": False}
+    cfg = build_settings()
 
-    class _TrackedOrchestrator(_FakeOrchestrator):
+    class _FakeContainer:
+        def __init__(self) -> None:
+            self.cfg = cfg
+
+        @classmethod
+        def from_env(cls) -> _test_hooks.ServiceContainerProtocol:
+            return cls()
+
+    class _FakeOrchestrator:
+        def __init__(self, container: _test_hooks.ServiceContainerProtocol) -> None:
+            self.container = container
+
         def run(self) -> None:
             ran["ok"] = True
 
-    monkeypatch.setenv("DISCORD_TOKEN", "x")
-    monkeypatch.setattr("clubbot.main.ServiceContainer", _FakeContainer)
-    monkeypatch.setattr("clubbot.main.BotOrchestrator", _TrackedOrchestrator)
-    monkeypatch.setattr("clubbot.main.setup_logging", _fake_setup_logging)
+    def _fake_create_container() -> _test_hooks.ServiceContainerProtocol:
+        result: _test_hooks.ServiceContainerProtocol = _FakeContainer()
+        return result
+
+    def _fake_create_orchestrator(
+        container: _test_hooks.ServiceContainerProtocol,
+    ) -> _test_hooks.BotOrchestratorProtocol:
+        result: _test_hooks.BotOrchestratorProtocol = _FakeOrchestrator(container)
+        return result
+
+    _test_hooks.setup_logging = _fake_setup_logging
+    _test_hooks.create_service_container = _fake_create_container
+    _test_hooks.create_bot_orchestrator = _fake_create_orchestrator
 
     from clubbot import main as main_mod
 

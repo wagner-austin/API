@@ -2,23 +2,26 @@ from __future__ import annotations
 
 import pytest
 from platform_discord.protocols import MessageProto
-from platform_discord.task_runner import TaskRunner
-from tests.support.discord_fakes import FakeBot, FakeEmbed, FakeMessage
+from platform_discord.subscriber import MessageSource
+from tests.support.discord_fakes import FakeBot, FakeEmbed, FakeMessage, FakeMessageSource
 
 from clubbot.services.jobs.digits_notifier import DigitsEventSubscriber
 
 
 @pytest.mark.asyncio
-async def test_digits_notifier_run_calls_runner_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    sub = DigitsEventSubscriber(FakeBot(), redis_url="redis://example")
-    called = {"n": 0}
+async def test_digits_notifier_run_calls_runner_once() -> None:
+    captured: list[FakeMessageSource] = []
 
-    async def _once(self: TaskRunner) -> None:
-        called["n"] += 1
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
 
-    monkeypatch.setattr(TaskRunner, "run_once", _once, raising=True)
+    sub = DigitsEventSubscriber(FakeBot(), redis_url="redis://example", source_factory=_factory)
     await sub._run()
-    assert called["n"] == 1
+    # run_once should have been called which creates source
+    assert len(captured) == 1
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,8 @@ from platform_discord.protocols import InteractionProto as _InteractionProto
 from platform_discord.protocols import UserProto as _UserProto
 from platform_discord.rate_limiter import RateLimiter
 
+from clubbot import _test_hooks
+
 # Use InteractionProto for methods that only use response/followup/user
 _InteractionType = _InteractionProto
 
@@ -157,7 +159,7 @@ class BaseCog(commands.Cog):
             bot = self.bot
             if bot is None:
                 return
-            user_obj = await bot.fetch_user(user_id)
+            user_obj = await _test_hooks.bot_fetch_user(bot, user_id)
             if isinstance(user_obj, _UserProto):
                 await user_obj.send(message)
                 return
@@ -171,7 +173,7 @@ class BaseCog(commands.Cog):
             bot = self.bot
             if bot is None:
                 return
-            user_obj = await bot.fetch_user(user_id)
+            user_obj = await _test_hooks.bot_fetch_user(bot, user_id)
             if isinstance(user_obj, _UserProto):
                 await user_obj.send(content, file=file)
                 return

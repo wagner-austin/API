@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from platform_core.http_client import HttpxAsyncClient, HttpxResponse, build_async_client
+from platform_core.http_client import HttpxAsyncClient, HttpxResponse
 from platform_core.http_utils import add_correlation_header
 from platform_core.json_utils import JSONValue
+
+from clubbot import _test_hooks
 
 
 class PredictResult:
@@ -95,7 +97,7 @@ class HandwritingClient(HandwritingReader):
         self._timeout: float = float(timeout_seconds)
         self._retries: int = max(0, int(max_retries))
         self._client: HttpxAsyncClient = (
-            build_async_client(self._timeout) if client is None else client
+            _test_hooks.build_async_client(self._timeout) if client is None else client
         )
 
     async def aclose(self) -> None:

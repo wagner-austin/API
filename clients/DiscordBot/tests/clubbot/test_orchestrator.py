@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from typing import Protocol
-
 import pytest
+from discord.app_commands import AppCommand
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
+from clubbot._test_hooks import BotTreeProto, SnowflakeLike
 from clubbot.config import DiscordbotSettings
 from clubbot.container import ServiceContainer
-from clubbot.orchestrator import BotOrchestrator
+from clubbot.orchestrator import BotOrchestrator, GuildLike
 from clubbot.services.qr.client import QRService
 
 
-class _GuildLike(Protocol):
-    id: int
-    name: str
-
-
 class _GuildImpl:
+    """Fake guild for testing that matches GuildLike protocol."""
+
     __slots__ = ("id", "name")
 
     def __init__(self, *, id: int, name: str) -> None:
@@ -27,7 +25,7 @@ class _GuildImpl:
 class _SyncCall:
     __slots__ = ("guild",)
 
-    def __init__(self, guild: _GuildLike | None) -> None:
+    def __init__(self, guild: SnowflakeLike | None) -> None:
         self.guild = guild
 
 
@@ -41,6 +39,20 @@ def _make_cfg(guild_ids: list[int] | None = None) -> DiscordbotSettings:
     )
 
 
+def _make_sync_recorder(
+    calls: list[_SyncCall],
+) -> _test_hooks.TreeSyncFactoryProtocol:
+    """Create a tree sync hook that records calls for verification."""
+
+    async def _recording_sync(
+        tree: BotTreeProto, guild: SnowflakeLike | None = None
+    ) -> list[AppCommand]:
+        calls.append(_SyncCall(guild=guild))
+        return []
+
+    return _recording_sync
+
+
 @pytest.mark.asyncio
 async def test_on_ready_triggers_sync_commands() -> None:
     cfg = build_settings(
@@ -52,15 +64,11 @@ async def test_on_ready_triggers_sync_commands() -> None:
 
     container = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(container)
-    bot = orch.build_bot()
+    orch.build_bot()
 
-    calls: list[dict[str, _GuildLike | None]] = []
+    calls: list[_SyncCall] = []
+    _test_hooks.tree_sync = _make_sync_recorder(calls)
 
-    async def fake_tree_sync(*, guild: _GuildLike | None = None) -> list[str]:
-        calls.append({"guild": guild})
-        return []
-
-    object.__setattr__(bot.tree, "sync", fake_tree_sync)
     orch.register_listeners()
     ready = orch._on_ready_listener
     if ready is None:
@@ -68,7 +76,7 @@ async def test_on_ready_triggers_sync_commands() -> None:
     await ready()
 
     assert len(calls) == 1
-    call_guild = calls[0]["guild"]
+    call_guild = calls[0].guild
     assert call_guild is None
 
 
@@ -83,16 +91,10 @@ async def test_sync_commands_global_only() -> None:
 
     container = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(container)
-    bot = orch.build_bot()
+    orch.build_bot()
 
-    # Patch tree.sync to observe calls
     calls: list[_SyncCall] = []
-
-    async def fake_tree_sync_global(*, guild: _GuildLike | None = None) -> list[str]:
-        calls.append(_SyncCall(guild=guild))
-        return []
-
-    object.__setattr__(bot.tree, "sync", fake_tree_sync_global)
+    _test_hooks.tree_sync = _make_sync_recorder(calls)
 
     await orch.sync_commands()
 
@@ -107,22 +109,17 @@ async def test_on_guild_join_no_per_guild_sync() -> None:
 
     container = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(container)
-    bot = orch.build_bot()
+    orch.build_bot()
     orch.register_listeners()
 
     calls: list[_SyncCall] = []
-
-    async def fake_tree_sync_join(*, guild: _GuildLike | None = None) -> list[str]:
-        calls.append(_SyncCall(guild=guild))
-        return []
-
-    object.__setattr__(bot.tree, "sync", fake_tree_sync_join)
+    _test_hooks.tree_sync = _make_sync_recorder(calls)
 
     # Invoke listener directly
     join_listener = orch._on_guild_join_listener
     if join_listener is None:
         raise AssertionError("expected on_guild_join_listener")
-    guild: _GuildLike = _GuildImpl(id=555, name="Target")
+    guild: GuildLike = _GuildImpl(id=555, name="Target")
     await join_listener(guild)
     assert calls == []
 
@@ -139,15 +136,10 @@ async def test_global_sync_runs_once_on_boot() -> None:
 
     container = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(container)
-    bot = orch.build_bot()
+    orch.build_bot()
 
     calls: list[_SyncCall] = []
-
-    async def fake_tree_sync_boot(*, guild: _GuildLike | None = None) -> list[str]:
-        calls.append(_SyncCall(guild=guild))
-        return []
-
-    object.__setattr__(bot.tree, "sync", fake_tree_sync_boot)
+    _test_hooks.tree_sync = _make_sync_recorder(calls)
     orch.register_listeners()
 
     # First ready should perform a global sync

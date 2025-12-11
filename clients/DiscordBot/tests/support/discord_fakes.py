@@ -299,9 +299,9 @@ class RecordedSend(TypedDict):
 class RecordingResponse:
     """Response that records sends for assertions."""
 
-    def __init__(self, parent: RecordingInteraction, *, done: bool = False) -> None:
+    def __init__(self, sent: list[RecordedSend], *, done: bool = False) -> None:
         self._done = done
-        self._parent = parent
+        self._sent = sent
 
     def is_done(self) -> bool:
         return self._done
@@ -314,7 +314,7 @@ class RecordingResponse:
         ephemeral: bool = False,
     ) -> None:
         self._done = True
-        self._parent.sent.append(
+        self._sent.append(
             {
                 "where": "response",
                 "content": content,
@@ -326,7 +326,7 @@ class RecordingResponse:
 
     async def defer(self, *, ephemeral: bool = False) -> None:
         self._done = True
-        self._parent.sent.append(
+        self._sent.append(
             {
                 "where": "response",
                 "content": None,
@@ -340,8 +340,8 @@ class RecordingResponse:
 class RecordingFollowup:
     """Followup that records sends for assertions."""
 
-    def __init__(self, parent: RecordingInteraction) -> None:
-        self._parent = parent
+    def __init__(self, sent: list[RecordedSend]) -> None:
+        self._sent = sent
 
     async def send(
         self,
@@ -351,7 +351,7 @@ class RecordingFollowup:
         file: FileProto | None = None,
         ephemeral: bool = False,
     ) -> MessageProto:
-        self._parent.sent.append(
+        self._sent.append(
             {
                 "where": "followup",
                 "content": content,
@@ -375,8 +375,8 @@ class RecordingInteraction:
         usr: UserProto = user if user is not None else FakeUser()
         self._user = usr
         self.sent: list[RecordedSend] = []
-        self.response = RecordingResponse(self, done=response_done)
-        self.followup = RecordingFollowup(self)
+        self.response = RecordingResponse(self.sent, done=response_done)
+        self.followup = RecordingFollowup(self.sent)
 
     @property
     def user(self) -> UserProto:
@@ -399,6 +399,30 @@ class RaisingFollowup:
     ) -> MessageProto:
         _ = (content, embed, file, ephemeral)
         raise self._exc_type()
+
+
+class FakeMessageSource:
+    """Fake message source that completes immediately for lifecycle tests."""
+
+    __slots__ = ("_index", "_messages", "closed")
+
+    def __init__(self, *, messages: list[str] | None = None) -> None:
+        self.closed = False
+        self._messages: list[str] = messages if messages is not None else []
+        self._index = 0
+
+    async def subscribe(self, channel: str) -> None:
+        _ = channel
+
+    async def get(self) -> str | None:
+        if self._index >= len(self._messages):
+            return None
+        msg = self._messages[self._index]
+        self._index += 1
+        return msg
+
+    async def close(self) -> None:
+        self.closed = True
 
 
 class TrackingMessage:
@@ -470,6 +494,24 @@ class NoIdUser:
     ) -> MessageProto:
         _ = (content, embed, file)
         return FakeMessage()
+
+
+class NoIdUserInteraction:
+    """Interaction with a NoIdUser for testing user.id=None error paths.
+
+    This is a separate class because NoIdUser.id returns int|None which doesn't
+    match UserProto.id -> int, so we can't use RecordingInteraction.
+    """
+
+    def __init__(self, *, response_done: bool = False) -> None:
+        self._user = NoIdUser()
+        self.sent: list[RecordedSend] = []
+        self.response = RecordingResponse(self.sent, done=response_done)
+        self.followup = RecordingFollowup(self.sent)
+
+    @property
+    def user(self) -> NoIdUser:
+        return self._user
 
 
 class StrAppIdBot:
@@ -592,10 +634,12 @@ __all__ = [
     "FakeInteraction",
     "FakeLogger",
     "FakeMessage",
+    "FakeMessageSource",
     "FakeResponse",
     "FakeResponseRaises",
     "FakeUser",
     "NoIdUser",
+    "NoIdUserInteraction",
     "NoneAppIdBot",
     "RaisingFollowup",
     "RecordedSend",

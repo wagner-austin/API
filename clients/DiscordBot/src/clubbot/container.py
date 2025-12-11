@@ -4,12 +4,11 @@ from typing import ClassVar
 
 from discord.ext import commands
 from platform_core.logging import get_logger
-from platform_core.queues import DIGITS_QUEUE
 from platform_discord.protocols import wrap_bot
 
+from . import _test_hooks
 from .config import DiscordbotSettings, load_discordbot_settings, require_discord_token
 from .services.digits.app import DigitService
-from .services.jobs.digits_enqueuer import RQDigitsEnqueuer
 from .services.qr.client import QRService
 from .services.transcript.client import TranscriptService
 
@@ -81,7 +80,7 @@ class ServiceContainer:
 
         if self.digits_service is not None and bot.get_cog("DigitsCog") is None:
             redis_url = cfg["redis"]["redis_url"] or ""
-            enqueuer = _build_digits_enqueuer(redis_url)
+            enqueuer = _test_hooks.build_digits_enqueuer(redis_url)
             await bot.add_cog(
                 DigitsCog(
                     wrapped,
@@ -100,18 +99,3 @@ class ServiceContainer:
 
 
 __all__ = ["ServiceContainer"]
-
-
-def _build_digits_enqueuer(redis_url: str) -> RQDigitsEnqueuer | None:
-    url = (redis_url or "").strip()
-    if not url:
-        return None
-    return RQDigitsEnqueuer(
-        redis_url=url,
-        queue_name=DIGITS_QUEUE,
-        job_timeout_s=25200,
-        result_ttl_s=86400,
-        failure_ttl_s=604800,
-        retry_max=2,
-        retry_intervals_s=(60, 300),
-    )

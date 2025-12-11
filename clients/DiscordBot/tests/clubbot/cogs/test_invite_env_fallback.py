@@ -7,8 +7,8 @@ from tests.support.discord_fakes import NoneAppIdBot
 from clubbot.cogs.invite import _resolve_app_id
 
 
-def test_resolve_app_id_env_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_app_id_raises_when_no_application_id() -> None:
+    """Test that _resolve_app_id raises RuntimeError when bot has no application_id."""
     bot: BotProto = NoneAppIdBot()
-    monkeypatch.setenv("DISCORD_APPLICATION_ID", "555")
     with pytest.raises(RuntimeError):
         _resolve_app_id(bot)

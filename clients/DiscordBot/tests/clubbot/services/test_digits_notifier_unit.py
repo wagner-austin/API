@@ -298,20 +298,45 @@ async def test_handle_event_unknown_type_noop() -> None:
     assert user.embeds
 
 
-@pytest.mark.asyncio
-async def test_start_and_stop_covers_branches(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Patch _run to a cooperative noop to avoid real Redis calls
-    async def _noop(self: dn.DigitsEventSubscriber) -> None:
-        await asyncio.sleep(0)
+class _FakeMessageSource:
+    """Fake message source that completes immediately."""
 
-    monkeypatch.setattr(dn.DigitsEventSubscriber, "_run", _noop, raising=True)
-    sub = dn.DigitsEventSubscriber(TrackingBot(TrackingUser()), redis_url="redis://fake")
+    __slots__ = ("closed",)
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def subscribe(self, channel: str) -> None:
+        _ = channel
+
+    async def get(self) -> str | None:
+        await asyncio.sleep(0)
+        return None
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_start_and_stop_covers_branches() -> None:
+    from platform_discord.subscriber import MessageSource
+
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        return _FakeMessageSource()
+
+    sub = dn.DigitsEventSubscriber(
+        TrackingBot(TrackingUser()), redis_url="redis://fake", source_factory=_factory
+    )
     sub.start()
     # second start should be a no-op branch
     sub.start()
+    await asyncio.sleep(0)
     await sub.stop()
     # stopping when no task should no-op branch
-    sub2 = dn.DigitsEventSubscriber(TrackingBot(TrackingUser()), redis_url="redis://fake")
+    sub2 = dn.DigitsEventSubscriber(
+        TrackingBot(TrackingUser()), redis_url="redis://fake", source_factory=_factory
+    )
     await sub2.stop()
 
 

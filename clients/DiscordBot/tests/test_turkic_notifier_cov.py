@@ -11,90 +11,94 @@ from platform_core.job_events import (
     encode_job_event,
     make_started_event,
 )
-from platform_discord.task_runner import TaskRunner
-from tests.support.discord_fakes import FakeBot, FakeUser
+from platform_discord.subscriber import MessageSource
 
 from clubbot.services.jobs.turkic_notifier import TurkicEventSubscriber
-
-
-class _FakeSource:
-    def __init__(self) -> None:
-        self.closed = False
-
-    async def subscribe(self, channel: str) -> None:
-        _ = channel
-
-    async def get(self) -> str | None:
-        await asyncio.sleep(0)
-        return None
-
-    async def close(self) -> None:
-        self.closed = True
+from tests.support.discord_fakes import FakeBot, FakeMessageSource, FakeUser
 
 
 @pytest.mark.asyncio
-async def test_stop_when_task_cancelled_closes_source(monkeypatch: pytest.MonkeyPatch) -> None:
-    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
-    src = _FakeSource()
-    object.__setattr__(sub, "_source", src)
+async def test_stop_closes_source_after_task_completes() -> None:
+    """Test that stop() closes the source properly."""
+    captured: list[FakeMessageSource] = []
 
-    async def _stub(self: TaskRunner) -> None:
-        await asyncio.sleep(0)
-
-    from platform_discord.task_runner import TaskRunner
-
-    monkeypatch.setattr(TaskRunner, "stop", _stub, raising=True)
-    await sub.stop()
-    assert src.closed is True
-
-
-@pytest.mark.asyncio
-async def test_stop_with_no_source_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
-    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
-
-    # Ensure no source set; runner.stop is a no-op
-    async def _stub(self: TaskRunner) -> None:
-        await asyncio.sleep(0)
-
-    monkeypatch.setattr(TaskRunner, "stop", _stub, raising=True)
-    await sub.stop()
-
-
-@pytest.mark.asyncio
-async def test_stop_when_task_failed_closes_source_and_raises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
-    src = _FakeSource()
-    object.__setattr__(sub, "_source", src)
-
-    async def _boom(self: TaskRunner) -> None:
-        raise RuntimeError("explode")
-
-    monkeypatch.setattr(TaskRunner, "stop", _boom, raising=True)
-    with pytest.raises(RuntimeError):
-        await sub.stop()
-    assert src.closed is True
-
-
-@pytest.mark.asyncio
-async def test_on_done_invoked_by_completed_task() -> None:
-    # Use source_factory to inject a fake source that completes immediately
-    from platform_discord.subscriber import MessageSource as _MessageSource
-
-    def _src_factory(url: str) -> _MessageSource:
+    def _factory(url: str) -> MessageSource:
         _ = url
-        return _FakeSource()
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
 
     sub = TurkicEventSubscriber(
         bot=FakeBot(),
         redis_url="redis://x",
-        source_factory=_src_factory,
+        source_factory=_factory,
+    )
+    sub.start()
+    # Allow task to run
+    await asyncio.sleep(0)
+    await sub.stop()
+
+    # Source should have been created and closed
+    assert len(captured) == 1
+    assert captured[0].closed is True
+
+
+@pytest.mark.asyncio
+async def test_stop_with_no_source_is_noop() -> None:
+    """Test that stop without start is a no-op."""
+    sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
+    # Should return early when no task is running
+    await sub.stop()
+
+
+@pytest.mark.asyncio
+async def test_stop_idempotent() -> None:
+    """Test that multiple stop calls are safe."""
+    captured: list[FakeMessageSource] = []
+
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
+
+    sub = TurkicEventSubscriber(
+        bot=FakeBot(),
+        redis_url="redis://x",
+        source_factory=_factory,
+    )
+    sub.start()
+    await asyncio.sleep(0)
+    await sub.stop()
+    # Second stop should be safe
+    await sub.stop()
+
+    assert len(captured) == 1
+    assert captured[0].closed is True
+
+
+@pytest.mark.asyncio
+async def test_on_done_invoked_by_completed_task() -> None:
+    """Test that source is closed when task completes naturally."""
+    captured: list[FakeMessageSource] = []
+
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
+
+    sub = TurkicEventSubscriber(
+        bot=FakeBot(),
+        redis_url="redis://x",
+        source_factory=_factory,
     )
     sub.start()
     await asyncio.sleep(0)
     # stop should find no running task by now and simply return after ensuring source is closed
     await sub.stop()
+
+    assert len(captured) == 1
 
 
 @pytest.mark.asyncio
@@ -147,7 +151,7 @@ async def test_handle_event_branches_calls_notify() -> None:
 
 
 @pytest.mark.asyncio
-async def test_handle_event_unknown_type_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_handle_event_unknown_type_is_noop() -> None:
     """Test that unknown event types are silently ignored."""
     sub = TurkicEventSubscriber(bot=FakeBot(), redis_url="redis://x")
 

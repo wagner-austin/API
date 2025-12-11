@@ -8,14 +8,14 @@ from platform_core.digits_metrics_events import DEFAULT_DIGITS_EVENTS_CHANNEL
 from platform_core.errors import AppError, ErrorCode
 from platform_core.logging import get_logger
 from platform_discord.embed_helpers import add_field, create_embed, set_footer
-from platform_discord.protocols import InteractionProto, UserProto, wrap_interaction
+from platform_discord.protocols import InteractionProto, UserProto
 from platform_discord.rate_limiter import RateLimiter
 
+from .. import _test_hooks
 from ..config import DiscordbotSettings
 from ..services.digits.app import DigitService
 from ..services.handai.client import HandwritingAPIError, PredictResult
 from ..services.jobs.digits_enqueuer import DigitsEnqueuer
-from ..services.jobs.digits_notifier import DigitsEventSubscriber
 from .base import BaseCog, _BotProto
 
 _PNG: Final[str] = "image/png"
@@ -47,12 +47,12 @@ class DigitsCog(BaseCog):
             config["digits"]["rate_limit"], config["digits"]["rate_window_seconds"]
         )
         self._enqueuer: DigitsEnqueuer | None = enqueuer
-        self._subscriber: DigitsEventSubscriber | None = None
+        self._subscriber: _test_hooks.DigitsEventSubscriberLike | None = None
         self._autostart_subscriber = autostart_subscriber
         redis_url = self.config["redis"]["redis_url"] or ""
         if redis_url:
-            self._subscriber = DigitsEventSubscriber(
-                bot=self.bot, redis_url=redis_url, events_channel=DEFAULT_DIGITS_EVENTS_CHANNEL
+            self._subscriber = _test_hooks.digits_event_subscriber_factory(
+                bot=self.bot, redis_url=redis_url
             )
             if self._autostart_subscriber:
                 self._subscriber.start()
@@ -76,7 +76,7 @@ class DigitsCog(BaseCog):
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.describe(image="PNG or JPEG image of a single digit")
     async def read(self, interaction: discord.Interaction, image: discord.Attachment) -> None:
-        wrapped: InteractionProto = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         await self._read_impl(wrapped, interaction.user, image)
 
     async def _read_impl(
@@ -140,7 +140,7 @@ class DigitsCog(BaseCog):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
     async def train(self, interaction: discord.Interaction) -> None:
-        wrapped: InteractionProto = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         await self._train_impl(wrapped, interaction.user)
 
     async def _train_impl(

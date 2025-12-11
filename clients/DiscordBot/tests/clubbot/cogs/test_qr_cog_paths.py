@@ -10,11 +10,10 @@ from platform_discord.protocols import InteractionProto, ResponseProto, UserProt
 from tests.support.discord_fakes import FakeBot, FakeFollowup, FakeResponse, FakeUser
 from tests.support.settings import build_settings
 
-import clubbot.cogs.qr as qr_mod
+from clubbot import _test_hooks
 from clubbot.cogs.base import _HasIntId
 from clubbot.cogs.qr import QRCog
 from clubbot.config import DiscordbotSettings
-from clubbot.services.qr.client import QRResult, QRService
 
 
 class _Logger(Protocol):
@@ -22,17 +21,18 @@ class _Logger(Protocol):
     def info(self, msg: str, *args: str) -> None: ...
 
 
-class _QRResult(QRResult):
+class _QRResult:
     def __init__(self) -> None:
-        super().__init__(image_png=b"x", url="https://x")
+        self.image_png = b"x"
+        self.url = "https://x"
 
 
-class _FakeService(QRService):
+class _FakeService:
     def __init__(self, cfg: DiscordbotSettings) -> None:
-        super().__init__(cfg)
+        _ = cfg
         self._res = _QRResult()
 
-    def generate_qr(self, url: str) -> QRResult:
+    def generate_qr(self, url: str) -> _QRResult:
         _ = url
         return self._res
 
@@ -111,7 +111,7 @@ async def test_qr_safe_defer_exceptions() -> None:
     assert ok3 is False
 
 
-def test_qr_extract_attr_and_setup(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_qr_extract_attr_and_setup() -> None:
     assert QRCog.decode_int_attr(None, "id") is None
 
     added: dict[str, bool] = {}
@@ -121,14 +121,21 @@ def test_qr_extract_attr_and_setup(monkeypatch: pytest.MonkeyPatch) -> None:
             _ = cog
             added["ok"] = True
 
-    def _mk_service(cfg: DiscordbotSettings) -> QRService:
+    def _mk_service(cfg: DiscordbotSettings) -> _test_hooks.QRServiceLike:
         return _FakeService(cfg)
 
-    monkeypatch.setattr(qr_mod, "load_discordbot_settings", _cfg, raising=True)
-    monkeypatch.setattr(qr_mod, "QRService", _mk_service, raising=True)
+    original_load = _test_hooks.load_settings
+    original_svc = _test_hooks.qr_service_factory
+    _test_hooks.load_settings = _cfg
+    _test_hooks.qr_service_factory = _mk_service
+    try:
+        import clubbot.cogs.qr as qr_mod
 
-    asyncio.get_event_loop().run_until_complete(qr_mod.setup(_Bot()))
-    assert added.get("ok") is True
+        asyncio.get_event_loop().run_until_complete(qr_mod.setup(_Bot()))
+        assert added.get("ok") is True
+    finally:
+        _test_hooks.load_settings = original_load
+        _test_hooks.qr_service_factory = original_svc
 
 
 logger = logging.getLogger(__name__)

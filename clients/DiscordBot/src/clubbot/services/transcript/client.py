@@ -3,13 +3,12 @@ from __future__ import annotations
 from typing import Final, TypedDict
 
 from platform_core.errors import AppError, ErrorCode
-from platform_core.http_client import HttpxClient, build_client
+from platform_core.http_client import HttpxClient
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.logging import get_logger
 
+from ... import _test_hooks
 from ...config import DiscordbotSettings
-from ...utils.youtube import extract_video_id, validate_youtube_url
-from .api_client import TranscriptApiClient, captions
 
 
 class TranscriptResult:
@@ -64,10 +63,10 @@ class TranscriptService:
     def _http_client(self) -> HttpxClient:
         if self._client is None:
             timeout_s = self._timeout
-            self._client = build_client(timeout_s)
+            self._client = _test_hooks.build_client(timeout_s)
         return self._client
 
-    def _client_dict(self) -> TranscriptApiClient:
+    def _client_dict(self) -> dict[str, float | str]:
         return {
             "base_url": self.cfg["transcript"]["api_url"],
             "timeout_seconds": self._timeout,
@@ -89,10 +88,12 @@ class TranscriptService:
         raise RuntimeError("Transcript API payload missing required fields")
 
     def fetch_cleaned(self, url: str) -> TranscriptResult:
-        canonical = validate_youtube_url(url)
-        vid = extract_video_id(canonical)
+        canonical = _test_hooks.validate_youtube_url_for_client(url)
+        vid = _test_hooks.extract_video_id(canonical)
         client_dict = self._client_dict()
-        payload = captions(client_dict, url=canonical, preferred_langs=self._preferred_langs)
+        payload = _test_hooks.captions(
+            client_dict, url=canonical, preferred_langs=self._preferred_langs
+        )
         validated = self._validate_payload(
             {"url": payload["url"], "video_id": payload["video_id"], "text": payload["text"]}
         )

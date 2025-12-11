@@ -4,10 +4,11 @@ from collections.abc import Mapping
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.http_client import HttpxClient, HttpxResponse, SyncTransport
+from platform_core.http_client import HttpxClient, HttpxResponse
 from platform_core.json_utils import InvalidJsonError, JSONValue, load_json_str
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
 from clubbot.config import DiscordbotSettings
 from clubbot.services.transcript.client import TranscriptResult, TranscriptService, _parse_langs
 
@@ -52,31 +53,30 @@ def test_parse_langs_variants() -> None:
     assert _parse_langs("  ") == ["en", "en-US"]
 
 
-def test_client_dict_and_http_client_build(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_client_dict_and_http_client_build() -> None:
     cfg = _cfg()
     svc = TranscriptService(cfg)
     # Stub build_client to return a fake; the client is cached on first call
     resp0: HttpxResponse = _FakeResp(500, "")
     fake = _FakeClient(resp0)
 
-    def _build_client(
-        timeout_seconds: float, transport: SyncTransport | None = None
-    ) -> HttpxClient:
-        assert timeout_seconds == float(cfg["transcript"]["stt_api_timeout_seconds"])
-        _ = transport
+    def _build_client(timeout: float) -> HttpxClient:
+        assert timeout == float(cfg["transcript"]["stt_api_timeout_seconds"])
         return fake
 
-    monkeypatch.setattr(
-        "clubbot.services.transcript.client.build_client", _build_client, raising=True
-    )
-    # First call constructs and caches
-    client = svc._http_client()
-    assert type(client) is _FakeClient
-    # Client dict reflects base URL and timeout
-    d = svc._client_dict()
-    assert isinstance(d["base_url"], str) and d["timeout_seconds"] == float(
-        cfg["transcript"]["stt_api_timeout_seconds"]
-    )
+    original = _test_hooks.build_client
+    _test_hooks.build_client = _build_client
+    try:
+        # First call constructs and caches
+        client = svc._http_client()
+        assert type(client) is _FakeClient
+        # Client dict reflects base URL and timeout
+        d = svc._client_dict()
+        assert isinstance(d["base_url"], str) and d["timeout_seconds"] == float(
+            cfg["transcript"]["stt_api_timeout_seconds"]
+        )
+    finally:
+        _test_hooks.build_client = original
 
 
 def test_fetch_success_and_payload_validation() -> None:
@@ -121,7 +121,7 @@ def test_fetch_unexpected_status_raises() -> None:
         _ = svc.fetch("http://x", request_id="r")
 
 
-def test_parse_app_error_payload_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parse_app_error_payload_validation() -> None:
     cfg = _cfg()
     svc = TranscriptService(cfg)
     with pytest.raises(InvalidJsonError):
@@ -166,57 +166,67 @@ def test_parse_app_error_parsed_not_dict() -> None:
         _ = svc._parse_app_error("[]", 400)
 
 
-def test_module_level_fetch_cleaned(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_module_level_fetch_cleaned() -> None:
     from clubbot.services.transcript.client import fetch_cleaned as module_fetch
 
     cfg = _cfg()
     svc = TranscriptService(cfg)
 
-    def _validate(u: str) -> str:
-        return u
+    def _validate(url: str) -> str:
+        return url
 
-    def _extract(_u: str) -> str:
+    def _extract(url: str) -> str:
+        _ = url
         return "vid"
 
     def _captions(
-        _client: dict[str, JSONValue], *, url: str, preferred_langs: list[str]
+        client: dict[str, float | str], *, url: str, preferred_langs: list[str]
     ) -> dict[str, str]:
-        _ = (url, preferred_langs)
+        _ = (client, url, preferred_langs)
         return {"url": "u", "video_id": "vid", "text": "t"}
 
-    monkeypatch.setattr(
-        "clubbot.services.transcript.client.validate_youtube_url", _validate, raising=True
-    )
-    monkeypatch.setattr(
-        "clubbot.services.transcript.client.extract_video_id", _extract, raising=True
-    )
-    monkeypatch.setattr("clubbot.services.transcript.client.captions", _captions, raising=True)
-    res = module_fetch(svc, "http://y")
-    assert type(res) is TranscriptResult
+    original_validate = _test_hooks.validate_youtube_url_for_client
+    original_extract = _test_hooks.extract_video_id
+    original_captions = _test_hooks.captions
+    _test_hooks.validate_youtube_url_for_client = _validate
+    _test_hooks.extract_video_id = _extract
+    _test_hooks.captions = _captions
+    try:
+        res = module_fetch(svc, "http://y")
+        assert type(res) is TranscriptResult
+    finally:
+        _test_hooks.validate_youtube_url_for_client = original_validate
+        _test_hooks.extract_video_id = original_extract
+        _test_hooks.captions = original_captions
 
 
-def test_fetch_cleaned_vid_mismatch_logs(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fetch_cleaned_vid_mismatch_logs() -> None:
     cfg = _cfg()
     svc = TranscriptService(cfg)
 
-    def _validate(u: str) -> str:
-        return u
+    def _validate(url: str) -> str:
+        return url
 
-    def _extract(_u: str) -> str:
+    def _extract(url: str) -> str:
+        _ = url
         return "different"
 
     def _captions(
-        _client: dict[str, JSONValue], *, url: str, preferred_langs: list[str]
+        client: dict[str, float | str], *, url: str, preferred_langs: list[str]
     ) -> dict[str, str]:
-        _ = (url, preferred_langs)
+        _ = (client, url, preferred_langs)
         return {"url": "u", "video_id": "vid", "text": "t"}
 
-    monkeypatch.setattr(
-        "clubbot.services.transcript.client.validate_youtube_url", _validate, raising=True
-    )
-    monkeypatch.setattr(
-        "clubbot.services.transcript.client.extract_video_id", _extract, raising=True
-    )
-    monkeypatch.setattr("clubbot.services.transcript.client.captions", _captions, raising=True)
-    res = svc.fetch_cleaned("http://y")
-    assert isinstance(res, TranscriptResult) and res.video_id == "different"
+    original_validate = _test_hooks.validate_youtube_url_for_client
+    original_extract = _test_hooks.extract_video_id
+    original_captions = _test_hooks.captions
+    _test_hooks.validate_youtube_url_for_client = _validate
+    _test_hooks.extract_video_id = _extract
+    _test_hooks.captions = _captions
+    try:
+        res = svc.fetch_cleaned("http://y")
+        assert isinstance(res, TranscriptResult) and res.video_id == "different"
+    finally:
+        _test_hooks.validate_youtube_url_for_client = original_validate
+        _test_hooks.extract_video_id = original_extract
+        _test_hooks.captions = original_captions

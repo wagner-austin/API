@@ -6,10 +6,11 @@ from typing import Protocol
 
 import pytest
 
+from clubbot import _test_hooks
+
 
 class _GuardModule(Protocol):
     def main(self, argv: list[str]) -> int: ...
-    def _find_monorepo_root(self, start: Path) -> Path: ...
 
 
 def _load_guard_module() -> _GuardModule:
@@ -22,9 +23,9 @@ def _load_guard_module() -> _GuardModule:
 
 
 def test_find_monorepo_root_raises(tmp_path: Path) -> None:
-    guard = _load_guard_module()
+    # The guard.py uses _test_hooks.guard_find_monorepo_root, so we test that directly
     with pytest.raises(RuntimeError):
-        _ = guard._find_monorepo_root(tmp_path)
+        _ = _test_hooks.guard_find_monorepo_root(tmp_path)
 
 
 def test_guard_main_non_verbose_returns_code(tmp_path: Path) -> None:

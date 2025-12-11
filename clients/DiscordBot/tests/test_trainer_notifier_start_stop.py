@@ -4,24 +4,43 @@ import asyncio
 import logging
 
 import pytest
-from tests.support.discord_fakes import FakeBot
+from platform_discord.subscriber import MessageSource
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
+from tests.support.discord_fakes import FakeBot, FakeMessageSource
+
+
+def _source_factory(captured: list[FakeMessageSource]) -> MessageSource:
+    """Factory that captures created sources for verification."""
+    src = FakeMessageSource()
+    captured.append(src)
+    return src
 
 
 @pytest.mark.asyncio
-async def test_trainer_notifier_start_stop(monkeypatch: pytest.MonkeyPatch) -> None:
-    sub = TrainerEventSubscriber(bot=FakeBot(), redis_url="redis://example")
+async def test_trainer_notifier_start_stop() -> None:
+    captured: list[FakeMessageSource] = []
 
-    async def _noop_run(self: TrainerEventSubscriber) -> None:
-        await asyncio.sleep(0)
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        return _source_factory(captured)
 
-    monkeypatch.setattr(TrainerEventSubscriber, "_run", _noop_run)
+    sub = TrainerEventSubscriber(
+        bot=FakeBot(),
+        redis_url="redis://example",
+        source_factory=_factory,
+    )
 
     sub.start()
     # idempotent start
     sub.start()
+    # Allow the task to run briefly
+    await asyncio.sleep(0)
     await sub.stop()
+
+    # Verify source was created and closed
+    assert len(captured) == 1
+    assert captured[0].closed is True
 
 
 @pytest.mark.asyncio

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from typing import ParamSpec, TypeVar
 
 import pytest
 from platform_core.errors import AppError, ErrorCode
 from platform_discord.protocols import InteractionProto
+from platform_discord.rate_limiter import RateLimiter
 from tests.support.discord_fakes import (
     FakeBot,
     FakeUser,
@@ -16,6 +16,7 @@ from tests.support.discord_fakes import (
 )
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
 from clubbot.cogs.base import _Logger
 from clubbot.cogs.transcript import TranscriptCog
 from clubbot.config import DiscordbotSettings
@@ -45,10 +46,24 @@ def _cfg(*, provider: str = "api", attach_mb: int | None = None) -> DiscordbotSe
 
 
 class _FakeTranscriptService(TranscriptService):
-    def __init__(self, cfg: DiscordbotSettings) -> None:
+    """Configurable fake transcript service for testing."""
+
+    def __init__(
+        self,
+        cfg: DiscordbotSettings,
+        *,
+        result: TranscriptResult | None = None,
+        raise_error: Exception | None = None,
+    ) -> None:
         super().__init__(cfg)
+        self._result = result
+        self._raise_error = raise_error
 
     def fetch_cleaned(self, url: str) -> TranscriptResult:
+        if self._raise_error is not None:
+            raise self._raise_error
+        if self._result is not None:
+            return self._result
         return TranscriptResult(url=url, video_id="vid", text="ok")
 
 
@@ -56,16 +71,15 @@ def _make_interaction() -> RecordingInteraction:
     return RecordingInteraction()
 
 
-def _run_in_thread_sync(func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
-    return func(*args, **kwargs)
+async def _run_sync(func: _test_hooks._SyncCallable, url: str) -> _test_hooks.TranscriptResultLike:
+    """Fake asyncio.to_thread that runs synchronously."""
+    result: _test_hooks.TranscriptResultLike = func(url)
+    return result
 
 
-async def _run_in_thread(func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
-    return func(*args, **kwargs)
-
-
-def _validate_url(u: str) -> str:
-    return u
+def _passthrough_url(url: str) -> str:
+    """Skip URL validation for testing."""
+    return url
 
 
 def _last_send(inter: RecordingInteraction) -> RecordedSend:
@@ -114,48 +128,50 @@ class _TestingCog(TranscriptCog):
         self._exceptions.append(e)
 
 
+def _make_exhausted_rate_limiter() -> RateLimiter:
+    """Create a rate limiter that's already exhausted."""
+    rl = RateLimiter(per_window=1, window_seconds=60)
+    # Pre-exhaust for common test user IDs
+    rl.allow(67890, "transcript")
+    return rl
+
+
 @pytest.mark.asyncio
-async def test_transcript_attachment_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_transcript_attachment_too_large() -> None:
     cfg = _cfg(provider="api", attach_mb=1)
     messages: list[str] = []
 
-    def fake_fetch_cleaned(_svc: TranscriptService, _url: str) -> TranscriptResult:
-        text = "x" * (2 * 1024 * 1024)
-        return TranscriptResult(url="https://v", video_id="vid1", text=text)
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+    _test_hooks.asyncio_to_thread = _run_sync
 
-    def validate_url(u: str) -> str:
-        return u
-
-    monkeypatch.setattr("clubbot.cogs.transcript.validate_youtube_url", validate_url, raising=True)
-    monkeypatch.setattr("clubbot.cogs.transcript.asyncio.to_thread", _run_in_thread, raising=True)
+    # Large text result
+    large_text = "x" * (2 * 1024 * 1024)
+    result = TranscriptResult(url="https://v", video_id="vid1", text=large_text)
+    svc = _FakeTranscriptService(cfg, result=result)
 
     bot = FakeBot()
-    svc = _FakeTranscriptService(cfg)
     cog = _TestingCog(messages, [], bot, cfg, svc)
 
-    def _fetch_cleaned_bound(url: str) -> TranscriptResult:
-        return fake_fetch_cleaned(svc, url)
-
-    monkeypatch.setattr(svc, "fetch_cleaned", _fetch_cleaned_bound, raising=True)
     inter = _make_interaction()
     await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")
     assert messages and "too large" in messages[-1]
 
 
 @pytest.mark.asyncio
-async def test_transcript_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_transcript_rate_limit() -> None:
     cfg = _cfg()
 
-    def allow_rate(_user_id: int, _action: str) -> tuple[bool, float]:
-        return (False, 3.0)
-
-    monkeypatch.setattr("clubbot.cogs.transcript.asyncio.to_thread", _run_in_thread, raising=True)
-    monkeypatch.setattr("clubbot.cogs.transcript.validate_youtube_url", _validate_url, raising=True)
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+    _test_hooks.asyncio_to_thread = _run_sync
 
     bot = FakeBot()
     svc = _FakeTranscriptService(cfg)
     cog = _TestingCog([], [], bot, cfg, svc)
-    monkeypatch.setattr(cog.rate_limiter, "allow", allow_rate, raising=True)
+    # Replace rate limiter with exhausted one
+    cog.rate_limiter = _make_exhausted_rate_limiter()
+
     inter = _make_interaction()
     await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")
     last = _last_send(inter)
@@ -164,85 +180,108 @@ async def test_transcript_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_transcript_user_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_transcript_user_error() -> None:
     cfg = _cfg()
     errors: list[str] = []
 
-    def bad_fetch(_svc: TranscriptService, _url: str) -> TranscriptResult:
-        raise AppError(ErrorCode.INVALID_INPUT, "bad", http_status=400)
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+    _test_hooks.asyncio_to_thread = _run_sync
 
-    def allow_all(_user_id: int, _action: str) -> tuple[bool, float]:
-        return (True, 0.0)
-
-    monkeypatch.setattr("clubbot.cogs.transcript.asyncio.to_thread", _run_in_thread, raising=True)
-    monkeypatch.setattr("clubbot.cogs.transcript.validate_youtube_url", _validate_url, raising=True)
+    # Service that raises user error
+    svc = _FakeTranscriptService(
+        cfg, raise_error=AppError(ErrorCode.INVALID_INPUT, "bad", http_status=400)
+    )
 
     bot = FakeBot()
-    svc = _FakeTranscriptService(cfg)
     cog = _TestingCog(errors, [], bot, cfg, svc)
 
-    def _bad_fetch_bound(url: str) -> TranscriptResult:
-        return bad_fetch(svc, url)
-
-    monkeypatch.setattr(svc, "fetch_cleaned", _bad_fetch_bound, raising=True)
-    monkeypatch.setattr(cog.rate_limiter, "allow", allow_all, raising=True)
     inter = _make_interaction()
     await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")
     assert errors and "bad" in errors[-1]
 
 
 @pytest.mark.asyncio
-async def test_transcript_runtime_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_transcript_runtime_error() -> None:
     cfg = _cfg()
     exceptions: list[Exception] = []
 
-    def boom_fetch(_svc: TranscriptService, _url: str) -> TranscriptResult:
-        raise RuntimeError("boom")
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+    _test_hooks.asyncio_to_thread = _run_sync
 
-    def allow_all(_user_id: int, _action: str) -> tuple[bool, float]:
-        return (True, 0.0)
-
-    monkeypatch.setattr("clubbot.cogs.transcript.asyncio.to_thread", _run_in_thread, raising=True)
-    monkeypatch.setattr("clubbot.cogs.transcript.validate_youtube_url", _validate_url, raising=True)
+    # Service that raises runtime error
+    svc = _FakeTranscriptService(cfg, raise_error=RuntimeError("boom"))
 
     bot = FakeBot()
-    svc = _FakeTranscriptService(cfg)
     cog = _TestingCog([], exceptions, bot, cfg, svc)
 
-    def _boom_fetch_bound(url: str) -> TranscriptResult:
-        return boom_fetch(svc, url)
-
-    monkeypatch.setattr(svc, "fetch_cleaned", _boom_fetch_bound, raising=True)
-    monkeypatch.setattr(cog.rate_limiter, "allow", allow_all, raising=True)
     inter = _make_interaction()
     await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")
     assert exceptions and isinstance(exceptions[-1], RuntimeError)
 
 
 @pytest.mark.asyncio
-async def test_transcript_success(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_transcript_success() -> None:
     cfg = _cfg()
 
-    def ok_fetch(_svc: TranscriptService, _url: str) -> TranscriptResult:
-        return TranscriptResult(url="https://v", video_id="vid1", text="hi")
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+    _test_hooks.asyncio_to_thread = _run_sync
 
-    def allow_all(_user_id: int, _action: str) -> tuple[bool, float]:
-        return (True, 0.0)
-
-    monkeypatch.setattr("clubbot.cogs.transcript.asyncio.to_thread", _run_in_thread, raising=True)
-    monkeypatch.setattr("clubbot.cogs.transcript.validate_youtube_url", _validate_url, raising=True)
+    result = TranscriptResult(url="https://v", video_id="vid1", text="hi")
+    svc = _FakeTranscriptService(cfg, result=result)
 
     bot = FakeBot()
-    svc = _FakeTranscriptService(cfg)
     cog = _TestingCog([], [], bot, cfg, svc)
 
-    def _ok_fetch_bound(url: str) -> TranscriptResult:
-        return ok_fetch(svc, url)
-
-    monkeypatch.setattr(svc, "fetch_cleaned", _ok_fetch_bound, raising=True)
-    monkeypatch.setattr(cog.rate_limiter, "allow", allow_all, raising=True)
     inter = _make_interaction()
     await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")
     last = _last_send(inter)
     if last["file"] is None:
         raise AssertionError("expected file")
+
+
+class _FakeTranscriptResultLike:
+    """A class that matches TranscriptResultLike but is NOT a TranscriptResult instance.
+
+    This is used to trigger the isinstance check failure in transcript.py line 124.
+    """
+
+    url: str = "https://v"
+    video_id: str = "vid"
+    text: str = "hello"
+
+
+@pytest.mark.asyncio
+async def test_transcript_unexpected_result_type_raises() -> None:
+    """Test that unexpected result type from asyncio_to_thread raises RuntimeError.
+
+    This covers transcript.py line 124:
+        raise RuntimeError("Unexpected result type from task")
+    """
+    cfg = _cfg()
+
+    # Configure hooks
+    _test_hooks.validate_youtube_url = _passthrough_url
+
+    # Make asyncio_to_thread return something that's NOT a TranscriptResult
+    async def _return_wrong_type(
+        func: _test_hooks._SyncCallable, url: str
+    ) -> _test_hooks.TranscriptResultLike:
+        _ = (func, url)
+        # Return a class instance that matches the protocol but is not TranscriptResult
+        # The isinstance check will fail
+        return _FakeTranscriptResultLike()
+
+    _test_hooks.asyncio_to_thread = _return_wrong_type
+
+    # Service won't actually be called since we're overriding asyncio_to_thread
+    svc = _FakeTranscriptService(cfg)
+
+    bot = FakeBot()
+    cog = TranscriptCog(bot=bot, config=cfg, transcript_service=svc)
+
+    inter = _make_interaction()
+    with pytest.raises(RuntimeError, match="Unexpected result type from task"):
+        await cog._transcript_impl(inter, inter.user, None, "https://example.com/watch?v=1")

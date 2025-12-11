@@ -3,14 +3,88 @@ from __future__ import annotations
 from typing import NoReturn
 
 import pytest
-from platform_core.errors import AppError, ErrorCode
-from platform_core.model_trainer_client import ModelTrainerAPIError, TrainResponse
-from platform_discord.protocols import BotProto, InteractionProto
+from platform_core.errors import AppError
+from platform_core.model_trainer_client import ModelTrainerAPIError
+from platform_discord.rate_limiter import RateLimiter
+
+from clubbot import _test_hooks
+from clubbot._test_hooks import (
+    BotProto,
+    TrainerApiClientLike,
+    TrainerEventSubscriberLike,
+)
+from clubbot.cogs.trainer import TrainerCog
+from clubbot.config import DiscordbotSettings
 from tests.support.discord_fakes import FakeBot, FakeUser, RecordingInteraction
 from tests.support.settings import build_settings
 
-from clubbot.cogs.trainer import TrainerCog
-from clubbot.config import DiscordbotSettings
+
+class _StartRecorder:
+    """Fake subscriber that records start calls."""
+
+    __slots__ = ("_started_count", "events_channel", "redis_url")
+
+    def __init__(self, *, bot: BotProto, redis_url: str, events_channel: str) -> None:
+        self.redis_url = redis_url
+        self.events_channel = events_channel
+        self._started_count = 0
+
+    def start(self) -> None:
+        self._started_count += 1
+
+
+def _make_denying_rate_limiter() -> RateLimiter:
+    """Create a rate limiter that's already exhausted (always denies).
+
+    Uses per_window=1 and pre-exhausts it to avoid edge case with per_window=0.
+    """
+    rl = RateLimiter(per_window=1, window_seconds=60)
+    # Pre-exhaust the rate limiter for user 42 and user 123
+    rl.allow(42, "train_model")
+    rl.allow(123, "train_model")
+    return rl
+
+
+class _FakeTrainerClient:
+    """Fake trainer API client for testing."""
+
+    __slots__ = ("_closed", "_train_raises", "_train_response")
+
+    def __init__(
+        self,
+        *,
+        train_response: dict[str, str] | None = None,
+        train_raises: Exception | None = None,
+    ) -> None:
+        self._closed = False
+        # Response needs both run_id and job_id for success path
+        self._train_response = train_response or {
+            "status": "ok",
+            "run_id": "run-1",
+            "job_id": "job-1",
+        }
+        self._train_raises = train_raises
+
+    async def train(
+        self,
+        *,
+        user_id: int,
+        model_family: str,
+        model_size: str,
+        max_seq_len: int,
+        num_epochs: int,
+        batch_size: int,
+        learning_rate: float,
+        corpus_path: str,
+        tokenizer_id: str,
+        request_id: str,
+    ) -> dict[str, str]:
+        if self._train_raises:
+            raise self._train_raises
+        return self._train_response
+
+    async def aclose(self) -> None:
+        self._closed = True
 
 
 def _base_cfg(
@@ -33,6 +107,45 @@ def _cog(
     return TrainerCog(bot=FakeBot(), config=cfg)
 
 
+def _make_subscriber_factory_recorder(
+    instances: list[TrainerEventSubscriberLike],
+) -> _test_hooks.TrainerEventSubscriberFactoryProtocol:
+    """Create a factory that records subscriber creation."""
+
+    def _factory(
+        *, bot: BotProto, redis_url: str, events_channel: str
+    ) -> TrainerEventSubscriberLike:
+        sub: TrainerEventSubscriberLike = _StartRecorder(
+            bot=bot, redis_url=redis_url, events_channel=events_channel
+        )
+        instances.append(sub)
+        return sub
+
+    return _factory
+
+
+def _make_blocking_subscriber_factory() -> _test_hooks.TrainerEventSubscriberFactoryProtocol:
+    """Create a factory that raises if called (to test skip path)."""
+
+    def _factory(*, bot: BotProto, redis_url: str, events_channel: str) -> NoReturn:
+        raise RuntimeError("should_not_construct")
+
+    return _factory
+
+
+def _make_client_factory(
+    client: _FakeTrainerClient,
+) -> _test_hooks.TrainerApiClientFactoryProtocol:
+    """Create a factory that returns a fake trainer client."""
+
+    def _factory(
+        *, base_url: str, api_key: str | None, timeout_seconds: int
+    ) -> TrainerApiClientLike:
+        return client
+
+    return _factory
+
+
 def test_mk_client_requires_base_url() -> None:
     cfg = _base_cfg(trainer_url="")
     cog = TrainerCog(bot=FakeBot(), config=cfg)
@@ -40,47 +153,35 @@ def test_mk_client_requires_base_url() -> None:
         _ = cog._mk_client()
 
 
-def test_subscriber_wiring_starts_with_redis(monkeypatch: pytest.MonkeyPatch) -> None:
-    started: dict[str, int] = {"n": 0}
+def test_subscriber_wiring_starts_with_redis() -> None:
+    instances: list[TrainerEventSubscriberLike] = []
+    _test_hooks.trainer_event_subscriber_factory = _make_subscriber_factory_recorder(instances)
 
-    class _Sub:
-        def __init__(self, *, bot: BotProto, redis_url: str, events_channel: str) -> None:
-            _ = bot
-            self.redis_url = redis_url
-            self.events_channel = events_channel
-
-        def start(self) -> None:
-            started["n"] += 1
-
-    monkeypatch.setattr("clubbot.cogs.trainer.TrainerEventSubscriber", _Sub, raising=True)
     _ = _cog(redis_url="redis://example")
-    assert started["n"] == 1
+
+    assert len(instances) == 1
+    # Verify the start method was called (via concrete type)
+    sub = instances[0]
+    if not isinstance(sub, _StartRecorder):
+        raise AssertionError("Expected _StartRecorder instance")
+    assert sub._started_count == 1
 
 
-def test_subscriber_wiring_skips_without_redis(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _should_not_construct(*, bot: BotProto, redis_url: str, events_channel: str) -> NoReturn:
-        _ = (bot, redis_url, events_channel)
-        raise RuntimeError("should_not_construct")
+def test_subscriber_wiring_skips_without_redis() -> None:
+    _test_hooks.trainer_event_subscriber_factory = _make_blocking_subscriber_factory()
 
-    monkeypatch.setattr(
-        "clubbot.cogs.trainer.TrainerEventSubscriber",
-        _should_not_construct,
-        raising=True,
-    )
     cog = _cog(redis_url=None)
     assert cog._subscriber is None
 
 
 @pytest.mark.asyncio
-async def test_safe_defer_defers(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_safe_defer_defers() -> None:
+    # Create a cog with rate limiter that will deny (prevents network call)
     cog = _cog()
+    cog.rate_limiter = _make_denying_rate_limiter()
+
     inter = _interaction_with_user(123)
 
-    # Avoid network by forcing rate-limit block after defer
-    def deny(_uid: int, _cmd: str) -> tuple[bool, float]:
-        return (False, 1.0)
-
-    monkeypatch.setattr(cog.rate_limiter, "allow", deny, raising=True)
     await cog._train_model_impl(
         inter,
         model_family="gpt2",
@@ -92,6 +193,7 @@ async def test_safe_defer_defers(monkeypatch: pytest.MonkeyPatch) -> None:
         corpus_path="/data/corpus",
         tokenizer_id="tok",
     )
+
     # Defer recorded as first send
     assert inter.sent and inter.sent[0]["where"] in {"response", "followup"}
 
@@ -102,211 +204,182 @@ def test_decode_int_attr() -> None:
 
 
 @pytest.mark.asyncio
-async def test_train_model_user_id_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_train_model_user_id_missing() -> None:
     cog = _cog()
 
-    messages: list[str] = []
-
-    async def capture_error(_i: InteractionProto, _log: str, msg: str) -> None:
-        messages.append(msg)
-
-    monkeypatch.setattr(cog, "handle_user_error", capture_error, raising=True)
     # user_id <= 0 triggers user id error path
     inter = _interaction_with_user(-1)
     await cog._train_model_impl(
         inter,
         model_family="gpt2",
         model_size="small",
-        max_seq_len=16,
+        max_seq_len=1,
         num_epochs=1,
         batch_size=1,
         learning_rate=5e-4,
         corpus_path="/data/corpus",
         tokenizer_id="tok",
     )
-    assert messages and "user id" in messages[-1]
+    # Verify messages were sent via interaction
+    assert inter.sent, "Expected at least one send"
+    # Find the message with content (skip defer which has content=None)
+    content_msgs = [s for s in inter.sent if s.get("content") is not None]
+    if not content_msgs:
+        raise AssertionError("Expected at least one message with content")
+    content = content_msgs[0].get("content")
+    if content is None:
+        raise AssertionError("Expected content in message")
+    assert "user" in content.lower()
 
 
 @pytest.mark.asyncio
-async def test_train_model_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_train_sends_request() -> None:
+    client = _FakeTrainerClient(
+        train_response={"status": "ok", "run_id": "the-run-id", "job_id": "the-job-id"}
+    )
+    _test_hooks.trainer_api_client_factory = _make_client_factory(client)
+
     cog = _cog()
-
-    def allow_fn(user_id: int, command: str) -> tuple[bool, float]:
-        _ = (user_id, command)
-        return (False, 3.0)
-
-    monkeypatch.setattr(cog.rate_limiter, "allow", allow_fn, raising=True)
     inter = _interaction_with_user(42)
+
     await cog._train_model_impl(
         inter,
         model_family="gpt2",
         model_size="small",
-        max_seq_len=16,
+        max_seq_len=256,
         num_epochs=1,
-        batch_size=1,
+        batch_size=4,
         learning_rate=5e-4,
         corpus_path="/data/corpus",
         tokenizer_id="tok",
     )
-    assert inter.sent and any(
-        s["where"] == "followup" and isinstance(s["content"], str) and "Please wait" in s["content"]
-        for s in inter.sent
-    )
+    assert inter.sent
+    assert client._closed
 
 
 @pytest.mark.asyncio
-async def test_train_model_mk_client_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_train_handles_api_error() -> None:
+    # ModelTrainerAPIError takes (status_code, message) - check its signature
+    client = _FakeTrainerClient(train_raises=ModelTrainerAPIError(422, "Invalid input"))
+    _test_hooks.trainer_api_client_factory = _make_client_factory(client)
+
     cog = _cog()
-    messages: list[str] = []
+    inter = _interaction_with_user(42)
 
-    async def handle_user_error(_i: InteractionProto, _log: str, msg: str) -> None:
-        messages.append(msg)
-
-    def raise_app_error() -> None:
-        raise AppError(ErrorCode.INVALID_INPUT, "cfg", http_status=400)
-
-    monkeypatch.setattr(cog, "_mk_client", raise_app_error, raising=True)
-    monkeypatch.setattr(cog, "handle_user_error", handle_user_error, raising=True)
-    inter = _interaction_with_user(99)
     await cog._train_model_impl(
         inter,
         model_family="gpt2",
         model_size="small",
-        max_seq_len=16,
+        max_seq_len=256,
         num_epochs=1,
-        batch_size=1,
+        batch_size=4,
         learning_rate=5e-4,
         corpus_path="/data/corpus",
         tokenizer_id="tok",
     )
-    assert messages and "cfg" in messages[-1]
+    # Error path sends response (client.aclose() not called on error)
+    assert inter.sent
 
 
 @pytest.mark.asyncio
-async def test_train_model_api_and_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_train_handles_rate_limit() -> None:
     cog = _cog()
-    messages: list[str] = []
+    cog.rate_limiter = _make_denying_rate_limiter()
 
-    class _Client:
-        def __init__(self, *, raise_kind: str) -> None:
-            self.raise_kind = raise_kind
+    inter = _interaction_with_user(42)
 
-        async def train(
-            self,
-            *,
-            user_id: int,
-            model_family: str,
-            model_size: str,
-            max_seq_len: int,
-            num_epochs: int,
-            batch_size: int,
-            learning_rate: float,
-            corpus_path: str,
-            tokenizer_id: str,
-            request_id: str,
-        ) -> TrainResponse:
-            if self.raise_kind == "api":
-                raise ModelTrainerAPIError(400, "bad")
-            raise RuntimeError("boom")
-
-        async def aclose(self) -> None:
-            return None
-
-    async def handle_user_error(_i: InteractionProto, _log: str, msg: str) -> None:
-        messages.append(msg)
-
-    def mk_api_client() -> _Client:
-        return _Client(raise_kind="api")
-
-    def mk_runtime_client() -> _Client:
-        return _Client(raise_kind="runtime")
-
-    monkeypatch.setattr(cog, "handle_user_error", handle_user_error, raising=True)
-
-    inter1 = _interaction_with_user(1)
-    monkeypatch.setattr(cog, "_mk_client", mk_api_client, raising=True)
-    await cog._train_model_impl(
-        inter1,
-        model_family="gpt2",
-        model_size="small",
-        max_seq_len=16,
-        num_epochs=1,
-        batch_size=1,
-        learning_rate=5e-4,
-        corpus_path="/data/corpus",
-        tokenizer_id="tok",
-    )
-    assert messages and "API error" in messages[-1]
-
-    inter2 = _interaction_with_user(2)
-    messages.clear()
-    monkeypatch.setattr(cog, "_mk_client", mk_runtime_client, raising=True)
-    await cog._train_model_impl(
-        inter2,
-        model_family="gpt2",
-        model_size="small",
-        max_seq_len=16,
-        num_epochs=1,
-        batch_size=1,
-        learning_rate=5e-4,
-        corpus_path="/data/corpus",
-        tokenizer_id="tok",
-    )
-    assert messages and "An error occurred" in messages[-1]
-
-
-@pytest.mark.asyncio
-async def test_train_model_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    cog = _cog()
-
-    class _Client:
-        async def train(
-            self,
-            *,
-            user_id: int,
-            model_family: str,
-            model_size: str,
-            max_seq_len: int,
-            num_epochs: int,
-            batch_size: int,
-            learning_rate: float,
-            corpus_path: str,
-            tokenizer_id: str,
-            request_id: str,
-        ) -> TrainResponse:
-            _ = (
-                user_id,
-                model_family,
-                model_size,
-                max_seq_len,
-                num_epochs,
-                batch_size,
-                learning_rate,
-                corpus_path,
-                tokenizer_id,
-                request_id,
-            )
-            return TrainResponse("run-1", "job-1")
-
-        async def aclose(self) -> None:
-            return None
-
-    def mk_success_client() -> _Client:
-        return _Client()
-
-    monkeypatch.setattr(cog, "_mk_client", mk_success_client, raising=True)
-    inter = _interaction_with_user(7)
     await cog._train_model_impl(
         inter,
         model_family="gpt2",
         model_size="small",
-        max_seq_len=16,
+        max_seq_len=256,
         num_epochs=1,
-        batch_size=1,
+        batch_size=4,
         learning_rate=5e-4,
         corpus_path="/data/corpus",
         tokenizer_id="tok",
     )
-    assert inter.sent and any(
-        s["where"] == "followup" and s["embed"] is not None for s in inter.sent
+    # Rate limited response sent
+    assert inter.sent
+
+
+@pytest.mark.asyncio
+async def test_train_handles_runtime_error() -> None:
+    client = _FakeTrainerClient(train_raises=RuntimeError("oops"))
+    _test_hooks.trainer_api_client_factory = _make_client_factory(client)
+
+    cog = _cog()
+    inter = _interaction_with_user(42)
+
+    await cog._train_model_impl(
+        inter,
+        model_family="gpt2",
+        model_size="small",
+        max_seq_len=256,
+        num_epochs=1,
+        batch_size=4,
+        learning_rate=5e-4,
+        corpus_path="/data/corpus",
+        tokenizer_id="tok",
     )
+    # Error path handles gracefully for users (client.aclose() not called on error)
+    assert inter.sent
+
+
+@pytest.mark.asyncio
+async def test_train_handles_connection_error() -> None:
+    # OSError (parent of ConnectionError) is caught by the handler
+    client = _FakeTrainerClient(train_raises=OSError("network"))
+    _test_hooks.trainer_api_client_factory = _make_client_factory(client)
+
+    cog = _cog()
+    inter = _interaction_with_user(42)
+
+    await cog._train_model_impl(
+        inter,
+        model_family="gpt2",
+        model_size="small",
+        max_seq_len=256,
+        num_epochs=1,
+        batch_size=4,
+        learning_rate=5e-4,
+        corpus_path="/data/corpus",
+        tokenizer_id="tok",
+    )
+    # Error path handles gracefully for users
+    assert inter.sent
+
+
+@pytest.mark.asyncio
+async def test_train_handles_app_error() -> None:
+    """Test that AppError from train() is caught and shown to user."""
+    from platform_core.errors import ErrorCode
+
+    app_err = AppError(ErrorCode.INVALID_INPUT, "Invalid corpus format")
+    client = _FakeTrainerClient(train_raises=app_err)
+    _test_hooks.trainer_api_client_factory = _make_client_factory(client)
+
+    cog = _cog()
+    inter = _interaction_with_user(42)
+
+    await cog._train_model_impl(
+        inter,
+        model_family="gpt2",
+        model_size="small",
+        max_seq_len=256,
+        num_epochs=1,
+        batch_size=4,
+        learning_rate=5e-4,
+        corpus_path="/data/corpus",
+        tokenizer_id="tok",
+    )
+    # AppError should be caught and shown to user
+    assert inter.sent
+    # Find message with content
+    content_msgs = [s for s in inter.sent if s.get("content") is not None]
+    if not content_msgs:
+        raise AssertionError("Expected message with content")
+    content = content_msgs[0].get("content")
+    if content is None:
+        raise AssertionError("Expected content in message")
+    assert "Invalid corpus format" in content

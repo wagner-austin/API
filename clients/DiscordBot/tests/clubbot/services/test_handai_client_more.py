@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Mapping
 
@@ -75,8 +74,8 @@ class _FakeClientWithHeaders:
         return _FakeResponse(200, _predict_body())
 
 
-class _FakeClientRetryThenSuccess:
-    """Fake client that fails first then succeeds."""
+class _FakeClientAlwaysFails:
+    """Fake client that always raises."""
 
     def __init__(self) -> None:
         self.call_count = 0
@@ -93,12 +92,10 @@ class _FakeClientRetryThenSuccess:
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
     ) -> HttpxResponse:
         self.call_count += 1
-        if self.call_count == 1:
-            raise RequestError("boom")
-        return _FakeResponse(200, _predict_body())
+        raise RequestError("boom")
 
     async def get(self, url: str, *, headers: Mapping[str, str]) -> HttpxResponse:
-        return _FakeResponse(200, _predict_body())
+        raise RequestError("boom")
 
 
 class _FakeClientListResponse:
@@ -144,17 +141,14 @@ async def test_headers_include_api_key() -> None:
 
 
 @pytest.mark.asyncio
-async def test_request_error_retries_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fast_sleep(_t: float) -> None:
-        return None
-
-    monkeypatch.setattr(asyncio, "sleep", _fast_sleep)
-    fake_client = _FakeClientRetryThenSuccess()
+async def test_request_error_propagates_without_retry() -> None:
+    """Test that exceptions propagate immediately when max_retries=0."""
+    fake_client = _FakeClientAlwaysFails()
     hc = HandwritingClient(
         base_url="http://x",
         api_key=None,
         timeout_seconds=1,
-        max_retries=1,
+        max_retries=0,
         client=fake_client,
     )
     with pytest.raises(RequestError):

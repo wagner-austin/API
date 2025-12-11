@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 from platform_workers.rq_harness import (
     RQClientQueue,
     RQJobLike,
@@ -10,6 +9,8 @@ from platform_workers.rq_harness import (
 from platform_workers.rq_harness import (
     _JsonValue as _RQJsonValue,
 )
+
+from clubbot import _test_hooks
 
 
 def test_digits_enqueuer_redis_helper_cov() -> None:
@@ -21,7 +22,7 @@ def test_digits_enqueuer_redis_helper_cov() -> None:
     _ = conn
 
 
-def test_digits_enqueuer_queue_and_retry_helpers_cov(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_digits_enqueuer_queue_and_retry_helpers_cov() -> None:
     from clubbot.services.jobs import digits_enqueuer as de
 
     class _DummyConn:
@@ -54,7 +55,7 @@ def test_digits_enqueuer_queue_and_retry_helpers_cov(monkeypatch: pytest.MonkeyP
             self.max = 1
             self.interval = [1, 2]
 
-    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+    def _fake_rq_queue(name: str, *, connection: _RedisBytesClient) -> RQClientQueue:
         _ = (name, connection)
         return _DummyQueue()
 
@@ -62,9 +63,14 @@ def test_digits_enqueuer_queue_and_retry_helpers_cov(monkeypatch: pytest.MonkeyP
         _ = (max_retries, intervals)
         return _DummyRetry()
 
-    monkeypatch.setattr("platform_workers.rq_harness.rq_queue", _fake_rq_queue, raising=True)
-    monkeypatch.setattr("platform_workers.rq_harness.rq_retry", _fake_rq_retry, raising=True)
-
-    q = de._rq_queue("digits", connection=_DummyConn())
-    r = de._rq_retry(max_retries=1, intervals=[1, 2])
-    assert q is not None and r is not None
+    original_queue = _test_hooks.rq_queue
+    original_retry = _test_hooks.rq_retry
+    _test_hooks.rq_queue = _fake_rq_queue
+    _test_hooks.rq_retry = _fake_rq_retry
+    try:
+        q = de._rq_queue("digits", connection=_DummyConn())
+        r = de._rq_retry(max_retries=1, intervals=[1, 2])
+        assert q is not None and r is not None
+    finally:
+        _test_hooks.rq_queue = original_queue
+        _test_hooks.rq_retry = original_retry

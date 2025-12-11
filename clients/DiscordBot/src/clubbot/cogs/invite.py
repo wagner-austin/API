@@ -6,6 +6,7 @@ from monorepo_guards._types import UnknownJson
 from platform_discord.embed_helpers import add_field, create_embed
 from platform_discord.protocols import InteractionProto
 
+from .. import _test_hooks
 from ..config import DiscordbotSettings
 from .base import BaseCog, _BotProto
 
@@ -27,9 +28,7 @@ class InviteCog(BaseCog):
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.allowed_installs(guilds=True, users=True)
     async def invite(self, interaction: discord.Interaction) -> None:
-        from platform_discord.protocols import wrap_interaction
-
-        wrapped = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         await self._invite_impl(wrapped)
 
     async def _invite_impl(self, interaction: InteractionProto) -> None:

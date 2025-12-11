@@ -8,6 +8,7 @@ from clubbot.config import (
     DigitsConfig,
     DiscordbotSettings,
     DiscordConfig,
+    GatewayConfig,
     HandwritingConfig,
     ModelTrainerConfig,
     QRConfig,
@@ -250,6 +251,10 @@ def build_settings(
         "rate_window_seconds": trainer_window,
     }
 
+    gateway_cfg: GatewayConfig = {
+        "api_url": "",
+    }
+
     return {
         "discord": discord_cfg,
         "qr": qr_cfg,
@@ -258,6 +263,7 @@ def build_settings(
         "handwriting": handwriting_cfg,
         "digits": digits_cfg,
         "model_trainer": model_trainer_cfg,
+        "gateway": gateway_cfg,
     }
 
 

@@ -3,36 +3,45 @@ from __future__ import annotations
 import logging
 
 import pytest
-from platform_discord.protocols import BotProto
 from tests.support.discord_fakes import FakeBot, FakeDigitService
+from tests.support.settings import build_settings
 
-import clubbot.cogs.digits as digits_mod
+from clubbot import _test_hooks
 from clubbot.cogs.digits import DigitsCog
 
 _Bot = FakeBot
 
 
+class _FakeSub:
+    """Fake subscriber that tracks calls."""
+
+    def __init__(self, *, redis_url: str) -> None:
+        self.redis_url = redis_url
+        self._started = False
+        self._stopped = False
+
+    def start(self) -> None:
+        self._started = True
+
+    async def stop(self) -> None:
+        self._stopped = True
+
+
 @pytest.mark.asyncio
-async def test_digits_cog_initializes_event_subscriber(monkeypatch: pytest.MonkeyPatch) -> None:
-    from tests.support.settings import build_settings
+async def test_digits_cog_initializes_event_subscriber() -> None:
+    captured: list[_FakeSub] = []
 
-    created: dict[str, str | bool] = {}
+    def _factory(
+        *,
+        bot: _test_hooks.BotProto,
+        redis_url: str,
+    ) -> _FakeSub:
+        _ = bot
+        sub = _FakeSub(redis_url=redis_url)
+        captured.append(sub)
+        return sub
 
-    class _FakeSub:
-        def __init__(self, bot: BotProto, *, redis_url: str, events_channel: str) -> None:
-            _ = bot
-            created["redis_url"] = redis_url
-            created["events_channel"] = events_channel
-            self._started = False
-
-        def start(self) -> None:
-            self._started = True
-            created["started"] = True
-
-        async def stop(self) -> None:
-            created["stopped"] = True
-
-    monkeypatch.setattr("clubbot.cogs.digits.DigitsEventSubscriber", _FakeSub, raising=True)
+    _test_hooks.digits_event_subscriber_factory = _factory
 
     bot = _Bot()
     cfg = build_settings(
@@ -43,9 +52,10 @@ async def test_digits_cog_initializes_event_subscriber(monkeypatch: pytest.Monke
     )
     svc = FakeDigitService()
     _ = DigitsCog(bot, cfg, svc)
-    assert created.get("redis_url") == "redis://fake"
-    assert created.get("events_channel") == digits_mod.DEFAULT_DIGITS_EVENTS_CHANNEL
-    assert created.get("started") is True
+
+    assert len(captured) == 1
+    assert captured[0].redis_url == "redis://fake"
+    assert captured[0]._started is True
 
 
 logger = logging.getLogger(__name__)

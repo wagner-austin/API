@@ -3,9 +3,8 @@ from __future__ import annotations
 import pytest
 from platform_discord.protocols import (
     InteractionProto,
-    UserProto,
 )
-from tests.support.discord_fakes import FakeBot, RecordingInteraction
+from tests.support.discord_fakes import FakeBot, FakeUser, RecordingInteraction
 from tests.support.settings import build_settings
 
 from clubbot.cogs.base import _Logger
@@ -25,16 +24,38 @@ def test_mk_client_success() -> None:
     _ = client.aclose
 
 
-@pytest.mark.asyncio
-async def test_train_model_impl_ack_false_short_circuits(monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = _cfg_with_trainer()
-    cog = TrainerCog(bot=FakeBot(), config=cfg)
+class _DeferFalseCog(TrainerCog):
+    """Cog subclass where _safe_defer returns False."""
 
-    async def _false_ack(_i: InteractionProto, *, ephemeral: bool) -> bool:
-        _ = ephemeral
+    async def _safe_defer(self, interaction: InteractionProto, *, ephemeral: bool) -> bool:
+        _ = (interaction, ephemeral)
         return False
 
-    monkeypatch.setattr(cog, "_safe_defer", _false_ack, raising=True)
+
+class _ErrorCapturingCog(TrainerCog):
+    """Cog subclass that captures error messages."""
+
+    def __init__(
+        self,
+        bot: FakeBot,
+        config: DiscordbotSettings,
+        errors: list[str],
+    ) -> None:
+        super().__init__(bot=bot, config=config)
+        self._errors = errors
+
+    async def handle_user_error(
+        self, interaction: InteractionProto, log: _Logger, message: str
+    ) -> None:
+        _ = (interaction, log)
+        self._errors.append(message)
+
+
+@pytest.mark.asyncio
+async def test_train_model_impl_ack_false_short_circuits() -> None:
+    cfg = _cfg_with_trainer()
+    cog = _DeferFalseCog(bot=FakeBot(), config=cfg)
+
     inter = RecordingInteraction()
     await cog._train_model_impl(
         inter,
@@ -52,30 +73,13 @@ async def test_train_model_impl_ack_false_short_circuits(monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
-async def test_train_model_impl_user_id_missing_calls_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_train_model_impl_user_id_missing_calls_error() -> None:
     cfg = _cfg_with_trainer()
-    cog = TrainerCog(bot=FakeBot(), config=cfg)
-    inter = RecordingInteraction()
-
-    # Force ack to true to proceed into user id decode path
-    async def _true_ack(_i: InteractionProto, *, ephemeral: bool) -> bool:
-        _ = ephemeral
-        return True
-
-    def _none_decode(_o: UserProto | None, _n: str) -> int | None:
-        return None
-
-    monkeypatch.setattr(cog, "_safe_defer", _true_ack, raising=True)
-    monkeypatch.setattr(TrainerCog, "decode_int_attr", staticmethod(_none_decode), raising=True)
-
     errors: list[str] = []
+    cog = _ErrorCapturingCog(FakeBot(), cfg, errors)
 
-    async def capture_error(_i: InteractionProto, _l: _Logger, msg: str) -> None:
-        errors.append(msg)
-
-    monkeypatch.setattr(cog, "handle_user_error", capture_error, raising=True)
+    # Use a user with id=-1 to trigger the "user_id <= 0" error path
+    inter = RecordingInteraction(user=FakeUser(user_id=-1))
 
     await cog._train_model_impl(
         inter,

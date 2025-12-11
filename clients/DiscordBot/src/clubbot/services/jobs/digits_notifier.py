@@ -37,7 +37,6 @@ from platform_discord.handwriting.runtime import (
     on_artifact,
     on_batch,
     on_best,
-    on_completed,
     on_failed,
     on_progress,
     on_prune,
@@ -47,6 +46,8 @@ from platform_discord.handwriting.runtime import (
 from platform_discord.handwriting.types import TrainingConfig, TrainingMetrics
 from platform_discord.protocols import BotProto
 from platform_discord.subscriber import MessageSource
+
+from clubbot import _test_hooks
 
 _EVENT_TASK_NAME: Final[str] = "digits-event-subscriber"
 
@@ -252,7 +253,7 @@ class DigitsEventSubscriber(BotEventSubscriber[DigitsEventV1]):
         )
 
     async def _handle_completed_event(self, event: DigitsCompletedMetricsV1) -> None:
-        act_opt = on_completed(
+        act_opt = _test_hooks.on_completed(
             self._runtime,
             user_id=event["user_id"],
             request_id=event["job_id"],
@@ -261,7 +262,9 @@ class DigitsEventSubscriber(BotEventSubscriber[DigitsEventV1]):
             val_acc=event["val_acc"],
         )
         if act_opt is not None:
-            await self._maybe_notify(act_opt)
+            # Cast to RequestAction for type safety
+            act: RequestAction = act_opt
+            await self._maybe_notify(act)
 
     async def _handle_failed_event(self, event: JobFailedV1) -> None:
         act = on_failed(

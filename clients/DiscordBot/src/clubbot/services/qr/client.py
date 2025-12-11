@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Protocol, TypedDict
 
 from platform_core.errors import AppError, ErrorCode
-from platform_core.http_client import HttpxClient, JsonObject, build_client
+from platform_core.http_client import HttpxClient, JsonObject
 from platform_core.http_utils import add_correlation_header
 from platform_core.json_utils import load_json_str
 from platform_core.logging import get_logger
+
+from clubbot import _test_hooks
 
 from ...config import DiscordbotSettings
 
@@ -43,7 +45,7 @@ class QRHttpClient(QRClient):
     def __init__(self, base_url: str, timeout_seconds: int = 5) -> None:
         self._base: str = base_url.rstrip("/")
         self._timeout: float = float(timeout_seconds)
-        self._client: HttpxClient = build_client(self._timeout)
+        self._client: HttpxClient = _test_hooks.build_client(self._timeout)
 
     def close(self) -> None:
         self._client.close()

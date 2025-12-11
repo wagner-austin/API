@@ -15,9 +15,9 @@ from platform_core.trainer_metrics_events import (
 from platform_discord.embed_helpers import EmbedProto
 from platform_discord.protocols import FileProto, MessageProto, UserProto
 from platform_discord.trainer.handler import TrainerEventV1
-from tests.support.discord_fakes import FakeMessage
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
+from tests.support.discord_fakes import FakeMessage
 
 
 class _TrackingUser:

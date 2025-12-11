@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Coroutine
-from typing import Protocol
 
 import pytest
 from platform_discord.embed_helpers import EmbedProto
@@ -18,6 +16,7 @@ from platform_discord.protocols import (
 from tests.support.discord_fakes import RaisingFollowup
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
 from clubbot.container import ServiceContainer
 from clubbot.orchestrator import BotOrchestrator
 from clubbot.services.qr.client import QRService
@@ -25,25 +24,8 @@ from clubbot.services.qr.client import QRService
 logger = logging.getLogger(__name__)
 
 
-class ErrorHandler(Protocol):
-    __name__: str
-
-    def __call__(
-        self, interaction: InteractionProto, error: BaseException, /
-    ) -> Coroutine[None, None, None]: ...
-
-
 class _HTTPError(Exception):
     pass
-
-
-class _Capture:
-    def __init__(self, store: dict[str, ErrorHandler]) -> None:
-        self._store = store
-
-    def __call__(self, func: ErrorHandler, name: str | None = None) -> None:
-        key = func.__name__ if name is None else name
-        self._store[key] = func
 
 
 class _Msg(MessageProto):
@@ -113,9 +95,7 @@ class _Interaction(InteractionProto):
         return self._user
 
 
-def test_on_app_command_error_followup_send_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    import clubbot.orchestrator as orch_mod
-
+def test_on_app_command_error_followup_send_failure() -> None:
     cfg = build_settings(
         commands_sync_global=False,
         qr_default_border=2,
@@ -125,19 +105,20 @@ def test_on_app_command_error_followup_send_failure(monkeypatch: pytest.MonkeyPa
     container = ServiceContainer(cfg=cfg, qr_service=QRService(cfg))
     orch = BotOrchestrator(container)
     orch.build_bot()
-
-    captured: dict[str, ErrorHandler] = {}
-    monkeypatch.setattr(orch.bot, "add_listener", _Capture(captured), raising=True)
     orch.register_listeners()
-    handler = captured["on_application_command_error"]
 
-    class _FakeDiscord:
-        HTTPException = _HTTPError
-        Forbidden = _HTTPError
-        NotFound = _HTTPError
+    # Use the hook directly - no need to build orchestrator
+    handler = _test_hooks.app_command_error_handler
 
-    monkeypatch.setattr(orch_mod, "discord", _FakeDiscord, raising=True)
+    # Use the discord_exception_types hook to inject our custom exception types
+    def _custom_exception_types() -> tuple[type[Exception], type[Exception], type[Exception]]:
+        return (_HTTPError, _HTTPError, _HTTPError)
 
-    interaction: InteractionProto = _Interaction()
-    with pytest.raises(_HTTPError):
-        asyncio.run(handler(interaction, RuntimeError("x")))
+    original = _test_hooks.discord_exception_types
+    _test_hooks.discord_exception_types = _custom_exception_types
+    try:
+        interaction: InteractionProto = _Interaction()
+        with pytest.raises(_HTTPError):
+            asyncio.run(handler(interaction, RuntimeError("x")))
+    finally:
+        _test_hooks.discord_exception_types = original

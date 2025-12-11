@@ -8,12 +8,12 @@ import discord
 from discord import app_commands
 from platform_core.errors import AppError
 from platform_core.logging import get_logger
-from platform_discord.protocols import InteractionProto, wrap_interaction
+from platform_discord.protocols import InteractionProto
 from platform_discord.rate_limiter import RateLimiter
 
+from .. import _test_hooks
 from ..config import DiscordbotSettings, load_discordbot_settings
 from ..services.transcript.client import TranscriptService
-from ..utils.youtube import validate_youtube_url
 from .base import BaseCog, BotForSetup, _BotProto
 
 
@@ -57,7 +57,7 @@ class TranscriptCog(BaseCog):
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.describe(url="YouTube video URL")
     async def transcript(self, interaction: discord.Interaction, url: str) -> None:
-        wrapped: InteractionProto = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         guild_obj: _HasId | None = getattr(interaction, "guild", None)
         await self._transcript_impl(
             wrapped,
@@ -92,7 +92,7 @@ class TranscriptCog(BaseCog):
         log.debug("Transcript command invoked by user=%s guild=%s", str(user_id), guild_id_str)
 
         # Validate early that it's a YouTube URL for nice errors
-        _ = validate_youtube_url(url)
+        _ = _test_hooks.validate_youtube_url(url)
 
         if not await self.check_rate_limit(
             wrapped,
@@ -107,7 +107,8 @@ class TranscriptCog(BaseCog):
         # Fetch via API provider without try/except by inspecting task outcome
         from ..services.transcript.client import TranscriptResult
 
-        task = asyncio.create_task(asyncio.to_thread(self.transcript_service.fetch_cleaned, url))
+        coro = _test_hooks.asyncio_to_thread(self.transcript_service.fetch_cleaned, url)
+        task = asyncio.create_task(coro)
         await asyncio.wait({task})
         exc = task.exception()
         if isinstance(exc, AppError):

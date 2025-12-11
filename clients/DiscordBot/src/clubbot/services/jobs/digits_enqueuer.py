@@ -7,13 +7,12 @@ from platform_workers.rq_harness import (
     RQJobLike,
     RQRetryLike,
     _RedisBytesClient,
-    redis_raw_for_rq,
-    rq_queue,
-    rq_retry,
 )
 from platform_workers.rq_harness import (
     _JsonValue as _RQJsonValue,
 )
+
+from clubbot import _test_hooks
 
 
 class DigitsEnqueuer(Protocol):
@@ -92,7 +91,7 @@ class RQDigitsEnqueuer:
 
 
 def _redis_from_url(redis_url: str) -> _RedisBytesClient:
-    conn: _RedisBytesClient = redis_raw_for_rq(redis_url)
+    conn: _RedisBytesClient = _test_hooks.redis_raw_for_rq(redis_url)
     return conn
 
 
@@ -139,8 +138,8 @@ def _enqueue_train_impl(
 
 
 def _rq_queue(name: str, *, connection: _RedisBytesClient) -> RQClientQueue:
-    return rq_queue(name, connection=connection)
+    return _test_hooks.rq_queue(name, connection=connection)
 
 
 def _rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
-    return rq_retry(max_retries=max_retries, intervals=intervals)
+    return _test_hooks.rq_retry(max_retries=max_retries, intervals=intervals)

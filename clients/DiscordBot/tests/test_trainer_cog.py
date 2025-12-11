@@ -4,14 +4,13 @@ import asyncio
 import logging
 from types import TracebackType
 
-import pytest
-from platform_core.model_trainer_client import TrainResponse
 from platform_discord.embed_helpers import EmbedProto
 from platform_discord.protocols import FileProto, MessageProto, ResponseProto, UserProto
+
+from clubbot import _test_hooks
+from clubbot.cogs.trainer import TrainerCog
 from tests.support.discord_fakes import FakeBot, FakeMessage, FakeUser
 from tests.support.settings import build_settings
-
-from clubbot.cogs.trainer import TrainerCog
 
 
 class _Resp:
@@ -106,21 +105,28 @@ class _ClientStub:
         corpus_path: str,
         tokenizer_id: str,
         request_id: str,
-    ) -> TrainResponse:
-        return TrainResponse(run_id="r", job_id="j")
+    ) -> dict[str, str]:
+        return {"run_id": "r", "job_id": "j"}
 
 
-def test_trainer_cog_train_model_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_trainer_cog_train_model_happy_path() -> None:
     cfg = build_settings(
         model_trainer_api_url="https://example",
         model_trainer_api_key=None,
         model_trainer_api_timeout_seconds=10,
     )
+
+    def _fake_client_factory(
+        *, base_url: str, api_key: str | None, timeout_seconds: int
+    ) -> _test_hooks.TrainerApiClientLike:
+        return _ClientStub()
+
+    _test_hooks.trainer_api_client_factory = _fake_client_factory
+
     cog = TrainerCog(bot=FakeBot(), config=cfg)
     inter = _Interaction()
 
     async def _run() -> None:
-        monkeypatch.setattr(cog, "_mk_client", lambda: _ClientStub())
         # Call the internal implementation directly for testing
         await cog._train_model_impl(
             inter,

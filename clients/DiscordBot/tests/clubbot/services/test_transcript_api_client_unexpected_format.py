@@ -1,24 +1,13 @@
 from __future__ import annotations
 
-import sys
 from collections.abc import Mapping
-from typing import Protocol
 
 import pytest
-from platform_core.http_client import HttpxClient, HttpxResponse, Timeout
+from platform_core.http_client import HttpxClient, HttpxResponse
 from platform_core.json_utils import JSONValue
 
+from clubbot import _test_hooks
 from clubbot.services.transcript.api_client import TranscriptApiClient, captions
-
-
-class _FakeTimeout:
-    """Fake timeout that satisfies Timeout Protocol."""
-
-    def __init__(self, timeout: float) -> None:
-        self._timeout = timeout
-
-    def __repr__(self) -> str:
-        return f"Timeout({self._timeout})"
 
 
 class _FakeResp:
@@ -55,52 +44,19 @@ class _FakeClient:
         return None
 
 
-class _TimeoutCtor(Protocol):
-    def __call__(self, timeout: float) -> Timeout: ...
+def _make_fake_client_builder(text: str) -> _test_hooks.BuildClientProtocol:
+    """Create a build_client hook that returns a fake client with given text."""
 
-
-class _ClientCtor(Protocol):
-    def __call__(self, *, timeout: Timeout) -> HttpxClient: ...
-
-
-def _make_timeout_ctor() -> _TimeoutCtor:
-    """Create a typed Timeout constructor."""
-
-    def ctor(timeout: float) -> Timeout:
-        return _FakeTimeout(timeout)
-
-    return ctor
-
-
-def _make_client_ctor(text: str) -> _ClientCtor:
-    """Create a typed Client constructor."""
-
-    def ctor(*, timeout: Timeout) -> HttpxClient:
+    def builder(timeout: float) -> HttpxClient:
         _ = timeout
         return _FakeClient(text=text)
 
-    return ctor
+    return builder
 
 
-class _FakeHttpxModule:
-    """Fake httpx module with properly typed attributes."""
-
-    def __init__(self, text: str) -> None:
-        timeout_ctor = _make_timeout_ctor()
-        client_ctor = _make_client_ctor(text)
-
-        def _async_client(*, timeout: Timeout) -> HttpxClient:
-            _ = timeout
-            return client_ctor(timeout=timeout)
-
-        object.__setattr__(self, "Timeout", timeout_ctor)
-        object.__setattr__(self, "AsyncClient", _async_client)
-        object.__setattr__(self, "Client", client_ctor)
-
-
-def test_transcript_api_client_unexpected_format(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(sys.modules, "httpx", _FakeHttpxModule('"not a dict"'))
+def test_transcript_api_client_unexpected_format() -> None:
+    _test_hooks.build_client = _make_fake_client_builder('"not a dict"')
 
     client: TranscriptApiClient = {"base_url": "http://api", "timeout_seconds": 1.0}
     with pytest.raises(RuntimeError):
-        _ = captions(client, url="https://x", preferred_langs=["en"])  # triggers unexpected format
+        _ = captions(client, url="https://x", preferred_langs=["en"])

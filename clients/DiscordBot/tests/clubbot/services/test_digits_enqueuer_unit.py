@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import Final, NamedTuple
 
-import pytest
 from platform_workers.rq_harness import (
     RQClientQueue,
+    RQJobLike,
     RQRetryLike,
     _RedisBytesClient,
 )
@@ -13,44 +13,83 @@ from platform_workers.rq_harness import (
     _JsonValue as _RQJsonValue,
 )
 
+from clubbot import _test_hooks
+from clubbot._test_hooks import (
+    RqBytesClientFactoryProtocol,
+    RqQueueProtocol,
+    RqRetryProtocol,
+)
 from clubbot.services.jobs.digits_enqueuer import RQDigitsEnqueuer
 
 
-class _Retry:
-    def __init__(self, *, max: int, interval: list[int]) -> None:
-        self.max = max
-        self.interval = interval
+class EnqueueCall(NamedTuple):
+    """Record of an enqueue call for assertions."""
 
-
-class _FakeRedisConnection:
-    pass
-
-
-class _CallState(TypedDict, total=False):
-    queue_name: str
-    func_name: str
+    func_ref: str
     payload: dict[str, int | str | float | bool | None]
-    opts: dict[str, int | str | _Retry]
-    connection: _FakeRedisConnection | None
+    job_timeout: int
+    result_ttl: int
+    failure_ttl: int
+    retry_max: int
+    retry_intervals: list[int]
+    description: str
 
 
-CALLS: _CallState = {}
+class _FakeJob:
+    """Fake RQ job for testing."""
 
+    __slots__ = ("_id",)
 
-class _Job:
-    def __init__(self, jid: str) -> None:
-        self._id = jid
+    def __init__(self, job_id: str) -> None:
+        self._id = job_id
 
     def get_id(self) -> str:
         return self._id
 
 
-class _Queue(RQClientQueue):
+class _FakeRetry:
+    """Fake RQ Retry for testing."""
+
+    __slots__ = ("interval", "max")
+
+    def __init__(self, *, max: int, interval: list[int]) -> None:
+        self.max = max
+        self.interval = interval
+
+
+class _FakeRedisBytesConnection:
+    """Fake Redis bytes connection for testing."""
+
+    __slots__ = ("_closed",)
+
+    def __init__(self) -> None:
+        self._closed = False
+
+    def ping(self, **kwargs: str | int | float | bool | None) -> bool:
+        """Ping implementation for protocol compliance."""
+        return True
+
+    def close(self) -> None:
+        self._closed = True
+
+
+class _FakeQueueWithRecording:
+    """Fake RQ queue that records enqueue calls for verification."""
+
+    __slots__ = ("_calls", "_connection", "_job_id", "_name")
+
     def __init__(
-        self, name: str, connection: _RedisBytesClient | _FakeRedisConnection | None = None
+        self,
+        name: str,
+        connection: _RedisBytesClient,
+        *,
+        calls: list[EnqueueCall],
+        job_id: str,
     ) -> None:
-        CALLS["queue_name"] = name
-        CALLS["connection"] = connection if isinstance(connection, _FakeRedisConnection) else None
+        self._name = name
+        self._connection = connection
+        self._calls = calls
+        self._job_id = job_id
 
     def enqueue(
         self,
@@ -61,56 +100,76 @@ class _Queue(RQClientQueue):
         failure_ttl: int | None = None,
         retry: RQRetryLike | None = None,
         description: str | None = None,
-    ) -> _Job:
-        CALLS["func_name"] = func_ref
-        pl: dict[str, int | str | float | bool | None] = {}
+    ) -> RQJobLike:
+        payload: dict[str, int | str | float | bool | None] = {}
         if len(args) > 0 and isinstance(args[0], dict):
             for k, v in args[0].items():
                 if isinstance(v, (int, float, str, bool)) or v is None:
-                    pl[str(k)] = v
-        CALLS["payload"] = pl
-        CALLS["opts"] = {
-            "job_timeout": int(job_timeout or 0),
-            "result_ttl": int(result_ttl or 0),
-            "failure_ttl": int(failure_ttl or 0),
-            "retry": (retry if isinstance(retry, _Retry) else _Retry(max=0, interval=[])),
-            "description": str(description or ""),
-        }
-        return _Job("jid1")
+                    payload[str(k)] = v
+        retry_max = 0
+        retry_intervals: list[int] = []
+        if isinstance(retry, _FakeRetry):
+            retry_max = retry.max
+            retry_intervals = list(retry.interval)
+        self._calls.append(
+            EnqueueCall(
+                func_ref=func_ref,
+                payload=payload,
+                job_timeout=int(job_timeout or 0),
+                result_ttl=int(result_ttl or 0),
+                failure_ttl=int(failure_ttl or 0),
+                retry_max=retry_max,
+                retry_intervals=retry_intervals,
+                description=str(description or ""),
+            )
+        )
+        job: RQJobLike = _FakeJob(self._job_id)
+        return job
 
 
-def _fake_from_url(_: str) -> _FakeRedisConnection:
-    return _FakeRedisConnection()
+class RecordingHooksState:
+    """State holder for recording hooks during test."""
+
+    __slots__ = ("calls", "connection", "job_id")
+
+    def __init__(self, job_id: str = "jid1") -> None:
+        self.calls: list[EnqueueCall] = []
+        self.connection: _FakeRedisBytesConnection | None = None
+        self.job_id = job_id
 
 
-def _fake_rq_queue(
-    name: str, *, connection: _RedisBytesClient | _FakeRedisConnection
-) -> RQClientQueue:
-    return _Queue(name, connection)
+def _make_recording_hooks(
+    state: RecordingHooksState,
+) -> tuple[RqBytesClientFactoryProtocol, RqQueueProtocol, RqRetryProtocol]:
+    """Create hooks that record calls for verification."""
+
+    def _redis_hook(url: str) -> _RedisBytesClient:
+        conn = _FakeRedisBytesConnection()
+        state.connection = conn
+        return conn
+
+    def _queue_hook(name: str, *, connection: _RedisBytesClient) -> RQClientQueue:
+        queue: RQClientQueue = _FakeQueueWithRecording(
+            name, connection, calls=state.calls, job_id=state.job_id
+        )
+        return queue
+
+    def _retry_hook(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
+        retry: RQRetryLike = _FakeRetry(max=max_retries, interval=intervals)
+        return retry
+
+    return _redis_hook, _queue_hook, _retry_hook
 
 
-def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
-    return _Retry(max=max_retries, interval=intervals)
+def test_digits_enqueuer_builds_job_with_expected_args() -> None:
+    """Test that RQDigitsEnqueuer passes correct arguments to RQ."""
+    state = RecordingHooksState(job_id="jid1")
+    redis_hook, queue_hook, retry_hook = _make_recording_hooks(state)
 
-
-def test_digits_enqueuer_builds_job_with_expected_args(monkeypatch: pytest.MonkeyPatch) -> None:
-    global CALLS
-    CALLS = {}
-
-    # Patch module-level helpers to avoid importing rq directly
-    monkeypatch.setattr(
-        "clubbot.services.jobs.digits_enqueuer._redis_from_url", _fake_from_url, raising=True
-    )
-    monkeypatch.setattr(
-        "clubbot.services.jobs.digits_enqueuer._rq_queue",
-        _fake_rq_queue,
-        raising=True,
-    )
-    monkeypatch.setattr(
-        "clubbot.services.jobs.digits_enqueuer._rq_retry",
-        _fake_rq_retry,
-        raising=True,
-    )
+    # Set hooks
+    _test_hooks.redis_raw_for_rq = redis_hook
+    _test_hooks.rq_queue = queue_hook
+    _test_hooks.rq_retry = retry_hook
 
     enq = RQDigitsEnqueuer(
         redis_url="redis://localhost:6379/0",
@@ -132,11 +191,26 @@ def test_digits_enqueuer_builds_job_with_expected_args(monkeypatch: pytest.Monke
         augment=True,
         notes="hello",
     )
+
+    # Verify job ID returned
     assert job_id == "jid1"
-    assert CALLS["queue_name"] == "digits"
-    assert type(CALLS["connection"]) is _FakeRedisConnection
-    assert CALLS["func_name"] == "handwriting_ai.jobs.digits.process_train_job"
-    payload = CALLS["payload"]
+
+    # Verify connection was created - check it's a protocol-compliant connection
+    # by verifying the close() method exists and returns without error
+    conn = state.connection
+    if conn is None:
+        raise AssertionError("Expected connection to be created")
+    conn.close()  # Should not raise
+
+    # Verify enqueue call was recorded
+    assert len(state.calls) == 1
+    call = state.calls[0]
+
+    # Verify function reference
+    assert call.func_ref == "handwriting_ai.jobs.digits.process_train_job"
+
+    # Verify payload
+    payload = call.payload
     assert payload["type"] == "digits.train.v1"
     assert payload["request_id"] == "r1"
     assert payload["user_id"] == 9
@@ -146,16 +220,16 @@ def test_digits_enqueuer_builds_job_with_expected_args(monkeypatch: pytest.Monke
     assert payload["lr"] == 0.001
     assert payload["seed"] == 42
     assert payload["augment"] is True
-    opts = CALLS["opts"]
-    retry_obj = opts["retry"]
-    assert type(retry_obj) is _Retry
-    assert retry_obj.max == 2
-    assert retry_obj.interval == [60, 300]
-    assert opts["job_timeout"] == 25200
-    assert opts["result_ttl"] == 86400
-    assert opts["failure_ttl"] == 604800
-    assert opts["description"] == "digits:r1"
-    # No global rq module patching required
+
+    # Verify retry configuration
+    assert call.retry_max == 2
+    assert call.retry_intervals == [60, 300]
+
+    # Verify job options
+    assert call.job_timeout == 25200
+    assert call.result_ttl == 86400
+    assert call.failure_ttl == 604800
+    assert call.description == "digits:r1"
 
 
-logger = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)

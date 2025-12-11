@@ -7,7 +7,8 @@ from platform_core.digits_metrics_events import (
     DigitsPruneV1,
     DigitsUploadV1,
 )
-from tests.support.discord_fakes import FakeBot
+from platform_discord.subscriber import MessageSource
+from tests.support.discord_fakes import FakeBot, FakeMessageSource
 
 from clubbot.services.jobs.digits_notifier import DigitsEventSubscriber
 
@@ -59,16 +60,17 @@ async def test_digits_notifier_handles_non_notify_events() -> None:
 
 
 @pytest.mark.asyncio
-async def test_digits_notifier_run_delegates_to_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_digits_notifier_run_delegates_to_runner() -> None:
+    captured: list[FakeMessageSource] = []
+
+    def _factory(url: str) -> MessageSource:
+        _ = url
+        src = FakeMessageSource()
+        captured.append(src)
+        return src
+
     bot = FakeBot()
-    sub = DigitsEventSubscriber(bot, redis_url="redis://")
-    called = {"n": 0}
-
-    from platform_discord.task_runner import TaskRunner
-
-    async def _once(self: TaskRunner) -> None:
-        called["n"] += 1
-
-    monkeypatch.setattr(TaskRunner, "run_once", _once, raising=True)
+    sub = DigitsEventSubscriber(bot, redis_url="redis://", source_factory=_factory)
     await sub._run()
-    assert called["n"] == 1
+    # run_once creates a source
+    assert len(captured) == 1

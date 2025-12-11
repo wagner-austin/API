@@ -5,23 +5,25 @@ import pytest
 from discord.ext import commands
 from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
+from clubbot.config import DiscordbotSettings
 from clubbot.container import ServiceContainer
 
 
 @pytest.mark.asyncio
-async def test_container_from_env_stt_no_digits_no_trainer(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_container_from_env_stt_no_digits_no_trainer() -> None:
     # Provider not API, no handwriting and no trainer URLs
-    monkeypatch.setenv("DISCORD_TOKEN", "x")
-    monkeypatch.setenv("TRANSCRIPT_PROVIDER", "stt")
-    # Intentionally omit HANDWRITING_API_URL and MODEL_TRAINER_API_URL
-
     cfg = build_settings(
         transcript_provider="stt",
         handwriting_api_url="",
         model_trainer_api_url="",
     )
-    # Override autouse guard to use our custom settings for this test
-    monkeypatch.setattr("clubbot.container.load_discordbot_settings", lambda: cfg, raising=True)
+
+    def _test_load_settings() -> DiscordbotSettings:
+        return cfg
+
+    _test_hooks.load_settings = _test_load_settings
+
     cont = ServiceContainer.from_env()
     assert cont.transcript_service is None
     assert cont.digits_service is None

@@ -11,17 +11,18 @@ from platform_core.logging import get_logger
 from platform_discord.protocols import (
     FileProto,
     InteractionProto,
-    wrap_interaction,
 )
 from platform_discord.rate_limiter import RateLimiter
 
-from ..config import DiscordbotSettings, load_discordbot_settings
-from ..services.qr.client import QRResult, QRService
+from .. import _test_hooks
+from ..config import DiscordbotSettings
 from .base import BaseCog, BotForSetup, _BotProto, _Logger
 
 
 class QRCog(BaseCog):
-    def __init__(self, bot: _BotProto, config: DiscordbotSettings, qr_service: QRService) -> None:
+    def __init__(
+        self, bot: _BotProto, config: DiscordbotSettings, qr_service: _test_hooks.QRServiceLike
+    ) -> None:
         super().__init__()
         self.bot = bot
         self.config = config
@@ -37,7 +38,7 @@ class QRCog(BaseCog):
     @app_commands.describe(url="URL to encode as a QR code")
     async def qrcode(self, interaction: discord.Interaction, url: str) -> None:
         # Wrap discord.Interaction for Protocol-based methods
-        wrapped: InteractionProto = wrap_interaction(interaction)
+        wrapped: InteractionProto = _test_hooks.wrap_interaction(interaction)
         await self._qrcode_impl(wrapped, url)
 
     async def _qrcode_impl(self, interaction: InteractionProto, url: str) -> None:
@@ -108,11 +109,11 @@ class QRCog(BaseCog):
         )
         log.info("QR code sent successfully for url=%s", result.url[:50])
 
-    async def _generate_qr_image(self, url: str) -> QRResult:
+    async def _generate_qr_image(self, url: str) -> _test_hooks.QRResultLike:
         return await asyncio.to_thread(self.qr_service.generate_qr, url)
 
 
 async def setup(bot: BotForSetup) -> None:
-    cfg = load_discordbot_settings()
-    service = QRService(cfg)
+    cfg = _test_hooks.load_settings()
+    service = _test_hooks.qr_service_factory(cfg)
     await bot.add_cog(QRCog(bot, cfg, service))

@@ -6,9 +6,9 @@ from typing import ClassVar
 import pytest
 from platform_core.job_events import default_events_channel
 from platform_discord.subscriber import MessageSource
-from tests.support.discord_fakes import FakeBot
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
+from tests.support.discord_fakes import FakeBot
 
 
 class _FakeSource(MessageSource):

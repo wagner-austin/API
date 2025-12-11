@@ -5,6 +5,7 @@ import asyncio
 import pytest
 from platform_core.json_utils import JSONValue
 from platform_core.model_trainer_client import HTTPModelTrainerClient, ModelTrainerAPIError
+
 from tests.support.httpx_fakes import FakeHttpxAsyncClient, FakeResponse, Request
 
 

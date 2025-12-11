@@ -3,16 +3,27 @@ from __future__ import annotations
 import discord
 import pytest
 from discord.ext import commands
+from tests.support.settings import build_settings
 
+from clubbot import _test_hooks
+from clubbot.config import DiscordbotSettings
 from clubbot.container import ServiceContainer
 
 
 @pytest.mark.asyncio
-async def test_wire_bot_skips_when_cogs_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Minimal env to satisfy require_token
-    monkeypatch.setenv("DISCORD_TOKEN", "x")
-    monkeypatch.setenv("TRANSCRIPT_PROVIDER", "api")
-    monkeypatch.setenv("TRANSCRIPT_API_URL", "http://localhost:8000")
+async def test_wire_bot_skips_when_cogs_present() -> None:
+    # Build settings for this test
+    cfg = build_settings(
+        discord_token="x",
+        transcript_provider="api",
+        transcript_api_url="http://localhost:8000",
+    )
+
+    def _test_load_settings() -> DiscordbotSettings:
+        return cfg
+
+    _test_hooks.load_settings = _test_load_settings
+
     cont = ServiceContainer.from_env()
 
     intents = discord.Intents.default()

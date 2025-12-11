@@ -7,9 +7,9 @@ from platform_core.job_events import (
     JobProgressV1,
     JobStartedV1,
 )
-from tests.support.discord_fakes import TrackingBot, TrackingUser
 
 from clubbot.services.jobs.turkic_notifier import TurkicEventSubscriber
+from tests.support.discord_fakes import TrackingBot, TrackingUser
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,9 @@
+"""Tests for cog command callbacks invoking their implementations.
+
+These tests verify that Discord command callbacks correctly call through
+to their implementation methods using proper hook-based testing.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Awaitable
@@ -6,16 +12,25 @@ from typing import Generic, Protocol, TypeVar
 import discord
 import pytest
 from platform_discord.protocols import InteractionProto, UserProto, _DiscordInteraction
-from tests.support.discord_fakes import FakeAttachment, RecordingInteraction
+from tests.support.discord_fakes import FakeAttachment, FakeBot, RecordingInteraction
 from tests.support.settings import build_settings
 
-from clubbot.cogs.digits import DigitsCog
+from clubbot import _test_hooks
+from clubbot.cogs.digits import DigitsCog, _HasId
 from clubbot.cogs.invite import InviteCog
 from clubbot.cogs.qr import QRCog
 from clubbot.cogs.trainer import TrainerCog
 from clubbot.cogs.transcript import TranscriptCog
+from clubbot.config import DiscordbotSettings
 from clubbot.services.qr.client import QRService
 from clubbot.services.transcript.client import TranscriptService
+
+
+class _HasIdProto(Protocol):
+    """Protocol for objects with optional id property."""
+
+    @property
+    def id(self) -> int | None: ...
 
 
 class _InviteCB(Protocol):
@@ -71,111 +86,74 @@ class _HasCallback(Protocol, Generic[_CB]):
     callback: _CB
 
 
-@pytest.mark.asyncio
-async def test_invite_wrapper_callback_invokes_impl(monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = build_settings()
-    from tests.support.discord_fakes import FakeBot
+class _TrackingInviteCog(InviteCog):
+    """InviteCog subclass that tracks impl calls."""
 
-    bot = FakeBot()
-    cog = InviteCog(bot, cfg)
-    called: dict[str, int] = {"n": 0}
+    def __init__(self, bot: FakeBot, config: DiscordbotSettings) -> None:
+        super().__init__(bot, config)
+        self.impl_called = 0
 
-    async def impl(self_obj: InviteCog, _i: InteractionProto) -> None:
-        called["n"] += 1
-
-    def _wrap(_i: _DiscordInteraction) -> RecordingInteraction:
-        return RecordingInteraction()
-
-    monkeypatch.setattr("platform_discord.protocols.wrap_interaction", _wrap, raising=True)
-    monkeypatch.setattr(InviteCog, "_invite_impl", impl, raising=True)
-    name_inv = "invite"
-    inv_attr: _HasCallback[_InviteCB] = getattr(cog, name_inv)
-    cb: _InviteCB = inv_attr.callback
-    await cb(cog, RecordingInteraction())
-    assert called["n"] == 1
+    async def _invite_impl(self, interaction: InteractionProto) -> None:
+        self.impl_called += 1
 
 
-@pytest.mark.asyncio
-async def test_qr_wrapper_callback_invokes_impl(monkeypatch: pytest.MonkeyPatch) -> None:
-    cfg = build_settings(qr_api_url="http://api")
-    from tests.support.discord_fakes import FakeBot
+class _TrackingQRCog(QRCog):
+    """QRCog subclass that tracks impl calls."""
 
-    bot2 = FakeBot()
-    cog = QRCog(bot2, cfg, QRService(cfg))
-    called: dict[str, int] = {"n": 0}
+    def __init__(self, bot: FakeBot, config: DiscordbotSettings, svc: QRService) -> None:
+        super().__init__(bot, config, svc)
+        self.impl_called = 0
 
-    async def impl(self_obj: QRCog, _i: InteractionProto, _url: str) -> None:
-        called["n"] += 1
-
-    def _wrap2(_i: _DiscordInteraction) -> RecordingInteraction:
-        return RecordingInteraction()
-
-    monkeypatch.setattr("platform_discord.protocols.wrap_interaction", _wrap2, raising=True)
-    monkeypatch.setattr(QRCog, "_qrcode_impl", impl, raising=True)
-    name_qr = "qrcode"
-    qr_attr: _HasCallback[_QRCB] = getattr(cog, name_qr)
-    cb: _QRCB = qr_attr.callback
-    await cb(cog, RecordingInteraction(), "https://x")
-    assert called["n"] == 1
+    async def _qrcode_impl(self, interaction: InteractionProto, url: str) -> None:
+        _ = url
+        self.impl_called += 1
 
 
-@pytest.mark.asyncio
-async def test_digits_read_and_train_wrappers_invoke_impls(monkeypatch: pytest.MonkeyPatch) -> None:
-    from clubbot.services.digits.app import DigitService
+class _TrackingDigitsCog(DigitsCog):
+    """DigitsCog subclass that tracks impl calls."""
 
-    cfg = build_settings(handwriting_api_url="http://h")
-    from tests.support.discord_fakes import FakeBot
-
-    bot3 = FakeBot()
-    svc = DigitService(cfg)
-    cog = DigitsCog(bot3, cfg, svc, enqueuer=None, autostart_subscriber=False)
-    calls: dict[str, int] = {"read": 0, "train": 0}
-
-    async def impl_read(
-        self_obj: DigitsCog, _i: InteractionProto, _user: UserProto, _img: discord.Attachment
+    def __init__(
+        self,
+        bot: FakeBot,
+        config: DiscordbotSettings,
+        svc: _test_hooks.DigitsEnqueuerLike | None,
     ) -> None:
-        calls["read"] += 1
+        from clubbot.services.digits.app import DigitService
 
-    async def impl_train(self_obj: DigitsCog, _i: InteractionProto, _user: UserProto) -> None:
-        calls["train"] += 1
+        _ = svc  # Unused in this test subclass
+        service = DigitService(config)
+        super().__init__(bot, config, service, enqueuer=None, autostart_subscriber=False)
+        self.read_called = 0
+        self.train_called = 0
 
-    def _wrap3(_i: _DiscordInteraction) -> RecordingInteraction:
-        return RecordingInteraction()
+    async def _read_impl(
+        self,
+        interaction: InteractionProto,
+        user: _HasId | None,
+        image: discord.Attachment,
+    ) -> None:
+        _ = (user, image)
+        self.read_called += 1
 
-    monkeypatch.setattr("platform_discord.protocols.wrap_interaction", _wrap3, raising=True)
-    monkeypatch.setattr(DigitsCog, "_read_impl", impl_read, raising=True)
-    monkeypatch.setattr(DigitsCog, "_train_impl", impl_train, raising=True)
-
-    name_read = "read"
-    name_train = "train"
-    read_attr: _HasCallback[_DigitsReadCB] = getattr(cog, name_read)
-    train_attr: _HasCallback[_DigitsTrainCB] = getattr(cog, name_train)
-    read_cb: _DigitsReadCB = read_attr.callback
-    train_cb: _DigitsTrainCB = train_attr.callback
-
-    att = FakeAttachment(filename="x.png", content_type="image/png", size=1, data=b"x")
-    await read_cb(cog, RecordingInteraction(), att)
-    await train_cb(cog, RecordingInteraction())
-    assert calls == {"read": 1, "train": 1}
+    async def _train_impl(
+        self,
+        interaction: InteractionProto,
+        user: discord.User | discord.Member | UserProto | None,
+    ) -> None:
+        _ = user
+        self.train_called += 1
 
 
-@pytest.mark.asyncio
-async def test_trainer_and_transcript_wrappers_invoke_impls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    cfg = build_settings(model_trainer_api_url="http://t")
-    tcfg = build_settings(transcript_api_url="http://x")
-    tsvc = TranscriptService(tcfg)
-    from tests.support.discord_fakes import FakeBot
+class _TrackingTrainerCog(TrainerCog):
+    """TrainerCog subclass that tracks impl calls."""
 
-    fb = FakeBot()
-    trainer = TrainerCog(bot=fb, config=cfg)
-    transcript = TranscriptCog(bot=fb, config=tcfg, transcript_service=tsvc)
-    counts: dict[str, int] = {"train": 0, "transcript": 0}
+    def __init__(self, bot: FakeBot, config: DiscordbotSettings) -> None:
+        super().__init__(bot=bot, config=config)
+        self.impl_called = 0
 
-    async def impl_train(
-        self_obj: TrainerCog,
-        _i: InteractionProto,
+    async def _train_model_impl(
+        self,
+        interaction: InteractionProto,
         *,
         model_family: str,
         model_size: str,
@@ -196,23 +174,110 @@ async def test_trainer_and_transcript_wrappers_invoke_impls(
             corpus_path,
             tokenizer_id,
         )
-        counts["train"] += 1
+        self.impl_called += 1
 
-    async def impl_transcript(
-        self_obj: TranscriptCog,
-        _i: InteractionProto,
-        _user: UserProto,
-        _guild: UserProto | None,
-        _url: str,
+
+class _TrackingTranscriptCog(TranscriptCog):
+    """TranscriptCog subclass that tracks impl calls."""
+
+    def __init__(
+        self,
+        bot: FakeBot,
+        config: DiscordbotSettings,
+        svc: TranscriptService,
     ) -> None:
-        counts["transcript"] += 1
+        super().__init__(bot=bot, config=config, transcript_service=svc)
+        self.impl_called = 0
 
-    def _wrap4(_i: _DiscordInteraction) -> RecordingInteraction:
-        return RecordingInteraction()
+    async def _transcript_impl(
+        self,
+        wrapped: InteractionProto,
+        user_obj: _HasIdProto | None,
+        guild_obj: _HasIdProto | None,
+        url: str,
+    ) -> None:
+        _ = (wrapped, user_obj, guild_obj, url)
+        self.impl_called += 1
 
-    monkeypatch.setattr("platform_discord.protocols.wrap_interaction", _wrap4, raising=True)
-    monkeypatch.setattr(TrainerCog, "_train_model_impl", impl_train, raising=True)
-    monkeypatch.setattr(TranscriptCog, "_transcript_impl", impl_transcript, raising=True)
+
+def _wrap_fake(
+    interaction: _test_hooks.DiscordInteractionLike,
+) -> _test_hooks.InteractionProtoLike:
+    """Fake wrap_interaction that returns a RecordingInteraction."""
+    _ = interaction
+    result: _test_hooks.InteractionProtoLike = RecordingInteraction()
+    return result
+
+
+@pytest.mark.asyncio
+async def test_invite_wrapper_callback_invokes_impl() -> None:
+    cfg = build_settings()
+    bot = FakeBot()
+    cog = _TrackingInviteCog(bot, cfg)
+
+    # Override wrap_interaction hook
+    _test_hooks.wrap_interaction = _wrap_fake
+
+    name_inv = "invite"
+    inv_attr: _HasCallback[_InviteCB] = getattr(cog, name_inv)
+    cb: _InviteCB = inv_attr.callback
+    await cb(cog, RecordingInteraction())
+
+    assert cog.impl_called == 1
+
+
+@pytest.mark.asyncio
+async def test_qr_wrapper_callback_invokes_impl() -> None:
+    cfg = build_settings(qr_api_url="http://api")
+    bot2 = FakeBot()
+    cog = _TrackingQRCog(bot2, cfg, QRService(cfg))
+
+    # Override wrap_interaction hook
+    _test_hooks.wrap_interaction = _wrap_fake
+
+    name_qr = "qrcode"
+    qr_attr: _HasCallback[_QRCB] = getattr(cog, name_qr)
+    cb: _QRCB = qr_attr.callback
+    await cb(cog, RecordingInteraction(), "https://x")
+
+    assert cog.impl_called == 1
+
+
+@pytest.mark.asyncio
+async def test_digits_read_and_train_wrappers_invoke_impls() -> None:
+    cfg = build_settings(handwriting_api_url="http://h")
+    bot3 = FakeBot()
+    cog = _TrackingDigitsCog(bot3, cfg, None)
+
+    # Override wrap_interaction hook
+    _test_hooks.wrap_interaction = _wrap_fake
+
+    name_read = "read"
+    name_train = "train"
+    read_attr: _HasCallback[_DigitsReadCB] = getattr(cog, name_read)
+    train_attr: _HasCallback[_DigitsTrainCB] = getattr(cog, name_train)
+    read_cb: _DigitsReadCB = read_attr.callback
+    train_cb: _DigitsTrainCB = train_attr.callback
+
+    att = FakeAttachment(filename="x.png", content_type="image/png", size=1, data=b"x")
+    await read_cb(cog, RecordingInteraction(), att)
+    await train_cb(cog, RecordingInteraction())
+
+    assert cog.read_called == 1
+    assert cog.train_called == 1
+
+
+@pytest.mark.asyncio
+async def test_trainer_and_transcript_wrappers_invoke_impls() -> None:
+    cfg = build_settings(model_trainer_api_url="http://t")
+    tcfg = build_settings(transcript_api_url="http://x")
+    tsvc = TranscriptService(tcfg)
+    fb = FakeBot()
+    trainer = _TrackingTrainerCog(bot=fb, config=cfg)
+    transcript = _TrackingTranscriptCog(bot=fb, config=tcfg, svc=tsvc)
+
+    # Override wrap_interaction hook
+    _test_hooks.wrap_interaction = _wrap_fake
 
     name_tm = "train_model"
     name_tx = "transcript"
@@ -234,4 +299,6 @@ async def test_trainer_and_transcript_wrappers_invoke_impls(
         tokenizer_id="tok",
     )
     await x_cb(transcript, RecordingInteraction(), "https://x")
-    assert counts == {"train": 1, "transcript": 1}
+
+    assert trainer.impl_called == 1
+    assert transcript.impl_called == 1

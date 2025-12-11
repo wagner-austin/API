@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 from platform_discord.trainer.runtime import RequestAction
-from tests.support.discord_fakes import FakeBot
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
+from tests.support.discord_fakes import FakeBot
 
 
 @pytest.mark.asyncio

@@ -7,12 +7,10 @@ from typing import Protocol
 
 import discord
 from discord.ext import commands
-from monorepo_guards._types import UnknownJson
 from platform_core.logging import get_logger
-from platform_discord.exceptions import DForbiddenError as _DForbiddenError
-from platform_discord.exceptions import DHTTPExceptionError as _DHTTPExceptionError
-from platform_discord.exceptions import DNotFoundError as _DNotFoundError
+from platform_discord.protocols import InteractionProto
 
+from . import _test_hooks
 from .container import ServiceContainer
 
 
@@ -45,6 +43,9 @@ class BotOrchestrator:
         # Exposed listeners for tests (set in register_listeners)
         self._on_ready_listener: Callable[[], Awaitable[None]] | None = None
         self._on_guild_join_listener: Callable[[GuildLike], Awaitable[None]] | None = None
+        self._on_application_command_error_listener: (
+            Callable[[discord.Interaction | InteractionProto, Exception], Awaitable[None]] | None
+        ) = None
 
     def build_bot(self) -> commands.Bot:
         intents = discord.Intents.default()
@@ -70,7 +71,9 @@ class BotOrchestrator:
     async def sync_commands(self) -> None:
         assert self.bot is not None
         logger = self.logger
-        task: asyncio.Task[bool] = asyncio.create_task(self._sync_global())
+        # Use hook if set (for testing exception paths), otherwise call own method
+        sync_func = _test_hooks.orchestrator_sync_global_override or self._sync_global
+        task: asyncio.Task[bool] = asyncio.create_task(sync_func())
         await asyncio.wait({task})
         exc = task.exception()
         if exc is None:
@@ -99,7 +102,7 @@ class BotOrchestrator:
         if self._has_synced_global:
             logger.info("Global command sync already performed in this process; skipping")
             return False
-        await self.bot.tree.sync()
+        await _test_hooks.tree_sync(self.bot.tree)
         self._has_synced_global = True
         logger.info("Performed global command sync (DMs enabled; propagation may take time)")
         return True
@@ -132,26 +135,10 @@ class BotOrchestrator:
             # Global commands are sufficient; no per-guild sync needed.
 
         async def on_application_command_error(
-            interaction: discord.Interaction, error: Exception
+            interaction: discord.Interaction | InteractionProto, error: Exception
         ) -> None:
-            # The cog-level handlers already take care of most user errors;
-            # this is a final catch-all.
-            logger = get_logger(__name__)
-            original_obj: UnknownJson = getattr(error, "original", None)
-            original = original_obj if isinstance(original_obj, Exception) else error
-            logger.exception("Unhandled application command error: %s", original)
-            try:
-                if interaction.response.is_done():
-                    await interaction.followup.send(
-                        "An error occurred. Please try again later.", ephemeral=True
-                    )
-                else:
-                    await interaction.response.send_message(
-                        "An error occurred. Please try again later.", ephemeral=True
-                    )
-            except (_DHTTPExceptionError, _DForbiddenError, _DNotFoundError):
-                logger.exception("Failed to send error response to interaction")
-                raise
+            # Delegate to hook for testability (hook uses InteractionProto)
+            await _test_hooks.app_command_error_handler(interaction, error)
 
         # Register listeners (no decorators to keep type-checkers happy)
         self.bot.add_listener(on_ready)
@@ -162,21 +149,24 @@ class BotOrchestrator:
         # Expose for tests (avoid accessing internal listener tables)
         self._on_ready_listener = on_ready
         self._on_guild_join_listener = on_guild_join
+        self._on_application_command_error_listener = on_application_command_error
 
     def start_background_subscribers(self) -> None:
         assert self.bot is not None
         # Registry-driven startup: map service ids to cog names
-        from .services.registry import SERVICE_REGISTRY
+        service_registry = _test_hooks.get_service_registry()
 
         id_to_cog: dict[str, str] = {
             "digits": "DigitsCog",
             "trainer": "TrainerCog",
             # transcript currently API-only in this bot; no subscriber class
         }
+        # Use hook override if set, otherwise use bot's get_cog
+        get_cog = _test_hooks.orchestrator_get_cog_override or self.bot.get_cog
         for sid, cog_name in id_to_cog.items():
-            if sid not in SERVICE_REGISTRY:
+            if sid not in service_registry:
                 continue
-            cog = self.bot.get_cog(cog_name)
+            cog = get_cog(cog_name)
             if cog is not None and hasattr(cog, "ensure_subscriber_started"):
                 cog.ensure_subscriber_started()
 
@@ -188,8 +178,8 @@ class BotOrchestrator:
             )
 
     def run(self) -> None:
-        # Build
-        bot = self.build_bot()
+        # Build via hook (production default or test override)
+        bot = _test_hooks.orchestrator_build_bot(self)
         # Cog wiring and listener registration handled in setup_hook
         # Validate and run
         self._preflight_token_check()

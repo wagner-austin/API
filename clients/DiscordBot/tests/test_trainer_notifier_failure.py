@@ -8,9 +8,9 @@ import pytest
 from platform_discord.embed_helpers import EmbedProto
 from platform_discord.protocols import FileProto, UserProto
 from platform_discord.trainer.handler import decode_trainer_event
-from tests.support.discord_fakes import FakeEmbed
 
 from clubbot.services.jobs.trainer_notifier import TrainerEventSubscriber
+from tests.support.discord_fakes import FakeEmbed
 
 # Typed dynamic import for discord exception type
 _discord = __import__("discord")
