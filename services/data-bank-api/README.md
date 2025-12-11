@@ -30,10 +30,10 @@ poetry install --with dev
 
 ```bash
 # Development
-poetry run hypercorn 'data_bank_api.app:create_app()' --bind 0.0.0.0:8000 --reload
+poetry run hypercorn 'data_bank_api.api.main:create_app()' --bind 0.0.0.0:8000 --reload
 
 # Production
-poetry run hypercorn 'data_bank_api.app:create_app()' --bind [::]:${PORT:-8000}
+poetry run hypercorn 'data_bank_api.api.main:create_app()' --bind [::]:${PORT:-8000}
 ```
 
 ### Verify
@@ -68,22 +68,29 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 
 ### Environment Variables
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `DATA_ROOT` | string | `/data/files` | Storage root directory |
-| `MIN_FREE_GB` | int | `1` | Minimum free disk space (GB) |
-| `MAX_FILE_BYTES` | int | `0` | Max upload size (0 = unlimited) |
-| `DELETE_STRICT_404` | bool | `false` | Return 404 on missing delete |
-| `API_UPLOAD_KEYS` | string | - | Comma-separated upload keys |
-| `API_READ_KEYS` | string | - | Comma-separated read keys (inherits from upload if empty) |
-| `API_DELETE_KEYS` | string | - | Comma-separated delete keys (inherits from upload if empty) |
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `REDIS_URL` | string | **Yes** | - | Redis connection URL |
+| `API_UPLOAD_KEYS` | string | **Yes** | - | Comma-separated upload keys |
+| `API_READ_KEYS` | string | No | (inherits from upload) | Comma-separated read keys |
+| `API_DELETE_KEYS` | string | No | (inherits from upload) | Comma-separated delete keys |
+| `PORT` | int | No | `8000` | Server port |
+
+### Fixed Configuration
+
+The following values are fixed in the codebase and cannot be changed via environment variables:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `DATA_ROOT` | `/data/files` | Storage root directory |
+| `MIN_FREE_GB` | `1` | Minimum free disk space (GB) |
+| `MAX_FILE_BYTES` | `0` | Max upload size (0 = unlimited) |
+| `DELETE_STRICT_404` | `false` | Return 404 on missing delete |
 
 ### Example Configuration
 
 ```bash
-DATA_ROOT=/data/files
-MIN_FREE_GB=2
-MAX_FILE_BYTES=1073741824  # 1GB limit
+REDIS_URL=redis://localhost:6379/0
 API_UPLOAD_KEYS=turkic-api-key,model-trainer-key
 API_READ_KEYS=model-trainer-key
 API_DELETE_KEYS=admin-key
@@ -234,13 +241,14 @@ poetry run pytest --cov-report=html
 data-bank-api/
 ├── src/data_bank_api/
 │   ├── __init__.py         # Public API exports
-│   ├── app.py              # FastAPI routes and handlers
 │   ├── storage.py          # Storage logic (atomic writes, ranges)
 │   ├── config.py           # Configuration loading
 │   ├── client.py           # Re-export typed client
 │   ├── api/
+│   │   ├── main.py         # App factory
 │   │   ├── config.py       # TypedDict settings
-│   │   └── jobs.py         # Job processing integration
+│   │   ├── jobs.py         # Job processing integration
+│   │   └── routes/         # Route handlers
 │   └── core/
 │       └── corpus_download.py  # Corpus helper
 ├── tests/
