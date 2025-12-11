@@ -15,6 +15,7 @@ from .routes import evaluate as routes_evaluate
 from .routes import health as routes_health
 from .routes import measurements as routes_measurements
 from .routes import ml as routes_ml
+from .routes import status as routes_status
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,19 +28,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         Configured FastAPI application instance.
     """
     cfg = settings or settings_from_env()
-    container = ServiceContainer.from_settings(cfg)
+    # Setup logging first so model loading logs appear in JSON format
     setup_logging(
         level="INFO",
         format_mode="json",
         service_name="covenant-radar-api",
         instance_id=None,
-        extra_fields=["request_id"],
+        extra_fields=["request_id", "model_path"],
     )
+    # Create container with eager model loading for fast first predictions
+    container = ServiceContainer.from_settings(cfg, eager_load_model=True)
     app = FastAPI(title="covenant-radar-api", version="0.1.0")
     install_request_id_middleware(app)
     install_exception_handlers_fastapi(app)
 
     app.include_router(routes_health.build_router(container))
+    app.include_router(routes_status.build_router(container))
     app.include_router(routes_deals.build_router(container))
     app.include_router(routes_covenants.build_router(container))
     app.include_router(routes_measurements.build_router(container))

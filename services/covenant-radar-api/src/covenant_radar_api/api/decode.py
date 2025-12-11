@@ -26,6 +26,7 @@ from covenant_ml.types import TrainConfig
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
+    JSONValue,
     load_json_str,
     require_float,
     require_int,
@@ -105,6 +106,43 @@ class TrainResponse(TypedDict, total=True):
 
     job_id: str
     status: Literal["queued"]
+
+
+def _parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
+    """Parse device setting, defaulting to 'auto'."""
+    if raw is None:
+        return "auto"
+    if not isinstance(raw, str):
+        raise JSONTypeError("device must be a string")
+    if raw == "cpu":
+        return "cpu"
+    if raw == "cuda":
+        return "cuda"
+    if raw == "auto":
+        return "auto"
+    raise JSONTypeError("device must be one of: cpu, cuda, auto")
+
+
+def _optional_float(data: JSONObject, key: str, default: float) -> float:
+    """Extract optional float from JSON, raising on wrong type."""
+    raw = data.get(key)
+    if raw is None:
+        return default
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    raise JSONTypeError(f"Field '{key}' must be a number")
+
+
+def _optional_int(data: JSONObject, key: str, default: int) -> int:
+    """Extract optional int from JSON, raising on wrong type."""
+    raw = data.get(key)
+    if raw is None:
+        return default
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        return int(raw)
+    raise JSONTypeError(f"Field '{key}' must be a number")
 
 
 def _parse_body_as_dict(body: bytes) -> JSONObject:
@@ -220,18 +258,64 @@ def parse_predict_request(body: bytes) -> PredictRequest:
 def parse_train_request(body: bytes) -> TrainConfig:
     """Parse request body into TrainConfig.
 
+    Optional fields with defaults:
+    - device: "auto"
+    - train_ratio: 0.7
+    - val_ratio: 0.15
+    - test_ratio: 0.15
+    - early_stopping_rounds: 10
+    - reg_alpha: 0.0
+    - reg_lambda: 1.0
+    - scale_pos_weight: None
+
     Raises:
         JSONTypeError: Missing required field or invalid field type.
     """
     data = _parse_body_as_dict(body)
-    return TrainConfig(
-        learning_rate=require_float(data, "learning_rate"),
-        max_depth=require_int(data, "max_depth"),
-        n_estimators=require_int(data, "n_estimators"),
-        subsample=require_float(data, "subsample"),
-        colsample_bytree=require_float(data, "colsample_bytree"),
-        random_state=require_int(data, "random_state"),
-    )
+
+    # Required fields
+    learning_rate = require_float(data, "learning_rate")
+    max_depth = require_int(data, "max_depth")
+    n_estimators = require_int(data, "n_estimators")
+    subsample = require_float(data, "subsample")
+    colsample_bytree = require_float(data, "colsample_bytree")
+    random_state = require_int(data, "random_state")
+
+    device = _parse_device(data.get("device"))
+
+    # Optional fields with defaults
+    train_ratio = _optional_float(data, "train_ratio", 0.7)
+    val_ratio = _optional_float(data, "val_ratio", 0.15)
+    test_ratio = _optional_float(data, "test_ratio", 0.15)
+    early_stopping_rounds = _optional_int(data, "early_stopping_rounds", 10)
+    reg_alpha = _optional_float(data, "reg_alpha", 0.0)
+    reg_lambda = _optional_float(data, "reg_lambda", 1.0)
+
+    scale_pos_weight_raw = data.get("scale_pos_weight")
+    scale_pos_weight: float | None = None
+    if isinstance(scale_pos_weight_raw, (int, float)):
+        scale_pos_weight = float(scale_pos_weight_raw)
+    elif scale_pos_weight_raw is not None:
+        raise JSONTypeError("scale_pos_weight must be a number")
+
+    train_config: TrainConfig = {
+        "device": device,
+        "learning_rate": learning_rate,
+        "max_depth": max_depth,
+        "n_estimators": n_estimators,
+        "subsample": subsample,
+        "colsample_bytree": colsample_bytree,
+        "random_state": random_state,
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "early_stopping_rounds": early_stopping_rounds,
+        "reg_alpha": reg_alpha,
+        "reg_lambda": reg_lambda,
+    }
+    if scale_pos_weight is not None:
+        train_config["scale_pos_weight"] = scale_pos_weight
+    return train_config
 
 
 __all__ = [

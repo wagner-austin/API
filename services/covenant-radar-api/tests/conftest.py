@@ -6,18 +6,20 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from covenant_ml.testing import set_cuda_hook
 from covenant_persistence import ConnectionProtocol
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from platform_core.config import _test_hooks as config_test_hooks
 from platform_workers.redis import RedisBytesProto, RedisStrProto
 from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
-from scripts import guard as guard_mod
 
 from covenant_radar_api import _test_hooks as worker_test_hooks
 from covenant_radar_api.core import _test_hooks
 from covenant_radar_api.core.config import Settings
 from covenant_radar_api.core.container import ServiceContainer
+from covenant_radar_api.seeding import _test_hooks as seeding_test_hooks
+from scripts import guard as guard_mod
 
 # =============================================================================
 # Container And Store for Testing
@@ -64,7 +66,21 @@ def _make_fake_queue() -> FakeQueue:
 
 def _make_test_settings() -> Settings:
     return Settings(
-        redis_url="redis://test:6379/0",
+        app_env="dev",
+        logging={"level": "INFO"},
+        redis={"enabled": True, "url": "redis://test:6379/0"},
+        rq={
+            "queue_name": "covenant",
+            "job_timeout_sec": 3600,
+            "result_ttl_sec": 86400,
+            "failure_ttl_sec": 604800,
+        },
+        app={
+            "data_root": "/data",
+            "models_root": "/data/models",
+            "logs_root": "/data/logs",
+            "active_model_path": "/data/models/active.ubj",
+        },
         database_url="postgresql://test:test@localhost/test",
     )
 
@@ -156,6 +172,22 @@ def _reset_guard_hooks_impl() -> Generator[None, None, None]:
     guard_mod._is_dir = orig_is_dir
 
 
+def _reset_seeding_hooks_impl() -> Generator[None, None, None]:
+    """Reset seeding module hooks after each test."""
+    orig_conn = seeding_test_hooks.connection_factory
+    orig_uuid = seeding_test_hooks.uuid_generator
+    yield
+    seeding_test_hooks.connection_factory = orig_conn
+    seeding_test_hooks.uuid_generator = orig_uuid
+
+
+def _disable_cuda_impl() -> Generator[None, None, None]:
+    """Disable CUDA in tests to avoid XGBoost GPU warnings."""
+    set_cuda_hook(lambda: False)
+    yield
+    set_cuda_hook(None)
+
+
 # =============================================================================
 # Pytest Fixtures
 # =============================================================================
@@ -170,3 +202,5 @@ _reset_test_hooks = pytest.fixture(autouse=True)(_reset_test_hooks_impl)
 _reset_config_hooks = pytest.fixture(autouse=True)(_reset_config_hooks_impl)
 _reset_worker_hooks = pytest.fixture(autouse=True)(_reset_worker_hooks_impl)
 _reset_guard_hooks = pytest.fixture(autouse=True)(_reset_guard_hooks_impl)
+_reset_seeding_hooks = pytest.fixture(autouse=True)(_reset_seeding_hooks_impl)
+_disable_cuda = pytest.fixture(autouse=True)(_disable_cuda_impl)

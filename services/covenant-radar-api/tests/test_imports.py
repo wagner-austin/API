@@ -14,9 +14,13 @@ def test_core_package_exports() -> None:
     """Test core package exports ServiceContainer, Settings, and settings_from_env."""
     from covenant_radar_api.core import ServiceContainer, Settings, settings_from_env
 
-    # Verify Settings is a TypedDict with expected keys
-    assert "redis_url" in Settings.__annotations__
+    # Verify Settings is a TypedDict with expected keys (new nested structure)
+    assert "redis" in Settings.__annotations__
     assert "database_url" in Settings.__annotations__
+    assert "app" in Settings.__annotations__
+    assert "logging" in Settings.__annotations__
+    assert "rq" in Settings.__annotations__
+    assert "app_env" in Settings.__annotations__
 
     # Verify settings_from_env is callable and returns correct type
     assert callable(settings_from_env)

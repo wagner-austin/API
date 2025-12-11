@@ -14,6 +14,10 @@ services:
     environment:
       - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
       - DATABASE_URL=${DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/covenant}
+    volumes:
+      - ./data:/data
+      - ./models:/data/models
+      - ./logs:/data/logs
     ports:
       - "8007:8000"
     restart: unless-stopped
@@ -38,6 +42,10 @@ services:
     environment:
       - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
       - DATABASE_URL=${DATABASE_URL:-postgresql://covenant:covenant@platform-postgres:5432/covenant}
+    volumes:
+      - ./data:/data
+      - ./models:/data/models
+      - ./logs:/data/logs
     restart: unless-stopped
     networks:
       - platform-network

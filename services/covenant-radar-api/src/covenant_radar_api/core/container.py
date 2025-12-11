@@ -8,7 +8,7 @@ the container rather than creating their own connections.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from covenant_ml.predictor import load_model
 from covenant_ml.types import XGBModelProtocol
@@ -23,12 +23,40 @@ from covenant_persistence import (
     PostgresDealRepository,
     PostgresMeasurementRepository,
 )
+from platform_core.json_utils import JSONValue
 from platform_core.queues import COVENANT_QUEUE
 from platform_workers.redis import RedisStrProto
-from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
+from platform_workers.rq_harness import (
+    RQClientQueue,
+    _RedisBytesClient,
+    load_no_such_job_error,
+    rq_fetch_job,
+)
 
 from . import _test_hooks
 from .config import Settings
+
+# Default encoders used for ML feature extraction.
+# These map categorical values to integer indices.
+DEFAULT_SECTOR_ENCODER: dict[str, int] = {
+    "Technology": 0,
+    "Finance": 1,
+    "Healthcare": 2,
+}
+
+DEFAULT_REGION_ENCODER: dict[str, int] = {
+    "North America": 0,
+    "Europe": 1,
+    "Asia": 2,
+}
+
+
+class JobStatus(TypedDict, total=True):
+    """Status of a background job."""
+
+    job_id: str
+    status: Literal["queued", "started", "finished", "failed", "not_found"]
+    result: JSONValue | None
 
 
 class ModelInfo(TypedDict, total=True):
@@ -106,6 +134,7 @@ class ServiceContainer:
         model_output_dir: Path | None = None,
         sector_encoder: dict[str, int] | None = None,
         region_encoder: dict[str, int] | None = None,
+        eager_load_model: bool = False,
     ) -> ServiceContainer:
         """Create container from settings, instantiating all dependencies.
 
@@ -115,30 +144,44 @@ class ServiceContainer:
             model_output_dir: Directory for new model output.
             sector_encoder: Sector to int encoding.
             region_encoder: Region to int encoding.
+            eager_load_model: If True, load ML model immediately at startup.
+                This ensures fast first predictions and validates model exists.
 
         Returns:
             Fully initialized service container.
         """
-        redis: RedisStrProto = _test_hooks.kv_factory(settings["redis_url"])
-        db_conn = _test_hooks.connection_factory(settings["database_url"])
-        redis_rq = _test_hooks.rq_client_factory(settings["redis_url"])
-        output_dir = model_output_dir if model_output_dir is not None else Path("./models")
+        redis_url = settings["redis"]["url"]
+        database_url = settings["database_url"]
+        redis: RedisStrProto = _test_hooks.kv_factory(redis_url)
+        db_conn = _test_hooks.connection_factory(database_url)
+        redis_rq = _test_hooks.rq_client_factory(redis_url)
+        output_dir = (
+            model_output_dir
+            if model_output_dir is not None
+            else Path(settings["app"]["models_root"])
+        )
+        resolved_model_path = model_path if model_path else settings["app"]["active_model_path"]
         default_sector_encoder: dict[str, int] = (
-            sector_encoder if sector_encoder is not None else {}
+            sector_encoder if sector_encoder is not None else DEFAULT_SECTOR_ENCODER
         )
         default_region_encoder: dict[str, int] = (
-            region_encoder if region_encoder is not None else {}
+            region_encoder if region_encoder is not None else DEFAULT_REGION_ENCODER
         )
-        return cls(
+        container = cls(
             settings=settings,
             redis=redis,
             db_conn=db_conn,
             redis_rq=redis_rq,
-            model_path=model_path,
+            model_path=resolved_model_path,
             model_output_dir=output_dir,
             sector_encoder=default_sector_encoder,
             region_encoder=default_region_encoder,
         )
+
+        if eager_load_model:
+            container.load_model_now()
+
+        return container
 
     def close(self: ServiceContainer) -> None:
         """Close all resources held by the container."""
@@ -169,6 +212,42 @@ class ServiceContainer:
     def rq_queue(self: ServiceContainer) -> RQClientQueue:
         """Get RQ queue client for enqueueing jobs."""
         return _test_hooks.queue_factory(COVENANT_QUEUE, self._redis_rq)
+
+    def load_model_now(self: ServiceContainer) -> bool:
+        """Eagerly load the ML model into memory.
+
+        Call this at startup to ensure the model is loaded and ready
+        for predictions. If the model file doesn't exist yet (e.g., no
+        training has been done), logs a warning and returns False.
+
+        Returns:
+            True if model was loaded successfully, False if file not found.
+        """
+        from pathlib import Path
+
+        from platform_core.logging import get_logger
+
+        log = get_logger(__name__)
+        model_path = Path(self._model_info["model_path"])
+
+        if not model_path.exists():
+            log.warning(
+                "Model file not found, predictions will fail until model is trained",
+                extra={"model_path": str(model_path)},
+            )
+            return False
+
+        self._model = load_model(str(model_path))
+        self._model_info = ModelInfo(
+            model_id=self._model_info["model_id"],
+            model_path=self._model_info["model_path"],
+            is_loaded=True,
+        )
+        log.info(
+            "ML model loaded successfully",
+            extra={"model_path": str(model_path)},
+        )
+        return True
 
     def get_model(self: ServiceContainer) -> XGBModelProtocol:
         """Get the XGBoost model, loading it if necessary.
@@ -201,5 +280,53 @@ class ServiceContainer:
         """Get directory for model output."""
         return self._model_output_dir
 
+    def get_job_status(self: ServiceContainer, job_id: str) -> JobStatus:
+        """Get status of a background job.
 
-__all__ = ["ModelInfo", "ServiceContainer"]
+        Args:
+            job_id: The job UUID string
+
+        Returns:
+            JobStatus with job_id, status, and result if available.
+        """
+        from platform_core.logging import get_logger
+
+        log = get_logger(__name__)
+        no_such_job_error = load_no_such_job_error()
+        try:
+            job = rq_fetch_job(job_id, self._redis_rq)
+        except no_such_job_error:
+            log.debug("job not found: %s", job_id)
+            return JobStatus(job_id=job_id, status="not_found", result=None)
+
+        # Map RQ status to our status enum
+        rq_status = job.get_status()
+        status: Literal["queued", "started", "finished", "failed", "not_found"]
+        if rq_status == "queued":
+            status = "queued"
+        elif rq_status == "started":
+            status = "started"
+        elif rq_status == "finished":
+            status = "finished"
+        elif rq_status == "failed":
+            status = "failed"
+        else:
+            status = "not_found"
+
+        # Get result if job is finished
+        result: JSONValue | None = None
+        if status == "finished":
+            raw_result = job.return_value()
+            if isinstance(raw_result, dict):
+                result = raw_result
+
+        return JobStatus(job_id=job_id, status=status, result=result)
+
+
+__all__ = [
+    "DEFAULT_REGION_ENCODER",
+    "DEFAULT_SECTOR_ENCODER",
+    "JobStatus",
+    "ModelInfo",
+    "ServiceContainer",
+]

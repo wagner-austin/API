@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 from covenant_domain import Deal, DealId, Measurement
+from covenant_ml.testing import make_train_config
 from covenant_ml.trainer import save_model, train_model
-from covenant_ml.types import TrainConfig
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from numpy.typing import NDArray
@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
     require_bool,
+    require_float,
     require_str,
 )
 
@@ -77,13 +78,11 @@ def _create_and_save_model(model_path: Path) -> None:
     y_train[2] = 1
     y_train[3] = 1
 
-    config = TrainConfig(
-        learning_rate=0.1,
-        max_depth=3,
-        n_estimators=10,
+    config = make_train_config(
         subsample=1.0,
         colsample_bytree=1.0,
-        random_state=42,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
     )
 
     model = train_model(x_train, y_train, config)
@@ -213,7 +212,9 @@ class TestTrainEndpoint:
                 "n_estimators": 100,
                 "subsample": 0.8,
                 "colsample_bytree": 0.8,
-                "random_state": 42
+                "random_state": 42,
+                "device": "cuda",
+                "scale_pos_weight": 1.5
             }""",
         )
 
@@ -222,6 +223,34 @@ class TestTrainEndpoint:
         assert require_str(data, "status") == "queued"
         # Verify job_id is the expected fake job id
         assert require_str(data, "job_id") == "test-job-id"
+        # Verify enqueued payload contains device and scale_pos_weight
+        enqueued = container_with_store.queue.jobs[-1]
+        config_payload = narrow_json_to_dict(load_json_str(str(enqueued.args[0])))
+        assert require_str(config_payload, "device") == "cuda"
+        assert require_float(config_payload, "scale_pos_weight") == 1.5
+
+    def test_train_enqueues_job_without_scale_weight(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Train endpoint enqueues job with defaults when scale_pos_weight omitted."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train",
+            content=b"""{
+                "learning_rate": 0.2,
+                "max_depth": 4,
+                "n_estimators": 50,
+                "subsample": 0.9,
+                "colsample_bytree": 0.7,
+                "random_state": 99
+            }""",
+        )
+
+        assert response.status_code == 202
+        enqueued = container_with_store.queue.jobs[-1]
+        config_payload = narrow_json_to_dict(load_json_str(str(enqueued.args[0])))
+        assert require_str(config_payload, "device") == "auto"
+        assert "scale_pos_weight" not in config_payload
 
     def test_train_invalid_json(self, container_with_store: ContainerAndStore) -> None:
         """Test training with invalid JSON."""
@@ -251,3 +280,111 @@ class TestModelsActiveEndpoint:
         assert require_str(data, "model_id") == "default"
         assert require_str(data, "model_path").endswith("test_model.ubj")
         assert require_bool(data, "is_loaded") is False
+
+
+class TestJobStatusEndpoint:
+    """Tests for GET /ml/jobs/{job_id}."""
+
+    def test_get_job_status_not_found(self, container_with_store: ContainerAndStore) -> None:
+        """Test getting status of non-existent job."""
+        from platform_workers.testing import hooks, make_fake_fetch_job_not_found
+
+        hooks.fetch_job = make_fake_fetch_job_not_found()
+
+        client = _create_test_client(container_with_store)
+        response = client.get("/ml/jobs/nonexistent-job-id")
+
+        assert response.status_code == 200
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "job_id") == "nonexistent-job-id"
+        assert require_str(data, "status") == "not_found"
+        assert "result" not in data
+
+    def test_get_job_status_queued(self, container_with_store: ContainerAndStore) -> None:
+        """Test getting status of queued job."""
+        from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+        fake_job = FakeFetchedJob(job_id="job-queued", status="queued", result=None)
+        hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+        client = _create_test_client(container_with_store)
+        response = client.get("/ml/jobs/job-queued")
+
+        assert response.status_code == 200
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "job_id") == "job-queued"
+        assert require_str(data, "status") == "queued"
+
+    def test_get_job_status_finished_with_result(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test getting status of finished job with result."""
+        from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+        fake_job = FakeFetchedJob(
+            job_id="job-finished",
+            status="finished",
+            result={"model_path": "/path/to/model.ubj"},
+        )
+        hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+        client = _create_test_client(container_with_store)
+        response = client.get("/ml/jobs/job-finished")
+
+        assert response.status_code == 200
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "job_id") == "job-finished"
+        assert require_str(data, "status") == "finished"
+        # Verify result is present and is a dict with expected content
+        result = data.get("result")
+        assert type(result) is dict
+        assert result.get("model_path") == "/path/to/model.ubj"
+
+
+class TestTrainExternalEndpoint:
+    """Tests for POST /ml/train-external."""
+
+    def test_train_external_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
+        """Test external training job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external",
+            content=b"""{
+                "dataset": "taiwan",
+                "learning_rate": 0.1,
+                "max_depth": 6,
+                "n_estimators": 100,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "random_state": 42
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
+
+        # Verify job was enqueued with correct function
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_external_train_job" in enqueued.func
+
+    def test_train_external_passes_raw_config(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """External training passes raw JSON config to job."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external",
+            content=(
+                b'{"dataset":"us","learning_rate":0.2,"max_depth":4,'
+                b'"n_estimators":50,"subsample":0.9,"colsample_bytree":0.9,'
+                b'"random_state":99}'
+            ),
+        )
+
+        assert response.status_code == 202
+
+        # Verify raw JSON was passed
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "us" in str(enqueued.args[0])

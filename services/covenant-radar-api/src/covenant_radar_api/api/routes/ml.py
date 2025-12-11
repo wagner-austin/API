@@ -32,6 +32,14 @@ class ModelInfo(TypedDict, total=True):
     is_loaded: bool
 
 
+class JobStatus(TypedDict, total=True):
+    """Status of a background job."""
+
+    job_id: str
+    status: Literal["queued", "started", "finished", "failed", "not_found"]
+    result: JSONValue | None
+
+
 class ContainerProtocol(Protocol):
     """Protocol for service container with ML dependencies."""
 
@@ -50,6 +58,8 @@ class ContainerProtocol(Protocol):
     def get_sector_encoder(self) -> dict[str, int]: ...
 
     def get_region_encoder(self) -> dict[str, int]: ...
+
+    def get_job_status(self, job_id: str) -> JobStatus: ...
 
 
 def build_router(get_container: ContainerProtocol) -> APIRouter:
@@ -149,6 +159,10 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             subsample: float
             colsample_bytree: float
             random_state: int
+            device: "cpu" | "cuda" | "auto"
+            reg_alpha: float
+            reg_lambda: float
+            scale_pos_weight: float (optional)
 
         Returns:
             JSON object with job_id and status.
@@ -157,18 +171,28 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         config: TrainConfig = parse_train_request(body_bytes)
 
         queue = get_container.rq_queue()
-        config_json = dump_json_str(
-            {
-                "learning_rate": config["learning_rate"],
-                "max_depth": config["max_depth"],
-                "n_estimators": config["n_estimators"],
-                "subsample": config["subsample"],
-                "colsample_bytree": config["colsample_bytree"],
-                "random_state": config["random_state"],
-            }
-        )
+        payload: dict[str, JSONValue] = {
+            "learning_rate": config["learning_rate"],
+            "max_depth": config["max_depth"],
+            "n_estimators": config["n_estimators"],
+            "subsample": config["subsample"],
+            "colsample_bytree": config["colsample_bytree"],
+            "random_state": config["random_state"],
+            "train_ratio": config["train_ratio"],
+            "val_ratio": config["val_ratio"],
+            "test_ratio": config["test_ratio"],
+            "early_stopping_rounds": config["early_stopping_rounds"],
+            "reg_alpha": config["reg_alpha"],
+            "reg_lambda": config["reg_lambda"],
+            "device": config["device"],
+        }
+        scale_pos_weight = config.get("scale_pos_weight")
+        if scale_pos_weight is not None:
+            payload["scale_pos_weight"] = scale_pos_weight
+
+        config_json = dump_json_str(payload)
         job = queue.enqueue(
-            "covenant_radar_api.worker.train_job.run_training",
+            "covenant_radar_api.worker.train_job.process_train_job",
             config_json,
             job_timeout=3600,
             result_ttl=86400,
@@ -201,11 +225,76 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             media_type="application/json",
         )
 
+    def _get_job_status(job_id: str) -> Response:
+        """Get status of a background job.
+
+        Args:
+            job_id: The job UUID string
+
+        Returns:
+            JSON object with job_id, status, and result (if finished).
+        """
+        status = get_container.get_job_status(job_id)
+        body: dict[str, JSONValue] = {
+            "job_id": status["job_id"],
+            "status": status["status"],
+        }
+        if status["result"] is not None:
+            body["result"] = status["result"]
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+        )
+
+    async def _train_external(request: Request) -> Response:
+        """Train on external CSV data (Taiwan/US/Polish) with automatic feature selection.
+
+        XGBoost trains on ALL columns and determines which features are most important.
+
+        Request body:
+            dataset: "taiwan" | "us" | "polish"
+            learning_rate: float
+            max_depth: int
+            n_estimators: int
+            subsample: float
+            colsample_bytree: float
+            random_state: int
+            device: "cpu" | "cuda" | "auto" (optional, default "auto")
+            reg_alpha: float (optional, default 0.0)
+            reg_lambda: float (optional, default 1.0)
+            scale_pos_weight: float (optional)
+
+        Returns:
+            JSON with job_id and status. Use /ml/jobs/{job_id} to get results
+            including feature_importances ranking.
+        """
+        body_bytes = await request.body()
+        config_json = body_bytes.decode("utf-8")
+
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.train_external_job.process_external_train_job",
+            config_json,
+            job_timeout=3600,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description="External data ML training with automatic feature selection",
+        )
+
+        body: dict[str, JSONValue] = {"job_id": job.get_id(), "status": "queued"}
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
     router.add_api_route("/predict", _predict, methods=["POST"], response_model=None)
     router.add_api_route("/train", _train, methods=["POST"], response_model=None)
+    router.add_api_route("/train-external", _train_external, methods=["POST"], response_model=None)
     router.add_api_route("/models/active", _get_model_info, methods=["GET"], response_model=None)
+    router.add_api_route("/jobs/{job_id}", _get_job_status, methods=["GET"], response_model=None)
 
     return router
 
 
-__all__ = ["ModelInfo", "build_router"]
+__all__ = ["JobStatus", "ModelInfo", "build_router"]

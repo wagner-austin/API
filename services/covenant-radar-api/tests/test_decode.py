@@ -336,7 +336,11 @@ class TestParseTrainRequest:
             "n_estimators": 100,
             "subsample": 0.8,
             "colsample_bytree": 0.8,
-            "random_state": 42
+            "random_state": 42,
+            "train_ratio": 0.7,
+            "val_ratio": 0.15,
+            "test_ratio": 0.15,
+            "early_stopping_rounds": 10
         }"""
         result = parse_train_request(body)
 
@@ -346,6 +350,171 @@ class TestParseTrainRequest:
         assert result["subsample"] == 0.8
         assert result["colsample_bytree"] == 0.8
         assert result["random_state"] == 42
+        assert result["train_ratio"] == 0.7
+        assert result["val_ratio"] == 0.15
+        assert result["test_ratio"] == 0.15
+        assert result["early_stopping_rounds"] == 10
+        # reg_alpha/reg_lambda default when not provided
+        assert result["reg_alpha"] == 0.0
+        assert result["reg_lambda"] == 1.0
+        assert result["device"] == "auto"
+
+    def test_request_with_defaults(self) -> None:
+        """Test parsing with optional fields defaulted."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        result = parse_train_request(body)
+
+        assert result["learning_rate"] == 0.1
+        # Default values for optional fields
+        assert result["train_ratio"] == 0.7
+        assert result["val_ratio"] == 0.15
+        assert result["test_ratio"] == 0.15
+        assert result["early_stopping_rounds"] == 10
+        assert result["reg_alpha"] == 0.0
+        assert result["reg_lambda"] == 1.0
+        assert result["device"] == "auto"
+
+    def test_train_request_with_regularization_and_scale(self) -> None:
+        """Test parsing reg params, device, and scale_pos_weight."""
+        body = b"""{
+            "learning_rate": 0.2,
+            "max_depth": 4,
+            "n_estimators": 50,
+            "subsample": 0.9,
+            "colsample_bytree": 0.7,
+            "random_state": 7,
+            "device": "cuda",
+            "reg_alpha": 2.5,
+            "reg_lambda": 3.5,
+            "scale_pos_weight": 1.2
+        }"""
+        result = parse_train_request(body)
+
+        assert result["device"] == "cuda"
+        assert result["reg_alpha"] == 2.5
+        assert result["reg_lambda"] == 3.5
+        assert result["scale_pos_weight"] == 1.2
+        assert result["n_estimators"] == 50
+
+    def test_train_request_invalid_scale_pos_weight(self) -> None:
+        """Test parsing rejects invalid scale_pos_weight type."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "scale_pos_weight": "heavy"
+        }"""
+        with pytest.raises(JSONTypeError, match="scale_pos_weight must be a number"):
+            parse_train_request(body)
+
+    def test_train_request_invalid_ratio_type(self) -> None:
+        """Test parsing rejects non-numeric ratio values."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "train_ratio": "big"
+        }"""
+        with pytest.raises(JSONTypeError, match="Field 'train_ratio' must be a number"):
+            parse_train_request(body)
+
+    def test_train_request_invalid_device(self) -> None:
+        """Test parsing rejects unsupported device value."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "device": "tpu"
+        }"""
+        with pytest.raises(JSONTypeError, match="device must be one of: cpu, cuda, auto"):
+            parse_train_request(body)
+
+    def test_train_request_device_cpu(self) -> None:
+        """Test parsing accepts explicit CPU device."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "device": "cpu"
+        }"""
+        result = parse_train_request(body)
+        assert result["device"] == "cpu"
+
+    def test_train_request_device_auto_string(self) -> None:
+        """Test parsing accepts explicit auto device string."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "device": "auto"
+        }"""
+        result = parse_train_request(body)
+        assert result["device"] == "auto"
+
+    def test_train_request_non_string_device(self) -> None:
+        """Test parsing rejects non-string device types."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "device": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="device must be a string"):
+            parse_train_request(body)
+
+    def test_early_stopping_as_float(self) -> None:
+        """Test parsing early_stopping_rounds as float (converts to int)."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "early_stopping_rounds": 15.0
+        }"""
+        result = parse_train_request(body)
+
+        assert result["early_stopping_rounds"] == 15
+
+    def test_early_stopping_invalid_type(self) -> None:
+        """Test parsing rejects non-numeric early_stopping_rounds."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "early_stopping_rounds": "fast"
+        }"""
+        with pytest.raises(JSONTypeError, match="Field 'early_stopping_rounds' must be a number"):
+            parse_train_request(body)
 
     def test_missing_field_raises_json_type_error(self) -> None:
         """Test that missing field raises JSONTypeError."""

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 from covenant_domain import Covenant, CovenantId, Deal, DealId, Measurement
+from covenant_ml.testing import make_train_config
 from covenant_ml.trainer import save_model, train_model
-from covenant_ml.types import TrainConfig
 from covenant_persistence.testing import InMemoryStore
 from numpy.typing import NDArray
 
@@ -201,13 +201,11 @@ def test_container_get_model_loads_and_caches_model(
     y_train[2] = 1
     y_train[3] = 1
 
-    config = TrainConfig(
-        learning_rate=0.1,
-        max_depth=3,
-        n_estimators=10,
+    config = make_train_config(
         subsample=1.0,
         colsample_bytree=1.0,
-        random_state=42,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
     )
     model = train_model(x_train, y_train, config)
     save_model(model, str(model_path))
@@ -245,17 +243,111 @@ def test_container_close_closes_resources(
 # =============================================================================
 
 
-def test_default_psycopg_connect_calls_real_psycopg() -> None:
-    """Test _default_psycopg_connect calls real psycopg.connect."""
+def test_load_psycopg_module_returns_real_module() -> None:
+    """Test _load_psycopg_module returns real psycopg when hook is None."""
+    from covenant_radar_api.core import _test_hooks
+
+    # Ensure hook is None (default production behavior)
+    orig_hook = _test_hooks.load_psycopg_module_hook
+    _test_hooks.load_psycopg_module_hook = None
+
+    try:
+        module = _test_hooks._load_psycopg_module()
+        # Verify module has connect method (required by protocol)
+        # We call it with invalid DSN expecting OperationalError
+        psycopg = __import__("psycopg")
+        operational_error: type[Exception] = psycopg.OperationalError
+        import pytest
+
+        with pytest.raises(operational_error):
+            module.connect("host= dbname=x", autocommit=True)
+    finally:
+        _test_hooks.load_psycopg_module_hook = orig_hook
+
+
+def test_load_psycopg_module_uses_hook_when_set() -> None:
+    """Test _load_psycopg_module uses hook when set."""
+    from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+
+    from covenant_radar_api.core import _test_hooks
+    from covenant_radar_api.core._test_hooks import PsycopgModuleProtocol
+
+    store = InMemoryStore()
+    hook_called = [False]
+
+    class FakePsycopgModule:
+        """Fake psycopg module for testing."""
+
+        def connect(self, dsn: str, autocommit: bool = False) -> InMemoryConnection:
+            hook_called[0] = True
+            return InMemoryConnection(store)
+
+    def fake_hook() -> PsycopgModuleProtocol:
+        fake: PsycopgModuleProtocol = FakePsycopgModule()
+        return fake
+
+    orig_hook = _test_hooks.load_psycopg_module_hook
+    _test_hooks.load_psycopg_module_hook = fake_hook
+
+    try:
+        module = _test_hooks._load_psycopg_module()
+        # Call connect to verify it's the fake
+        module.connect("test-dsn", autocommit=True)
+        assert hook_called[0] is True
+    finally:
+        _test_hooks.load_psycopg_module_hook = orig_hook
+
+
+def test_psycopg_connect_autocommit_with_hook() -> None:
+    """Test _psycopg_connect_autocommit returns connection via hook."""
+    from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+
+    from covenant_radar_api.core import _test_hooks
+    from covenant_radar_api.core._test_hooks import PsycopgModuleProtocol
+
+    store = InMemoryStore()
+
+    class FakePsycopgModule:
+        """Fake psycopg module for testing."""
+
+        def connect(self, dsn: str, autocommit: bool = False) -> InMemoryConnection:
+            return InMemoryConnection(store)
+
+    def fake_hook() -> PsycopgModuleProtocol:
+        fake: PsycopgModuleProtocol = FakePsycopgModule()
+        return fake
+
+    orig_hook = _test_hooks.load_psycopg_module_hook
+    _test_hooks.load_psycopg_module_hook = fake_hook
+
+    try:
+        # This will now hit the return conn line
+        conn = _test_hooks._psycopg_connect_autocommit("test-dsn")
+        # Verify we got a connection that works
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+    finally:
+        _test_hooks.load_psycopg_module_hook = orig_hook
+
+
+def test_psycopg_connect_autocommit_calls_real_psycopg() -> None:
+    """Test _psycopg_connect_autocommit calls real psycopg.connect."""
     import pytest
 
-    from covenant_radar_api.core._test_hooks import _default_psycopg_connect
+    from covenant_radar_api.core import _test_hooks
 
-    psycopg = __import__("psycopg")
-    operational_error: type[Exception] = psycopg.OperationalError
+    # Ensure hook is None to use real psycopg
+    orig_hook = _test_hooks.load_psycopg_module_hook
+    _test_hooks.load_psycopg_module_hook = None
 
-    with pytest.raises(operational_error):
-        _default_psycopg_connect("host= dbname=x")
+    try:
+        psycopg = __import__("psycopg")
+        operational_error: type[Exception] = psycopg.OperationalError
+
+        with pytest.raises(operational_error):
+            _test_hooks._psycopg_connect_autocommit("host= dbname=x")
+    finally:
+        _test_hooks.load_psycopg_module_hook = orig_hook
 
 
 def test_default_kv_factory_calls_real_redis() -> None:
@@ -283,20 +375,181 @@ def test_default_rq_client_factory_calls_real_redis() -> None:
         client.ping()
 
 
-def test_default_rq_queue_factory_creates_real_queue() -> None:
-    """Test _default_rq_queue creates real RQ queue from redis connection."""
+def test_rq_queue_factory_creates_real_queue() -> None:
+    """Test rq_queue (production default) creates real RQ queue from redis connection."""
     import pytest
     from platform_workers.redis import _load_redis_error_class
-    from platform_workers.rq_harness import redis_raw_for_rq
-
-    from covenant_radar_api.core._test_hooks import _default_rq_queue
+    from platform_workers.rq_harness import redis_raw_for_rq, rq_queue
 
     redis_error: type[BaseException] = _load_redis_error_class()
 
     # Get a real connection (will fail but proves the factory path works)
     client = redis_raw_for_rq("redis://nonexistent-host:6379/0")
-    queue = _default_rq_queue("test-queue", client)
+    queue = rq_queue("test-queue", client)
 
     # Verify queue was created (attempting to enqueue will fail with connection error)
     with pytest.raises((redis_error, OSError)):
         queue.enqueue("some_func")
+
+
+# =============================================================================
+# Tests for get_job_status
+# =============================================================================
+
+
+def test_container_get_job_status_not_found(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status returns not_found when job doesn't exist."""
+    from platform_workers.testing import hooks, make_fake_fetch_job_not_found
+
+    hooks.fetch_job = make_fake_fetch_job_not_found()
+
+    status = container_with_store.container.get_job_status("nonexistent-job-id")
+    assert status["job_id"] == "nonexistent-job-id"
+    assert status["status"] == "not_found"
+    assert status["result"] is None
+
+
+def test_container_get_job_status_queued(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status returns queued status."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    fake_job = FakeFetchedJob(job_id="job-queued", status="queued", result=None)
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-queued")
+    assert status["job_id"] == "job-queued"
+    assert status["status"] == "queued"
+    assert status["result"] is None
+
+
+def test_container_get_job_status_started(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status returns started status."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    fake_job = FakeFetchedJob(job_id="job-started", status="started", result=None)
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-started")
+    assert status["job_id"] == "job-started"
+    assert status["status"] == "started"
+    assert status["result"] is None
+
+
+def test_container_get_job_status_finished_with_result(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status returns finished status with result."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    fake_job = FakeFetchedJob(
+        job_id="job-finished",
+        status="finished",
+        result={"model_path": "/path/to/model.ubj"},
+    )
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-finished")
+    assert status["job_id"] == "job-finished"
+    assert status["status"] == "finished"
+    assert status["result"] == {"model_path": "/path/to/model.ubj"}
+
+
+def test_container_get_job_status_failed(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status returns failed status."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    fake_job = FakeFetchedJob(job_id="job-failed", status="failed", result=None)
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-failed")
+    assert status["job_id"] == "job-failed"
+    assert status["status"] == "failed"
+    assert status["result"] is None
+
+
+def test_container_get_job_status_unknown_status(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status maps unknown RQ status to not_found."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    fake_job = FakeFetchedJob(job_id="job-unknown", status="deferred", result=None)
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-unknown")
+    assert status["job_id"] == "job-unknown"
+    assert status["status"] == "not_found"
+    assert status["result"] is None
+
+
+def test_container_get_job_status_finished_with_non_dict_result(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test get_job_status ignores non-dict result."""
+    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+
+    # Result is a string, not a dict - should be ignored
+    fake_job = FakeFetchedJob(job_id="job-string-result", status="finished", result="ok")
+    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+
+    status = container_with_store.container.get_job_status("job-string-result")
+    assert status["job_id"] == "job-string-result"
+    assert status["status"] == "finished"
+    assert status["result"] is None  # Non-dict result is ignored
+
+
+# =============================================================================
+# Tests for load_model_now
+# =============================================================================
+
+
+def test_container_load_model_now_returns_false_when_file_missing(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test load_model_now returns False when model file doesn't exist."""
+    # Don't create model file - it should not exist
+    result = container_with_store.container.load_model_now()
+    assert result is False
+    # Model should still not be loaded
+    assert container_with_store.container.get_model_info()["is_loaded"] is False
+
+
+def test_container_load_model_now_returns_true_when_file_exists(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """Test load_model_now returns True and loads model when file exists."""
+    # Create a real model file at the expected path
+    model_path = Path(container_with_store.container.get_model_info()["model_path"])
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+
+    x_train: NDArray[np.float64] = np.zeros((4, 8), dtype=np.float64)
+    x_train[0, 0] = 2.0
+    x_train[1, 0] = 3.0
+    x_train[2, 0] = 5.0
+    x_train[3, 0] = 6.0
+
+    y_train: NDArray[np.int64] = np.zeros(4, dtype=np.int64)
+    y_train[2] = 1
+    y_train[3] = 1
+
+    config = make_train_config(
+        subsample=1.0,
+        colsample_bytree=1.0,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
+    )
+    model = train_model(x_train, y_train, config)
+    save_model(model, str(model_path))
+
+    # Now load model
+    result = container_with_store.container.load_model_now()
+    assert result is True
+    assert container_with_store.container.get_model_info()["is_loaded"] is True
