@@ -44,28 +44,37 @@ src/
   model_trainer/
     api/
       main.py
+      middleware.py
       routes/
         health.py, runs.py, tokenizers.py
       schemas/
+      validators/
     core/
       config/settings.py
       contracts/
-      errors/handlers.py
+        compute.py, conversation.py, dataset.py, model.py, queue.py, tokenizer.py
+      compute/device_selector.py
       infra/paths.py, redis_utils.py
       logging/types.py, utils.py
       services/
         container.py
-        dataset/
-        model/backends/
+        data/corpus.py, corpus_fetcher.py, corpus_cache_cleanup.py
+        dataset/local_text_builder.py
+        model/backends/, backend_factory.py, unavailable_backend.py
         queue/rq_adapter.py
-        tokenizer/bpe_backend.py, spm_backend.py (optional)
+        storage/artifact_cleanup.py
+        tokenizer/bpe_backend.py, char_backend.py, spm_backend.py, tokenizer_cleanup.py
+        training/base_trainer.py, dataset_builder.py
     infra/
       storage/run_store.py
-      persistence/
+      persistence/models.py
+    maintenance/cleanup.py
     orchestrators/
-      training_orchestrator.py, tokenizer_orchestrator.py, inference_orchestrator.py
+      training_orchestrator.py, tokenizer_orchestrator.py, inference_orchestrator.py, conversation_orchestrator.py
     worker/
-      training_worker.py, tokenizer_worker.py, rq_worker.py, generate_job.py, score_job.py
+      train_job.py, eval_job.py, tokenizer_worker.py, generate_job.py, score_job.py, chat_job.py
+      job_utils.py, manifest.py, trainer_job_store.py
+    worker_entry.py
 tests/
 scripts/
   cleanup_tokenizers.py
