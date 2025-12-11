@@ -564,7 +564,7 @@ Predict breach risk for a deal.
 
 ### POST /ml/train
 
-Enqueue a model training job.
+Enqueue a model training job using internal deal/measurement data.
 
 **Request Body:**
 
@@ -576,10 +576,14 @@ Enqueue a model training job.
 | `subsample` | float | Yes | - | Row subsample ratio |
 | `colsample_bytree` | float | Yes | - | Column subsample ratio |
 | `random_state` | int | Yes | - | Random seed |
-| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` (prefers GPU when available) |
+| `train_ratio` | float | Yes | - | Training set ratio (e.g., 0.7) |
+| `val_ratio` | float | Yes | - | Validation set ratio (e.g., 0.15) |
+| `test_ratio` | float | Yes | - | Test set ratio (e.g., 0.15) |
+| `early_stopping_rounds` | int | Yes | - | Early stopping patience |
+| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
 | `reg_alpha` | float | No | `0.0` | L1 regularization strength |
 | `reg_lambda` | float | No | `1.0` | L2 regularization strength |
-| `scale_pos_weight` | float | No | - | Class weight for positives (optional) |
+| `scale_pos_weight` | float | No | - | Class weight for positives |
 
 **Request Example:**
 ```json
@@ -590,6 +594,10 @@ Enqueue a model training job.
   "subsample": 0.8,
   "colsample_bytree": 0.8,
   "random_state": 42,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "early_stopping_rounds": 10,
   "device": "auto",
   "reg_alpha": 0.0,
   "reg_lambda": 1.0,
@@ -597,13 +605,221 @@ Enqueue a model training job.
 }
 ```
 
-**Response (200):**
+**Response (202):**
 ```json
 {
   "job_id": "train-job-uuid",
   "status": "queued"
 }
 ```
+
+**Job Result (when complete):**
+
+Poll `/ml/jobs/{job_id}` to get the result:
+
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "model_id": "model-2024-01-15-143052",
+    "model_path": "/data/models/model-2024-01-15-143052.ubj",
+    "active_model_path": "/data/models/active.ubj",
+    "samples_total": 100,
+    "samples_train": 70,
+    "samples_val": 15,
+    "samples_test": 15,
+    "best_val_auc": 0.89,
+    "best_round": 45,
+    "total_rounds": 100,
+    "early_stopped": true,
+    "train_metrics": {
+      "loss": 0.32,
+      "auc": 0.95,
+      "accuracy": 0.88,
+      "precision": 0.85,
+      "recall": 0.82,
+      "f1_score": 0.83
+    },
+    "val_metrics": {
+      "loss": 0.41,
+      "auc": 0.89,
+      "accuracy": 0.84,
+      "precision": 0.81,
+      "recall": 0.78,
+      "f1_score": 0.79
+    },
+    "test_metrics": {
+      "loss": 0.43,
+      "auc": 0.87,
+      "accuracy": 0.82,
+      "precision": 0.79,
+      "recall": 0.76,
+      "f1_score": 0.77
+    },
+    "config": {
+      "device": "auto",
+      "learning_rate": 0.1,
+      "max_depth": 6,
+      "n_estimators": 100,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "random_state": 42,
+      "train_ratio": 0.7,
+      "val_ratio": 0.15,
+      "test_ratio": 0.15,
+      "early_stopping_rounds": 10,
+      "reg_alpha": 0.0,
+      "reg_lambda": 1.0
+    }
+  }
+}
+```
+
+**Result Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `model_id` | string | Unique model identifier |
+| `model_path` | string | Path to saved model file |
+| `active_model_path` | string | Path to active model (copied for API use) |
+| `samples_*` | int | Sample counts for train/val/test splits |
+| `best_val_auc` | float | Best validation AUC achieved |
+| `best_round` | int | Round with best validation AUC |
+| `early_stopped` | bool | Whether training stopped early |
+| `*_metrics` | object | Metrics for train/val/test sets |
+
+**Metrics Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `loss` | float | Log loss |
+| `auc` | float | Area under ROC curve |
+| `accuracy` | float | Classification accuracy |
+| `precision` | float | Precision score |
+| `recall` | float | Recall score |
+| `f1_score` | float | F1 score |
+
+---
+
+### POST /ml/train-external
+
+Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automatic feature selection. XGBoost trains on all columns and determines feature importance.
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `dataset` | string | Yes | - | Dataset to use: `taiwan`, `us`, or `polish` |
+| `learning_rate` | float | Yes | - | Learning rate |
+| `max_depth` | int | Yes | - | XGBoost max tree depth |
+| `n_estimators` | int | Yes | - | Number of trees |
+| `subsample` | float | Yes | - | Row subsample ratio |
+| `colsample_bytree` | float | Yes | - | Column subsample ratio |
+| `random_state` | int | Yes | - | Random seed |
+| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
+| `reg_alpha` | float | No | `0.0` | L1 regularization strength |
+| `reg_lambda` | float | No | `1.0` | L2 regularization strength |
+| `scale_pos_weight` | float | No | - | Class weight for positives |
+
+**Request Example:**
+```json
+{
+  "dataset": "taiwan",
+  "learning_rate": 0.1,
+  "max_depth": 6,
+  "n_estimators": 100,
+  "subsample": 0.8,
+  "colsample_bytree": 0.8,
+  "random_state": 42,
+  "device": "auto"
+}
+```
+
+**Response (202):**
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "queued"
+}
+```
+
+**Job Result (when complete):**
+
+Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ranking:
+
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "dataset": "taiwan",
+    "model_id": "model-2024-01-15-143052",
+    "model_path": "/data/models/model-2024-01-15-143052.ubj",
+    "active_model_path": "/data/models/active.ubj",
+    "samples_total": 6819,
+    "samples_train": 4773,
+    "samples_val": 1023,
+    "samples_test": 1023,
+    "n_features": 95,
+    "best_val_auc": 0.94,
+    "best_round": 67,
+    "total_rounds": 100,
+    "early_stopped": true,
+    "train_metrics": {
+      "loss": 0.18,
+      "auc": 0.98,
+      "accuracy": 0.94,
+      "precision": 0.91,
+      "recall": 0.88,
+      "f1_score": 0.89
+    },
+    "val_metrics": {
+      "loss": 0.24,
+      "auc": 0.94,
+      "accuracy": 0.91,
+      "precision": 0.87,
+      "recall": 0.84,
+      "f1_score": 0.85
+    },
+    "test_metrics": {
+      "loss": 0.26,
+      "auc": 0.93,
+      "accuracy": 0.90,
+      "precision": 0.86,
+      "recall": 0.83,
+      "f1_score": 0.84
+    },
+    "feature_importances": [
+      {"name": "X6", "importance": 0.1842, "rank": 1},
+      {"name": "X1", "importance": 0.0923, "rank": 2},
+      {"name": "X5", "importance": 0.0856, "rank": 3},
+      {"name": "X9", "importance": 0.0734, "rank": 4},
+      {"name": "X3", "importance": 0.0612, "rank": 5}
+    ]
+  }
+}
+```
+
+**Additional Result Fields (vs /ml/train):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dataset` | string | Dataset used (`taiwan`, `us`, or `polish`) |
+| `n_features` | int | Number of features in the dataset |
+| `feature_importances` | array | Ranked list of feature importances |
+
+**Feature Importance Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Feature/column name from the dataset |
+| `importance` | float | XGBoost feature importance score (0.0-1.0) |
+| `rank` | int | Rank by importance (1 = most important) |
+
+The `feature_importances` array contains ALL features ranked by importance, allowing you to identify which financial ratios are most predictive of bankruptcy/default.
 
 ---
 
