@@ -124,7 +124,7 @@ async def test_stop_without_task_closes_existing_closable() -> None:
     c = _FakeClosable()
     runner = TaskRunner(build=_build_pair(r, c), name="t6")
     # Simulate an externally set closable without an active task
-    object.__setattr__(runner, "_closable", c)
+    runner._set_closable_for_testing(c)
     await runner.stop()
     assert c.closed is True
 
@@ -187,7 +187,7 @@ async def test_stop_cancelled_without_closable_path() -> None:
     runner.start()
     await asyncio.sleep(0)
     # clear closable to exercise the false branch of the conditional
-    object.__setattr__(runner, "_closable", None)
+    runner._set_closable_for_testing(None)
     await runner.stop()
 
 
@@ -198,7 +198,7 @@ async def test_stop_finished_no_closable_no_exception() -> None:
     runner = TaskRunner(build=_build_pair(r, c), name="t11")
     runner.start()
     await asyncio.sleep(0)  # let it finish successfully
-    object.__setattr__(runner, "_closable", None)
+    runner._set_closable_for_testing(None)
     await runner.stop()
 
 
@@ -223,6 +223,6 @@ async def test_stop_with_finished_task_no_exception_and_no_closable() -> None:
 
     t = asyncio.create_task(_ok())
     await t
-    object.__setattr__(runner, "_task", t)
-    object.__setattr__(runner, "_closable", None)
+    runner._set_task_for_testing(t)
+    runner._set_closable_for_testing(None)
     await runner.stop()

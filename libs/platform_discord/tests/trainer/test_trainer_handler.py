@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 from platform_core.job_events import encode_job_event, make_failed_event
 from platform_core.trainer_metrics_events import (
@@ -11,6 +13,7 @@ from platform_core.trainer_metrics_events import (
     make_progress_metrics_event,
 )
 
+from platform_discord.testing import fake_load_discord_module, hooks
 from platform_discord.trainer.handler import (
     decode_trainer_event,
     handle_trainer_event,
@@ -19,53 +22,10 @@ from platform_discord.trainer.runtime import new_runtime
 
 
 @pytest.fixture(autouse=True)
-def _patch_discord_embed_module(monkeypatch: pytest.MonkeyPatch) -> None:
-    import platform_discord.embed_helpers as eh
-
-    class _FakeColor:
-        def __init__(self, value: int) -> None:
-            self.value = int(value)
-
-    class _Field:
-        def __init__(self, name: str, value: str, inline: bool) -> None:
-            self.name = name
-            self.value = value
-            self.inline = inline
-
-    class _Footer:
-        def __init__(self) -> None:
-            self.text: str | None = None
-
-    class _FakeEmbed:
-        def __init__(
-            self,
-            *,
-            title: str | None = None,
-            description: str | None = None,
-            color: _FakeColor | None = None,
-        ) -> None:
-            self.title = title
-            self.description = description
-            self.color = color
-            self.footer = _Footer()
-            self.fields: list[_Field] = []
-
-        def add_field(self, *, name: str, value: str, inline: bool = True) -> _FakeEmbed:
-            self.fields.append(_Field(name, value, inline))
-            return self
-
-        def set_footer(self, *, text: str) -> _FakeEmbed:
-            self.footer.text = text
-            return self
-
-    class _FakeDiscordModule:
-        Embed = _FakeEmbed
-        Color = _FakeColor
-
-    def _fake_loader() -> type[_FakeDiscordModule]:
-        return _FakeDiscordModule
-
-    monkeypatch.setattr(eh, "_load_discord_module", _fake_loader, raising=True)
+def _use_fake_discord() -> Generator[None, None, None]:
+    """Set up fake discord module via hooks."""
+    hooks.load_discord_module = fake_load_discord_module
+    yield
 
 
 def test_decode_config_event() -> None:
@@ -228,27 +188,20 @@ def test_handle_failed_event() -> None:
     assert result["request_id"] == "h-4"
 
 
-def test_handle_unknown_event_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that unknown event types return None (for exhaustiveness)."""
-    from platform_discord.trainer import handler
-    from platform_discord.trainer.handler import TrainerEventV1
-
-    def _false_guard(_: TrainerEventV1) -> bool:
-        return False
+def test_handle_unknown_event_type_returns_none() -> None:
+    """Test that handle_trainer_event returns None for unrecognized event type."""
+    from platform_core.job_events import JobFailedV1
 
     rt = new_runtime()
-    # Create a valid config event but monkeypatch all TypeGuards to return False
-    ev = make_config_event(
-        job_id="u-1",
-        user_id=1,
-        model_family="gpt2",
-        model_size="small",
-        total_epochs=5,
-        queue="q",
-    )
-    monkeypatch.setattr(handler, "is_config", _false_guard)
-    monkeypatch.setattr(handler, "is_progress", _false_guard)
-    monkeypatch.setattr(handler, "is_completed", _false_guard)
-    monkeypatch.setattr(handler, "is_job_failed", _false_guard)
-    result = handle_trainer_event(rt, ev)
+    # Create a valid JobFailedV1 but with type that doesn't match is_job_failed TypeGuard
+    # The TypeGuard checks for ".job.failed." in type, so we use a different pattern
+    event: JobFailedV1 = {
+        "type": "trainer.unexpected.event.v1",  # No ".job.failed." pattern
+        "domain": "trainer",
+        "job_id": "fake",
+        "user_id": 1,
+        "error_kind": "system",
+        "message": "test",
+    }
+    result = handle_trainer_event(rt, event)
     assert result is None

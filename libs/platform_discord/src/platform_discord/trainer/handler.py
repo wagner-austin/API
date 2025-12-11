@@ -117,6 +117,7 @@ def handle_trainer_event(
     if is_completed(event):
         return on_completed(runtime, event)
 
+    # Must be JobFailedV1 - TypeGuard narrows for mypy
     if is_job_failed(event):
         return on_failed(
             runtime,
@@ -126,7 +127,6 @@ def handle_trainer_event(
             message=event["message"],
             status="failed",
         )
-
     return None
 
 

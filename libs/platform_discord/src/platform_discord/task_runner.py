@@ -124,5 +124,21 @@ class TaskRunner:
             return
         await runnable.run(limit=1)
 
+    def _set_closable_for_testing(self, closable: Closable | None) -> None:
+        """Set _closable for testing edge cases.
+
+        This method is for testing only - it allows tests to set up specific
+        internal states without using object.__setattr__.
+        """
+        self._closable = closable
+
+    def _set_task_for_testing(self, task: asyncio.Task[None] | None) -> None:
+        """Set _task for testing edge cases.
+
+        This method is for testing only - it allows tests to set up specific
+        internal states without using object.__setattr__.
+        """
+        self._task = task
+
 
 __all__ = ["BuildFunc", "Closable", "OnError", "Runnable", "TaskRunner"]

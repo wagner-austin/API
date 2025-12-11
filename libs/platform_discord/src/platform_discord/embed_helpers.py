@@ -297,7 +297,9 @@ def create_embed(
     Returns:
         An EmbedProto instance wrapping the discord.Embed.
     """
-    discord_mod = _load_discord_module()
+    from .testing import hooks
+
+    discord_mod = hooks.load_discord_module()
     color_obj = discord_mod.Color(color) if color is not None else None
     inner = discord_mod.Embed(title=title, description=description, color=color_obj)
     return _EmbedAdapter(inner)

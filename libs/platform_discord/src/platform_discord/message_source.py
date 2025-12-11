@@ -3,7 +3,6 @@ from __future__ import annotations
 from platform_workers.redis import (
     RedisAsyncProto,
     RedisPubSubProto,
-    _redis_async_from_url,
 )
 
 from .subscriber import MessageSource as _MsgSourceProto
@@ -11,7 +10,9 @@ from .subscriber import MessageSource as _MsgSourceProto
 
 class RedisPubSubSource(_MsgSourceProto):
     def __init__(self, redis_url: str) -> None:
-        self._redis: RedisAsyncProto = _redis_async_from_url(redis_url)
+        from .testing import hooks
+
+        self._redis: RedisAsyncProto = hooks.async_client_from_url(redis_url)
         self._pubsub: RedisPubSubProto | None = None
 
     async def subscribe(self, channel: str) -> None:

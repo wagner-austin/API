@@ -109,29 +109,43 @@ class InteractionProto(Protocol):
     def user(self) -> UserProto: ...
 
 
-class _DiscordInteraction(Protocol):
-    """Internal Protocol for discord.Interaction - minimal interface for wrapping."""
+class _DiscordMessage(Protocol):
+    """Protocol for discord.Message - only id is accessed directly."""
 
-    # Empty protocol - any object structurally satisfies this
-    # We use this to avoid 'object' annotation while still accepting any discord type
-
-
-class _DiscordBot(Protocol):
-    """Internal Protocol for discord.Bot - minimal interface for wrapping."""
-
-    # Empty protocol - any object structurally satisfies this
+    @property
+    def id(self) -> int: ...
 
 
 class _DiscordUser(Protocol):
-    """Internal Protocol for discord.User - minimal interface for wrapping."""
+    """Protocol for discord.User/Member - only id is accessed directly."""
 
-    # Empty protocol - any object structurally satisfies this
+    @property
+    def id(self) -> int: ...
 
 
-class _DiscordMessage(Protocol):
-    """Internal Protocol for discord.Message - minimal interface for wrapping."""
+class _DiscordResponse(Protocol):
+    """Protocol for discord.InteractionResponse."""
 
-    # Empty protocol - any object structurally satisfies this
+    def is_done(self) -> bool: ...
+
+
+class _DiscordFollowup(Protocol):
+    """Protocol for discord.Webhook (followup) - accessed via getattr."""
+
+    pass
+
+
+class _DiscordInteraction(Protocol):
+    """Protocol for discord.Interaction - attributes accessed via getattr."""
+
+    @property
+    def user(self) -> _DiscordUser: ...
+
+
+class _DiscordBot(Protocol):
+    """Protocol for discord.Bot - fetch_user accessed via getattr."""
+
+    async def fetch_user(self, user_id: int, /) -> _DiscordUser: ...
 
 
 class _EditCallable(Protocol):
@@ -293,6 +307,8 @@ __all__ = [
     "ResponseProto",
     "SendableProto",
     "UserProto",
+    "_DiscordBot",
+    "_DiscordInteraction",
     "wrap_bot",
     "wrap_interaction",
 ]

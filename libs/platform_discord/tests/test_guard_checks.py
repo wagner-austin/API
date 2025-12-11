@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pytest import MonkeyPatch, raises
+from pytest import raises
 
 
 def _project_root() -> Path:
@@ -83,15 +83,12 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     assert "Guard checks failed" in out
 
 
-def test_guard_find_monorepo_root_errors_without_libs_dir(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_guard_find_monorepo_root_errors_without_libs_dir(tmp_path: Path) -> None:
     from scripts import guard as guard_mod
 
-    def _always_false(self: Path) -> bool:
-        return False
+    from platform_discord.testing import fake_path_is_dir_false, hooks
 
-    monkeypatch.setattr(Path, "is_dir", _always_false)
+    hooks.path_is_dir = fake_path_is_dir_false
 
     with raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
         guard_mod._find_monorepo_root(tmp_path)

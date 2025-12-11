@@ -11,9 +11,11 @@ class _RunForProject(Protocol):
 
 
 def _find_monorepo_root(start: Path) -> Path:
+    from platform_discord.testing import hooks
+
     current = start
     while True:
-        if (current / "libs").is_dir():
+        if hooks.path_is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")

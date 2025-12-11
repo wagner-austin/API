@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 
+from platform_discord.testing import fake_load_discord_module, hooks
 from platform_discord.turkic.runtime import (
     RequestAction,
     TurkicRuntime,
@@ -18,53 +21,10 @@ def _rt() -> TurkicRuntime:
 
 
 @pytest.fixture(autouse=True)
-def _patch_discord_embed_module(monkeypatch: pytest.MonkeyPatch) -> None:
-    import platform_discord.embed_helpers as eh
-
-    class _FakeColor:
-        def __init__(self, value: int) -> None:
-            self.value = int(value)
-
-    class _Field:
-        def __init__(self, name: str, value: str, inline: bool) -> None:
-            self.name = name
-            self.value = value
-            self.inline = inline
-
-    class _Footer:
-        def __init__(self) -> None:
-            self.text: str | None = None
-
-    class _FakeEmbed:
-        def __init__(
-            self,
-            *,
-            title: str | None = None,
-            description: str | None = None,
-            color: _FakeColor | None = None,
-        ) -> None:
-            self.title = title
-            self.description = description
-            self.color = color
-            self.footer = _Footer()
-            self.fields: list[_Field] = []
-
-        def add_field(self, *, name: str, value: str, inline: bool = True) -> _FakeEmbed:
-            self.fields.append(_Field(name, value, inline))
-            return self
-
-        def set_footer(self, *, text: str) -> _FakeEmbed:
-            self.footer.text = text
-            return self
-
-    class _FakeDiscordModule:
-        Embed = _FakeEmbed
-        Color = _FakeColor
-
-    def _fake_loader() -> type[_FakeDiscordModule]:
-        return _FakeDiscordModule
-
-    monkeypatch.setattr(eh, "_load_discord_module", _fake_loader, raising=True)
+def _use_fake_discord() -> Generator[None, None, None]:
+    """Set up fake discord module via hooks."""
+    hooks.load_discord_module = fake_load_discord_module
+    yield
 
 
 def test_turkic_runtime_flow_with_user() -> None:
