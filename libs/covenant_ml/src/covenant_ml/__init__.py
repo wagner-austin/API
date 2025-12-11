@@ -23,6 +23,7 @@ from .trainer import (
 )
 from .types import (
     EvalMetrics,
+    FeatureImportance,
     Proba2DProtocol,
     TrainConfig,
     TrainOutcome,
@@ -36,6 +37,7 @@ from .types import (
 __all__ = [
     "DataSplits",
     "EvalMetrics",
+    "FeatureImportance",
     "Proba2DProtocol",
     "ProgressCallback",
     "TrainConfig",
