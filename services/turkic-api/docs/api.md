@@ -55,8 +55,9 @@ Create a new corpus extraction job.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
+| `user_id` | int | Yes | - | User ID for tracking |
 | `source` | string | Yes | - | Dataset source: `oscar`, `wikipedia`, `culturax` |
-| `language` | string | Yes | - | Language code: `kk`, `ky`, `uz`, `tr`, `ug`, `fi`, `az` |
+| `language` | string | Yes | - | Language code: `kk`, `ky`, `uz`, `tr`, `ug`, `fi`, `az`, `en` |
 | `script` | string | No | `null` | Script filter: `Latn`, `Cyrl`, `Arab` |
 | `max_sentences` | int | No | `1000` | Maximum sentences to extract (1-100000) |
 | `transliterate` | bool | No | `true` | Apply IPA transliteration to output |
@@ -73,6 +74,7 @@ Create a new corpus extraction job.
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": 12345,
   "status": "queued",
   "created_at": "2024-01-15T10:30:00"
 }
@@ -83,6 +85,7 @@ Create a new corpus extraction job.
 | Field | Type | Description |
 |-------|------|-------------|
 | `job_id` | string | Unique job identifier (UUID) |
+| `user_id` | int | User ID from request |
 | `status` | string | Initial status, always `queued` |
 | `created_at` | string | ISO 8601 timestamp |
 
@@ -91,6 +94,7 @@ Create a new corpus extraction job.
 curl -X POST http://localhost:8000/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
+    "user_id": 12345,
     "source": "oscar",
     "language": "kk",
     "script": "Cyrl",
@@ -107,6 +111,7 @@ import httpx
 response = httpx.post(
     "http://localhost:8000/api/v1/jobs",
     json={
+        "user_id": 12345,
         "source": "oscar",
         "language": "kk",
         "script": "Cyrl",
@@ -353,6 +358,7 @@ The `request_id` appears in:
 | `ug` | Uyghur | Arabic | Yes |
 | `fi` | Finnish | Latin | Yes |
 | `az` | Azerbaijani | Latin | Yes |
+| `en` | English | Latin | Yes |
 
 ---
 
