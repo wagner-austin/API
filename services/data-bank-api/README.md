@@ -55,7 +55,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
-| `/readyz` | GET | Readiness probe (checks disk space) |
+| `/readyz` | GET | Readiness probe (checks Redis, disk space, writability) |
 | `/files` | POST | Upload file (returns SHA256 file ID) |
 | `/files/{file_id}` | GET | Download file (supports Range) |
 | `/files/{file_id}` | HEAD | Probe metadata |
@@ -74,7 +74,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `API_UPLOAD_KEYS` | string | **Yes** | - | Comma-separated upload keys |
 | `API_READ_KEYS` | string | No | (inherits from upload) | Comma-separated read keys |
 | `API_DELETE_KEYS` | string | No | (inherits from upload) | Comma-separated delete keys |
-| `PORT` | int | No | `8000` | Server port |
+
+> **Note:** The server port is configured via hypercorn's `--bind` flag (e.g., `--bind [::]:${PORT:-8000}`), not as an application environment variable.
 
 ### Fixed Configuration
 
@@ -204,11 +205,11 @@ except DataBankClientError as e:
 ### Commands
 
 ```bash
-make install      # Install dependencies
-make install-dev  # Install with dev dependencies
-make lint         # Run guards + ruff + mypy
-make test         # Run pytest with coverage
-make check        # Run lint + test
+poetry install            # Install dependencies
+poetry install --with dev # Install with dev dependencies
+make lint                 # Run guards + ruff + mypy
+make test                 # Run pytest with coverage
+make check                # Run lint + test
 ```
 
 ### Quality Gates
@@ -244,11 +245,16 @@ data-bank-api/
 │   ├── storage.py          # Storage logic (atomic writes, ranges)
 │   ├── config.py           # Configuration loading
 │   ├── client.py           # Re-export typed client
+│   ├── health.py           # Health check logic
+│   ├── testing.py          # Test utilities
+│   ├── worker_entry.py     # RQ worker entry point
 │   ├── api/
 │   │   ├── main.py         # App factory
-│   │   ├── config.py       # TypedDict settings
+│   │   ├── config.py       # TypedDict settings for jobs
 │   │   ├── jobs.py         # Job processing integration
-│   │   └── routes/         # Route handlers
+│   │   └── routes/
+│   │       ├── health.py   # Health endpoints
+│   │       └── files.py    # File endpoints
 │   └── core/
 │       └── corpus_download.py  # Corpus helper
 ├── tests/
@@ -276,7 +282,7 @@ docker build -t data-bank-api:latest .
 
 # Run
 docker run -p 8000:8000 \
-  -e DATA_ROOT=/data/files \
+  -e REDIS_URL=redis://host.docker.internal:6379/0 \
   -e API_UPLOAD_KEYS=test-key \
   -v $(pwd)/data:/data/files \
   data-bank-api:latest
@@ -288,8 +294,7 @@ docker run -p 8000:8000 \
 2. **Add persistent volume** mounted at `/data/files`
 3. **Configure environment:**
    ```
-   DATA_ROOT=/data/files
-   MIN_FREE_GB=2
+   REDIS_URL=${{Redis.REDIS_URL}}
    API_UPLOAD_KEYS=turkic-key-xyz
    API_READ_KEYS=trainer-key-abc
    API_DELETE_KEYS=admin-key-123
@@ -302,7 +307,7 @@ docker run -p 8000:8000 \
 ### Health Checks
 
 - **Liveness:** `/healthz`
-- **Readiness:** `/readyz` (checks disk space and writability)
+- **Readiness:** `/readyz` (checks Redis, disk space, and writability)
 
 ---
 
