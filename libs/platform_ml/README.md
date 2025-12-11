@@ -1,6 +1,6 @@
 # platform-ml
 
-Shared ML artifact handling for the monorepo. Provides tarball utilities, versioned manifest schemas, and remote artifact storage via data-bank-api.
+Shared ML artifact handling: tarball utilities, versioned manifest schemas, remote artifact storage, and Weights & Biases integration.
 
 ## Installation
 
@@ -9,13 +9,27 @@ Shared ML artifact handling for the monorepo. Provides tarball utilities, versio
 platform-ml = { path = "../libs/platform_ml", develop = true }
 ```
 
+## Quick Start
+
+```python
+from pathlib import Path
+from platform_ml import ArtifactStore, create_tarball, extract_tarball
+
+# Upload artifacts
+store = ArtifactStore(base_url="http://data-bank-api:8000", api_key="secret")
+resp = store.upload_artifact(Path("./model-output"), artifact_name="model-v1", request_id="req-123")
+
+# Download and extract
+root = store.download_artifact(file_id="model-v1.tar.gz", dest_dir=Path("./downloaded"), request_id="req-456")
+```
+
 ## ArtifactStore
 
 Remote artifact storage wrapping `DataBankClient`. Upload directories as tarballs and download them back with integrity checks.
 
 ```python
 from pathlib import Path
-from platform_ml import ArtifactStore
+from platform_ml import ArtifactStore, ArtifactStoreError
 
 store = ArtifactStore(
     base_url="http://data-bank-api:8000",
@@ -32,13 +46,16 @@ resp = store.upload_artifact(
 print(resp["file_id"], resp["sha256"])
 
 # Download and extract
-root = store.download_artifact(
-    file_id="model-v1.tar.gz",
-    dest_dir=Path("./downloaded"),
-    request_id="req-456",
-    expected_root="model-v1",
-)
-print(root)  # Path to extracted directory
+try:
+    root = store.download_artifact(
+        file_id="model-v1.tar.gz",
+        dest_dir=Path("./downloaded"),
+        request_id="req-456",
+        expected_root="model-v1",
+    )
+    print(root)  # Path to extracted directory
+except ArtifactStoreError as e:
+    print(f"Failed: {e}")
 ```
 
 ## Manifest Schema
@@ -52,6 +69,7 @@ from platform_ml import (
     TrainingRunMetadata,
     from_json_manifest_v2,
     from_path_manifest_v2,
+    MANIFEST_SCHEMA_VERSION,
 )
 
 # Parse from JSON string
@@ -117,7 +135,7 @@ except TarballError as e:
 Protocol-based Weights & Biases integration for experiment tracking across ML services.
 
 ```python
-from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
+from platform_ml import WandbPublisher, WandbUnavailableError
 
 # Create publisher (requires wandb package installed)
 try:
@@ -199,6 +217,61 @@ publisher = WandbPublisher(project="x", run_name="y", enabled=False)
 publisher.log_step({"loss": 1.0})  # No-op, no error
 ```
 
+### Wandb Types
+
+```python
+from platform_ml import (
+    WandbRunConfig,
+    WandbPublisherConfig,
+    WandbStepMetrics,
+    WandbEpochMetrics,
+    WandbFinalMetrics,
+    WandbTableRow,
+    WandbInitResult,
+)
+```
+
+## API Reference
+
+### Artifact Store
+
+| Type | Description |
+|------|-------------|
+| `ArtifactStore` | Remote artifact storage client |
+| `ArtifactStoreError` | Store operation error |
+
+### Manifest
+
+| Type | Description |
+|------|-------------|
+| `ModelManifestV2` | Model manifest schema |
+| `TrainingRunMetadata` | Training run metadata |
+| `from_json_manifest_v2` | Parse manifest from JSON |
+| `from_path_manifest_v2` | Parse manifest from file |
+| `MANIFEST_SCHEMA_VERSION` | Current schema version |
+
+### Tarball
+
+| Function | Description |
+|----------|-------------|
+| `create_tarball` | Create gzip tarball from directory |
+| `extract_tarball` | Extract tarball with security checks |
+| `TarballError` | Tarball operation error |
+
+### Wandb
+
+| Type | Description |
+|------|-------------|
+| `WandbPublisher` | W&B experiment publisher |
+| `WandbUnavailableError` | W&B not installed error |
+| `WandbRunConfig` | Run configuration |
+| `WandbPublisherConfig` | Publisher configuration |
+| `WandbStepMetrics` | Step metrics TypedDict |
+| `WandbEpochMetrics` | Epoch metrics TypedDict |
+| `WandbFinalMetrics` | Final metrics TypedDict |
+| `WandbTableRow` | Table row type |
+| `WandbInitResult` | Init result TypedDict |
+
 ## Development
 
 ```bash
@@ -211,4 +284,5 @@ make check   # Run both lint and test
 
 - Python 3.12+
 - platform-core (for DataBankClient, JSON utilities)
-
+- wandb (optional, for experiment tracking)
+- 100% test coverage enforced
