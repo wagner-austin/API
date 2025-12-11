@@ -10,6 +10,26 @@ poetry add covenant-domain
 
 No external dependencies - this is a pure domain library.
 
+## Quick Start
+
+```python
+from covenant_domain import (
+    Deal, DealId, Covenant, CovenantId, Measurement, CovenantResult,
+    evaluate_covenant_for_period, classify_status,
+)
+
+# Evaluate a covenant
+result: CovenantResult = evaluate_covenant_for_period(
+    covenant=covenant,
+    period_start_iso="2024-01-01",
+    period_end_iso="2024-03-31",
+    measurements=[total_debt_measurement, ebitda_measurement],
+    tolerance_ratio_scaled=100_000,
+)
+
+print(result["status"])  # "OK", "NEAR_BREACH", or "BREACH"
+```
+
 ## Domain Models
 
 All models are TypedDicts with no mutable state:
@@ -126,7 +146,13 @@ except FormulaEvalError as e:
 Extract features for breach prediction:
 
 ```python
-from covenant_domain import extract_features, classify_risk_tier, LoanFeatures
+from covenant_domain import (
+    extract_features,
+    classify_risk_tier,
+    LoanFeatures,
+    RiskPrediction,
+    FEATURE_ORDER,
+)
 
 features: LoanFeatures = extract_features(
     deal=deal,
@@ -146,6 +172,18 @@ features: LoanFeatures = extract_features(
 
 # Classify risk tier from probability
 risk_tier = classify_risk_tier(0.75)  # Returns "HIGH"
+
+# Feature column order for numpy array conversion
+print(FEATURE_ORDER)  # ("debt_to_ebitda", "interest_cover", ...)
+```
+
+### RiskPrediction Type
+
+```python
+prediction: RiskPrediction = {
+    "probability": 0.75,
+    "risk_tier": "HIGH",  # Literal["LOW", "MEDIUM", "HIGH"]
+}
 ```
 
 ## JSON Encoding/Decoding
@@ -155,7 +193,9 @@ Convert between JSON dicts and TypedDicts:
 ```python
 from covenant_domain import (
     decode_deal, encode_deal,
+    decode_deal_id, encode_deal_id,
     decode_covenant, encode_covenant,
+    decode_covenant_id, encode_covenant_id,
     decode_measurement, encode_measurement,
     decode_covenant_result, encode_covenant_result,
 )
@@ -168,13 +208,37 @@ deal = decode_deal(json_dict)
 json_dict = encode_deal(deal)
 ```
 
-## Design Principles
+## API Reference
 
-- All types are `TypedDict` (no dataclasses, no classes with state)
-- All monetary values stored as scaled integers (`* 1_000_000`)
-- No `Any`, `cast`, `type: ignore`, or `.pyi` stubs
-- No `try/except` in core logic - exceptions propagate
-- 100% test coverage (statement + branch)
+### Models
+
+| Type | Description |
+|------|-------------|
+| `Deal` | Loan facility with borrower info |
+| `DealId` | Typed deal identifier |
+| `Covenant` | Rule attached to a deal |
+| `CovenantId` | Typed covenant identifier |
+| `Measurement` | Financial metric for a period |
+| `CovenantResult` | Evaluation result with status |
+| `LoanFeatures` | ML feature vector |
+| `RiskPrediction` | ML prediction output |
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| `evaluate_formula` | Parse and evaluate arithmetic expression |
+| `evaluate_covenant_for_period` | Evaluate single covenant |
+| `evaluate_all_covenants_for_period` | Evaluate all covenants for a period |
+| `classify_status` | Map value to OK/NEAR_BREACH/BREACH |
+| `extract_features` | Extract ML features from domain data |
+| `classify_risk_tier` | Map probability to LOW/MEDIUM/HIGH |
+
+### Constants
+
+| Constant | Description |
+|----------|-------------|
+| `FEATURE_ORDER` | Tuple of feature column names for numpy conversion |
 
 ## Development
 
