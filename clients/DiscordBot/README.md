@@ -146,11 +146,10 @@ Generate an OAuth2 invite URL for the bot.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DISCORD_TOKEN` | string | - | Bot token from Developer Portal |
+| `DISCORD_TOKEN` | string | **Required** | Bot token from Developer Portal |
 | `DISCORD_APPLICATION_ID` | string | - | For invite URL generation |
 | `DISCORD_GUILD_ID` | string | - | Guild-specific command sync |
 | `DISCORD_GUILD_IDS` | string | - | Multiple guilds (comma-separated) |
-| `COMMANDS_SYNC_ON_START` | bool | `false` | Sync commands on startup |
 | `COMMANDS_SYNC_GLOBAL` | bool | `false` | Use global command sync |
 | `LOG_LEVEL` | string | `INFO` | Logging level |
 
@@ -165,13 +164,21 @@ Generate an OAuth2 invite URL for the bot.
 | `MODEL_TRAINER_API_URL` | string | - | Model Trainer API URL |
 | `REDIS_URL` | string | - | Redis connection URL |
 
-#### Service API Keys
+#### Handwriting Service
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `HANDWRITING_API_KEY` | string | - | API key for handwriting-ai |
+| `HANDWRITING_API_TIMEOUT_SECONDS` | int | `5` | Request timeout (seconds) |
+| `HANDWRITING_API_MAX_RETRIES` | int | `1` | Max request retries |
+
+#### Model Trainer Service
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
 | `MODEL_TRAINER_API_KEY` | string | - | API key for model-trainer |
-| `MODEL_TRAINER_API_TIMEOUT_SECONDS` | int | `300` | Request timeout |
+| `MODEL_TRAINER_API_TIMEOUT_SECONDS` | int | `10` | Request timeout (seconds) |
+| `MODEL_TRAINER_API_MAX_RETRIES` | int | `1` | Max request retries |
 
 #### QR Code Settings
 
@@ -190,26 +197,54 @@ Generate an OAuth2 invite URL for the bot.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
+| `TRANSCRIPT_PROVIDER` | string | `api` | Provider type (`api`) |
 | `TRANSCRIPT_RATE_LIMIT` | int | `2` | Requests per window |
 | `TRANSCRIPT_RATE_WINDOW_SECONDS` | int | `60` | Rate limit window |
 | `TRANSCRIPT_PUBLIC_RESPONSES` | bool | `false` | Show responses publicly |
 | `TRANSCRIPT_MAX_ATTACHMENT_MB` | int | `25` | Max attachment size |
+| `TRANSCRIPT_MAX_FILE_MB` | int | `25` | Max file size |
+| `TRANSCRIPT_MAX_MESSAGE_CHARS` | int | `1800` | Max message characters |
+| `TRANSCRIPT_PREFERRED_LANGS` | string | `en,en-US,en-GB` | Preferred languages |
+| `TRANSCRIPT_STT_RTF` | float | `0.5` | Speech-to-text real-time factor |
+| `TRANSCRIPT_DL_MIB_PER_SEC` | float | `4.0` | Download speed estimate |
+| `TRANSCRIPT_STT_API_TIMEOUT_SECONDS` | int | `900` | STT API timeout |
+| `TRANSCRIPT_STT_API_MAX_RETRIES` | int | `2` | STT API max retries |
+| `TRANSCRIPT_ENABLE_CHUNKING` | bool | `true` | Enable audio chunking |
+| `TRANSCRIPT_CHUNK_THRESHOLD_MB` | float | `20.0` | Chunk threshold size |
+| `TRANSCRIPT_TARGET_CHUNK_MB` | float | `20.0` | Target chunk size |
+| `TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS` | float | `600.0` | Max chunk duration |
+| `TRANSCRIPT_MAX_CONCURRENT_CHUNKS` | int | `3` | Max concurrent chunks |
+| `TRANSCRIPT_COOKIES_TEXT` | string | - | YouTube cookies (text) |
+| `TRANSCRIPT_COOKIES_PATH` | string | - | YouTube cookies (file path) |
+| `YOUTUBE_API_KEY` | string | - | YouTube Data API key |
+| `OPENAI_API_KEY` | string | - | OpenAI API key (for Whisper) |
 
 #### Digits Settings
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DIGITS_RATE_LIMIT` | int | `5` | Requests per window |
+| `DIGITS_RATE_LIMIT` | int | `2` | Requests per window |
 | `DIGITS_RATE_WINDOW_SECONDS` | int | `60` | Rate limit window |
 | `DIGITS_PUBLIC_RESPONSES` | bool | `false` | Show responses publicly |
 | `DIGITS_MAX_IMAGE_MB` | int | `2` | Max image size |
 
-#### Model Trainer Settings
+#### Model Trainer Rate Limits
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `MODEL_TRAINER_RATE_LIMIT` | int | `1` | Requests per window |
-| `MODEL_TRAINER_RATE_WINDOW_SECONDS` | int | `300` | Rate limit window |
+| `MODEL_TRAINER_RATE_WINDOW_SECONDS` | int | `10` | Rate limit window |
+
+#### Redis / Job Queue Settings
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `JOB_QUEUE_BRPOP_TIMEOUT_SECONDS` | int | `0` | BRPOP timeout (0 = blocking) |
+| `RQ_TRANSCRIPT_JOB_TIMEOUT_SEC` | int | `600` | Transcript job timeout |
+| `RQ_TRANSCRIPT_RESULT_TTL_SEC` | int | `86400` | Result TTL (24 hours) |
+| `RQ_TRANSCRIPT_FAILURE_TTL_SEC` | int | `604800` | Failure TTL (7 days) |
+| `RQ_TRANSCRIPT_RETRY_MAX` | int | `2` | Max retries |
+| `RQ_TRANSCRIPT_RETRY_INTERVALS_SEC` | string | `60,300` | Retry intervals (CSV) |
 
 ### Example .env
 
@@ -261,10 +296,12 @@ LOG_LEVEL=INFO
 
 ```
 src/clubbot/
+├── __init__.py             # Package init
 ├── main.py                 # Bot entry point
 ├── config.py               # Re-exports config from platform_core
 ├── container.py            # Service container (DI composition)
 ├── orchestrator.py         # Bot lifecycle management
+├── _test_hooks.py          # Test hooks for DI
 │
 ├── cogs/
 │   ├── base.py             # Shared BaseCog (logging, error handling)
@@ -279,8 +316,10 @@ src/clubbot/
 │   ├── registry.py         # Service registry
 │   ├── enqueue.py          # Shared enqueueing utilities
 │   ├── qr/
+│   │   ├── __init__.py
 │   │   └── client.py       # QR code generation service
 │   ├── transcript/
+│   │   ├── __init__.py
 │   │   ├── client.py       # Transcript service orchestrator
 │   │   └── api_client.py   # HTTP client to transcript-api
 │   ├── digits/
@@ -290,7 +329,8 @@ src/clubbot/
 │   └── jobs/
 │       ├── digits_enqueuer.py   # RQ job enqueuer
 │       ├── digits_notifier.py   # Redis pub/sub for digits
-│       └── trainer_notifier.py  # Redis pub/sub for trainer
+│       ├── trainer_notifier.py  # Redis pub/sub for trainer
+│       └── turkic_notifier.py   # Redis pub/sub for turkic
 │
 └── utils/
     └── youtube.py          # YouTube URL validation
@@ -340,6 +380,12 @@ src/clubbot/
 - `trainer.job.progress.v1`
 - `trainer.job.completed.v1`
 - `trainer.job.failed.v1`
+
+**Turkic Events (`turkic:events`):**
+- `turkic.job.started.v1`
+- `turkic.job.progress.v1`
+- `turkic.job.completed.v1`
+- `turkic.job.failed.v1`
 
 ### Notifier Pattern
 
