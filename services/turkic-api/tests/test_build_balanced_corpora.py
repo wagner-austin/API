@@ -1,3 +1,5 @@
+"""Tests for build_balanced_corpora script."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -12,11 +14,11 @@ from typing import Protocol
 import numpy as np
 import pytest
 from numpy.typing import NDArray
-from tests.conftest import make_probs
 
 import turkic_api.core.corpus_download as cd
 import turkic_api.core.langid as lid
 import turkic_api.core.translit as tr
+from tests.conftest import make_probs
 from turkic_api.core.langid import LangIdModel
 
 
@@ -83,28 +85,42 @@ def stub_to_ipa(text: str, lang: str) -> str:
     return text
 
 
-def test_dry_run_bottleneck_and_no_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.fixture()
+def _argv_context() -> Generator[Callable[[list[str]], None], None, None]:
+    """Context manager to set and restore sys.argv."""
+    original = sys.argv
+
+    def set_argv(new_argv: list[str]) -> None:
+        sys.argv = new_argv
+
+    yield set_argv
+    sys.argv = original
+
+
+def test_dry_run_bottleneck_and_no_outputs(
+    tmp_path: Path, _argv_context: Callable[[list[str]], None]
+) -> None:
     script = Path("scripts/build_balanced_corpora.py")
     streams = {"ug": ["aaaaa", "aaaaa"], "kk": ["a" * 50, "a" * 50]}
 
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    def stub_load_langid_model(data_dir: str, prefer_218e: bool = True) -> LangIdModel:
+    def stub_load_langid_model_local(data_dir: str, prefer_218e: bool = True) -> LangIdModel:
         return _StubLID()
 
-    def stub_build_lang_script_filter(
+    def stub_build_lang_script_filter_local(
         *, target_lang: str, script: str | None, threshold: float, model: LangIdModel
     ) -> Callable[[str], bool]:
         return lambda s: True
 
-    def stub_to_ipa(text: str, lang: str) -> str:
+    def stub_to_ipa_local(text: str, lang: str) -> str:
         return text
 
     cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    lid.load_langid_model = stub_load_langid_model_local
+    lid.build_lang_script_filter = stub_build_lang_script_filter_local
+    tr.to_ipa = stub_to_ipa_local
 
     mod = _load_script_module(script)
     report = tmp_path / "r.json"
@@ -125,7 +141,7 @@ def test_dry_run_bottleneck_and_no_outputs(tmp_path: Path, monkeypatch: pytest.M
         str(report),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
 
     text = report.read_text(encoding="utf-8")
@@ -133,7 +149,7 @@ def test_dry_run_bottleneck_and_no_outputs(tmp_path: Path, monkeypatch: pytest.M
     assert not any((tmp_path / "out").glob("*.txt"))
 
 
-def test_write_balanced_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_write_balanced_outputs(tmp_path: Path, _argv_context: Callable[[list[str]], None]) -> None:
     script = Path("scripts/build_balanced_corpora.py")
     streams = {"ug": ["aaaaa", "aaaaa"], "kk": ["a" * 7, "a" * 7, "a" * 7]}
 
@@ -161,7 +177,7 @@ def test_write_balanced_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         str(out_dir),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
 
     ug_file = out_dir / "oscar_ug_ipa.txt"
@@ -175,7 +191,7 @@ def test_write_balanced_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert count_letters(kk_file) == 10
 
 
-def test_full_scan_branch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_full_scan_branch(tmp_path: Path, _argv_context: Callable[[list[str]], None]) -> None:
     script = Path("scripts/build_balanced_corpora.py")
     streams = {"ug": ["aaa"], "kk": ["aa"]}
 
@@ -207,7 +223,7 @@ def test_full_scan_branch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
         str(report),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
     text = report.read_text(encoding="utf-8")
     assert '"language": "kk"' in text
@@ -229,7 +245,7 @@ def test_get_streamer_invalid_raises() -> None:
         get_streamer("bogus")
 
 
-def test_filtered_stream_filters_out(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_filtered_stream_filters_out() -> None:
     # Stub the predicate to always return False; expect empty stream
     mod = _load_script_module(Path("scripts/build_balanced_corpora.py"))
 
@@ -252,7 +268,7 @@ def test_filtered_stream_filters_out(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out == []
 
 
-def test_empty_languages_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_empty_languages_raises(tmp_path: Path, _argv_context: Callable[[list[str]], None]) -> None:
     # Drive main with empty --langs to hit the guard raising RuntimeError
     mod = _load_script_module(Path("scripts/build_balanced_corpora.py"))
     streams = {"ug": ["a"]}
@@ -280,12 +296,14 @@ def test_empty_languages_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         "--dry-run",
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     with pytest.raises(RuntimeError):
         main_fn()
 
 
-def test_internal_helpers_cover_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_internal_helpers_cover_branches(
+    tmp_path: Path, _argv_context: Callable[[list[str]], None]
+) -> None:
     mod = _load_script_module(Path("scripts/build_balanced_corpora.py"))
 
     # _is_ipa_token_char: empty char -> False, break branch
@@ -337,7 +355,7 @@ def test_internal_helpers_cover_branches(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_assume_path_other_language_smaller(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, _argv_context: Callable[[list[str]], None]
 ) -> None:
     # With assume_uz_bottleneck=True and uz in languages, detect kk is smaller via count_until_limit
     script = Path("scripts/build_balanced_corpora.py")
@@ -371,14 +389,14 @@ def test_assume_path_other_language_smaller(
         str(report),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
     text = report.read_text(encoding="utf-8")
     assert '"language": "kk"' in text
 
 
 def test_assume_path_language_reaches_limit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, _argv_context: Callable[[list[str]], None]
 ) -> None:
     # With assume_uz_bottleneck=True, kk has MORE chars than uz so reaches limit
     # This covers the return True, total branch in _count_until_limit (line 152)
@@ -414,14 +432,16 @@ def test_assume_path_language_reaches_limit(
         str(report),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
     text = report.read_text(encoding="utf-8")
     # uz stays bottleneck since kk reached the limit
     assert '"language": "uz"' in text
 
 
-def test_full_scan_non_decreasing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_full_scan_non_decreasing(
+    tmp_path: Path, _argv_context: Callable[[list[str]], None]
+) -> None:
     # Full-scan path where second language is not smaller (covers else branch)
     script = Path("scripts/build_balanced_corpora.py")
     streams = {"ug": ["aa"], "kk": ["aaa"]}
@@ -454,13 +474,13 @@ def test_full_scan_non_decreasing(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         str(report),
     ]
     main_fn: Callable[[], None] = mod.main
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     main_fn()
     text = report.read_text(encoding="utf-8")
     assert '"language": "ug"' in text
 
 
-def test_main_guard_executes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes(tmp_path: Path, _argv_context: Callable[[list[str]], None]) -> None:
     # Execute the script as __main__ to cover the guard
     import runpy
 
@@ -492,14 +512,14 @@ def test_main_guard_executes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         "--report",
         str(report),
     ]
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     runpy.run_path(str(script), run_name="__main__")
     assert report.exists()
 
 
 def test_progress_disabled_emits_no_phase(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    _argv_context: Callable[[list[str]], None],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     # With --progress-every=0 (default), no progress lines should be printed
@@ -530,7 +550,7 @@ def test_progress_disabled_emits_no_phase(
         "--dry-run",
         # implicit --progress-every=0
     ]
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     mod.main()
     out = capsys.readouterr().out
     # With progress disabled, no count_all/count_until/write progress lines should appear
@@ -539,7 +559,7 @@ def test_progress_disabled_emits_no_phase(
 
 def test_progress_enabled_dry_run_logs_counting(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    _argv_context: Callable[[list[str]], None],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     # With --progress-every, expect count_all / count_until progress lines in dry-run
@@ -573,7 +593,7 @@ def test_progress_enabled_dry_run_logs_counting(
         "--log-format",
         "text",
     ]
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     mod.main()
     out = capsys.readouterr().out
     # Rich format: "count_all <lang> <lines> lines <chars> IPA chars"
@@ -582,7 +602,7 @@ def test_progress_enabled_dry_run_logs_counting(
 
 def test_progress_enabled_write_logs(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    _argv_context: Callable[[list[str]], None],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     # Non-dry-run should emit write progress lines
@@ -616,7 +636,7 @@ def test_progress_enabled_write_logs(
         "--log-format",
         "text",
     ]
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     mod.main()
     out = capsys.readouterr().out
     # Rich format: "write <lang> <lines> lines <chars> IPA chars"
@@ -624,7 +644,9 @@ def test_progress_enabled_write_logs(
 
 
 def test_progress_enabled_count_until_limit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    _argv_context: Callable[[list[str]], None],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     # Test progress logging in _count_until_limit (line 148) with assume_uz_bottleneck
     script = Path("scripts/build_balanced_corpora.py")
@@ -660,7 +682,7 @@ def test_progress_enabled_count_until_limit(
         "--log-format",
         "text",
     ]
-    monkeypatch.setattr(sys, "argv", argv, raising=False)
+    _argv_context(argv)
     mod.main()
     out = capsys.readouterr().out
     # With assume_uz_bottleneck=True and uz in langs, _count_until_limit is called for kk

@@ -4,90 +4,129 @@ from __future__ import annotations
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError
+from platform_core.json_utils import JSONTypeError, JSONValue
 
+from turkic_api import _test_hooks
 from turkic_api.api import models
 
 
-def test_decode_source_literal_invalid_after_validation(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Test defensive error path in _decode_source_literal line 117
-    # Mock _decode_required_literal to return an unexpected value
+def test_decode_source_literal_invalid_after_validation() -> None:
+    # Test defensive error path in _decode_source_literal
+    # Override decode_required_literal to return an unexpected value
+    orig_decode = _test_hooks.decode_required_literal
+
     def mock_decode(
-        _v: str | int | float | bool | None | list[str] | dict[str, str],
-        _f: str,
-        _a: frozenset[str],
+        val: JSONValue,
+        field: str,
+        allowed: frozenset[str],
     ) -> str:
         return "invalid"
 
-    monkeypatch.setattr(models, "_decode_required_literal", mock_decode)
+    _test_hooks.decode_required_literal = mock_decode
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_source_literal("anything")
+        assert exc_info.value.http_status == 400
+        assert "Invalid source" in exc_info.value.message
+    finally:
+        _test_hooks.decode_required_literal = orig_decode
 
-    with pytest.raises(AppError) as exc_info:
-        models._decode_source_literal("anything")
-    assert exc_info.value.http_status == 400
-    assert "Invalid source" in exc_info.value.message
 
+def test_decode_language_literal_invalid_after_validation() -> None:
+    # Test defensive error path in _decode_language_literal
+    orig_decode = _test_hooks.decode_required_literal
 
-def test_decode_language_literal_invalid_after_validation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Test defensive error path in _decode_language_literal line 132
     def mock_decode(
-        _v: str | int | float | bool | None | list[str] | dict[str, str],
-        _f: str,
-        _a: frozenset[str],
+        val: JSONValue,
+        field: str,
+        allowed: frozenset[str],
     ) -> str:
         return "invalid"
 
-    monkeypatch.setattr(models, "_decode_required_literal", mock_decode)
+    _test_hooks.decode_required_literal = mock_decode
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_language_literal("anything")
+        assert exc_info.value.http_status == 400
+        assert "Invalid language" in exc_info.value.message
+    finally:
+        _test_hooks.decode_required_literal = orig_decode
 
-    with pytest.raises(AppError) as exc_info:
-        models._decode_language_literal("anything")
-    assert exc_info.value.http_status == 400
-    assert "Invalid language" in exc_info.value.message
+
+def test_decode_job_create_map_lookup_failures() -> None:
+    # Test defensive map lookup failures
+    orig_source_map = _test_hooks.source_map
+    orig_language_map = _test_hooks.language_map
+
+    # First test source map failure (empty map = None lookup result)
+    _test_hooks.source_map = {}
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_job_create_from_unknown(
+                {
+                    "user_id": 42,
+                    "source": "oscar",
+                    "language": "kk",
+                    "max_sentences": 1,
+                    "transliterate": True,
+                    "confidence_threshold": 0.9,
+                }
+            )
+        assert exc_info.value.http_status == 400
+        assert "Invalid source" in exc_info.value.message
+    finally:
+        _test_hooks.source_map = orig_source_map
+
+    # Now test language map failure (empty map = None lookup result)
+    _test_hooks.language_map = {}
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_job_create_from_unknown(
+                {
+                    "user_id": 42,
+                    "source": "oscar",
+                    "language": "kk",
+                    "max_sentences": 1,
+                    "transliterate": True,
+                    "confidence_threshold": 0.9,
+                }
+            )
+        assert exc_info.value.http_status == 400
+        assert "Invalid language" in exc_info.value.message
+    finally:
+        _test_hooks.language_map = orig_language_map
 
 
-def test_decode_job_create_map_lookup_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Test lines 159 and 165 - defensive map lookup failures
-    # First test source map failure
-    original_source_map = models._SOURCE_MAP
+def test_decode_source_literal_final_raise() -> None:
+    """Test defensive final raise in _decode_source_literal (line 149)."""
+    # Need to make source_map return a non-None value that isn't oscar/wikipedia/culturax
+    orig_source_map = _test_hooks.source_map
+    _test_hooks.source_map = {"oscar": "unknown_source"}  # Pass None check, fail literal narrow
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_source_literal("oscar")
+        assert exc_info.value.http_status == 400
+        assert "Invalid source" in exc_info.value.message
+    finally:
+        _test_hooks.source_map = orig_source_map
 
-    monkeypatch.setattr(models, "_SOURCE_MAP", {})
 
-    with pytest.raises(AppError) as exc_info:
-        models._decode_job_create_from_unknown(
-            {
-                "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
-                "max_sentences": 1,
-                "transliterate": True,
-                "confidence_threshold": 0.9,
-            }
-        )
-    assert exc_info.value.http_status == 400
-    assert "Invalid source" in exc_info.value.message
-
-    # Restore source map and break language map
-    monkeypatch.setattr(models, "_SOURCE_MAP", original_source_map)
-    monkeypatch.setattr(models, "_LANGUAGE_MAP", {})
-
-    with pytest.raises(AppError) as exc_info:
-        models._decode_job_create_from_unknown(
-            {
-                "user_id": 42,
-                "source": "oscar",
-                "language": "kk",
-                "max_sentences": 1,
-                "transliterate": True,
-                "confidence_threshold": 0.9,
-            }
-        )
-    assert exc_info.value.http_status == 400
-    assert "Invalid language" in exc_info.value.message
+def test_decode_language_literal_final_raise() -> None:
+    """Test defensive final raise in _decode_language_literal (line 182)."""
+    # Need to make language_map return a non-None value that isn't one of the literals
+    orig_language_map = _test_hooks.language_map
+    _test_hooks.language_map = {"kk": "unknown_lang"}  # Pass None check, fail literal narrow
+    try:
+        with pytest.raises(AppError) as exc_info:
+            models._decode_language_literal("kk")
+        assert exc_info.value.http_status == 400
+        assert "Invalid language" in exc_info.value.message
+    finally:
+        _test_hooks.language_map = orig_language_map
 
 
 def test_parse_job_create_with_list_values() -> None:
-    # Test the else branch (line 215) - handle list values in payload
+    # Test the else branch - handle list values in payload
     from turkic_api.api.types import JsonDict
 
     payload: JsonDict = {
@@ -105,13 +144,13 @@ def test_parse_job_create_with_list_values() -> None:
 
 
 def test_parse_job_response_json_not_dict() -> None:
-    # Test line 260 - JSON is not a dict
+    # Test JSON is not a dict
     with pytest.raises(JSONTypeError, match="Expected JSON object"):
         models.parse_job_response_json('"not a dict"')
 
 
 def test_parse_job_response_json_invalid_status() -> None:
-    # Test line 272 - invalid job status value
+    # Test invalid job status value
     with pytest.raises(JSONTypeError, match="Invalid job status"):
         models.parse_job_response_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, '
@@ -120,13 +159,13 @@ def test_parse_job_response_json_invalid_status() -> None:
 
 
 def test_parse_job_status_json_not_dict() -> None:
-    # Test line 288 - JSON is not a dict
+    # Test JSON is not a dict
     with pytest.raises(JSONTypeError, match="Expected JSON object"):
         models.parse_job_status_json("123")
 
 
 def test_parse_job_status_json_invalid_status() -> None:
-    # Test line 320 - invalid job status value in result
+    # Test invalid job status value in result
     with pytest.raises(JSONTypeError, match="Invalid job status"):
         models.parse_job_status_json(
             '{"status": "invalid", "job_id": "x", "user_id": 42, "progress": 0, '
@@ -135,7 +174,7 @@ def test_parse_job_status_json_invalid_status() -> None:
 
 
 def test_decode_source_literal_all_values() -> None:
-    # Test lines 114, 116, 119 - all source literal branches
+    # Test all source literal branches
     assert models._decode_source_literal("oscar") == "oscar"
     assert models._decode_source_literal("wikipedia") == "wikipedia"
     assert models._decode_source_literal("culturax") == "culturax"
@@ -150,34 +189,38 @@ def test_decode_language_literal_all_values() -> None:
     assert models._decode_language_literal("ug") == "ug"
     assert models._decode_language_literal("fi") == "fi"
     assert models._decode_language_literal("az") == "az"
+    assert models._decode_language_literal("en") == "en"
 
 
 def test_decode_script_literal_all_values() -> None:
-    # Test lines 136-145 - all script literal branches including None
+    # Test all script literal branches including None
     assert models._decode_script_literal(None) is None
     assert models._decode_script_literal("Latn") == "Latn"
     assert models._decode_script_literal("Cyrl") == "Cyrl"
     assert models._decode_script_literal("Arab") == "Arab"
 
 
-def test_decode_script_literal_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Test line 145 - defensive return None when validation passes but no branches match
-    # Mock _decode_optional_literal to not validate, allowing an unexpected value through
+def test_decode_script_literal_fallback() -> None:
+    # Test defensive return None when validation passes but no branches match
+    orig_decode = _test_hooks.decode_optional_literal
+
     def mock_decode_optional(
-        _v: str | int | float | bool | None | list[str] | dict[str, str],
-        _f: str,
-        _a: frozenset[str],
+        val: JSONValue,
+        field: str,
+        allowed: frozenset[str],
     ) -> str | None:
-        return "unexpected" if isinstance(_v, str) else None
+        return "unexpected" if isinstance(val, str) else None
 
-    monkeypatch.setattr(models, "_decode_optional_literal", mock_decode_optional)
-
-    result = models._decode_script_literal("unexpected")
-    assert result is None
+    _test_hooks.decode_optional_literal = mock_decode_optional
+    try:
+        result = models._decode_script_literal("unexpected")
+        assert result is None
+    finally:
+        _test_hooks.decode_optional_literal = orig_decode
 
 
 def test_decode_job_create_from_unknown_user_id_not_int() -> None:
-    """Cover line 172: user_id must be an integer in _decode_job_create_from_unknown."""
+    """Cover user_id must be an integer in _decode_job_create_from_unknown."""
     with pytest.raises(AppError) as exc_info:
         models._decode_job_create_from_unknown(
             {
@@ -194,7 +237,7 @@ def test_decode_job_create_from_unknown_user_id_not_int() -> None:
 
 
 def test_decode_job_create_from_unknown_user_id_none() -> None:
-    """Cover line 172: user_id None triggers the error."""
+    """Cover user_id None triggers the error."""
     with pytest.raises(AppError) as exc_info:
         models._decode_job_create_from_unknown(
             {
@@ -211,7 +254,7 @@ def test_decode_job_create_from_unknown_user_id_none() -> None:
 
 
 def test_parse_job_response_json_user_id_not_int() -> None:
-    """Cover line 269: user_id must be an integer in parse_job_response_json."""
+    """Cover user_id must be an integer in parse_job_response_json."""
     with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_response_json(
             '{"job_id": "x", "user_id": "42", "status": "queued", '
@@ -220,7 +263,7 @@ def test_parse_job_response_json_user_id_not_int() -> None:
 
 
 def test_parse_job_response_json_user_id_null() -> None:
-    """Cover line 269: user_id null is not an integer."""
+    """Cover user_id null is not an integer."""
     with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_response_json(
             '{"job_id": "x", "user_id": null, "status": "queued", '
@@ -229,7 +272,7 @@ def test_parse_job_response_json_user_id_null() -> None:
 
 
 def test_parse_job_status_json_user_id_not_int() -> None:
-    """Cover line 301: user_id must be an integer in parse_job_status_json."""
+    """Cover user_id must be an integer in parse_job_status_json."""
     with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_status_json(
             '{"job_id": "x", "user_id": "42", "status": "queued", "progress": 0, '
@@ -238,7 +281,7 @@ def test_parse_job_status_json_user_id_not_int() -> None:
 
 
 def test_parse_job_status_json_user_id_null() -> None:
-    """Cover line 301: user_id null is not an integer."""
+    """Cover user_id null is not an integer."""
     with pytest.raises(JSONTypeError, match="user_id must be an integer"):
         models.parse_job_status_json(
             '{"job_id": "x", "user_id": null, "status": "queued", "progress": 0, '

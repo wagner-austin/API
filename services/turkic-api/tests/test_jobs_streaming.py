@@ -1,23 +1,27 @@
+"""Tests for streaming functionality in jobs module."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 
-import pytest
 from platform_core.json_utils import JSONValue
 from platform_core.turkic_jobs import TurkicJobStatus
 from platform_workers.job_context import JobContext
 from platform_workers.testing import FakeRedis
 
-import turkic_api.api.jobs as jobs_mod
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.job_store import TurkicJobStore
+from turkic_api.api.jobs import _result_stream
 from turkic_api.core.corpus import LocalCorpusService
 from turkic_api.core.models import ProcessSpec
 
 
-class _Ctx(JobContext):
+class FakeJobContext(JobContext):
+    """Fake job context for testing."""
+
     def __init__(self) -> None:
         self.started: int = 0
         self.progress: list[tuple[int, str | None]] = []
@@ -39,7 +43,9 @@ class _Ctx(JobContext):
         self.failed.append((error_kind, message))
 
 
-class _TrackingStore(TurkicJobStore):
+class TrackingStore(TurkicJobStore):
+    """TurkicJobStore that tracks saved entries."""
+
     def __init__(self) -> None:
         self.saved: list[TurkicJobStatus] = []
         self._fake = FakeRedis()
@@ -50,22 +56,25 @@ class _TrackingStore(TurkicJobStore):
         super().save(data)
 
 
-def test_result_stream_publishes_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+class FakeCorpusServiceManyLines:
+    """Fake corpus service that yields many lines."""
+
+    def __init__(self, lines: list[str]) -> None:
+        self._lines = lines
+
+    def stream(self, _spec: ProcessSpec) -> Generator[str, None, None]:
+        yield from self._lines
+
+
+def test_result_stream_publishes_progress(tmp_path: Path) -> None:
+    """Test that _result_stream publishes progress every 50 lines."""
     lines = [f"line{i}" for i in range(1, 121)]
 
-    class _Svc:
-        def __init__(self, _root: str) -> None:
-            pass
+    def _corpus_factory(data_dir: str) -> FakeCorpusServiceManyLines:
+        return FakeCorpusServiceManyLines(lines)
 
-        def stream(self, _spec: ProcessSpec) -> Generator[str, None, None]:
-            yield from lines
-
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
-
-    def _to_ipa(text: str, _lang: str) -> str:
-        return f"{text}-ipa"
-
-    monkeypatch.setattr(jobs_mod, "to_ipa", _to_ipa)
+    _test_hooks.local_corpus_service_factory = _corpus_factory
+    _test_hooks.to_ipa = lambda text, _lang: f"{text}-ipa"
 
     spec: ProcessSpec = {
         "source": "oscar",
@@ -81,11 +90,11 @@ def test_result_stream_publishes_progress(monkeypatch: pytest.MonkeyPatch, tmp_p
         data_bank_api_url="http://db",
         data_bank_api_key="k",
     )
-    store = _TrackingStore()
-    ctx = _Ctx()
+    store = TrackingStore()
+    ctx = FakeJobContext()
     created_at = datetime.utcnow()
 
-    out = list(jobs_mod._result_stream("jid", 42, spec, settings, store, ctx, created_at))
+    out = list(_result_stream("jid", 42, spec, settings, store, ctx, created_at))
 
     assert len(out) == 120
     assert out[0] == b"line1-ipa\n"
@@ -96,6 +105,7 @@ def test_result_stream_publishes_progress(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 
 def test_local_corpus_service_handles_empty_file(tmp_path: Path) -> None:
+    """Test that LocalCorpusService handles empty corpus file."""
     corpus_dir = tmp_path / "corpus"
     corpus_dir.mkdir(parents=True, exist_ok=True)
     corpus_path = corpus_dir / "oscar_kk.txt"

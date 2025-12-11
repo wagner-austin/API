@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Final
 
 from turkic_api.core.transliteval import Rule, apply_rules, load_rules
 
-_RULE_DIR: Final[Path] = Path(__file__).with_suffix("").parent / "rules"
+# Module-level directory path - not Final to allow test overrides
+_RULE_DIR: Path = Path(__file__).with_suffix("").parent / "rules"
 
 _SUPPORTED_LANGS: dict[str, list[str]] | None = None
 _RULE_CACHE: dict[str, list[Rule]] = {}

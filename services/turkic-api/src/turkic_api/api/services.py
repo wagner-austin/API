@@ -8,7 +8,7 @@ from platform_workers.redis import RedisStrProto
 
 from turkic_api.api.job_store import TurkicJobStore
 from turkic_api.api.models import JobCreate, JobResponse, JobStatus
-from turkic_api.api.types import LoggerProtocol, QueueProtocol, UnknownJson
+from turkic_api.api.types import JSONValue, LoggerProtocol, QueueProtocol
 
 
 class JobService:
@@ -52,7 +52,7 @@ class JobService:
         self._store.save(queued_status)
 
         # Enqueue background job via injected queue with a typed payload
-        payload: dict[str, UnknownJson] = {
+        payload: dict[str, JSONValue] = {
             "user_id": user_id,
             "source": job["source"],
             "language": job["language"],

@@ -4,8 +4,6 @@ from typing import Literal, TypeGuard
 
 from typing_extensions import TypedDict
 
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
-
 Source = Literal["oscar", "wikipedia", "culturax"]
 Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en"]
 

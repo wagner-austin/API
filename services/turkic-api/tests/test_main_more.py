@@ -1,20 +1,21 @@
+"""Additional tests for main.py routes."""
+
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 from platform_workers.testing import FakeRedis, FakeRedisError
 
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.main import RedisCombinedProtocol, create_app
-from turkic_api.api.types import QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
-from turkic_api.core.models import UnknownJson
+from turkic_api.api.types import JSONValue, QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
 
 class _QueueStub:
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -58,7 +59,7 @@ def test_get_job_result_404() -> None:
         redis.assert_only_called({"hgetall"})
 
 
-def test_readyz_handles_redis_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readyz_handles_redis_error() -> None:
     captured_err: list[FakeRedisError] = []
 
     def _redis_err_provider(settings: Settings) -> RedisCombinedProtocol:
@@ -66,18 +67,14 @@ def test_readyz_handles_redis_error(monkeypatch: pytest.MonkeyPatch) -> None:
         captured_err.append(r)
         return r
 
+    # Use hook to make path appear to exist
+    _test_hooks.path_exists = lambda p: True
+
     app = create_app(
         redis_provider=_redis_err_provider,
         queue_provider=_queue_provider_stub,
     )
     with TestClient(app) as c:
-        # Force volume to appear mounted so we hit the Redis degraded branch
-        from pathlib import Path
-
-        def _exists(_: Path) -> bool:
-            return True
-
-        monkeypatch.setattr("pathlib.Path.exists", _exists, raising=False)
         r = c.get("/readyz")
         assert r.status_code == 503
         body: dict[str, str | None] = r.json()

@@ -4,11 +4,12 @@ from collections.abc import Generator
 
 from fastapi.responses import StreamingResponse
 from platform_core.data_bank_client import (
-    DataBankClient,
     DataBankClientError,
     NotFoundError,
 )
 from platform_core.errors import AppError, ErrorCode
+
+from turkic_api import _test_hooks
 
 from .config import Settings
 
@@ -27,7 +28,7 @@ def _require_data_bank_config(settings: Settings) -> tuple[str, str]:
 
 def stream_data_bank_file(job_id: str, file_id: str, settings: Settings) -> StreamingResponse:
     base_url, api_key = _require_data_bank_config(settings)
-    client = DataBankClient(base_url, api_key, timeout_seconds=120.0)
+    client = _test_hooks.data_bank_downloader_factory(base_url, api_key, timeout_seconds=120.0)
 
     try:
         head = client.head(file_id, request_id=job_id)

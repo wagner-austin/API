@@ -12,6 +12,8 @@ from platform_core.health import HealthResponse, ReadyResponse, healthz
 from platform_workers.health import readyz_redis_with_workers
 from platform_workers.redis import RedisStrProto
 
+from turkic_api import _test_hooks
+
 
 def healthz_endpoint() -> HealthResponse:
     """Liveness probe - always returns ok."""
@@ -34,7 +36,7 @@ def readyz_endpoint(redis: RedisStrProto, data_dir: str) -> ReadyResponse:
         return redis_result
 
     # Check volume exists
-    if not Path(data_dir).exists():
+    if not _test_hooks.path_exists(Path(data_dir)):
         return {"status": "degraded", "reason": "data volume not found"}
 
     return {"status": "ready", "reason": None}

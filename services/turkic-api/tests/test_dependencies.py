@@ -1,77 +1,70 @@
+"""Tests for FastAPI dependencies in turkic-api."""
+
 from __future__ import annotations
 
-import sys
-from types import ModuleType
+from typing import ClassVar
 
 import pytest
-from platform_workers.testing import FakeRedis, FakeRedisBytesClient
+from platform_workers.redis import RedisStrProto
+from platform_workers.testing import FakeRedis
 
-from turkic_api.api.dependencies import get_queue
-from turkic_api.core.models import UnknownJson
+from turkic_api import _test_hooks
+from turkic_api.api.dependencies import get_redis, get_settings
 
 
-def test_get_redis_closes_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    created: list[FakeRedis] = []
+class TrackingFakeRedis(FakeRedis):
+    """FakeRedis that tracks whether it was created."""
 
-    def _from_url(_url: str) -> FakeRedis:
-        stub = FakeRedis()
-        created.append(stub)
-        return stub
+    instances: ClassVar[list[FakeRedis]] = []
 
-    import platform_workers.redis as pw_redis
+    def __init__(self) -> None:
+        super().__init__()
+        TrackingFakeRedis.instances.append(self)
 
-    import turkic_api.api.dependencies as deps
 
-    # Patch the internal factory used by get_redis
-    monkeypatch.setattr(pw_redis, "_redis_from_url_str", _from_url)
+def test_get_redis_closes_client() -> None:
+    """Test that get_redis generator closes the client on teardown."""
+    # Reset tracking
+    TrackingFakeRedis.instances = []
 
-    gen = deps.get_redis(deps.get_settings())
+    def _fake_redis_factory(url: str) -> RedisStrProto:
+        return TrackingFakeRedis()
+
+    _test_hooks.redis_factory = _fake_redis_factory
+
+    gen = get_redis(get_settings())
     client = next(gen)
-    assert type(client).__name__ == "FakeRedis"
+    # Verify the client is the one we created via our tracking class
+    assert len(TrackingFakeRedis.instances) == 1
+    assert client is TrackingFakeRedis.instances[0]
+
+    # Trigger generator cleanup
     with pytest.raises(StopIteration):
         gen.send(None)
-    assert created
-    assert created[0].closed is True
-    created[0].assert_only_called({"close"})
+
+    assert TrackingFakeRedis.instances
+    assert TrackingFakeRedis.instances[0].closed is True
+    TrackingFakeRedis.instances[0].assert_only_called({"close"})
 
 
-def test_get_queue_returns_queue(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _Q:
-        def __init__(self, name: str, *, connection: UnknownJson) -> None:
-            self.name = name
-            self.connection = connection
+def test_get_redis_uses_settings_url() -> None:
+    """Test that get_redis passes the settings URL to the factory."""
+    captured_urls: list[str] = []
 
-    class _RQModule(ModuleType):
-        Queue: type[_Q]
+    def _capturing_redis_factory(url: str) -> RedisStrProto:
+        captured_urls.append(url)
+        return FakeRedis()
 
-    dummy = _RQModule("rq")
-    dummy.Queue = _Q
-    sys.modules["rq"] = dummy
+    _test_hooks.redis_factory = _capturing_redis_factory
 
-    import turkic_api.api.dependencies as deps
+    settings = get_settings()
+    gen = get_redis(settings)
+    next(gen)
 
-    # Call get_queue with settings dependency
-    q = get_queue(deps.get_settings())
-    assert callable(q.enqueue)
-    # FakeRedis not directly used here, but guard requires assertion
-    FakeRedis().assert_only_called(set())
+    assert len(captured_urls) == 1
+    assert captured_urls[0] == settings["redis_url"]
 
-
-def test_get_queue_invalid_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
-    import platform_workers.redis as pw_redis
-
-    import turkic_api.api.dependencies as deps
-
-    def _return_bytes_client(_url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
-    monkeypatch.setattr(pw_redis, "redis_raw_for_rq", _return_bytes_client)
-
-    q = get_queue(deps.get_settings())
-    # When the underlying RQ queue is backed by FakeRedisBytesClient (minimal impl),
-    # the enqueue call raises AttributeError because the Queue object
-    # created from rq_queue is incomplete without a proper connection.
-    with pytest.raises(AttributeError):
-        q.enqueue("task")
-    # FakeRedis not directly used here, but guard requires assertion
+    # Trigger cleanup
+    with pytest.raises(StopIteration):
+        gen.send(None)
     FakeRedis().assert_only_called(set())

@@ -11,7 +11,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from turkic_api.api import models
 from turkic_api.api.jobs import _decode_job_params
 from turkic_api.api.main import _to_json_simple
-from turkic_api.api.types import JsonDict, UnknownJson
+from turkic_api.api.types import JsonDict, JSONValue
 from turkic_api.core import transliteval as te
 from turkic_api.core.corpus import CorpusService, LocalCorpusService
 from turkic_api.core.models import ProcessSpec
@@ -80,7 +80,7 @@ def test_decode_job_params_branches() -> None:
                 "confidence_threshold": 0.4,
             }
         )
-    payload_bad: dict[str, UnknownJson] = {
+    payload_bad: dict[str, JSONValue] = {
         "user_id": 42,
         "source": "oscar",
         "language": "kk",
@@ -144,7 +144,7 @@ def test_models_parse_job_create_and_json_helpers() -> None:
 
 
 def test_models_literal_and_conversion_paths() -> None:
-    base: dict[str, UnknownJson] = {
+    base: dict[str, JSONValue] = {
         "user_id": 42,
         "source": "oscar",
         "language": "kk",

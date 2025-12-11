@@ -1,3 +1,5 @@
+"""Tests for main.py override patterns."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -8,10 +10,9 @@ from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeQueue, FakeRedis
 
 from turkic_api.api.config import Settings
-from turkic_api.api.main import create_app
+from turkic_api.api.main import RedisCombinedProtocol, create_app
 from turkic_api.api.routes.jobs import _to_hash_redis
-from turkic_api.api.types import LoggerProtocol, RQJobLike, RQRetryLike, _EnqCallable
-from turkic_api.core.models import UnknownJson
+from turkic_api.api.types import JSONValue, LoggerProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
 
 def test_to_hash_redis_wraps_real_redis() -> None:
@@ -86,18 +87,6 @@ def test_create_app_defaults_paths() -> None:
     FakeRedis().assert_only_called(set())
 
 
-def test_create_app_type_checking_else_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    import turkic_api.api.main as m
-
-    monkeypatch.setattr(m, "TYPE_CHECKING", True, raising=False)
-    app = m.create_app()
-    if app is None:
-        pytest.fail("expected app")
-    monkeypatch.setattr(m, "TYPE_CHECKING", False, raising=False)
-    # FakeRedis imported but not used directly in this test
-    FakeRedis().assert_only_called(set())
-
-
 def test_to_hash_redis_identity() -> None:
     r = FakeRedis()
     r.hset(turkic_job_key("x"), {"x": "1"})
@@ -110,7 +99,7 @@ class _ProviderQueue:
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -124,8 +113,7 @@ class _ProviderQueue:
         return _Job()
 
 
-def test_provider_context_generator_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    import turkic_api.api.main as m
+def test_provider_context_generator_branch() -> None:
     import turkic_api.api.provider_context as pc
 
     ctx = pc.provider_context
@@ -149,7 +137,7 @@ def test_provider_context_generator_branch(monkeypatch: pytest.MonkeyPatch) -> N
 
     captured_redis: list[FakeRedis] = []
 
-    def redis_provider(_settings: Settings) -> Generator[m.RedisCombinedProtocol, None, None]:
+    def redis_provider(_settings: Settings) -> Generator[RedisCombinedProtocol, None, None]:
         r = FakeRedis()
         captured_redis.append(r)
         yield r
@@ -181,7 +169,7 @@ def test_provider_context_generator_branch(monkeypatch: pytest.MonkeyPatch) -> N
         r.assert_only_called(set())
 
 
-def test_get_redis_context_when_none(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_context_when_none() -> None:
     import turkic_api.api.provider_context as pc
 
     ctx = pc.provider_context

@@ -1,3 +1,5 @@
+"""Tests for process_corpus entry points in jobs module."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -5,16 +7,22 @@ from pathlib import Path
 from typing import BinaryIO
 
 import numpy as np
-import pytest
 from numpy.typing import NDArray
+from platform_core.config import config_test_hooks
 from platform_core.data_bank_protocol import FileUploadResponse
+from platform_core.json_utils import JSONValue
+from platform_core.testing import make_fake_env
 from platform_workers.testing import FakeRedis
+
 from tests.conftest import make_probs
+from turkic_api import _test_hooks
+from turkic_api.api.jobs import _decode_process_corpus, process_corpus
+from turkic_api.core.models import ProcessSpec
 
-import turkic_api.api.jobs as jobs_mod
 
+class FakeDataBankClient:
+    """Fake data bank client for testing."""
 
-class _MockDataBankClient:
     def __init__(
         self,
         base_url: str,
@@ -41,57 +49,63 @@ class _MockDataBankClient:
         }
 
 
-def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # Ensure data dir and data-bank config
-    monkeypatch.setenv("TURKIC_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "k")
+class FakeCorpusService:
+    """Fake corpus service that yields a single line."""
 
-    # Stub _get_redis_client
-    stub = FakeRedis()
+    def __init__(self, _root: str) -> None:
+        pass
 
-    def _get_client(_url: str) -> FakeRedis:
-        return stub
+    def stream(self, _spec: ProcessSpec) -> Generator[str, None, None]:
+        yield "hello"
 
-    monkeypatch.setattr(jobs_mod, "_get_redis_client", _get_client)
 
-    # Stub corpus and transliteration
-    class _Svc:
-        def __init__(self, _root: str) -> None: ...
-        def stream(self, _spec: str | int | float | bool | None) -> Generator[str, None, None]:
-            yield "hello"
+class FakeLangModel:
+    """Fake language ID model."""
 
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
+    def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+        return (("__label__kk",), make_probs(1.0))
 
-    def _to_ipa(s: str, _l: str) -> str:
-        return s
 
-    monkeypatch.setattr(jobs_mod, "to_ipa", _to_ipa)
+def _setup_job_hooks(tmp_path: Path, stub: FakeRedis) -> None:
+    """Set up test hooks for job processing tests."""
+    env = make_fake_env(
+        {
+            "TURKIC_DATA_DIR": str(tmp_path),
+            "TURKIC_DATA_BANK_API_URL": "http://db",
+            "TURKIC_DATA_BANK_API_KEY": "k",
+            "TURKIC_REDIS_URL": "redis://test:6379/0",
+        }
+    )
+    config_test_hooks.get_env = env
 
-    # Avoid network in test: pretend corpus file exists (single patch)
-    def _ensure(
-        *_a: str | int | float | bool | None, **_k: str | int | float | bool | None
+    _test_hooks.redis_factory = lambda _url: stub
+    _test_hooks.local_corpus_service_factory = lambda _data_dir: FakeCorpusService(_data_dir)
+    _test_hooks.to_ipa = lambda s, _l: s
+
+    def _fake_ensure_corpus(
+        spec: ProcessSpec,
+        data_dir: str,
+        script: str | None = None,
+        *,
+        langid_model: _test_hooks.LangIdModelProtocol | None = None,
     ) -> Path:
         return tmp_path / "corpus" / "oscar_kk.txt"
 
-    monkeypatch.setattr(jobs_mod, "ensure_corpus_file", _ensure)
+    _test_hooks.ensure_corpus_file = _fake_ensure_corpus
+    _test_hooks.load_langid_model = lambda _data_dir, prefer_218e=True: FakeLangModel()
+    _test_hooks.data_bank_client_factory = (
+        lambda api_url, api_key, timeout_seconds: FakeDataBankClient(
+            api_url, api_key, timeout_seconds=timeout_seconds
+        )
+    )
 
-    # Mock langid model loader
-    class _LangModel:
-        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
-            return (("__label__kk",), make_probs(1.0))
 
-    def _load_langid(data_dir: str, prefer_218e: bool = True) -> _LangModel:
-        return _LangModel()
+def test_process_corpus_entry(tmp_path: Path) -> None:
+    """Test _decode_process_corpus entry point."""
+    stub = FakeRedis()
+    _setup_job_hooks(tmp_path, stub)
 
-    monkeypatch.setattr(jobs_mod, "load_langid_model", _load_langid)
-
-    # Mock DataBankClient
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _MockDataBankClient)
-
-    from turkic_api.core.models import UnknownJson
-
-    params: dict[str, UnknownJson] = {
+    params: dict[str, JSONValue] = {
         "user_id": 42,
         "source": "oscar",
         "language": "kk",
@@ -100,7 +114,7 @@ def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         "confidence_threshold": 0.9,
     }
 
-    result = jobs_mod._decode_process_corpus("e1", params)
+    result = _decode_process_corpus("e1", params)
     assert result["status"] == "completed"
     assert stub.closed is True
     # With streaming upload, no local result file is written.
@@ -108,55 +122,10 @@ def test_process_corpus_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     stub.assert_only_called({"hset", "expire", "publish", "close"})
 
 
-def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_process_corpus_public_entry(tmp_path: Path) -> None:
     """Test the public process_corpus entry point delegates correctly."""
-    # Ensure data dir and data-bank config
-    monkeypatch.setenv("TURKIC_DATA_DIR", str(tmp_path))
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "k")
-
-    # Stub _get_redis_client
     stub = FakeRedis()
-
-    def _get_client(_url: str) -> FakeRedis:
-        return stub
-
-    monkeypatch.setattr(jobs_mod, "_get_redis_client", _get_client)
-
-    # Stub corpus and transliteration
-    class _Svc:
-        def __init__(self, _root: str) -> None: ...
-        def stream(self, _spec: str | int | float | bool | None) -> Generator[str, None, None]:
-            yield "hello"
-
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
-
-    def _to_ipa(s: str, _l: str) -> str:
-        return s
-
-    monkeypatch.setattr(jobs_mod, "to_ipa", _to_ipa)
-
-    def _ensure(
-        *_a: str | int | float | bool | None, **_k: str | int | float | bool | None
-    ) -> Path:
-        return tmp_path / "corpus" / "oscar_kk.txt"
-
-    monkeypatch.setattr(jobs_mod, "ensure_corpus_file", _ensure)
-
-    # Mock langid model loader
-    class _LangModel2:
-        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
-            return (("__label__kk",), make_probs(1.0))
-
-    def _load_langid2(data_dir: str, prefer_218e: bool = True) -> _LangModel2:
-        return _LangModel2()
-
-    monkeypatch.setattr(jobs_mod, "load_langid_model", _load_langid2)
-
-    # Mock DataBankClient
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _MockDataBankClient)
-
-    from platform_core.json_utils import JSONValue
+    _setup_job_hooks(tmp_path, stub)
 
     # Use Mapping[str, JSONValue] compatible input (simulating RQ payload)
     params: dict[str, JSONValue] = {
@@ -169,7 +138,7 @@ def test_process_corpus_public_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     }
 
     # Call the PUBLIC entry point
-    result = jobs_mod.process_corpus("e2", params)
+    result = process_corpus("e2", params)
     assert result["status"] == "completed"
     assert stub.closed is True
     stub.assert_only_called({"hset", "expire", "publish", "close"})

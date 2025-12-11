@@ -11,19 +11,40 @@ from typing import Literal, NotRequired
 
 from platform_core.errors import AppError
 from platform_core.errors import ErrorCode as PlatformErrorCode
-from platform_core.json_utils import JSONTypeError, load_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 from typing_extensions import TypedDict
 
-from .types import JsonDict, UnknownJson
+from .types import JsonDict
 from .validators import (
     _decode_bool,
     _decode_float_range,
     _decode_int_range,
-    _decode_optional_literal,
-    _decode_required_literal,
     _decode_str,
     _load_json_dict,
 )
+
+
+def _hook_decode_required_literal(
+    val: JSONValue,
+    field: str,
+    allowed: frozenset[str],
+) -> str:
+    """Decode required literal using hook for test injection."""
+    from turkic_api import _test_hooks
+
+    return _test_hooks.decode_required_literal(val, field, allowed)
+
+
+def _hook_decode_optional_literal(
+    val: JSONValue,
+    field: str,
+    allowed: frozenset[str],
+) -> str | None:
+    """Decode optional literal using hook for test injection."""
+    from turkic_api import _test_hooks
+
+    return _test_hooks.decode_optional_literal(val, field, allowed)
+
 
 # Type aliases for literals
 Status = Literal["queued", "processing", "completed", "failed"]
@@ -92,52 +113,83 @@ class ErrorResponse(TypedDict):
 _SOURCE_VALUES = frozenset({"oscar", "wikipedia", "culturax"})
 _LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az", "en"})
 _SCRIPT_VALUES = frozenset({"Latn", "Cyrl", "Arab"})
-_SOURCE_MAP: dict[str, Source] = {
-    "oscar": "oscar",
-    "wikipedia": "wikipedia",
-    "culturax": "culturax",
-}
-_LANGUAGE_MAP: dict[str, Language] = {
-    "kk": "kk",
-    "ky": "ky",
-    "uz": "uz",
-    "tr": "tr",
-    "ug": "ug",
-    "fi": "fi",
-    "az": "az",
-    "en": "en",
-}
 _SCRIPT_MAP: dict[str, Script] = {"Latn": "Latn", "Cyrl": "Cyrl", "Arab": "Arab"}
 
 
-def _decode_source_literal(val: UnknownJson) -> Source:
-    decoded = _decode_required_literal(val, "source", _SOURCE_VALUES)
-    source = _SOURCE_MAP.get(decoded)
-    if source is None:
+def _get_source_map() -> dict[str, str]:
+    """Get source map from hooks for test injection."""
+    from turkic_api import _test_hooks
+
+    return _test_hooks.source_map
+
+
+def _get_language_map() -> dict[str, str]:
+    """Get language map from hooks for test injection."""
+    from turkic_api import _test_hooks
+
+    return _test_hooks.language_map
+
+
+def _decode_source_literal(val: JSONValue) -> Source:
+    decoded = _hook_decode_required_literal(val, "source", _SOURCE_VALUES)
+    source_val = _get_source_map().get(decoded)
+    if source_val is None:
         raise AppError(
             code=PlatformErrorCode.INVALID_INPUT,
             message="Invalid source",
             http_status=400,
         )
-    return source
+    # Narrow to Source literal
+    if source_val == "oscar":
+        return "oscar"
+    if source_val == "wikipedia":
+        return "wikipedia"
+    if source_val == "culturax":
+        return "culturax"
+    raise AppError(
+        code=PlatformErrorCode.INVALID_INPUT,
+        message="Invalid source",
+        http_status=400,
+    )
 
 
-def _decode_language_literal(val: UnknownJson) -> Language:
-    decoded = _decode_required_literal(val, "language", _LANGUAGE_VALUES)
-    language = _LANGUAGE_MAP.get(decoded)
-    if language is None:
+def _decode_language_literal(val: JSONValue) -> Language:
+    decoded = _hook_decode_required_literal(val, "language", _LANGUAGE_VALUES)
+    lang_val = _get_language_map().get(decoded)
+    if lang_val is None:
         raise AppError(
             code=PlatformErrorCode.INVALID_INPUT,
             message="Invalid language",
             http_status=400,
         )
-    return language
+    # Narrow to Language literal
+    if lang_val == "kk":
+        return "kk"
+    if lang_val == "ky":
+        return "ky"
+    if lang_val == "uz":
+        return "uz"
+    if lang_val == "tr":
+        return "tr"
+    if lang_val == "ug":
+        return "ug"
+    if lang_val == "fi":
+        return "fi"
+    if lang_val == "az":
+        return "az"
+    if lang_val == "en":
+        return "en"
+    raise AppError(
+        code=PlatformErrorCode.INVALID_INPUT,
+        message="Invalid language",
+        http_status=400,
+    )
 
 
-def _decode_script_literal(val: UnknownJson) -> Script | None:
+def _decode_script_literal(val: JSONValue) -> Script | None:
     if val is None:
         return None
-    _decode_optional_literal(val, "script", _SCRIPT_VALUES)
+    _hook_decode_optional_literal(val, "script", _SCRIPT_VALUES)
     if val == "Latn":
         return "Latn"
     if val == "Cyrl":
@@ -147,14 +199,14 @@ def _decode_script_literal(val: UnknownJson) -> Script | None:
     return None
 
 
-def _decode_job_create_from_unknown(payload: UnknownJson) -> JobCreate:
+def _decode_job_create_from_unknown(payload: JSONValue) -> JobCreate:
     """Decode and validate JobCreate from unknown JSON.
 
     Uses explicit literal narrowing to satisfy mypy's strict TypedDict checking.
     """
     d = _load_json_dict(payload)
 
-    user_id_raw: UnknownJson = d.get("user_id")
+    user_id_raw: JSONValue = d.get("user_id")
     if not isinstance(user_id_raw, int):
         raise AppError(
             code=PlatformErrorCode.INVALID_INPUT,
@@ -163,34 +215,20 @@ def _decode_job_create_from_unknown(payload: UnknownJson) -> JobCreate:
         )
     user_id: int = user_id_raw
 
-    source_raw: UnknownJson = d.get("source")
-    source_val = _decode_required_literal(source_raw, "source", _SOURCE_VALUES)
-    source = _SOURCE_MAP.get(source_val)
-    if source is None:
-        raise AppError(
-            code=PlatformErrorCode.INVALID_INPUT,
-            message="Invalid source",
-            http_status=400,
-        )
+    source_raw: JSONValue = d.get("source")
+    source = _decode_source_literal(source_raw)
 
-    language_raw: UnknownJson = d.get("language")
-    language_val = _decode_required_literal(language_raw, "language", _LANGUAGE_VALUES)
-    language = _LANGUAGE_MAP.get(language_val)
-    if language is None:
-        raise AppError(
-            code=PlatformErrorCode.INVALID_INPUT,
-            message="Invalid language",
-            http_status=400,
-        )
+    language_raw: JSONValue = d.get("language")
+    language = _decode_language_literal(language_raw)
 
-    script_raw: UnknownJson = d.get("script")
+    script_raw: JSONValue = d.get("script")
     if script_raw is None:
         script: Script | None = None
     else:
-        _decode_optional_literal(script_raw, "script", _SCRIPT_VALUES)
+        _hook_decode_optional_literal(script_raw, "script", _SCRIPT_VALUES)
         script = _SCRIPT_MAP.get(script_raw if isinstance(script_raw, str) else "")
 
-    max_raw: UnknownJson = d.get("max_sentences")
+    max_raw: JSONValue = d.get("max_sentences")
     max_sentences = _decode_int_range(
         max_raw,
         "max_sentences",
@@ -199,14 +237,14 @@ def _decode_job_create_from_unknown(payload: UnknownJson) -> JobCreate:
         default=1000,
     )
 
-    transliterate_raw: UnknownJson = d.get("transliterate")
+    transliterate_raw: JSONValue = d.get("transliterate")
     transliterate = _decode_bool(
         transliterate_raw,
         "transliterate",
         default=True,
     )
 
-    confidence_raw: UnknownJson = d.get("confidence_threshold")
+    confidence_raw: JSONValue = d.get("confidence_threshold")
     confidence_threshold = _decode_float_range(
         confidence_raw,
         "confidence_threshold",
@@ -228,17 +266,17 @@ def _decode_job_create_from_unknown(payload: UnknownJson) -> JobCreate:
 
 def parse_job_create(payload: JsonDict) -> JobCreate:
     """Parse and validate JobCreate from request body (public API)."""
-    converted: dict[str, UnknownJson] = {}
+    converted: dict[str, JSONValue] = {}
     for k, v in payload.items():
         if v is None or isinstance(v, (str, int, float, bool)):
             converted[k] = v
         else:
             # v must be a list given JsonDict type constraints
-            items: list[UnknownJson] = [
+            items: list[JSONValue] = [
                 item for item in v if item is None or isinstance(item, (str, int, float, bool))
             ]
             converted[k] = items
-    converted_payload: UnknownJson = converted
+    converted_payload: JSONValue = converted
     return _decode_job_create_from_unknown(converted_payload)
 
 
@@ -247,7 +285,7 @@ def parse_job_response_json(s: str) -> JobResponse:
     """Parse JobResponse from JSON string."""
     from datetime import datetime
 
-    obj: UnknownJson = load_json_str(s)
+    obj: JSONValue = load_json_str(s)
     if not isinstance(obj, dict):
         raise JSONTypeError("Expected JSON object")
 
@@ -279,7 +317,7 @@ def parse_job_status_json(s: str) -> JobStatus:
     """Parse JobStatus from JSON string."""
     from datetime import datetime
 
-    obj: UnknownJson = load_json_str(s)
+    obj: JSONValue = load_json_str(s)
     if not isinstance(obj, dict):
         raise JSONTypeError("Expected JSON object")
 

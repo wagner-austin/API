@@ -147,12 +147,12 @@ class JobParams(TypedDict):
 
 **Never use:** Pydantic models, dataclasses, or plain dicts with no types.
 
-#### Use UnknownJson for External Data
+#### Use JSONValue for External Data
 
 ```python
-from turkic_api.api.types import UnknownJson
+from platform_core.json_utils import JSONValue
 
-def parse_external(data: dict[str, UnknownJson]) -> JobParams:
+def parse_external(data: dict[str, JSONValue]) -> JobParams:
     """Parse and validate external data with runtime checks."""
     source = data.get("source")
     if not isinstance(source, str):
@@ -226,26 +226,36 @@ tests/
 └── conftest.py                    # Pytest fixtures
 ```
 
-#### Fixture Patterns
+#### Test Hooks Pattern
+
+This project uses **test hooks** for dependency injection instead of mocks or monkeypatch. The `_test_hooks.py` module provides module-level hooks that tests override:
 
 ```python
-import pytest
-from turkic_api.api.types import LoggerProtocol
+# In production code (e.g., api/jobs.py)
+from turkic_api import _test_hooks
 
-class _TestLogger:
-    """Test double for logger protocol."""
-    def __init__(self) -> None:
-        self.messages: list[str] = []
+def process_job(job_id: str) -> None:
+    client = _test_hooks.redis_factory(url)  # Uses hook
+    # ...
 
-    def info(self, msg: str, **kwargs: object) -> None:
-        self.messages.append(msg)
+# In tests (e.g., tests/test_jobs.py)
+from turkic_api import _test_hooks
+from platform_workers.testing import FakeRedis
 
-@pytest.fixture
-def test_logger() -> LoggerProtocol:
-    return _TestLogger()
+def test_process_job() -> None:
+    # Override hook with fake
+    orig = _test_hooks.redis_factory
+    _test_hooks.redis_factory = lambda url: FakeRedis()
+    try:
+        result = process_job("job-123")
+        assert result["status"] == "completed"
+    finally:
+        _test_hooks.redis_factory = orig  # Restore original
 ```
 
-**Never use:** Mock objects, unittest.mock, or any dynamic patching that bypasses type checking.
+The `conftest.py` auto-resets all hooks after each test via an autouse fixture.
+
+**Never use:** `unittest.mock`, `monkeypatch`, `@patch`, or any dynamic patching.
 
 #### Parallel Test Execution
 
@@ -500,12 +510,11 @@ def load_corpus(data_dir: str, source: str, language: str) -> Path:
 ### JSON Parsing
 
 ```python
-from platform_core.json_utils import load_json_str
-from turkic_api.api.types import UnknownJson
+from platform_core.json_utils import JSONValue, load_json_str
 
 def parse_response(payload: str) -> dict[str, str]:
     """Parse JSON response with runtime validation."""
-    parsed = load_json_str(payload)
+    parsed: JSONValue = load_json_str(payload)
     if not isinstance(parsed, dict):
         raise ValueError("Expected JSON object")
 

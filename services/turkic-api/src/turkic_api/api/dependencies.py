@@ -6,16 +6,17 @@ from typing import Annotated
 from fastapi import Depends
 from platform_core.logging import get_logger
 from platform_core.queues import TURKIC_QUEUE
-from platform_workers.redis import RedisStrProto, redis_for_kv, redis_raw_for_rq
+from platform_workers.redis import RedisStrProto, redis_raw_for_rq
 from platform_workers.rq_harness import RQClientQueue, rq_queue
 
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings, settings_from_env
 from turkic_api.api.types import (
+    JSONValue,
     LoggerProtocol,
     QueueProtocol,
     RQJobLike,
     RQRetryLike,
-    UnknownJson,
     _EnqCallable,
 )
 
@@ -30,7 +31,7 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 def get_redis(settings: SettingsDep) -> Generator[RedisStrProto, None, None]:
     """Dependency: typed Redis (strings) using URL from settings; closes on teardown."""
-    client = redis_for_kv(settings["redis_url"])
+    client = _test_hooks.redis_factory(settings["redis_url"])
     try:
         yield client
     finally:
@@ -60,7 +61,7 @@ def get_queue(settings: SettingsDep) -> QueueProtocol:
         def enqueue(
             self,
             func: str | _EnqCallable,
-            *args: UnknownJson,
+            *args: JSONValue,
             job_timeout: int | None = None,
             result_ttl: int | None = None,
             failure_ttl: int | None = None,

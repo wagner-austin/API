@@ -8,18 +8,17 @@ from platform_workers.testing import FakeRedis
 
 from turkic_api.api.models import JobCreate
 from turkic_api.api.services import JobService
-from turkic_api.api.types import RQJobLike, RQRetryLike, _EnqCallable
-from turkic_api.core.models import UnknownJson
+from turkic_api.api.types import JSONValue, RQJobLike, RQRetryLike, _EnqCallable
 
 
 class _QueueStub:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, tuple[UnknownJson, ...]]] = []
+        self.calls: list[tuple[str, tuple[JSONValue, ...]]] = []
 
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,

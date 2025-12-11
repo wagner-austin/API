@@ -1,12 +1,15 @@
+"""Tests for Redis client creation in jobs module."""
+
 from __future__ import annotations
 
-import pytest
 from platform_workers.testing import FakeRedis
 
-import turkic_api.api.jobs as jobs
+from turkic_api import _test_hooks
+from turkic_api.api.jobs import _get_redis_client
 
 
-def test_get_redis_client_uses_shared_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_client_uses_shared_adapter() -> None:
+    """Test that _get_redis_client uses the redis_factory hook."""
     seen: list[str] = []
     captured: list[FakeRedis] = []
 
@@ -16,9 +19,9 @@ def test_get_redis_client_uses_shared_adapter(monkeypatch: pytest.MonkeyPatch) -
         captured.append(r)
         return r
 
-    monkeypatch.setattr(jobs, "redis_for_kv", fake_redis_for_kv)
+    _test_hooks.redis_factory = fake_redis_for_kv
 
-    client = jobs._get_redis_client("redis://localhost:6379/0")
+    client = _get_redis_client("redis://localhost:6379/0")
     assert client.hset("k", {"a": "1"}) == 1
     client.close()
     assert seen == ["redis://localhost:6379/0"]

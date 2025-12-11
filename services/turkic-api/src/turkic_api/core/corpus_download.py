@@ -2,32 +2,17 @@ from __future__ import annotations
 
 import bz2
 import html
-import importlib as _importlib
 import re
 from collections.abc import Generator, Mapping
 from pathlib import Path
-from typing import BinaryIO, Final, Protocol
+from typing import Final, Protocol
 from xml.etree import ElementTree as ET
 
+from platform_core.json_utils import JSONValue
 from typing_extensions import TypedDict
 
 from turkic_api.core.langid import LangIdModel, build_lang_script_filter
-from turkic_api.core.models import ProcessSpec, UnknownJson
-
-
-class _RespProto(Protocol):
-    raw: BinaryIO
-
-    def raise_for_status(self) -> None: ...
-    def __enter__(self) -> _RespProto: ...
-    def __exit__(self, *args: UnknownJson) -> None: ...
-
-
-class _RequestsModule(Protocol):
-    def get(self, url: str, *, stream: bool, timeout: int) -> _RespProto: ...
-
-
-requests: _RequestsModule = _importlib.import_module("requests")
+from turkic_api.core.models import ProcessSpec
 
 # NOTE: We deliberately avoid Any/casts/ignores. External library usage is
 # narrowed to typed access patterns.
@@ -78,7 +63,7 @@ class _DSIterable(Protocol):
 
 
 class _DSMod(Protocol):
-    def load_dataset(self, *args: UnknownJson, **kwargs: UnknownJson) -> _DSIterable: ...
+    def load_dataset(self, *args: JSONValue, **kwargs: JSONValue) -> _DSIterable: ...
 
 
 def _get_ds() -> _DSMod:
@@ -110,11 +95,14 @@ def stream_wikipedia_xml(lang: str) -> Generator[str, None, None]:
     """Stream sentences from Wikipedia XML dump for language "lang".
 
     Uses the latest dump and streams/decompresses on the fly.
+    Uses _test_hooks.wikipedia_requests_get for the HTTP request.
     """
+    from turkic_api import _test_hooks
+
     dump_version = "latest"
     dump_name = f"{lang}wiki-{dump_version}-pages-articles.xml.bz2"
     url = f"https://dumps.wikimedia.org/{lang}wiki/{dump_version}/{dump_name}"
-    with requests.get(url, stream=True, timeout=30) as resp:
+    with _test_hooks.wikipedia_requests_get(url, stream=True, timeout=30) as resp:
         resp.raise_for_status()
         bz_stream = bz2.BZ2File(resp.raw)
         for _, elem in ET.iterparse(bz_stream, events=("end",)):
@@ -142,13 +130,18 @@ def _write_lines(dest: Path, lines: Generator[str, None, None], limit: int) -> i
 
 
 def _stream_for_source(source: str, language: str) -> Generator[str, None, None]:
-    """Return a corpus stream generator for the given source."""
+    """Return a corpus stream generator for the given source.
+
+    Uses hooks from _test_hooks to allow test injection.
+    """
+    from turkic_api import _test_hooks
+
     if source == "oscar":
-        return stream_oscar(language)
+        return _test_hooks.stream_oscar_hook(language)
     if source == "culturax":
-        return stream_culturax(language)
+        return _test_hooks.stream_culturax_hook(language)
     if source == "wikipedia":
-        return stream_wikipedia_xml(language)
+        return _test_hooks.stream_wikipedia_xml_hook(language)
     raise ValueError(f"Unsupported corpus source: {source}")
 
 
@@ -197,9 +190,11 @@ def ensure_corpus_file(
     if written == 0:
         from platform_core.logging import get_logger
 
+        from turkic_api import _test_hooks
+
         logger = get_logger("turkic_api")
         try:
-            path.unlink(missing_ok=True)
+            _test_hooks.path_unlink(path)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.warning("corpus_zero_unlink_failed path=%s error=%s", path, exc)
         raise RuntimeError("No sentences were written for the requested corpus")

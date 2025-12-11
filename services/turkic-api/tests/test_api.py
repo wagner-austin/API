@@ -1,24 +1,25 @@
+"""Tests for turkic-api API endpoints."""
+
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 from platform_workers.testing import FakeRedis, FakeRedisNoPong
 
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.main import RedisCombinedProtocol, create_app
 from turkic_api.api.models import parse_job_response_json
-from turkic_api.api.types import QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
-from turkic_api.core.models import UnknownJson
+from turkic_api.api.types import JSONValue, QueueProtocol, RQJobLike, RQRetryLike, _EnqCallable
 
 
 class _QueueStub:
     def __init__(self) -> None:
-        self.calls: list[tuple[str | _EnqCallable, tuple[UnknownJson, ...]]] = []
+        self.calls: list[tuple[str | _EnqCallable, tuple[JSONValue, ...]]] = []
 
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -67,17 +68,15 @@ def test_healthz_always_ok() -> None:
         r.assert_only_called({"sadd", "close"})
 
 
-def test_readyz_degraded_when_volume_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readyz_degraded_when_volume_missing() -> None:
     """Test /readyz returns degraded when data volume is missing."""
     _clear_redis_instances()
+
+    # Use hook to fake path not existing
+    _test_hooks.path_exists = lambda p: False
+
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
-    from pathlib import Path
-
-    def _exists(self: Path) -> bool:
-        return False
-
-    monkeypatch.setattr("pathlib.Path.exists", _exists, raising=False)
     resp = client.get("/readyz")
     assert resp.status_code == 503
     data: dict[str, str | None] = resp.json()
@@ -109,18 +108,14 @@ def test_create_job_enqueues_and_returns_id() -> None:
         r.assert_only_called({"sadd", "hset", "expire", "close"})
 
 
-def test_readyz_ready_and_degraded_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readyz_ready_and_degraded_paths() -> None:
     """Test /readyz ready when healthy, degraded when Redis fails."""
     _clear_redis_instances()
     app = create_app(redis_provider=_redis_provider, queue_provider=_queue_provider)
     client = TestClient(app)
+
     # Ready: redis True, volume True
-    from pathlib import Path
-
-    def _exists_true(self: Path) -> bool:
-        return True
-
-    monkeypatch.setattr("pathlib.Path.exists", _exists_true, raising=False)
+    _test_hooks.path_exists = lambda p: True
     resp = client.get("/readyz")
     assert resp.status_code == 200
     ready_body: dict[str, str | None] = resp.json()

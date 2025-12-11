@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
+import sys
+
+from platform_core.config import config_test_hooks
 from platform_core.job_events import default_events_channel
 from platform_core.queues import TURKIC_QUEUE
+from platform_core.testing import make_fake_env
 from platform_workers.rq_harness import WorkerConfig
 
 from turkic_api import _test_hooks
@@ -38,12 +41,17 @@ class _RecordingRunner:
         self.configs.append(config)
 
 
-def test_build_config_reads_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_reads_settings() -> None:
     """Test _build_config reads settings and uses TURKIC_QUEUE."""
-    monkeypatch.setenv("TURKIC_REDIS_URL", "redis://test-host:6379/0")
-    monkeypatch.setenv("TURKIC_DATA_DIR", "/data")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "key")
+    env = make_fake_env(
+        {
+            "TURKIC_REDIS_URL": "redis://test-host:6379/0",
+            "TURKIC_DATA_DIR": "/data",
+            "TURKIC_DATA_BANK_API_URL": "http://db",
+            "TURKIC_DATA_BANK_API_KEY": "key",
+        }
+    )
+    config_test_hooks.get_env = env
 
     cfg = _build_config()
 
@@ -97,14 +105,17 @@ def test_main_with_injected_dependencies() -> None:
     assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def test_main_builds_config_from_settings_when_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_builds_config_from_settings_when_not_provided() -> None:
     """Test main() builds config from settings when not provided."""
-    monkeypatch.setenv("TURKIC_REDIS_URL", "redis://from-env:6379/0")
-    monkeypatch.setenv("TURKIC_DATA_DIR", "/data")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "key")
+    env = make_fake_env(
+        {
+            "TURKIC_REDIS_URL": "redis://from-env:6379/0",
+            "TURKIC_DATA_DIR": "/data",
+            "TURKIC_DATA_BANK_API_URL": "http://db",
+            "TURKIC_DATA_BANK_API_KEY": "key",
+        }
+    )
+    config_test_hooks.get_env = env
 
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -123,12 +134,9 @@ def test_get_default_runner_returns_test_runner_when_set() -> None:
     def _custom_runner(config: WorkerConfig) -> None:
         pass
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _custom_runner
 
     result = _get_default_runner()
-
-    _test_hooks.test_runner = original
 
     assert result is _custom_runner
 
@@ -137,24 +145,24 @@ def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> Non
     """Test _get_default_runner returns run_rq_worker when test_runner is None."""
     from platform_workers.rq_harness import run_rq_worker
 
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = None
 
     result = _get_default_runner()
 
-    _test_hooks.test_runner = original
-
     assert result is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_uses_test_runner_when_set() -> None:
     """Test main() uses test_runner when set in _test_hooks."""
-    monkeypatch.setenv("TURKIC_REDIS_URL", "redis://test-runner:6379/0")
-    monkeypatch.setenv("TURKIC_DATA_DIR", "/data")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "key")
+    env = make_fake_env(
+        {
+            "TURKIC_REDIS_URL": "redis://test-runner:6379/0",
+            "TURKIC_DATA_DIR": "/data",
+            "TURKIC_DATA_BANK_API_URL": "http://db",
+            "TURKIC_DATA_BANK_API_KEY": "key",
+        }
+    )
+    config_test_hooks.get_env = env
 
     received_configs: list[WorkerConfig] = []
 
@@ -162,33 +170,33 @@ def test_main_uses_test_runner_when_set(
         received_configs.append(config)
 
     # Set the test runner in _test_hooks
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Call main() with no args - should use test_runner
     main()
-
-    # Restore
-    _test_hooks.test_runner = original
 
     assert len(received_configs) == 1
     assert received_configs[0]["redis_url"] == "redis://test-runner:6379/0"
     assert received_configs[0]["queue_name"] == TURKIC_QUEUE
 
 
-def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
     Because _test_hooks is a separate module, our test_runner persists.
     """
     import runpy
-    import sys
 
-    monkeypatch.setenv("TURKIC_REDIS_URL", "redis://runpy-guard-test:6379/0")
-    monkeypatch.setenv("TURKIC_DATA_DIR", "/data")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("TURKIC_DATA_BANK_API_KEY", "key")
+    env = make_fake_env(
+        {
+            "TURKIC_REDIS_URL": "redis://runpy-guard-test:6379/0",
+            "TURKIC_DATA_DIR": "/data",
+            "TURKIC_DATA_BANK_API_URL": "http://db",
+            "TURKIC_DATA_BANK_API_KEY": "key",
+        }
+    )
+    config_test_hooks.get_env = env
 
     received_configs: list[WorkerConfig] = []
 
@@ -196,7 +204,6 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
         received_configs.append(config)
 
     # Set the test runner in _test_hooks BEFORE running as __main__
-    original = _test_hooks.test_runner
     _test_hooks.test_runner = _recording_runner
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
@@ -214,9 +221,6 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     # Restore module to sys.modules if it was there before
     if saved_module is not None:
         sys.modules[module_name] = saved_module
-
-    # Restore test runner
-    _test_hooks.test_runner = original
 
     # The guard should have been triggered, calling main()
     assert len(received_configs) == 1

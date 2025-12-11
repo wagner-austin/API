@@ -5,34 +5,29 @@ from pathlib import Path
 from typing import Final, Protocol
 
 import numpy as np
-import requests
 from numpy.typing import NDArray
+
+from turkic_api import _test_hooks
 
 _MODEL_DIRNAME: Final[str] = "models"
 _URL_218E: Final[str] = "https://dl.fbaipublicfiles.com/nllb/lid/lid218e.bin"
 _URL_176: Final[str] = "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"
 
 
-def _download(url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, stream=True, timeout=30) as r:
-        r.raise_for_status()
-        with dest.open("wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-
-
 def ensure_model_path(data_dir: str, prefer_218e: bool = True) -> Path:
+    """Ensure model file exists, downloading if necessary.
+
+    Uses _test_hooks.langid_download for the actual download operation.
+    """
     base = Path(data_dir) / _MODEL_DIRNAME
     path_218e = base / "lid218e.bin"
     path_176 = base / "lid.176.bin"
     if prefer_218e:
         if not path_218e.exists():
-            _download(_URL_218E, path_218e)
+            _test_hooks.langid_download(_URL_218E, path_218e)
         return path_218e
     if not path_176.exists():
-        _download(_URL_176, path_176)
+        _test_hooks.langid_download(_URL_176, path_176)
     return path_176
 
 
@@ -83,24 +78,16 @@ class LangIdModel(Protocol):
         ...
 
 
-class _FastTextModelFactory(Protocol):
-    """Protocol for FastText model constructor callable."""
-
-    def __call__(self, *, model_path: str) -> LangIdModel:
-        """Construct a FastText model from a file path."""
-        ...
-
-
-def _get_fasttext_model_factory() -> _FastTextModelFactory:
+def _get_fasttext_model_factory() -> _test_hooks.LangIdModelFactoryProtocol:
     """Get the FastText model constructor without triggering deprecation warnings.
 
     The fasttext.load_model wrapper prints a warning to stderr on every call.
     We bypass it by directly accessing the underlying _FastText class from
     fasttext.FastText module, which accepts model_path as a keyword argument.
+
+    Uses _test_hooks.langid_get_fasttext_factory for the actual factory lookup.
     """
-    ft_module = __import__("fasttext.FastText", fromlist=["_FastText"])
-    factory: _FastTextModelFactory = ft_module._FastText
-    return factory
+    return _test_hooks.langid_get_fasttext_factory()
 
 
 def load_langid_model(data_dir: str, prefer_218e: bool = True) -> LangIdModel:
@@ -109,8 +96,10 @@ def load_langid_model(data_dir: str, prefer_218e: bool = True) -> LangIdModel:
     The underlying implementation uses fastText at runtime without exposing
     untyped imports to the type checker. Uses the internal _FastText constructor
     directly to avoid the deprecation warning from fasttext.load_model.
+
+    Uses _test_hooks.langid_ensure_model_path for path resolution.
     """
-    model_path = ensure_model_path(data_dir, prefer_218e=prefer_218e)
+    model_path = _test_hooks.langid_ensure_model_path(data_dir, prefer_218e=prefer_218e)
     factory = _get_fasttext_model_factory()
     return factory(model_path=str(model_path))
 

@@ -1,3 +1,5 @@
+"""Tests for error paths and edge cases in jobs module."""
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -11,13 +13,21 @@ from platform_core.logging import get_logger
 from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
 
-import turkic_api.api.jobs as jobs_mod
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
-from turkic_api.core.langid import LangIdModel
+from turkic_api.api.jobs import (
+    JobParams,
+    _decode_job_params,
+    _get_redis_client,
+    _normalize_script,
+    process_corpus_impl,
+)
 from turkic_api.core.models import ProcessSpec
 
 
-class _MockDataBankClient:
+class FakeDataBankClient:
+    """Fake data bank client for testing."""
+
     def __init__(
         self,
         base_url: str,
@@ -44,18 +54,29 @@ class _MockDataBankClient:
         }
 
 
+class FakeCorpusService:
+    """Fake corpus service that yields multiple lines."""
+
+    def __init__(self, _data_dir: str) -> None:
+        pass
+
+    def stream(self, _spec: ProcessSpec) -> Generator[str, None, None]:
+        for i in range(100):
+            yield f"line {i}"
+
+
 def test_process_spec_type_errors() -> None:
-    # Test validation errors in _decode_job_params
+    """Test validation errors in _decode_job_params."""
     with pytest.raises(JSONTypeError, match="source and language"):
-        jobs_mod._decode_job_params({"user_id": 42, "source": 1, "language": 2})
+        _decode_job_params({"user_id": 42, "source": 1, "language": 2})
 
     with pytest.raises(JSONTypeError, match="max_sentences"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {"user_id": 42, "source": "oscar", "language": "kk", "max_sentences": "x"}
         )
 
     with pytest.raises(JSONTypeError, match="transliterate"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {
                 "user_id": 42,
                 "source": "oscar",
@@ -66,7 +87,7 @@ def test_process_spec_type_errors() -> None:
         )
 
     with pytest.raises(JSONTypeError, match="confidence_threshold"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {
                 "user_id": 42,
                 "source": "oscar",
@@ -79,9 +100,9 @@ def test_process_spec_type_errors() -> None:
 
 
 def test_invalid_source_or_language() -> None:
-    # Test validation errors in _decode_job_params
+    """Test validation errors for invalid source or language."""
     with pytest.raises(JSONTypeError, match="Invalid source or language"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {
                 "user_id": 42,
                 "source": "bogus",
@@ -93,7 +114,8 @@ def test_invalid_source_or_language() -> None:
         )
 
 
-def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_progress_updates_every_50(tmp_path: Path) -> None:
+    """Test that progress updates occur every 50 lines."""
     redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
@@ -104,33 +126,27 @@ def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     )
     logger = get_logger(__name__)
 
-    class _Svc:
-        def __init__(self, _data_dir: str) -> None: ...
-        def stream(self, _spec: ProcessSpec) -> Generator[str, None, None]:
-            for i in range(100):
-                yield f"line {i}"
+    # Set up hooks
+    _test_hooks.local_corpus_service_factory = lambda _data_dir: FakeCorpusService(_data_dir)
+    _test_hooks.to_ipa = lambda s, _l: s
 
-    monkeypatch.setattr(jobs_mod, "LocalCorpusService", _Svc)
-
-    def _to_ipa(s: str, _l: str) -> str:
-        return s
-
-    monkeypatch.setattr(jobs_mod, "to_ipa", _to_ipa)
-
-    def _ensure(
+    def _fake_ensure_corpus(
         spec: ProcessSpec,
         data_dir: str,
         script: str | None = None,
         *,
-        langid_model: LangIdModel | None = None,
+        langid_model: _test_hooks.LangIdModelProtocol | None = None,
     ) -> Path:
         return tmp_path / "corpus" / "oscar_kk.txt"
 
-    monkeypatch.setattr(jobs_mod, "ensure_corpus_file", _ensure)
+    _test_hooks.ensure_corpus_file = _fake_ensure_corpus
+    _test_hooks.data_bank_client_factory = (
+        lambda api_url, api_key, timeout_seconds: FakeDataBankClient(
+            api_url, api_key, timeout_seconds=timeout_seconds
+        )
+    )
 
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _MockDataBankClient)
-
-    params: jobs_mod.JobParams = {
+    params: JobParams = {
         "user_id": 42,
         "source": "oscar",
         "language": "kk",
@@ -140,9 +156,7 @@ def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         "confidence_threshold": 0.0,
     }
 
-    result = jobs_mod.process_corpus_impl(
-        "p1", params, redis=redis, settings=settings, logger=logger
-    )
+    result = process_corpus_impl("p1", params, redis=redis, settings=settings, logger=logger)
     h = redis._hashes.get(turkic_job_key("p1"))
     if h is None:
         pytest.fail("expected job hash")
@@ -152,8 +166,9 @@ def test_progress_updates_every_50(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
 
 def test_invalid_script_type_raises() -> None:
+    """Test that invalid script type raises JSONTypeError."""
     with pytest.raises(JSONTypeError, match="script must be a string or null"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {
                 "user_id": 42,
                 "source": "oscar",
@@ -167,8 +182,9 @@ def test_invalid_script_type_raises() -> None:
 
 
 def test_invalid_script_value_raises() -> None:
+    """Test that invalid script value raises JSONTypeError."""
     with pytest.raises(JSONTypeError, match="Invalid script"):
-        jobs_mod._decode_job_params(
+        _decode_job_params(
             {
                 "user_id": 42,
                 "source": "oscar",
@@ -183,7 +199,7 @@ def test_invalid_script_value_raises() -> None:
 
 def test_valid_script_normalizes_and_passes() -> None:
     """Test that valid script values are normalized correctly in _decode_job_params."""
-    result = jobs_mod._decode_job_params(
+    result = _decode_job_params(
         {
             "user_id": 42,
             "source": "oscar",
@@ -199,7 +215,7 @@ def test_valid_script_normalizes_and_passes() -> None:
 
 def test_blank_script_string_is_treated_as_none() -> None:
     """Test that blank script strings are treated as None in _decode_job_params."""
-    result = jobs_mod._decode_job_params(
+    result = _decode_job_params(
         {
             "user_id": 42,
             "source": "oscar",
@@ -215,30 +231,31 @@ def test_blank_script_string_is_treated_as_none() -> None:
 
 def test_normalize_script_with_value() -> None:
     """Test _normalize_script with a valid script value."""
-    assert jobs_mod._normalize_script("latn") == "Latn"
-    assert jobs_mod._normalize_script("CYRL") == "Cyrl"
-    assert jobs_mod._normalize_script("ArAb") == "Arab"
+    assert _normalize_script("latn") == "Latn"
+    assert _normalize_script("CYRL") == "Cyrl"
+    assert _normalize_script("ArAb") == "Arab"
 
 
 def test_normalize_script_with_whitespace_only() -> None:
     """Test _normalize_script treats whitespace-only as None."""
-    assert jobs_mod._normalize_script("   ") is None
-    assert jobs_mod._normalize_script("\t\n") is None
+    assert _normalize_script("   ") is None
+    assert _normalize_script("\t\n") is None
 
 
 def test_normalize_script_with_none() -> None:
     """Test _normalize_script returns None for None input."""
-    assert jobs_mod._normalize_script(None) is None
+    assert _normalize_script(None) is None
 
 
-def test_get_redis_client_returns_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_client_returns_adapter() -> None:
+    """Test that _get_redis_client uses the redis_factory hook."""
     stub_client = FakeRedis()
 
     def fake_for_kv(url: str) -> FakeRedis:
         assert url == "redis://example"
         return stub_client
 
-    monkeypatch.setattr(jobs_mod, "redis_for_kv", fake_for_kv)
-    client = jobs_mod._get_redis_client("redis://example")
+    _test_hooks.redis_factory = fake_for_kv
+    client = _get_redis_client("redis://example")
     assert type(client).__name__ == "FakeRedis"
     stub_client.assert_only_called(set())

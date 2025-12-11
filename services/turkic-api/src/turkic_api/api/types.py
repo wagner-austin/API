@@ -4,11 +4,10 @@ from collections.abc import Mapping
 from types import TracebackType
 from typing import Protocol
 
+from platform_core.json_utils import JSONValue
 from platform_workers.rq_harness import RQJobLike, RQRetryLike
 
-from turkic_api.core.models import UnknownJson
-
-__all__ = ["JsonDict", "LoggerProtocol", "QueueProtocol", "RQJobLike", "RQRetryLike", "UnknownJson"]
+__all__ = ["JSONValue", "JsonDict", "LoggerProtocol", "QueueProtocol", "RQJobLike", "RQRetryLike"]
 
 # Public JSON type for API boundaries - non-recursive, one-level deep
 JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | bool | None]]
@@ -17,7 +16,7 @@ JsonDict = dict[str, str | int | float | bool | None | list[str | int | float | 
 class _EnqCallable(Protocol):
     def __call__(
         self,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,
@@ -32,7 +31,7 @@ class LoggerProtocol(Protocol):
     def debug(
         self,
         msg: str,
-        *args: UnknownJson,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -40,13 +39,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, UnknownJson] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def info(
         self,
         msg: str,
-        *args: UnknownJson,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -54,13 +53,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, UnknownJson] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def warning(
         self,
         msg: str,
-        *args: UnknownJson,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -68,13 +67,13 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, UnknownJson] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
     def error(
         self,
         msg: str,
-        *args: UnknownJson,
+        *args: JSONValue,
         exc_info: bool
         | BaseException
         | tuple[type[BaseException], BaseException, TracebackType | None]
@@ -82,7 +81,7 @@ class LoggerProtocol(Protocol):
         | None = None,
         stack_info: bool = False,
         stacklevel: int = 1,
-        extra: Mapping[str, UnknownJson] | None = None,
+        extra: Mapping[str, JSONValue] | None = None,
     ) -> None: ...
 
 
@@ -92,7 +91,7 @@ class QueueProtocol(Protocol):
     def enqueue(
         self,
         func: str | _EnqCallable,
-        *args: UnknownJson,
+        *args: JSONValue,
         job_timeout: int | None = None,
         result_ttl: int | None = None,
         failure_ttl: int | None = None,

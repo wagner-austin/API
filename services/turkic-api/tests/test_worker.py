@@ -12,12 +12,12 @@ from platform_core.turkic_jobs import turkic_job_key
 from platform_workers.testing import FakeRedis
 from tests.conftest import make_probs
 
-import turkic_api.api.jobs as jobs_mod
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.jobs import process_corpus_impl
 
 
-class _MockDataBankClient:
+class _FakeDataBankClient:
     def __init__(
         self,
         base_url: str,
@@ -44,9 +44,12 @@ class _MockDataBankClient:
         }
 
 
-def test_process_corpus_impl_creates_file_and_updates_status(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+class _FakeLangModel:
+    def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+        return (("__label__kk",), make_probs(1.0))
+
+
+def test_process_corpus_impl_creates_file_and_updates_status(tmp_path: Path) -> None:
     redis = FakeRedis()
     settings = Settings(
         redis_url="redis://localhost:6379/0",
@@ -62,18 +65,18 @@ def test_process_corpus_impl_creates_file_and_updates_status(
     corpus_dir.mkdir(exist_ok=True)
     (corpus_dir / "oscar_kk.txt").write_text("Қазақстан\n", encoding="utf-8")
 
-    # Mock DataBankClient
-    monkeypatch.setattr(jobs_mod, "DataBankClient", _MockDataBankClient)
+    # Set up test hooks for DataBankClient and langid model
+    def _fake_data_bank_factory(
+        api_url: str, api_key: str, *, timeout_seconds: float
+    ) -> _FakeDataBankClient:
+        return _FakeDataBankClient(api_url, api_key, timeout_seconds=timeout_seconds)
 
-    # Provide a trivial langid model to satisfy filtering when threshold>0
-    class _LangModel:
-        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
-            return (("__label__kk",), make_probs(1.0))
+    _test_hooks.data_bank_client_factory = _fake_data_bank_factory
 
-    def _load_model(data_dir: str, prefer_218e: bool = True) -> _LangModel:
-        return _LangModel()
+    def _fake_load_model(data_dir: str, prefer_218e: bool = True) -> _FakeLangModel:
+        return _FakeLangModel()
 
-    monkeypatch.setattr(jobs_mod, "load_langid_model", _load_model)
+    _test_hooks.load_langid_model = _fake_load_model
 
     from turkic_api.api.jobs import JobParams
 

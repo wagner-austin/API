@@ -5,23 +5,20 @@ from collections.abc import Generator, Mapping
 from datetime import datetime
 from typing import Final
 
-from platform_core.data_bank_client import DataBankClient, DataBankClientError
+from platform_core.data_bank_client import DataBankClientError
 from platform_core.job_events import default_events_channel
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import TURKIC_QUEUE
 from platform_workers.job_context import JobContext, make_job_context
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
+from turkic_api import _test_hooks
 from turkic_api.api.config import Settings, settings_from_env
 from turkic_api.api.job_store import TurkicJobStore
-from turkic_api.api.types import LoggerProtocol, UnknownJson
-from turkic_api.core.corpus import LocalCorpusService
-from turkic_api.core.corpus_download import ensure_corpus_file
-from turkic_api.core.langid import load_langid_model
+from turkic_api.api.types import LoggerProtocol
 from turkic_api.core.models import ProcessSpec, is_language, is_source
-from turkic_api.core.translit import to_ipa
 
 
 # TypedDicts for job processing
@@ -62,7 +59,7 @@ def _parse_script_param(script_val: str | None) -> str | None:
     return norm
 
 
-def _decode_job_params(raw: dict[str, UnknownJson]) -> JobParams:
+def _decode_job_params(raw: dict[str, JSONValue]) -> JobParams:
     """Parse and validate job parameters from queue payload.
 
     Raises:
@@ -162,11 +159,11 @@ def _ensure_corpus(
     lang_model = None
     filtering_needed = spec["confidence_threshold"] > 0.0 or script is not None
     if filtering_needed:
-        lang_model = load_langid_model(settings["data_dir"])
-    ensure_corpus_file(
+        lang_model = _test_hooks.load_langid_model(settings["data_dir"])
+    _test_hooks.ensure_corpus_file(
         spec,
         settings["data_dir"],
-        script=script,
+        script,
         langid_model=lang_model,
     )
 
@@ -180,9 +177,9 @@ def _result_stream(
     ctx: JobContext,
     created_at: datetime,
 ) -> Generator[bytes, None, None]:
-    svc = LocalCorpusService(settings["data_dir"])
+    svc = _test_hooks.local_corpus_service_factory(settings["data_dir"])
     for idx, line in enumerate(svc.stream(spec), start=1):
-        text_line = to_ipa(line, spec["language"]) if spec["transliterate"] else line
+        text_line = _test_hooks.to_ipa(line, spec["language"]) if spec["transliterate"] else line
         if idx % 50 == 0:
             now = datetime.utcnow()
             current_progress = min(99, idx)
@@ -259,8 +256,8 @@ def _upload_and_record(
     result_bytes = buffer.tell()
     buffer.seek(0)
 
-    # Use DataBankClient from platform_core
-    client = DataBankClient(url_cfg, key_cfg, timeout_seconds=600.0)
+    # Use DataBankClient via test hook
+    client = _test_hooks.data_bank_client_factory(url_cfg, key_cfg, timeout_seconds=600.0)
     try:
         response = client.upload(
             file_id=f"{job_id}.txt",
@@ -352,17 +349,17 @@ def _mark_completed(
     logger.info("Job completed", extra={"job_id": job_id, "file_id": file_id})
 
 
-def _decode_process_corpus(job_id: str, params: dict[str, UnknownJson]) -> JobResult:
+def _decode_process_corpus(job_id: str, params: dict[str, JSONValue]) -> JobResult:
     """RQ job entry point (via _decode prefix). Loads deps from env and delegates to the impl.
 
-    Note: params is dict[str, UnknownJson] from RQ queue, decoded internally.
+    Note: params is dict[str, JSONValue] from RQ queue, decoded internally.
     Logging is initialized by worker_entry.py before the worker starts processing jobs.
     """
     settings = settings_from_env()
     logger = get_logger(__name__)
     client = _get_redis_client(settings["redis_url"])
 
-    # Decode params from UnknownJson to typed JobParams
+    # Decode params from JSONValue to typed JobParams
     decoded_params = _decode_job_params(params)
 
     try:
@@ -374,7 +371,7 @@ def _decode_process_corpus(job_id: str, params: dict[str, UnknownJson]) -> JobRe
 
 
 def _get_redis_client(url: str) -> RedisStrProto:
-    return redis_for_kv(url)
+    return _test_hooks.redis_factory(url)
 
 
 def process_corpus(job_id: str, params: Mapping[str, JSONValue]) -> JobResult:
@@ -383,5 +380,5 @@ def process_corpus(job_id: str, params: Mapping[str, JSONValue]) -> JobResult:
     This is the function that RQ workers call. It delegates to the internal
     implementation after loading settings and decoding the payload.
     """
-    # Convert Mapping to concrete dict - JSONValue is compatible with UnknownJson
+    # Convert Mapping to concrete dict - JSONValue is compatible with JSONValue
     return _decode_process_corpus(job_id, dict(params))

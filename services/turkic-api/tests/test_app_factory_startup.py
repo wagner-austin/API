@@ -1,8 +1,10 @@
+"""Tests for app factory and startup endpoints."""
+
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
+from turkic_api import _test_hooks
 from turkic_api.api.main import create_app
 
 
@@ -17,17 +19,13 @@ def test_app_factory_and_healthz_endpoint() -> None:
     assert body == {"status": "ok"}
 
 
-def test_readyz_with_default_redis_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readyz_with_default_redis_provider() -> None:
     """Test /readyz uses default redis provider when none is configured.
 
     This exercises the default redis path in main.py line 120.
     """
-    from pathlib import Path
-
-    def _exists(_: Path) -> bool:
-        return True
-
-    monkeypatch.setattr("pathlib.Path.exists", _exists, raising=False)
+    # Use hook to make path appear to exist
+    _test_hooks.path_exists = lambda p: True
 
     # Create app without redis_provider to use the default path
     app = create_app()
