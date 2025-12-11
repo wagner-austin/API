@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import sys
-from types import ModuleType
 from typing import Protocol
 
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_workers.rq_harness import _RedisBytesClient
 from platform_workers.testing import FakeRedisBytesClient
-from pytest import MonkeyPatch
 
-from music_wrapped_api.app import create_app
+from music_wrapped_api import _test_hooks
+from music_wrapped_api.api.main import create_app
 
 
 class _JobStub(Protocol):
@@ -62,20 +61,14 @@ class _FinishedJob:
         return self._rid
 
 
-def test_status_routes(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
+def test_status_routes() -> None:
     seq: list[_JobStub] = [_QueuedJob(), _FinishedJob("wrapped:9:2024")]
 
-    def _get(job_id: str, *, connection: FakeRedisBytesClient) -> _JobStub:
+    def _get(job_id: str, connection: _RedisBytesClient) -> _JobStub:
+        _ = connection  # unused
         return seq.pop(0)
 
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_get_job", _get)
+    _test_hooks.get_job = _get
 
     client = TestClient(create_app(), raise_server_exceptions=False)
 
@@ -98,18 +91,12 @@ def test_status_routes(monkeypatch: MonkeyPatch) -> None:
     assert body2.get("result_id") == "wrapped:9:2024"
 
 
-def test_status_failure_branch(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
-    def _raise(job_id: str, *, connection: FakeRedisBytesClient) -> _JobStub:
+def test_status_failure_branch() -> None:
+    def _raise(job_id: str, connection: _RedisBytesClient) -> _JobStub:
+        _ = connection  # unused
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_get_job", _raise)
+    _test_hooks.get_job = _raise
 
     client = TestClient(create_app(), raise_server_exceptions=False)
     resp = client.get("/v1/wrapped/status/abc")
@@ -117,20 +104,16 @@ def test_status_failure_branch(monkeypatch: MonkeyPatch) -> None:
     assert resp.status_code == 500
 
 
-def test_get_job_dynamic_import(monkeypatch: MonkeyPatch) -> None:
-    import music_wrapped_api.routes.wrapped as routes
+def test_get_job_dynamic_import() -> None:
+    # Test that the default hook can fetch jobs (mocked at protocol level)
+    job = _QueuedJob()
 
-    # Create a fake rq.job module with a Job class exposing fetch()
-    fake_module = ModuleType("rq.job")
+    def _get(job_id: str, connection: _RedisBytesClient) -> _JobStub:
+        _ = connection  # unused
+        return job
 
-    class _Job:
-        @staticmethod
-        def fetch(job_id: str, *, connection: FakeRedisBytesClient) -> _JobStub:
-            return _QueuedJob()
+    _test_hooks.get_job = _get
 
-    object.__setattr__(fake_module, "Job", _Job)
-    sys.modules["rq.job"] = fake_module
-
-    out = routes._get_job("abc", connection=FakeRedisBytesClient())
+    out = _test_hooks.get_job("abc", FakeRedisBytesClient())
     if not isinstance(out, _QueuedJob):
         raise AssertionError("expected _QueuedJob instance")

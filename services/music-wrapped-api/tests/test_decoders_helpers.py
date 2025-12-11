@@ -4,7 +4,7 @@ import pytest
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue
 
-from music_wrapped_api.routes._decoders import (
+from music_wrapped_api.api.routes._decoders import (
     decode_apple_credentials,
     decode_spotify_credentials,
     decode_wrapped_generate,

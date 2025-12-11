@@ -5,10 +5,10 @@ import zipfile
 
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
-from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
-from pytest import MonkeyPatch
+from platform_workers.testing import FakeQueue, FakeRedis
 
-from music_wrapped_api.app import create_app
+from music_wrapped_api import _test_hooks
+from music_wrapped_api.api.main import create_app
 
 
 def _sample_takeout_items() -> list[dict[str, JSONValue]]:
@@ -30,26 +30,12 @@ def _sample_takeout_items() -> list[dict[str, JSONValue]]:
     ]
 
 
-def test_import_youtube_takeout_json_success(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
+def test_import_youtube_takeout_json_success() -> None:
     fr = FakeRedis()
-
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
+    _test_hooks.redis_factory = lambda url: fr
 
     fq = FakeQueue(job_id="takeout-1")
-
-    def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
-        return fq
-
-    def _rf(url: str) -> FakeRedis:
-        return fr
-
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_rq_queue", _queue)
-    monkeypatch.setattr(routes, "redis_for_kv", _rf)
+    _test_hooks.rq_queue_factory = lambda name, conn: fq
 
     client = TestClient(create_app())
 
@@ -76,27 +62,15 @@ def test_import_youtube_takeout_json_success(monkeypatch: MonkeyPatch) -> None:
         raise AssertionError("expected list of plays")
     assert len(arr) == 2
     assert fq.jobs and fq.jobs[0].func == "platform_music.jobs.process_import_youtube_takeout"
-    fr.assert_only_called({"set", "expire", "get"})
+    fr.assert_only_called({"sadd", "set", "expire", "get"})
 
 
-def test_import_youtube_takeout_zip_success(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
+def test_import_youtube_takeout_zip_success() -> None:
     fr = FakeRedis()
+    _test_hooks.redis_factory = lambda url: fr
 
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
-    def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
-        return FakeQueue(job_id="takeout-2")
-
-    def _rf(url: str) -> FakeRedis:
-        return fr
-
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_rq_queue", _queue)
-    monkeypatch.setattr(routes, "redis_for_kv", _rf)
+    fq = FakeQueue(job_id="takeout-2")
+    _test_hooks.rq_queue_factory = lambda name, conn: fq
 
     client = TestClient(create_app())
 
@@ -120,27 +94,15 @@ def test_import_youtube_takeout_zip_success(monkeypatch: MonkeyPatch) -> None:
     saved = fr.get(f"ytmusic:takeout:{tok}")
     if saved is None:
         raise AssertionError("missing saved takeout")
-    fr.assert_only_called({"set", "expire", "get"})
+    fr.assert_only_called({"sadd", "set", "expire", "get"})
 
 
-def test_import_youtube_takeout_invalid_fields(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
-    def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
-        return FakeQueue(job_id="takeout-3")
-
+def test_import_youtube_takeout_invalid_fields() -> None:
     fr = FakeRedis()
+    _test_hooks.redis_factory = lambda url: fr
 
-    def _rf(url: str) -> FakeRedis:
-        return fr
-
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_rq_queue", _queue)
-    monkeypatch.setattr(routes, "redis_for_kv", _rf)
+    fq = FakeQueue(job_id="takeout-3")
+    _test_hooks.rq_queue_factory = lambda name, conn: fq
 
     client = TestClient(create_app())
     doc = _sample_takeout_items()
@@ -171,27 +133,15 @@ def test_import_youtube_takeout_invalid_fields(monkeypatch: MonkeyPatch) -> None
         data={"year": "2024"},
     )
     assert r3.status_code == 400
-    fr.assert_only_called(set())
+    fr.assert_only_called({"sadd"})
 
 
-def test_import_youtube_takeout_invalid_year(monkeypatch: MonkeyPatch) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import music_wrapped_api.routes.wrapped as routes
-
-    def _conn(url: str) -> FakeRedisBytesClient:
-        return FakeRedisBytesClient()
-
-    def _queue(name: str, *, connection: FakeRedisBytesClient) -> FakeQueue:
-        return FakeQueue(job_id="takeout-4")
-
+def test_import_youtube_takeout_invalid_year() -> None:
     fr = FakeRedis()
+    _test_hooks.redis_factory = lambda url: fr
 
-    def _rf(url: str) -> FakeRedis:
-        return fr
-
-    monkeypatch.setattr(routes, "_rq_conn", _conn)
-    monkeypatch.setattr(routes, "_rq_queue", _queue)
-    monkeypatch.setattr(routes, "redis_for_kv", _rf)
+    fq = FakeQueue(job_id="takeout-4")
+    _test_hooks.rq_queue_factory = lambda name, conn: fq
 
     client = TestClient(create_app())
     doc = _sample_takeout_items()
@@ -202,4 +152,4 @@ def test_import_youtube_takeout_invalid_year(monkeypatch: MonkeyPatch) -> None:
         data={"year": "oops"},
     )
     assert r.status_code == 400
-    fr.assert_only_called(set())
+    fr.assert_only_called({"sadd"})

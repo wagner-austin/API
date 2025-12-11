@@ -2,24 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import urllib.parse
-import urllib.request
-from types import TracebackType
-from typing import Annotated, Literal, Protocol, TypedDict
+from typing import Annotated, Literal, TypedDict
 
 from fastapi import APIRouter, File, Request, UploadFile
-from platform_core.config import _require_env_str
 from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONValue, load_json_bytes
 from platform_core.queues import MUSIC_WRAPPED_QUEUE
-from platform_music import WrappedResult
 from platform_music.jobs import LastFmCredentials
-from platform_workers.redis import redis_for_kv
-from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient, redis_raw_for_rq, rq_queue
 from starlette.datastructures import FormData
 from starlette.responses import Response
 
-# Make __import__ overrideable in tests via monkeypatch
-__import__ = __import__
+from music_wrapped_api import _test_hooks
 
 from ._decoders import (
     AppleGenerateFull,
@@ -45,46 +38,6 @@ class _GenerateRequest(TypedDict):
     service: str
 
 
-def _rq_conn(url: str) -> _RedisBytesClient:
-    return redis_raw_for_rq(url)
-
-
-def _rq_queue(name: str, *, connection: _RedisBytesClient) -> RQClientQueue:
-    return rq_queue(name, connection=connection)
-
-
-class _RQJobLike(Protocol):
-    def get_status(self) -> str: ...
-
-    @property
-    def is_finished(self) -> bool: ...
-
-    @property
-    def meta(self) -> dict[str, JSONValue]: ...
-
-    @property
-    def result(self) -> str | None: ...
-
-
-class _JobFetcher(Protocol):
-    def __call__(self, job_id: str, *, connection: _RedisBytesClient) -> _RQJobLike: ...
-
-
-class _RQJobClass(Protocol):
-    def fetch(self, job_id: str, *, connection: _RedisBytesClient) -> _RQJobLike: ...
-
-
-def _get_job(job_id: str, connection: _RedisBytesClient) -> _RQJobLike:
-    """Load an RQ job instance using a typed dynamic import.
-
-    Uses __import__("rq.job", fromlist=["Job"]) and a Protocol-typed class
-    reference to avoid Any while calling the classmethod `fetch`.
-    """
-    rq_job_mod = __import__("rq.job", fromlist=["Job"])
-    job_cls: _RQJobClass = rq_job_mod.Job
-    return job_cls.fetch(job_id, connection=connection)
-
-
 class _DecodeReq(TypedDict):
     year: int
     service: Literal["lastfm"]
@@ -103,8 +56,8 @@ def _payload_lastfm(req_l: LastFmGenerate, *, redis_url: str) -> dict[str, JSONV
     else:
         lfm = to_full_lastfm_credentials(
             creds_in,
-            api_key_env=_require_env_str("LASTFM_API_KEY"),
-            api_secret_env=_require_env_str("LASTFM_API_SECRET"),
+            api_key_env=_test_hooks.require_env("LASTFM_API_KEY"),
+            api_secret_env=_test_hooks.require_env("LASTFM_API_SECRET"),
         )
     creds_json: dict[str, JSONValue] = {
         "api_key": lfm["api_key"],
@@ -123,7 +76,9 @@ def _payload_lastfm(req_l: LastFmGenerate, *, redis_url: str) -> dict[str, JSONV
 
 
 def _payload_spotify_token(req_sp: SpotifyGenerateToken, *, redis_url: str) -> dict[str, JSONValue]:
-    data = redis_for_kv(redis_url).hgetall(f"spotify:session:{req_sp['credentials']['token_id']}")
+    data = _test_hooks.redis_factory(redis_url).hgetall(
+        f"spotify:session:{req_sp['credentials']['token_id']}"
+    )
     at, rt, ex = data.get("access_token"), data.get("refresh_token"), data.get("expires_in")
     if not (isinstance(at, str) and isinstance(rt, str) and isinstance(ex, str)):
         raise AppError(
@@ -166,7 +121,9 @@ def _payload_spotify_full(req_sf: SpotifyGenerateFull, *, redis_url: str) -> dic
 
 
 def _payload_apple_token(req_ap: AppleGenerateToken, *, redis_url: str) -> dict[str, JSONValue]:
-    data2 = redis_for_kv(redis_url).hgetall(f"apple:session:{req_ap['credentials']['token_id']}")
+    data2 = _test_hooks.redis_factory(redis_url).hgetall(
+        f"apple:session:{req_ap['credentials']['token_id']}"
+    )
     mus = data2.get("music_user_token")
     if not isinstance(mus, str):
         raise AppError(
@@ -176,7 +133,7 @@ def _payload_apple_token(req_ap: AppleGenerateToken, *, redis_url: str) -> dict[
         )
     creds_json: dict[str, JSONValue] = {
         "music_user_token": mus,
-        "developer_token": _require_env_str("APPLE_DEVELOPER_TOKEN"),
+        "developer_token": _test_hooks.require_env("APPLE_DEVELOPER_TOKEN"),
     }
     return {
         "type": "music_wrapped.generate.v1",
@@ -207,7 +164,9 @@ def _payload_apple_full(req_af: AppleGenerateFull, *, redis_url: str) -> dict[st
 
 
 def _payload_youtube_token(req_yt: YouTubeGenerateToken, *, redis_url: str) -> dict[str, JSONValue]:
-    data3 = redis_for_kv(redis_url).hgetall(f"ytmusic:session:{req_yt['credentials']['token_id']}")
+    data3 = _test_hooks.redis_factory(redis_url).hgetall(
+        f"ytmusic:session:{req_yt['credentials']['token_id']}"
+    )
     sid, ck = data3.get("sapisid"), data3.get("cookies")
     if not isinstance(sid, str) or not isinstance(ck, str):
         raise AppError(
@@ -356,9 +315,9 @@ async def _generate(request: Request) -> dict[str, str]:
     body = await request.body()
     doc = load_json_bytes(body)
 
-    redis_url = _require_env_str("REDIS_URL")
-    conn = _rq_conn(redis_url)
-    queue = _rq_queue(MUSIC_WRAPPED_QUEUE, connection=conn)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    conn = _test_hooks.rq_conn(redis_url)
+    queue = _test_hooks.rq_queue_factory(MUSIC_WRAPPED_QUEUE, conn)
     payload = _build_payload_for_service(doc, redis_url=redis_url)
     job = queue.enqueue(
         "platform_music.jobs.process_wrapped_job",
@@ -416,13 +375,13 @@ async def _import_youtube_takeout(
     # Deterministic token for idempotency and cacheability
     token_id = hashlib.sha256(raw).hexdigest()[:32]
 
-    redis_url = _require_env_str("REDIS_URL")
-    redis = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    redis = _test_hooks.redis_factory(redis_url)
     redis.set(f"ytmusic:takeout:{token_id}", dump_json_str(plays))
 
     # Enqueue import job
-    conn = _rq_conn(redis_url)
-    queue = _rq_queue(MUSIC_WRAPPED_QUEUE, connection=conn)
+    conn = _test_hooks.rq_conn(redis_url)
+    queue = _test_hooks.rq_queue_factory(MUSIC_WRAPPED_QUEUE, conn)
     payload: dict[str, JSONValue] = {
         "type": "music_wrapped.import_youtube_takeout.v1",
         "year": int(year),
@@ -442,8 +401,8 @@ async def _import_youtube_takeout(
 
 
 async def _result(result_id: str) -> Response:
-    redis_url = _require_env_str("REDIS_URL")
-    redis = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    redis = _test_hooks.redis_factory(redis_url)
     raw = redis.get(result_id)
     if raw is None:
         raise AppError(
@@ -454,17 +413,9 @@ async def _result(result_id: str) -> Response:
     return Response(content=raw, media_type="application/json")
 
 
-class _RendererProto(Protocol):
-    def render_wrapped(self, result: WrappedResult) -> bytes: ...
-
-
-class _RendererFactory(Protocol):
-    def __call__(self) -> _RendererProto: ...
-
-
 async def _download(result_id: str) -> Response:
-    redis_url = _require_env_str("REDIS_URL")
-    redis = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    redis = _test_hooks.redis_factory(redis_url)
     raw = redis.get(result_id)
     if raw is None:
         raise AppError(
@@ -478,9 +429,7 @@ async def _download(result_id: str) -> Response:
     doc = load_json_str(raw)
     result = decode_wrapped_result(doc)
 
-    img_mod = __import__("platform_music.image_gen.renderer", fromlist=["build_renderer"])
-    factory: _RendererFactory = img_mod.build_renderer
-    renderer = factory()
+    renderer = _test_hooks.build_renderer()
     png = renderer.render_wrapped(result)
     return Response(content=png, media_type="image/png")
 
@@ -489,53 +438,6 @@ def _build_lastfm_auth_url(callback: str, *, api_key: str) -> str:
     base = "https://www.last.fm/api/auth/"
     qs = urllib.parse.urlencode({"api_key": api_key, "cb": callback})
     return f"{base}?{qs}"
-
-
-def _lastfm_sig(api_key: str, api_secret: str, token: str) -> str:
-    raw = f"api_key{api_key}methodauth.getSessiontoken{token}{api_secret}"
-    return hashlib.md5(raw.encode("utf-8")).hexdigest()
-
-
-class _HttpRespProto(Protocol):
-    def read(self) -> bytes: ...
-
-    def __enter__(self) -> _HttpRespProto: ...
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None: ...
-
-
-class _UrlOpenModule(Protocol):
-    def urlopen(self, url: str, timeout: float) -> _HttpRespProto: ...
-
-
-def _lfm_get_session_json(api_key: str, api_secret: str, token: str) -> dict[str, JSONValue]:
-    sig = _lastfm_sig(api_key, api_secret, token)
-    params = {
-        "method": "auth.getSession",
-        "api_key": api_key,
-        "api_sig": sig,
-        "token": token,
-        "format": "json",
-    }
-    url = "https://ws.audioscrobbler.com/2.0/?" + urllib.parse.urlencode(params)
-    mod: _UrlOpenModule = __import__("urllib.request", fromlist=["urlopen"])
-    with mod.urlopen(url, timeout=10) as resp:
-        data = resp.read().decode("utf-8")
-    from platform_core.json_utils import load_json_str
-
-    doc = load_json_str(data)
-    if not isinstance(doc, dict):
-        raise AppError(
-            code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message="invalid lastfm json",
-            http_status=502,
-        )
-    return doc
 
 
 def _decode_lastfm_session(doc: dict[str, JSONValue]) -> tuple[str, str]:
@@ -558,30 +460,24 @@ def _decode_lastfm_session(doc: dict[str, JSONValue]) -> tuple[str, str]:
 
 
 async def _auth_lastfm_start(callback: str) -> dict[str, str]:
-    api_key = _require_env_str("LASTFM_API_KEY")
+    api_key = _test_hooks.require_env("LASTFM_API_KEY")
     auth_url = _build_lastfm_auth_url(callback, api_key=api_key)
     return {"auth_url": auth_url}
 
 
 async def _auth_lastfm_callback(token: str) -> dict[str, str]:
-    api_key = _require_env_str("LASTFM_API_KEY")
-    api_secret = _require_env_str("LASTFM_API_SECRET")
-    doc = _lfm_get_session_json(api_key, api_secret, token)
+    api_key = _test_hooks.require_env("LASTFM_API_KEY")
+    api_secret = _test_hooks.require_env("LASTFM_API_SECRET")
+    doc = _test_hooks.lfm_get_session_json(api_key, api_secret, token)
     sk, name = _decode_lastfm_session(doc)
     return {"session_key": sk, "username": name}
 
 
-def _rand_state() -> str:
-    import secrets as _secrets
-
-    return _secrets.token_urlsafe(16)
-
-
 async def _auth_spotify_start(callback: str) -> dict[str, str]:
-    client_id = _require_env_str("SPOTIFY_CLIENT_ID")
-    state = _rand_state()
-    redis_url = _require_env_str("REDIS_URL")
-    r = redis_for_kv(redis_url)
+    client_id = _test_hooks.require_env("SPOTIFY_CLIENT_ID")
+    state = _test_hooks.rand_state()
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    r = _test_hooks.redis_factory(redis_url)
     r.hset(f"spotify:state:{state}", {"ok": "1"})
     base = "https://accounts.spotify.com/authorize"
     params = {
@@ -595,81 +491,15 @@ async def _auth_spotify_start(callback: str) -> dict[str, str]:
     return {"auth_url": url, "state": state}
 
 
-class _HttpPostRespProto(Protocol):
-    def read(self) -> bytes: ...
-
-    def __enter__(self) -> _HttpPostRespProto: ...
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None: ...
-
-
-class _UrlOpenPostModule(Protocol):
-    def urlopen(self, req: _RequestObj, timeout: float) -> _HttpPostRespProto: ...
-
-
-class _RequestObj(Protocol):
-    def add_header(self, name: str, value: str) -> None: ...
-
-
-class _RequestFactory(Protocol):
-    def __call__(self, url: str, data: bytes) -> _RequestObj: ...
-
-
-def _spotify_exchange_code(
-    code: str, redirect_uri: str, *, client_id: str, client_secret: str
-) -> dict[str, JSONValue]:
-    token_url = "https://accounts.spotify.com/api/token"
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": redirect_uri,
-    }
-    encoded = urllib.parse.urlencode(data).encode("utf-8")
-
-    class _Req:
-        def __init__(self, url: str, data: bytes) -> None:
-            self._ = (url, data)
-
-        def add_header(self, name: str, value: str) -> None:
-            _ = (name, value)
-
-    req: _RequestObj = _Req(token_url, encoded)
-    import base64 as _b64
-
-    auth = (client_id + ":" + client_secret).encode("utf-8")
-    hdr = "Basic " + _b64.b64encode(auth).decode("utf-8")
-    req.add_header("Authorization", hdr)
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    imp = __import__
-    mod: _UrlOpenPostModule = imp("urllib.request", fromlist=["urlopen"])
-    with mod.urlopen(req, timeout=10) as resp:
-        payload = resp.read().decode("utf-8")
-    from platform_core.json_utils import load_json_str
-
-    doc = load_json_str(payload)
-    if not isinstance(doc, dict):
-        raise AppError(
-            code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message="invalid spotify json",
-            http_status=502,
-        )
-    return doc
-
-
 async def _auth_spotify_callback(code: str, state: str, callback: str) -> dict[str, str | int]:
-    redis_url = _require_env_str("REDIS_URL")
-    r = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    r = _test_hooks.redis_factory(redis_url)
     st = r.hgetall(f"spotify:state:{state}")
     if st.get("ok") != "1":
         raise AppError(code=ErrorCode.INVALID_INPUT, message="invalid state", http_status=400)
-    client_id = _require_env_str("SPOTIFY_CLIENT_ID")
-    client_secret = _require_env_str("SPOTIFY_CLIENT_SECRET")
-    doc = _spotify_exchange_code(code, callback, client_id=client_id, client_secret=client_secret)
+    client_id = _test_hooks.require_env("SPOTIFY_CLIENT_ID")
+    client_secret = _test_hooks.require_env("SPOTIFY_CLIENT_SECRET")
+    doc = _test_hooks.spotify_exchange_code(code, callback, client_id, client_secret)
     at = doc.get("access_token")
     rt = doc.get("refresh_token")
     ex = doc.get("expires_in")
@@ -697,8 +527,8 @@ async def _auth_youtube_store(request: Request) -> dict[str, str]:
     token_id = hashlib.sha256(
         (creds["sapisid"] + ":" + creds["cookies"]).encode("utf-8")
     ).hexdigest()[:32]
-    redis_url = _require_env_str("REDIS_URL")
-    redis = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    redis = _test_hooks.redis_factory(redis_url)
     redis.hset(
         f"ytmusic:session:{token_id}",
         {"sapisid": creds["sapisid"], "cookies": creds["cookies"]},
@@ -713,8 +543,8 @@ async def _auth_apple_store(request: Request) -> dict[str, str]:
     doc = load_json_bytes(body)
     val: AppleStoreInput = decode_apple_store(doc)
     token_id = hashlib.sha256(val["music_user_token"].encode("utf-8")).hexdigest()[:32]
-    redis_url = _require_env_str("REDIS_URL")
-    redis = redis_for_kv(redis_url)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    redis = _test_hooks.redis_factory(redis_url)
     redis.hset(
         f"apple:session:{token_id}",
         {"music_user_token": val["music_user_token"]},
@@ -792,9 +622,9 @@ async def _schema() -> Response:
 
 
 async def _status(job_id: str) -> Response:
-    redis_url = _require_env_str("REDIS_URL")
-    conn = _rq_conn(redis_url)
-    job = _get_job(job_id, connection=conn)
+    redis_url = _test_hooks.require_env("REDIS_URL")
+    conn = _test_hooks.rq_conn(redis_url)
+    job = _test_hooks.get_job(job_id, conn)
     status = job.get_status()
     meta = job.meta
     progress_val = meta.get("progress") if isinstance(meta, dict) else None

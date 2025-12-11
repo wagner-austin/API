@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 
 from fastapi import APIRouter
-from platform_core.config import _require_env_str
 from platform_core.health import HealthResponse, ReadyResponse
 from platform_workers.redis import RedisStrProto
 from starlette.responses import Response
+
+from music_wrapped_api import _test_hooks
 
 from ..health import healthz_endpoint, readyz_endpoint
 
 
 def _redis_client() -> Generator[RedisStrProto, None, None]:
-    url = _require_env_str("REDIS_URL")
-    app_mod = __import__("music_wrapped_api.app", fromlist=["redis_for_kv"])
-    rf: Callable[[str], RedisStrProto] = app_mod.redis_for_kv
-    client = rf(url)
+    url = _test_hooks.require_env("REDIS_URL")
+    client = _test_hooks.redis_factory(url)
     try:
         yield client
     finally:

@@ -281,4 +281,7 @@ Network: Requires `platform-network` and `platform-redis` from root docker-compo
 ## Related
 
 - [API Documentation](docs/api.md) - Full endpoint specifications
+- [Contributing Guide](docs/CONTRIBUTING.md) - Development guidelines and test hooks pattern
 - [platform_music](../../libs/platform_music) - Core music analytics library
+- [platform_workers](../../libs/platform_workers) - RQ and Redis utilities
+- [platform_core](../../libs/platform_core) - Configuration and utilities

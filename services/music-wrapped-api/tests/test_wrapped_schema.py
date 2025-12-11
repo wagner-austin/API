@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
 
-from music_wrapped_api.app import create_app
+from music_wrapped_api.api.main import create_app
 
 
 def test_schema_endpoint_returns_json_schema() -> None:

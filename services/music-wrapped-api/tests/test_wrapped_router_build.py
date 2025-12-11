@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from music_wrapped_api.routes.wrapped import build_router
+from music_wrapped_api.api.routes.wrapped import build_router
 
 
 def test_build_router_executes() -> None:
