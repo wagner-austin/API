@@ -2,7 +2,7 @@
 
 Complete API documentation for the qr-api QR code generation service.
 
-**Base URL:** `http://localhost:8080` (default)
+**Base URL:** `http://localhost:8000` (default)
 
 ---
 
@@ -16,6 +16,27 @@ Liveness probe for container orchestration.
 ```json
 {
   "status": "ok"
+}
+```
+
+---
+
+### GET /readyz
+
+Readiness probe. Returns 503 if Redis unavailable or no workers registered.
+
+**Response (200):**
+```json
+{
+  "status": "ready"
+}
+```
+
+**Response (503):**
+```json
+{
+  "status": "degraded",
+  "reason": "redis-unavailable"
 }
 ```
 
