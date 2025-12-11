@@ -70,6 +70,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/covenants/{covenant_id}` | GET | Get covenant by ID |
 | `/covenants/{covenant_id}` | DELETE | Delete covenant |
 | `/measurements` | POST | Add measurements |
+| `/measurements/by-deal/{deal_id}` | GET | List measurements for a deal |
+| `/measurements/by-deal/{deal_id}/period` | GET | List measurements for deal and period |
 | `/evaluate` | POST | Evaluate covenant compliance |
 | `/ml/predict` | POST | Predict breach risk |
 | `/ml/train` | POST | Enqueue model training |
@@ -172,6 +174,12 @@ curl http://localhost:8007/covenants/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
 ### Measurements
 
 ```bash
+# List all measurements for a deal
+curl http://localhost:8007/measurements/by-deal/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+
+# List measurements for a deal within a specific period
+curl "http://localhost:8007/measurements/by-deal/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/period?period_start=2024-01-01&period_end=2024-03-31"
+
 # Add financial measurements for a deal
 curl -X POST http://localhost:8007/measurements \
   -H "Content-Type: application/json" \
@@ -285,7 +293,8 @@ covenant_radar_api/
 │   └── container.py       # DI container
 ├── worker/
 │   ├── evaluate_job.py    # Batch evaluation
-│   └── train_job.py       # Model training
+│   ├── train_job.py       # Model training (internal data)
+│   └── train_external_job.py # Model training (external datasets)
 └── seeding/               # Database seeding
 ```
 
