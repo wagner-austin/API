@@ -21,6 +21,27 @@ Liveness probe for container orchestration.
 
 ---
 
+### GET /readyz
+
+Readiness probe. Returns 503 if Redis unavailable.
+
+**Response (200):**
+```json
+{
+  "status": "ready"
+}
+```
+
+**Response (503):**
+```json
+{
+  "status": "degraded",
+  "reason": "redis-unavailable"
+}
+```
+
+---
+
 ## Transcript Endpoints
 
 ### POST /v1/captions
@@ -164,6 +185,109 @@ print(f"Transcription: {result['text'][:100]}...")
    - Merge segments with adjusted timestamps
 5. Otherwise, transcribe entire file via OpenAI Whisper
 6. Clean and return text
+
+---
+
+## Async Job Endpoints
+
+### POST /v1/stt/jobs
+
+Create an async STT job for background processing.
+
+**Content-Type:** `application/json`
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | YouTube video URL |
+| `user_id` | int | Yes | User ID for tracking |
+
+**Request Headers:**
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Content-Type` | Yes | Must be `application/json` |
+| `X-Request-ID` | No | Correlation ID (auto-generated if omitted) |
+
+**Response (202):**
+```json
+{
+  "job_id": "uuid-job-id",
+  "user_id": 12345,
+  "status": "queued",
+  "url": "https://www.youtube.com/watch?v=VIDEO_ID"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `job_id` | string | Unique job identifier |
+| `user_id` | int | User ID from request |
+| `status` | string | Always `queued` on successful submission |
+| `url` | string | Canonicalized YouTube URL |
+
+**Example - curl:**
+```bash
+curl -X POST http://localhost:8000/v1/stt/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://youtu.be/dQw4w9WgXcQ",
+    "user_id": 12345
+  }'
+```
+
+---
+
+### GET /v1/stt/jobs/{job_id}
+
+Get the status of an async STT job.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `job_id` | string | Job UUID from create response |
+
+**Response (200):**
+```json
+{
+  "job_id": "uuid-job-id",
+  "user_id": 12345,
+  "status": "completed",
+  "progress": 100,
+  "message": "Transcription complete",
+  "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+  "video_id": "VIDEO_ID",
+  "error": null,
+  "text": "Transcribed text content..."
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `job_id` | string | Job identifier |
+| `user_id` | int | User ID |
+| `status` | string | `queued`, `started`, `completed`, `failed` |
+| `progress` | int | Progress percentage (0-100) |
+| `message` | string\|null | Current processing step description |
+| `url` | string | YouTube URL |
+| `video_id` | string\|null | Extracted video ID |
+| `error` | string\|null | Error message (when failed) |
+| `text` | string\|null | Transcript text (only when completed) |
+
+**Response (404):**
+```json
+{
+  "code": "NOT_FOUND",
+  "message": "Job not found",
+  "request_id": "uuid"
+}
+```
 
 ---
 
