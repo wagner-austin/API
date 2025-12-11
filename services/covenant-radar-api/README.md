@@ -73,6 +73,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/evaluate` | POST | Evaluate covenant compliance |
 | `/ml/predict` | POST | Predict breach risk |
 | `/ml/train` | POST | Enqueue model training |
+| `/ml/train-external` | POST | Train on external CSV datasets |
 | `/ml/jobs/{job_id}` | GET | Get training job status |
 | `/ml/models/active` | GET | Get active model info |
 
@@ -235,21 +236,28 @@ curl http://localhost:8007/ml/models/active
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DATABASE_URL` | string | - | PostgreSQL connection URL |
-| `REDIS_URL` | string | `redis://redis:6379/0` | Redis connection URL |
-| `RQ__QUEUE_NAME` | string | `covenant-radar` | RQ queue name |
-| `RQ__JOB_TIMEOUT_SEC` | int | `3600` | Job timeout |
-| `APP__MODEL_PATH` | string | `/data/models/active.ubj` | Active model path |
-| `APP__MODEL_OUTPUT_DIR` | string | `/data/models` | Model output directory |
-| `LOGGING__LEVEL` | string | `INFO` | Log level |
+| `APP_ENV` | string | `dev` | Application environment (`dev` or `prod`) |
+| `DATABASE_URL` | string | - | PostgreSQL connection URL (required) |
+| `REDIS_URL` or `REDIS__URL` | string | `redis://redis:6379/0` | Redis connection URL |
+| `REDIS__ENABLED` | bool | `true` | Enable Redis |
+| `RQ__QUEUE_NAME` | string | `covenant` | RQ queue name |
+| `RQ__JOB_TIMEOUT_SEC` | int | `3600` | Job timeout in seconds |
+| `RQ__RESULT_TTL_SEC` | int | `86400` | Result TTL in seconds |
+| `RQ__FAILURE_TTL_SEC` | int | `604800` | Failure TTL in seconds |
+| `APP__DATA_ROOT` | string | `/data` | Data root directory |
+| `APP__MODELS_ROOT` | string | `/data/models` | Models directory |
+| `APP__LOGS_ROOT` | string | `/data/logs` | Logs directory |
+| `APP__ACTIVE_MODEL_PATH` | string | `/data/models/active.ubj` | Active model path |
+| `LOGGING__LEVEL` | string | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
 
 ### Example .env
 
 ```bash
+APP_ENV=dev
 DATABASE_URL=postgresql://covenant:covenant@postgres:5432/covenant
 REDIS_URL=redis://redis:6379/0
-RQ__QUEUE_NAME=covenant-radar
-APP__MODEL_PATH=/data/models/active.ubj
+RQ__QUEUE_NAME=covenant
+APP__ACTIVE_MODEL_PATH=/data/models/active.ubj
 LOGGING__LEVEL=INFO
 ```
 
@@ -418,7 +426,9 @@ This creates 12 sample deals (6 safe, 6 risky) with covenants, measurements, and
 
 ## ML Model Training
 
-Train an XGBoost model on the seeded data:
+### Train on Internal Data
+
+Train an XGBoost model on seeded deal/measurement data:
 
 ```bash
 # Trigger training job
@@ -431,18 +441,67 @@ curl -X POST http://localhost:8007/ml/train \
     "subsample": 0.8,
     "colsample_bytree": 0.8,
     "random_state": 42,
-    "device": "auto",
-    "reg_alpha": 0.0,
-    "reg_lambda": 1.0,
-    "scale_pos_weight": 1.5
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "early_stopping_rounds": 10
   }'
 # {"job_id": "uuid", "status": "queued"}
 
-# Poll for completion
+# Poll for completion - returns full metrics
 curl http://localhost:8007/ml/jobs/{job_id}
-# {"job_id": "uuid", "status": "finished", "result": {...}}
+# {
+#   "job_id": "uuid",
+#   "status": "finished",
+#   "result": {
+#     "model_id": "model-2024-01-15",
+#     "best_val_auc": 0.89,
+#     "test_metrics": {"auc": 0.87, "accuracy": 0.82, ...},
+#     ...
+#   }
+# }
+```
 
-# Predict breach risk
+### Train on External Datasets (with Automatic Feature Selection)
+
+Train on real-world bankruptcy datasets. XGBoost automatically determines which features are most predictive:
+
+```bash
+# Train on Taiwan bankruptcy data (95 financial ratios)
+curl -X POST http://localhost:8007/ml/train-external \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "learning_rate": 0.1,
+    "max_depth": 6,
+    "n_estimators": 100,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42
+  }'
+
+# Poll for results with feature importance ranking
+curl http://localhost:8007/ml/jobs/{job_id}
+# {
+#   "result": {
+#     "test_metrics": {"auc": 0.93, ...},
+#     "feature_importances": [
+#       {"name": "X6", "importance": 0.18, "rank": 1},
+#       {"name": "X1", "importance": 0.09, "rank": 2},
+#       ...
+#     ]
+#   }
+# }
+```
+
+**Available Datasets:**
+- `taiwan` - Taiwan bankruptcy data (6,819 samples, 95 features)
+- `us` - US bankruptcy data
+- `polish` - Polish bankruptcy data
+
+### Predict Breach Risk
+
+```bash
 curl -X POST http://localhost:8007/ml/predict \
   -H "Content-Type: application/json" \
   -d '{"deal_id": "your-deal-uuid"}'
