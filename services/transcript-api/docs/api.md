@@ -370,12 +370,19 @@ All errors return JSON with consistent format:
 
 | Constraint | Default | Environment Variable |
 |------------|---------|---------------------|
+| OpenAI API Key | **Required** | `OPENAI_API_KEY` |
+| Redis URL | **Required** | `REDIS_URL` |
 | Max video duration | Unlimited | `TRANSCRIPT_MAX_VIDEO_SECONDS` |
 | Max file size | Unlimited | `TRANSCRIPT_MAX_FILE_MB` |
+| Enable chunking | false | `TRANSCRIPT_ENABLE_CHUNKING` |
 | Chunk threshold | 20 MB | `TRANSCRIPT_CHUNK_THRESHOLD_MB` |
 | Target chunk size | 20 MB | `TRANSCRIPT_TARGET_CHUNK_MB` |
 | Max chunk duration | 600s | `TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS` |
 | Concurrent chunks | 3 | `TRANSCRIPT_MAX_CONCURRENT_CHUNKS` |
+| Silence threshold | -40 dB | `TRANSCRIPT_SILENCE_THRESHOLD_DB` |
+| Min silence duration | 0.5s | `TRANSCRIPT_SILENCE_DURATION_SECONDS` |
+| STT real-time factor | 0.5 | `TRANSCRIPT_STT_RTF` |
+| Download speed estimate | 4.0 MiB/s | `TRANSCRIPT_DL_MIB_PER_SEC` |
 
 ---
 

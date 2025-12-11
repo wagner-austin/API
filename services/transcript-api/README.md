@@ -90,14 +90,17 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `TRANSCRIPT_MAX_CONCURRENT_CHUNKS` | int | `3` | Parallel chunk transcription workers |
 | `TRANSCRIPT_SILENCE_THRESHOLD_DB` | float | `-40.0` | Silence detection threshold (dB) |
 | `TRANSCRIPT_SILENCE_DURATION_SECONDS` | float | `0.5` | Min silence duration for split point |
+| `TRANSCRIPT_STT_RTF` | float | `0.5` | Real-time factor for STT timeout estimation |
+| `TRANSCRIPT_DL_MIB_PER_SEC` | float | `4.0` | Estimated download speed (MiB/s) for timeout |
 | `TRANSCRIPT_PREFERRED_LANGS` | string | - | Comma-separated default languages |
-| `REDIS_URL` | string | - | Redis URL for event publishing (optional) |
+| `REDIS_URL` | string | **Required** | Redis URL for /readyz health check and events |
 
 ### Example Configurations
 
 **Development (with chunking):**
 ```bash
 export OPENAI_API_KEY=sk-...
+export REDIS_URL=redis://localhost:6379/0
 export TRANSCRIPT_ENABLE_CHUNKING=1
 export TRANSCRIPT_CHUNK_THRESHOLD_MB=10
 export TRANSCRIPT_MAX_CONCURRENT_CHUNKS=5
@@ -106,6 +109,7 @@ export TRANSCRIPT_MAX_CONCURRENT_CHUNKS=5
 **Production (strict limits):**
 ```bash
 export OPENAI_API_KEY=sk-...
+export REDIS_URL=redis://redis:6379/0
 export TRANSCRIPT_MAX_VIDEO_SECONDS=3600
 export TRANSCRIPT_MAX_FILE_MB=100
 export TRANSCRIPT_ENABLE_CHUNKING=1
@@ -315,7 +319,6 @@ poetry run pytest --cov-report=html
 transcript-api/
 ├── src/transcript_api/
 │   ├── __init__.py
-│   ├── app.py              # FastAPI routes
 │   ├── asgi.py             # ASGI entry point
 │   ├── startup.py          # App initialization
 │   ├── settings.py         # Config loading
@@ -327,9 +330,22 @@ transcript-api/
 │   ├── merger.py           # Segment merging
 │   ├── parallel.py         # Parallel transcription
 │   ├── whisper_parse.py    # OpenAI response parsing
+│   ├── vtt_parser.py       # VTT subtitle parsing
 │   ├── youtube.py          # URL validation
 │   ├── cleaner.py          # Text cleaning
 │   ├── events.py           # Redis event publishing
+│   ├── health.py           # Health check logic
+│   ├── jobs.py             # Async job processing
+│   ├── job_store.py        # Redis job state storage
+│   ├── json_util.py        # JSON serialization helpers
+│   ├── dependencies.py     # FastAPI dependencies
+│   ├── worker_entry.py     # RQ worker entry point
+│   ├── api/
+│   │   ├── main.py         # FastAPI app factory
+│   │   └── routes/
+│   │       ├── health.py       # Health endpoints
+│   │       ├── transcripts.py  # Captions/STT endpoints
+│   │       └── jobs.py         # Async job endpoints
 │   └── adapters/
 │       ├── youtube_client.py   # youtube_transcript_api wrapper
 │       ├── openai_client.py    # OpenAI Whisper client
@@ -360,6 +376,7 @@ docker build -t transcript-api:latest .
 # Run
 docker run -p 8000:8000 \
   -e OPENAI_API_KEY=sk-... \
+  -e REDIS_URL=redis://host.docker.internal:6379/0 \
   -e TRANSCRIPT_ENABLE_CHUNKING=1 \
   transcript-api:latest
 ```
