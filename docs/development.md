@@ -91,21 +91,25 @@ poetry run ruff format .
 ```
 API/
 ├── libs/                    # Shared libraries
-│   ├── platform_core/       # Config, logging, HTTP
-│   ├── platform_workers/    # RQ job infrastructure
-│   ├── platform_ml/         # ML artifacts
-│   ├── platform_discord/    # Discord utilities
-│   ├── platform_music/      # Music service adapters
+│   ├── covenant_domain/     # Covenant domain models & rules
+│   ├── covenant_ml/         # XGBoost training for covenants
+│   ├── covenant_persistence/# PostgreSQL repositories
 │   ├── instrument_io/       # Scientific formats
-│   └── monorepo_guards/     # Static analysis
+│   ├── monorepo_guards/     # Static analysis
+│   ├── platform_core/       # Config, logging, HTTP
+│   ├── platform_discord/    # Discord utilities
+│   ├── platform_ml/         # ML artifacts
+│   ├── platform_music/      # Music service adapters
+│   └── platform_workers/    # RQ job infrastructure
 ├── services/                # Microservices
+│   ├── covenant-radar-api/
 │   ├── data-bank-api/
-│   ├── Model-Trainer/
 │   ├── handwriting-ai/
-│   ├── turkic-api/
-│   ├── transcript-api/
+│   ├── Model-Trainer/
+│   ├── music-wrapped-api/
 │   ├── qr-api/
-│   └── music-wrapped-api/
+│   ├── transcript-api/
+│   └── turkic-api/
 ├── clients/                 # Client applications
 │   └── DiscordBot/
 ├── docs/                    # Documentation
