@@ -343,16 +343,27 @@ All file endpoints require authentication:
 
 ## Configuration
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `PORT` | int | `8000` | Server port |
-| `DATA_ROOT` | string | `/data/files` | Storage root directory |
-| `MIN_FREE_GB` | int | `1` | Minimum free disk space (GB) |
-| `MAX_FILE_BYTES` | int | `0` | Max upload size (0 = unlimited) |
-| `DELETE_STRICT_404` | bool | `false` | Return 404 on missing delete |
-| `API_UPLOAD_KEYS` | string | - | Comma-separated upload keys |
-| `API_READ_KEYS` | string | - | Comma-separated read keys |
-| `API_DELETE_KEYS` | string | - | Comma-separated delete keys |
+### Environment Variables
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `REDIS_URL` | string | **Yes** | - | Redis connection URL |
+| `API_UPLOAD_KEYS` | string | **Yes** | - | Comma-separated upload keys |
+| `API_READ_KEYS` | string | No | (inherits from upload) | Comma-separated read keys |
+| `API_DELETE_KEYS` | string | No | (inherits from upload) | Comma-separated delete keys |
+
+> **Note:** The server port is configured via hypercorn's `--bind` flag (e.g., `--bind [::]:${PORT:-8000}`), not as an application environment variable.
+
+### Fixed Configuration
+
+The following values are fixed in the codebase and cannot be changed via environment variables:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `DATA_ROOT` | `/data/files` | Storage root directory |
+| `MIN_FREE_GB` | `1` | Minimum free disk space (GB) |
+| `MAX_FILE_BYTES` | `0` | Max upload size (0 = unlimited) |
+| `DELETE_STRICT_404` | `false` | Return 404 on missing delete |
 
 ---
 
