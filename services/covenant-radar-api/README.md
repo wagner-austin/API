@@ -46,7 +46,7 @@ docker compose up -d redis postgres
 poetry run hypercorn 'covenant_radar_api.api.main:create_app()' --bind 0.0.0.0:8000
 
 # Run Worker (separate terminal)
-poetry run covenantworker
+poetry run covenant-rq-worker
 ```
 
 ## API Reference
