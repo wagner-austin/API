@@ -10,101 +10,28 @@ enabling strict mypy compliance without Any, cast, or type: ignore.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Final, Literal, Protocol, TypedDict
+from typing import Final, Literal, TypedDict
 
 from platform_core.json_utils import JSONValue
 
+from .testing import WandbModuleProtocol, hooks
 from .wandb_types import WandbInitResult
-
-
-class _WandbRunProto(Protocol):
-    """Protocol for wandb.Run interface."""
-
-    @property
-    def id(self) -> str:
-        """Run ID assigned by wandb."""
-        ...
-
-
-class _WandbConfigProto(Protocol):
-    """Protocol for wandb.config interface."""
-
-    def update(self, d: Mapping[str, JSONValue]) -> None:
-        """Update config with dictionary."""
-        ...
-
-
-class _WandbTableProto(Protocol):
-    """Protocol for wandb.Table constructor result."""
-
-
-class _WandbTableCtorProto(Protocol):
-    """Protocol for wandb.Table constructor."""
-
-    def __call__(
-        self,
-        columns: list[str],
-        data: list[list[float | int | str | bool]],
-    ) -> _WandbTableProto:
-        """Create a new wandb Table."""
-        ...
-
-
-class _WandbModuleProto(Protocol):
-    """Protocol for wandb module interface."""
-
-    @property
-    def run(self) -> _WandbRunProto | None:
-        """Current active run, or None if not initialized."""
-        ...
-
-    @property
-    def config(self) -> _WandbConfigProto:
-        """Config object for the current run."""
-        ...
-
-    def init(
-        self,
-        *,
-        project: str,
-        name: str,
-    ) -> _WandbRunProto:
-        """Initialize a new wandb run."""
-        ...
-
-    def log(self, data: Mapping[str, float | int | str | bool | _WandbTableProto]) -> None:
-        """Log metrics to the current run."""
-        ...
-
-    def finish(self) -> None:
-        """Finish the current run."""
-        ...
 
 
 class WandbUnavailableError(Exception):
     """Raised when wandb is requested but not installed."""
 
 
-def _load_wandb_module() -> _WandbModuleProto:
+def _load_wandb_module() -> WandbModuleProtocol:
     """Load wandb module with Protocol-typed interface.
 
     Returns:
-        The wandb module typed as _WandbModuleProto.
+        The wandb module typed as WandbModuleProtocol.
 
     Raises:
         WandbUnavailableError: If wandb package is not installed.
     """
-    # Import check - this will raise ImportError if wandb not installed
-    # We convert to our domain error for clarity
-    import importlib.util
-
-    spec = importlib.util.find_spec("wandb")
-    if spec is None:
-        raise WandbUnavailableError("wandb package is not installed")
-
-    mod = __import__("wandb")
-    wandb_module: _WandbModuleProto = mod
-    return wandb_module
+    return hooks.load_wandb_module()
 
 
 class _MetricsData(TypedDict, total=False):
@@ -143,7 +70,7 @@ class WandbPublisher:
     """
 
     _enabled: Final[bool]
-    _wandb: _WandbModuleProto | None
+    _wandb: WandbModuleProtocol | None
     _run_id: str | None
 
     def __init__(
@@ -261,13 +188,9 @@ class WandbPublisher:
         if self._wandb.run is None:
             return
 
-        # Get Table constructor via getattr to avoid PascalCase property in Protocol
-        wandb_mod = __import__("wandb")
-        table_ctor: _WandbTableCtorProto = wandb_mod.Table
-
         # Convert sequences to lists for wandb.Table
         data_lists: list[list[float | int | str | bool]] = [list(row) for row in data]
-        table = table_ctor(columns=columns, data=data_lists)
+        table = self._wandb.table_ctor(columns=columns, data=data_lists)
         self._wandb.log({name: table})
 
     def finish(self) -> None:
@@ -310,4 +233,5 @@ __all__ = [
     "PublisherStatus",
     "WandbPublisher",
     "WandbUnavailableError",
+    "_load_wandb_module",
 ]

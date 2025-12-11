@@ -9,7 +9,8 @@ from typing import Final
 from platform_core import DataBankClient
 from platform_core.data_bank_protocol import FileUploadResponse
 
-from .tarball import TarballError, create_tarball, extract_tarball
+from . import _test_hooks
+from .tarball import TarballError, extract_tarball
 
 
 class ArtifactStoreError(Exception):
@@ -20,18 +21,14 @@ class ArtifactStore:
     """ML artifact storage via data-bank-api.
 
     All artifacts are stored remotely. No local-only mode.
+
+    Args:
+        client: A DataBankClient instance. For testing, create with a fake
+            HTTP transport: `DataBankClient(..., client=httpx.Client(transport=fake))`
     """
 
-    def __init__(
-        self,
-        base_url: str,
-        api_key: str,
-        *,
-        timeout_seconds: float = 600.0,
-    ) -> None:
-        self._client: Final[DataBankClient] = DataBankClient(
-            base_url, api_key, timeout_seconds=timeout_seconds
-        )
+    def __init__(self, client: DataBankClient) -> None:
+        self._client: Final[DataBankClient] = client
 
     def upload_artifact(
         self,
@@ -55,7 +52,7 @@ class ArtifactStore:
             tmp_dir = Path(tmp)
             tar_path = tmp_dir / f"{name}.tar.gz"
             try:
-                create_tarball(dir_path, tar_path, root_name=name)
+                _test_hooks.hooks.create_tarball(dir_path, tar_path, root_name=name)
             except TarballError as exc:
                 raise ArtifactStoreError(f"tarball creation failed: {exc}") from exc
             # Compute sha256 for observability (server returns its own)
@@ -95,15 +92,16 @@ class ArtifactStore:
         dest_dir.mkdir(parents=True, exist_ok=True)
         # Use a deterministic temporary file name under dest_dir
         tmp_path = dest_dir / f".{os.path.basename(fid)}.part"
-        head = self._client.download_to_path(fid, tmp_path, request_id=request_id, verify_etag=True)
+        # Check file size before attempting download
+        head_info = self._client.head(fid, request_id=request_id)
+        if head_info["size"] <= 0:
+            raise ArtifactStoreError("downloaded file has invalid size")
+        self._client.download_to_path(fid, tmp_path, request_id=request_id, verify_etag=True)
         # Extract ensuring the archive contains the expected root
         try:
             out_root = extract_tarball(tmp_path, dest_dir, expected_root=expected_root)
         except TarballError as exc:
             raise ArtifactStoreError(f"tarball extraction failed: {exc}") from exc
-        # Optional: verify size consistency (after extraction, temp may be removed by caller)
-        if head["size"] <= 0:
-            raise ArtifactStoreError("downloaded file has invalid size")
         # Leave tmp tarball for caller to manage if needed
         return out_root
 

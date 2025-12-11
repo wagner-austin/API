@@ -17,6 +17,7 @@ include = ["src/platform_ml/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
+sentencepiece = "^0.2.1"
 wandb = { version = "^0.18", optional = true }
 
 [tool.poetry.extras]
