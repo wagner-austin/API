@@ -82,6 +82,15 @@ Enqueue a model training job.
 | `precision` | string | No | `"auto"` | `"fp32"`, `"fp16"`, `"bf16"`, or `"auto"` (resolves based on device) |
 | `data_num_workers` | int\|null | No | `null` | Optional DataLoader workers; default depends on device |
 | `data_pin_memory` | bool\|null | No | `null` | Optional DataLoader pin_memory; default depends on device |
+| `holdout_fraction` | float | No | `0.01` | Fraction of data held out for validation (0.0-0.5) |
+| `seed` | int | No | `42` | Random seed for reproducibility |
+| `pretrained_run_id` | string\|null | No | `null` | Run ID of pretrained model for fine-tuning |
+| `freeze_embed` | bool | No | `false` | Freeze embedding layers during fine-tuning |
+| `gradient_clipping` | float | No | `1.0` | Maximum gradient norm for clipping |
+| `optimizer` | string | No | `"adamw"` | Optimizer type (`adamw`, `adam`, `sgd`) |
+| `early_stopping_patience` | int | No | `5` | Epochs without improvement before stopping |
+| `test_split_ratio` | float | No | `0.15` | Fraction of data held out for testing (0.0-0.5) |
+| `finetune_lr_cap` | float | No | `0.00005` | Maximum learning rate for fine-tuning |
 
 **Request Example:**
 ```json
@@ -383,16 +392,21 @@ Generate text using a trained model.
 | `prompt_path` | string | Conditional | - | File path for prompt (mutually exclusive with `prompt_text`) |
 | `max_new_tokens` | int | No | `64` | Maximum tokens to generate (1-1024) |
 | `temperature` | float | No | `1.0` | Sampling temperature (0.0-2.0) |
-| `top_k` | int | No | `50` | Top-k sampling |
+| `top_k` | int | No | `50` | Top-k sampling (0=disabled) |
 | `top_p` | float | No | `1.0` | Nucleus sampling threshold (0.0-1.0) |
-| `seed` | int | No | null | Random seed |
+| `stop_on_eos` | bool | No | `true` | Stop at end-of-sequence token |
+| `stop_sequences` | string[] | No | `[]` | Custom stop strings |
+| `seed` | int | No | `null` | Random seed for reproducibility |
+| `num_return_sequences` | int | No | `1` | Number of sequences to generate (1-16) |
 
 **Request Example:**
 ```json
 {
   "prompt_text": "Once upon a time",
   "max_new_tokens": 100,
-  "temperature": 0.8
+  "temperature": 0.8,
+  "stop_on_eos": true,
+  "num_return_sequences": 1
 }
 ```
 
@@ -547,7 +561,7 @@ Enqueue a tokenizer training job.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `method` | string | Yes | Tokenizer method (`bpe` or `sentencepiece`) |
+| `method` | string | Yes | Tokenizer method (`bpe`, `sentencepiece`, or `char`) |
 | `vocab_size` | int | Yes | Vocabulary size (>= 100) |
 | `min_frequency` | int | Yes | Minimum token frequency (>= 1) |
 | `corpus_file_id` | string | Yes | File ID in data-bank for training corpus |
