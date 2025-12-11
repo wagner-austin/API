@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Protocol
-
+from platform_core import torch_types as torch_types_mod
 from platform_core.torch_types import (
+    DeviceProtocol,
     TensorProtocol,
     ThreadConfig,
+    _TorchModuleProtocol,
     configure_torch_threads,
     get_num_threads,
     set_manual_seed,
@@ -54,25 +55,28 @@ class _MockTensor:
     def tolist(self) -> list[float]:
         return []
 
-    def detach(self) -> _MockTensor:
+    def detach(self) -> TensorProtocol:
         return self
 
-    def cpu(self) -> _MockTensor:
+    def cpu(self) -> TensorProtocol:
         return self
 
-    def cuda(self, device: int | None = None) -> _MockTensor:
+    def clone(self) -> TensorProtocol:
         return self
 
-    def to(self, device: _MockDevice | str) -> _MockTensor:
+    def cuda(self, device: int | None = None) -> TensorProtocol:
         return self
 
-    def __add__(self, other: TensorProtocol | float | int) -> _MockTensor:
+    def to(self, device: DeviceProtocol | str) -> TensorProtocol:
         return self
 
-    def __mul__(self, other: TensorProtocol | float | int) -> _MockTensor:
+    def __add__(self, other: TensorProtocol | float | int) -> TensorProtocol:
         return self
 
-    def __truediv__(self, other: TensorProtocol | float | int) -> _MockTensor:
+    def __mul__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+        return self
+
+    def __truediv__(self, other: TensorProtocol | float | int) -> TensorProtocol:
         return self
 
 
@@ -105,7 +109,7 @@ class _MockTorchModule:
     def set_num_threads(self, num: int) -> None:
         self.set_num_threads_calls.append(num)
 
-    def manual_seed(self, seed: int) -> _MockTensor:
+    def manual_seed(self, seed: int) -> TensorProtocol:
         self.manual_seed_calls.append(seed)
         return _MockTensor()
 
@@ -113,63 +117,50 @@ class _MockTorchModule:
         return self._num_threads
 
 
-def test_configure_torch_threads_positive_threads(
-    monkeypatch: _MonkeypatchProto,
-) -> None:
+def test_configure_torch_threads_positive_threads() -> None:
     """Test configure_torch_threads sets threads when positive."""
     cfg: ThreadConfig = _MockThreadConfig(4)
-
     mock_torch = _MockTorchModule()
 
-    def mock_import(name: str) -> _MockTorchModule:
-        if name == "torch":
-            return mock_torch
-        raise ImportError(f"No module named {name}")
+    def _mock_import() -> _TorchModuleProtocol:
+        return mock_torch
 
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    torch_types_mod._import_torch = _mock_import
 
     configure_torch_threads(cfg)
 
     assert mock_torch.set_num_threads_calls == [4]
 
 
-def test_configure_torch_threads_zero_threads(
-    monkeypatch: _MonkeypatchProto,
-) -> None:
+def test_configure_torch_threads_zero_threads() -> None:
     """Test configure_torch_threads does nothing when threads is 0."""
     cfg: ThreadConfig = _MockThreadConfig(0)
-
     mock_torch = _MockTorchModule()
 
-    def mock_import(name: str) -> _MockTorchModule:
-        if name == "torch":
-            return mock_torch
-        raise ImportError(f"No module named {name}")
+    def _mock_import() -> _TorchModuleProtocol:
+        return mock_torch
 
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    torch_types_mod._import_torch = _mock_import
 
     configure_torch_threads(cfg)
 
+    # With threads=0, we should not call set_num_threads
     assert mock_torch.set_num_threads_calls == []
 
 
-def test_configure_torch_threads_negative_threads(
-    monkeypatch: _MonkeypatchProto,
-) -> None:
+def test_configure_torch_threads_negative_threads() -> None:
     """Test configure_torch_threads does nothing when threads is negative."""
     cfg: ThreadConfig = _MockThreadConfig(-1)
-
     mock_torch = _MockTorchModule()
 
-    def mock_import(name: str) -> _MockTorchModule:
-        if name == "torch":
-            return mock_torch
-        raise ImportError(f"No module named {name}")
+    def _mock_import() -> _TorchModuleProtocol:
+        return mock_torch
 
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    torch_types_mod._import_torch = _mock_import
 
     configure_torch_threads(cfg)
 
+    # With threads=-1, we should not call set_num_threads
     assert mock_torch.set_num_threads_calls == []
 
 
@@ -184,50 +175,39 @@ def test_thread_config_protocol() -> None:
     assert result == 8
 
 
-def test_set_manual_seed(
-    monkeypatch: _MonkeypatchProto,
-) -> None:
+def test_set_manual_seed() -> None:
     """Test set_manual_seed calls torch.manual_seed."""
     mock_torch = _MockTorchModule()
 
-    def mock_import(name: str) -> _MockTorchModule:
-        if name == "torch":
-            return mock_torch
-        raise ImportError(f"No module named {name}")
+    def _mock_import() -> _TorchModuleProtocol:
+        return mock_torch
 
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    torch_types_mod._import_torch = _mock_import
 
     set_manual_seed(42)
 
     assert mock_torch.manual_seed_calls == [42]
 
 
-def test_get_num_threads(
-    monkeypatch: _MonkeypatchProto,
-) -> None:
+def test_get_num_threads() -> None:
     """Test get_num_threads returns torch.get_num_threads value."""
     mock_torch = _MockTorchModule(num_threads=8)
 
-    def mock_import(name: str) -> _MockTorchModule:
-        if name == "torch":
-            return mock_torch
-        raise ImportError(f"No module named {name}")
+    def _mock_import() -> _TorchModuleProtocol:
+        return mock_torch
 
-    monkeypatch.setattr("builtins.__import__", mock_import)
+    torch_types_mod._import_torch = _mock_import
 
     result = get_num_threads()
 
     assert result == 8
 
 
-# Protocol for pytest monkeypatch
+def test_default_import_torch_returns_real_torch() -> None:
+    """Test _default_import_torch imports the real torch module."""
+    from platform_core.torch_types import _default_import_torch
 
-
-class _MockImportFn(Protocol):
-    """Protocol for mock __import__ function used in tests."""
-
-    def __call__(self, name: str) -> _MockTorchModule: ...
-
-
-class _MonkeypatchProto(Protocol):
-    def setattr(self, name: str, value: _MockImportFn) -> None: ...
+    torch_mod = _default_import_torch()
+    # Verify it returns a torch module by calling get_num_threads
+    threads = torch_mod.get_num_threads()
+    assert threads >= 0

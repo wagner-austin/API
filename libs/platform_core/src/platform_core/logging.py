@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
+import multiprocessing as _mp
 import socket
 import sys
 import time
@@ -119,7 +121,27 @@ class JsonFormatter(logging.Formatter):
             payload[field_name] = field_value
 
         # Include standard structured fields when present on the record
-        for field_name in ("latency_ms", "digit", "confidence", "model_id", "uncertain"):
+        # Includes ML training progress fields for visibility
+        for field_name in (
+            "latency_ms",
+            "digit",
+            "confidence",
+            "model_id",
+            "uncertain",
+            # Training progress fields
+            "round",
+            "train_auc",
+            "val_auc",
+            "best_val_auc",
+            "n_samples",
+            "n_features",
+            "samples_train",
+            "samples_val",
+            "samples_test",
+            "early_stopped",
+            "config",
+            "test_auc",
+        ):
             if field_name in payload:
                 continue
             field_value = _get_json_record_value(record, field_name)
@@ -305,6 +327,94 @@ class LogEventFields(TypedDict, total=False):
     confidence: float
     model_id: str
     uncertain: bool
+    # ML training progress fields
+    round: int
+    train_auc: float
+    val_auc: float
+    best_val_auc: float
+    n_samples: int
+    n_features: int
+    samples_train: int
+    samples_val: int
+    samples_test: int
+    early_stopped: bool
+    config: dict[str, float | int]
+    test_auc: float
+
+
+# =============================================================================
+# Multiprocessing Queue Logging Support
+# =============================================================================
+# These types support multiprocessing IPC logging via QueueHandler/QueueListener.
+# Used by calibration runners and other multiprocessing code.
+
+
+class QueueListenerProtocol(Protocol):
+    """Protocol for logging.handlers.QueueListener."""
+
+    def start(self) -> None: ...
+
+    def stop(self) -> None: ...
+
+
+class LogRecordQueueProtocol(Protocol):
+    """Protocol for multiprocessing.Queue[logging.LogRecord].
+
+    This protocol allows typed access to log record queues without
+    exposing the generic Queue type.
+    """
+
+    def put(
+        self,
+        obj: logging.LogRecord,
+        block: bool = True,
+        timeout: float | None = None,
+    ) -> None: ...
+
+    def get(
+        self, block: bool = True, timeout: float | None = None
+    ) -> logging.LogRecord: ...
+
+    def empty(self) -> bool: ...
+
+
+class QueueHandlerFactory(Protocol):
+    """Protocol for QueueHandler constructor."""
+
+    def __call__(
+        self, queue: _mp.Queue[logging.LogRecord]
+    ) -> logging.Handler: ...
+
+
+class QueueListenerFactory(Protocol):
+    """Protocol for QueueListener constructor."""
+
+    def __call__(
+        self,
+        queue: _mp.Queue[logging.LogRecord],
+        *handlers: logging.Handler,
+        respect_handler_level: bool = False,
+    ) -> QueueListenerProtocol: ...
+
+
+def load_queue_handler_factory() -> QueueHandlerFactory:
+    """Load QueueHandler constructor from logging.handlers.
+
+    Returns a factory that creates QueueHandler instances for sending
+    log records to a multiprocessing queue.
+    """
+    factory: QueueHandlerFactory = logging.handlers.QueueHandler
+    return factory
+
+
+def load_queue_listener_factory() -> QueueListenerFactory:
+    """Load QueueListener constructor from logging.handlers.
+
+    Returns a factory that creates QueueListener instances for receiving
+    log records from a multiprocessing queue and dispatching to handlers.
+    """
+    factory: QueueListenerFactory = logging.handlers.QueueListener
+    return factory
 
 
 __all__ = [
@@ -312,8 +422,14 @@ __all__ = [
     "LogEventFields",
     "LogFormat",
     "LogLevel",
+    "LogRecordQueueProtocol",
+    "QueueHandlerFactory",
+    "QueueListenerFactory",
+    "QueueListenerProtocol",
     "TextFormatter",
     "get_logger",
+    "load_queue_handler_factory",
+    "load_queue_listener_factory",
     "setup_logging",
     "stdlib_logging",
 ]

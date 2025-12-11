@@ -2,49 +2,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-import pytest
-
 from platform_core.config import ModelTrainerSettings, load_model_trainer_settings
+from platform_core.testing import make_fake_env
 
 
-def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    keys = [
-        "LOGGING__LEVEL",
-        "REDIS__ENABLED",
-        "REDIS__URL",
-        "RQ__QUEUE_NAME",
-        "RQ__JOB_TIMEOUT_SEC",
-        "RQ__RESULT_TTL_SEC",
-        "RQ__FAILURE_TTL_SEC",
-        "RQ__RETRY_MAX",
-        "RQ__RETRY_INTERVALS_SEC",
-        "APP__DATA_ROOT",
-        "APP__ARTIFACTS_ROOT",
-        "APP__RUNS_ROOT",
-        "APP__LOGS_ROOT",
-        "APP__THREADS",
-        "APP__TOKENIZER_SAMPLE_MAX_LINES",
-        "APP__DATA_BANK_API_URL",
-        "APP__DATA_BANK_API_KEY",
-        "APP__CLEANUP__ENABLED",
-        "APP__CLEANUP__VERIFY_UPLOAD",
-        "APP__CLEANUP__GRACE_PERIOD_SECONDS",
-        "APP__CLEANUP__DRY_RUN",
-        "APP__CORPUS_CACHE_CLEANUP__ENABLED",
-        "APP__CORPUS_CACHE_CLEANUP__MAX_BYTES",
-        "APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES",
-        "APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY",
-        "APP__TOKENIZER_CLEANUP__ENABLED",
-        "APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS",
-        "SECURITY__API_KEY",
-        "APP_ENV",
-    ]
-    for key in keys:
-        monkeypatch.delenv(key, raising=False)
-
-
-def test_model_trainer_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)
+def test_model_trainer_settings_defaults() -> None:
+    make_fake_env()
     cfg: ModelTrainerSettings = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "INFO"
     assert cfg["redis"] == {"enabled": True, "url": "redis://redis:6379/0"}
@@ -74,37 +37,37 @@ def test_model_trainer_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> Non
     assert cfg["app_env"] == "dev"
 
 
-def test_model_trainer_settings_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("LOGGING__LEVEL", "DEBUG")
-    monkeypatch.setenv("REDIS__ENABLED", "false")
-    monkeypatch.setenv("REDIS__URL", "redis://override:6379/1")
-    monkeypatch.setenv("RQ__QUEUE_NAME", "trainer")
-    monkeypatch.setenv("RQ__JOB_TIMEOUT_SEC", "100")
-    monkeypatch.setenv("RQ__RESULT_TTL_SEC", "200")
-    monkeypatch.setenv("RQ__FAILURE_TTL_SEC", "300")
-    monkeypatch.setenv("RQ__RETRY_MAX", "2")
-    monkeypatch.setenv("RQ__RETRY_INTERVALS_SEC", "10,20")
-    monkeypatch.setenv("APP__DATA_ROOT", "/tmp/data")
-    monkeypatch.setenv("APP__ARTIFACTS_ROOT", "/tmp/artifacts")
-    monkeypatch.setenv("APP__RUNS_ROOT", "/tmp/runs")
-    monkeypatch.setenv("APP__LOGS_ROOT", "/tmp/logs")
-    monkeypatch.setenv("APP__THREADS", "4")
-    monkeypatch.setenv("APP__TOKENIZER_SAMPLE_MAX_LINES", "500")
-    monkeypatch.setenv("APP__DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("APP__DATA_BANK_API_KEY", "k")
-    monkeypatch.setenv("APP__CLEANUP__ENABLED", "false")
-    monkeypatch.setenv("APP__CLEANUP__VERIFY_UPLOAD", "false")
-    monkeypatch.setenv("APP__CLEANUP__GRACE_PERIOD_SECONDS", "5")
-    monkeypatch.setenv("APP__CLEANUP__DRY_RUN", "true")
-    monkeypatch.setenv("APP__CORPUS_CACHE_CLEANUP__ENABLED", "true")
-    monkeypatch.setenv("APP__CORPUS_CACHE_CLEANUP__MAX_BYTES", "123")
-    monkeypatch.setenv("APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES", "456")
-    monkeypatch.setenv("APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY", "oldest")
-    monkeypatch.setenv("APP__TOKENIZER_CLEANUP__ENABLED", "true")
-    monkeypatch.setenv("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", "7")
-    monkeypatch.setenv("SECURITY__API_KEY", "sekret")
-    monkeypatch.setenv("APP_ENV", "prod")
+def test_model_trainer_settings_env_overrides() -> None:
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "DEBUG")
+    env.set("REDIS__ENABLED", "false")
+    env.set("REDIS__URL", "redis://override:6379/1")
+    env.set("RQ__QUEUE_NAME", "trainer")
+    env.set("RQ__JOB_TIMEOUT_SEC", "100")
+    env.set("RQ__RESULT_TTL_SEC", "200")
+    env.set("RQ__FAILURE_TTL_SEC", "300")
+    env.set("RQ__RETRY_MAX", "2")
+    env.set("RQ__RETRY_INTERVALS_SEC", "10,20")
+    env.set("APP__DATA_ROOT", "/tmp/data")
+    env.set("APP__ARTIFACTS_ROOT", "/tmp/artifacts")
+    env.set("APP__RUNS_ROOT", "/tmp/runs")
+    env.set("APP__LOGS_ROOT", "/tmp/logs")
+    env.set("APP__THREADS", "4")
+    env.set("APP__TOKENIZER_SAMPLE_MAX_LINES", "500")
+    env.set("APP__DATA_BANK_API_URL", "http://db")
+    env.set("APP__DATA_BANK_API_KEY", "k")
+    env.set("APP__CLEANUP__ENABLED", "false")
+    env.set("APP__CLEANUP__VERIFY_UPLOAD", "false")
+    env.set("APP__CLEANUP__GRACE_PERIOD_SECONDS", "5")
+    env.set("APP__CLEANUP__DRY_RUN", "true")
+    env.set("APP__CORPUS_CACHE_CLEANUP__ENABLED", "true")
+    env.set("APP__CORPUS_CACHE_CLEANUP__MAX_BYTES", "123")
+    env.set("APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES", "456")
+    env.set("APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY", "oldest")
+    env.set("APP__TOKENIZER_CLEANUP__ENABLED", "true")
+    env.set("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", "7")
+    env.set("SECURITY__API_KEY", "sekret")
+    env.set("APP_ENV", "prod")
 
     cfg = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "DEBUG"
@@ -140,31 +103,28 @@ def test_model_trainer_settings_env_overrides(monkeypatch: pytest.MonkeyPatch) -
     assert app_env_literal in ("dev", "prod")
 
 
-def test_model_trainer_settings_log_levels(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_model_trainer_settings_log_levels() -> None:
     """Test all log level branches are covered."""
-    _clear_env(monkeypatch)
-
     # Test WARNING
-    monkeypatch.setenv("LOGGING__LEVEL", "WARNING")
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "WARNING")
     cfg = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "WARNING"
 
     # Test ERROR
-    monkeypatch.setenv("LOGGING__LEVEL", "ERROR")
+    env.clear()
+    env.set("LOGGING__LEVEL", "ERROR")
     cfg = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "ERROR"
 
     # Test CRITICAL
-    monkeypatch.setenv("LOGGING__LEVEL", "CRITICAL")
+    env.clear()
+    env.set("LOGGING__LEVEL", "CRITICAL")
     cfg = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "CRITICAL"
 
     # Test invalid level falls back to INFO
-    monkeypatch.setenv("LOGGING__LEVEL", "INVALID")
+    env.clear()
+    env.set("LOGGING__LEVEL", "INVALID")
     cfg = load_model_trainer_settings()
     assert cfg["logging"]["level"] == "INFO"
-
-
-@pytest.fixture(autouse=True)
-def _reset_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)

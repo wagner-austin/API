@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
+
+
+class _TorchModuleProtocol(Protocol):
+    """Protocol for torch module."""
+
+    def set_num_threads(self, num: int) -> None: ...
+    def manual_seed(self, seed: int) -> TensorProtocol: ...
+    def get_num_threads(self) -> int: ...
+
+
+def _default_import_torch() -> _TorchModuleProtocol:
+    """Production implementation - imports real torch."""
+    return __import__("torch")
+
+
+_import_torch: Callable[[], _TorchModuleProtocol] = _default_import_torch
 
 
 class PILImage(Protocol):
@@ -98,37 +115,22 @@ def configure_torch_threads(cfg: ThreadConfig) -> None:
         cfg: Config dict with "threads" key containing thread count.
              If threads <= 0, no configuration is performed.
     """
-    torch_mod = __import__("torch")
     threads = int(cfg["threads"])
     if threads > 0:
-        set_num_threads: _SetNumThreadsFn = torch_mod.set_num_threads
-        set_num_threads(threads)
-
-
-class _SetNumThreadsFn(Protocol):
-    def __call__(self, num: int) -> None: ...
+        torch_mod = _import_torch()
+        torch_mod.set_num_threads(threads)
 
 
 def set_manual_seed(seed: int) -> None:
     """Set PyTorch random seed for reproducibility."""
-    torch_mod = __import__("torch")
-    manual_seed: _ManualSeedFn = torch_mod.manual_seed
-    manual_seed(seed)
-
-
-class _ManualSeedFn(Protocol):
-    def __call__(self, seed: int) -> TensorProtocol: ...
+    torch_mod = _import_torch()
+    torch_mod.manual_seed(seed)
 
 
 def get_num_threads() -> int:
     """Get current PyTorch thread count."""
-    torch_mod = __import__("torch")
-    get_threads: _GetNumThreadsFn = torch_mod.get_num_threads
-    return get_threads()
-
-
-class _GetNumThreadsFn(Protocol):
-    def __call__(self) -> int: ...
+    torch_mod = _import_torch()
+    return torch_mod.get_num_threads()
 
 
 __all__ = [
@@ -141,6 +143,9 @@ __all__ = [
     "TensorProtocol",
     "ThreadConfig",
     "TrainableModel",
+    "_TorchModuleProtocol",
+    "_default_import_torch",
+    "_import_torch",
     "configure_torch_threads",
     "get_num_threads",
     "set_manual_seed",

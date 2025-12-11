@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from . import _test_hooks as config_test_hooks
+from ._test_hooks import _default_get_env
 from ._utils import (
     _decode_table,
     _decode_toml,
@@ -12,12 +14,20 @@ from ._utils import (
     _require_env_csv,
     _require_env_str,
 )
-from .covenant_radar import CovenantRadarSettings, load_covenant_radar_settings
+from .covenant_radar import (
+    CovenantRadarAppConfig,
+    CovenantRadarLoggingConfig,
+    CovenantRadarRedisConfig,
+    CovenantRadarRQConfig,
+    CovenantRadarSettings,
+    load_covenant_radar_settings,
+)
 from .data_bank import DataBankSettings, load_data_bank_settings
 from .discordbot import (
     DigitsConfig,
     DiscordbotSettings,
     DiscordConfig,
+    GatewayConfig,
     HandwritingConfig,
     ModelTrainerConfig,
     QRConfig,
@@ -51,11 +61,16 @@ from .model_trainer import (
 from .turkic_api import TurkicApiSettings, load_turkic_api_settings
 
 __all__ = [
+    "CovenantRadarAppConfig",
+    "CovenantRadarLoggingConfig",
+    "CovenantRadarRQConfig",
+    "CovenantRadarRedisConfig",
     "CovenantRadarSettings",
     "DataBankSettings",
     "DigitsConfig",
     "DiscordConfig",
     "DiscordbotSettings",
+    "GatewayConfig",
     "HandwritingAiAppConfig",
     "HandwritingAiDigitsConfig",
     "HandwritingAiLimits",
@@ -79,6 +94,7 @@ __all__ = [
     "TurkicApiSettings",
     "_decode_table",
     "_decode_toml",
+    "_default_get_env",
     "_optional_env_str",
     "_parse_bool",
     "_parse_float",
@@ -87,6 +103,7 @@ __all__ = [
     "_parse_str",
     "_require_env_csv",
     "_require_env_str",
+    "config_test_hooks",
     "limits_from_handwriting_ai_settings",
     "load_covenant_radar_settings",
     "load_data_bank_settings",

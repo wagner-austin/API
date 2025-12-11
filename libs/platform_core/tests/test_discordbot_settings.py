@@ -6,78 +6,11 @@ from platform_core.config.discordbot import (
     load_discordbot_settings,
     require_discord_token,
 )
+from platform_core.testing import make_fake_env
 
 
-def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear all discordbot-related environment variables."""
-    keys = [
-        "DISCORD_TOKEN",
-        "DISCORD_GUILD_ID",
-        "DISCORD_GUILD_IDS",
-        "LOG_LEVEL",
-        "COMMANDS_SYNC_GLOBAL",
-        "QR_API_URL",
-        "QRCODE_RATE_LIMIT",
-        "QRCODE_RATE_WINDOW_SECONDS",
-        "QR_DEFAULT_ERROR_CORRECTION",
-        "QR_DEFAULT_BOX_SIZE",
-        "QR_DEFAULT_BORDER",
-        "QR_DEFAULT_FILL_COLOR",
-        "QR_DEFAULT_BACK_COLOR",
-        "QR_PUBLIC_RESPONSES",
-        "TRANSCRIPT_API_URL",
-        "TRANSCRIPT_PROVIDER",
-        "TRANSCRIPT_PUBLIC_RESPONSES",
-        "TRANSCRIPT_RATE_LIMIT",
-        "TRANSCRIPT_RATE_WINDOW_SECONDS",
-        "TRANSCRIPT_PREFERRED_LANGS",
-        "TRANSCRIPT_MAX_MESSAGE_CHARS",
-        "TRANSCRIPT_MAX_FILE_MB",
-        "TRANSCRIPT_STT_RTF",
-        "TRANSCRIPT_DL_MIB_PER_SEC",
-        "TRANSCRIPT_STT_API_TIMEOUT_SECONDS",
-        "TRANSCRIPT_STT_API_MAX_RETRIES",
-        "TRANSCRIPT_MAX_ATTACHMENT_MB",
-        "TRANSCRIPT_ESTIMATED_TEXT_KB_PER_MIN",
-        "TRANSCRIPT_ENABLE_CHUNKING",
-        "TRANSCRIPT_CHUNK_THRESHOLD_MB",
-        "TRANSCRIPT_TARGET_CHUNK_MB",
-        "TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS",
-        "TRANSCRIPT_MAX_CONCURRENT_CHUNKS",
-        "TRANSCRIPT_SILENCE_THRESHOLD_DB",
-        "TRANSCRIPT_SILENCE_DURATION_SECONDS",
-        "TRANSCRIPT_COOKIES_TEXT",
-        "TRANSCRIPT_COOKIES_PATH",
-        "YOUTUBE_API_KEY",
-        "OPENAI_API_KEY",
-        "OPEN_AI_API_KEY",
-        "REDIS_URL",
-        "JOB_QUEUE_BRPOP_TIMEOUT_SECONDS",
-        "RQ_TRANSCRIPT_JOB_TIMEOUT_SEC",
-        "RQ_TRANSCRIPT_RESULT_TTL_SEC",
-        "RQ_TRANSCRIPT_FAILURE_TTL_SEC",
-        "RQ_TRANSCRIPT_RETRY_MAX",
-        "RQ_TRANSCRIPT_RETRY_INTERVALS_SEC",
-        "HANDWRITING_API_URL",
-        "HANDWRITING_API_KEY",
-        "HANDWRITING_API_TIMEOUT_SECONDS",
-        "HANDWRITING_API_MAX_RETRIES",
-        "DIGITS_PUBLIC_RESPONSES",
-        "DIGITS_RATE_LIMIT",
-        "DIGITS_RATE_WINDOW_SECONDS",
-        "DIGITS_MAX_IMAGE_MB",
-        "MODEL_TRAINER_API_URL",
-        "MODEL_TRAINER_API_KEY",
-        "MODEL_TRAINER_API_TIMEOUT_SECONDS",
-        "MODEL_TRAINER_API_MAX_RETRIES",
-    ]
-    for key in keys:
-        monkeypatch.delenv(key, raising=False)
-
-
-def test_load_discordbot_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)
-
+def test_load_discordbot_settings_defaults() -> None:
+    make_fake_env()
     settings = load_discordbot_settings()
 
     assert settings["discord"]["token"] == ""
@@ -147,11 +80,9 @@ def test_load_discordbot_settings_defaults(monkeypatch: pytest.MonkeyPatch) -> N
     assert settings["model_trainer"]["api_max_retries"] == 1
 
 
-def test_load_discordbot_settings_single_guild_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("DISCORD_GUILD_ID", "123456789")
+def test_load_discordbot_settings_single_guild_id() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_GUILD_ID", "123456789")
 
     settings = load_discordbot_settings()
 
@@ -159,132 +90,109 @@ def test_load_discordbot_settings_single_guild_id(
     assert settings["discord"]["guild_ids"] == [123456789]
 
 
-def test_load_discordbot_settings_multiple_guild_ids(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("DISCORD_GUILD_IDS", "111,222,333")
+def test_load_discordbot_settings_multiple_guild_ids() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_GUILD_IDS", "111,222,333")
 
     settings = load_discordbot_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_guild_ids_with_spaces(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("DISCORD_GUILD_IDS", "111 222 333")
+def test_load_discordbot_settings_guild_ids_with_spaces() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_GUILD_IDS", "111 222 333")
 
     settings = load_discordbot_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_guild_ids_filters_non_digits(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("DISCORD_GUILD_IDS", "111,invalid,222,not-a-number,333")
+def test_load_discordbot_settings_guild_ids_filters_non_digits() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_GUILD_IDS", "111,invalid,222,not-a-number,333")
 
     settings = load_discordbot_settings()
 
     assert settings["discord"]["guild_ids"] == [111, 222, 333]
 
 
-def test_load_discordbot_settings_retry_intervals_custom(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30,120")
+def test_load_discordbot_settings_retry_intervals_custom() -> None:
+    env = make_fake_env()
+    env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30,120")
 
     settings = load_discordbot_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (30, 120)
 
 
-def test_load_discordbot_settings_retry_intervals_with_spaces(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30 120")
+def test_load_discordbot_settings_retry_intervals_with_spaces() -> None:
+    env = make_fake_env()
+    env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30 120")
 
     settings = load_discordbot_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (30, 120)
 
 
-def test_load_discordbot_settings_retry_intervals_invalid_defaults(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "invalid")
+def test_load_discordbot_settings_retry_intervals_invalid_defaults() -> None:
+    env = make_fake_env()
+    env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "invalid")
 
     settings = load_discordbot_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (60, 300)
 
 
-def test_load_discordbot_settings_retry_intervals_insufficient_parts(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30")
+def test_load_discordbot_settings_retry_intervals_insufficient_parts() -> None:
+    env = make_fake_env()
+    env.set("RQ_TRANSCRIPT_RETRY_INTERVALS_SEC", "30")
 
     settings = load_discordbot_settings()
 
     assert settings["redis"]["rq_transcript_retry_intervals_sec"] == (60, 300)
 
 
-def test_load_discordbot_settings_openai_key_primary(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("OPENAI_API_KEY", "primary-key")
+def test_load_discordbot_settings_openai_key_primary() -> None:
+    env = make_fake_env()
+    env.set("OPENAI_API_KEY", "primary-key")
 
     settings = load_discordbot_settings()
 
     assert settings["transcript"]["openai_api_key"] == "primary-key"
 
 
-def test_load_discordbot_settings_openai_key_alt(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("OPEN_AI_API_KEY", "alt-key")
+def test_load_discordbot_settings_openai_key_alt() -> None:
+    env = make_fake_env()
+    env.set("OPEN_AI_API_KEY", "alt-key")
 
     settings = load_discordbot_settings()
 
     assert settings["transcript"]["openai_api_key"] == "alt-key"
 
 
-def test_load_discordbot_settings_openai_key_primary_takes_precedence(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("OPENAI_API_KEY", "primary-key")
-    monkeypatch.setenv("OPEN_AI_API_KEY", "alt-key")
+def test_load_discordbot_settings_openai_key_primary_takes_precedence() -> None:
+    env = make_fake_env()
+    env.set("OPENAI_API_KEY", "primary-key")
+    env.set("OPEN_AI_API_KEY", "alt-key")
 
     settings = load_discordbot_settings()
 
     assert settings["transcript"]["openai_api_key"] == "primary-key"
 
 
-def test_load_discordbot_settings_all_overrides(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-
-    monkeypatch.setenv("DISCORD_TOKEN", "test-token")
-    monkeypatch.setenv("LOG_LEVEL", "debug")
-    monkeypatch.setenv("COMMANDS_SYNC_GLOBAL", "true")
-    monkeypatch.setenv("QR_API_URL", "http://qr-api")
-    monkeypatch.setenv("TRANSCRIPT_API_URL", "http://transcript-api")
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/1")
-    monkeypatch.setenv("HANDWRITING_API_URL", "http://handwriting-api")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "handwriting-key")
-    monkeypatch.setenv("MODEL_TRAINER_API_URL", "http://trainer-api")
-    monkeypatch.setenv("MODEL_TRAINER_API_KEY", "trainer-key")
+def test_load_discordbot_settings_all_overrides() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_TOKEN", "test-token")
+    env.set("LOG_LEVEL", "debug")
+    env.set("COMMANDS_SYNC_GLOBAL", "true")
+    env.set("QR_API_URL", "http://qr-api")
+    env.set("TRANSCRIPT_API_URL", "http://transcript-api")
+    env.set("REDIS_URL", "redis://localhost:6379/1")
+    env.set("HANDWRITING_API_URL", "http://handwriting-api")
+    env.set("HANDWRITING_API_KEY", "handwriting-key")
+    env.set("MODEL_TRAINER_API_URL", "http://trainer-api")
+    env.set("MODEL_TRAINER_API_KEY", "trainer-key")
 
     settings = load_discordbot_settings()
 
@@ -300,26 +208,17 @@ def test_load_discordbot_settings_all_overrides(
     assert settings["model_trainer"]["api_key"] == "trainer-key"
 
 
-def test_require_discord_token_raises_when_empty(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
+def test_require_discord_token_raises_when_empty() -> None:
+    make_fake_env()
     settings = load_discordbot_settings()
 
     with pytest.raises(RuntimeError, match="DISCORD_TOKEN is required"):
         require_discord_token(settings)
 
 
-def test_require_discord_token_succeeds_when_present(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _clear_env(monkeypatch)
-    monkeypatch.setenv("DISCORD_TOKEN", "test-token")
+def test_require_discord_token_succeeds_when_present() -> None:
+    env = make_fake_env()
+    env.set("DISCORD_TOKEN", "test-token")
     settings = load_discordbot_settings()
 
     require_discord_token(settings)
-
-
-@pytest.fixture(autouse=True)
-def _reset_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)

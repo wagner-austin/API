@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as _json_module
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from json import JSONDecodeError
 from typing import Protocol
@@ -9,6 +10,17 @@ from fastapi.responses import Response
 from starlette.requests import Request
 
 JSONValue = dict[str, "JSONValue"] | list["JSONValue"] | str | int | float | bool | None
+
+
+# Test hook for json.loads - allows testing invalid return types
+def _default_json_loads(s: str) -> JSONValue:
+    """Production implementation using stdlib json.loads."""
+    # Type annotation uses JSONValue to satisfy strict mypy
+    loads_func: Callable[[str], JSONValue] = _json_module.loads
+    return loads_func(s)
+
+
+_json_loads: Callable[[str], JSONValue] = _default_json_loads
 
 # Input type for dump_json_str - broad enough to accept:
 # 1. TypedDict subclasses (via Mapping)
@@ -57,15 +69,10 @@ def dump_json_str(
 
 
 def load_json_str(raw: str) -> JSONValue:
-    module = __import__("json")
-    loads: _JsonLoads = module.loads
     try:
-        value = loads(raw)
+        return _json_loads(raw)
     except JSONDecodeError as exc:
         raise InvalidJsonError("Invalid JSON payload") from exc
-    if isinstance(value, (dict, list, str, int, float, bool)) or value is None:
-        return value
-    raise InvalidJsonError("Invalid JSON payload")
 
 
 def load_json_bytes(raw: bytes) -> JSONValue:
@@ -306,6 +313,8 @@ __all__ = [
     "JSONObject",
     "JSONTypeError",
     "JSONValue",
+    "_default_json_loads",
+    "_json_loads",
     "dump_json_str",
     "load_json_bytes",
     "load_json_str",

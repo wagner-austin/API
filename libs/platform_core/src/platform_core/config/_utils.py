@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
-import tomllib
 from pathlib import Path
 from typing import Literal
 
 from platform_core.json_utils import JSONValue
+
+from . import _test_hooks
 
 # Log level type - must match platform_core.logging.LogLevel
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -19,7 +19,7 @@ class _EnvError(RuntimeError):
 
 
 def _require_env_str(key: str) -> str:
-    value = os.getenv(key)
+    value = _test_hooks.get_env(key)
     if value is None:
         raise _EnvError(f"Missing required env var: {key}")
     trimmed = value.strip()
@@ -29,7 +29,7 @@ def _require_env_str(key: str) -> str:
 
 
 def _optional_env_str(key: str) -> str | None:
-    value = os.getenv(key)
+    value = _test_hooks.get_env(key)
     if value is None:
         return None
     trimmed = value.strip()
@@ -97,10 +97,7 @@ def _parse_log_level(key: str, default: LogLevel) -> LogLevel:
 
 def _decode_toml(path: Path) -> dict[str, JSONValue]:
     text = path.read_text(encoding="utf-8")
-    parsed: JSONValue = tomllib.loads(text)
-    if not isinstance(parsed, dict):
-        raise RuntimeError(f"TOML root must be a table: {path}")
-    return parsed
+    return _test_hooks.tomllib_loads(text)
 
 
 def _decode_table(data: dict[str, JSONValue], key: str) -> dict[str, JSONValue]:

@@ -105,19 +105,6 @@ def test_load_json_str_invalid() -> None:
         load_json_str("{")
 
 
-def test_load_json_str_rejects_non_json_value(monkeypatch: pytest.MonkeyPatch) -> None:
-    import json as json_module
-
-    import platform_core.json_utils as ju
-
-    def _fake_loads(_s: str) -> tuple[int, int]:
-        return (1, 2)
-
-    monkeypatch.setattr(json_module, "loads", _fake_loads, raising=True)
-    with pytest.raises(ju.InvalidJsonError):
-        ju.load_json_str("[]")
-
-
 def test_load_json_bytes_valid() -> None:
     val: JSONValue = load_json_bytes(b'["x", 1]')
     assert type(val) is list

@@ -15,37 +15,7 @@ from platform_core.config.handwriting_ai import (
     limits_from_handwriting_ai_settings,
     load_handwriting_ai_settings,
 )
-
-
-def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear all handwriting-ai related environment variables."""
-    keys = [
-        "HANDWRITING_DATA_ROOT",
-        "HANDWRITING_ARTIFACTS_ROOT",
-        "HANDWRITING_LOGS_ROOT",
-        "HANDWRITING_MODEL_DIR",
-        "HANDWRITING_MODEL_ID",
-        "HANDWRITING_API_KEY",
-        "HANDWRITING_ALLOWED_HOSTS",
-        "APP__DATA_ROOT",
-        "APP__ARTIFACTS_ROOT",
-        "APP__LOGS_ROOT",
-        "APP__THREADS",
-        "APP__PORT",
-        "DIGITS__MODEL_DIR",
-        "DIGITS__ACTIVE_MODEL",
-        "DIGITS__TTA",
-        "DIGITS__UNCERTAIN_THRESHOLD",
-        "DIGITS__MAX_IMAGE_MB",
-        "DIGITS__MAX_IMAGE_SIDE_PX",
-        "DIGITS__PREDICT_TIMEOUT_SECONDS",
-        "DIGITS__VISUALIZE_MAX_KB",
-        "DIGITS__RETENTION_KEEP_RUNS",
-        "SECURITY__API_KEY",
-        "SECURITY__API_KEY_ENABLED",
-    ]
-    for key in keys:
-        monkeypatch.delenv(key, raising=False)
+from platform_core.testing import make_fake_env
 
 
 def test_bool_env_returns_default_when_none() -> None:
@@ -68,18 +38,19 @@ def test_bool_env_raises_on_invalid() -> None:
         _bool_env("invalid", False)
 
 
-def test_base_settings_creates_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_base_settings_creates_dirs(tmp_path: Path) -> None:
+    env = make_fake_env()
     data_root = tmp_path / "data"
     artifacts_root = tmp_path / "artifacts"
     logs_root = tmp_path / "logs"
     model_dir = tmp_path / "models"
 
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(data_root))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(artifacts_root))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(logs_root))
-    monkeypatch.setenv("HANDWRITING_MODEL_DIR", str(model_dir))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
+    env.set("HANDWRITING_DATA_ROOT", str(data_root))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(artifacts_root))
+    env.set("HANDWRITING_LOGS_ROOT", str(logs_root))
+    env.set("HANDWRITING_MODEL_DIR", str(model_dir))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
 
     assert not data_root.exists()
     assert not artifacts_root.exists()
@@ -98,16 +69,17 @@ def test_base_settings_creates_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert settings["digits"]["model_dir"] == model_dir.resolve()
 
 
-def test_base_settings_skips_create_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_base_settings_skips_create_dirs(tmp_path: Path) -> None:
+    env = make_fake_env()
     data_root = tmp_path / "data"
     artifacts_root = tmp_path / "artifacts"
     logs_root = tmp_path / "logs"
 
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(data_root))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(artifacts_root))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(logs_root))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
+    env.set("HANDWRITING_DATA_ROOT", str(data_root))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(artifacts_root))
+    env.set("HANDWRITING_LOGS_ROOT", str(logs_root))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
 
     settings = _base_settings(create_dirs=False)
 
@@ -117,37 +89,36 @@ def test_base_settings_skips_create_dirs(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert settings["app"]["data_root"] == data_root.resolve()
 
 
-def test_base_settings_with_allowed_hosts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
-    monkeypatch.setenv("HANDWRITING_ALLOWED_HOSTS", "host1.com, host2.com, host3.com")
+def test_base_settings_with_allowed_hosts(tmp_path: Path) -> None:
+    env = make_fake_env()
+    env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
+    env.set("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
+    env.set("HANDWRITING_ALLOWED_HOSTS", "host1.com, host2.com, host3.com")
 
     settings = _base_settings(create_dirs=False)
 
     assert settings["digits"]["allowed_hosts"] == frozenset({"host1.com", "host2.com", "host3.com"})
 
 
-def test_base_settings_without_allowed_hosts(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
-    monkeypatch.delenv("HANDWRITING_ALLOWED_HOSTS", raising=False)
+def test_base_settings_without_allowed_hosts(tmp_path: Path) -> None:
+    env = make_fake_env()
+    env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
+    env.set("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
+    # HANDWRITING_ALLOWED_HOSTS not set
 
     settings = _base_settings(create_dirs=False)
 
     assert settings["digits"]["allowed_hosts"] == frozenset()
 
 
-def test_apply_app_env_overrides_all_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_apply_app_env_overrides_all_fields(tmp_path: Path) -> None:
+    env = make_fake_env()
     from platform_core.config.handwriting_ai import HandwritingAiAppConfig
 
     base_app: HandwritingAiAppConfig = {
@@ -158,11 +129,11 @@ def test_apply_app_env_overrides_all_fields(
         "port": 8081,
     }
 
-    monkeypatch.setenv("APP__DATA_ROOT", str(tmp_path / "override_data"))
-    monkeypatch.setenv("APP__ARTIFACTS_ROOT", str(tmp_path / "override_artifacts"))
-    monkeypatch.setenv("APP__LOGS_ROOT", str(tmp_path / "override_logs"))
-    monkeypatch.setenv("APP__THREADS", "4")
-    monkeypatch.setenv("APP__PORT", "9000")
+    env.set("APP__DATA_ROOT", str(tmp_path / "override_data"))
+    env.set("APP__ARTIFACTS_ROOT", str(tmp_path / "override_artifacts"))
+    env.set("APP__LOGS_ROOT", str(tmp_path / "override_logs"))
+    env.set("APP__THREADS", "4")
+    env.set("APP__PORT", "9000")
 
     result = _apply_app_env(base_app)
 
@@ -173,23 +144,23 @@ def test_apply_app_env_overrides_all_fields(
     assert result["port"] == 9000
 
 
-def test_apply_app_env_port_out_of_range_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_app_env_port_out_of_range_raises() -> None:
+    env = make_fake_env()
     from platform_core.config.handwriting_ai import HandwritingAiAppConfig
 
     base_app: HandwritingAiAppConfig = {"port": 8081}
 
-    monkeypatch.setenv("APP__PORT", "0")
+    env.set("APP__PORT", "0")
     with pytest.raises(RuntimeError):
         _apply_app_env(base_app)
 
-    monkeypatch.setenv("APP__PORT", "65536")
+    env.set("APP__PORT", "65536")
     with pytest.raises(RuntimeError):
         _apply_app_env(base_app)
 
 
-def test_apply_digits_env_overrides_all_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_apply_digits_env_overrides_all_fields(tmp_path: Path) -> None:
+    env = make_fake_env()
     from platform_core.config.handwriting_ai import HandwritingAiDigitsConfig
 
     base_digits: HandwritingAiDigitsConfig = {
@@ -204,15 +175,15 @@ def test_apply_digits_env_overrides_all_fields(
         "retention_keep_runs": 5,
     }
 
-    monkeypatch.setenv("DIGITS__MODEL_DIR", str(tmp_path / "override_models"))
-    monkeypatch.setenv("DIGITS__ACTIVE_MODEL", "override-model")
-    monkeypatch.setenv("DIGITS__TTA", "true")
-    monkeypatch.setenv("DIGITS__UNCERTAIN_THRESHOLD", "0.85")
-    monkeypatch.setenv("DIGITS__MAX_IMAGE_MB", "20")
-    monkeypatch.setenv("DIGITS__MAX_IMAGE_SIDE_PX", "4096")
-    monkeypatch.setenv("DIGITS__PREDICT_TIMEOUT_SECONDS", "10")
-    monkeypatch.setenv("DIGITS__VISUALIZE_MAX_KB", "128")
-    monkeypatch.setenv("DIGITS__RETENTION_KEEP_RUNS", "10")
+    env.set("DIGITS__MODEL_DIR", str(tmp_path / "override_models"))
+    env.set("DIGITS__ACTIVE_MODEL", "override-model")
+    env.set("DIGITS__TTA", "true")
+    env.set("DIGITS__UNCERTAIN_THRESHOLD", "0.85")
+    env.set("DIGITS__MAX_IMAGE_MB", "20")
+    env.set("DIGITS__MAX_IMAGE_SIDE_PX", "4096")
+    env.set("DIGITS__PREDICT_TIMEOUT_SECONDS", "10")
+    env.set("DIGITS__VISUALIZE_MAX_KB", "128")
+    env.set("DIGITS__RETENTION_KEEP_RUNS", "10")
 
     result = _apply_digits_env(base_digits)
 
@@ -227,7 +198,8 @@ def test_apply_digits_env_overrides_all_fields(
     assert result["retention_keep_runs"] == 10
 
 
-def test_apply_security_env_overrides_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_security_env_overrides_all_fields() -> None:
+    env = make_fake_env()
     from platform_core.config.handwriting_ai import HandwritingAiSecurityConfig
 
     base_sec: HandwritingAiSecurityConfig = {
@@ -235,8 +207,8 @@ def test_apply_security_env_overrides_all_fields(monkeypatch: pytest.MonkeyPatch
         "api_key_enabled": True,
     }
 
-    monkeypatch.setenv("SECURITY__API_KEY", "override-key")
-    monkeypatch.setenv("SECURITY__API_KEY_ENABLED", "false")
+    env.set("SECURITY__API_KEY", "override-key")
+    env.set("SECURITY__API_KEY_ENABLED", "false")
 
     result = _apply_security_env(base_sec)
 
@@ -283,16 +255,13 @@ def test_finalize_missing_api_key_enabled_defaults_to_enabled() -> None:
     assert result["security"]["api_key_enabled"] is True
 
 
-def test_load_handwriting_ai_settings_integration(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    _clear_env(monkeypatch)
-
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
+def test_load_handwriting_ai_settings_integration(tmp_path: Path) -> None:
+    env = make_fake_env()
+    env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
+    env.set("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
 
     settings = load_handwriting_ai_settings(create_dirs=True)
 
@@ -304,19 +273,16 @@ def test_load_handwriting_ai_settings_integration(
     assert settings["security"]["api_key_enabled"] is True
 
 
-def test_load_handwriting_ai_settings_with_overrides(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    _clear_env(monkeypatch)
-
-    monkeypatch.setenv("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
-    monkeypatch.setenv("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
-    monkeypatch.setenv("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
-    monkeypatch.setenv("HANDWRITING_MODEL_ID", "test-model")
-    monkeypatch.setenv("HANDWRITING_API_KEY", "test-key")
-    monkeypatch.setenv("APP__PORT", "9090")
-    monkeypatch.setenv("DIGITS__TTA", "true")
-    monkeypatch.setenv("SECURITY__API_KEY_ENABLED", "false")
+def test_load_handwriting_ai_settings_with_overrides(tmp_path: Path) -> None:
+    env = make_fake_env()
+    env.set("HANDWRITING_DATA_ROOT", str(tmp_path / "data"))
+    env.set("HANDWRITING_ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
+    env.set("HANDWRITING_LOGS_ROOT", str(tmp_path / "logs"))
+    env.set("HANDWRITING_MODEL_ID", "test-model")
+    env.set("HANDWRITING_API_KEY", "test-key")
+    env.set("APP__PORT", "9090")
+    env.set("DIGITS__TTA", "true")
+    env.set("SECURITY__API_KEY_ENABLED", "false")
 
     settings = load_handwriting_ai_settings(create_dirs=False)
 
@@ -352,17 +318,13 @@ def test_limits_from_handwriting_ai_settings_uses_defaults() -> None:
     assert limits["max_side_px"] == 2048  # DEFAULT_MAX_IMAGE_SIDE_PX
 
 
-@pytest.fixture(autouse=True)
-def _reset_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    _clear_env(monkeypatch)
-
-
-def test_apply_app_env_data_bank_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_app_env_data_bank_overrides() -> None:
+    env = make_fake_env()
     from platform_core.config.handwriting_ai import HandwritingAiAppConfig, _apply_app_env
 
     base_app: HandwritingAiAppConfig = {"threads": 0, "port": 8081}
-    monkeypatch.setenv("APP__DATA_BANK_API_URL", "http://db")
-    monkeypatch.setenv("APP__DATA_BANK_API_KEY", "secret")
+    env.set("APP__DATA_BANK_API_URL", "http://db")
+    env.set("APP__DATA_BANK_API_KEY", "secret")
 
     result = _apply_app_env(base_app)
     assert result["data_bank_api_url"] == "http://db"
