@@ -223,6 +223,86 @@ curl -X POST http://localhost:8081/v1/admin/models/upload \
 
 ---
 
+## Training Endpoints
+
+### POST /api/v1/training/jobs
+
+Enqueue a new model training job for background processing.
+
+**Content-Type:** `application/json`
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `user_id` | int | Yes | - | User ID for tracking |
+| `model_id` | string | Yes | - | Unique model identifier |
+| `epochs` | int | Yes | - | Number of training epochs |
+| `batch_size` | int | Yes | - | Training batch size |
+| `lr` | float | Yes | - | Learning rate |
+| `seed` | int | Yes | - | Random seed for reproducibility |
+| `augment` | bool | No | `false` | Enable data augmentation |
+| `notes` | string | No | `null` | Optional notes about this training run |
+
+**Request Example:**
+```json
+{
+  "user_id": 12345,
+  "model_id": "mnist_resnet18_v3",
+  "epochs": 10,
+  "batch_size": 64,
+  "lr": 0.001,
+  "seed": 42,
+  "augment": true,
+  "notes": "Experiment with augmentation"
+}
+```
+
+**Response (202):**
+```json
+{
+  "job_id": "rq-job-uuid",
+  "request_id": "uuid-for-tracking",
+  "user_id": 12345,
+  "model_id": "mnist_resnet18_v3",
+  "status": "queued"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `job_id` | string | RQ job identifier |
+| `request_id` | string | Request tracking UUID |
+| `user_id` | int | User ID from request |
+| `model_id` | string | Model identifier from request |
+| `status` | string | Always `queued` on successful submission |
+
+**Request Headers:**
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `X-Api-Key` | Conditional | Required if `SECURITY__API_KEY_ENABLED=true` |
+
+**Example - curl:**
+```bash
+curl -X POST http://localhost:8081/api/v1/training/jobs \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: your-api-key" \
+  -d '{
+    "user_id": 12345,
+    "model_id": "mnist_resnet18_v3",
+    "epochs": 10,
+    "batch_size": 64,
+    "lr": 0.001,
+    "seed": 42,
+    "augment": true
+  }'
+```
+
+---
+
 ## Error Handling
 
 All errors return JSON with consistent format:

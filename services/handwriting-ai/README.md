@@ -31,10 +31,10 @@ poetry install --with dev
 
 ```bash
 # Development
-poetry run hypercorn 'handwriting_ai.api.app:create_app()' --bind 0.0.0.0:8081 --reload
+poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind 0.0.0.0:8081 --reload
 
 # Production
-poetry run hypercorn 'handwriting_ai.api.app:create_app()' --bind [::]:${PORT:-8081}
+poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind [::]:${PORT:-8081}
 ```
 
 ### Verify
@@ -61,6 +61,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/v1/read` | POST | Classify handwritten digit image |
 | `/v1/predict` | POST | Alias for `/v1/read` |
 | `/v1/admin/models/upload` | POST | Upload new model (admin) |
+| `/api/v1/training/jobs` | POST | Enqueue training job |
 
 ---
 
@@ -357,26 +358,56 @@ poetry run pytest --cov-report=html
 ```
 handwriting-ai/
 ├── src/handwriting_ai/
+│   ├── __init__.py
 │   ├── api/
-│   │   ├── app.py              # FastAPI routes
-│   │   └── schemas.py          # Response schemas
+│   │   ├── main.py             # App factory
+│   │   ├── schemas.py          # Response schemas
+│   │   ├── types.py            # API types
+│   │   ├── dependencies.py     # Dependency injection
+│   │   └── routes/
+│   │       ├── health.py       # Health endpoints
+│   │       ├── read.py         # Read/predict endpoints
+│   │       ├── models.py       # Model metadata endpoint
+│   │       ├── admin.py        # Admin upload endpoint
+│   │       └── training.py     # Training job endpoint
 │   ├── inference/
 │   │   ├── engine.py           # Inference engine
 │   │   ├── manifest.py         # Model manifest handling
 │   │   └── types.py            # Inference types
 │   ├── training/
+│   │   ├── __init__.py
 │   │   ├── mnist_train.py      # Training loop
 │   │   ├── augment.py          # Data augmentation
 │   │   ├── calibrate.py        # Dataloader calibration
+│   │   ├── loops.py            # Training loops
+│   │   ├── runtime.py          # Training runtime
+│   │   ├── resources.py        # Resource management
+│   │   ├── safety.py           # Memory safety guards
+│   │   ├── train_utils.py      # Training utilities
+│   │   ├── train_config.py     # Training configuration
+│   │   ├── dataset.py          # Dataset handling
+│   │   ├── metrics.py          # Training metrics
+│   │   ├── artifacts.py        # Artifact management
+│   │   ├── progress.py         # Progress tracking
+│   │   ├── optim.py            # Optimizer utilities
 │   │   └── calibration/        # Calibration subsystem
+│   │       ├── calibrator.py
+│   │       ├── orchestrator.py
+│   │       ├── runner.py
+│   │       ├── measure.py
+│   │       ├── cache.py
+│   │       ├── candidates.py
+│   │       └── checkpoint.py
 │   ├── jobs/
 │   │   └── digits.py           # RQ job handler
-│   ├── discord/
-│   │   ├── embeds.py           # Discord embeds
-│   │   └── runtime.py          # Bot integration
 │   ├── preprocess.py           # Preprocessing pipeline
 │   ├── config.py               # Configuration loading
-│   └── monitoring.py           # Memory monitoring
+│   ├── monitoring.py           # Memory monitoring
+│   ├── middleware.py           # Custom middleware
+│   ├── version.py              # Version info
+│   ├── worker_entry.py         # RQ worker entry point
+│   └── _test_hooks.py          # Test hooks for DI
+├── seed/                       # Seed model artifacts
 ├── config/
 │   └── handai.toml             # Default configuration
 ├── tests/
