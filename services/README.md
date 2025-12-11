@@ -18,34 +18,37 @@ This monorepo contains a suite of interconnected API services for language proce
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                           API Services Layer                                                 │
 │                                                                                                              │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐ │
-│  │  handwriting-ai  │  │   turkic-api     │  │  Model-Trainer   │  │  transcript-api  │  │    qr-api      │ │
-│  │                  │  │                  │  │                  │  │                  │  │                │ │
-│  │  MNIST digit     │  │  Turkic corpus   │  │  LLM training    │  │  Video caption   │  │  QR code       │ │
-│  │  recognition     │  │  processing &    │  │  & tokenizer     │  │  & speech-to-    │  │  generation    │ │
-│  │  (inference)     │  │  transliteration │  │  service         │  │  text            │  │                │ │
-│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘  └────────────────┘ │
-│           │                     │                     │                     │                               │
-└───────────┼─────────────────────┼─────────────────────┼─────────────────────┼───────────────────────────────┘
-            │                     │                     │                     │
-            │                     ▼                     ▼                     │
-            │           ┌─────────────────────────────────────────┐           │
-            │           │           data-bank-api                 │           │
-            │           │                                         │           │
-            │           │  Central file storage for artifacts,    │           │
-            │           │  corpus files, and model weights        │           │
-            │           └─────────────────────────────────────────┘           │
-            │                              │                                  │
-            ▼                              ▼                                  ▼
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐         │
+│  │ handwriting-ai │  │  turkic-api    │  │ Model-Trainer  │  │ transcript-api │  │    qr-api      │         │
+│  │ MNIST digit    │  │ Turkic corpus  │  │ LLM training   │  │ YouTube/Whisper│  │ QR code gen    │         │
+│  │ recognition    │  │ processing     │  │ & tokenizers   │  │ transcription  │  │                │         │
+│  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘  └────────────────┘         │
+│          │                   │                   │                   │                                      │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                                                 │
+│  │covenant-radar  │  │ music-wrapped  │  │                │                                                 │
+│  │ Loan covenant  │  │ Music Wrapped  │  │                │                                                 │
+│  │ monitoring     │  │ analytics      │  │                │                                                 │
+│  └───────┬────────┘  └───────┬────────┘  └────────────────┘                                                 │
+│          │                   │                                                                              │
+└──────────┼───────────────────┼──────────────────────────────────────────────────────────────────────────────┘
+           │                   │                   │                   │
+           │                   ▼                   ▼                   │
+           │         ┌─────────────────────────────────────────┐       │
+           │         │           data-bank-api                 │       │
+           │         │  Central file storage for artifacts,    │       │
+           │         │  corpus files, and model weights        │       │
+           │         └─────────────────────────────────────────┘       │
+           │                          │                                │
+           ▼                          ▼                                ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                         Infrastructure Layer                                                 │
 │                                                                                                              │
-│  ┌──────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐                   │
-│  │         Redis            │  │    Persistent Volumes    │  │       Railway            │                   │
-│  │  Job queues (RQ)         │  │  Artifacts, corpus,      │  │  Deployment platform     │                   │
-│  │  Event pub/sub           │  │  model weights           │  │  Private networking      │                   │
-│  │  Status tracking         │  │                          │  │                          │                   │
-│  └──────────────────────────┘  └──────────────────────────┘  └──────────────────────────┘                   │
+│  ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐ │
+│  │        Redis          │  │     PostgreSQL        │  │  Persistent Volumes   │  │       Railway         │ │
+│  │  Job queues (RQ)      │  │  covenant-radar-api   │  │  Artifacts, corpus,   │  │  Deployment platform  │ │
+│  │  Event pub/sub        │  │  persistence          │  │  model weights        │  │  Private networking   │ │
+│  │  Status tracking      │  │                       │  │                       │  │                       │ │
+│  └───────────────────────┘  └───────────────────────┘  └───────────────────────┘  └───────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,14 +56,30 @@ This monorepo contains a suite of interconnected API services for language proce
 
 | Service | Purpose | Port | Docs |
 |---------|---------|------|------|
+| [covenant-radar-api](./covenant-radar-api/) | Loan covenant monitoring and breach prediction | 8007 | [README](./covenant-radar-api/README.md) |
 | [data-bank-api](./data-bank-api/) | Central file storage for service-to-service data exchange | 8000 | [README](./data-bank-api/README.md) • [DESIGN](./data-bank-api/DESIGN.md) |
 | [handwriting-ai](./handwriting-ai/) | MNIST digit recognition with ResNet-18 inference | 8081 | [README](./handwriting-ai/README.md) |
 | [Model-Trainer](./Model-Trainer/) | LLM training and tokenizer service (GPT-2, BPE) | 8000 | [README](./Model-Trainer/README.md) • [DESIGN](./Model-Trainer/DESIGN.md) |
+| [music-wrapped-api](./music-wrapped-api/) | Music listening analytics and yearly Wrapped reports | 8006 | [README](./music-wrapped-api/README.md) |
 | [qr-api](./qr-api/) | QR code generation via Segno | 8080 | [README](./qr-api/README.md) |
 | [transcript-api](./transcript-api/) | Video captions (YouTube) and speech-to-text (OpenAI) | 8000 | [README](./transcript-api/README.md) |
 | [turkic-api](./turkic-api/) | Turkic language corpus processing and IPA transliteration | 8000 | [README](./turkic-api/README.md) • [DESIGN](./turkic-api/DESIGN.md) |
 
 ### Service Details
+
+#### covenant-radar-api
+Loan covenant monitoring and breach prediction API. Features deterministic rule evaluation, XGBoost-based breach risk prediction, and PostgreSQL persistence.
+
+**Key Features:**
+- Deal and covenant CRUD operations
+- Financial measurement ingestion
+- Deterministic covenant compliance checking (OK/NEAR_BREACH/BREACH)
+- XGBoost classifier for breach risk prediction (LOW/MEDIUM/HIGH)
+- Background training via Redis + RQ
+
+**Integrations:** PostgreSQL (persistence), Redis (job queue)
+
+---
 
 #### data-bank-api
 Central file storage service for internal service-to-service exchange. Provides streaming uploads/downloads with HTTP Range support, atomic writes, SHA256 checksums, and disk-space guards.
@@ -98,6 +117,20 @@ Modular system for training and evaluating small language models and tokenizers 
 - Artifact management with manifests
 
 **Integrations:** data-bank-api (artifact storage), Discord Bot (training notifications)
+
+---
+
+#### music-wrapped-api
+Music listening analytics service that aggregates data from Spotify, Apple Music, YouTube Music, and Last.fm to generate yearly "Wrapped" reports.
+
+**Key Features:**
+- Multi-service support (Spotify, Apple Music, YouTube Music, Last.fm)
+- OAuth integration for Spotify and Last.fm
+- YouTube Takeout import support
+- Background report generation via RQ workers
+- PNG export for visual wrapped cards
+
+**Consumers:** Discord Bot
 
 ---
 
@@ -473,9 +506,11 @@ branch = true
 ```
 API/
 ├── services/                    # Microservices (this directory)
+│   ├── covenant-radar-api/
 │   ├── data-bank-api/
 │   ├── handwriting-ai/
 │   ├── Model-Trainer/
+│   ├── music-wrapped-api/
 │   ├── qr-api/
 │   ├── transcript-api/
 │   ├── turkic-api/
@@ -484,6 +519,10 @@ API/
 │   ├── platform_core/
 │   ├── platform_workers/
 │   ├── platform_discord/
+│   ├── platform_music/
+│   ├── covenant_domain/
+│   ├── covenant_persistence/
+│   ├── covenant_ml/
 │   └── monorepo_guards/
 ├── clients/                     # Client applications
 │   └── DiscordBot/
