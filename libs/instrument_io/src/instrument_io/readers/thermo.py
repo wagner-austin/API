@@ -14,12 +14,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 from instrument_io._exceptions import ThermoReadError
-from instrument_io._protocols.thermo import (
-    _cleanup_temp_dir,
-    _convert_raw_to_mzml,
-    _create_temp_dir,
-)
-from instrument_io.readers.mzml import MzMLReader
+from instrument_io.testing import hooks
 from instrument_io.types.chromatogram import (
     ChromatogramData,
     ChromatogramMeta,
@@ -90,7 +85,7 @@ class ThermoReader:
 
     def __init__(self) -> None:
         """Initialize ThermoReader with internal MzMLReader."""
-        self._mzml_reader = MzMLReader()
+        self._mzml_reader = hooks.mzml_reader_factory()
 
     def supports_format(self, path: Path) -> bool:
         """Check if path is a Thermo .raw file.
@@ -123,9 +118,9 @@ class ThermoReader:
             raise ThermoReadError(source_path, "Not a .raw file")
 
         # Convert to mzML in temp directory
-        temp_dir = _create_temp_dir()
+        temp_dir = hooks.create_temp_dir()
 
-        mzml_path = _convert_raw_to_mzml(path, temp_dir)
+        mzml_path = hooks.convert_raw_to_mzml(path, temp_dir)
 
         # Extract TIC from spectra
         retention_times: list[float] = []
@@ -136,7 +131,7 @@ class ThermoReader:
             intensities.append(spectrum["meta"]["total_ion_current"])
 
         # Cleanup temp files
-        _cleanup_temp_dir(temp_dir)
+        hooks.cleanup_temp_dir(temp_dir)
 
         if not retention_times:
             raise ThermoReadError(source_path, "No spectra found in file")
@@ -186,9 +181,9 @@ class ThermoReader:
             raise ThermoReadError(source_path, "Not a .raw file")
 
         # Convert to mzML
-        temp_dir = _create_temp_dir()
+        temp_dir = hooks.create_temp_dir()
 
-        mzml_path = _convert_raw_to_mzml(path, temp_dir)
+        mzml_path = hooks.convert_raw_to_mzml(path, temp_dir)
 
         # Calculate m/z window
         mz_low = target_mz - mz_tolerance
@@ -213,7 +208,7 @@ class ThermoReader:
             intensities.append(total_intensity)
 
         # Cleanup
-        _cleanup_temp_dir(temp_dir)
+        hooks.cleanup_temp_dir(temp_dir)
 
         if not retention_times:
             raise ThermoReadError(source_path, "No spectra found in file")
@@ -256,15 +251,15 @@ class ThermoReader:
             raise ThermoReadError(source_path, "Not a .raw file")
 
         # Convert to mzML
-        temp_dir = _create_temp_dir()
+        temp_dir = hooks.create_temp_dir()
 
-        mzml_path = _convert_raw_to_mzml(path, temp_dir)
+        mzml_path = hooks.convert_raw_to_mzml(path, temp_dir)
 
         # Read specific spectrum
         spectrum = self._mzml_reader.read_spectrum(mzml_path, scan_number)
 
         # Cleanup
-        _cleanup_temp_dir(temp_dir)
+        hooks.cleanup_temp_dir(temp_dir)
 
         # Update source path to original .raw file
         updated_meta = spectrum["meta"].copy()
@@ -294,9 +289,9 @@ class ThermoReader:
             raise ThermoReadError(source_path, "Not a .raw file")
 
         # Convert to mzML
-        temp_dir = _create_temp_dir()
+        temp_dir = hooks.create_temp_dir()
 
-        mzml_path = _convert_raw_to_mzml(path, temp_dir)
+        mzml_path = hooks.convert_raw_to_mzml(path, temp_dir)
 
         # Iterate and update source paths
         for spectrum in self._mzml_reader.iter_spectra(mzml_path):
@@ -310,7 +305,7 @@ class ThermoReader:
             )
 
         # Cleanup after iteration complete
-        _cleanup_temp_dir(temp_dir)
+        hooks.cleanup_temp_dir(temp_dir)
 
     def count_spectra(self, path: Path) -> int:
         """Count total number of spectra in .raw file.
@@ -330,14 +325,14 @@ class ThermoReader:
             raise ThermoReadError(source_path, "Not a .raw file")
 
         # Convert to mzML
-        temp_dir = _create_temp_dir()
+        temp_dir = hooks.create_temp_dir()
 
-        mzml_path = _convert_raw_to_mzml(path, temp_dir)
+        mzml_path = hooks.convert_raw_to_mzml(path, temp_dir)
 
         count = self._mzml_reader.count_spectra(mzml_path)
 
         # Cleanup
-        _cleanup_temp_dir(temp_dir)
+        hooks.cleanup_temp_dir(temp_dir)
 
         return count
 

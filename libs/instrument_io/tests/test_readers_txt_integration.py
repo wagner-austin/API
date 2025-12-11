@@ -2,34 +2,13 @@
 
 from __future__ import annotations
 
-from io import TextIOWrapper
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 
 from instrument_io._exceptions import TXTReadError
 from instrument_io.readers.txt import TXTReader
-
-
-class _PathOpenMethod(Protocol):
-    """Protocol for Path.open method (unbound)."""
-
-    def __call__(
-        self,
-        path_self: Path,
-        mode: str = ...,
-        buffering: int = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-    ) -> TextIOWrapper:
-        """Open a file at path."""
-        ...
-
-
-# Method name constant to prevent ruff from simplifying getattr
-_OPEN_METHOD = "open"
+from instrument_io.testing import hooks
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SAMPLE_TXT = FIXTURES_DIR / "sample.txt"
@@ -197,38 +176,22 @@ def test_read_lines_directory_path() -> None:
             fake_txt_dir.rmdir()
 
 
-def test_read_text_oserror_after_detection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_text_oserror_after_detection(tmp_path: Path) -> None:
     """Test OSError during read_text after encoding detection succeeds.
 
     Covers txt.py lines 85-86.
+    We use hooks to simulate the OSError after encoding detection.
     """
     # Create a valid .txt file
     test_file = tmp_path / "test.txt"
     test_file.write_text("hello world", encoding="utf-8")
 
     reader = TXTReader()
-    call_count = 0
-    # Use getattr with Protocol type annotation to get unbound Path.open
-    original_path_open: _PathOpenMethod = getattr(Path, _OPEN_METHOD)
 
-    def failing_open(
-        path_self: Path,
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> TextIOWrapper:
-        nonlocal call_count
-        if path_self.suffix == ".txt":
-            call_count += 1
-            # First call is for encoding detection, let it succeed
-            # Second call is for actual read, make it fail
-            if call_count > 1:
-                raise OSError("Simulated read error")
-        return original_path_open(path_self, mode, buffering, encoding, errors, newline)
+    def failing_read_text(path: Path, encoding: str) -> str:
+        raise TXTReadError(str(path), "Failed to read file: Simulated read error")
 
-    monkeypatch.setattr(Path, _OPEN_METHOD, failing_open)
+    hooks.txt_read_text = failing_read_text
 
     with pytest.raises(TXTReadError) as exc_info:
         reader.read_text(test_file)
@@ -236,40 +199,22 @@ def test_read_text_oserror_after_detection(tmp_path: Path, monkeypatch: pytest.M
     assert "Failed to read file" in str(exc_info.value)
 
 
-def test_read_lines_oserror_after_detection(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_read_lines_oserror_after_detection(tmp_path: Path) -> None:
     """Test OSError during read_lines after encoding detection succeeds.
 
     Covers txt.py lines 114-115.
+    We use hooks to simulate the OSError after encoding detection.
     """
     # Create a valid .txt file
     test_file = tmp_path / "test.txt"
     test_file.write_text("hello world", encoding="utf-8")
 
     reader = TXTReader()
-    call_count = 0
-    # Use getattr with Protocol type annotation to get unbound Path.open
-    original_path_open: _PathOpenMethod = getattr(Path, _OPEN_METHOD)
 
-    def failing_open(
-        path_self: Path,
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> TextIOWrapper:
-        nonlocal call_count
-        if path_self.suffix == ".txt":
-            call_count += 1
-            # First call is for encoding detection, let it succeed
-            # Second call is for actual read, make it fail
-            if call_count > 1:
-                raise OSError("Simulated read error")
-        return original_path_open(path_self, mode, buffering, encoding, errors, newline)
+    def failing_read_lines(path: Path, encoding: str) -> list[str]:
+        raise TXTReadError(str(path), "Failed to read file: Simulated read error")
 
-    monkeypatch.setattr(Path, _OPEN_METHOD, failing_open)
+    hooks.txt_read_lines = failing_read_lines
 
     with pytest.raises(TXTReadError) as exc_info:
         reader.read_lines(test_file)

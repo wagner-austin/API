@@ -14,6 +14,7 @@ from instrument_io._decoders.smps import (
     _decode_smps_metadata,
 )
 from instrument_io._exceptions import SMPSReadError
+from instrument_io.testing import hooks
 from instrument_io.types.common import CellValue
 from instrument_io.types.smps import SMPSData, SMPSMetadata
 
@@ -24,7 +25,7 @@ def _is_rps_file(path: Path) -> bool:
 
 
 def _read_lines(path: Path) -> list[str]:
-    """Read all lines from file.
+    """Read all lines from file via hook.
 
     Args:
         path: Path to .rps file.
@@ -35,18 +36,7 @@ def _read_lines(path: Path) -> list[str]:
     Raises:
         SMPSReadError: If reading fails.
     """
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            return [line.rstrip("\r\n") for line in f]
-    except UnicodeDecodeError:
-        # Try cp1252 encoding (common for Windows-generated files)
-        try:
-            with path.open("r", encoding="cp1252") as f:
-                return [line.rstrip("\r\n") for line in f]
-        except (UnicodeDecodeError, OSError) as e:
-            raise SMPSReadError(str(path), f"Failed to read file: {e}") from e
-    except OSError as e:
-        raise SMPSReadError(str(path), f"Failed to read file: {e}") from e
+    return hooks.smps_read_lines(path)
 
 
 class SMPSReader:

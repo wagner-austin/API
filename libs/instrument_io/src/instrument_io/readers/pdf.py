@@ -10,7 +10,7 @@ from pathlib import Path
 
 from instrument_io._decoders.pdf import _decode_pdf_table
 from instrument_io._exceptions import PDFReadError
-from instrument_io._protocols.pdfplumber import _open_pdf
+from instrument_io.testing import hooks
 from instrument_io.types.common import CellValue
 
 
@@ -58,7 +58,7 @@ class PDFReader:
         if not _is_pdf_file(path):
             raise PDFReadError(str(path), "Not a PDF file")
 
-        with _open_pdf(path) as pdf:
+        with hooks.open_pdf(path) as pdf:
             if page_number is not None:
                 # Extract from specific page
                 if page_number < 1 or page_number > len(pdf.pages):
@@ -103,7 +103,7 @@ class PDFReader:
         if not _is_pdf_file(path):
             raise PDFReadError(str(path), "Not a PDF file")
 
-        with _open_pdf(path) as pdf:
+        with hooks.open_pdf(path) as pdf:
             result: list[list[dict[str, CellValue]]] = []
 
             if page_number is not None:
@@ -149,7 +149,7 @@ class PDFReader:
         if not _is_pdf_file(path):
             raise PDFReadError(str(path), "Not a PDF file")
 
-        with _open_pdf(path) as pdf:
+        with hooks.open_pdf(path) as pdf:
             return len(pdf.pages)
 
 

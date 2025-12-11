@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TypedDict
 
 import pytest
 import scripts.guard as guard
+
+from instrument_io.testing import hooks
 
 
 class _RunCall(TypedDict):
@@ -21,7 +24,8 @@ def test_find_monorepo_root_locates_libs(tmp_path: Path) -> None:
     start = libs / "some" / "deep"
     start.mkdir(parents=True, exist_ok=True)
 
-    found = guard._find_monorepo_root(start)
+    # Use production implementation directly via hook
+    found = hooks.find_monorepo_root(start)
     assert found == root
 
 
@@ -29,10 +33,10 @@ def test_find_monorepo_root_raises_when_missing(tmp_path: Path) -> None:
     start = tmp_path / "no_libs"
     start.mkdir(parents=True, exist_ok=True)
     with pytest.raises(RuntimeError):
-        _ = guard._find_monorepo_root(start)
+        _ = hooks.find_monorepo_root(start)
 
 
-def test_load_orchestrator_imports_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_orchestrator_imports_run(tmp_path: Path) -> None:
     libs_dir = tmp_path / "libs"
     mg_src = libs_dir / "monorepo_guards" / "src" / "monorepo_guards"
     mg_src.mkdir(parents=True, exist_ok=True)
@@ -40,36 +44,58 @@ def test_load_orchestrator_imports_run(monkeypatch: pytest.MonkeyPatch, tmp_path
     # Write orchestrator that stores call info in a file and returns int
     (mg_src / "orchestrator.py").write_text(
         "from pathlib import Path\n"
-        "def run_for_project(monorepo_root, project_root):\n"
+        "def run_for_project(*, monorepo_root, project_root):\n"
         "    (monorepo_root / 'call_info.txt').write_text("
         "f'{project_root}', encoding='utf-8')\n"
         "    return 0\n",
         encoding="utf-8",
     )
+
+    # Override hook to use our temp path
+    def _test_load_orchestrator(monorepo_root: Path) -> Callable[[Path, Path], int]:
+        import sys
+        from typing import Protocol
+
+        class _RunForProjectFn(Protocol):
+            def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+
+        libs_path = monorepo_root / "libs"
+        guards_src = libs_path / "monorepo_guards" / "src"
+        sys.path.insert(0, str(guards_src))
+        sys.path.insert(0, str(libs_path))
+        mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
+
+        run_fn: _RunForProjectFn = mod.run_for_project
+
+        def _wrapper(mr: Path, pr: Path) -> int:
+            return run_fn(monorepo_root=mr, project_root=pr)
+
+        return _wrapper
+
+    hooks.load_orchestrator = _test_load_orchestrator
+
     run = guard._load_orchestrator(tmp_path)
-    result = run(monorepo_root=tmp_path, project_root=tmp_path / "proj")
+    result = run(tmp_path, tmp_path / "proj")
     assert result == 0
     call_info = (tmp_path / "call_info.txt").read_text(encoding="utf-8")
     assert call_info == str(tmp_path / "proj")
 
 
-def test_main_invokes_run_and_supports_flags(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_main_invokes_run_and_supports_flags(tmp_path: Path) -> None:
     calls: list[_RunCall] = []
 
-    def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+    def _fake_run_for_project(monorepo_root: Path, project_root: Path) -> int:
         calls.append({"monorepo_root": monorepo_root, "project_root": project_root})
         return 3
 
     def _fake_find_monorepo_root(start: Path) -> Path:
         return start
 
-    def _fake_load_orchestrator(_: Path) -> guard._RunForProject:
+    def _fake_load_orchestrator(mr: Path) -> Callable[[Path, Path], int]:
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find_monorepo_root)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load_orchestrator)
+    hooks.find_monorepo_root = _fake_find_monorepo_root
+    hooks.load_orchestrator = _fake_load_orchestrator
 
     project_root = Path(__file__).resolve().parents[1]
 
@@ -80,42 +106,42 @@ def test_main_invokes_run_and_supports_flags(
     assert calls[0]["project_root"] == tmp_path
 
 
-def test_main_uses_default_args_when_none(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_uses_default_args_when_none(tmp_path: Path) -> None:
     calls: list[_RunCall] = []
 
-    def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+    def _fake_run_for_project(monorepo_root: Path, project_root: Path) -> int:
         calls.append({"monorepo_root": monorepo_root, "project_root": project_root})
         return 0
 
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(mr: Path) -> Callable[[Path, Path], int]:
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    hooks.find_monorepo_root = _fake_find
+    hooks.load_orchestrator = _fake_load
 
     rc = guard.main(None)
     assert rc == 0
     assert calls[0]["project_root"].name == "instrument_io"
 
 
-def test_main_skips_unknown_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_skips_unknown_flags(tmp_path: Path) -> None:
     calls: list[_RunCall] = []
 
-    def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+    def _fake_run_for_project(monorepo_root: Path, project_root: Path) -> int:
         calls.append({"monorepo_root": monorepo_root, "project_root": project_root})
         return 7
 
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(mr: Path) -> Callable[[Path, Path], int]:
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    hooks.find_monorepo_root = _fake_find
+    hooks.load_orchestrator = _fake_load
 
     rc = guard.main(["--unknown", "--root", str(tmp_path)])
     assert rc == 7
@@ -123,21 +149,21 @@ def test_main_skips_unknown_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert calls[0]["project_root"] == tmp_path
 
 
-def test_main_verbose_flag_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_verbose_flag_only(tmp_path: Path) -> None:
     calls: list[_RunCall] = []
 
-    def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+    def _fake_run_for_project(monorepo_root: Path, project_root: Path) -> int:
         calls.append({"monorepo_root": monorepo_root, "project_root": project_root})
         return 5
 
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(mr: Path) -> Callable[[Path, Path], int]:
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    hooks.find_monorepo_root = _fake_find
+    hooks.load_orchestrator = _fake_load
 
     rc = guard.main(["--verbose"])
     assert rc == 5
@@ -182,22 +208,20 @@ def test_run_local_rules_with_violation(tmp_path: Path) -> None:
     assert rc == 2
 
 
-def test_main_with_verbose_and_local_violations(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_main_with_verbose_and_local_violations(tmp_path: Path) -> None:
     """Test main with verbose flag when local rules have violations."""
 
-    def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+    def _fake_run_for_project(monorepo_root: Path, project_root: Path) -> int:
         return 0
 
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(mr: Path) -> Callable[[Path, Path], int]:
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    hooks.find_monorepo_root = _fake_find
+    hooks.load_orchestrator = _fake_load
 
     # Create project with mock violation
     project_root = tmp_path / "project"

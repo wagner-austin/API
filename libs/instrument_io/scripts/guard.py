@@ -1,35 +1,30 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Protocol
 
 from scripts.mock_ban_rule import MockBanRule
 
-
-class _RunForProject(Protocol):
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+# Import hooks from testing module
+# Note: we import here instead of from instrument_io.testing to avoid
+# circular import during module load
+_find_monorepo_root_impl: Callable[[Path], Path] | None = None
+_load_orchestrator_impl: Callable[[Path], Callable[[Path, Path], int]] | None = None
 
 
 def _find_monorepo_root(start: Path) -> Path:
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
+    """Find monorepo root, delegating to testing hooks."""
+    from instrument_io.testing import hooks
+
+    return hooks.find_monorepo_root(start)
 
 
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: _RunForProject = mod.run_for_project
-    return run_for_project
+def _load_orchestrator(monorepo_root: Path) -> Callable[[Path, Path], int]:
+    """Load orchestrator, delegating to testing hooks."""
+    from instrument_io.testing import hooks
+
+    return hooks.load_orchestrator(monorepo_root)
 
 
 def _run_local_rules(project_root: Path) -> int:
@@ -83,7 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     target_root = root_override if root_override is not None else project_root
 
-    rc = run_for_project(monorepo_root=monorepo_root, project_root=target_root)
+    rc = run_for_project(monorepo_root, target_root)
     if rc != 0:
         return rc
 

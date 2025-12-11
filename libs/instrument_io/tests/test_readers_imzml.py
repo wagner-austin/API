@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import TracebackType
-from typing import Protocol
 
 import pytest
 
 from instrument_io._exceptions import ImzMLReadError
 from instrument_io._protocols.imzml import ImzMLParserProtocol
-from instrument_io._protocols.numpy import NdArray1DProtocol
 from instrument_io.readers.imzml import (
     ImzMLReader,
     _compute_image_dimensions,
@@ -18,99 +15,9 @@ from instrument_io.readers.imzml import (
     _is_imzml_file,
     _spectrum_to_imaging_spectrum,
 )
+from instrument_io.testing import FakeImzMLParser, hooks
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
-
-
-class _MockDType:
-    """Mock dtype for testing."""
-
-    @property
-    def name(self) -> str:
-        return "float64"
-
-
-class MockNdArray1D:
-    """Mock 1D array implementing NdArray1DProtocol."""
-
-    def __init__(self, data: list[float]) -> None:
-        self._data = data
-
-    @property
-    def shape(self) -> tuple[int]:
-        return (len(self._data),)
-
-    @property
-    def dtype(self) -> _MockDType:
-        return _MockDType()
-
-    def tolist(self) -> list[float]:
-        return self._data.copy()
-
-    def __len__(self) -> int:
-        return len(self._data)
-
-    def __getitem__(self, idx: int) -> float:
-        return self._data[idx]
-
-
-class MockImzMLParser:
-    """Mock ImzMLParser implementing ImzMLParserProtocol."""
-
-    def __init__(
-        self,
-        coordinates: list[tuple[int, int, int]],
-        polarity: str = "positive",
-        spectrum_mode: str = "centroid",
-    ) -> None:
-        self._coordinates = coordinates
-        self._polarity = polarity
-        self._spectrum_mode = spectrum_mode
-
-    @property
-    def coordinates(self) -> list[tuple[int, int, int]]:
-        return self._coordinates
-
-    @property
-    def polarity(self) -> str:
-        return self._polarity
-
-    @property
-    def spectrum_mode(self) -> str:
-        return self._spectrum_mode
-
-    def getspectrum(self, index: int) -> tuple[NdArray1DProtocol, NdArray1DProtocol]:
-        mz_data = [100.0 + index, 200.0 + index, 300.0 + index]
-        intensity_data = [1000.0, 2000.0, 500.0]
-        mz_array: NdArray1DProtocol = MockNdArray1D(mz_data)
-        intensity_array: NdArray1DProtocol = MockNdArray1D(intensity_data)
-        return (mz_array, intensity_array)
-
-    def __enter__(self) -> ImzMLParserProtocol:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        pass
-
-
-class _OpenImzmlFn(Protocol):
-    """Protocol for _open_imzml replacement."""
-
-    def __call__(self, path: Path) -> MockImzMLParser: ...
-
-
-def _make_open_imzml(parser: MockImzMLParser) -> _OpenImzmlFn:
-    """Create mock _open_imzml function."""
-
-    def open_fn(path: Path) -> MockImzMLParser:
-        return parser
-
-    return open_fn
 
 
 class TestIsImzmlFile:
@@ -143,17 +50,25 @@ class TestGetSpectrumArrays:
     """Tests for _get_spectrum_arrays function."""
 
     def test_extracts_arrays(self) -> None:
-        parser: ImzMLParserProtocol = MockImzMLParser([(1, 1, 1)])
+        parser: ImzMLParserProtocol = FakeImzMLParser(
+            coordinates=[(1, 1, 1)],
+            spectra=[([100.0, 200.0, 300.0], [1000.0, 2000.0, 500.0])],
+        )
         mz_values, intensities = _get_spectrum_arrays(parser, 0)
 
         assert mz_values == [100.0, 200.0, 300.0]
         assert intensities == [1000.0, 2000.0, 500.0]
 
     def test_extracts_arrays_at_index(self) -> None:
-        parser: ImzMLParserProtocol = MockImzMLParser([(1, 1, 1), (2, 1, 1)])
+        parser: ImzMLParserProtocol = FakeImzMLParser(
+            coordinates=[(1, 1, 1), (2, 1, 1)],
+            spectra=[
+                ([100.0, 200.0, 300.0], [1000.0, 2000.0, 500.0]),
+                ([101.0, 201.0, 301.0], [1000.0, 2000.0, 500.0]),
+            ],
+        )
         mz_values, intensities = _get_spectrum_arrays(parser, 1)
 
-        # Index 1 adds offset to mz values
         assert mz_values == [101.0, 201.0, 301.0]
         assert intensities == [1000.0, 2000.0, 500.0]
 
@@ -162,7 +77,13 @@ class TestSpectrumToImagingSpectrum:
     """Tests for _spectrum_to_imaging_spectrum function."""
 
     def test_converts_spectrum(self) -> None:
-        parser: ImzMLParserProtocol = MockImzMLParser([(1, 2, 1), (2, 2, 1)])
+        parser: ImzMLParserProtocol = FakeImzMLParser(
+            coordinates=[(1, 2, 1), (2, 2, 1)],
+            spectra=[
+                ([100.0, 200.0, 300.0], [1000.0, 2000.0, 500.0]),
+                ([100.0, 200.0, 300.0], [1000.0, 2000.0, 500.0]),
+            ],
+        )
         result = _spectrum_to_imaging_spectrum(parser, "/path/file.imzML", 0, "positive")
 
         assert result["meta"]["source_path"] == "/path/file.imzML"
@@ -177,13 +98,19 @@ class TestSpectrumToImagingSpectrum:
         assert result["stats"]["num_peaks"] == 3
 
     def test_negative_polarity(self) -> None:
-        parser: ImzMLParserProtocol = MockImzMLParser([(1, 1, 1)])
+        parser: ImzMLParserProtocol = FakeImzMLParser(
+            coordinates=[(1, 1, 1)],
+            spectra=[([100.0], [1000.0])],
+        )
         result = _spectrum_to_imaging_spectrum(parser, "/test.imzML", 0, "negative")
 
         assert result["meta"]["polarity"] == "negative"
 
     def test_with_z_coordinate(self) -> None:
-        parser: ImzMLParserProtocol = MockImzMLParser([(1, 1, 3)])
+        parser: ImzMLParserProtocol = FakeImzMLParser(
+            coordinates=[(1, 1, 3)],
+            spectra=[([100.0], [1000.0])],
+        )
         result = _spectrum_to_imaging_spectrum(parser, "/test.imzML", 0, "positive")
 
         assert result["meta"]["coordinate"]["z"] == 3
@@ -237,19 +164,17 @@ class TestImzMLReaderGetFileInfo:
         with pytest.raises(ImzMLReadError, match="Not an imzML file"):
             reader.get_file_info(file)
 
-    def test_returns_file_info(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_returns_file_info(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1), (1, 2, 1), (2, 2, 1)],
+            spectra=[([100.0], [1000.0])] * 4,
             polarity="positive",
             spectrum_mode="centroid",
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         info = reader.get_file_info(file)
@@ -261,21 +186,17 @@ class TestImzMLReaderGetFileInfo:
         assert info["x_pixels"] == 2
         assert info["y_pixels"] == 2
 
-    def test_returns_negative_polarity(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_returns_negative_polarity(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1)],
+            spectra=[([100.0], [1000.0])],
             polarity="negative",
             spectrum_mode="profile",
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         info = reader.get_file_info(file)
@@ -295,17 +216,15 @@ class TestImzMLReaderGetCoordinates:
         with pytest.raises(ImzMLReadError, match="Not an imzML file"):
             reader.get_coordinates(file)
 
-    def test_returns_coordinates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_returns_coordinates(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1), (1, 2, 1)],
+            spectra=[([100.0], [1000.0])] * 3,
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         coords = reader.get_coordinates(file)
@@ -328,18 +247,19 @@ class TestImzMLReaderIterSpectra:
         with pytest.raises(ImzMLReadError, match="Not an imzML file"):
             list(reader.iter_spectra(file))
 
-    def test_iterates_all_spectra(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_iterates_all_spectra(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1)],
+            spectra=[
+                ([100.0, 200.0, 300.0], [1000.0, 2000.0, 500.0]),
+                ([101.0, 201.0, 301.0], [1000.0, 2000.0, 500.0]),
+            ],
             polarity="negative",
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         spectra = list(reader.iter_spectra(file))
@@ -369,17 +289,19 @@ class TestImzMLReaderReadSpectrum:
         with pytest.raises(ImzMLReadError, match="Invalid index"):
             reader.read_spectrum(file, -1)
 
-    def test_reads_spectrum_by_index(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_reads_spectrum_by_index(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1), (3, 1, 1)],
+            spectra=[
+                ([100.0], [1000.0]),
+                ([101.0], [1001.0]),
+                ([102.0], [1002.0]),
+            ],
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         spectrum = reader.read_spectrum(file, 1)
@@ -387,17 +309,15 @@ class TestImzMLReaderReadSpectrum:
         assert spectrum["meta"]["index"] == 1
         assert spectrum["meta"]["coordinate"]["x"] == 2
 
-    def test_raises_for_index_out_of_range(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_raises_for_index_out_of_range(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(coordinates=[(1, 1, 1)])
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        fake_parser = FakeImzMLParser(
+            coordinates=[(1, 1, 1)],
+            spectra=[([100.0], [1000.0])],
+        )
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         with pytest.raises(ImzMLReadError, match="Spectrum index 5 not found"):
@@ -415,19 +335,19 @@ class TestImzMLReaderReadSpectrumAtCoordinate:
         with pytest.raises(ImzMLReadError, match="Not an imzML file"):
             reader.read_spectrum_at_coordinate(file, 1, 1)
 
-    def test_reads_spectrum_at_coordinate(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_reads_spectrum_at_coordinate(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1), (1, 2, 1)],
+            spectra=[
+                ([100.0], [1000.0]),
+                ([101.0], [1001.0]),
+                ([102.0], [1002.0]),
+            ],
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         spectrum = reader.read_spectrum_at_coordinate(file, x=2, y=1, z=1)
@@ -435,19 +355,18 @@ class TestImzMLReaderReadSpectrumAtCoordinate:
         assert spectrum["meta"]["coordinate"]["x"] == 2
         assert spectrum["meta"]["coordinate"]["y"] == 1
 
-    def test_raises_for_coordinate_not_found(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_raises_for_coordinate_not_found(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1)],
+            spectra=[
+                ([100.0], [1000.0]),
+                ([101.0], [1001.0]),
+            ],
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         with pytest.raises(ImzMLReadError, match=r"Coordinate \(99, 99, 1\) not found"):
@@ -465,17 +384,15 @@ class TestImzMLReaderCountSpectra:
         with pytest.raises(ImzMLReadError, match="Not an imzML file"):
             reader.count_spectra(file)
 
-    def test_returns_count(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from instrument_io.readers import imzml as imzml_module
-
+    def test_returns_count(self, tmp_path: Path) -> None:
         file = tmp_path / "sample.imzML"
         file.write_text("")
 
-        mock_parser = MockImzMLParser(
+        fake_parser = FakeImzMLParser(
             coordinates=[(1, 1, 1), (2, 1, 1), (1, 2, 1), (2, 2, 1), (3, 1, 1)],
+            spectra=[([100.0], [1000.0])] * 5,
         )
-        open_fn: _OpenImzmlFn = _make_open_imzml(mock_parser)
-        monkeypatch.setattr(imzml_module, "_open_imzml", open_fn)
+        hooks.open_imzml = lambda p: fake_parser
 
         reader = ImzMLReader()
         count = reader.count_spectra(file)

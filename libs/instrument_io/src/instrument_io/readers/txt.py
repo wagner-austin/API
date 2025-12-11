@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from instrument_io._exceptions import TXTReadError
+from instrument_io.testing import hooks
 
 
 def _is_txt_file(path: Path) -> bool:
@@ -17,7 +18,7 @@ def _is_txt_file(path: Path) -> bool:
 
 
 def _detect_encoding(path: Path) -> str:
-    """Detect file encoding by trying common encodings.
+    """Detect file encoding by trying common encodings via hook.
 
     Args:
         path: Path to text file.
@@ -28,19 +29,7 @@ def _detect_encoding(path: Path) -> str:
     Note:
         latin-1 accepts all byte values (0x00-0xFF), making it the guaranteed fallback.
     """
-    # Try preferred encodings first (may fail with UnicodeDecodeError)
-    preferred_encodings = ["utf-8", "utf-16", "utf-16-le", "utf-16-be", "cp1252"]
-
-    for encoding in preferred_encodings:
-        try:
-            with path.open("r", encoding=encoding) as f:
-                f.read()
-            return encoding
-        except (UnicodeDecodeError, UnicodeError):
-            continue
-
-    # latin-1 accepts all byte values (0x00-0xFF), guaranteed to succeed
-    return "latin-1"
+    return hooks.txt_detect_encoding(path)
 
 
 class TXTReader:
@@ -81,12 +70,7 @@ class TXTReader:
             raise TXTReadError(str(path), "Not a text file")
 
         detected_encoding = encoding if encoding else _detect_encoding(path)
-
-        try:
-            with path.open("r", encoding=detected_encoding) as f:
-                return f.read()
-        except OSError as e:
-            raise TXTReadError(str(path), f"Failed to read file: {e}") from e
+        return hooks.txt_read_text(path, detected_encoding)
 
     def read_lines(self, path: Path, encoding: str | None = None) -> list[str]:
         """Read text file as list of lines.
@@ -110,12 +94,7 @@ class TXTReader:
             raise TXTReadError(str(path), "Not a text file")
 
         detected_encoding = encoding if encoding else _detect_encoding(path)
-
-        try:
-            with path.open("r", encoding=detected_encoding) as f:
-                return [line.rstrip("\r\n") for line in f]
-        except OSError as e:
-            raise TXTReadError(str(path), f"Failed to read file: {e}") from e
+        return hooks.txt_read_lines(path, detected_encoding)
 
 
 __all__ = [

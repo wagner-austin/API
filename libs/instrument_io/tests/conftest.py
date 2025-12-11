@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+
+from instrument_io.testing import reset_hooks as _reset_hooks
 
 # Fixtures directory location
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -27,6 +30,14 @@ def _get_fixtures_dir() -> Path:
 
 sample_d_directory = pytest.fixture(_get_sample_d_directory)
 test_data_root = pytest.fixture(_get_fixtures_dir)
+
+
+@pytest.fixture(autouse=True)
+def reset_hooks_fixture() -> Generator[None, None, None]:
+    """Reset all test hooks to production defaults before and after each test."""
+    _reset_hooks()
+    yield
+    _reset_hooks()
 
 
 def pytest_configure(config: pytest.Config) -> None:

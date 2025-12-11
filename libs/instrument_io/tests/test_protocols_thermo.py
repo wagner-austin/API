@@ -16,6 +16,7 @@ from instrument_io._protocols.thermo import (
     _find_thermorawfileparser,
     _get_bundled_exe_path,
 )
+from instrument_io.testing import hooks
 
 
 class TestGetBundledExePath:
@@ -88,70 +89,31 @@ class TestCleanupTempDir:
 class TestFindThermorawfileparserBranches:
     """Tests for _find_thermorawfileparser covering all branches."""
 
-    def test_finds_candidate_when_exists(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_finds_candidate_when_exists(self, tmp_path: Path) -> None:
         """Test branch 57->56: candidate.exists() returns True.
 
         Creates a real executable file and verifies it is found.
         """
-        import instrument_io._protocols.thermo as thermo_mod
-
         # Create a real executable file
         exe_path = tmp_path / "ThermoRawFileParser.exe"
         exe_path.touch()
 
-        # Point bundled path to our real file
-        monkeypatch.setattr(thermo_mod, "_get_bundled_exe_path", lambda: exe_path)
+        # Point bundled path hook to our real file
+        hooks.get_bundled_exe_path = lambda: exe_path
 
         result = _find_thermorawfileparser()
         assert result == exe_path
         assert result.exists()
 
-    def test_finds_via_path_with_real_executable(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Test lines 61-63: shutil.which finds executable in PATH.
-
-        Creates a real executable in a temp directory added to PATH.
-        """
-        import instrument_io._protocols.thermo as thermo_mod
-
-        # Make bundled path not exist
-        monkeypatch.setattr(thermo_mod, "_get_bundled_exe_path", lambda: Path("/nonexistent"))
-
-        # Create a real executable in tmp_path
-        if sys.platform == "win32":
-            exe_name = "ThermoRawFileParser.exe"
-            exe_path = tmp_path / exe_name
-            exe_path.write_text("@echo off\n")
-        else:
-            exe_name = "ThermoRawFileParser"
-            exe_path = tmp_path / exe_name
-            exe_path.write_text("#!/bin/bash\n")
-            exe_path.chmod(exe_path.stat().st_mode | stat.S_IEXEC)
-
-        # Set PATH to include tmp_path (monkeypatch handles restoration)
-        monkeypatch.setenv("PATH", str(tmp_path))
-
-        result = _find_thermorawfileparser()
-        # Windows may return different case, so compare case-insensitively
-        assert result.name.lower() == exe_name.lower()
-
-    def test_raises_when_not_found_anywhere(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_raises_when_not_found_anywhere(self, tmp_path: Path) -> None:
         """Test lines 66-71: FileNotFoundError raised when not found.
 
-        Ensures no candidate paths exist and PATH doesn't contain it.
+        Ensures bundled exe doesn't exist and is the only candidate.
         """
-        import instrument_io._protocols.thermo as thermo_mod
-
-        # Make bundled path not exist
-        monkeypatch.setattr(thermo_mod, "_get_bundled_exe_path", lambda: Path("/nonexistent/path"))
-
-        # Clear PATH to ensure shutil.which won't find it
-        monkeypatch.setenv("PATH", str(tmp_path))  # Empty dir with no executables
+        # Make bundled path not exist, which covers the branch where bundled doesn't exist
+        # and shutil.which won't find it either (no ThermoRawFileParser in standard PATH)
+        hooks.get_bundled_exe_path = lambda: tmp_path / "nonexistent" / "ThermoRawFileParser.exe"
+        hooks.shutil_which = lambda cmd: None
 
         with pytest.raises(FileNotFoundError) as exc_info:
             _find_thermorawfileparser()
@@ -159,19 +121,32 @@ class TestFindThermorawfileparserBranches:
         assert "ThermoRawFileParser not found" in str(exc_info.value)
         assert "dotnet tool install" in str(exc_info.value)
 
+    def test_finds_via_shutil_which(self, tmp_path: Path) -> None:
+        """Test line 64: shutil.which finds executable in PATH.
+
+        Covers the branch where no candidate exists but shutil.which finds it.
+        """
+        # Create a real executable file that shutil.which would find
+        exe_path = tmp_path / "ThermoRawFileParser.exe"
+        exe_path.touch()
+
+        # Make bundled path not exist
+        hooks.get_bundled_exe_path = lambda: tmp_path / "nonexistent" / "ThermoRawFileParser.exe"
+        # Make shutil.which return our path
+        hooks.shutil_which = lambda cmd: str(exe_path)
+
+        result = _find_thermorawfileparser()
+        assert result == exe_path
+
 
 class TestConvertRawToMzml:
     """Tests for _convert_raw_to_mzml using real subprocess execution."""
 
-    def test_raises_when_subprocess_fails(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_raises_when_subprocess_fails(self, tmp_path: Path) -> None:
         """Test line 118: ThermoReadError raised when subprocess fails.
 
         Creates a real script that exits with non-zero code.
         """
-        import instrument_io._protocols.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
         output_dir = tmp_path / "output"
@@ -190,23 +165,19 @@ class TestConvertRawToMzml:
             )
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
-        # Point to our failing script
-        monkeypatch.setattr(thermo_mod, "_find_thermorawfileparser", lambda: script_path)
+        # Point hook to our failing script
+        hooks.find_thermorawfileparser = lambda: script_path
 
         with pytest.raises(ThermoReadError) as exc_info:
             _convert_raw_to_mzml(raw_file, output_dir)
 
         assert "ThermoRawFileParser failed" in str(exc_info.value)
 
-    def test_raises_when_output_file_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_raises_when_output_file_missing(self, tmp_path: Path) -> None:
         """Test line 127: ThermoReadError raised when output file missing.
 
         Creates a real script that succeeds but doesn't create output.
         """
-        import instrument_io._protocols.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
         output_dir = tmp_path / "output"
@@ -221,8 +192,8 @@ class TestConvertRawToMzml:
             script_path.write_text("#!/bin/bash\nexit 0\n")
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
-        # Point to our script
-        monkeypatch.setattr(thermo_mod, "_find_thermorawfileparser", lambda: script_path)
+        # Point hook to our script
+        hooks.find_thermorawfileparser = lambda: script_path
 
         with pytest.raises(ThermoReadError) as exc_info:
             _convert_raw_to_mzml(raw_file, output_dir)
@@ -230,15 +201,11 @@ class TestConvertRawToMzml:
         assert "Expected output file not found" in str(exc_info.value)
         assert "test.mzML" in str(exc_info.value)
 
-    def test_success_when_output_file_created(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_success_when_output_file_created(self, tmp_path: Path) -> None:
         """Test successful conversion when output file is created.
 
         Creates a real script that succeeds and creates the output file.
         """
-        import instrument_io._protocols.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
         output_dir = tmp_path / "output"
@@ -262,8 +229,8 @@ exit 0
             script_path.write_text(script_content)
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
-        # Point to our script
-        monkeypatch.setattr(thermo_mod, "_find_thermorawfileparser", lambda: script_path)
+        # Point hook to our script
+        hooks.find_thermorawfileparser = lambda: script_path
 
         result = _convert_raw_to_mzml(raw_file, output_dir)
 

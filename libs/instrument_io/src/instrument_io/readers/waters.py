@@ -22,8 +22,8 @@ from instrument_io._exceptions import WatersReadError
 from instrument_io._protocols.rainbow import (
     DataDirectoryProtocol,
     DataFileProtocol,
-    _load_data_directory,
 )
+from instrument_io.testing import hooks
 from instrument_io.types.chromatogram import (
     ChromatogramData,
     ChromatogramMeta,
@@ -254,7 +254,7 @@ class WatersReader:
         Raises:
             WatersReadError: If neither TIC nor MS data available.
         """
-        datadir = _load_data_directory(path)
+        datadir = hooks.load_data_directory(path)
 
         tic_file = _find_tic_file_optional(datadir)
         if tic_file is not None:
@@ -366,7 +366,7 @@ class WatersReader:
         Raises:
             WatersReadError: If reading fails or MS data not found.
         """
-        datadir = _load_data_directory(path)
+        datadir = hooks.load_data_directory(path)
         ms_file = _find_ms_file(datadir, str(path))
 
         rt_list = _narrow_tolist_1d(ms_file.xlabels.tolist())
@@ -410,7 +410,7 @@ class WatersReader:
         Raises:
             WatersReadError: If reading fails or UV data not found.
         """
-        datadir = _load_data_directory(path)
+        datadir = hooks.load_data_directory(path)
         uv_file = _find_uv_file(datadir, str(path))
 
         rt_list = _narrow_tolist_1d(uv_file.xlabels.tolist())
@@ -450,7 +450,7 @@ class WatersReader:
         Raises:
             WatersReadError: If reading fails or MS data not found.
         """
-        datadir = _load_data_directory(path)
+        datadir = hooks.load_data_directory(path)
         ms_file = _find_ms_file(datadir, str(path))
 
         rt_list = _narrow_tolist_1d(ms_file.xlabels.tolist())

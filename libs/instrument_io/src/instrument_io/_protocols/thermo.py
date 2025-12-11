@@ -37,12 +37,12 @@ def _find_thermorawfileparser() -> Path:
     Raises:
         FileNotFoundError: If executable not found.
     """
-    import shutil
+    from instrument_io.testing import hooks
 
     # Common locations to check (bundled first, then system locations)
     candidates: list[Path] = [
         # Bundled with package
-        _get_bundled_exe_path(),
+        hooks.get_bundled_exe_path(),
         # Windows installed via dotnet tool
         Path.home() / ".dotnet" / "tools" / "ThermoRawFileParser.exe",
         # Linux/Mac via Mono - typically in PATH or /usr/local/bin
@@ -59,7 +59,7 @@ def _find_thermorawfileparser() -> Path:
 
     # Try to find in PATH via 'which' or 'where'
     # On Windows, shutil.which auto-appends PATHEXT extensions (including .exe)
-    which_result = shutil.which("ThermoRawFileParser")
+    which_result = hooks.shutil_which("ThermoRawFileParser")
     if which_result is not None:
         return Path(which_result)
 
@@ -86,8 +86,9 @@ def _convert_raw_to_mzml(raw_path: Path, output_dir: Path) -> Path:
         subprocess.CalledProcessError: If conversion fails.
     """
     from instrument_io._exceptions import ThermoReadError
+    from instrument_io.testing import hooks
 
-    parser_path = _find_thermorawfileparser()
+    parser_path = hooks.find_thermorawfileparser()
 
     # Build command
     # -i: input file

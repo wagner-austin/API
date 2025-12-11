@@ -1,19 +1,17 @@
-"""Unit tests for WatersReader with mocked dependencies.
+"""Unit tests for WatersReader with fake dependencies via hooks.
 
-Tests error paths and edge cases using monkeypatch.
-All mock classes properly implement the required protocols.
+Tests error paths and edge cases using hooks instead of monkeypatch.
+All fake classes properly implement the required protocols.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from instrument_io._exceptions import WatersReadError
-from instrument_io._protocols.numpy import NdArrayProtocol
-from instrument_io._protocols.rainbow import DataDirectoryProtocol, DataFileProtocol
+from instrument_io._protocols.rainbow import DataDirectoryProtocol
 from instrument_io.readers.waters import (
     WatersReader,
     _build_chromatogram_meta,
@@ -24,196 +22,7 @@ from instrument_io.readers.waters import (
     _find_uv_file,
     _is_waters_raw_directory,
 )
-
-
-def _make_loader(datadir: DataDirectoryProtocol) -> Callable[[Path], DataDirectoryProtocol]:
-    """Create a typed mock loader function that returns the given datadir."""
-
-    def loader(path: Path) -> DataDirectoryProtocol:
-        del path  # unused
-        return datadir
-
-    return loader
-
-
-class MockDType:
-    """Mock dtype that satisfies DTypeProtocol."""
-
-    @property
-    def name(self) -> str:
-        return "float64"
-
-
-class MockNdArray:
-    """Mock ndarray that satisfies NdArrayProtocol.
-
-    Supports both 1D and 2D data representations.
-    """
-
-    def __init__(self, data: list[float] | list[list[float]]) -> None:
-        self._data = data
-        # Detect dimensionality by checking first element
-        is_2d = bool(data) and isinstance(data[0], list)
-        if is_2d:
-            # 2D data: count rows and cols
-            rows = len(data)
-            first_row = data[0]
-            cols = len(first_row) if isinstance(first_row, list) else 0
-            self._shape: tuple[int, ...] = (rows, cols)
-            self._ndim = 2
-            self._size = rows * cols
-        else:
-            # 1D data
-            self._shape = (len(data),)
-            self._ndim = 1
-            self._size = len(data)
-        self._dtype = MockDType()
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return self._shape
-
-    @property
-    def dtype(self) -> MockDType:
-        return self._dtype
-
-    @property
-    def ndim(self) -> int:
-        return self._ndim
-
-    @property
-    def size(self) -> int:
-        return self._size
-
-    def tolist(self) -> list[float] | list[list[float]] | list[int] | list[list[int]]:
-        return self._data
-
-    def __len__(self) -> int:
-        return self._shape[0]
-
-    def __getitem__(self, idx: int) -> float:
-        item = self._data[idx]
-        if isinstance(item, list):
-            # 2D case: return first element of row
-            return item[0]
-        # 1D case: item is already a float
-        return item
-
-
-class MockNdArray3D:
-    """Mock 3D ndarray for testing error case.
-
-    Note: This intentionally returns a shape that will trigger
-    the "unexpected data shape" error in the reader. The tolist()
-    return type matches NdArrayProtocol even though the actual
-    shape is 3D - this allows us to test the shape validation.
-    """
-
-    def __init__(self) -> None:
-        self._dtype = MockDType()
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        # Returns 3D shape to trigger error
-        return (2, 2, 2)
-
-    @property
-    def dtype(self) -> MockDType:
-        return self._dtype
-
-    @property
-    def ndim(self) -> int:
-        return 3
-
-    @property
-    def size(self) -> int:
-        return 8
-
-    def tolist(self) -> list[float] | list[list[float]] | list[int] | list[list[int]]:
-        # Return empty list - the shape check happens before tolist() is called
-        return []
-
-    def __len__(self) -> int:
-        return 2
-
-    def __getitem__(self, idx: int) -> float:
-        return 1.0
-
-
-class MockDataFile:
-    """Mock DataFile that satisfies DataFileProtocol."""
-
-    def __init__(
-        self,
-        detector: str,
-        xlabels_data: list[float],
-        ylabels_data: list[float],
-        data: list[float] | list[list[float]],
-    ) -> None:
-        self._detector = detector
-        self._xlabels: NdArrayProtocol = MockNdArray(xlabels_data)
-        self._ylabels: NdArrayProtocol = MockNdArray(ylabels_data)
-        self._data: NdArrayProtocol = MockNdArray(data)
-        self._name = f"{detector.lower()}_data.dat"
-
-    @property
-    def xlabels(self) -> NdArrayProtocol:
-        return self._xlabels
-
-    @property
-    def ylabels(self) -> NdArrayProtocol:
-        return self._ylabels
-
-    @property
-    def data(self) -> NdArrayProtocol:
-        return self._data
-
-    @property
-    def detector(self) -> str:
-        return self._detector
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    def get_info(self) -> str:
-        return f"MockDataFile({self._detector})"
-
-    def set_data(self, new_data: NdArrayProtocol) -> None:
-        """Set data for testing edge cases."""
-        self._data = new_data
-
-
-class MockDataDirectory:
-    """Mock DataDirectory that satisfies DataDirectoryProtocol."""
-
-    def __init__(
-        self,
-        directory: str,
-        files: list[MockDataFile],
-        by_detector: dict[str, list[MockDataFile]],
-    ) -> None:
-        self._directory = directory
-        # Convert to list[DataFileProtocol] to satisfy type checker (list is invariant)
-        self._files: list[DataFileProtocol] = list(files)
-        self._by_detector = by_detector
-        self._by_name: dict[str, DataFileProtocol] = {f.name: f for f in files}
-
-    @property
-    def datafiles(self) -> list[DataFileProtocol]:
-        return self._files
-
-    @property
-    def directory(self) -> str:
-        return self._directory
-
-    def get_file(self, name: str) -> DataFileProtocol | None:
-        return self._by_name.get(name.upper())
-
-    def get_detector(self, detector: str) -> list[DataFileProtocol]:
-        result = self._by_detector.get(detector.upper(), [])
-        # Return as list[DataFileProtocol]
-        return list(result)
+from instrument_io.testing import FakeDataDirectory, FakeDataFile, FakeDataFile3D, hooks
 
 
 class TestIsWatersRawDirectory:
@@ -255,45 +64,32 @@ class TestFindTicFileOptional:
 
     def test_finds_tic_by_detector(self) -> None:
         """Test finding TIC via get_detector."""
-        tic_file = MockDataFile("TIC", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [tic_file],
-            {"TIC": [tic_file]},
-        )
+        tic_file = FakeDataFile([1.0], [], [100.0], "TIC", "tic_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([tic_file], "/test")
         result = _find_tic_file_optional(datadir)
-        assert result is tic_file
+        assert result == tic_file
+        assert result.detector == "TIC"
 
     def test_finds_tic_in_datafiles(self) -> None:
         """Test finding TIC by searching datafiles."""
-        tic_file = MockDataFile("tic_scan", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [tic_file],
-            {},
-        )
+        tic_file = FakeDataFile([1.0], [], [100.0], "tic_scan", "tic_scan_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([tic_file], "/test")
         result = _find_tic_file_optional(datadir)
-        assert result is tic_file
+        assert result == tic_file
+        assert "tic" in result.detector.lower()
 
     def test_finds_total_in_datafiles(self) -> None:
         """Test finding TIC via 'total' in detector name."""
-        total_file = MockDataFile("Total Ion", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [total_file],
-            {},
-        )
+        total_file = FakeDataFile([1.0], [], [100.0], "Total Ion", "total_ion.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([total_file], "/test")
         result = _find_tic_file_optional(datadir)
-        assert result is total_file
+        assert result == total_file
+        assert "total" in result.detector.lower()
 
     def test_returns_none_when_not_found(self) -> None:
         """Test returns None when no TIC found."""
-        ms_file = MockDataFile("MS", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [ms_file],
-            {},
-        )
+        ms_file = FakeDataFile([1.0], [], [100.0], "MS", "ms_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], "/test")
         result = _find_tic_file_optional(datadir)
         assert result is None
 
@@ -303,35 +99,24 @@ class TestFindMsFileOptional:
 
     def test_finds_ms_by_detector(self) -> None:
         """Test finding MS via get_detector."""
-        ms_file = MockDataFile("MS", [1.0], [100.0], [[50.0]])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [[50.0]], "MS", "ms_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], "/test")
         result = _find_ms_file_optional(datadir)
-        assert result is ms_file
+        assert result == ms_file
+        assert result.detector == "MS"
 
     def test_finds_ms_in_datafiles(self) -> None:
         """Test finding MS by searching datafiles."""
-        # Use "ms_scan" which contains "ms" substring (unlike "mass_spec" which doesn't)
-        ms_file = MockDataFile("ms_scan", [1.0], [100.0], [[50.0]])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [ms_file],
-            {},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [[50.0]], "ms_scan", "ms_scan.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], "/test")
         result = _find_ms_file_optional(datadir)
-        assert result is ms_file
+        assert result == ms_file
+        assert "ms" in result.detector.lower()
 
     def test_returns_none_when_not_found(self) -> None:
         """Test returns None when no MS found."""
-        uv_file = MockDataFile("UV", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [uv_file],
-            {},
-        )
+        uv_file = FakeDataFile([1.0], [], [100.0], "UV", "uv_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], "/test")
         result = _find_ms_file_optional(datadir)
         assert result is None
 
@@ -341,12 +126,8 @@ class TestFindMsFile:
 
     def test_raises_when_not_found(self) -> None:
         """Test raises WatersReadError when MS not found."""
-        uv_file = MockDataFile("UV", [1.0], [], [100.0])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [uv_file],
-            {},
-        )
+        uv_file = FakeDataFile([1.0], [], [100.0], "UV", "uv_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], "/test")
         with pytest.raises(WatersReadError) as exc_info:
             _find_ms_file(datadir, "/test")
         assert "No MS data file found" in str(exc_info.value)
@@ -357,34 +138,24 @@ class TestFindUvFile:
 
     def test_finds_uv_by_detector(self) -> None:
         """Test finding UV via get_detector."""
-        uv_file = MockDataFile("UV", [1.0], [200.0], [[50.0]])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [uv_file],
-            {"UV": [uv_file]},
-        )
+        uv_file = FakeDataFile([1.0], [200.0], [[50.0]], "UV", "uv_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], "/test")
         result = _find_uv_file(datadir, "/test")
-        assert result is uv_file
+        assert result == uv_file
+        assert result.detector == "UV"
 
     def test_finds_pda_in_datafiles(self) -> None:
         """Test finding UV via 'pda' in detector name."""
-        pda_file = MockDataFile("pda_scan", [1.0], [200.0], [[50.0]])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [pda_file],
-            {},
-        )
+        pda_file = FakeDataFile([1.0], [200.0], [[50.0]], "pda_scan", "pda_scan.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([pda_file], "/test")
         result = _find_uv_file(datadir, "/test")
-        assert result is pda_file
+        assert result == pda_file
+        assert "pda" in result.detector.lower()
 
     def test_raises_when_not_found(self) -> None:
         """Test raises WatersReadError when UV not found."""
-        ms_file = MockDataFile("MS", [1.0], [100.0], [[50.0]])
-        datadir: DataDirectoryProtocol = MockDataDirectory(
-            "/test",
-            [ms_file],
-            {},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [[50.0]], "MS", "ms_data.dat")
+        datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], "/test")
         with pytest.raises(WatersReadError) as exc_info:
             _find_uv_file(datadir, "/test")
         assert "No UV data file found" in str(exc_info.value)
@@ -460,25 +231,18 @@ class TestWatersReaderSupportsFormat:
         assert reader.supports_format(d_dir) is False
 
 
-class TestWatersReaderWithMocks:
-    """Test WatersReader methods with mocked data."""
+class TestWatersReaderWithFakes:
+    """Test WatersReader methods with fake data via hooks."""
 
-    def test_read_tic_1d_data(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_tic_1d_data(self, tmp_path: Path) -> None:
         """Test reading TIC with 1D data array."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        tic_file = MockDataFile("TIC", [1.0, 2.0, 3.0], [], [100.0, 200.0, 300.0])
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [tic_file],
-            {"TIC": [tic_file]},
-        )
+        tic_file = FakeDataFile([1.0, 2.0, 3.0], [], [100.0, 200.0, 300.0], "TIC", "tic_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([tic_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         tic = reader.read_tic(raw_dir)
@@ -486,27 +250,21 @@ class TestWatersReaderWithMocks:
         assert tic["meta"]["source_path"] == str(raw_dir)
         assert tic["stats"]["num_points"] == 3
 
-    def test_read_tic_2d_data(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_tic_2d_data(self, tmp_path: Path) -> None:
         """Test reading TIC with 2D data array (summed)."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        tic_file = MockDataFile(
-            "TIC",
+        tic_file = FakeDataFile(
             [1.0, 2.0],
             [],
             [[100.0, 200.0], [150.0, 250.0]],
+            "TIC",
+            "tic_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [tic_file],
-            {"TIC": [tic_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([tic_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         tic = reader.read_tic(raw_dir)
@@ -515,52 +273,63 @@ class TestWatersReaderWithMocks:
         # Summed: [300.0, 400.0]
         assert tic["data"]["intensities"] == [300.0, 400.0]
 
-    def test_read_tic_3d_data_raises(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        """Test reading TIC with unexpected data shape raises."""
+    def test_read_tic_3d_data_raises(self, tmp_path: Path) -> None:
+        """Test reading TIC fails when data has 3+ dimensions.
+
+        Covers waters.py line 299: Unexpected data shape error.
+        """
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        tic_file = MockDataFile("TIC", [1.0], [], [100.0])
-        # Replace data with 3D array
-        tic_file.set_data(MockNdArray3D())
-
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [tic_file],
-            {"TIC": [tic_file]},
+        # FakeDataFile3D has 3D shape which triggers the error branch
+        tic_file = FakeDataFile3D(
+            [1.0, 2.0],
+            [],
+            (2, 3, 4),  # 3D shape
+            "TIC",
+            "tic_data.dat",
         )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([tic_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:
             reader.read_tic(raw_dir)
         assert "Unexpected data shape" in str(exc_info.value)
+        assert "(2, 3, 4)" in str(exc_info.value)
 
-    def test_compute_tic_from_ms(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_tic_no_data_raises(self, tmp_path: Path) -> None:
+        """Test reading TIC when no TIC or MS data available."""
+        raw_dir = tmp_path / "test.raw"
+        raw_dir.mkdir()
+
+        # Only UV data, no TIC or MS
+        uv_file = FakeDataFile([1.0], [200.0], [[50.0]], "UV", "uv_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], str(raw_dir))
+
+        hooks.load_data_directory = lambda p: fake_datadir
+
+        reader = WatersReader()
+        with pytest.raises(WatersReadError) as exc_info:
+            reader.read_tic(raw_dir)
+        assert "No TIC or MS data available" in str(exc_info.value)
+
+    def test_compute_tic_from_ms(self, tmp_path: Path) -> None:
         """Test computing TIC from MS data when no TIC file."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile(
-            "MS",
+        ms_file = FakeDataFile(
             [1.0, 2.0],
             [100.0, 200.0],
             [[50.0, 150.0], [75.0, 225.0]],
+            "MS",
+            "ms_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         tic = reader.read_tic(raw_dir)
@@ -570,51 +339,36 @@ class TestWatersReaderWithMocks:
         assert tic["data"]["intensities"] == [200.0, 300.0]
         assert "(computed)" in tic["meta"]["detector"]
 
-    def test_compute_tic_from_ms_1d_raises(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_compute_tic_from_ms_1d_raises(self, tmp_path: Path) -> None:
         """Test computing TIC fails when MS data is 1D."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile("MS", [1.0], [100.0], [50.0])
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [50.0], "MS", "ms_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:
             reader.read_tic(raw_dir)
         assert "MS data must be 2D to compute TIC" in str(exc_info.value)
 
-    def test_read_eic(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_eic(self, tmp_path: Path) -> None:
         """Test reading EIC."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile(
-            "MS",
+        ms_file = FakeDataFile(
             [1.0, 2.0],
             [100.0, 200.0, 300.0],
             [[50.0, 150.0, 250.0], [75.0, 175.0, 275.0]],
+            "MS",
+            "ms_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         eic = reader.read_eic(raw_dir, target_mz=200.0, mz_tolerance=1.0)
@@ -622,49 +376,36 @@ class TestWatersReaderWithMocks:
         assert eic["params"]["target_mz"] == 200.0
         assert eic["data"]["intensities"] == [150.0, 175.0]
 
-    def test_read_eic_1d_raises(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_eic_1d_raises(self, tmp_path: Path) -> None:
         """Test reading EIC fails when MS data is 1D."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile("MS", [1.0], [100.0], [50.0])
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [50.0], "MS", "ms_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:
             reader.read_eic(raw_dir, target_mz=100.0, mz_tolerance=1.0)
         assert "MS data must be 2D for EIC" in str(exc_info.value)
 
-    def test_read_uv(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_uv(self, tmp_path: Path) -> None:
         """Test reading UV data."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        uv_file = MockDataFile(
-            "UV",
+        uv_file = FakeDataFile(
             [1.0, 2.0],
             [200.0, 300.0],
             [[50.0, 150.0], [75.0, 175.0]],
+            "UV",
+            "uv_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [uv_file],
-            {"UV": [uv_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         uv = reader.read_uv(raw_dir)
@@ -672,49 +413,36 @@ class TestWatersReaderWithMocks:
         assert uv["wavelengths"] == [200.0, 300.0]
         assert len(uv["retention_times"]) == 2
 
-    def test_read_uv_1d_raises(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_read_uv_1d_raises(self, tmp_path: Path) -> None:
         """Test reading UV fails when data is 1D."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        uv_file = MockDataFile("UV", [1.0], [200.0], [50.0])
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [uv_file],
-            {"UV": [uv_file]},
-        )
+        uv_file = FakeDataFile([1.0], [200.0], [50.0], "UV", "uv_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([uv_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:
             reader.read_uv(raw_dir)
         assert "UV data must be 2D" in str(exc_info.value)
 
-    def test_iter_spectra(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_iter_spectra(self, tmp_path: Path) -> None:
         """Test iterating spectra."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile(
-            "MS",
+        ms_file = FakeDataFile(
             [1.0, 2.0],
             [100.0, 200.0],
             [[50.0, 150.0], [0.0, 200.0]],  # Second row has zero at first mz
+            "MS",
+            "ms_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         spectra = list(reader.iter_spectra(raw_dir))
@@ -727,27 +455,21 @@ class TestWatersReaderWithMocks:
         # Second spectrum has 1 peak (zero filtered out)
         assert spectra[1]["stats"]["num_peaks"] == 1
 
-    def test_iter_spectra_empty_row(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_iter_spectra_empty_row(self, tmp_path: Path) -> None:
         """Test iterating spectra with all-zero row."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile(
-            "MS",
+        ms_file = FakeDataFile(
             [1.0],
             [100.0, 200.0],
             [[0.0, 0.0]],  # All zeros
+            "MS",
+            "ms_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         spectra = list(reader.iter_spectra(raw_dir))
@@ -757,52 +479,37 @@ class TestWatersReaderWithMocks:
         assert spectra[0]["stats"]["mz_min"] == 0.0
         assert spectra[0]["stats"]["base_peak_mz"] == 0.0
 
-    def test_iter_spectra_1d_raises(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def test_iter_spectra_1d_raises(self, tmp_path: Path) -> None:
         """Test iter_spectra fails when MS data is 1D."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        ms_file = MockDataFile("MS", [1.0], [100.0], [50.0])
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        ms_file = FakeDataFile([1.0], [100.0], [50.0], "MS", "ms_data.dat")
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:
             list(reader.iter_spectra(raw_dir))
         assert "MS data must be 2D for spectra" in str(exc_info.value)
 
-    def test_iter_spectra_row_length_mismatch(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_iter_spectra_row_length_mismatch(self, tmp_path: Path) -> None:
         """Test iter_spectra fails when row length doesn't match mz axis."""
         raw_dir = tmp_path / "test.raw"
         raw_dir.mkdir()
 
-        # Create mock where row length != mz axis length
-        ms_file = MockDataFile(
-            "MS",
+        # Create fake where row length != mz axis length
+        ms_file = FakeDataFile(
             [1.0],
             [100.0, 200.0, 300.0],  # 3 m/z values
             [[50.0, 150.0]],  # But only 2 intensities
+            "MS",
+            "ms_data.dat",
         )
-        mock_datadir: DataDirectoryProtocol = MockDataDirectory(
-            str(raw_dir),
-            [ms_file],
-            {"MS": [ms_file]},
-        )
+        fake_datadir: DataDirectoryProtocol = FakeDataDirectory([ms_file], str(raw_dir))
 
-        monkeypatch.setattr(
-            "instrument_io.readers.waters._load_data_directory",
-            _make_loader(mock_datadir),
-        )
+        hooks.load_data_directory = lambda p: fake_datadir
 
         reader = WatersReader()
         with pytest.raises(WatersReadError) as exc_info:

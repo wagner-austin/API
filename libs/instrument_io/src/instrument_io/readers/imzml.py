@@ -21,11 +21,9 @@ from instrument_io._decoders.imzml import (
     _make_imzml_spectrum_meta,
 )
 from instrument_io._exceptions import ImzMLReadError
-from instrument_io._protocols.imzml import (
-    ImzMLParserProtocol,
-    _open_imzml,
-)
+from instrument_io._protocols.imzml import ImzMLParserProtocol
 from instrument_io._protocols.numpy import NdArray1DProtocol
+from instrument_io.testing import hooks
 from instrument_io.types.imaging import (
     ImagingSpectrum,
     ImzMLFileInfo,
@@ -160,7 +158,7 @@ class ImzMLReader:
         if not _is_imzml_file(path):
             raise ImzMLReadError(source_path, "Not an imzML file")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             num_spectra = len(parser.coordinates)
             polarity = _decode_imzml_polarity(parser.polarity)
@@ -193,7 +191,7 @@ class ImzMLReader:
         if not _is_imzml_file(path):
             raise ImzMLReadError(source_path, "Not an imzML file")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             return [_decode_coordinate(c) for c in parser.coordinates]
 
@@ -214,7 +212,7 @@ class ImzMLReader:
         if not _is_imzml_file(path):
             raise ImzMLReadError(source_path, "Not an imzML file")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             polarity_str = parser.polarity
             for index in range(len(parser.coordinates)):
@@ -241,7 +239,7 @@ class ImzMLReader:
         if index < 0:
             raise ImzMLReadError(source_path, f"Invalid index: {index}")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             num_spectra = len(parser.coordinates)
             if index >= num_spectra:
@@ -270,7 +268,7 @@ class ImzMLReader:
         if not _is_imzml_file(path):
             raise ImzMLReadError(source_path, "Not an imzML file")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             # Find index for coordinate
             target = (x, y, z)
@@ -299,7 +297,7 @@ class ImzMLReader:
         if not _is_imzml_file(path):
             raise ImzMLReadError(source_path, "Not an imzML file")
 
-        parser: ImzMLParserProtocol = _open_imzml(path)
+        parser: ImzMLParserProtocol = hooks.open_imzml(path)
         with parser:
             return len(parser.coordinates)
 

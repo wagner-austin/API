@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 
@@ -14,6 +12,7 @@ from instrument_io.readers.thermo import (
     _compute_chromatogram_stats,
     _is_raw_file,
 )
+from instrument_io.testing import FakeMzMLReader, hooks
 from instrument_io.types.spectrum import MSSpectrum
 
 
@@ -147,15 +146,6 @@ class TestThermoReader:
         assert "Not a .raw file" in str(exc_info.value)
 
 
-# Protocol for MzMLReader replacement
-class _MzMLReaderProtocol(Protocol):
-    """Protocol for MzMLReader mock."""
-
-    def iter_spectra(self, path: Path) -> Generator[MSSpectrum, None, None]: ...
-    def read_spectrum(self, path: Path, scan_number: int) -> MSSpectrum: ...
-    def count_spectra(self, path: Path) -> int: ...
-
-
 def _make_spectrum(source_path: str, scan_number: int, rt: float, tic: float) -> MSSpectrum:
     """Create a spectrum for testing."""
     return MSSpectrum(
@@ -178,32 +168,11 @@ def _make_spectrum(source_path: str, scan_number: int, rt: float, tic: float) ->
     )
 
 
-class _FakeMzMLReader:
-    """Fake MzMLReader for testing ThermoReader."""
-
-    def __init__(self, spectra: list[MSSpectrum]) -> None:
-        self._spectra = spectra
-
-    def iter_spectra(self, path: Path) -> Generator[MSSpectrum, None, None]:
-        yield from self._spectra
-
-    def read_spectrum(self, path: Path, scan_number: int) -> MSSpectrum:
-        for sp in self._spectra:
-            if sp["meta"]["scan_number"] == scan_number:
-                return sp
-        raise ValueError(f"Scan {scan_number} not found")
-
-    def count_spectra(self, path: Path) -> int:
-        return len(self._spectra)
-
-
 class TestThermoReaderWithFakes:
-    """Tests for ThermoReader using fake MzMLReader."""
+    """Tests for ThermoReader using fake MzMLReader via hooks."""
 
-    def test_read_tic_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_read_tic_success(self, tmp_path: Path) -> None:
         """Test successful TIC reading with fake conversion."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -212,24 +181,13 @@ class TestThermoReaderWithFakes:
         mzml_output.touch()
 
         mock_spectrum = _make_spectrum(str(mzml_output), 1, 1.0, 1000.0)
-        fake_reader = _FakeMzMLReader([mock_spectrum])
+        fake_reader = FakeMzMLReader([mock_spectrum])
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         tic_data = reader.read_tic(raw_file)
@@ -239,12 +197,8 @@ class TestThermoReaderWithFakes:
         assert tic_data["data"]["retention_times"] == [1.0]
         assert tic_data["data"]["intensities"] == [1000.0]
 
-    def test_read_tic_no_spectra_raises(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_read_tic_no_spectra_raises(self, tmp_path: Path) -> None:
         """Test error when no spectra found."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -252,34 +206,21 @@ class TestThermoReaderWithFakes:
         mzml_output.parent.mkdir()
         mzml_output.touch()
 
-        fake_reader = _FakeMzMLReader([])  # Empty - no spectra
+        fake_reader = FakeMzMLReader([])  # Empty - no spectra
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         with pytest.raises(ThermoReadError) as exc_info:
             reader.read_tic(raw_file)
         assert "No spectra found" in str(exc_info.value)
 
-    def test_read_eic_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_read_eic_success(self, tmp_path: Path) -> None:
         """Test successful EIC reading."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -310,24 +251,13 @@ class TestThermoReaderWithFakes:
             },
         )
 
-        fake_reader = _FakeMzMLReader([mock_spectrum])
+        fake_reader = FakeMzMLReader([mock_spectrum])
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         eic_data = reader.read_eic(raw_file, target_mz=100.0, mz_tolerance=0.5)
@@ -338,12 +268,8 @@ class TestThermoReaderWithFakes:
         # Should sum intensities in range [99.5, 100.5]: 300.0 + 400.0 = 700.0
         assert eic_data["data"]["intensities"] == [700.0]
 
-    def test_read_eic_no_spectra_raises(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_read_eic_no_spectra_raises(self, tmp_path: Path) -> None:
         """Test error when no spectra found for EIC."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -351,34 +277,21 @@ class TestThermoReaderWithFakes:
         mzml_output.parent.mkdir()
         mzml_output.touch()
 
-        fake_reader = _FakeMzMLReader([])
+        fake_reader = FakeMzMLReader([])
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         with pytest.raises(ThermoReadError) as exc_info:
             reader.read_eic(raw_file, target_mz=100.0, mz_tolerance=0.5)
         assert "No spectra found" in str(exc_info.value)
 
-    def test_read_spectrum_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_read_spectrum_success(self, tmp_path: Path) -> None:
         """Test successful single spectrum reading."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -387,24 +300,13 @@ class TestThermoReaderWithFakes:
         mzml_output.touch()
 
         mock_spectrum = _make_spectrum(str(mzml_output), 1, 1.0, 1000.0)
-        fake_reader = _FakeMzMLReader([mock_spectrum])
+        fake_reader = FakeMzMLReader([mock_spectrum])
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         spectrum = reader.read_spectrum(raw_file, scan_number=1)
@@ -412,10 +314,8 @@ class TestThermoReaderWithFakes:
         # Source path should be updated to original .raw file
         assert str(raw_file) in spectrum["meta"]["source_path"]
 
-    def test_iter_spectra_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_iter_spectra_success(self, tmp_path: Path) -> None:
         """Test successful spectrum iteration."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -424,24 +324,13 @@ class TestThermoReaderWithFakes:
         mzml_output.touch()
 
         mock_spectrum = _make_spectrum(str(mzml_output), 1, 1.0, 1000.0)
-        fake_reader = _FakeMzMLReader([mock_spectrum])
+        fake_reader = FakeMzMLReader([mock_spectrum])
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         spectra = list(reader.iter_spectra(raw_file))
@@ -450,10 +339,8 @@ class TestThermoReaderWithFakes:
         # Source path should be updated to original .raw file
         assert str(raw_file) in spectra[0]["meta"]["source_path"]
 
-    def test_count_spectra_success(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_count_spectra_success(self, tmp_path: Path) -> None:
         """Test successful spectrum counting."""
-        import instrument_io.readers.thermo as thermo_mod
-
         raw_file = tmp_path / "test.raw"
         raw_file.touch()
 
@@ -463,24 +350,13 @@ class TestThermoReaderWithFakes:
 
         # Create 42 mock spectra
         spectra = [_make_spectrum(str(mzml_output), i, float(i), 1000.0) for i in range(42)]
-        fake_reader = _FakeMzMLReader(spectra)
+        fake_reader = FakeMzMLReader(spectra)
 
-        def _fake_create_temp_dir() -> Path:
-            return tmp_path / "output"
-
-        def _fake_convert(raw: Path, out_dir: Path) -> Path:
-            return mzml_output
-
-        def _fake_cleanup(temp_dir: Path) -> None:
-            pass
-
-        def _fake_mzml_reader() -> _MzMLReaderProtocol:
-            return fake_reader
-
-        monkeypatch.setattr(thermo_mod, "_create_temp_dir", _fake_create_temp_dir)
-        monkeypatch.setattr(thermo_mod, "_convert_raw_to_mzml", _fake_convert)
-        monkeypatch.setattr(thermo_mod, "_cleanup_temp_dir", _fake_cleanup)
-        monkeypatch.setattr(thermo_mod, "MzMLReader", _fake_mzml_reader)
+        # Set up hooks for testing
+        hooks.create_temp_dir = lambda: tmp_path / "output"
+        hooks.convert_raw_to_mzml = lambda raw, out_dir: mzml_output
+        hooks.cleanup_temp_dir = lambda temp_dir: None
+        hooks.mzml_reader_factory = lambda: fake_reader
 
         reader = ThermoReader()
         count = reader.count_spectra(raw_file)

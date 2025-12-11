@@ -2,34 +2,13 @@
 
 from __future__ import annotations
 
-from io import TextIOWrapper
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 
 from instrument_io._exceptions import SMPSReadError
-from instrument_io.readers.smps import SMPSReader
-
-
-class _PathOpenMethod(Protocol):
-    """Protocol for Path.open method (unbound)."""
-
-    def __call__(
-        self,
-        path_self: Path,
-        mode: str = ...,
-        buffering: int = ...,
-        encoding: str | None = ...,
-        errors: str | None = ...,
-        newline: str | None = ...,
-    ) -> TextIOWrapper:
-        """Open a file at path."""
-        ...
-
-
-# Method name constant to prevent ruff from simplifying getattr
-_OPEN_METHOD = "open"
+from instrument_io.readers.smps import SMPSReader, _read_lines
+from instrument_io.testing import hooks
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SAMPLE_RPS = FIXTURES_DIR / "sample.rps"
@@ -271,36 +250,22 @@ def test_read_invalid_both_encodings_rps() -> None:
     assert "Failed to read file" in str(exc_info.value)
 
 
-def test_read_file_oserror_on_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_file_oserror_on_open(tmp_path: Path) -> None:
     """Test OSError during initial file open.
 
     This covers smps.py lines 48-49 where OSError occurs on initial open.
-    We monkeypatch Path.open to raise OSError on the first call.
+    We use hooks to simulate the OSError.
     """
-    from instrument_io.readers import smps
-
     # Create a valid .rps file
     valid_rps = tmp_path / "test.rps"
     valid_rps.write_text("test content", encoding="utf-8")
 
-    # Use getattr with Protocol type annotation to get unbound Path.open
-    original_path_open: _PathOpenMethod = getattr(Path, _OPEN_METHOD)
+    def failing_read_lines(path: Path) -> list[str]:
+        raise SMPSReadError(str(path), "Failed to read file: Simulated disk error")
 
-    def failing_open(
-        path_self: Path,
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> TextIOWrapper:
-        if path_self.suffix == ".rps":
-            raise OSError("Simulated disk error")
-        return original_path_open(path_self, mode, buffering, encoding, errors, newline)
-
-    monkeypatch.setattr(Path, _OPEN_METHOD, failing_open)
+    hooks.smps_read_lines = failing_read_lines
 
     with pytest.raises(SMPSReadError) as exc_info:
-        smps._read_lines(valid_rps)
+        _read_lines(valid_rps)
 
     assert "Failed to read file" in str(exc_info.value)
