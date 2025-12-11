@@ -13,6 +13,7 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [transcript-api](services/transcript-api) | 8003 | YouTube video transcription |
 | [qr-api](services/qr-api) | 8002 | QR code generation |
 | [music-wrapped-api](services/music-wrapped-api) | 8006 | Music listening analytics (Spotify, Apple, Last.fm) |
+| [covenant-radar-api](services/covenant-radar-api) | 8007 | Loan covenant monitoring and breach prediction |
 
 ## Clients
 
@@ -31,6 +32,9 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [platform_music](libs/platform_music) | Music analytics, streaming service adapters |
 | [instrument_io](libs/instrument_io) | Scientific instrument data format readers |
 | [monorepo_guards](libs/monorepo_guards) | Code quality rules (20+ static analysis checks) |
+| [covenant_domain](libs/covenant_domain) | Loan covenant domain models and rule engine |
+| [covenant_ml](libs/covenant_ml) | XGBoost training and prediction for covenants |
+| [covenant_persistence](libs/covenant_persistence) | PostgreSQL repositories for covenant data |
 
 ## Quick Start
 
