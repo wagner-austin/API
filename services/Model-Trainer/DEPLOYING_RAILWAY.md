@@ -16,7 +16,7 @@ Service: API (model-trainer-api)
 - Exposed Port: Use platform default (image honors `$PORT`, defaults 8000)
 - Healthcheck Path: `/readyz`
 - Environment Variables:
-  - `REDIS_URL` = Use Redis plugin provided URL
+  - `REDIS__URL` = Use Redis plugin provided URL
   - `APP__ARTIFACTS_ROOT` = `/data/artifacts`
   - `APP__RUNS_ROOT` = `/data/runs`
   - `APP__LOGS_ROOT` = `/data/logs`
@@ -30,7 +30,7 @@ Service: Worker (model-trainer-worker)
 - Builder: Dockerfile
 - Dockerfile Path: `Dockerfile`
 - Start Command: `/app/.venv/bin/modeltrainer-rq-worker`
-- Environment + Volumes: same as API (especially `REDIS_URL` and `/data` mount)
+- Environment + Volumes: same as API (especially `REDIS__URL` and `/data` mount)
 
  Notes on Reliability and Drift
 - Single source of truth for container logic is `Dockerfile`.
@@ -50,7 +50,11 @@ API Quick Reference
 - Health: `GET /healthz`, `GET /readyz`
 - Tokenizers: `POST /tokenizers/train`, `GET /tokenizers/{id}`
 - Training Runs: `POST /runs/train`, `GET /runs/{id}`, `POST /runs/{id}/evaluate`, `GET /runs/{id}/eval`
-- Logs: `GET /runs/{id}/logs` and `/runs/{id}/logs/stream`
+- Artifacts: `GET /runs/{id}/artifact`
+- Logs: `GET /runs/{id}/logs`, `GET /runs/{id}/logs/stream`
+- Cancellation: `POST /runs/{id}/cancel`
+- Inference: `POST /runs/{id}/generate`, `GET /runs/{id}/generate/{request_id}`, `POST /runs/{id}/score`, `GET /runs/{id}/score/{request_id}`
+- Chat: `POST /runs/{id}/chat`, `GET /runs/{id}/chat/{session_id}/{request_id}`, `GET /runs/{id}/chat/{session_id}`, `DELETE /runs/{id}/chat/{session_id}`
 
 Security
 - If `SECURITY__API_KEY` is set, all endpoints require header: `X-API-Key: <value>`.
