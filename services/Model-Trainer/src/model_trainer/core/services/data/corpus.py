@@ -34,11 +34,11 @@ def count_lines(files: Sequence[str]) -> int:
 
 
 def sample_lines(files: Sequence[str], k: int, *, seed: int) -> list[str]:
-    import random
+    from model_trainer.core import _test_hooks
 
     if k <= 0:
         return []
-    rng = random.Random(seed)
+    rng = _test_hooks.random_factory(seed)
     reservoir: list[str] = []
     for i, s in enumerate(iter_lines(files), start=1):
         if len(reservoir) < k:

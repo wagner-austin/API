@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import shutil
-
-import pytest
-
+from model_trainer.core import _test_hooks
 from model_trainer.core.services.container import _create_tokenizer_registry
 
 
-def test_tokenizer_registry_without_sentencepiece(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _which_none(name: str) -> None:
+def test_tokenizer_registry_without_sentencepiece() -> None:
+    def _which_none(cmd: str) -> None:
         return None
 
-    monkeypatch.setattr(shutil, "which", _which_none)
+    _test_hooks.shutil_which = _which_none
     reg = _create_tokenizer_registry()
     assert "bpe" in reg.backends and "sentencepiece" not in reg.backends
 
 
-def test_tokenizer_registry_with_sentencepiece(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _which_path(name: str) -> str:
+def test_tokenizer_registry_with_sentencepiece() -> None:
+    def _which_path(cmd: str) -> str:
         return "/bin/spm"
 
-    monkeypatch.setattr(shutil, "which", _which_path)
+    _test_hooks.shutil_which = _which_path
     reg = _create_tokenizer_registry()
     assert "sentencepiece" in reg.backends

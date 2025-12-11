@@ -4,9 +4,10 @@ from typing import Final
 
 from platform_core.json_utils import JSONValue
 from platform_core.queues import TRAINER_QUEUE
-from platform_workers.redis import _RedisBytesClient, redis_raw_for_rq
-from platform_workers.rq_harness import RQClientQueue, RQJobLike, rq_queue, rq_retry
+from platform_workers.redis import _RedisBytesClient
+from platform_workers.rq_harness import RQClientQueue, RQJobLike
 
+from ... import _test_hooks
 from ...contracts.conversation import ChatJobPayload
 from ...contracts.queue import (
     EvalJobPayload,
@@ -49,12 +50,12 @@ class RQEnqueuer:
         self.settings = settings
 
     def _connection(self: RQEnqueuer) -> _RedisBytesClient:
-        return redis_raw_for_rq(self.redis_url)
+        return _test_hooks.rq_connection_factory(self.redis_url)
 
     def enqueue_train(self: RQEnqueuer, payload: TrainJobPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         req = payload["request"]
@@ -98,8 +99,8 @@ class RQEnqueuer:
 
     def enqueue_eval(self: RQEnqueuer, payload: EvalJobPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         payload_dict: dict[str, JSONValue] = {
@@ -120,8 +121,8 @@ class RQEnqueuer:
 
     def enqueue_tokenizer(self: RQEnqueuer, payload: TokenizerTrainPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         payload_dict: dict[str, JSONValue] = {
@@ -146,8 +147,8 @@ class RQEnqueuer:
 
     def enqueue_score(self: RQEnqueuer, payload: ScoreJobPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         payload_dict: dict[str, JSONValue] = {
@@ -172,8 +173,8 @@ class RQEnqueuer:
 
     def enqueue_generate(self: RQEnqueuer, payload: GenerateJobPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         stop_seq_json: list[JSONValue] = list(payload["stop_sequences"])
@@ -204,8 +205,8 @@ class RQEnqueuer:
 
     def enqueue_chat(self: RQEnqueuer, payload: ChatJobPayload) -> str:
         conn = self._connection()
-        q: RQClientQueue = rq_queue(self.queue_name, connection=conn)
-        retry = rq_retry(
+        q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
+        retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
         payload_dict: dict[str, JSONValue] = {

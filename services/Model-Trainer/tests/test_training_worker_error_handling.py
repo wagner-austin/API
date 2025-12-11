@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, NoReturn, Protocol
 
 import pytest
-from platform_workers.redis import _load_redis_error_class
-from platform_workers.testing import FakeRedis
+from platform_workers.redis import RedisStrProto
+from platform_workers.testing import (
+    FakeRedisConditionalHsetError,
+    FakeRedisConditionalHsetRedisError,
+)
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.worker import train_job
@@ -31,8 +35,20 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_root: Path, expected_fid: str) -> None:
+        self._corpus_root = corpus_root
+        self._expected_fid = expected_fid
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        assert fid == self._expected_fid
+        return self._corpus_root
+
+
 def test_process_train_job_reraises_non_redis_error_on_handle_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     """Cover training_worker.py line 421 (non-Redis error re-raises during error handling).
 
@@ -48,7 +64,11 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
         logs_root=str(logs_root),
         data_root=str(tmp_path / "data"),
     )
-    monkeypatch.setattr(train_job, "load_settings", lambda: settings)
+
+    def _test_load_settings() -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _test_load_settings
 
     payload: TrainJobPayload = {
         "run_id": "run-non-redis-err",
@@ -79,55 +99,41 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
     }
     corpus_root = tmp_path / "corpus"
     corpus_root.mkdir()
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            assert fid == "deadbeef"
-            return corpus_root
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     (corpus_root / "a.txt").write_text("hello\n", encoding="utf-8")
 
-    # Use FakeRedis with conditional hset - only fail when status == "failed"
-    # This allows the initial save (status=processing) to succeed, then fails
-    # when _handle_train_error saves with status=failed
-    client = FakeRedis()
-    original_hset = client.hset
+    # Create fake corpus fetcher via hook
+    fake_fetcher = _FakeCorpusFetcher(corpus_root, "deadbeef")
 
-    def conditional_hset(key: str, mapping: dict[str, str]) -> int:
-        if mapping.get("status") == "failed":
-            client._record("hset", key, mapping)
-            raise RuntimeError("non-redis error during error handling")
-        return original_hset(key, mapping)
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return fake_fetcher
 
-    monkeypatch.setattr(client, "hset", conditional_hset)
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
 
-    def _fake_redis(settings: Settings) -> FakeRedis:
+    # Use specialized FakeRedis that fails with RuntimeError when status == "failed"
+    client = FakeRedisConditionalHsetError(fail_on_status="failed")
+
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return client
 
-    monkeypatch.setattr(train_job, "redis_client", _fake_redis)
+    _test_hooks.kv_store_factory = _fake_kv_store
 
     # Force training to fail so we enter the error handling path
-    class _C:
-        @staticmethod
-        def from_settings(_: Settings) -> None:
-            raise RuntimeError("training failed")
+    def _fail_container(settings: Settings) -> NoReturn:
+        raise RuntimeError("training failed")
 
-    monkeypatch.setattr(train_job, "ServiceContainer", _C)
+    _test_hooks.service_container_from_settings = _fail_container
 
     # The non-Redis error during error handling should be re-raised (line 421)
-    with pytest.raises(RuntimeError, match="non-redis error during error handling"):
+    with pytest.raises(RuntimeError, match="simulated hset failure"):
         train_job.process_train_job(payload)
 
     client.assert_only_called({"hset", "publish", "set"})
 
 
 def test_process_train_job_logs_redis_error_on_handle_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     """Cover training_worker.py line 678 (Redis error logs warning during error handling).
 
@@ -143,7 +149,11 @@ def test_process_train_job_logs_redis_error_on_handle_error(
         logs_root=str(logs_root),
         data_root=str(tmp_path / "data"),
     )
-    monkeypatch.setattr(train_job, "load_settings", lambda: settings)
+
+    def _test_load_settings() -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _test_load_settings
 
     payload: TrainJobPayload = {
         "run_id": "run-redis-err",
@@ -174,44 +184,31 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     }
     corpus_root = tmp_path / "corpus"
     corpus_root.mkdir()
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            assert fid == "deadbeef"
-            return corpus_root
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     (corpus_root / "a.txt").write_text("hello\n", encoding="utf-8")
 
-    # Use FakeRedis with conditional hset - only fail when status == "failed"
-    client = FakeRedis()
-    original_hset = client.hset
-    redis_error_cls = _load_redis_error_class()
+    # Create fake corpus fetcher via hook
+    fake_fetcher = _FakeCorpusFetcher(corpus_root, "deadbeef")
 
-    def conditional_hset(key: str, mapping: dict[str, str]) -> int:
-        if mapping.get("status") == "failed":
-            client._record("hset", key, mapping)
-            raise redis_error_cls("simulated redis connection failure")
-        return original_hset(key, mapping)
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return fake_fetcher
 
-    monkeypatch.setattr(client, "hset", conditional_hset)
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
 
-    def _fake_redis(settings: Settings) -> FakeRedis:
+    # Use specialized FakeRedis that fails with Redis error when status == "failed"
+    client = FakeRedisConditionalHsetRedisError(fail_on_status="failed")
+
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return client
 
-    monkeypatch.setattr(train_job, "redis_client", _fake_redis)
+    _test_hooks.kv_store_factory = _fake_kv_store
 
     # Force training to fail so we enter the error handling path
-    class _C:
-        @staticmethod
-        def from_settings(_: Settings) -> None:
-            raise RuntimeError("training failed")
+    def _fail_container(settings: Settings) -> NoReturn:
+        raise RuntimeError("training failed")
 
-    monkeypatch.setattr(train_job, "ServiceContainer", _C)
+    _test_hooks.service_container_from_settings = _fail_container
 
     # The original training error should be re-raised (not the Redis error)
     # The Redis error is logged as a warning (line 678)

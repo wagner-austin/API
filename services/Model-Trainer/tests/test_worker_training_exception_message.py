@@ -7,24 +7,36 @@ from platform_core.errors import AppError
 from platform_core.job_types import job_key
 from platform_workers.testing import FakeRedis
 
-from model_trainer.core.config.settings import Settings
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import CorpusFetcherProto
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.worker import train_job
 
 
-def test_training_worker_sets_status_message_on_exception(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> None:
     """Test that training errors set status to failed and message before propagating."""
     fake = FakeRedis()
 
-    def _fake_redis(settings: Settings) -> FakeRedis:
+    def _fake_kv(url: str) -> FakeRedis:
         return fake
 
-    monkeypatch.setattr(train_job, "redis_client", _fake_redis)
+    _test_hooks.kv_store_factory = _fake_kv
 
-    # Ensure artifacts root has no tokenizer so worker fails with AppError
-    monkeypatch.setenv("APP__ARTIFACTS_ROOT", str(tmp_path / "artifacts"))
+    # Stub fetcher to point to local corpus dir
+    (tmp_path / "corpus").mkdir()
+
+    class _FakeCorpusFetcher:
+        def __init__(self, api_url: str, api_key: str, cache_dir: Path) -> None:
+            self._tmp = tmp_path
+
+        def fetch(self, fid: str) -> Path:
+            return self._tmp / "corpus"
+
+    def _fake_fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+        return _FakeCorpusFetcher(api_url, api_key, cache_dir)
+
+    _test_hooks.corpus_fetcher_factory = _fake_fetcher_factory
+
     # Build payload with nonexistent tokenizer
     payload: TrainJobPayload = {
         "run_id": "run-x",
@@ -53,19 +65,6 @@ def test_training_worker_sets_status_message_on_exception(
             "precision": "auto",
         },
     }
-
-    # Stub fetcher to point to local corpus dir
-    (tmp_path / "corpus").mkdir()
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            return tmp_path / "corpus"
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
 
     with pytest.raises(AppError, match="Tokenizer artifact not found"):
         train_job.process_train_job(payload)  # raises due to missing tokenizer artifact

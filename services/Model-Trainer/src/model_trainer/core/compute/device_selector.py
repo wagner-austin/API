@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Final, Literal
 
+from model_trainer.core import _test_hooks
+
 RequestedDevice = Literal["cpu", "cuda", "auto"]
 ResolvedDevice = Literal["cpu", "cuda"]
 RequestedPrecision = Literal["fp32", "fp16", "bf16", "auto"]
@@ -27,9 +29,8 @@ def resolve_device(requested: RequestedDevice) -> ResolvedDevice:
     if requested == _CPU:
         return _CPU
 
-    import torch as _torch  # local import to avoid import-time side effects
-
-    return _CUDA if _torch.cuda.is_available() else _CPU
+    # Use hook for CUDA availability check - allows testing without torch import
+    return _CUDA if _test_hooks.cuda_is_available() else _CPU
 
 
 def recommended_batch_size(current: int, device: ResolvedDevice) -> int:

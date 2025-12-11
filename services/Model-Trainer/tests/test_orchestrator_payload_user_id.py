@@ -1,18 +1,46 @@
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
-from platform_workers.testing import FakeRedis
+from platform_core.json_utils import JSONValue
+from platform_workers.redis import _RedisBytesClient
+from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 
 from model_trainer.api.schemas.runs import TrainRequest
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
 
 
-def test_orchestrator_threads_user_id(monkeypatch: MonkeyPatch) -> None:
+def _get_payload_user_id(raw: JSONValue) -> int:
+    """Extract user_id from a raw JSON payload dict."""
+    if not isinstance(raw, dict):
+        raise AssertionError("payload must be dict")
+    val = raw.get("user_id")
+    if not isinstance(val, int):
+        raise AssertionError("user_id must be int")
+    return val
+
+
+def test_orchestrator_threads_user_id() -> None:
     s = load_settings()
     r = FakeRedis()
-    # Real enqueuer instance for type compatibility
+
+    # Set up fake RQ infrastructure via hooks
+    fake_queue = FakeQueue(job_id="job-1")
+
+    def _fake_rq_connection(url: str) -> _RedisBytesClient:
+        return FakeRedisBytesClient()
+
+    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> FakeQueue:
+        return fake_queue
+
+    def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> FakeRetry:
+        return FakeRetry(max=max_retries, interval=intervals)
+
+    _test_hooks.rq_connection_factory = _fake_rq_connection
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
+
     enq = RQEnqueuer(
         redis_url="redis://localhost:6379/0",
         settings=RQSettings(
@@ -23,32 +51,8 @@ def test_orchestrator_threads_user_id(monkeypatch: MonkeyPatch) -> None:
             retry_intervals=[],
         ),
     )
-    seen: dict[str, int] = {}
 
-    def _fake_enqueue_train(payload: dict[str, str | int | float | bool | None]) -> str:
-        val = payload.get("user_id")
-        assert val == 42, f"Expected user_id to be 42, got {val}"
-        if not isinstance(val, int):
-            raise AssertionError(f"Expected user_id to be int, got {type(val)}")
-        seen["user_id"] = val
-        return "job-1"
-
-    monkeypatch.setattr(enq, "enqueue_train", _fake_enqueue_train)
     orch = TrainingOrchestrator(settings=s, redis_client=r, enqueuer=enq, model_registry=None)
-    # Stub CorpusFetcher to avoid network and provide a local path
-    import tempfile
-    from pathlib import Path
-
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, file_id: str) -> Path:
-            return Path(tempfile.gettempdir())
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     req = TrainRequest(
         model_family="gpt2",
         model_size="small",
@@ -72,5 +76,12 @@ def test_orchestrator_threads_user_id(monkeypatch: MonkeyPatch) -> None:
         precision="auto",
     )
     out = orch.enqueue_training(req)
-    assert out["run_id"] and seen.get("user_id") == 42
+    assert out["run_id"]
+
+    # Verify user_id was passed correctly in the payload
+    assert len(fake_queue.jobs) == 1
+    job = fake_queue.jobs[0]
+    user_id = _get_payload_user_id(job.args[0])
+    assert user_id == 42
+
     r.assert_only_called({"hset"})

@@ -10,7 +10,7 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _find_monorepo_root(start: Path) -> Path:
+def _find_monorepo_root_impl(start: Path) -> Path:
     current = start
     while True:
         if (current / "libs").is_dir():
@@ -20,7 +20,18 @@ def _find_monorepo_root(start: Path) -> Path:
         current = current.parent
 
 
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+def _find_monorepo_root(start: Path) -> Path:
+    """Find monorepo root, using hook if set."""
+    # Import here to avoid circular imports at module load time
+    from model_trainer.core import _test_hooks
+
+    hook = _test_hooks.guard_find_monorepo_root
+    if hook is not None:
+        return hook(start)
+    return _find_monorepo_root_impl(start)
+
+
+def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -28,6 +39,17 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
     run_for_project: _RunForProject = mod.run_for_project
     return run_for_project
+
+
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+    """Load orchestrator, using hook if set."""
+    # Import here to avoid circular imports at module load time
+    from model_trainer.core import _test_hooks
+
+    hook = _test_hooks.guard_load_orchestrator
+    if hook is not None:
+        return hook(monorepo_root)
+    return _load_orchestrator_impl(monorepo_root)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

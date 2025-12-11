@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Protocol
 
 import torch
-from pytest import MonkeyPatch
 
 from model_trainer.core.contracts.model import PreparedLMModel
 from model_trainer.core.services.model.backends.gpt2.io import (
@@ -95,6 +94,95 @@ class Tok:
         return "".join(str(i) for i in ids)
 
 
+# Helper classes for load tests - defined at module level to reduce complexity
+
+
+class _TokH:
+    """Tokenizer handle with EOS/PAD token support."""
+
+    def encode(self: _TokH, text: str) -> list[int]:
+        return [1]
+
+    def token_to_id(self: _TokH, token: str) -> int | None:
+        if token == "[EOS]":
+            return 2
+        if token == "[PAD]":
+            return 0
+        return None
+
+    def get_vocab_size(self: _TokH) -> int:
+        return 16
+
+    def decode(self: _TokH, ids: list[int]) -> str:
+        return "".join(str(i) for i in ids)
+
+
+class _TokHNoTokens:
+    """Tokenizer handle without special tokens."""
+
+    def encode(self: _TokHNoTokens, text: str) -> list[int]:
+        return [1]
+
+    def token_to_id(self: _TokHNoTokens, token: str) -> int | None:
+        return None
+
+    def get_vocab_size(self: _TokHNoTokens) -> int:
+        return 16
+
+    def decode(self: _TokHNoTokens, ids: list[int]) -> str:
+        return "".join(str(i) for i in ids)
+
+
+class _CfgWithPositions(ConfigLike):
+    """Config with n_positions set."""
+
+    n_positions: int = 64
+
+
+class _CfgNoPositions(ConfigLike):
+    """Config without n_positions to trigger default."""
+
+    pass
+
+
+class _FakeModel(LMModelProto):
+    """Fake model with configurable n_positions."""
+
+    def __init__(self: _FakeModel, cfg: ConfigLike) -> None:
+        self._config = cfg
+
+    @classmethod
+    def from_pretrained(cls: type[_FakeModel], path: str) -> LMModelProto:
+        return cls(_CfgWithPositions())
+
+    def train(self: _FakeModel) -> None:
+        pass
+
+    def eval(self: _FakeModel) -> None:
+        pass
+
+    def forward(
+        self: _FakeModel, *, input_ids: torch.Tensor, labels: torch.Tensor
+    ) -> ForwardOutProto:
+        return _Fwd()
+
+    def parameters(self: _FakeModel) -> Sequence[ParameterLike]:
+        return []
+
+    def named_parameters(self: _FakeModel) -> Sequence[tuple[str, NamedParameter]]:
+        return []
+
+    def to(self: _FakeModel, device: str) -> LMModelProto:
+        return self
+
+    def save_pretrained(self: _FakeModel, out_dir: str) -> None:
+        pass
+
+    @property
+    def config(self: _FakeModel) -> ConfigLike:
+        return self._config
+
+
 def test_token_ids_defaults_when_missing() -> None:
     class FakeTok:
         def token_to_id(self: FakeTok, token: str) -> int | None:
@@ -123,67 +211,27 @@ def test_save_prepared_gpt2_writes(tmp_path: Path) -> None:
     assert (tmp_path / "m" / "weights.bin").exists()
 
 
-def test_load_prepared_gpt2_from_handle_uses_n_positions(monkeypatch: MonkeyPatch) -> None:
-    class TokH:
-        def encode(self: TokH, text: str) -> list[int]:
-            return [1]
+def test_load_prepared_gpt2_from_handle_uses_n_positions() -> None:
+    from model_trainer.core import _test_hooks
 
-        def token_to_id(self: TokH, token: str) -> int | None:
-            if token == "[EOS]":
-                return 2
-            if token == "[PAD]":
-                return 0
-            return None
+    def fake_load(path: str) -> LMModelProto:
+        _ = path
+        return _FakeModel(_CfgWithPositions())
 
-        def get_vocab_size(self: TokH) -> int:
-            return 16
+    _test_hooks.load_gpt2_model = fake_load
 
-        def decode(self: TokH, ids: list[int]) -> str:
-            return "".join(str(i) for i in ids)
-
-    class _M:
-        def __init__(self: _M) -> None:
-            class _Cfg:
-                n_positions = 64
-
-            self.config = _Cfg()
-
-    def fake_load(path: str) -> _M:
-        return _M()
-
-    import model_trainer.core.services.model.backends.gpt2.io as _io
-
-    monkeypatch.setattr(_io, "load_gpt2_model", fake_load)
-    prepared = load_prepared_gpt2_from_handle("/does/not/matter", TokH())
+    prepared = load_prepared_gpt2_from_handle("/does/not/matter", _TokH())
     assert prepared.max_seq_len == 64
 
 
-def test_load_prepared_gpt2_from_handle_defaults_when_missing(monkeypatch: MonkeyPatch) -> None:
-    class TokH:
-        def encode(self: TokH, text: str) -> list[int]:
-            return [1]
+def test_load_prepared_gpt2_from_handle_defaults_when_missing() -> None:
+    from model_trainer.core import _test_hooks
 
-        def token_to_id(self: TokH, token: str) -> int | None:
-            return None
+    def fake_load2(path: str) -> LMModelProto:
+        _ = path
+        return _FakeModel(_CfgNoPositions())
 
-        def get_vocab_size(self: TokH) -> int:
-            return 16
+    _test_hooks.load_gpt2_model = fake_load2
 
-        def decode(self: TokH, ids: list[int]) -> str:
-            return "".join(str(i) for i in ids)
-
-    class _M2:
-        def __init__(self: _M2) -> None:
-            class _Cfg:
-                pass
-
-            self.config = _Cfg()
-
-    def fake_load2(path: str) -> _M2:
-        return _M2()
-
-    import model_trainer.core.services.model.backends.gpt2.io as _io2
-
-    monkeypatch.setattr(_io2, "load_gpt2_model", fake_load2)
-    prepared = load_prepared_gpt2_from_handle("/no/file", TokH())
+    prepared = load_prepared_gpt2_from_handle("/no/file", _TokHNoTokens())
     assert prepared.max_seq_len == 512

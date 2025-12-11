@@ -21,7 +21,8 @@ from platform_core.trainer_keys import (
 from platform_workers.redis import RedisStrProto
 from typing_extensions import TypedDict
 
-from model_trainer.core.config.settings import Settings, load_settings
+from model_trainer.core import _test_hooks
+from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.conversation import (
     ChatJobPayload,
     ConversationMessage,
@@ -94,11 +95,13 @@ def _ensure_model_downloaded(settings: Settings, r: RedisStrProto, run_id: str) 
             model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
         )
 
+    from platform_core.data_bank_client import DataBankClient
     from platform_ml import ArtifactStore
 
     api_url = settings["app"]["data_bank_api_url"]
     api_key = settings["app"]["data_bank_api_key"]
-    store = ArtifactStore(api_url, api_key)
+    client = DataBankClient(api_url, api_key)
+    store = ArtifactStore(client)
     models_root = models_dir(settings)
     expected_root = f"model-{run_id}"
     normalized = models_root / run_id
@@ -171,7 +174,7 @@ def _update_session_ttl(r: RedisStrProto, run_id: str, session_id: str) -> None:
 
 def process_chat_job(payload: ChatJobPayload) -> None:
     """Process a chat job with conversation memory."""
-    settings = load_settings()
+    settings = _test_hooks.load_settings()
     setup_job_logging(settings)
 
     log = get_logger(__name__)

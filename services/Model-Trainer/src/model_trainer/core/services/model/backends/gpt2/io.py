@@ -8,8 +8,6 @@ from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoder, HandleEncoder
 from model_trainer.core.types import ConfigLike, LMModelProto
 
-from .hf_gpt2 import load_gpt2_model
-
 
 def encoder_from_handle(handle: TokenizerHandle) -> Encoder:
     return HandleEncoder(handle)
@@ -54,8 +52,10 @@ def get_model_max_seq_len(model: LMModelProto) -> int:
 def load_prepared_gpt2_from_handle(
     artifact_path: str, tokenizer: TokenizerHandle
 ) -> PreparedLMModel:
+    from model_trainer.core import _test_hooks
+
     eos_id, pad_id, _ = token_ids(tokenizer)
-    model = load_gpt2_model(artifact_path)
+    model = _test_hooks.load_gpt2_model(artifact_path)
     max_seq_len = get_model_max_seq_len(model)
     return PreparedLMModel(
         model=model,

@@ -228,7 +228,9 @@ def test_cleanup_success_deletes_directory(tmp_path: Path) -> None:
     r.assert_only_called({"set", "hset", "get", "hgetall"})
 
 
-def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cleanup_deletion_failure_raises(tmp_path: Path) -> None:
+    from model_trainer.core import _test_hooks
+
     settings = _settings_with_cleanup(enabled=True)
     r = FakeRedis()
     r.set(artifact_file_id_key("run-8"), "fid-000")
@@ -238,13 +240,11 @@ def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.Mon
 
     delete_called: Final[list[bool]] = [False]
 
-    def _fail_rmtree(path: str) -> None:
+    def _fail_rmtree(path: str | Path) -> None:
         delete_called[0] = True
         raise OSError("boom")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.storage.artifact_cleanup.shutil.rmtree", _fail_rmtree
-    )
+    _test_hooks.shutil_rmtree = _fail_rmtree
     service = _service(settings, r)
 
     with pytest.raises(CleanupError):
@@ -256,16 +256,16 @@ def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_cleanup_grace_period_delays_before_delete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
+    from model_trainer.core import _test_hooks
+
     sleep_called: Final[list[float]] = []
 
     def _fake_sleep(seconds: float) -> None:
         sleep_called.append(seconds)
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.storage.artifact_cleanup.time.sleep", _fake_sleep
-    )
+    _test_hooks.time_sleep = _fake_sleep
 
     settings = _settings_with_cleanup(
         enabled=True,

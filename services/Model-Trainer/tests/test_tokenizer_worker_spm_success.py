@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
-from _pytest.monkeypatch import MonkeyPatch
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TokenizerTrainPayload
-from model_trainer.core.contracts.tokenizer import TokenizerTrainStats
 from model_trainer.worker.tokenizer_worker import process_tokenizer_train_job
 
 
@@ -29,46 +29,55 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-def test_tokenizer_worker_spm_success(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_path: Path) -> None:
+        self._corpus_path = corpus_path
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        return self._corpus_path
+
+
+def test_tokenizer_worker_spm_success(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    """Test SPM tokenizer training completes successfully."""
+    # Fake redis via hook
     fake = FakeRedis()
 
-    def _redis_for_kv(url: str) -> FakeRedis:
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return fake
 
-    monkeypatch.setattr(
-        "model_trainer.worker.tokenizer_worker.redis_for_kv",
-        _redis_for_kv,
-    )
+    _test_hooks.kv_store_factory = _fake_kv_store
 
-    # Force CLI available
-    def _which(_name: str) -> str:
+    # Force CLI available via shutil_which hook
+    def _which(cmd: str) -> str | None:
         return "spm"
 
-    monkeypatch.setattr(
-        "model_trainer.worker.tokenizer_worker.shutil.which",
-        _which,
-    )
+    _test_hooks.shutil_which = _which
 
-    # Stub the backend class imported inside the worker branch
-    class _SPMBackend:
-        def train(
-            self: _SPMBackend, cfg: dict[str, str | int | float | bool]
-        ) -> TokenizerTrainStats:
-            return TokenizerTrainStats(
-                coverage=0.9,
-                oov_rate=0.1,
-                token_count=10,
-                char_coverage=0.8,
-            )
+    # Stub spm_require_cli to not raise
+    def _noop_require_cli() -> None:
+        pass
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.tokenizer.spm_backend.SentencePieceBackend",
-        _SPMBackend,
-        raising=True,
-    )
+    _test_hooks.spm_require_cli = _noop_require_cli
 
+    # Stub spm_train to create mock files
+    def _fake_spm_train(files: list[str], *, model_prefix: str, vocab_size: int) -> None:
+        model_path = Path(model_prefix + ".model")
+        vocab_path = Path(model_prefix + ".vocab")
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        model_path.write_bytes(b"\x00\x01mock")
+        vocab_path.write_text("[UNK]\t0\nA\t0\nB\t0\n", encoding="utf-8")
+
+    _test_hooks.spm_train = _fake_spm_train
+
+    # Stub spm_encode_ids to return token IDs
+    def _fake_spm_encode_ids(model_path: str, text: str) -> list[int]:
+        return [1, 2, 3]
+
+    _test_hooks.spm_encode_ids = _fake_spm_encode_ids
+
+    # Settings via hook
     settings = settings_factory(
         artifacts_root=str(tmp_path / "artifacts"),
         data_root=str(tmp_path / "data"),
@@ -77,10 +86,19 @@ def test_tokenizer_worker_spm_success(
     def _load_settings() -> Settings:
         return settings
 
-    monkeypatch.setattr("model_trainer.worker.tokenizer_worker.load_settings", _load_settings)
+    _test_hooks.load_settings = _load_settings
+
     # Minimal corpus
     (tmp_path / "c").mkdir()
     (tmp_path / "c" / "a.txt").write_text("hi\n", encoding="utf-8")
+
+    # Stub corpus fetcher via hook
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return _FakeCorpusFetcher(tmp_path / "c")
+
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
 
     payload: TokenizerTrainPayload = {
         "tokenizer_id": "tok-spm-succ",
@@ -91,17 +109,7 @@ def test_tokenizer_worker_spm_success(
         "holdout_fraction": 0.1,
         "seed": 1,
     }
-    # Stub fetcher to return local corpus dir
-    from model_trainer.core.services.data import corpus_fetcher as cf
 
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            return tmp_path / "c"
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     process_tokenizer_train_job(payload)
     assert fake.get("tokenizer:tok-spm-succ:status") == "completed"
     stats_json = fake.get("tokenizer:tok-spm-succ:stats")

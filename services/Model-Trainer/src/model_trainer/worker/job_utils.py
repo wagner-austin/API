@@ -14,8 +14,9 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.compute.device_selector import (
     RequestedDevice,
     RequestedPrecision,
@@ -39,7 +40,7 @@ EVENTS_CHANNEL = "trainer:events"
 
 def redis_client(settings: Settings) -> RedisStrProto:
     """Create Redis client from settings."""
-    return redis_for_kv(settings["redis"]["url"])
+    return _test_hooks.kv_store_factory(settings["redis"]["url"])
 
 
 def publish_metrics(r: RedisStrProto, message: str) -> None:

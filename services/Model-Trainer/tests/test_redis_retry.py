@@ -1,44 +1,54 @@
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
+from platform_workers.redis import _load_redis_error_class
 from platform_workers.testing import FakeRedis as _FakeRedis
-from redis.exceptions import RedisError
 
 from model_trainer.core.infra.redis_utils import get_with_retry, set_with_retry
 
+_RedisError: type[BaseException] = _load_redis_error_class()
 
-def test_get_with_retry_succeeds_after_transient(monkeypatch: MonkeyPatch) -> None:
-    client = _FakeRedis()
-    client.set("a", "b")
-    calls: dict[str, int] = {"n": 0}
 
-    original_get = client.get
+class _FlakyGetRedis(_FakeRedis):
+    """FakeRedis that fails on first get call."""
 
-    def flaky_get(key: str) -> str | None:
-        if calls["n"] == 0:
-            calls["n"] += 1
-            raise RedisError("transient")
-        return original_get(key)
+    def __init__(self) -> None:
+        super().__init__()
+        self._get_calls = 0
 
-    monkeypatch.setattr(client, "get", flaky_get, raising=True)
+    def get(self, key: str) -> str | None:
+        self._record("get", key)
+        self._get_calls += 1
+        if self._get_calls == 1:
+            raise _RedisError("transient")
+        return self._strings.get(key)
+
+
+class _FlakySetRedis(_FakeRedis):
+    """FakeRedis that fails on first set call."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._set_calls = 0
+
+    def set(self, key: str, value: str) -> bool:
+        self._record("set", key, value)
+        self._set_calls += 1
+        if self._set_calls == 1:
+            raise _RedisError("transient")
+        self._strings[key] = value
+        return True
+
+
+def test_get_with_retry_succeeds_after_transient() -> None:
+    client = _FlakyGetRedis()
+    client._strings["a"] = "b"  # Seed data directly
     val = get_with_retry(client, "a")
     assert val == "b"
-    client.assert_only_called({"set", "get"})
+    client.assert_only_called({"get"})
 
 
-def test_set_with_retry_succeeds_after_transient(monkeypatch: MonkeyPatch) -> None:
-    client = _FakeRedis()
-    calls: dict[str, int] = {"n": 0}
-
-    original_set = client.set
-
-    def flaky_set(key: str, value: str) -> bool | str | None:
-        if calls["n"] == 0:
-            calls["n"] += 1
-            raise RedisError("transient")
-        return original_set(key, value)
-
-    monkeypatch.setattr(client, "set", flaky_set, raising=True)
+def test_set_with_retry_succeeds_after_transient() -> None:
+    client = _FlakySetRedis()
     set_with_retry(client, "a", "b")
     v_after = client.get("a")
     assert v_after == "b"

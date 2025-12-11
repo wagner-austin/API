@@ -202,8 +202,10 @@ def test_manifest_json_error_raises(tmp_path: Path) -> None:
 
 
 def test_tokenizer_cleanup_deletion_failure_raises(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
+    from model_trainer.core import _test_hooks
+
     artifacts = tmp_path
     tokenizers_root = artifacts / "tokenizers"
     tokenizers_root.mkdir()
@@ -219,21 +221,21 @@ def test_tokenizer_cleanup_deletion_failure_raises(
     settings = _settings_with_tokenizer_cleanup(cfg, artifacts)
     svc = TokenizerCleanupService(settings=settings)
 
-    def _fail_rmtree(_path: Path) -> None:
+    def _fail_rmtree(path: str | Path) -> None:
         raise OSError("boom")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.tokenizer.tokenizer_cleanup.shutil.rmtree",
-        _fail_rmtree,
-    )
+    _test_hooks.shutil_rmtree = _fail_rmtree
 
     with pytest.raises(TokenizerCleanupError):
         svc.clean()
 
 
 def test_tokenizer_cleanup_oserror_on_iterdir_raises(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
+    from model_trainer.core import _test_hooks
+    from model_trainer.core._test_hooks import PathIterator
+
     artifacts = tmp_path
     tokenizers_root = artifacts / "tokenizers"
     tokenizers_root.mkdir()
@@ -242,13 +244,10 @@ def test_tokenizer_cleanup_oserror_on_iterdir_raises(
     settings = _settings_with_tokenizer_cleanup(cfg, artifacts)
     svc = TokenizerCleanupService(settings=settings)
 
-    def _iterdir_fail(_self: Path) -> None:
+    def _iterdir_fail(path: Path) -> PathIterator:
         raise OSError("iterdir-fail")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.tokenizer.tokenizer_cleanup.Path.iterdir",
-        _iterdir_fail,
-    )
+    _test_hooks.path_iterdir = _iterdir_fail
 
     with pytest.raises(TokenizerCleanupError):
         svc.clean()

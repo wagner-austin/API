@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
@@ -99,8 +97,10 @@ class CorpusCacheCleanupService:
             },
         )
 
+        from model_trainer.core import _test_hooks
+
         try:
-            usage = shutil.disk_usage(str(cache_dir))
+            usage = _test_hooks.shutil_disk_usage(str(cache_dir))
         except OSError as exc:
             logger.error(
                 "Failed to read disk usage for corpus cache",
@@ -139,7 +139,7 @@ class CorpusCacheCleanupService:
             if total_bytes <= cfg["max_bytes"] and free_bytes >= cfg["min_free_bytes"]:
                 break
             try:
-                entry.path.unlink()
+                _test_hooks.path_unlink(entry.path)
             except OSError as exc:
                 logger.error(
                     "Failed to delete corpus cache file",
@@ -171,10 +171,12 @@ class CorpusCacheCleanupService:
         self: CorpusCacheCleanupService,
         cache_dir: Path,
     ) -> tuple[list[_CacheEntry], int]:
+        from model_trainer.core import _test_hooks
+
         entries: list[_CacheEntry] = []
         total = 0
         try:
-            with os.scandir(str(cache_dir)) as it:
+            with _test_hooks.os_scandir(str(cache_dir)) as it:
                 for dirent in it:
                     if not dirent.is_file():
                         continue

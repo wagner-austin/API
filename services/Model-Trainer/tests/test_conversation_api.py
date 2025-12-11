@@ -12,11 +12,11 @@ from platform_core.trainer_keys import conversation_key, conversation_meta_key
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
-from pytest import MonkeyPatch
 
 from model_trainer.api.routes import runs as runs_routes
 from model_trainer.api.schemas.runs import ChatRequest
 from model_trainer.api.validators.runs import _decode_chat_request
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.container import ServiceContainer
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -32,7 +32,7 @@ from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestr
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
 
 
-def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, FakeQueue]) -> None:
+def _install_fakes(queue_holder: dict[str, FakeQueue]) -> None:
     fake_queue = FakeQueue()
     queue_holder["q"] = fake_queue
 
@@ -45,11 +45,9 @@ def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, FakeQueue])
     def _fake_redis_raw_for_rq(url: str) -> RedisBytesProto:
         return FakeRedisBytesClient()
 
-    monkeypatch.setattr("model_trainer.core.services.queue.rq_adapter.rq_queue", _fake_rq_queue)
-    monkeypatch.setattr("model_trainer.core.services.queue.rq_adapter.rq_retry", _fake_rq_retry)
-    monkeypatch.setattr(
-        "model_trainer.core.services.queue.rq_adapter.redis_raw_for_rq", _fake_redis_raw_for_rq
-    )
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
+    _test_hooks.rq_connection_factory = _fake_redis_raw_for_rq
 
 
 class TestChatRequestValidator:
@@ -153,9 +151,9 @@ class TestDecodeMessagesFromJson:
 
 
 class TestConversationOrchestrator:
-    def test_enqueue_chat_new_session(self, monkeypatch: MonkeyPatch) -> None:
+    def test_enqueue_chat_new_session(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -182,9 +180,9 @@ class TestConversationOrchestrator:
         assert redis.get(conv_key) == "[]"
         redis.assert_only_called({"set", "get", "expire"})
 
-    def test_enqueue_chat_existing_session(self, monkeypatch: MonkeyPatch) -> None:
+    def test_enqueue_chat_existing_session(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -205,9 +203,9 @@ class TestConversationOrchestrator:
         assert resp["status"] == "queued"
         redis.assert_only_called({"set", "get"})
 
-    def test_get_chat_result_not_found(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_result_not_found(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -220,9 +218,9 @@ class TestConversationOrchestrator:
         assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
         redis.assert_only_called({"get"})
 
-    def test_get_chat_result_completed(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_result_completed(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -238,9 +236,9 @@ class TestConversationOrchestrator:
         assert resp["response"] == "Hi!"
         redis.assert_only_called({"set", "get"})
 
-    def test_get_chat_result_corrupt_cache(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_result_corrupt_cache(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -258,9 +256,9 @@ class TestConversationOrchestrator:
         assert "corrupt" in err.message
         redis.assert_only_called({"set", "get"})
 
-    def test_get_history_session_not_found(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_history_session_not_found(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -273,9 +271,9 @@ class TestConversationOrchestrator:
         assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
         redis.assert_only_called({"get"})
 
-    def test_get_history_valid(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_history_valid(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -312,9 +310,9 @@ class TestConversationOrchestrator:
         assert resp["created_at"] == "2025-01-01T00:00:00Z"
         redis.assert_only_called({"set", "get"})
 
-    def test_get_history_corrupt_meta(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_history_corrupt_meta(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -332,9 +330,9 @@ class TestConversationOrchestrator:
         assert "corrupt" in err.message
         redis.assert_only_called({"set", "get"})
 
-    def test_get_history_empty_messages(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_history_empty_messages(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -358,9 +356,9 @@ class TestConversationOrchestrator:
         assert resp["messages"] == []
         redis.assert_only_called({"set", "get"})
 
-    def test_delete_session(self, monkeypatch: MonkeyPatch) -> None:
+    def test_delete_session(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         settings = load_settings()
         redis = FakeRedis()
@@ -415,9 +413,9 @@ def _build_app(container: ServiceContainer) -> TestClient:
 
 
 class TestChatApiRoutes:
-    def test_enqueue_chat_creates_session(self, monkeypatch: MonkeyPatch) -> None:
+    def test_enqueue_chat_creates_session(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))
@@ -438,9 +436,9 @@ class TestChatApiRoutes:
         assert isinstance(data["request_id"], str) and len(data["request_id"]) > 0
         redis.assert_only_called({"set", "expire"})
 
-    def test_get_chat_result_not_found(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_result_not_found(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))
@@ -454,9 +452,9 @@ class TestChatApiRoutes:
         assert resp.status_code == 404
         redis.assert_only_called({"get"})
 
-    def test_get_chat_result_completed(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_result_completed(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))
@@ -478,9 +476,9 @@ class TestChatApiRoutes:
         assert data["response"] == "Hi!"
         redis.assert_only_called({"set", "get"})
 
-    def test_get_chat_history_not_found(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_history_not_found(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))
@@ -494,9 +492,9 @@ class TestChatApiRoutes:
         assert resp.status_code == 404
         redis.assert_only_called({"get"})
 
-    def test_get_chat_history_valid(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_chat_history_valid(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))
@@ -530,9 +528,9 @@ class TestChatApiRoutes:
         assert isinstance(msgs, list) and len(msgs) == 1
         redis.assert_only_called({"set", "get"})
 
-    def test_delete_chat_session(self, monkeypatch: MonkeyPatch) -> None:
+    def test_delete_chat_session(self) -> None:
         queue_holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, queue_holder)
+        _install_fakes(queue_holder)
 
         redis = FakeRedis()
         enq = RQEnqueuer("redis://localhost", RQSettings(1, 1, 1, 0, []))

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import shutil
-import time
 from pathlib import Path
 
 from platform_core.job_types import JobStatusLiteral
@@ -124,9 +122,11 @@ class ArtifactCleanupService:
                 reason="run_not_terminal",
             )
 
+        from model_trainer.core import _test_hooks
+
         grace = self.settings["app"]["cleanup"]["grace_period_seconds"]
         if grace > 0:
-            time.sleep(grace)
+            _test_hooks.time_sleep(grace)
 
         bytes_freed = self._calculate_directory_size(artifact_path)
         files_deleted = self._count_files(artifact_path)
@@ -151,7 +151,7 @@ class ArtifactCleanupService:
             )
 
         try:
-            shutil.rmtree(str(artifact_path))
+            _test_hooks.shutil_rmtree(str(artifact_path))
         except OSError as exc:
             logger.error(
                 "Cleanup failed",

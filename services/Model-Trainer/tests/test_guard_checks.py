@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import logging
-import runpy
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
+from scripts.guard import main as guard_main
+
+from model_trainer.core import _test_hooks
 
 
 def _write(path: Path, text: str) -> None:
@@ -65,7 +65,7 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     assert "local-errors-module" in out
 
 
-def test_guard_main_entry_no_violations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
     project_root = _project_root()
     guard_path = project_root / "scripts" / "guard.py"
 
@@ -78,12 +78,22 @@ def test_guard_main_entry_no_violations(tmp_path: Path, monkeypatch: pytest.Monk
     )
     assert result.returncode == 0
 
-    # Cover __main__ entry point by executing the script directly.
-    # Monkeypatch sys.argv to use tmp_path as root (avoids full project scan timeout)
-    monkeypatch.setattr("sys.argv", ["guard.py", "--root", str(tmp_path)])
-    try:
-        runpy.run_path(str(guard_path), run_name="__main__")
-    except SystemExit as exc:
-        logging.getLogger("model_trainer.tests").info("guard_main_exit code=%s", exc.code)
-        code = exc.code
-        assert code == 0 or code == "0"
+    # Cover __main__ entry point by calling main() directly with args
+    # instead of using runpy.run_path with sys.argv patching
+    # Set up hooks to make guard use tmp_path as root
+    class _FakeFindRoot:
+        def __call__(self, start: Path) -> Path:
+            return tmp_path
+
+    class _FakeLoader:
+        def __call__(self, monorepo_root: Path) -> _test_hooks.RunForProjectProto:
+            def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+                return 0
+
+            return _run_for_project
+
+    _test_hooks.guard_find_monorepo_root = _FakeFindRoot()
+    _test_hooks.guard_load_orchestrator = _FakeLoader()
+
+    code = guard_main(["--root", str(tmp_path)])
+    assert code == 0

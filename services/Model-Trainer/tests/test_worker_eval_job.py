@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
+from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
 from platform_workers.testing import FakeRedis as _FakeRedis
-from pytest import MonkeyPatch
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
@@ -73,16 +75,10 @@ def _verify_eval_result(raw: str | None) -> None:
     assert ppl_v >= 1.0
 
 
-def test_eval_job_success(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     # Use fake redis
     fake = _FakeRedis()
-
-    def _redis_for_kv(url: str) -> _FakeRedis:
-        return fake
-
-    monkeypatch.setattr("model_trainer.worker.job_utils.redis_for_kv", _redis_for_kv)
+    _test_hooks.kv_store_factory = lambda url: fake
 
     # Prepare artifacts and tokenizer
     artifacts = tmp_path / "artifacts"
@@ -95,13 +91,7 @@ def test_eval_job_success(
         data_bank_api_key="secret-key",
     )
 
-    def _load_settings() -> Settings:
-        return settings_for_train
-
-    monkeypatch.setattr(
-        "model_trainer.worker.eval_job.load_settings",
-        _load_settings,
-    )
+    _test_hooks.load_settings = lambda: settings_for_train
 
     corpus = tmp_path / "corpus"
     corpus.mkdir()
@@ -183,32 +173,24 @@ def test_eval_job_success(
     file_id = "fid-eval-1"
     fake.set(artifact_file_id_key(run_id), file_id)
 
-    # Stub DataBankClient used by ArtifactDownloader
-
-    class _ClientStub:
-        def __init__(
-            self: _ClientStub, base_url: str, api_key: str, timeout_seconds: float = 0.0
-        ) -> None:
-            self.base_url = base_url
-            self.api_key = api_key
-            self.timeout_seconds = timeout_seconds
-
-        def download_to_path(
-            self: _ClientStub,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> None:
-            assert file_id == "fid-eval-1"
-            dest.write_bytes(tar_path.read_bytes())
-
     class _FakeStore:
         def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
             pass
+
+        def upload_artifact(
+            self,
+            dir_path: Path,
+            *,
+            artifact_name: str,
+            request_id: str,
+        ) -> FileUploadResponse:
+            return FileUploadResponse(
+                file_id="fake-upload-id",
+                size=1,
+                sha256="x",
+                content_type="application/gzip",
+                created_at=None,
+            )
 
         def download_artifact(
             self,
@@ -224,7 +206,12 @@ def test_eval_job_success(
                 tf.extractall(dest_dir)
             return out
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _FakeStore)
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
 
     # Now process eval job using the worker entry
     payload: EvalJobPayload = {
@@ -238,15 +225,9 @@ def test_eval_job_success(
     fake.assert_only_called({"set", "get"})
 
 
-def test_eval_job_missing_manifest(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     fake = _FakeRedis()
-
-    def _redis_for_kv(url: str) -> _FakeRedis:
-        return fake
-
-    monkeypatch.setattr("model_trainer.worker.job_utils.redis_for_kv", _redis_for_kv)
+    _test_hooks.kv_store_factory = lambda url: fake
 
     artifacts = tmp_path / "artifacts"
     settings = settings_factory(
@@ -258,10 +239,7 @@ def test_eval_job_missing_manifest(
         data_bank_api_key="secret-key",
     )
 
-    def _load_settings() -> Settings:
-        return settings
-
-    monkeypatch.setattr("model_trainer.worker.eval_job.load_settings", _load_settings)
+    _test_hooks.load_settings = lambda: settings
 
     run_id = "run-missing"
     file_id = "fid-missing"
@@ -285,30 +263,24 @@ def test_eval_job_missing_manifest(
                 arcname = Path(name) / rel
                 tf.add(str(abs_path), arcname=str(arcname))
 
-    class _ClientStub:
-        def __init__(
-            self: _ClientStub, base_url: str, api_key: str, timeout_seconds: float = 0.0
-        ) -> None:
-            self.base_url = base_url
-            self.api_key = api_key
-            self.timeout_seconds = timeout_seconds
-
-        def download_to_path(
-            self: _ClientStub,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> None:
-            assert file_id == "fid-missing"
-            dest.write_bytes(tar_path.read_bytes())
-
     class _FakeStore:
         def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
             pass
+
+        def upload_artifact(
+            self,
+            dir_path: Path,
+            *,
+            artifact_name: str,
+            request_id: str,
+        ) -> FileUploadResponse:
+            return FileUploadResponse(
+                file_id="fake-upload-id",
+                size=1,
+                sha256="x",
+                content_type="application/gzip",
+                created_at=None,
+            )
 
         def download_artifact(
             self,
@@ -324,7 +296,12 @@ def test_eval_job_missing_manifest(
                 tf.extractall(dest_dir)
             return out
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _FakeStore)
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
 
     payload: EvalJobPayload = {
         "run_id": run_id,
@@ -347,16 +324,10 @@ def test_eval_job_missing_manifest(
     fake.assert_only_called({"set", "get"})
 
 
-def test_eval_job_destination_exists(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_eval_job_destination_exists(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     """Cover line 632: RuntimeError when destination already exists."""
     fake = _FakeRedis()
-
-    def _redis_for_kv(url: str) -> _FakeRedis:
-        return fake
-
-    monkeypatch.setattr("model_trainer.worker.job_utils.redis_for_kv", _redis_for_kv)
+    _test_hooks.kv_store_factory = lambda url: fake
 
     artifacts = tmp_path / "artifacts"
     settings = settings_factory(
@@ -368,10 +339,7 @@ def test_eval_job_destination_exists(
         data_bank_api_key="secret-key",
     )
 
-    def _load_settings() -> Settings:
-        return settings
-
-    monkeypatch.setattr("model_trainer.worker.eval_job.load_settings", _load_settings)
+    _test_hooks.load_settings = lambda: settings
 
     run_id = "run-dest-exists"
     file_id = "fid-dest-exists"
@@ -396,6 +364,21 @@ def test_eval_job_destination_exists(
         def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
             pass
 
+        def upload_artifact(
+            self,
+            dir_path: Path,
+            *,
+            artifact_name: str,
+            request_id: str,
+        ) -> FileUploadResponse:
+            return FileUploadResponse(
+                file_id="fake-upload-id",
+                size=1,
+                sha256="x",
+                content_type="application/gzip",
+                created_at=None,
+            )
+
         def download_artifact(
             self,
             file_id: str,
@@ -410,7 +393,12 @@ def test_eval_job_destination_exists(
                 tf.extractall(dest_dir)
             return out
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _FakeStore)
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
 
     payload: EvalJobPayload = {
         "run_id": run_id,
@@ -423,15 +411,11 @@ def test_eval_job_destination_exists(
 
 
 def test_eval_job_artifact_pointer_missing(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     """Cover eval_job.py line 54: AppError when artifact pointer not found."""
     fake = _FakeRedis()
-
-    def _redis_for_kv(url: str) -> _FakeRedis:
-        return fake
-
-    monkeypatch.setattr("model_trainer.worker.job_utils.redis_for_kv", _redis_for_kv)
+    _test_hooks.kv_store_factory = lambda url: fake
 
     artifacts = tmp_path / "artifacts"
     settings = settings_factory(
@@ -443,10 +427,7 @@ def test_eval_job_artifact_pointer_missing(
         data_bank_api_key="secret-key",
     )
 
-    def _load_settings() -> Settings:
-        return settings
-
-    monkeypatch.setattr("model_trainer.worker.eval_job.load_settings", _load_settings)
+    _test_hooks.load_settings = lambda: settings
 
     run_id = "run-no-pointer"
     # Do NOT set any artifact_file_id_key so file_id will be None/empty

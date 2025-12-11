@@ -11,6 +11,8 @@ from platform_ml.artifact_store import ArtifactStore, ArtifactStoreError
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.worker import train_job
 
@@ -52,7 +54,7 @@ def test_upload_and_persist_pointer_config_missing(
 
 
 def test_upload_and_persist_pointer_missing_dir(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     class _Store:
         def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
@@ -76,7 +78,23 @@ def test_upload_and_persist_pointer_missing_dir(
                 "created_at": None,
             }
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _Store)
+        def download_artifact(
+            self,
+            file_id: str,
+            *,
+            dest_dir: Path,
+            request_id: str,
+            expected_root: str,
+        ) -> Path:
+            raise NotImplementedError("download_artifact not needed for this test")
+
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _Store(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
+
     base = tmp_path / "missing-dir"
     base.mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +114,7 @@ def test_upload_and_persist_pointer_missing_dir(
 
 
 def test_upload_and_persist_pointer_success(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     base = tmp_path / "model"
     base.mkdir(parents=True, exist_ok=True)
@@ -124,7 +142,22 @@ def test_upload_and_persist_pointer_success(
                 "created_at": None,
             }
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _Store)
+        def download_artifact(
+            self,
+            file_id: str,
+            *,
+            dest_dir: Path,
+            request_id: str,
+            expected_root: str,
+        ) -> Path:
+            raise NotImplementedError("download_artifact not needed for this test")
+
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _Store(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
 
     r = FakeRedis()
     settings = settings_factory(
@@ -142,7 +175,7 @@ def test_upload_and_persist_pointer_success(
 
 
 def test_upload_and_persist_pointer_store_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     base = tmp_path / "model2"
     base.mkdir(parents=True, exist_ok=True)
@@ -163,7 +196,22 @@ def test_upload_and_persist_pointer_store_error(
         ) -> FileUploadResponse:
             raise ArtifactStoreError("boom")
 
-    monkeypatch.setattr("platform_ml.ArtifactStore", _StoreBad)
+        def download_artifact(
+            self,
+            file_id: str,
+            *,
+            dest_dir: Path,
+            request_id: str,
+            expected_root: str,
+        ) -> Path:
+            raise NotImplementedError("download_artifact not needed for this test")
+
+    def _fake_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _StoreBad(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_store_factory
 
     fake = FakeRedis()
     r: RedisStrProto = fake
@@ -183,4 +231,7 @@ def test_upload_and_persist_pointer_store_error(
 
 def test_artifact_store_init_and_proxy() -> None:
     # Validate ArtifactStore can be instantiated independently (smoke)
-    _ = ArtifactStore(base_url="http://x", api_key="k")
+    from platform_core.data_bank_client import DataBankClient
+
+    client = DataBankClient("http://x", "k")
+    _ = ArtifactStore(client)

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
 
+import httpx
 import pytest
-from platform_core.data_bank_client import HeadInfo
 from platform_core.logging import stdlib_logging
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.services.data.corpus_fetcher import CorpusFetcher
 
 _T = TypeVar("_T")
@@ -32,6 +34,86 @@ def _has_log_extra(record: stdlib_logging.LogRecord, key: str) -> bool:
     return val is not None
 
 
+class _SuccessServer:
+    """Mock server that returns successful responses."""
+
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+        self._etag = sha256(data).hexdigest()
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        hdrs: dict[str, str] = {k.lower(): v for k, v in request.headers.items()}
+        if hdrs.get("x-api-key") != "k":
+            return httpx.Response(401, text="unauthorized")
+
+        if request.method == "HEAD":
+            return httpx.Response(
+                200,
+                headers={
+                    "Content-Length": str(len(self._data)),
+                    "ETag": self._etag,
+                    "Content-Type": "text/plain",
+                },
+            )
+        if request.method == "GET":
+            rng_header = hdrs.get("range")
+            if rng_header and rng_header.startswith("bytes="):
+                start = int(rng_header.split("=")[1].split("-")[0])
+                part = self._data[start:]
+                return httpx.Response(
+                    206,
+                    content=part,
+                    headers={
+                        "Content-Length": str(len(part)),
+                        "Content-Range": f"bytes {start}-{len(self._data) - 1}/{len(self._data)}",
+                        "ETag": self._etag,
+                    },
+                )
+            return httpx.Response(
+                200,
+                content=self._data,
+                headers={
+                    "Content-Length": str(len(self._data)),
+                    "ETag": self._etag,
+                },
+            )
+        return httpx.Response(500, text="unhandled")
+
+
+class _SizeMismatchServer:
+    """Mock server that returns wrong size in HEAD vs actual data."""
+
+    def __init__(self, reported_size: int, actual_data: bytes) -> None:
+        self._reported_size = reported_size
+        self._actual_data = actual_data
+        self._etag = sha256(actual_data).hexdigest()
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        hdrs: dict[str, str] = {k.lower(): v for k, v in request.headers.items()}
+        if hdrs.get("x-api-key") != "k":
+            return httpx.Response(401, text="unauthorized")
+
+        if request.method == "HEAD":
+            return httpx.Response(
+                200,
+                headers={
+                    "Content-Length": str(self._reported_size),
+                    "ETag": self._etag,
+                    "Content-Type": "text/plain",
+                },
+            )
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                content=self._actual_data,
+                headers={
+                    "Content-Length": str(len(self._actual_data)),
+                    "ETag": self._etag,
+                },
+            )
+        return httpx.Response(500, text="unhandled")
+
+
 def test_fetcher_logs_cache_hit(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that cache hits are logged."""
     cache = tmp_path / "cache"
@@ -50,41 +132,17 @@ def test_fetcher_logs_cache_hit(tmp_path: Path, caplog: pytest.LogCaptureFixture
     assert _get_log_extra(record, "path", str) == str(cache_path)
 
 
-def test_fetcher_logs_fetch_start(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_fetch_start(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that fetch start is logged with structured fields."""
     payload = b"test"
     cache = tmp_path / "cache"
+
+    server = _SuccessServer(payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
     f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C:
-        def __init__(
-            self: _C, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            with dest.open("wb") as out:
-                out.write(payload)
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.INFO)
     _ = f.fetch("test_file")
@@ -97,40 +155,17 @@ def test_fetcher_logs_fetch_start(
     assert _get_log_extra(record, "api_url", str) == "http://test"
 
 
-def test_fetcher_logs_head_request(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_head_request(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that HEAD request is logged."""
     payload = b"test"
     cache = tmp_path / "cache"
+
+    server = _SuccessServer(payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
     f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C2:
-        def __init__(
-            self: _C2, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C2, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C2,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            with dest.open("wb") as out:
-                out.write(payload)
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C2)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.INFO)
     _ = f.fetch("test_file")
@@ -139,40 +174,17 @@ def test_fetcher_logs_head_request(
     assert any("HEAD request successful" in r.message for r in caplog.records)
 
 
-def test_fetcher_logs_download_start(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_download_start(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that download start is logged with size."""
     payload = b"test"
     cache = tmp_path / "cache"
+
+    server = _SuccessServer(payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
     f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C3:
-        def __init__(
-            self: _C3, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C3, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C3,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            with dest.open("wb") as out:
-                out.write(payload)
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C3)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.INFO)
     _ = f.fetch("test_file")
@@ -182,40 +194,17 @@ def test_fetcher_logs_download_start(
     assert _get_log_extra(record, "expected_size", int) == len(payload)
 
 
-def test_fetcher_logs_completion(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_completion(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that successful completion is logged with elapsed time."""
     payload = b"test"
     cache = tmp_path / "cache"
+
+    server = _SuccessServer(payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
     f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C:
-        def __init__(
-            self: _C, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            with dest.open("wb") as out:
-                out.write(payload)
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.INFO)
     _ = f.fetch("test_file")
@@ -227,47 +216,23 @@ def test_fetcher_logs_completion(
     assert _has_log_extra(record, "elapsed_seconds")
 
 
-def test_fetcher_logs_resume(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_resume(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that resume is logged with offset."""
     payload = b"test data"
     cache = tmp_path / "cache"
-    f = CorpusFetcher("http://test", "k", cache)
 
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
+    server = _SuccessServer(payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
+    f = CorpusFetcher("http://test", "k", cache)
 
     fid = "resume_file"
     cache_path = cache / f"{fid}.txt"
     tmp = cache_path.with_suffix(".tmp")
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_bytes(payload[:4])
-
-    class _C:
-        def __init__(
-            self: _C, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            start = dest.stat().st_size if dest.exists() else 0
-            with dest.open("ab" if start > 0 else "wb") as out:
-                out.write(payload[start:])
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.INFO)
     _ = f.fetch(fid)
@@ -277,40 +242,18 @@ def test_fetcher_logs_resume(
     assert _get_log_extra(record, "resume_from", int) == 4
 
 
-def test_fetcher_logs_size_mismatch_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_fetcher_logs_size_mismatch_error(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Verify that size mismatch is logged as error."""
     payload = b"small"
     cache = tmp_path / "cache"
+
+    # Report size=100 but return only 5 bytes
+    server = _SizeMismatchServer(reported_size=100, actual_data=payload)
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: httpx.Client(
+        transport=httpx.MockTransport(server.handle)
+    )
+
     f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C:
-        def __init__(
-            self: _C, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=100, etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            with dest.open("wb") as out:
-                out.write(payload)
-            return HeadInfo(size=100, etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C)
 
     stdlib_logging.getLogger().setLevel(stdlib_logging.ERROR)
     with pytest.raises(RuntimeError):

@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
+from platform_core.config import _test_hooks as config_hooks
 from platform_core.job_events import default_events_channel
 from platform_core.queues import TRAINER_QUEUE
 from platform_workers.rq_harness import WorkerConfig
 
-from model_trainer.worker import _test_hooks
-from model_trainer.worker.worker_entry import (
+from model_trainer import _test_hooks
+from model_trainer.worker_entry import (
     _build_config,
     _get_default_runner,
     _run_worker,
     main,
 )
+
+
+def _make_env_getter(env_vars: dict[str, str]) -> Callable[[str], str | None]:
+    """Create a fake get_env function that reads from a dict."""
+
+    def _get_env(key: str) -> str | None:
+        return env_vars.get(key)
+
+    return _get_env
 
 
 class _RecordingLogger:
@@ -38,9 +50,9 @@ class _RecordingRunner:
         self.configs.append(config)
 
 
-def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_reads_env() -> None:
     """Test _build_config reads REDIS_URL and uses TRAINER_QUEUE."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-host:6379/0")
+    config_hooks.get_env = _make_env_getter({"REDIS_URL": "redis://test-host:6379/0"})
 
     cfg = _build_config()
 
@@ -49,9 +61,9 @@ def test_build_config_reads_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["events_channel"] == default_events_channel("trainer")
 
 
-def test_build_config_requires_redis_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_config_requires_redis_url() -> None:
     """Test _build_config raises when REDIS_URL is missing."""
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    config_hooks.get_env = _make_env_getter({})  # No REDIS_URL
 
     with pytest.raises(RuntimeError, match="REDIS_URL"):
         _build_config()
@@ -102,11 +114,9 @@ def test_main_with_injected_dependencies() -> None:
     assert runner.configs[0]["redis_url"] == "redis://injected:6379/0"
 
 
-def test_main_builds_config_from_env_when_not_provided(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_builds_config_from_env_when_not_provided() -> None:
     """Test main() builds config from environment when not provided."""
-    monkeypatch.setenv("REDIS_URL", "redis://from-env:6379/0")
+    config_hooks.get_env = _make_env_getter({"REDIS_URL": "redis://from-env:6379/0"})
 
     logger = _RecordingLogger()
     runner = _RecordingRunner()
@@ -149,11 +159,9 @@ def test_get_default_runner_returns_run_rq_worker_when_test_runner_none() -> Non
     assert result is run_rq_worker
 
 
-def test_main_uses_test_runner_when_set(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_main_uses_test_runner_when_set() -> None:
     """Test main() uses test_runner when set in _test_hooks."""
-    monkeypatch.setenv("REDIS_URL", "redis://test-runner:6379/0")
+    config_hooks.get_env = _make_env_getter({"REDIS_URL": "redis://test-runner:6379/0"})
 
     received_configs: list[WorkerConfig] = []
 
@@ -175,7 +183,7 @@ def test_main_uses_test_runner_when_set(
     assert received_configs[0]["queue_name"] == TRAINER_QUEUE
 
 
-def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_guard_executes_main() -> None:
     """Test the if __name__ == '__main__' guard executes main().
 
     Uses runpy.run_module to actually execute the module as __main__.
@@ -184,7 +192,7 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
     import runpy
     import sys
 
-    monkeypatch.setenv("REDIS_URL", "redis://runpy-guard-test:6379/0")
+    config_hooks.get_env = _make_env_getter({"REDIS_URL": "redis://runpy-guard-test:6379/0"})
 
     received_configs: list[WorkerConfig] = []
 
@@ -197,7 +205,7 @@ def test_main_guard_executes_main(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Remove the module from sys.modules to avoid the RuntimeWarning
     # about the module being found in sys.modules prior to execution
-    module_name = "model_trainer.worker.worker_entry"
+    module_name = "model_trainer.worker_entry"
     saved_module = sys.modules.pop(module_name, None)
 
     # Run the module as __main__ - this executes the guard

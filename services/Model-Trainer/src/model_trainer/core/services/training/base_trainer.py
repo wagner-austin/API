@@ -24,6 +24,7 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_ml.wandb_publisher import WandbPublisher
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.dataset import DatasetConfig
 from model_trainer.core.contracts.model import (
@@ -33,12 +34,8 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
     ValidationMetrics,
 )
-from model_trainer.core.infra.paths import model_dir
 from model_trainer.core.services.model.backends.gpt2._dl import DataLoader
-from model_trainer.core.services.training.dataset_builder import (
-    CausalLMDataset,
-    split_corpus_files,
-)
+from model_trainer.core.services.training.dataset_builder import CausalLMDataset
 from model_trainer.core.types import (
     LMModelProto,
     OptimizerCtorProto,
@@ -89,17 +86,13 @@ def _gather_lib_versions(service_name: str) -> TrainingManifestVersions:
     Returns:
         Dictionary with version strings for torch, transformers, tokenizers, datasets.
     """
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as _pkg_version
 
     def _v(name: str) -> str:
-        try:
-            return _pkg_version(name)
-        except PackageNotFoundError as e:
+        version = _test_hooks.pkg_version(name)
+        if version == "unknown":
             _logger.warning(
-                "%s not available for version detection: %s",
+                "%s not available for version detection",
                 name,
-                e,
                 extra={
                     "category": "model",
                     "service": service_name,
@@ -107,7 +100,7 @@ def _gather_lib_versions(service_name: str) -> TrainingManifestVersions:
                     "reason": "package_not_found",
                 },
             )
-            return "unknown"
+        return version
 
     return {
         "torch": _v("torch"),
@@ -247,7 +240,7 @@ class BaseTrainer:
 
         # Freeze embeddings if configured
         if self._cfg["freeze_embed"]:
-            _freeze_embeddings(model)
+            _test_hooks.freeze_embeddings(model)
 
         # 4. Initialize early stopping (NEW)
         self._es_state = EarlyStoppingState(
@@ -261,7 +254,7 @@ class BaseTrainer:
             model, train_loader, effective_lr
         )
 
-        out_dir = str(model_dir(self._settings, self._run_id))
+        out_dir = str(_test_hooks.model_dir(self._settings, self._run_id))
         os.makedirs(out_dir, exist_ok=True)
 
         # 6. Save checkpoint if not cancelled and no best was saved
@@ -333,7 +326,7 @@ class BaseTrainer:
         """
         device_str = self._cfg["device"]
         if device_str == "cuda":
-            if not torch.cuda.is_available():
+            if not _test_hooks.cuda_is_available():
                 raise RuntimeError("CUDA requested but not available")
             return torch.device("cuda")
         return torch.device("cpu")
@@ -378,7 +371,7 @@ class BaseTrainer:
             holdout_fraction=self._cfg["holdout_fraction"],
             test_split_ratio=self._cfg["test_split_ratio"],
         )
-        train_files, val_files, test_files = split_corpus_files(ds_cfg)
+        train_files, val_files, test_files = _test_hooks.split_corpus_files(ds_cfg)
 
         def make_loader(files: list[str], shuffle: bool) -> DataLoader | None:
             if not files:
@@ -456,7 +449,7 @@ class BaseTrainer:
 
     def _save_best_checkpoint(self: BaseTrainer) -> None:
         """Save current model as best checkpoint."""
-        out_dir = str(model_dir(self._settings, self._run_id))
+        out_dir = str(_test_hooks.model_dir(self._settings, self._run_id))
         os.makedirs(out_dir, exist_ok=True)
         self._prepared.model.save_pretrained(out_dir)
         self._best_checkpoint_path = Path(out_dir)

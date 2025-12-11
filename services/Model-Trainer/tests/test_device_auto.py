@@ -6,6 +6,7 @@ import pytest
 from platform_core.json_utils import JSONValue
 
 from model_trainer.api.validators.runs import _decode_train_request
+from model_trainer.core import _test_hooks
 from model_trainer.core.compute.device_selector import (
     recommended_batch_size,
     recommended_batch_size_for,
@@ -66,13 +67,13 @@ def test_decode_train_request_device_explicit_cpu() -> None:
     assert out["device"] == "cpu"
 
 
-def test_resolve_device_auto_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("torch.cuda.is_available", lambda: True, raising=True)
+def test_resolve_device_auto_cuda() -> None:
+    _test_hooks.cuda_is_available = lambda: True
     assert resolve_device("auto") == "cuda"
 
 
-def test_resolve_device_auto_cpu(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("torch.cuda.is_available", lambda: False, raising=True)
+def test_resolve_device_auto_cpu() -> None:
+    _test_hooks.cuda_is_available = lambda: False
     assert resolve_device("auto") == "cpu"
 
 
@@ -91,9 +92,9 @@ def test_resolve_device_passthrough_cpu() -> None:
     assert resolve_device("cpu") == "cpu"
 
 
-def test_build_cfg_resolves_auto_and_adjusts_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
     # CUDA available -> auto resolves to cuda and batch size increases to gpt2 default (32)
-    monkeypatch.setattr("torch.cuda.is_available", lambda: True, raising=True)
+    _test_hooks.cuda_is_available = lambda: True
     req: TrainRequestPayload = {
         "model_family": "gpt2",
         "model_size": "small",
@@ -125,8 +126,8 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size(monkeypatch: pytest.Monk
     assert cfg["data_pin_memory"] is True
 
 
-def test_build_cfg_auto_cpu_keeps_batch_size(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("torch.cuda.is_available", lambda: False, raising=True)
+def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
+    _test_hooks.cuda_is_available = lambda: False
     req: TrainRequestPayload = {
         "model_family": "gpt2",
         "model_size": "small",

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import random as _random
 from pathlib import Path
 
-import pytest
-
+from model_trainer.core import _test_hooks
 from model_trainer.core.services.data import corpus as corpus_mod
 
 
@@ -18,15 +16,16 @@ class _StubRandom:
         return a if self._n % 2 == 1 else b
 
 
-def test_sample_lines_exercises_both_replace_branches(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_sample_lines_exercises_both_replace_branches(tmp_path: Path) -> None:
     # Create file with several lines
     fp = tmp_path / "data.txt"
     fp.write_text("\n".join(["l1", "l2", "l3", "l4"]), encoding="utf-8")
 
-    # Monkeypatch the Random class used by sample_lines to our stub
-    monkeypatch.setattr(_random, "Random", _StubRandom, raising=True)
+    # Use hook to inject stub random factory
+    def _stub_random_factory(seed: int) -> _StubRandom:
+        return _StubRandom(seed)
+
+    _test_hooks.random_factory = _stub_random_factory
 
     out = corpus_mod.sample_lines([str(fp)], 1, seed=123)
     # Reservoir size 1 is preserved, exact value not asserted

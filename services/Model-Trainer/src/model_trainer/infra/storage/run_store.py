@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 import time
 
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import JSONValue
 from platform_core.trainer_keys import heartbeat_key, status_key
+
+from model_trainer.core import _test_hooks
 
 
 class RunStore:
@@ -32,5 +34,5 @@ class RunStore:
             "heartbeat_key": heartbeat_key(run_id),
         }
         with open(manifest_path, "w", encoding="utf-8") as f:
-            f.write(dump_json_str(body))
+            f.write(_test_hooks.dump_json_str(body))
         return run_id

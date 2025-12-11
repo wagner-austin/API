@@ -491,22 +491,20 @@ def test_generate_char_lstm_no_seed(settings_with_paths: Settings, tmp_path: Pat
     assert len(result["outputs"]) == 1
 
 
-def test_generate_single_eos_termination(
-    settings_with_paths: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_generate_single_eos_termination(settings_with_paths: Settings, tmp_path: Path) -> None:
     """Test that EOS token terminates generation and sets eos_terminated flag."""
-    from model_trainer.core.services.model.backends.char_lstm import generate as gen_module
+    from model_trainer.core import _test_hooks
 
     prepared, _ = _prepare_trained_model(settings_with_paths, tmp_path)
     eos_id = prepared.eos_id
 
-    # Mock _sample_token to return the EOS token on first call
-    def mock_sample_token(
+    # Inject fake sample_token that returns the EOS token on first call
+    def _fake_sample_token(
         logits: torch.Tensor, *, temperature: float, top_k: int, top_p: float
     ) -> int:
         return eos_id
 
-    monkeypatch.setattr(gen_module, "_sample_token", mock_sample_token)
+    _test_hooks.sample_token = _fake_sample_token
 
     prompt_ids: list[int] = [1, 2]  # Some prompt tokens
     cfg = GenerateConfig(

@@ -12,10 +12,10 @@ from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 from platform_workers.redis import RedisBytesProto, _RedisBytesClient
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
-from pytest import MonkeyPatch
 
 from model_trainer.api.routes import runs as runs_routes
 from model_trainer.api.validators.runs import _decode_generate_request, _decode_score_request
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.services.container import ServiceContainer
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -31,7 +31,7 @@ from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestr
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
 
 
-def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, FakeQueue]) -> None:
+def _install_fakes(queue_holder: dict[str, FakeQueue]) -> None:
     fake_queue = FakeQueue()
     queue_holder["q"] = fake_queue
 
@@ -44,11 +44,9 @@ def _install_fakes(monkeypatch: MonkeyPatch, queue_holder: dict[str, FakeQueue])
     def _fake_redis_raw_for_rq(url: str) -> RedisBytesProto:
         return FakeRedisBytesClient()
 
-    monkeypatch.setattr("model_trainer.core.services.queue.rq_adapter.rq_queue", _fake_rq_queue)
-    monkeypatch.setattr("model_trainer.core.services.queue.rq_adapter.rq_retry", _fake_rq_retry)
-    monkeypatch.setattr(
-        "model_trainer.core.services.queue.rq_adapter.redis_raw_for_rq", _fake_redis_raw_for_rq
-    )
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
+    _test_hooks.rq_connection_factory = _fake_redis_raw_for_rq
 
 
 class TestScoreRequestValidator:
@@ -240,18 +238,18 @@ class TestParseScoreTopk:
 
 class TestInferenceOrchestrator:
     def _make_orchestrator(
-        self, monkeypatch: MonkeyPatch
+        self,
     ) -> tuple[InferenceOrchestrator, FakeRedis, dict[str, FakeQueue]]:
         holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, holder)
+        _install_fakes(holder)
         s = load_settings()
         r = FakeRedis()
         enq = RQEnqueuer("redis://ignored", RQSettings(60, 300, 300, 1, [30]))
         orch = InferenceOrchestrator(settings=s, redis_client=r, enqueuer=enq)
         return orch, r, holder
 
-    def test_enqueue_score(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_enqueue_score(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         detail_level: Literal["summary", "per_char"] = "summary"
         response = orch.enqueue_score(
             "run123",
@@ -273,16 +271,16 @@ class TestInferenceOrchestrator:
         assert response["perplexity"] is None
         r.assert_only_called({"set"})
 
-    def test_get_score_not_found(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_score_not_found(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         with pytest.raises(AppError) as exc_info:
             orch.get_score("run123", "nonexistent")
         err: AppError[ModelTrainerErrorCode] = exc_info.value
         assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
         r.assert_only_called({"get"})
 
-    def test_get_score_corrupt_cache(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_score_corrupt_cache(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import score_key
 
         r.set(score_key("run123", "req123"), '"not a dict"')
@@ -291,8 +289,8 @@ class TestInferenceOrchestrator:
         assert "corrupt" in exc_info.value.message
         r.assert_only_called({"set", "get"})
 
-    def test_get_score_completed(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_score_completed(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import score_key
 
         cache: dict[str, JSONValue] = {
@@ -313,8 +311,8 @@ class TestInferenceOrchestrator:
         assert result["tokens"] == ["h", "e", "l", "l", "o"]
         r.assert_only_called({"set", "get"})
 
-    def test_get_score_non_list_surprisal_and_tokens(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_score_non_list_surprisal_and_tokens(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import score_key
 
         cache: dict[str, JSONValue] = {
@@ -332,8 +330,8 @@ class TestInferenceOrchestrator:
         assert result["tokens"] is None
         r.assert_only_called({"set", "get"})
 
-    def test_enqueue_generate(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_enqueue_generate(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         response = orch.enqueue_generate(
             "run123",
             {
@@ -360,16 +358,16 @@ class TestInferenceOrchestrator:
         assert response["eos_terminated"] is None
         r.assert_only_called({"set"})
 
-    def test_get_generate_not_found(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_generate_not_found(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         with pytest.raises(AppError) as exc_info:
             orch.get_generate("run123", "nonexistent")
         err: AppError[ModelTrainerErrorCode] = exc_info.value
         assert err.code == ModelTrainerErrorCode.DATA_NOT_FOUND
         r.assert_only_called({"get"})
 
-    def test_get_generate_corrupt_cache(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_generate_corrupt_cache(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import generate_key
 
         r.set(generate_key("run123", "req123"), '"not a dict"')
@@ -378,8 +376,8 @@ class TestInferenceOrchestrator:
         assert "corrupt" in exc_info.value.message
         r.assert_only_called({"set", "get"})
 
-    def test_get_generate_completed(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_generate_completed(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import generate_key
 
         cache: dict[str, JSONValue] = {
@@ -396,8 +394,8 @@ class TestInferenceOrchestrator:
         assert result["eos_terminated"] == [True]
         r.assert_only_called({"set", "get"})
 
-    def test_get_generate_non_list_outputs_and_eos(self, monkeypatch: MonkeyPatch) -> None:
-        orch, r, _holder = self._make_orchestrator(monkeypatch)
+    def test_get_generate_non_list_outputs_and_eos(self) -> None:
+        orch, r, _holder = self._make_orchestrator()
         from platform_core.trainer_keys import generate_key
 
         cache: dict[str, JSONValue] = {
@@ -415,9 +413,9 @@ class TestInferenceOrchestrator:
 
 
 class TestInferenceAPIRoutes:
-    def _make_client(self, monkeypatch: MonkeyPatch) -> tuple[TestClient, FakeRedis]:
+    def _make_client(self) -> tuple[TestClient, FakeRedis]:
         holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, holder)
+        _install_fakes(holder)
         s = load_settings()
         r = FakeRedis()
         ds = LocalTextDatasetBuilder()
@@ -450,8 +448,8 @@ class TestInferenceAPIRoutes:
         install_exception_handlers_fastapi(app, logger_name="test", request_id_var=None)
         return TestClient(app), r
 
-    def test_enqueue_score_endpoint(self, monkeypatch: MonkeyPatch) -> None:
-        client, r = self._make_client(monkeypatch)
+    def test_enqueue_score_endpoint(self) -> None:
+        client, r = self._make_client()
         payload: dict[str, JSONValue] = {"text": "hello"}
         res = client.post(
             "/runs/run123/score",
@@ -472,8 +470,8 @@ class TestInferenceAPIRoutes:
         assert parsed_uuid.version == 4
         r.assert_only_called({"set"})
 
-    def test_get_score_not_found_route(self, monkeypatch: MonkeyPatch) -> None:
-        client, r = self._make_client(monkeypatch)
+    def test_get_score_not_found_route(self) -> None:
+        client, r = self._make_client()
         res = client.get(
             "/runs/run123/score/nonexistent",
             headers={"X-API-Key": "test-key"},
@@ -481,8 +479,8 @@ class TestInferenceAPIRoutes:
         assert res.status_code == 404
         r.assert_only_called({"get"})
 
-    def test_enqueue_generate_endpoint(self, monkeypatch: MonkeyPatch) -> None:
-        client, r = self._make_client(monkeypatch)
+    def test_enqueue_generate_endpoint(self) -> None:
+        client, r = self._make_client()
         payload: dict[str, JSONValue] = {"prompt_text": "hello"}
         res = client.post(
             "/runs/run123/generate",
@@ -503,8 +501,8 @@ class TestInferenceAPIRoutes:
         assert parsed_uuid.version == 4
         r.assert_only_called({"set"})
 
-    def test_get_generate_not_found_route(self, monkeypatch: MonkeyPatch) -> None:
-        client, r = self._make_client(monkeypatch)
+    def test_get_generate_not_found_route(self) -> None:
+        client, r = self._make_client()
         res = client.get(
             "/runs/run123/generate/nonexistent",
             headers={"X-API-Key": "test-key"},
@@ -512,10 +510,10 @@ class TestInferenceAPIRoutes:
         assert res.status_code == 404
         r.assert_only_called({"get"})
 
-    def _make_client_with_redis(self, monkeypatch: MonkeyPatch) -> tuple[TestClient, FakeRedis]:
+    def _make_client_with_redis(self) -> tuple[TestClient, FakeRedis]:
         """Create a test client and return both client and redis for pre-populating."""
         holder: dict[str, FakeQueue] = {}
-        _install_fakes(monkeypatch, holder)
+        _install_fakes(holder)
         s = load_settings()
         r = FakeRedis()
         enq = RQEnqueuer("redis://ignored", RQSettings(60, 300, 300, 1, [30]))
@@ -547,10 +545,10 @@ class TestInferenceAPIRoutes:
         install_exception_handlers_fastapi(app, logger_name="test", request_id_var=None)
         return TestClient(app), r
 
-    def test_get_score_found_route(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_score_found_route(self) -> None:
         from platform_core.trainer_keys import score_key
 
-        client, redis = self._make_client_with_redis(monkeypatch)
+        client, redis = self._make_client_with_redis()
         cache: dict[str, JSONValue] = {
             "status": "completed",
             "loss": 1.5,
@@ -572,10 +570,10 @@ class TestInferenceAPIRoutes:
         assert body["loss"] == 1.5
         redis.assert_only_called({"set", "get"})
 
-    def test_get_generate_found_route(self, monkeypatch: MonkeyPatch) -> None:
+    def test_get_generate_found_route(self) -> None:
         from platform_core.trainer_keys import generate_key
 
-        client, redis = self._make_client_with_redis(monkeypatch)
+        client, redis = self._make_client_with_redis()
         cache: dict[str, JSONValue] = {
             "status": "completed",
             "outputs": ["generated text"],

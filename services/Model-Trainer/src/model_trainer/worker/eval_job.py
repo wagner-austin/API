@@ -10,11 +10,10 @@ from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
 from typing_extensions import TypedDict
 
-from model_trainer.core.config.settings import load_settings
+from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
 from model_trainer.core.infra.paths import model_eval_dir, models_dir
-from model_trainer.core.services.container import ServiceContainer
 from model_trainer.worker.job_utils import redis_client, setup_job_logging
 from model_trainer.worker.manifest import (
     as_device,
@@ -35,7 +34,7 @@ class _EvalCacheModel(TypedDict, total=False):
 
 def process_eval_job(payload: EvalJobPayload) -> None:
     """Process an evaluation job."""
-    settings = load_settings()
+    settings = _test_hooks.load_settings()
     setup_job_logging(settings)
 
     log = get_logger(__name__)
@@ -58,11 +57,9 @@ def process_eval_job(payload: EvalJobPayload) -> None:
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
 
-        from platform_ml import ArtifactStore
-
         api_url = settings["app"]["data_bank_api_url"]
         api_key = settings["app"]["data_bank_api_key"]
-        store = ArtifactStore(api_url, api_key)
+        store = _test_hooks.artifact_store_factory(api_url, api_key)
         expected_root = f"model-{run_id}"
         out_root = store.download_artifact(
             file_id.strip(), dest_dir=models_root, request_id=run_id, expected_root=expected_root
@@ -109,7 +106,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "finetune_lr_cap": manifest["finetune_lr_cap"],
         }
 
-        container = ServiceContainer.from_settings(settings)
+        container = _test_hooks.service_container_from_settings(settings)
         backend = container.model_registry.get(cfg["model_family"])
         if payload["path_override"] is not None:
             cfg["corpus_path"] = str(payload["path_override"]).strip()

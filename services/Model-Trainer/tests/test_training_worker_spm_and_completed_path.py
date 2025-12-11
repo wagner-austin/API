@@ -1,21 +1,48 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
-import pytest
+import torch
+from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.trainer_keys import artifact_file_id_key
 from platform_ml.wandb_publisher import WandbPublisher
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import ArtifactStoreProto, ServiceContainerProto
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.model import ModelTrainConfig, TrainOutcome
+from model_trainer.core.contracts.dataset import DatasetBuilder
+from model_trainer.core.contracts.model import (
+    BackendCapabilities,
+    EvalOutcome,
+    GenerateConfig,
+    GenerateOutcome,
+    ModelArtifact,
+    ModelBackend,
+    ModelTrainConfig,
+    PreparedLMModel,
+    ScoreConfig,
+    ScoreOutcome,
+    TrainOutcome,
+)
 from model_trainer.core.contracts.queue import TrainJobPayload
-from model_trainer.core.services.data import corpus_fetcher as cf
+from model_trainer.core.contracts.tokenizer import TokenizerHandle
+from model_trainer.core.encoding import ListEncoded
+from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
+from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
+from model_trainer.core.services.registries import BackendRegistration, ModelRegistry
+from model_trainer.core.types import (
+    ConfigLike,
+    ForwardOutProto,
+    LMModelProto,
+    NamedParameter,
+    ParameterLike,
+)
 from model_trainer.worker import train_job
 from model_trainer.worker.trainer_job_store import TrainerJobStore
-
-_CORPUS_PATH: Path | None = None
 
 
 class _SettingsFactory(Protocol):
@@ -35,15 +62,125 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-class _Backend:
+# ============================================================================
+# Fake model components for PreparedLMModel
+# ============================================================================
+
+
+class _FakeConfig(ConfigLike):
+    """Fake config for LMModelProto."""
+
+    n_positions: int = 64
+
+
+class _FakeFwd(ForwardOutProto):
+    """Fake forward output."""
+
+    @property
+    def loss(self: _FakeFwd) -> torch.Tensor:
+        return torch.tensor(0.1)
+
+
+class _FakeLMModel(LMModelProto):
+    """Fake LM model for testing."""
+
+    def __init__(self: _FakeLMModel) -> None:
+        self._config = _FakeConfig()
+
+    @classmethod
+    def from_pretrained(cls: type[_FakeLMModel], path: str) -> LMModelProto:
+        return cls()
+
+    def train(self: _FakeLMModel) -> None:
+        pass
+
+    def eval(self: _FakeLMModel) -> None:
+        pass
+
+    def forward(
+        self: _FakeLMModel, *, input_ids: torch.Tensor, labels: torch.Tensor
+    ) -> ForwardOutProto:
+        return _FakeFwd()
+
+    def parameters(self: _FakeLMModel) -> Sequence[ParameterLike]:
+        return []
+
+    def named_parameters(self: _FakeLMModel) -> Sequence[tuple[str, NamedParameter]]:
+        return []
+
+    def to(self: _FakeLMModel, device: str) -> LMModelProto:
+        return self
+
+    def save_pretrained(self: _FakeLMModel, out_dir: str) -> None:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        (Path(out_dir) / "weights.bin").write_bytes(b"\x00fake")
+
+    @property
+    def config(self: _FakeLMModel) -> ConfigLike:
+        return self._config
+
+
+class _FakeEncoder:
+    """Fake encoder for PreparedLMModel.tok_for_dataset."""
+
+    def encode(self: _FakeEncoder, text: str) -> ListEncoded:
+        return ListEncoded([ord(c) for c in text])
+
+    def decode(self: _FakeEncoder, ids: list[int]) -> str:
+        return "".join(chr(i) for i in ids if i < 128)
+
+    def token_to_id(self: _FakeEncoder, token: str) -> int | None:
+        if len(token) == 1:
+            return ord(token)
+        return None
+
+    def get_vocab_size(self: _FakeEncoder) -> int:
+        return 256
+
+
+def _make_fake_prepared(tokenizer_id: str) -> PreparedLMModel:
+    """Create a fake PreparedLMModel for testing."""
+    return PreparedLMModel(
+        model=_FakeLMModel(),
+        tokenizer_id=tokenizer_id,
+        eos_id=0,
+        pad_id=1,
+        max_seq_len=64,
+        tok_for_dataset=_FakeEncoder(),
+    )
+
+
+class _Backend(ModelBackend):
+    """Stub backend implementing full ModelBackend protocol."""
+
+    def name(self: _Backend) -> str:
+        return "gpt2"
+
+    def capabilities(self: _Backend) -> BackendCapabilities:
+        return UNAVAILABLE_CAPABILITIES
+
     def prepare(
         self: _Backend,
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: str | Path,
-    ) -> str:
-        return "prepared"
+        tokenizer: TokenizerHandle,
+    ) -> PreparedLMModel:
+        return _make_fake_prepared("fake-tok")
+
+    def save(self: _Backend, prepared: PreparedLMModel, out_dir: str) -> ModelArtifact:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        (Path(out_dir) / "weights.bin").write_bytes(b"\x00mock")
+        return ModelArtifact(out_dir=out_dir)
+
+    def load(
+        self: _Backend,
+        artifact_path: str,
+        settings: Settings,
+        *,
+        tokenizer: TokenizerHandle,
+    ) -> PreparedLMModel:
+        return _make_fake_prepared("loaded-tok")
 
     def train(
         self: _Backend,
@@ -51,15 +188,18 @@ class _Backend:
         settings: Settings,
         *,
         run_id: str,
-        heartbeat: str,
-        cancelled: str,
-        prepared: str,
-        progress: str,
+        heartbeat: Callable[[float], None],
+        cancelled: Callable[[], bool],
+        prepared: PreparedLMModel,
+        progress: (
+            Callable[[int, int, float, float, float, float, float | None, float | None], None]
+            | None
+        ) = None,
         wandb_publisher: WandbPublisher | None = None,
     ) -> TrainOutcome:
         # Exercise the worker's progress callback wrapper so that the
         # training_worker._progress closure is covered.
-        if callable(progress):
+        if progress is not None:
             progress(1, 0, 0.5, 1.65, 0.1, 100.0, None, None)
         return TrainOutcome(
             cancelled=False,
@@ -73,38 +213,99 @@ class _Backend:
             early_stopped=False,
         )
 
-    def save(self: _Backend, prepared: str, out_dir: str) -> str:
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        (Path(out_dir) / "weights.bin").write_bytes(b"\x00mock")
-        return out_dir
+    def evaluate(
+        self: _Backend, *, run_id: str, cfg: ModelTrainConfig, settings: Settings
+    ) -> EvalOutcome:
+        raise NotImplementedError
+
+    def score(
+        self: _Backend, *, prepared: PreparedLMModel, cfg: ScoreConfig, settings: Settings
+    ) -> ScoreOutcome:
+        raise NotImplementedError
+
+    def generate(
+        self: _Backend, *, prepared: PreparedLMModel, cfg: GenerateConfig, settings: Settings
+    ) -> GenerateOutcome:
+        raise NotImplementedError
 
 
-class _Reg:
-    def get(self: _Reg, name: str) -> _Backend:
-        return _Backend()
+def _backend_factory(dataset_builder: DatasetBuilder) -> _Backend:
+    """Factory that returns _Backend instance."""
+    return _Backend()
 
 
-class _C:
-    def __init__(self: _C) -> None:
-        self.model_registry = _Reg()
+class _FakeServiceContainer:
+    def __init__(self: _FakeServiceContainer, settings: Settings, redis: RedisStrProto) -> None:
+        self._settings = settings
+        self._redis = redis
+        self._model_registry = ModelRegistry(
+            registrations={
+                "gpt2": BackendRegistration(
+                    factory=_backend_factory, capabilities=UNAVAILABLE_CAPABILITIES
+                )
+            },
+            dataset_builder=LocalTextDatasetBuilder(),
+        )
 
-    @staticmethod
-    def from_settings(_: Settings) -> _C:
-        return _C()
+    @property
+    def settings(self) -> Settings:
+        return self._settings
+
+    @property
+    def redis(self) -> RedisStrProto:
+        return self._redis
+
+    @property
+    def model_registry(self) -> ModelRegistry:
+        return self._model_registry
 
 
-class _CF:
-    def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_path: Path) -> None:
+        self._corpus_path = corpus_path
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        return self._corpus_path
+
+
+class _FakeStore:
+    def __init__(
+        self: _FakeStore, base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> None:
         pass
 
-    def fetch(self: _CF, fid: str) -> Path:
-        assert _CORPUS_PATH is not None
-        return _CORPUS_PATH
+    def upload_artifact(
+        self: _FakeStore,
+        dir_path: Path,
+        *,
+        artifact_name: str,
+        request_id: str,
+    ) -> FileUploadResponse:
+        return FileUploadResponse(
+            file_id="deadbeef",
+            size=1,
+            sha256="x",
+            content_type="application/gzip",
+            created_at=None,
+        )
+
+    def download_artifact(
+        self: _FakeStore,
+        file_id: str,
+        *,
+        dest_dir: Path,
+        request_id: str,
+        expected_root: str,
+    ) -> Path:
+        return dest_dir / expected_root
 
 
 def test_training_worker_spm_artifact_and_completed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
+    """Test training worker with SPM tokenizer completes and uploads artifact."""
     # Environment roots
     artifacts = tmp_path / "artifacts"
     runs = tmp_path / "runs"
@@ -114,8 +315,15 @@ def test_training_worker_spm_artifact_and_completed(
         runs_root=str(runs),
         logs_root=str(logs),
         data_root=str(tmp_path / "data"),
+        data_bank_api_url="http://data-bank-api.local",
+        data_bank_api_key="secret-key",
     )
-    monkeypatch.setattr(train_job, "load_settings", lambda: settings)
+
+    # Settings via hook
+    def _load_settings() -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _load_settings
 
     # Provide sentencepiece tokenizer artifact (spm) so worker loads tok_spm path
     tok_id = "tok-spm"
@@ -129,15 +337,35 @@ def test_training_worker_spm_artifact_and_completed(
     corpus.mkdir()
     (corpus / "a.txt").write_text("hello world\nthis is a test\n", encoding="utf-8")
 
-    # Fake redis client
+    # Fake redis client via hook
     fake = FakeRedis()
 
-    def _fake_redis(settings: Settings) -> FakeRedis:
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return fake
 
-    monkeypatch.setattr(train_job, "redis_client", _fake_redis)
+    _test_hooks.kv_store_factory = _fake_kv_store
 
-    monkeypatch.setattr(train_job, "ServiceContainer", _C)
+    # Stub ServiceContainer via hook
+    def _from_settings(settings: Settings) -> ServiceContainerProto:
+        return _FakeServiceContainer(settings, fake)
+
+    _test_hooks.service_container_from_settings = _from_settings
+
+    # Stub corpus fetcher via hook
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return _FakeCorpusFetcher(corpus)
+
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
+
+    # Stub artifact store via hook
+    def _fake_artifact_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_artifact_store_factory
 
     payload: TrainJobPayload = {
         "run_id": "run-complete",
@@ -166,42 +394,6 @@ def test_training_worker_spm_artifact_and_completed(
             "precision": "auto",
         },
     }
-
-    # Stub fetcher to map file id to local corpus
-    global _CORPUS_PATH
-    _CORPUS_PATH = corpus
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
-
-    # Stub artifact store to avoid real network, and assert pointer is stored
-    class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
-        def upload_artifact(
-            self,
-            dir_path: Path,
-            *,
-            artifact_name: str,
-            request_id: str,
-        ) -> dict[str, str | int | None]:
-            return {
-                "file_id": "deadbeef",
-                "size": 1,
-                "sha256": "x",
-                "content_type": "application/gzip",
-                "created_at": None,
-            }
-
-    monkeypatch.setattr("platform_ml.ArtifactStore", _FakeStore)
-    settings_with_db = settings_factory(
-        artifacts_root=settings["app"]["artifacts_root"],
-        runs_root=settings["app"]["runs_root"],
-        logs_root=settings["app"]["logs_root"],
-        data_root=settings["app"]["data_root"],
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
-    )
-    monkeypatch.setattr(train_job, "load_settings", lambda: settings_with_db)
 
     train_job.process_train_job(payload)
 

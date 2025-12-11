@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import io
-import os
+import types
 from pathlib import Path
 from typing import Literal, Protocol
 
-from _pytest.monkeypatch import MonkeyPatch
-from fastapi.testclient import TestClient
-
-from model_trainer.api.main import create_app
+from model_trainer.api.routes import runs as runs_routes
+from model_trainer.api.routes.runs import _BinaryFileProto
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.services.container import ServiceContainer
 
 
 class _SettingsFactory(Protocol):
@@ -29,8 +28,43 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
+class _FakeBinaryFile:
+    """Fake binary file that implements _BinaryFileProto for testing."""
+
+    _buf: io.BytesIO
+
+    def __init__(self, data: bytes) -> None:
+        self._buf = io.BytesIO(data)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self._buf.seek(offset, whence)
+
+    def readline(self) -> bytes:
+        return self._buf.readline()
+
+    def __enter__(self) -> _FakeBinaryFile:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> bool | None:
+        return None
+
+    def __iter__(self) -> _FakeBinaryFile:
+        return self
+
+    def __next__(self) -> bytes:
+        line = self._buf.readline()
+        if not line:
+            raise StopIteration
+        return line
+
+
 def test_runs_logs_stream_handles_oserror_and_ends(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     # Arrange artifacts and a run log with two lines
     artifacts = tmp_path / "artifacts"
@@ -40,41 +74,38 @@ def test_runs_logs_stream_handles_oserror_and_ends(
     log_path = log_dir / "logs.jsonl"
     log_path.write_text("one\ntwo\n", encoding="utf-8")
 
-    app = create_app(settings_factory(artifacts_root=str(artifacts)))
-    client = TestClient(app)
+    s = settings_factory(artifacts_root=str(artifacts))
+    container = ServiceContainer.from_settings(s)
+    h = runs_routes._RunsRoutes(container)
 
-    # Patch open so that the second open (follow phase) raises OSError
-    from pathlib import Path as PathAlias
-
+    # Track open calls
     calls: dict[str, int] = {"count": 0}
 
-    def fake_open(
-        file: str | bytes | os.PathLike[str] | os.PathLike[bytes],
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> io.BytesIO:
-        path_s = str(file)
-        if path_s.endswith("logs.jsonl") and "rb" in mode:
+    def _fake_open(path: str, mode: str) -> _BinaryFileProto:
+        if path.endswith("logs.jsonl") and "rb" in mode:
             calls["count"] += 1
             if calls["count"] >= 2:
                 raise OSError("boom")
-            data = PathAlias(path_s).read_bytes()
-            return io.BytesIO(data)
+            data = Path(path).read_bytes()
+            return _FakeBinaryFile(data)
         raise AssertionError("unexpected open mode or path in test stub")
 
-    monkeypatch.setattr("model_trainer.api.routes.runs.open", fake_open, raising=False)
+    # Inject the fake open function via the class seam
+    h._open_fn = _fake_open
+    h._follow_max_loops = 3  # Ensure we don't loop forever
 
-    # Act: stream (default follow=True). The generator will emit tail lines
-    # then hit OSError and terminate. Collect what we can and ensure it ends.
-    with client.stream("GET", f"/runs/{run_id}/logs/stream", params={"tail": 1}) as resp:
-        assert resp.status_code == 200
-        chunks = list(resp.iter_bytes())
+    # No sleep needed for this test
+    def _no_sleep(_: float) -> None:
+        pass
+
+    h._sleep_fn = _no_sleep
+
+    # Drive the iterator directly
+    gen = h._sse_iter(str(log_path), tail=1, follow=True)
+    out: list[bytes] = list(gen)
 
     # Assert: at least one SSE data line came through and stream ended quickly
-    body = b"".join(chunks)
+    body = b"".join(out)
     assert b"data: " in body
     # And ensure our error path was triggered (second open attempted)
     assert calls["count"] >= 2

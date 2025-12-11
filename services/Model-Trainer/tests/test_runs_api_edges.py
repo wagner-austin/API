@@ -8,12 +8,11 @@ from fastapi.testclient import TestClient
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
-from pytest import MonkeyPatch
 
 from model_trainer.api.main import create_app
 from model_trainer.api.routes import runs as runs_routes
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.services.container import ServiceContainer
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
@@ -42,7 +41,7 @@ class _SettingsFactory(Protocol):
 
 
 def _mk_app(
-    tmp: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
+    tmp: Path, settings_factory: _SettingsFactory
 ) -> tuple[TestClient, Settings, FakeRedis]:
     s = settings_factory(
         artifacts_root=str(tmp / "artifacts"),
@@ -55,34 +54,29 @@ def _mk_app(
     def _fake_redis_for_kv(url: str) -> RedisStrProto:
         return fake
 
-    monkeypatch.setattr("model_trainer.core.services.container.redis_for_kv", _fake_redis_for_kv)
+    # Save originals for restoration
+    orig_kv = _test_hooks.kv_store_factory
 
-    # Short-circuit RQ enqueues
-    def _enq_train(self: RQEnqueuer, payload: dict[str, str | int | float | bool | None]) -> str:
-        return "job-train-1"
+    # Inject fakes via _test_hooks
+    _test_hooks.kv_store_factory = _fake_redis_for_kv
 
-    def _enq_eval(self: RQEnqueuer, payload: dict[str, str | int | float | bool | None]) -> str:
-        return "job-eval-1"
-
-    monkeypatch.setattr(RQEnqueuer, "enqueue_train", _enq_train)
-    monkeypatch.setattr(RQEnqueuer, "enqueue_eval", _enq_eval)
     app = create_app(s)
+
+    # Restore after app creation (conftest autouse fixture handles this too)
+    _test_hooks.kv_store_factory = orig_kv
+
     return TestClient(app), s, fake
 
 
-def test_runs_logs_not_found(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_logs_not_found(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, _, fake = _mk_app(tmp_path, settings_factory)
     res = client.get("/runs/unknown/logs")
     assert res.status_code == 404
     fake.assert_only_called(set())
 
 
-def test_runs_logs_read_failure(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_logs_read_failure(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, s, fake = _mk_app(tmp_path, settings_factory)
     log_dir = Path(s["app"]["artifacts_root"]) / "models" / "r1"
     log_dir.mkdir(parents=True, exist_ok=True)
     (log_dir / "logs.jsonl").mkdir(parents=True, exist_ok=True)
@@ -91,10 +85,8 @@ def test_runs_logs_read_failure(
     fake.assert_only_called(set())
 
 
-def test_runs_logs_tail_content(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_logs_tail_content(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, s, fake = _mk_app(tmp_path, settings_factory)
     run_dir = Path(s["app"]["artifacts_root"]) / "models" / "r2"
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "logs.jsonl"
@@ -105,19 +97,15 @@ def test_runs_logs_tail_content(
     fake.assert_only_called(set())
 
 
-def test_runs_logs_stream_not_found(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_logs_stream_not_found(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, _, fake = _mk_app(tmp_path, settings_factory)
     res = client.get("/runs/nope/logs/stream")
     assert res.status_code == 404
     fake.assert_only_called(set())
 
 
-def test_runs_logs_stream_follow_false(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, s, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_logs_stream_follow_false(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, s, fake = _mk_app(tmp_path, settings_factory)
     run_dir = Path(s["app"]["artifacts_root"]) / "models" / "r3"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "logs.jsonl").write_text("x\n" * 3, encoding="utf-8")
@@ -131,19 +119,15 @@ def test_runs_logs_stream_follow_false(
     fake.assert_only_called(set())
 
 
-def test_runs_eval_result_not_found(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
-    client, _, fake = _mk_app(tmp_path, monkeypatch, settings_factory)
+def test_runs_eval_result_not_found(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    client, _, fake = _mk_app(tmp_path, settings_factory)
     res = client.get("/runs/unknown/eval")
     # Exception handler maps to 404
     assert res.status_code == 404
     fake.assert_only_called({"get"})
 
 
-def test_runs_eval_result_cache_corrupt(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_runs_eval_result_cache_corrupt(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     # Build app and inject fake redis
     app = create_app(settings_factory(artifacts_root=str(tmp_path / "artifacts")))
     container: ServiceContainer = app.state.container
@@ -165,7 +149,7 @@ def test_runs_eval_result_cache_corrupt(
 
 
 def test_runs_train_unsupported_backend_maps_400(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
     s = settings_factory(
         artifacts_root=str(tmp_path / "artifacts"),
@@ -174,11 +158,6 @@ def test_runs_train_unsupported_backend_maps_400(
         data_root=str(tmp_path / "data"),
     )
 
-    # Enqueue methods
-    def _enq_train(self: RQEnqueuer, payload: TrainJobPayload) -> str:
-        return "job-x"
-
-    monkeypatch.setattr(RQEnqueuer, "enqueue_train", _enq_train)
     enq = RQEnqueuer("redis://ignored", RQSettings(1, 1, 1, 0, []))
     r = FakeRedis()
     model_reg = ModelRegistry(registrations={}, dataset_builder=LocalTextDatasetBuilder())

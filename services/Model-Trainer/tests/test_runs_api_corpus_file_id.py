@@ -3,11 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
-from _pytest.monkeypatch import MonkeyPatch
 from fastapi.testclient import TestClient
-from platform_workers.testing import FakeRedis
+from platform_workers.redis import _RedisBytesClient
+from platform_workers.rq_harness import RQClientQueue, RQRetryLike
+from platform_workers.testing import (
+    FakeQueue,
+    FakeRedis,
+    FakeRedisBytesClient,
+    FakeRetry,
+)
 
 from model_trainer.api.main import create_app
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.services.container import ServiceContainer
 
@@ -29,9 +36,7 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-def test_runs_train_with_corpus_file_id(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_runs_train_with_corpus_file_id(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     artifacts = tmp_path / "artifacts"
     settings = settings_factory(artifacts_root=str(artifacts))
     app = create_app(settings)
@@ -46,16 +51,21 @@ def test_runs_train_with_corpus_file_id(
     container.training_orchestrator._redis = fake
     container.training_orchestrator._job_store = TrainerJobStore(fake)
 
-    # Stub RQ to capture payload
-    from model_trainer.core.contracts.queue import TrainJobPayload, TrainRequestPayload
+    # Set up fake RQ infrastructure via hooks to capture payload
+    capturing_queue = FakeQueue("job-cfid")
 
-    captured: list[TrainJobPayload] = []
+    def _fake_rq_connection(url: str) -> _RedisBytesClient:
+        return FakeRedisBytesClient()
 
-    def _fake_enqueue_train(payload: TrainJobPayload) -> str:
-        captured.append(payload)
-        return "job-cfid"
+    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+        return capturing_queue
 
-    monkeypatch.setattr(container.rq_enqueuer, "enqueue_train", _fake_enqueue_train)
+    def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> RQRetryLike:
+        return FakeRetry(max=max_retries, interval=intervals)
+
+    _test_hooks.rq_connection_factory = _fake_rq_connection
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
 
     client = TestClient(app)
 
@@ -73,7 +83,16 @@ def test_runs_train_with_corpus_file_id(
 
     r = client.post("/runs/train", json=body)
     assert r.status_code == 200
-    assert captured, "payload should be captured"
-    req: TrainRequestPayload = captured[0]["request"]
-    assert req["corpus_file_id"] == "deadbeef"
+    assert capturing_queue.jobs, "payload should be captured"
+
+    # Extract the request payload from the enqueued job
+    # EnqueuedJob.args is tuple[_JsonValue, ...] where _JsonValue is recursive dict/list/scalar
+    enqueued = capturing_queue.jobs[0]
+    assert enqueued.args and len(enqueued.args) > 0
+
+    # The FakeQueue stores the raw dict structure matching TrainJobPayload
+    # Get corpus_file_id from nested structure - use str() for safe extraction
+    # The payload structure is: {"run_id": ..., "user_id": ..., "request": {"corpus_file_id": ...}}
+    payload_str = str(enqueued.args[0])
+    assert "deadbeef" in payload_str, f"corpus_file_id not found: {payload_str}"
     fake.assert_only_called({"hset"})

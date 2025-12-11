@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, NoReturn, Protocol
 
 import pytest
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainJobPayload
@@ -30,9 +32,21 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_root: Path, expected_fid: str) -> None:
+        self._corpus_root = corpus_root
+        self._expected_fid = expected_fid
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        assert fid == self._expected_fid
+        return self._corpus_root
+
+
 def _configure_worker_roots(
-    tmp_path: Path, settings_factory: _SettingsFactory, monkeypatch: pytest.MonkeyPatch
-) -> Path:
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> tuple[Path, Settings]:
     artifacts_root = tmp_path / "artifacts"
     runs_root = tmp_path / "runs"
     logs_root = tmp_path / "logs"
@@ -42,8 +56,12 @@ def _configure_worker_roots(
         logs_root=str(logs_root),
         data_root=str(tmp_path / "data"),
     )
-    monkeypatch.setattr(train_job, "load_settings", lambda: settings)
-    return artifacts_root
+
+    def _test_load_settings() -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _test_load_settings
+    return artifacts_root, settings
 
 
 def test_emit_metrics_helpers_publish() -> None:
@@ -94,9 +112,9 @@ def test_emit_metrics_helpers_publish() -> None:
 
 
 def test_process_train_job_sets_status_message_on_exception(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    _configure_worker_roots(tmp_path, settings_factory, monkeypatch)
+    _, _settings = _configure_worker_roots(tmp_path, settings_factory)
 
     payload: TrainJobPayload = {
         "run_id": "run-exc",
@@ -127,34 +145,31 @@ def test_process_train_job_sets_status_message_on_exception(
     }
     corpus_root = tmp_path / "corpus"
     corpus_root.mkdir()
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            assert fid == "deadbeef"
-            return corpus_root
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
     (corpus_root / "a.txt").write_text("hello\n", encoding="utf-8")
 
-    # Fake redis
+    # Create fake corpus fetcher via hook
+    fake_fetcher = _FakeCorpusFetcher(corpus_root, "deadbeef")
+
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return fake_fetcher
+
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
+
+    # Fake redis via hook
     client = FakeRedis()
 
-    def _fake_redis(settings: Settings) -> FakeRedis:
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return client
 
-    monkeypatch.setattr(train_job, "redis_client", _fake_redis)
+    _test_hooks.kv_store_factory = _fake_kv_store
 
-    # Force an exception by making container/model registry lookups blow up
-    class _C:
-        @staticmethod
-        def from_settings(_: Settings) -> None:
-            raise RuntimeError("container creation failed")
+    # Force an exception by making container creation blow up
+    def _fail_container(settings: Settings) -> NoReturn:
+        raise RuntimeError("container creation failed")
 
-    monkeypatch.setattr(train_job, "ServiceContainer", _C)
+    _test_hooks.service_container_from_settings = _fail_container
 
     with pytest.raises(RuntimeError):
         train_job.process_train_job(payload)

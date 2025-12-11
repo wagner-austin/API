@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import shutil
-
 from platform_core.queues import TRAINER_QUEUE
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 
 from ...orchestrators.conversation_orchestrator import ConversationOrchestrator
 from ...orchestrators.inference_orchestrator import InferenceOrchestrator
 from ...orchestrators.tokenizer_orchestrator import TokenizerOrchestrator
 from ...orchestrators.training_orchestrator import TrainingOrchestrator
+from .. import _test_hooks
 from ..config.settings import Settings
 from ..contracts.dataset import DatasetBuilder
 from ..contracts.tokenizer import TokenizerBackend
@@ -64,7 +63,8 @@ class ServiceContainer:
 
     @classmethod
     def from_settings(cls: type[ServiceContainer], settings: Settings) -> ServiceContainer:
-        r: RedisStrProto = redis_for_kv(settings["redis"]["url"])
+        redis_url = settings["redis"]["url"]
+        r: RedisStrProto = _test_hooks.kv_store_factory(redis_url)
         enq = _create_enqueuer(settings)
         dataset_builder = LocalTextDatasetBuilder()
 
@@ -128,7 +128,8 @@ def _create_enqueuer(settings: Settings) -> RQEnqueuer:
 
 def _create_tokenizer_registry() -> TokenizerRegistry:
     tok_backends: dict[str, TokenizerBackend] = {"bpe": BPEBackend(), "char": CharBackend()}
-    if all(shutil.which(x) is not None for x in ("spm_train", "spm_encode", "spm_decode")):
+    spm_cmds = ("spm_train", "spm_encode", "spm_decode")
+    if all(_test_hooks.shutil_which(x) is not None for x in spm_cmds):
         from .tokenizer.spm_backend import SentencePieceBackend
 
         tok_backends["sentencepiece"] = SentencePieceBackend()

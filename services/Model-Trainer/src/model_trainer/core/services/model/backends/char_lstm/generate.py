@@ -156,8 +156,10 @@ def _generate_single(
             if len(prompt_ids) + len(generated_ids) >= max_len:
                 break
 
-            # Sample next token from current logits
-            next_token = _sample_token(
+            # Sample next token from current logits (hook for testing)
+            from model_trainer.core import _test_hooks
+
+            next_token = _test_hooks.sample_token(
                 last_logits,
                 temperature=cfg["temperature"],
                 top_k=cfg["top_k"],

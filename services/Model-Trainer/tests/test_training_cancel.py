@@ -4,10 +4,13 @@ import threading
 from pathlib import Path
 from typing import Literal, Protocol
 
-from _pytest.monkeypatch import MonkeyPatch
+from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.trainer_keys import cancel_key, heartbeat_key
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
@@ -32,16 +35,57 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
+class _FakeCorpusFetcher:
+    """Fake CorpusFetcher for tests."""
+
+    def __init__(self: _FakeCorpusFetcher, corpus_path: Path) -> None:
+        self._corpus_path = corpus_path
+
+    def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
+        return self._corpus_path
+
+
+class _FakeStore:
+    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
+        pass
+
+    def upload_artifact(
+        self,
+        dir_path: Path,
+        *,
+        artifact_name: str,
+        request_id: str,
+    ) -> FileUploadResponse:
+        return FileUploadResponse(
+            file_id="fake-file-id",
+            size=1,
+            sha256="x",
+            content_type="application/gzip",
+            created_at=None,
+        )
+
+    def download_artifact(
+        self,
+        file_id: str,
+        *,
+        dest_dir: Path,
+        request_id: str,
+        expected_root: str,
+    ) -> Path:
+        return dest_dir / expected_root
+
+
 def test_training_cancellation_with_redis(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    # Use fake redis
+    """Test that training can be cancelled via Redis flag."""
+    # Use fake redis via hook
     fake = FakeRedis()
 
-    def _redis_for_kv(url: str) -> FakeRedis:
+    def _fake_kv_store(url: str) -> RedisStrProto:
         return fake
 
-    monkeypatch.setattr("model_trainer.worker.job_utils.redis_for_kv", _redis_for_kv)
+    _test_hooks.kv_store_factory = _fake_kv_store
 
     # Prepare artifacts and tokenizer
     artifacts = tmp_path / "artifacts"
@@ -55,7 +99,8 @@ def test_training_cancellation_with_redis(
     def _load_settings() -> Settings:
         return settings
 
-    monkeypatch.setattr("model_trainer.worker.train_job.load_settings", _load_settings)
+    _test_hooks.load_settings = _load_settings
+
     corpus = tmp_path / "corpus"
     corpus.mkdir()
     # Make corpus long enough to allow cancel
@@ -72,6 +117,22 @@ def test_training_cancellation_with_redis(
         out_dir=str(out_dir),
     )
     _ = BPEBackend().train(cfg_tok)
+
+    # Stub corpus fetcher via hook
+    def _fake_corpus_fetcher_factory(
+        api_url: str, api_key: str, cache_dir: Path
+    ) -> _FakeCorpusFetcher:
+        return _FakeCorpusFetcher(corpus)
+
+    _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
+
+    # Stub artifact store via hook
+    def _fake_artifact_store_factory(
+        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
+    ) -> ArtifactStoreProto:
+        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+
+    _test_hooks.artifact_store_factory = _fake_artifact_store_factory
 
     run_id = "run-cancel"
     payload = {
@@ -99,39 +160,6 @@ def test_training_cancellation_with_redis(
             "finetune_lr_cap": 5e-5,
         },
     }
-    # Stub fetcher to return local corpus
-    from model_trainer.core.services.data import corpus_fetcher as cf
-
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
-
-        def fetch(self: _CF, fid: str) -> Path:
-            return corpus
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
-
-    # Stub ArtifactStore used by training worker to avoid network
-    class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
-        def upload_artifact(
-            self,
-            dir_path: Path,
-            *,
-            artifact_name: str,
-            request_id: str,
-        ) -> dict[str, str | int | None]:
-            return {
-                "file_id": "fake-file-id",
-                "size": 1,
-                "sha256": "x",
-                "content_type": "application/gzip",
-                "created_at": None,
-            }
-
-    monkeypatch.setattr("platform_ml.ArtifactStore", _FakeStore)
 
     # Set cancel flag before starting training - ensures cancellation is detected
     fake.set(cancel_key(run_id), "1")

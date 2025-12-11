@@ -10,7 +10,7 @@ from platform_core.logging import get_logger, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
-from model_trainer.worker import _test_hooks
+from model_trainer import _test_hooks
 
 
 class LoggerProtocol(Protocol):

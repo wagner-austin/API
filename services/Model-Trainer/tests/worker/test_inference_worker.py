@@ -8,13 +8,21 @@ from typing import Literal, Protocol
 
 import pytest
 import torch
+from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, generate_key, score_key
 from platform_ml.wandb_publisher import WandbPublisher
+from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
 
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import (
+    ArtifactStoreProto,
+    ServiceContainerProto,
+)
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.dataset import DatasetBuilder
 from model_trainer.core.contracts.model import (
     BackendCapabilities,
     EvalOutcome,
@@ -31,7 +39,9 @@ from model_trainer.core.contracts.model import (
 from model_trainer.core.contracts.queue import GenerateJobPayload, ScoreJobPayload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
+from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
+from model_trainer.core.services.registries import BackendRegistration, ModelRegistry
 from model_trainer.core.types import ForwardOutProto, NamedParameter, ParameterLike
 from model_trainer.worker import generate_job, score_job
 
@@ -380,51 +390,102 @@ class _FakeBackendNoTopk:
         )
 
 
-class _FakeModelRegistry:
-    def __init__(self, backend: ModelBackend) -> None:
-        self._backend = backend
+class _FakeServiceContainer:
+    """Fake ServiceContainer for testing."""
 
-    def get(self, family: Literal["gpt2", "llama", "qwen", "char_lstm"]) -> ModelBackend:
-        return self._backend
+    def __init__(
+        self: _FakeServiceContainer,
+        settings: Settings,
+        redis: RedisStrProto,
+        backend: ModelBackend,
+    ) -> None:
+        self._settings = settings
+        self._redis = redis
+
+        def _backend_factory(dataset_builder: DatasetBuilder) -> ModelBackend:
+            return backend
+
+        self._model_registry = ModelRegistry(
+            registrations={
+                "gpt2": BackendRegistration(
+                    factory=_backend_factory, capabilities=UNAVAILABLE_CAPABILITIES
+                ),
+                "char_lstm": BackendRegistration(
+                    factory=_backend_factory, capabilities=UNAVAILABLE_CAPABILITIES
+                ),
+                "llama": BackendRegistration(
+                    factory=_backend_factory, capabilities=UNAVAILABLE_CAPABILITIES
+                ),
+                "qwen": BackendRegistration(
+                    factory=_backend_factory, capabilities=UNAVAILABLE_CAPABILITIES
+                ),
+            },
+            dataset_builder=LocalTextDatasetBuilder(),
+        )
+
+    @property
+    def settings(self) -> Settings:
+        return self._settings
+
+    @property
+    def redis(self) -> RedisStrProto:
+        return self._redis
+
+    @property
+    def model_registry(self) -> ModelRegistry:
+        return self._model_registry
 
 
-class _ContainerProto(Protocol):
-    """Protocol for container with model_registry."""
+class _FakeArtifactStore:
+    """Fake ArtifactStore for testing artifact download paths."""
 
-    model_registry: _FakeModelRegistry
+    def __init__(
+        self: _FakeArtifactStore,
+        base_url: str,
+        api_key: str,
+        *,
+        timeout_seconds: float = 600.0,
+        include_manifest: bool = True,
+        manifest_content: str | None = None,
+    ) -> None:
+        self._include_manifest = include_manifest
+        self._manifest_content = manifest_content
 
+    def upload_artifact(
+        self: _FakeArtifactStore,
+        dir_path: Path,
+        *,
+        artifact_name: str,
+        request_id: str,
+    ) -> FileUploadResponse:
+        return FileUploadResponse(
+            file_id="fake-upload-id",
+            size=1,
+            sha256="x",
+            content_type="application/gzip",
+            created_at=None,
+        )
 
-class _ContainerFactoryProto(Protocol):
-    """Protocol for container factory with from_settings."""
-
-    def from_settings(self, settings: Settings) -> _ContainerProto: ...
-
-
-class _FakeContainer:
-    def __init__(self, backend: ModelBackend) -> None:
-        self.model_registry = _FakeModelRegistry(backend)
-
-
-class _FakeContainerFactory:
-    """Factory that creates _FakeContainer instances."""
-
-    def __init__(self, backend: ModelBackend) -> None:
-        self._backend = backend
-
-    def from_settings(self, settings: Settings) -> _FakeContainer:
-        return _FakeContainer(self._backend)
-
-
-def _make_container_factory(backend: ModelBackend) -> _FakeContainerFactory:
-    """Create a container factory for testing."""
-    return _FakeContainerFactory(backend)
+    def download_artifact(
+        self: _FakeArtifactStore,
+        file_id: str,
+        *,
+        dest_dir: Path,
+        request_id: str,
+        expected_root: str,
+    ) -> Path:
+        out = dest_dir / expected_root
+        out.mkdir(parents=True, exist_ok=True)
+        if self._include_manifest and self._manifest_content is not None:
+            manifest_path = out / "manifest.json"
+            manifest_path.write_text(self._manifest_content, encoding="utf-8")
+        return out
 
 
 class TestProcessScoreJob:
     def test_score_job_success(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test successful score job execution."""
@@ -447,21 +508,21 @@ class TestProcessScoreJob:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run123"), "file123")
 
-        monkeypatch.setattr(score_job, "load_settings", lambda: settings)
+        # Override hooks
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(score_job, "redis_client", _fake_redis_client)
-
-        def _fake_load_tokenizer(s: Settings, tid: str) -> _FakeTokenizerHandle:
+        def _fake_load_tokenizer(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
             return _FakeTokenizerHandle()
 
-        monkeypatch.setattr(score_job, "load_tokenizer_for_training", _fake_load_tokenizer)
+        _test_hooks.load_tokenizer_for_training = _fake_load_tokenizer
 
         backend = _FakeBackendWithTopk()
-        container_factory = _make_container_factory(backend)
-        monkeypatch.setattr(score_job, "ServiceContainer", container_factory)
+
+        def _fake_service_container(settings: Settings) -> ServiceContainerProto:
+            return _FakeServiceContainer(settings, fake_redis, backend)
+
+        _test_hooks.service_container_from_settings = _fake_service_container
 
         payload: ScoreJobPayload = {
             "run_id": "run123",
@@ -486,7 +547,6 @@ class TestProcessScoreJob:
     def test_score_job_no_artifact_pointer_fails(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test score job fails when artifact pointer is missing."""
@@ -501,12 +561,8 @@ class TestProcessScoreJob:
 
         fake_redis = FakeRedis()
 
-        monkeypatch.setattr(score_job, "load_settings", lambda: settings)
-
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(score_job, "redis_client", _fake_redis_client)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
         payload: ScoreJobPayload = {
             "run_id": "run123",
@@ -530,7 +586,6 @@ class TestProcessScoreJob:
     def test_score_job_no_topk_or_surprisal(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test score job with no topk or surprisal in result."""
@@ -553,21 +608,20 @@ class TestProcessScoreJob:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run123"), "file123")
 
-        monkeypatch.setattr(score_job, "load_settings", lambda: settings)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(score_job, "redis_client", _fake_redis_client)
-
-        def _fake_load_tokenizer(s: Settings, tid: str) -> _FakeTokenizerHandle:
+        def _fake_load_tokenizer(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
             return _FakeTokenizerHandle()
 
-        monkeypatch.setattr(score_job, "load_tokenizer_for_training", _fake_load_tokenizer)
+        _test_hooks.load_tokenizer_for_training = _fake_load_tokenizer
 
         backend = _FakeBackendNoTopk()
-        container_factory = _make_container_factory(backend)
-        monkeypatch.setattr(score_job, "ServiceContainer", container_factory)
+
+        def _fake_service_container(settings: Settings) -> ServiceContainerProto:
+            return _FakeServiceContainer(settings, fake_redis, backend)
+
+        _test_hooks.service_container_from_settings = _fake_service_container
 
         payload: ScoreJobPayload = {
             "run_id": "run123",
@@ -595,7 +649,6 @@ class TestProcessGenerateJob:
     def test_generate_job_success(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test successful generate job execution."""
@@ -618,21 +671,20 @@ class TestProcessGenerateJob:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run123"), "file123")
 
-        monkeypatch.setattr(generate_job, "load_settings", lambda: settings)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(generate_job, "redis_client", _fake_redis_client)
-
-        def _fake_load_tokenizer(s: Settings, tid: str) -> _FakeTokenizerHandle:
+        def _fake_load_tokenizer(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
             return _FakeTokenizerHandle()
 
-        monkeypatch.setattr(generate_job, "load_tokenizer_for_training", _fake_load_tokenizer)
+        _test_hooks.load_tokenizer_for_training = _fake_load_tokenizer
 
         backend = _FakeBackendWithTopk()
-        container_factory = _make_container_factory(backend)
-        monkeypatch.setattr(generate_job, "ServiceContainer", container_factory)
+
+        def _fake_service_container(settings: Settings) -> ServiceContainerProto:
+            return _FakeServiceContainer(settings, fake_redis, backend)
+
+        _test_hooks.service_container_from_settings = _fake_service_container
 
         payload: GenerateJobPayload = {
             "run_id": "run123",
@@ -663,7 +715,6 @@ class TestProcessGenerateJob:
     def test_generate_job_no_artifact_pointer_fails(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test generate job fails when artifact pointer is missing."""
@@ -678,12 +729,8 @@ class TestProcessGenerateJob:
 
         fake_redis = FakeRedis()
 
-        monkeypatch.setattr(generate_job, "load_settings", lambda: settings)
-
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(generate_job, "redis_client", _fake_redis_client)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
         payload: GenerateJobPayload = {
             "run_id": "run123",
@@ -710,44 +757,12 @@ class TestProcessGenerateJob:
         fake_redis.assert_only_called({"set", "get"})
 
 
-class _FakeArtifactStore:
-    """Fake ArtifactStore for testing artifact download paths."""
-
-    def __init__(
-        self,
-        base_url: str,
-        api_key: str,
-        *,
-        timeout_seconds: float = 600.0,
-        include_manifest: bool = True,
-        manifest_content: str | None = None,
-    ) -> None:
-        self._include_manifest = include_manifest
-        self._manifest_content = manifest_content
-
-    def download_artifact(
-        self,
-        file_id: str,
-        *,
-        dest_dir: Path,
-        request_id: str,
-        expected_root: str,
-    ) -> Path:
-        out = dest_dir / expected_root
-        out.mkdir(parents=True, exist_ok=True)
-        if self._include_manifest and self._manifest_content is not None:
-            manifest_path = out / "manifest.json"
-            manifest_path.write_text(self._manifest_content, encoding="utf-8")
-        return out
-
-
 class TestArtifactDownloadPaths:
     """Tests for artifact download scenarios covering lines 846-852, 857, 958-964, 969."""
 
     def test_score_job_with_download(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test score job when artifact needs to be downloaded (covers lines 846-852)."""
@@ -766,28 +781,27 @@ class TestArtifactDownloadPaths:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run_download"), "file_download_123")
 
-        monkeypatch.setattr(score_job, "load_settings", lambda: settings)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(score_job, "redis_client", _fake_redis_client)
-
-        def _fake_load_tokenizer(s: Settings, tid: str) -> _FakeTokenizerHandle:
+        def _fake_load_tokenizer(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
             return _FakeTokenizerHandle()
 
-        monkeypatch.setattr(score_job, "load_tokenizer_for_training", _fake_load_tokenizer)
+        _test_hooks.load_tokenizer_for_training = _fake_load_tokenizer
 
         backend = _FakeBackendWithTopk()
-        container_factory = _make_container_factory(backend)
-        monkeypatch.setattr(score_job, "ServiceContainer", container_factory)
+
+        def _fake_service_container(settings: Settings) -> ServiceContainerProto:
+            return _FakeServiceContainer(settings, fake_redis, backend)
+
+        _test_hooks.service_container_from_settings = _fake_service_container
 
         # Create factory function that captures manifest content
         manifest_content = _make_manifest("char_lstm", "tok123")
 
         def _make_fake_store(
             base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> _FakeArtifactStore:
+        ) -> ArtifactStoreProto:
             return _FakeArtifactStore(
                 base_url,
                 api_key,
@@ -796,7 +810,7 @@ class TestArtifactDownloadPaths:
                 manifest_content=manifest_content,
             )
 
-        monkeypatch.setattr("platform_ml.ArtifactStore", _make_fake_store)
+        _test_hooks.artifact_store_factory = _make_fake_store
 
         payload: ScoreJobPayload = {
             "run_id": "run_download",
@@ -819,7 +833,6 @@ class TestArtifactDownloadPaths:
     def test_score_job_missing_manifest_after_download(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test score job when manifest is missing after download (covers line 857)."""
@@ -837,17 +850,13 @@ class TestArtifactDownloadPaths:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run_no_manifest"), "file_no_manifest_123")
 
-        monkeypatch.setattr(score_job, "load_settings", lambda: settings)
-
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(score_job, "redis_client", _fake_redis_client)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
         # Create factory without manifest
         def _make_fake_store_no_manifest(
             base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> _FakeArtifactStore:
+        ) -> ArtifactStoreProto:
             return _FakeArtifactStore(
                 base_url,
                 api_key,
@@ -856,7 +865,7 @@ class TestArtifactDownloadPaths:
                 manifest_content=None,
             )
 
-        monkeypatch.setattr("platform_ml.ArtifactStore", _make_fake_store_no_manifest)
+        _test_hooks.artifact_store_factory = _make_fake_store_no_manifest
 
         payload: ScoreJobPayload = {
             "run_id": "run_no_manifest",
@@ -875,7 +884,6 @@ class TestArtifactDownloadPaths:
     def test_generate_job_with_download(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test generate job when artifact needs to be downloaded (covers lines 958-964)."""
@@ -893,27 +901,26 @@ class TestArtifactDownloadPaths:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run_gen_download"), "file_gen_download_123")
 
-        monkeypatch.setattr(generate_job, "load_settings", lambda: settings)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(generate_job, "redis_client", _fake_redis_client)
-
-        def _fake_load_tokenizer(s: Settings, tid: str) -> _FakeTokenizerHandle:
+        def _fake_load_tokenizer(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
             return _FakeTokenizerHandle()
 
-        monkeypatch.setattr(generate_job, "load_tokenizer_for_training", _fake_load_tokenizer)
+        _test_hooks.load_tokenizer_for_training = _fake_load_tokenizer
 
         backend = _FakeBackendWithTopk()
-        container_factory = _make_container_factory(backend)
-        monkeypatch.setattr(generate_job, "ServiceContainer", container_factory)
+
+        def _fake_service_container(settings: Settings) -> ServiceContainerProto:
+            return _FakeServiceContainer(settings, fake_redis, backend)
+
+        _test_hooks.service_container_from_settings = _fake_service_container
 
         manifest_content = _make_manifest("char_lstm", "tok123")
 
         def _make_fake_store(
             base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> _FakeArtifactStore:
+        ) -> ArtifactStoreProto:
             return _FakeArtifactStore(
                 base_url,
                 api_key,
@@ -922,7 +929,7 @@ class TestArtifactDownloadPaths:
                 manifest_content=manifest_content,
             )
 
-        monkeypatch.setattr("platform_ml.ArtifactStore", _make_fake_store)
+        _test_hooks.artifact_store_factory = _make_fake_store
 
         payload: GenerateJobPayload = {
             "run_id": "run_gen_download",
@@ -950,7 +957,6 @@ class TestArtifactDownloadPaths:
     def test_generate_job_missing_manifest_after_download(
         self,
         tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
         settings_factory: _SettingsFactory,
     ) -> None:
         """Test generate job when manifest is missing after download (covers line 969)."""
@@ -968,16 +974,12 @@ class TestArtifactDownloadPaths:
         fake_redis = FakeRedis()
         fake_redis.set(artifact_file_id_key("run_gen_no_manifest"), "file_gen_no_manifest_123")
 
-        monkeypatch.setattr(generate_job, "load_settings", lambda: settings)
-
-        def _fake_redis_client(s: Settings) -> FakeRedis:
-            return fake_redis
-
-        monkeypatch.setattr(generate_job, "redis_client", _fake_redis_client)
+        _test_hooks.load_settings = lambda: settings
+        _test_hooks.kv_store_factory = lambda url: fake_redis
 
         def _make_fake_store_no_manifest(
             base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> _FakeArtifactStore:
+        ) -> ArtifactStoreProto:
             return _FakeArtifactStore(
                 base_url,
                 api_key,
@@ -986,7 +988,7 @@ class TestArtifactDownloadPaths:
                 manifest_content=None,
             )
 
-        monkeypatch.setattr("platform_ml.ArtifactStore", _make_fake_store_no_manifest)
+        _test_hooks.artifact_store_factory = _make_fake_store_no_manifest
 
         payload: GenerateJobPayload = {
             "run_id": "run_gen_no_manifest",

@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
-from _pytest.monkeypatch import MonkeyPatch
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
-from platform_workers.testing import FakeRedis
+from platform_workers.redis import _RedisBytesClient
+from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient, FakeRetry
 from typing_extensions import TypedDict
 
 from model_trainer.api.main import create_app
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.services.container import ServiceContainer
 
@@ -31,9 +32,7 @@ class _SettingsFactory(Protocol):
     ) -> Settings: ...
 
 
-def test_runs_train_and_status_and_logs(
-    tmp_path: Path, monkeypatch: MonkeyPatch, settings_factory: _SettingsFactory
-) -> None:
+def test_runs_train_and_status_and_logs(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
     artifacts = tmp_path / "artifacts"
     settings = settings_factory(artifacts_root=str(artifacts))
     app = create_app(settings)
@@ -49,23 +48,21 @@ def test_runs_train_and_status_and_logs(
     container.training_orchestrator._redis = fake
     container.training_orchestrator._job_store = TrainerJobStore(fake)
 
-    # Stub RQ enqueuer
-    def _fake_enqueue_train(payload: dict[str, str | int | float | bool | None]) -> str:
-        return "job-test"
+    # Set up fake RQ infrastructure via hooks
+    fake_queue = FakeQueue(job_id="job-test")
 
-    monkeypatch.setattr(container.rq_enqueuer, "enqueue_train", _fake_enqueue_train)
+    def _fake_rq_connection(url: str) -> _RedisBytesClient:
+        return FakeRedisBytesClient()
 
-    # Stub CorpusFetcher to map file id to local corpus path
-    from model_trainer.core.services.data import corpus_fetcher as cf
+    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> FakeQueue:
+        return fake_queue
 
-    class _CF:
-        def __init__(self: _CF, api_url: str, api_key: str, cache_dir: Path) -> None:
-            pass
+    def _fake_rq_retry(*, max_retries: int, intervals: list[int]) -> FakeRetry:
+        return FakeRetry(max=max_retries, interval=intervals)
 
-        def fetch(self: _CF, file_id: str) -> Path:
-            return tmp_path / "corpus"
-
-    monkeypatch.setattr(cf, "CorpusFetcher", _CF)
+    _test_hooks.rq_connection_factory = _fake_rq_connection
+    _test_hooks.rq_queue_factory = _fake_rq_queue
+    _test_hooks.rq_retry_factory = _fake_rq_retry
 
     client = TestClient(app)
 

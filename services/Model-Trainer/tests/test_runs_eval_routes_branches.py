@@ -3,15 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
-import pytest
 from fastapi.testclient import TestClient
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.job_types import job_key
+from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.trainer_keys import eval_key
+from platform_workers.redis import RedisStrProto
+from platform_workers.testing import FakeRedis
 from typing_extensions import TypedDict
 
 from model_trainer.api.main import create_app
-from model_trainer.api.schemas.runs import EvaluateRequest, EvaluateResponse
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.services.container import ServiceContainer
 
 
 class _SettingsFactory(Protocol):
@@ -32,37 +34,38 @@ class _SettingsFactory(Protocol):
 
 
 def test_runs_evaluate_and_eval_result_logging(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings_factory: _SettingsFactory
+    tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
-    app = create_app(settings_factory(artifacts_root=str(tmp_path / "artifacts")))
-    cont: ServiceContainer = app.state.container
+    # Set up FakeRedis via hook
+    fake = FakeRedis()
 
-    # Stub orchestrator methods
-    def _enq(run_id: str, req: EvaluateRequest) -> EvaluateResponse:
-        return {
-            "run_id": run_id,
-            "split": req["split"],
-            "status": "queued",
-            "loss": None,
-            "perplexity": None,
-            "artifact_path": None,
-        }
+    def _fake_kv_store(url: str) -> RedisStrProto:
+        return fake
 
-    def _get(run_id: str) -> EvaluateResponse:
-        return {
-            "run_id": run_id,
-            "split": "validation",
+    _test_hooks.kv_store_factory = _fake_kv_store
+
+    settings = settings_factory(artifacts_root=str(tmp_path / "artifacts"))
+    app = create_app(settings)
+
+    run_id = "r-eval"
+
+    # Pre-populate job status so enqueue_evaluation can proceed (it checks run status)
+    fake.hset(
+        job_key("trainer", run_id),
+        {
+            "job_id": run_id,
+            "user_id": "1",
             "status": "completed",
-            "loss": 1.0,
-            "perplexity": 2.0,
-            "artifact_path": None,
-        }
-
-    monkeypatch.setattr(cont.training_orchestrator, "enqueue_evaluation", _enq)
-    monkeypatch.setattr(cont.training_orchestrator, "get_evaluation", _get)
+            "progress": "100",
+            "message": "Training completed",
+            "created_at": "2024-01-01T00:00:00",
+            "updated_at": "2024-01-01T00:00:00",
+            "error": "",
+            "artifact_file_id": "",
+        },
+    )
 
     client = TestClient(app)
-    run_id = "r-eval"
     payload: dict[str, str | None] = {"split": "validation", "path_override": None}
     r1 = client.post(f"/runs/{run_id}/evaluate", json=payload)
     assert r1.status_code == 200
@@ -91,6 +94,21 @@ def test_runs_evaluate_and_eval_result_logging(
     assert obj1["perplexity"] is None, "Response perplexity must be None for queued status"
     assert "artifact_path" in obj1, "Response must contain 'artifact_path' key"
     assert obj1["artifact_path"] is None, "Response artifact_path must be None for queued status"
+
+    # Set completed eval result in Redis for the GET request
+    fake.set(
+        eval_key(run_id),
+        dump_json_str(
+            {
+                "status": "completed",
+                "split": "validation",
+                "loss": 1.0,
+                "ppl": 2.0,
+                "artifact": None,
+            }
+        ),
+    )
+
     r2 = client.get(f"/runs/{run_id}/eval")
     assert r2.status_code == 200
     obj2_raw = load_json_str(r2.text)
@@ -109,3 +127,4 @@ def test_runs_evaluate_and_eval_result_logging(
     assert obj2["perplexity"] == 2.0, "Response perplexity must be 2.0"
     assert "artifact_path" in obj2, "Response must contain 'artifact_path' key"
     assert obj2["artifact_path"] is None, "Response artifact_path must be None"
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})

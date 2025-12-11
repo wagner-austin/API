@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import time
 from pathlib import Path
 
@@ -83,8 +82,10 @@ class TokenizerCleanupService:
         deleted = 0
         freed = 0
 
+        from model_trainer.core import _test_hooks
+
         try:
-            for entry in t_root.iterdir():
+            for entry in _test_hooks.path_iterdir(t_root):
                 if not entry.is_dir():
                     continue
                 tokenizer_id = entry.name
@@ -96,7 +97,7 @@ class TokenizerCleanupService:
                     continue
                 size = _directory_size(entry)
                 try:
-                    shutil.rmtree(entry)
+                    _test_hooks.shutil_rmtree(entry)
                 except OSError as exc:
                     logger.error(
                         "Failed to delete tokenizer directory",

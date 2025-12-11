@@ -16,12 +16,11 @@ from platform_ml.wandb_publisher import WandbPublisher, WandbUnavailableError
 from platform_workers.job_context import JobContext, make_job_context
 from platform_workers.redis import RedisStrProto, is_redis_error
 
-from model_trainer.core.config.settings import Settings, load_settings
+from model_trainer.core import _test_hooks
+from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, TrainOutcome
 from model_trainer.core.contracts.queue import TrainJobPayload
 from model_trainer.core.infra.paths import model_dir
-from model_trainer.core.services.container import ServiceContainer
-from model_trainer.core.services.data import corpus_fetcher as corpus_fetcher_mod
 from model_trainer.worker.job_utils import (
     build_cfg,
     emit_completed_metrics,
@@ -97,7 +96,7 @@ def _upload_and_persist_pointer(
 ) -> tuple[str, int]:
     from pathlib import Path as _Path
 
-    from platform_ml import ArtifactStore
+    from model_trainer.core import _test_hooks
 
     api_url = settings["app"]["data_bank_api_url"]
     api_key = settings["app"]["data_bank_api_key"]
@@ -107,7 +106,7 @@ def _upload_and_persist_pointer(
             "data-bank-api configuration missing for artifact upload",
             model_trainer_status_for(ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED),
         )
-    store = ArtifactStore(api_url, api_key)
+    store = _test_hooks.artifact_store_factory(api_url, api_key)
     base = _Path(out_dir)
     fid_resp = store.upload_artifact(base, artifact_name=f"model-{run_id}", request_id=run_id)
     r.set(artifact_file_id_key(run_id), fid_resp["file_id"])
@@ -279,7 +278,7 @@ def _execute_training(
             val_ppl,
         )
 
-    container = ServiceContainer.from_settings(settings)
+    container = _test_hooks.service_container_from_settings(settings)
     backend = container.model_registry.get(cfg["model_family"])
     tok_handle = load_tokenizer_for_training(settings, cfg["tokenizer_id"])
     pretrained_run_id = cfg["pretrained_run_id"]
@@ -350,7 +349,7 @@ def _execute_training(
 
 def process_train_job(payload: TrainJobPayload) -> None:
     """Process a training job."""
-    settings = load_settings()
+    settings = _test_hooks.load_settings()
     setup_job_logging(settings)
 
     r = redis_client(settings)
@@ -383,10 +382,10 @@ def process_train_job(payload: TrainJobPayload) -> None:
 
     req = payload["request"]
     fid = str(req["corpus_file_id"]).strip()
-    fetcher = corpus_fetcher_mod.CorpusFetcher(
-        api_url=settings["app"]["data_bank_api_url"],
-        api_key=settings["app"]["data_bank_api_key"],
-        cache_dir=Path(settings["app"]["data_root"]) / "corpus_cache",
+    fetcher = _test_hooks.corpus_fetcher_factory(
+        settings["app"]["data_bank_api_url"],
+        settings["app"]["data_bank_api_key"],
+        Path(settings["app"]["data_root"]) / "corpus_cache",
     )
     resolved_corpus = str(fetcher.fetch(fid))
     cfg = build_cfg(req, resolved_corpus)

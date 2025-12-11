@@ -272,9 +272,11 @@ CHAR_LSTM_CAPABILITIES: BackendCapabilities = {
 # Pre-defined backend function bundles for GPT2 and CharLSTM
 def gpt2_backend_funcs() -> BackendFuncs:
     """Get function references for GPT2 backend."""
+    from model_trainer.core import _test_hooks
+
     from .backends.gpt2.evaluate import evaluate_gpt2
     from .backends.gpt2.generate import generate_gpt2
-    from .backends.gpt2.io import load_prepared_gpt2_from_handle, save_prepared_gpt2
+    from .backends.gpt2.io import save_prepared_gpt2
     from .backends.gpt2.prepare import prepare_gpt2_with_handle
     from .backends.gpt2.score import score_gpt2
     from .backends.gpt2.train import train_prepared_gpt2
@@ -283,7 +285,7 @@ def gpt2_backend_funcs() -> BackendFuncs:
         name="gpt2",
         prepare=prepare_gpt2_with_handle,
         save=save_prepared_gpt2,
-        load=load_prepared_gpt2_from_handle,
+        load=_test_hooks.load_prepared_gpt2_from_handle,
         train=train_prepared_gpt2,
         evaluate=evaluate_gpt2,
         score=score_gpt2,

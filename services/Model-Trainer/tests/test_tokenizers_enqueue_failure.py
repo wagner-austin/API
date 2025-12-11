@@ -1,30 +1,35 @@
 from __future__ import annotations
 
-from _pytest.monkeypatch import MonkeyPatch
 from fastapi.testclient import TestClient
+from platform_workers.testing import FakeRedis
 
 from model_trainer.api.main import create_app
+from model_trainer.api.schemas.tokenizers import TokenizerTrainRequest, TokenizerTrainResponse
+from model_trainer.core import _test_hooks
+from model_trainer.core._test_hooks import TokenizerOrchestratorProto
 from model_trainer.core.config.settings import load_settings
-from model_trainer.core.services.container import ServiceContainer
-from model_trainer.orchestrators.tokenizer_orchestrator import TokenizerOrchestrator
 
 
-def test_tokenizers_enqueue_returns_none_results_in_500(monkeypatch: MonkeyPatch) -> None:
-    app = create_app(load_settings())
-    container: ServiceContainer = app.state.container
+def test_tokenizers_enqueue_returns_none_results_in_500() -> None:
+    """Test that API returns 500 when orchestrator enqueue returns None."""
+    fake_redis = FakeRedis()
 
-    # Force orchestrator to return None on enqueue (patch class method to preserve binding)
-    def _enqueue_fail(self: TokenizerOrchestrator, req: str) -> None:
+    def _fake_kv_factory(url: str) -> FakeRedis:
+        return fake_redis
+
+    _test_hooks.kv_store_factory = _fake_kv_factory
+
+    # Use hook to make orchestrator return None
+    def _enqueue_returns_none(
+        orchestrator: TokenizerOrchestratorProto, req: TokenizerTrainRequest
+    ) -> TokenizerTrainResponse | None:
         return None
 
-    monkeypatch.setattr(
-        type(container.tokenizer_orchestrator),
-        "enqueue_training",
-        _enqueue_fail,
-        raising=True,
-    )
+    _test_hooks.tokenizer_enqueue_hook = _enqueue_returns_none
 
+    app = create_app(load_settings())
     client = TestClient(app, raise_server_exceptions=False)
+
     body = {
         "method": "bpe",
         "vocab_size": 128,
@@ -35,3 +40,5 @@ def test_tokenizers_enqueue_returns_none_results_in_500(monkeypatch: MonkeyPatch
     }
     r = client.post("/tokenizers/train", json=body)
     assert r.status_code == 500
+    # Enqueue hook returns None, so no Redis calls should happen for status
+    fake_redis.assert_only_called(set())

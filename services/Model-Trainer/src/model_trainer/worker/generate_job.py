@@ -8,16 +8,11 @@ from platform_core.logging import get_logger
 from platform_core.trainer_keys import artifact_file_id_key, generate_key
 from typing_extensions import TypedDict
 
-from model_trainer.core.config.settings import load_settings
+from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.model import GenerateConfig
 from model_trainer.core.contracts.queue import GenerateJobPayload
 from model_trainer.core.infra.paths import models_dir
-from model_trainer.core.services.container import ServiceContainer
-from model_trainer.worker.job_utils import (
-    load_tokenizer_for_training,
-    redis_client,
-    setup_job_logging,
-)
+from model_trainer.worker.job_utils import redis_client, setup_job_logging
 from model_trainer.worker.manifest import as_model_family, load_manifest_from_text
 
 
@@ -30,7 +25,7 @@ class _GenerateCacheModel(TypedDict, total=False):
 
 def process_generate_job(payload: GenerateJobPayload) -> None:
     """Process a generate inference job."""
-    settings = load_settings()
+    settings = _test_hooks.load_settings()
     setup_job_logging(settings)
 
     log = get_logger(__name__)
@@ -50,11 +45,9 @@ def process_generate_job(payload: GenerateJobPayload) -> None:
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
 
-        from platform_ml import ArtifactStore
-
         api_url = settings["app"]["data_bank_api_url"]
         api_key = settings["app"]["data_bank_api_key"]
-        store = ArtifactStore(api_url, api_key)
+        store = _test_hooks.artifact_store_factory(api_url, api_key)
         models_root = models_dir(settings)
         expected_root = f"model-{run_id}"
         normalized = models_root / run_id
@@ -79,8 +72,8 @@ def process_generate_job(payload: GenerateJobPayload) -> None:
         manifest_text = manifest_path.read_text(encoding="utf-8")
         manifest = load_manifest_from_text(manifest_text)
 
-        tok_handle = load_tokenizer_for_training(settings, manifest["tokenizer_id"])
-        container = ServiceContainer.from_settings(settings)
+        tok_handle = _test_hooks.load_tokenizer_for_training(settings, manifest["tokenizer_id"])
+        container = _test_hooks.service_container_from_settings(settings)
         backend = container.model_registry.get(as_model_family(manifest["model_family"]))
 
         cfg = GenerateConfig(

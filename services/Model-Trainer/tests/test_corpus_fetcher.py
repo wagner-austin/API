@@ -1,56 +1,105 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 
+import httpx
 import pytest
-from platform_core.data_bank_client import (
-    HeadInfo,
-)
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.services.data.corpus_fetcher import CorpusFetcher
 
 
+class _MemStore:
+    """In-memory file store for testing."""
+
+    def __init__(self) -> None:
+        self._files: dict[str, bytes] = {}
+
+    def put(self, fid: str, data: bytes) -> None:
+        self._files[fid] = data
+
+    def get(self, fid: str) -> bytes:
+        return self._files[fid]
+
+    def exists(self, fid: str) -> bool:
+        return fid in self._files
+
+
+class _MockServer:
+    """Mock HTTP server for DataBankClient testing."""
+
+    def __init__(self, store: _MemStore, expect_key: str) -> None:
+        self._store = store
+        self._key = expect_key
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        hdrs: dict[str, str] = {k.lower(): v for k, v in request.headers.items()}
+        if hdrs.get("x-api-key") != self._key:
+            return httpx.Response(401, text="unauthorized")
+
+        path = request.url.path
+        if request.method == "HEAD" and path.startswith("/files/"):
+            fid = path.split("/")[-1]
+            if not self._store.exists(fid):
+                return httpx.Response(404, text="not found")
+            data = self._store.get(fid)
+            etag = sha256(data).hexdigest()
+            return httpx.Response(
+                200,
+                headers={
+                    "Content-Length": str(len(data)),
+                    "ETag": etag,
+                    "Content-Type": "text/plain",
+                },
+            )
+        if request.method == "GET" and path.startswith("/files/"):
+            fid = path.split("/")[-1]
+            if not self._store.exists(fid):
+                return httpx.Response(404, text="not found")
+            data = self._store.get(fid)
+            rng_header = hdrs.get("range")
+            if rng_header and rng_header.startswith("bytes="):
+                start = int(rng_header.split("=")[1].split("-")[0])
+                part = data[start:]
+                return httpx.Response(
+                    206,
+                    content=part,
+                    headers={
+                        "Content-Length": str(len(part)),
+                        "Content-Range": f"bytes {start}-{len(data) - 1}/{len(data)}",
+                        "ETag": sha256(data).hexdigest(),
+                    },
+                )
+            return httpx.Response(
+                200,
+                content=data,
+                headers={
+                    "Content-Length": str(len(data)),
+                    "ETag": sha256(data).hexdigest(),
+                },
+            )
+        return httpx.Response(500, text="unhandled")
+
+
+def _make_mock_client(store: _MemStore, api_key: str = "k") -> httpx.Client:
+    """Create httpx.Client with mock transport."""
+    server = _MockServer(store, api_key)
+    return httpx.Client(transport=httpx.MockTransport(server.handle))
+
+
 @pytest.mark.parametrize("resume", [False, True])
-def test_fetcher_download_and_cache_resume(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, resume: bool
-) -> None:
+def test_fetcher_download_and_cache_resume(tmp_path: Path, resume: bool) -> None:
     payload = b"hello world" * 100
     cache = tmp_path / "cache"
-    f = CorpusFetcher("http://test", "k", cache)
-
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
-
-    class _C:
-        def __init__(
-            self: _C, base_url: str, api_key: str, *, timeout_seconds: float = 60.0
-        ) -> None:
-            pass
-
-        def head(self: _C, file_id: str, *, request_id: str | None = None) -> HeadInfo:
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-        def download_to_path(
-            self: _C,
-            file_id: str,
-            dest: Path,
-            *,
-            resume: bool = True,
-            request_id: str | None = None,
-            verify_etag: bool = True,
-            chunk_size: int = 1024 * 1024,
-        ) -> HeadInfo:
-            start = dest.stat().st_size if dest.exists() else 0
-            if start > 0:
-                with dest.open("ab") as f_bin:
-                    f_bin.write(payload[start:])
-            else:
-                with dest.open("wb") as f_bin:
-                    f_bin.write(payload)
-            return HeadInfo(size=len(payload), etag="abcd", content_type="text/plain")
-
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C)
-
+    store = _MemStore()
     fid = "deadbeef"
+    store.put(fid, payload)
+
+    # Set up httpx client factory with mock transport
+    _test_hooks.httpx_client_factory = lambda *, timeout_seconds=30.0: _make_mock_client(store, "k")
+
+    f = CorpusFetcher("http://test", "k", cache)
     cache_path = cache / f"{fid}.txt"
     if resume:
         tmp = cache_path.with_suffix(".tmp")
@@ -65,25 +114,20 @@ def test_fetcher_download_and_cache_resume(
     assert out2 == out
 
 
-def test_fetcher_uses_cache_without_network(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_fetcher_uses_cache_without_network(tmp_path: Path) -> None:
     cache = tmp_path / "cache"
-    f = CorpusFetcher("http://test", "k", cache)
     fid = "cafebabe"
     cache_path = cache / f"{fid}.txt"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text("cached", encoding="utf-8")
 
-    # If DataBankClient is created, fail the test
-    import model_trainer.core.services.data.corpus_fetcher as cf_mod
+    # If httpx client is created, fail the test (cache should bypass network)
+    def _fail_factory(*, timeout_seconds: float = 30.0) -> httpx.Client:
+        raise AssertionError("httpx.Client should not be created on cache hit")
 
-    class _C2:
-        def __init__(self: _C2) -> None:
-            raise AssertionError("DataBankClient should not be constructed on cache hit")
+    _test_hooks.httpx_client_factory = _fail_factory
 
-    monkeypatch.setattr(cf_mod, "DataBankClient", _C2)
-
+    f = CorpusFetcher("http://test", "k", cache)
     out = f.fetch(fid)
     assert out == cache_path
     assert out.read_text(encoding="utf-8") == "cached"

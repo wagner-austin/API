@@ -7,6 +7,8 @@ from typing import Final, Protocol
 from platform_core.data_bank_client import DataBankClient
 from platform_core.logging import get_logger
 
+from model_trainer.core import _test_hooks
+
 
 class _Logger(Protocol):
     def info(
@@ -57,7 +59,14 @@ class CorpusFetcher:
 
         url = f"{self._api_url}/files/{file_id}"
         _logger.info("Sending HEAD request to data bank", extra={"file_id": file_id, "url": url})
-        client = DataBankClient(base_url=self._api_url, api_key=self._api_key, timeout_seconds=30.0)
+        # Use hook for httpx client to enable testing with fake transport
+        httpx_client = _test_hooks.httpx_client_factory(timeout_seconds=30.0)
+        client = DataBankClient(
+            base_url=self._api_url,
+            api_key=self._api_key,
+            timeout_seconds=30.0,
+            client=httpx_client,
+        )
         head = client.head(file_id, request_id=file_id)
         expected_size = int(head["size"])
         _logger.info(

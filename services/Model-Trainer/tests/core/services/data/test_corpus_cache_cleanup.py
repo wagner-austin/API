@@ -193,7 +193,10 @@ def test_cleanup_raises_on_non_directory_cache(tmp_path: Path) -> None:
         service.clean()
 
 
-def test_scan_cache_dir_raises_on_oserror(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scan_cache_dir_raises_on_oserror(tmp_path: Path) -> None:
+    from model_trainer.core import _test_hooks
+    from model_trainer.core._test_hooks import ScandirIterator
+
     cache_dir = tmp_path / "corpus_cache"
     cache_dir.mkdir()
     cfg: CorpusCacheCleanupConfig = {
@@ -205,19 +208,19 @@ def test_scan_cache_dir_raises_on_oserror(tmp_path: Path, monkeypatch: pytest.Mo
     settings = _settings_with_cache_cleanup(cfg, tmp_path)
     service = CorpusCacheCleanupService(settings=settings)
 
-    def _scandir_fail(_path: str) -> None:
+    def _scandir_fail(path: str) -> ScandirIterator:
         raise OSError("boom")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.data.corpus_cache_cleanup.os.scandir",
-        _scandir_fail,
-    )
+    _test_hooks.os_scandir = _scandir_fail
 
     with pytest.raises(CorpusCacheCleanupError):
         service.clean()
 
 
-def test_disk_usage_error_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_disk_usage_error_raises(tmp_path: Path) -> None:
+    from model_trainer.core import _test_hooks
+    from model_trainer.core._test_hooks import DiskUsageProto
+
     cfg: CorpusCacheCleanupConfig = {
         "enabled": True,
         "max_bytes": 0,
@@ -229,13 +232,10 @@ def test_disk_usage_error_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     cache_dir.mkdir()
     (cache_dir / "a.txt").write_text("x", encoding="utf-8")
 
-    def _disk_usage_fail(_path: str) -> None:
+    def _disk_usage_fail(path: str) -> DiskUsageProto:
         raise OSError("disk fail")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.data.corpus_cache_cleanup.shutil.disk_usage",
-        _disk_usage_fail,
-    )
+    _test_hooks.shutil_disk_usage = _disk_usage_fail
     service = CorpusCacheCleanupService(settings=settings)
 
     with pytest.raises(CorpusCacheCleanupError):
@@ -256,8 +256,9 @@ def test_unsupported_eviction_policy_raises(tmp_path: Path) -> None:
 
 def test_cleanup_breaks_when_threshold_reached(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from model_trainer.core import _test_hooks
+
     # Create three files; configure thresholds so that only two need deletion.
     cfg = CorpusCacheCleanupConfig(
         enabled=True,
@@ -282,20 +283,17 @@ def test_cleanup_breaks_when_threshold_reached(
     settings = _settings_with_cache_cleanup(cfg, tmp_path)
     service = CorpusCacheCleanupService(settings=settings)
 
-    # Patch disk_usage to a stable large free space value
+    # Inject fake disk_usage with stable large free space value
     class _Usage:
         def __init__(self: _Usage) -> None:
             self.total = 100_000
             self.used = 10_000
             self.free = 90_000
 
-    def _fake_disk_usage(_path: str) -> _Usage:
+    def _fake_disk_usage(path: str) -> _Usage:
         return _Usage()
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.data.corpus_cache_cleanup.shutil.disk_usage",
-        _fake_disk_usage,
-    )
+    _test_hooks.shutil_disk_usage = _fake_disk_usage
 
     result = service.clean()
 
@@ -329,7 +327,9 @@ def test_scan_skips_non_file_entries(tmp_path: Path) -> None:
     assert result.deleted_files == 1
 
 
-def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cleanup_deletion_failure_raises(tmp_path: Path) -> None:
+    from model_trainer.core import _test_hooks
+
     cfg = CorpusCacheCleanupConfig(
         enabled=True,
         max_bytes=0,
@@ -344,13 +344,10 @@ def test_cleanup_deletion_failure_raises(tmp_path: Path, monkeypatch: pytest.Mon
     settings = _settings_with_cache_cleanup(cfg, tmp_path)
     service = CorpusCacheCleanupService(settings=settings)
 
-    def _unlink_fail(_self: Path) -> None:
+    def _unlink_fail(path: Path) -> None:
         raise OSError("unlink-fail")
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.data.corpus_cache_cleanup.Path.unlink",
-        _unlink_fail,
-    )
+    _test_hooks.path_unlink = _unlink_fail
 
     with pytest.raises(CorpusCacheCleanupError):
         service.clean()

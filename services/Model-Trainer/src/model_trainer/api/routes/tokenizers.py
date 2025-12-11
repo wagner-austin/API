@@ -5,6 +5,7 @@ from fastapi.params import Depends as DependsParamType
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.logging import get_logger
 
+from ...core import _test_hooks
 from ...core.logging.types import LoggingExtra
 from ...core.services.container import ServiceContainer
 from ..middleware import api_key_dependency
@@ -37,7 +38,9 @@ def build_router(container: ServiceContainer) -> APIRouter:
             "vocab_size": req["vocab_size"],
         }
         _logger.info("tokenizers enqueue", extra=extra)
-        out = orchestrator.enqueue_training(req)
+        # Allow test hook to override orchestrator behavior
+        hook = _test_hooks.tokenizer_enqueue_hook
+        out = hook(orchestrator, req) if hook is not None else orchestrator.enqueue_training(req)
         if out is None:
             raise AppError(
                 ModelTrainerErrorCode.TOKENIZER_TRAIN_FAILED,

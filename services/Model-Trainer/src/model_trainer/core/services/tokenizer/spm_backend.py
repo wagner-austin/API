@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 import time
 from pathlib import Path
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.logging import get_logger
+from platform_ml import sentencepiece as spm
 from typing_extensions import TypedDict
 
+from ... import _test_hooks
 from ...contracts.tokenizer import (
     TokenizerBackend as _TokenizerBackendProto,
 )
@@ -26,58 +26,19 @@ from ...contracts.tokenizer import (
 from ..data.corpus import count_lines, list_text_files, sample_lines
 
 
-def _require_cli() -> None:
-    for exe in ("spm_train", "spm_encode", "spm_decode"):
-        if shutil.which(exe) is None:
-            raise AppError(
-                ModelTrainerErrorCode.TOKENIZER_TRAIN_FAILED,
-                f"SentencePiece CLI '{exe}' not found in PATH",
-                model_trainer_status_for(ModelTrainerErrorCode.TOKENIZER_TRAIN_FAILED),
-            )
-
-
 def _spm_train(files: list[str], *, model_prefix: str, vocab_size: int) -> None:
-    args = [
-        "spm_train",
-        f"--input={','.join(files)}",
-        f"--model_prefix={model_prefix}",
-        f"--vocab_size={vocab_size}",
-        "--character_coverage=1.0",
-        "--model_type=bpe",
-        "--unk_piece=[UNK]",
-        "--pad_piece=[PAD]",
-        "--bos_piece=[BOS]",
-        "--eos_piece=[EOS]",
-        "--minloglevel=2",
-    ]
-    subprocess.run(args, check=True, capture_output=True, text=True)
+    """Train a SentencePiece model using the Python API."""
+    spm.train(files, model_prefix=model_prefix, vocab_size=vocab_size)
 
 
 def _spm_encode_ids(model_path: str, text: str) -> list[int]:
-    args = [
-        "spm_encode",
-        f"--model={model_path}",
-        "--output_format=id",
-    ]
-    proc = subprocess.run(args, input=text, check=True, capture_output=True, text=True)
-    # Output may contain newlines; take first non-empty line
-    for line in proc.stdout.splitlines():
-        s = line.strip()
-        if not s:
-            continue
-        parts = [p for p in s.split() if p]
-        return [int(p) for p in parts]
-    return []
+    """Encode text to token IDs using the Python API."""
+    return spm.encode_ids(model_path, text)
 
 
 def _spm_decode_ids(model_path: str, ids: list[int]) -> str:
-    args = [
-        "spm_decode",
-        f"--model={model_path}",
-    ]
-    input_line = " ".join(str(x) for x in ids)
-    proc = subprocess.run(args, input=input_line, check=True, capture_output=True, text=True)
-    return proc.stdout.strip()
+    """Decode token IDs to text using the Python API."""
+    return spm.decode_ids(model_path, ids)
 
 
 class TokenizerStats(TypedDict, total=True):
@@ -90,7 +51,7 @@ class TokenizerStats(TypedDict, total=True):
 def train_spm_tokenizer(
     corpus_path: str, out_dir: str, cfg: _TokenizerTrainConfig
 ) -> TokenizerStats:
-    _require_cli()
+    spm.require_module()
     os.makedirs(out_dir, exist_ok=True)
     files = list_text_files(corpus_path)
     if not files:
@@ -101,7 +62,7 @@ def train_spm_tokenizer(
         )
 
     model_prefix = str(Path(out_dir) / "tokenizer")
-    _spm_train(files, model_prefix=model_prefix, vocab_size=cfg.vocab_size)
+    _test_hooks.spm_train(files, model_prefix=model_prefix, vocab_size=cfg.vocab_size)
 
     model_path = f"{model_prefix}.model"
     total = count_lines(files)
@@ -116,7 +77,7 @@ def train_spm_tokenizer(
     # We assume UNK=0 here based on the generated vocab ordering.
     unk_id = 0
     for s in sample:
-        ids = _spm_encode_ids(model_path, s)
+        ids = _test_hooks.spm_encode_ids(model_path, s)
         total_tokens += len(ids)
         unk_tokens += ids.count(unk_id)
     coverage = 1.0 if total_tokens == 0 else max(0.0, 1.0 - (unk_tokens / max(1, total_tokens)))
@@ -124,7 +85,7 @@ def train_spm_tokenizer(
     uniq_chars = set("".join(sample))
     covered_chars = 0
     for ch in uniq_chars:
-        ids = _spm_encode_ids(model_path, ch)
+        ids = _test_hooks.spm_encode_ids(model_path, ch)
         if ids and any(tid != unk_id for tid in ids):
             covered_chars += 1
     char_cov = 1.0 if len(uniq_chars) == 0 else max(0.0, min(1.0, covered_chars / len(uniq_chars)))
@@ -176,10 +137,10 @@ class _SPMAdapter:
         self._vocab = table
 
     def encode(self: _SPMAdapter, text: str) -> list[int]:
-        return _spm_encode_ids(self._model, text)
+        return _test_hooks.spm_encode_ids(self._model, text)
 
     def decode(self: _SPMAdapter, ids: list[int]) -> str:
-        return _spm_decode_ids(self._model, ids)
+        return _test_hooks.spm_decode_ids(self._model, ids)
 
     def token_to_id(self: _SPMAdapter, token: str) -> int | None:
         return self._vocab.get(token)

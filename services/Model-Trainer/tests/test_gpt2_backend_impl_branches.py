@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import pytest
 import torch
 
+from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import load_settings
 from model_trainer.core.contracts.dataset import DatasetBuilder, DatasetConfig
 from model_trainer.core.contracts.model import PreparedLMModel
@@ -90,18 +90,16 @@ def _make_fake_prepared() -> PreparedLMModel:
     )
 
 
-def test_gpt2_backend_load_calls_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gpt2_backend_load_calls_helper() -> None:
     called: dict[str, str] = {}
 
-    def _fake_load(path: str, tok: TokenizerHandle) -> PreparedLMModel:
-        called["path"] = path
+    def _fake_load(artifact_path: str, tokenizer: TokenizerHandle) -> PreparedLMModel:
+        _ = tokenizer
+        called["path"] = artifact_path
         called["tok"] = "called"
         return _make_fake_prepared()
 
-    monkeypatch.setattr(
-        "model_trainer.core.services.model.backends.gpt2.io.load_prepared_gpt2_from_handle",
-        _fake_load,
-    )
+    _test_hooks.load_prepared_gpt2_from_handle = _fake_load
 
     class _Tok(TokenizerHandle):
         def encode(self: _Tok, text: str) -> list[int]:

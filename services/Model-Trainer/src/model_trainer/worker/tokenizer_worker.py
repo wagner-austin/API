@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import os
-import shutil
 from pathlib import Path
 
 from platform_core.logging import get_logger
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 
-from ..core.config.settings import Settings, load_settings
+from ..core import _test_hooks
+from ..core.config.settings import Settings
 from ..core.contracts.compute import LocalCPUProvider
 from ..core.contracts.queue import TokenizerTrainPayload
 from ..core.contracts.tokenizer import TokenizerTrainConfig, TokenizerTrainStats
 from ..core.infra.paths import tokenizer_dir
-from ..core.services.data import corpus_fetcher as corpus_fetcher_mod
 from ..core.services.tokenizer.bpe_backend import BPEBackend
 from ..core.services.tokenizer.char_backend import CharBackend
 
@@ -23,15 +22,16 @@ def _redis_client(settings: Settings) -> RedisStrProto:
     url = settings["redis"]["url"]
     if url.strip() == "":
         raise RuntimeError("Redis URL must not be empty")
-    return redis_for_kv(url)
+    return _test_hooks.kv_store_factory(url)
 
 
 def _has_spm_cli() -> bool:
-    return all(shutil.which(x) is not None for x in ("spm_train", "spm_encode", "spm_decode"))
+    spm_cmds = ("spm_train", "spm_encode", "spm_decode")
+    return all(_test_hooks.shutil_which(x) is not None for x in spm_cmds)
 
 
 def process_tokenizer_train_job(payload: TokenizerTrainPayload) -> None:
-    settings = load_settings()
+    settings = _test_hooks.load_settings()
     r = _redis_client(settings)
     tok_id = payload["tokenizer_id"]
     r.set(f"tokenizer:{tok_id}:status", "running")
@@ -58,7 +58,7 @@ def process_tokenizer_train_job(payload: TokenizerTrainPayload) -> None:
     )
     # Resolve corpus file id to local cache path
     fid = str(payload["corpus_file_id"]).strip()
-    fetcher = corpus_fetcher_mod.CorpusFetcher(
+    fetcher = _test_hooks.corpus_fetcher_factory(
         api_url=settings["app"]["data_bank_api_url"],
         api_key=settings["app"]["data_bank_api_key"],
         cache_dir=Path(settings["app"]["data_root"]) / "corpus_cache",
