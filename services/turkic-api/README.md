@@ -146,18 +146,17 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 
 ```bash
 # Redis connection
-REDIS_URL=redis://localhost:6379/0
+TURKIC_REDIS_URL=redis://localhost:6379/0
 
 # Data storage
-DATA_DIR=/data
+TURKIC_DATA_DIR=/data
 
-# Data bank integration
+# Data bank integration (either direct URL or gateway)
 TURKIC_DATA_BANK_API_URL=https://api.databank.example.com
 TURKIC_DATA_BANK_API_KEY=your-api-key
 
-# Optional
-LOG_LEVEL=INFO
-ENVIRONMENT=development
+# Alternative: Use API gateway (auto-appends /data-bank)
+# API_GATEWAY_URL=https://gateway.example.com
 ```
 
 ## Deployment
@@ -182,8 +181,9 @@ docker build -t turkic-api .
 
 # Run container
 docker run -p 8000:8000 \
-  -e REDIS_URL=redis://redis:6379/0 \
-  -e DATA_DIR=/data \
+  -e TURKIC_REDIS_URL=redis://redis:6379/0 \
+  -e TURKIC_DATA_DIR=/data \
+  -e TURKIC_DATA_BANK_API_KEY=your-api-key \
   turkic-api
 ```
 

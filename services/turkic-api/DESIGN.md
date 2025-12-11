@@ -77,7 +77,8 @@ branch = true        # 100% branch coverage required
 │  │  - POST /api/v1/jobs         (create corpus job)         │  │
 │  │  - GET  /api/v1/jobs/{id}    (get job status)            │  │
 │  │  - GET  /api/v1/jobs/{id}/result (stream result)         │  │
-│  │  - GET  /api/v1/health       (health check)              │  │
+│  │  - GET  /healthz             (liveness probe)            │  │
+│  │  - GET  /readyz              (readiness probe)           │  │
 │  └─────────────┬────────────────────────────────────────────┘  │
 │                │                                                │
 │                ▼                                                │
@@ -126,17 +127,23 @@ turkic-api/
 ├── src/
 │   └── turkic_api/                 # Main package
 │       ├── api/                    # FastAPI application layer
-│       │   ├── main.py            # App factory & routes
+│       │   ├── main.py            # App factory
 │       │   ├── config.py          # Settings (wraps platform_core)
 │       │   ├── dependencies.py    # Dependency injection
 │       │   ├── services.py        # Business logic (JobService)
 │       │   ├── jobs.py            # RQ job implementation
 │       │   ├── job_store.py       # Redis storage adapter
-│       │   ├── worker_entry.py    # RQ worker entry point
 │       │   ├── health.py          # Health check logic
-│       │   ├── errors.py          # Error handling
 │       │   ├── models.py          # TypedDict models
-│       │   └── types.py           # Type aliases & protocols
+│       │   ├── types.py           # Type aliases & protocols
+│       │   ├── validators.py      # Input validation
+│       │   ├── streaming.py       # Data bank streaming
+│       │   ├── logging_fields.py  # Logging configuration
+│       │   ├── provider_context.py # Dependency providers
+│       │   └── routes/            # Route handlers
+│       │       ├── health.py      # Health endpoints
+│       │       └── jobs.py        # Job endpoints
+│       ├── worker_entry.py        # RQ worker entry point
 │       └── core/                  # Core business logic
 │           ├── translit.py        # Transliteration engine
 │           ├── transliteval.py    # Rule evaluation
@@ -798,7 +805,7 @@ CMD ["sh", "-c", "exec hypercorn 'turkic_api.api.main:create_app' --bind [::]:${
 
 # Stage 3b: Worker target
 FROM runtime-base AS worker
-CMD ["sh", "-c", "exec python -m turkic_api.api.worker_entry"]
+CMD ["sh", "-c", "exec python -m turkic_api.worker_entry"]
 ```
 
 **Benefits:**
@@ -826,7 +833,7 @@ restartPolicyMaxRetries = 3
 **Worker service (separate Railway service):**
 ```bash
 # Docker build target: worker
-# Start command: python -m turkic_api.api.worker_entry
+# Start command: python -m turkic_api.worker_entry
 ```
 
 **Environment Variables:**
@@ -838,9 +845,11 @@ RAILWAY_ENVIRONMENT=production
 # Configured in Railway dashboard
 TURKIC_REDIS_URL=redis://default:xxx@redis.railway.internal:6379
 TURKIC_DATA_DIR=/data
-TURKIC_ENVIRONMENT=production
 TURKIC_DATA_BANK_API_URL=https://data-bank-api.railway.app
 TURKIC_DATA_BANK_API_KEY=<secret>
+
+# Alternative: Use gateway URL (auto-appends /data-bank)
+# API_GATEWAY_URL=https://gateway.railway.app
 ```
 
 ---

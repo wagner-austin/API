@@ -313,12 +313,11 @@ All errors return JSON with consistent format:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `REDIS_URL` | Yes | - | Redis connection URL |
-| `DATA_DIR` | Yes | - | Path to data directory |
-| `TURKIC_DATA_BANK_API_URL` | Yes | - | Data-bank API base URL |
+| `TURKIC_REDIS_URL` | No | `redis://redis:6379/0` | Redis connection URL |
+| `TURKIC_DATA_DIR` | No | `/data` | Path to data directory |
+| `TURKIC_DATA_BANK_API_URL` | Conditional | - | Data-bank API base URL (or use `API_GATEWAY_URL`) |
 | `TURKIC_DATA_BANK_API_KEY` | Yes | - | Data-bank API key |
-| `LOG_LEVEL` | No | `INFO` | Logging level |
-| `ENVIRONMENT` | No | `development` | Environment name |
+| `API_GATEWAY_URL` | Conditional | - | API gateway URL (auto-appends `/data-bank`) |
 
 ---
 
