@@ -515,10 +515,9 @@ All errors follow the platform standard error format:
 
 ```json
 {
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message"
-  }
+  "code": "ERROR_CODE",
+  "message": "Human-readable error message",
+  "request_id": "uuid-for-tracing"
 }
 ```
 

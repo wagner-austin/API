@@ -88,13 +88,15 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `REDIS_URL` | string | **Required** | Redis connection string |
-| `LASTFM_API_KEY` | string | **Required** | Last.fm API key |
-| `LASTFM_API_SECRET` | string | **Required** | Last.fm API secret |
-| `SPOTIFY_CLIENT_ID` | string | **Required** | Spotify app client ID |
-| `SPOTIFY_CLIENT_SECRET` | string | **Required** | Spotify app client secret |
-| `APPLE_DEVELOPER_TOKEN` | string | **Required** | Apple Music developer token |
+| `LASTFM_API_KEY` | string | Conditional | Last.fm API key (required for Last.fm auth) |
+| `LASTFM_API_SECRET` | string | Conditional | Last.fm API secret (required for Last.fm auth) |
+| `SPOTIFY_CLIENT_ID` | string | Conditional | Spotify app client ID (required for Spotify auth) |
+| `SPOTIFY_CLIENT_SECRET` | string | Conditional | Spotify app client secret (required for Spotify auth) |
+| `APPLE_DEVELOPER_TOKEN` | string | Conditional | Apple Music developer token (required for Apple Music) |
 | `PORT` | int | `8006` | Server port |
 | `LOGGING__LEVEL` | string | `INFO` | Log level |
+
+> **Note:** Service credentials are only required when using that specific service. Only `REDIS_URL` is always required.
 
 ### Example .env
 
@@ -198,19 +200,19 @@ poetry run pytest --cov-report=html
 music-wrapped-api/
 ├── src/music_wrapped_api/
 │   ├── __init__.py
-│   ├── api/
-│   │   ├── main.py           # App factory and routes
-│   │   ├── auth.py           # OAuth flows
-│   │   ├── generate.py       # Wrapped generation
-│   │   └── schemas.py        # Request/response models
-│   ├── services/
-│   │   ├── spotify.py        # Spotify integration
-│   │   ├── lastfm.py         # Last.fm integration
-│   │   ├── apple.py          # Apple Music integration
-│   │   └── youtube.py        # YouTube Music integration
-│   ├── worker/
-│   │   └── jobs.py           # RQ job handlers
-│   └── worker_entry.py       # Worker entry point
+│   ├── asgi.py               # ASGI entry point
+│   ├── health.py             # Health check logic
+│   ├── worker_entry.py       # RQ worker entry point
+│   ├── _test_hooks.py        # Test hooks for DI
+│   └── api/
+│       ├── __init__.py
+│       ├── main.py           # App factory
+│       ├── health.py         # Health endpoint helpers
+│       └── routes/
+│           ├── __init__.py
+│           ├── health.py     # Health endpoints
+│           ├── wrapped.py    # Auth, generate, status, result endpoints
+│           └── _decoders.py  # Credential decoders
 ├── tests/
 ├── scripts/
 │   └── guard.py
