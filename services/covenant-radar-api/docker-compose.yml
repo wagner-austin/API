@@ -20,6 +20,13 @@ services:
       - ./logs:/data/logs
     ports:
       - "8007:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.covenant.rule=PathPrefix(`/covenant`)"
+      - "traefik.http.routers.covenant.middlewares=covenant-strip"
+      - "traefik.http.middlewares.covenant-strip.stripprefix.prefixes=/covenant"
+      - "traefik.http.services.covenant.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
