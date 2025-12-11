@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import pytest
+from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 from platform_workers.testing import FakeRedis
-from pytest import MonkeyPatch
 
 from platform_music.jobs import ImportYouTubeTakeoutJobPayload, process_import_youtube_takeout
+from platform_music.testing import hooks, make_fake_redis_client
 
 
-def test_process_import_youtube_takeout_success(monkeypatch: MonkeyPatch) -> None:
+def test_process_import_youtube_takeout_success() -> None:
     # Prepare plays for 2024 (>= DEFAULT_MIN_PLAYS = 10)
     plays: list[dict[str, JSONValue]] = []
     for i in range(15):
@@ -29,13 +31,7 @@ def test_process_import_youtube_takeout_success(monkeypatch: MonkeyPatch) -> Non
     token_id = "tok"
     fr.set(f"ytmusic:takeout:{token_id}", dump_json_str(plays))
 
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        assert url == "redis://ignored"
-        return fr
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fr)
 
     payload: ImportYouTubeTakeoutJobPayload = {
         "type": "music_wrapped.import_youtube_takeout.v1",
@@ -59,15 +55,10 @@ def test_process_import_youtube_takeout_success(monkeypatch: MonkeyPatch) -> Non
     fr.assert_only_called({"set", "get", "publish", "delete"})
 
 
-def test_process_import_youtube_takeout_missing(monkeypatch: MonkeyPatch) -> None:
+def test_process_import_youtube_takeout_missing() -> None:
     fr = FakeRedis()
 
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        return fr
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fr)
 
     payload: ImportYouTubeTakeoutJobPayload = {
         "type": "music_wrapped.import_youtube_takeout.v1",
@@ -77,9 +68,6 @@ def test_process_import_youtube_takeout_missing(monkeypatch: MonkeyPatch) -> Non
         "redis_url": "redis://ignored",
         "queue_name": "music_wrapped",
     }
-
-    import pytest
-    from platform_core.errors import AppError
 
     with pytest.raises(AppError) as excinfo:
         process_import_youtube_takeout(payload)

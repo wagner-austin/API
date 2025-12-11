@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import types
 import urllib.parse
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -34,7 +35,16 @@ class _RequestObj(Protocol):
     def add_header(self, name: str, value: str) -> None: ...
 
 
-def _http_get(url: str, *, access_token: str, timeout: float) -> str:
+# Hook type for testing
+SpotifyHttpGetHook = Callable[[str, str, float], str]
+
+
+def http_get_impl(url: str, *, access_token: str, timeout: float) -> str:
+    """Production HTTP GET implementation for Spotify API.
+
+    Uses urllib.request to make HTTP GET requests with Bearer token auth.
+    This function is exported for use by testing.py to set production hooks.
+    """
     imp = __import__
     req_mod = imp("urllib.request", fromlist=["Request"])
     req: _RequestObj = req_mod.Request(url)
@@ -42,6 +52,13 @@ def _http_get(url: str, *, access_token: str, timeout: float) -> str:
     opener: _UrlOpen = imp("urllib.request", fromlist=["urlopen"])
     with opener.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8")
+
+
+def _http_get(url: str, *, access_token: str, timeout: float) -> str:
+    """HTTP GET via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.spotify_http_get(url, access_token, timeout)
 
 
 def _to_unix_seconds(iso: str) -> int:
@@ -111,5 +128,4 @@ def spotify_client(*, access_token: str, refresh_token: str, expires_in: int | s
     return _SpotifyClient(access_token=access_token)
 
 
-__all__ = ["SpotifyProto", "spotify_client"]
-__import__ = __import__
+__all__ = ["SpotifyHttpGetHook", "SpotifyProto", "http_get_impl", "spotify_client"]

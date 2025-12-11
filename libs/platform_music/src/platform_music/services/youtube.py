@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import time
 import types
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -34,10 +35,49 @@ class _RequestObj(Protocol):
     def add_header(self, name: str, value: str) -> None: ...
 
 
-def _sapisidhash(sapisid: str, origin: str, now: int) -> str:
+# Hook type for testing
+YouTubeHttpPostHook = Callable[[str, str, str, str, float, str], str]
+
+
+def sapisidhash(sapisid: str, origin: str, now: int) -> str:
+    """Generate SAPISIDHASH authentication header value for YouTube API.
+
+    This function is exported for testing the authentication logic.
+    """
     msg = f"{now} {sapisid} {origin}".encode()
     sha = hashlib.sha1(msg).hexdigest()
     return f"SAPISIDHASH {now}_{sha}"
+
+
+def http_post_impl(
+    url: str,
+    *,
+    sapisid: str,
+    cookies: str,
+    origin: str,
+    timeout: float,
+    body: str,
+) -> str:
+    """Production HTTP POST implementation for YouTube Music API.
+
+    Uses urllib.request to make HTTP POST requests with SAPISIDHASH auth.
+    This function is exported for use by testing.py to set production hooks.
+    """
+    imp = __import__
+    req_mod = imp("urllib.request", fromlist=["Request"])
+    req: _RequestObj = req_mod.Request(url)
+    # Attach request body for POST (works for stdlib and our test doubles)
+    object.__setattr__(req, "data", body.encode("utf-8"))
+    now = int(time.time())
+    req.add_header("Authorization", sapisidhash(sapisid, origin, now))
+    req.add_header("Cookie", cookies)
+    req.add_header("Origin", origin)
+    req.add_header("Content-Type", "application/json")
+    req.add_header("X-YouTube-Client-Name", "67")  # WEB_REMIX
+    req.add_header("X-YouTube-Client-Version", "1.20250101.00.00")
+    opener: _UrlOpen = imp("urllib.request", fromlist=["urlopen"])
+    with opener.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8")
 
 
 def _http_post(
@@ -49,21 +89,10 @@ def _http_post(
     timeout: float,
     body: str,
 ) -> str:
-    imp = __import__
-    req_mod = imp("urllib.request", fromlist=["Request"])
-    req: _RequestObj = req_mod.Request(url)
-    # Attach request body for POST (works for stdlib and our test doubles)
-    object.__setattr__(req, "data", body.encode("utf-8"))
-    now = int(time.time())
-    req.add_header("Authorization", _sapisidhash(sapisid, origin, now))
-    req.add_header("Cookie", cookies)
-    req.add_header("Origin", origin)
-    req.add_header("Content-Type", "application/json")
-    req.add_header("X-YouTube-Client-Name", "67")  # WEB_REMIX
-    req.add_header("X-YouTube-Client-Version", "1.20250101.00.00")
-    opener: _UrlOpen = imp("urllib.request", fromlist=["urlopen"])
-    with opener.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8")
+    """HTTP POST via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.youtube_http_post(url, sapisid, cookies, origin, timeout, body)
 
 
 def _decode_yt_item(raw: JSONValue) -> PlayRecord:
@@ -145,5 +174,10 @@ def youtube_client(*, sapisid: str, cookies: str) -> YouTubeMusicProto:
     return _YouTubeClient(sapisid=sapisid, cookies=cookies)
 
 
-__all__ = ["YouTubeMusicProto", "youtube_client"]
-__import__ = __import__
+__all__ = [
+    "YouTubeHttpPostHook",
+    "YouTubeMusicProto",
+    "http_post_impl",
+    "sapisidhash",
+    "youtube_client",
+]

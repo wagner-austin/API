@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import types
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, ErrorCode
@@ -32,7 +33,16 @@ class _RequestObj(Protocol):
     def add_header(self, name: str, value: str) -> None: ...
 
 
-def _http_get(url: str, *, developer_token: str, user_token: str, timeout: float) -> str:
+# Hook type for testing
+AppleHttpGetHook = Callable[[str, str, str, float], str]
+
+
+def http_get_impl(url: str, *, developer_token: str, user_token: str, timeout: float) -> str:
+    """Production HTTP GET implementation for Apple Music API.
+
+    Uses urllib.request to make HTTP GET requests with Bearer token and Music-User-Token.
+    This function is exported for use by testing.py to set production hooks.
+    """
     imp = __import__
     req_mod = imp("urllib.request", fromlist=["Request"])
     req: _RequestObj = req_mod.Request(url)
@@ -41,6 +51,13 @@ def _http_get(url: str, *, developer_token: str, user_token: str, timeout: float
     opener: _UrlOpen = imp("urllib.request", fromlist=["urlopen"])
     with opener.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8")
+
+
+def _http_get(url: str, *, developer_token: str, user_token: str, timeout: float) -> str:
+    """HTTP GET via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.apple_http_get(url, developer_token, user_token, timeout)
 
 
 def _decode_apple_item(raw: JSONValue) -> PlayRecord:
@@ -120,5 +137,4 @@ def apple_client(*, music_user_token: str, developer_token: str) -> AppleMusicPr
     return _AppleClient(developer_token=developer_token, user_token=music_user_token)
 
 
-__all__ = ["AppleMusicProto", "apple_client"]
-__import__ = __import__
+__all__ = ["AppleHttpGetHook", "AppleMusicProto", "apple_client", "http_get_impl"]

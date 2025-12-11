@@ -7,18 +7,18 @@ from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from platform_workers.job_context import JobContext, make_job_context
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 
 from platform_music.error_codes import MusicWrappedErrorCode
 from platform_music.importers.youtube_takeout import (
     decode_stored_plays,
     static_service_from_plays,
 )
-from platform_music.services.apple import apple_client
-from platform_music.services.lastfm import lastfm_client
+from platform_music.services.apple import AppleMusicProto
+from platform_music.services.lastfm import LastFmProto
 from platform_music.services.protocol import MusicServiceProto
-from platform_music.services.spotify import spotify_client
-from platform_music.services.youtube import youtube_client
+from platform_music.services.spotify import SpotifyProto
+from platform_music.services.youtube import YouTubeMusicProto
 from platform_music.wrapped import WrappedGenerator
 
 
@@ -63,8 +63,40 @@ _MUSIC_DOMAIN: JobDomain = "music_wrapped"
 
 
 def _redis_client(url: str) -> RedisStrProto:
-    client: RedisStrProto = redis_for_kv(url)
-    return client
+    """Get redis client via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.redis_client(url)
+
+
+def _get_lastfm_client(*, api_key: str, api_secret: str, session_key: str) -> LastFmProto:
+    """Get lastfm client via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.lastfm_client(api_key, api_secret, session_key)
+
+
+def _get_spotify_client(
+    *, access_token: str, refresh_token: str, expires_in: int | str
+) -> SpotifyProto:
+    """Get spotify client via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.spotify_client(access_token, refresh_token, expires_in)
+
+
+def _get_apple_client(*, music_user_token: str, developer_token: str) -> AppleMusicProto:
+    """Get apple client via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.apple_client(music_user_token, developer_token)
+
+
+def _get_youtube_client(*, sapisid: str, cookies: str) -> YouTubeMusicProto:
+    """Get youtube client via hook. Hook is always set (production or test fake)."""
+    from platform_music.testing import hooks
+
+    return hooks.youtube_client(sapisid, cookies)
 
 
 def _as_lastfm_creds(creds: ServiceCredentials) -> LastFmCredentials:
@@ -162,7 +194,7 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
 
         def _build_lastfm(creds: ServiceCredentials) -> MusicServiceProto:
             c = _as_lastfm_creds(creds)
-            return lastfm_client(
+            return _get_lastfm_client(
                 api_key=c["api_key"],
                 api_secret=c["api_secret"],
                 session_key=c["session_key"],
@@ -170,7 +202,7 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
 
         def _build_spotify(creds: ServiceCredentials) -> MusicServiceProto:
             c = _as_spotify_creds(creds)
-            return spotify_client(
+            return _get_spotify_client(
                 access_token=c["access_token"],
                 refresh_token=c["refresh_token"],
                 expires_in=c["expires_in"],
@@ -178,14 +210,14 @@ def process_wrapped_job(payload: WrappedJobPayload) -> str:
 
         def _build_apple(creds: ServiceCredentials) -> MusicServiceProto:
             c = _as_apple_creds(creds)
-            return apple_client(
+            return _get_apple_client(
                 music_user_token=c["music_user_token"],
                 developer_token=c["developer_token"],
             )
 
         def _build_youtube(creds: ServiceCredentials) -> MusicServiceProto:
             c = _as_youtube_creds(creds)
-            return youtube_client(sapisid=c["sapisid"], cookies=c["cookies"])
+            return _get_youtube_client(sapisid=c["sapisid"], cookies=c["cookies"])
 
         builders = {
             "lastfm": _build_lastfm,

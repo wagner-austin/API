@@ -3,54 +3,43 @@ from __future__ import annotations
 from platform_core.job_events import decode_job_event
 from platform_core.json_utils import load_json_str
 from platform_workers.testing import FakeRedis
-from pytest import MonkeyPatch
 
 from platform_music.jobs import WrappedJobPayload, process_wrapped_job
-from platform_music.models import PlayRecord, ServiceName
+from platform_music.models import ServiceName
+from platform_music.testing import (
+    FakeAppleMusic,
+    FakeSpotify,
+    FakeYouTubeMusic,
+    hooks,
+    make_fake_apple_client,
+    make_fake_redis_client,
+    make_fake_spotify_client,
+    make_fake_youtube_client,
+)
 
 
-def _plays(service: ServiceName) -> list[PlayRecord]:
-    out: list[PlayRecord] = []
+def _populate_fake(
+    fake: FakeSpotify | FakeAppleMusic | FakeYouTubeMusic, service: ServiceName
+) -> None:
+    """Add 12 plays to a fake music service."""
     for i in range(12):
-        out.append(
-            {
-                "track": {
-                    "id": f"{service}:t{i}",
-                    "title": f"S{i}",
-                    "artist_name": f"A{i % 3}",
-                    "duration_ms": 1000,
-                    "service": service,
-                },
-                "played_at": f"2024-{(i % 12) + 1:02d}-01T00:00:00Z",
-                "service": service,
-            }
+        fake.add_play(
+            track_id=f"{service}:t{i}",
+            title=f"S{i}",
+            artist_name=f"A{i % 3}",
+            played_at=f"2024-{(i % 12) + 1:02d}-01T00:00:00Z",
+            duration_ms=1000,
         )
-    return out
 
 
-def test_process_wrapped_job_spotify_success(monkeypatch: MonkeyPatch) -> None:
+def test_process_wrapped_job_spotify_success() -> None:
     fake_redis = FakeRedis()
+    fake_spotify = FakeSpotify()
+    _populate_fake(fake_spotify, "spotify")
 
-    import platform_music.jobs as jobs_mod
+    hooks.redis_client = make_fake_redis_client(fake_redis)
+    hooks.spotify_client = make_fake_spotify_client(fake_spotify)
 
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
-
-    # Spotify
-    import platform_music.services.spotify as sp
-
-    class _Sp(sp.SpotifyProto):
-        def get_listening_history(
-            self, *, start_date: str, end_date: str, limit: int | None = None
-        ) -> list[PlayRecord]:
-            return _plays("spotify")
-
-    def _mk_spotify_client(**kwargs: str | int) -> sp.SpotifyProto:
-        return _Sp()
-
-    monkeypatch.setattr(jobs_mod, "spotify_client", _mk_spotify_client)
     p_sp: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
@@ -71,29 +60,14 @@ def test_process_wrapped_job_spotify_success(monkeypatch: MonkeyPatch) -> None:
     fake_redis.assert_only_called({"set", "get", "publish"})
 
 
-def test_process_wrapped_job_apple_success(monkeypatch: MonkeyPatch) -> None:
+def test_process_wrapped_job_apple_success() -> None:
     fake_redis = FakeRedis()
+    fake_apple = FakeAppleMusic()
+    _populate_fake(fake_apple, "apple_music")
 
-    import platform_music.jobs as jobs_mod
+    hooks.redis_client = make_fake_redis_client(fake_redis)
+    hooks.apple_client = make_fake_apple_client(fake_apple)
 
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
-
-    # Apple
-    import platform_music.services.apple as ap
-
-    class _Ap(ap.AppleMusicProto):
-        def get_listening_history(
-            self, *, start_date: str, end_date: str, limit: int | None = None
-        ) -> list[PlayRecord]:
-            return _plays("apple_music")
-
-    def _mk_apple_client(**kwargs: str | int) -> ap.AppleMusicProto:
-        return _Ap()
-
-    monkeypatch.setattr(jobs_mod, "apple_client", _mk_apple_client)
     p_ap: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,
@@ -114,29 +88,14 @@ def test_process_wrapped_job_apple_success(monkeypatch: MonkeyPatch) -> None:
     fake_redis.assert_only_called({"set", "get", "publish"})
 
 
-def test_process_wrapped_job_youtube_success(monkeypatch: MonkeyPatch) -> None:
+def test_process_wrapped_job_youtube_success() -> None:
     fake_redis = FakeRedis()
+    fake_youtube = FakeYouTubeMusic()
+    _populate_fake(fake_youtube, "youtube_music")
 
-    import platform_music.jobs as jobs_mod
+    hooks.redis_client = make_fake_redis_client(fake_redis)
+    hooks.youtube_client = make_fake_youtube_client(fake_youtube)
 
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
-
-    # YouTube
-    import platform_music.services.youtube as yt
-
-    class _Yt(yt.YouTubeMusicProto):
-        def get_listening_history(
-            self, *, start_date: str, end_date: str, limit: int | None = None
-        ) -> list[PlayRecord]:
-            return _plays("youtube_music")
-
-    def _mk_youtube_client(**kwargs: str | int) -> yt.YouTubeMusicProto:
-        return _Yt()
-
-    monkeypatch.setattr(jobs_mod, "youtube_client", _mk_youtube_client)
     p_yt: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
         "year": 2024,

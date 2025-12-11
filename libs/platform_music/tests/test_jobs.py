@@ -7,9 +7,10 @@ from platform_workers.testing import FakeRedis
 
 from platform_music import FakeLastFm, process_wrapped_job
 from platform_music.jobs import AppleMusicCredentials, SpotifyCredentials, WrappedJobPayload
+from platform_music.testing import hooks, make_fake_lastfm_client, make_fake_redis_client
 
 
-def test_process_wrapped_job_success(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_wrapped_job_success() -> None:
     # Prepare fakes
     fake_lastfm = FakeLastFm()
     for i in range(15):
@@ -21,18 +22,9 @@ def test_process_wrapped_job_success(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     fake_redis = FakeRedis()
 
-    # Monkeypatch factories
-    import platform_music.jobs as jobs_mod
-
-    def _lfm(**_: str) -> FakeLastFm:
-        return fake_lastfm
-
-    def _rf(url: str) -> FakeRedis:
-        assert url == "redis://ignored"
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "lastfm_client", _lfm)
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    # Set hooks
+    hooks.lastfm_client = make_fake_lastfm_client(fake_lastfm)
+    hooks.redis_client = make_fake_redis_client(fake_redis)
 
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
@@ -66,32 +58,21 @@ def test_process_wrapped_job_success(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_redis.assert_only_called({"set", "get", "publish"})
 
 
-def test__redis_client_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Ensure wrapper calls underlying factory and returns it
-    from platform_workers.testing import FakeRedis
-
-    import platform_music.jobs as jobs_mod
-
+def test__redis_client_wrapper() -> None:
+    # Ensure wrapper calls underlying factory and returns it via hook
     fake = FakeRedis()
+    hooks.redis_client = make_fake_redis_client(fake)
 
-    def _rf(url: str) -> FakeRedis:
-        return fake
+    from platform_music.jobs import _redis_client
 
-    monkeypatch.setattr(jobs_mod, "redis_for_kv", _rf)
-    out = jobs_mod._redis_client("redis://ignored")
+    out = _redis_client("redis://ignored")
     assert out is fake
     fake.assert_only_called(set())
 
 
-def test_process_wrapped_job_unsupported_service(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_wrapped_job_unsupported_service() -> None:
     fake_redis = FakeRedis()
-
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fake_redis)
 
     payload: WrappedJobPayload = {
         "type": "music_wrapped.generate.v1",
@@ -114,15 +95,9 @@ def test_process_wrapped_job_unsupported_service(monkeypatch: pytest.MonkeyPatch
     fake_redis.assert_only_called({"publish"})
 
 
-def test_process_wrapped_job_invalid_lastfm_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_wrapped_job_invalid_lastfm_credentials() -> None:
     fake_redis = FakeRedis()
-
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fake_redis)
 
     bad_creds: SpotifyCredentials = {
         "access_token": "tok",
@@ -150,15 +125,9 @@ def test_process_wrapped_job_invalid_lastfm_credentials(monkeypatch: pytest.Monk
     fake_redis.assert_only_called({"publish"})
 
 
-def test_process_wrapped_job_invalid_apple_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_wrapped_job_invalid_apple_credentials() -> None:
     fake_redis = FakeRedis()
-
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fake_redis)
 
     bad_creds_sp: SpotifyCredentials = {
         "access_token": "tok",
@@ -187,15 +156,9 @@ def test_process_wrapped_job_invalid_apple_credentials(monkeypatch: pytest.Monke
     fake_redis.assert_only_called({"publish"})
 
 
-def test_process_wrapped_job_invalid_youtube_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_wrapped_job_invalid_youtube_credentials() -> None:
     fake_redis = FakeRedis()
-
-    import platform_music.jobs as jobs_mod
-
-    def _rf(url: str) -> FakeRedis:
-        return fake_redis
-
-    monkeypatch.setattr(jobs_mod, "_redis_client", _rf)
+    hooks.redis_client = make_fake_redis_client(fake_redis)
 
     bad_creds_ap: AppleMusicCredentials = {
         "developer_token": "d",
