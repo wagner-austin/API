@@ -72,7 +72,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 **Example `.env`:**
 
 ```bash
-PORT=8080
+PORT=8000
+REDIS_URL=redis://localhost:6379/0
 QR_DEFAULT_ERROR_CORRECTION=M
 QR_DEFAULT_BOX_SIZE=10
 QR_DEFAULT_BORDER=1
@@ -131,12 +132,18 @@ poetry run mypy src tests scripts
 qr-api/
 ├── src/qr_api/
 │   ├── __init__.py      # Package exports
-│   ├── app.py           # FastAPI factory and routes
 │   ├── asgi.py          # ASGI entry point
 │   ├── types.py         # TypedDict models (QRPayload, QROptions)
 │   ├── validators.py    # URL, color, dimension validation
 │   ├── generator.py     # Segno QR generation
-│   └── settings.py      # Environment config loading
+│   ├── settings.py      # Environment config loading
+│   ├── health.py        # Health check logic
+│   ├── worker_entry.py  # RQ worker entry point
+│   └── api/
+│       ├── main.py      # FastAPI factory
+│       └── routes/
+│           ├── health.py  # Health endpoints
+│           └── qr.py      # QR generation endpoint
 ├── tests/
 │   ├── test_health.py
 │   ├── test_qr_handler.py
@@ -163,10 +170,13 @@ qr-api/
 docker build -t qr-api:latest .
 
 # Run
-docker run -p 8080:8080 qr-api:latest
+docker run -p 8000:8000 \
+  -e REDIS_URL=redis://host.docker.internal:6379/0 \
+  qr-api:latest
 
 # With custom defaults
-docker run -p 8080:8080 \
+docker run -p 8000:8000 \
+  -e REDIS_URL=redis://host.docker.internal:6379/0 \
   -e QR_DEFAULT_ERROR_CORRECTION=H \
   -e QR_DEFAULT_BOX_SIZE=12 \
   qr-api:latest
@@ -211,8 +221,8 @@ Client Request
          │
          ▼
 ┌─────────────────┐
-│  FastAPI App    │  (app.py)
-│  Route Handler  │
+│  FastAPI App    │  (api/main.py)
+│  Route Handler  │  (api/routes/qr.py)
 └────────┬────────┘
          │
          ▼

@@ -83,7 +83,7 @@ Generate a QR code PNG from a URL.
 
 **Example - curl:**
 ```bash
-curl -X POST http://localhost:8080/v1/qr \
+curl -X POST http://localhost:8000/v1/qr \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com",
@@ -98,7 +98,7 @@ curl -X POST http://localhost:8080/v1/qr \
 
 **Example - minimal request:**
 ```bash
-curl -X POST http://localhost:8080/v1/qr \
+curl -X POST http://localhost:8000/v1/qr \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com"}' \
   --output qr.png
@@ -109,7 +109,7 @@ curl -X POST http://localhost:8080/v1/qr \
 import httpx
 
 response = httpx.post(
-    "http://localhost:8080/v1/qr",
+    "http://localhost:8000/v1/qr",
     json={
         "url": "https://example.com",
         "ecc": "M",
@@ -190,7 +190,8 @@ Default values can be configured via environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `8080` | Server port |
+| `PORT` | `8000` | Server port |
+| `REDIS_URL` | - | Redis connection URL (required for /readyz) |
 | `QR_DEFAULT_ERROR_CORRECTION` | `"M"` | Default ECC level (L/M/Q/H) |
 | `QR_DEFAULT_BOX_SIZE` | `10` | Default pixels per module (5-20) |
 | `QR_DEFAULT_BORDER` | `1` | Default quiet zone width (1-10) |
