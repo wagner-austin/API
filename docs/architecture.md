@@ -27,7 +27,10 @@ The API platform is a Python monorepo using FastAPI for HTTP services, RQ (Redis
 
 ```
 C:\Users\austi\PROJECTS\API/
-├── libs/                          # Shared libraries (7 packages)
+├── libs/                          # Shared libraries (10 packages)
+│   ├── covenant_domain/           # Loan covenant domain models & rule engine
+│   ├── covenant_ml/               # XGBoost training and prediction for covenants
+│   ├── covenant_persistence/      # PostgreSQL repositories for covenant data
 │   ├── instrument_io/             # IO for analytical chemistry data formats
 │   ├── monorepo_guards/           # Guard rules for monorepo integrity
 │   ├── platform_core/             # Typed event schemas & platform utilities
@@ -210,6 +213,50 @@ model-artifact.tar.xz
 | `checker.py` | AST-based rule enforcement |
 
 **Used by:** CI/CD pipelines
+
+---
+
+### covenant_domain
+
+**Purpose:** Loan covenant domain models, formula parser, and rule engine.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `models.py` | TypedDict models for deals, covenants, measurements |
+| `parser.py` | Formula parser for covenant expressions |
+| `engine.py` | Rule evaluation engine |
+
+**Used by:** covenant-radar-api
+
+---
+
+### covenant_ml
+
+**Purpose:** XGBoost training and prediction for covenant breach probability.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `trainer.py` | XGBoost model training |
+| `predictor.py` | Breach probability prediction |
+| `features.py` | Feature engineering for tabular data |
+
+**Used by:** covenant-radar-api
+
+---
+
+### covenant_persistence
+
+**Purpose:** PostgreSQL repositories for covenant data.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `repositories/` | Deal, covenant, measurement repositories |
+| `connection.py` | Database connection management |
+
+**Used by:** covenant-radar-api
 
 ---
 
