@@ -427,11 +427,14 @@ railway up
 
 ---
 
-## Event Publishing (Optional)
+## Discord Bot Integration
 
-If `REDIS_URL` is configured, the service publishes events:
+The Discord bot (`clients/DiscordBot`) integrates via:
 
-**Channel:** `transcript:events` (from platform_core)
+1. **Direct HTTP**: `/transcript url:<YouTube URL>` calls `/v1/captions` or `/v1/stt`
+2. **Redis Events**: Async job progress published to `transcript:events` channel
+
+**Channel:** `transcript:events` (via `platform_core.job_events`)
 
 **Events (generic job schema):**
 - `transcript.job.started.v1` — `{type, domain, job_id, user_id, queue}`
