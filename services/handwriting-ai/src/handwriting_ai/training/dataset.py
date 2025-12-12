@@ -10,6 +10,8 @@ from PIL import Image
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 
+from handwriting_ai import _test_hooks
+
 from ..inference.types import PreprocessOutput
 from ..preprocess import PreprocessOptions, run_preprocess
 from .augment import (
@@ -268,7 +270,7 @@ def make_loaders(
     train_base: MNISTLike,
     test_base: MNISTLike,
     cfg: TrainConfig,
-    loader_cfg: DataLoaderConfig | None = None,
+    loader_cfg: DataLoaderConfig | _test_hooks.DataLoaderConfigProtocol | None = None,
 ) -> tuple[
     Dataset[tuple[Tensor, Tensor]],
     DataLoader[tuple[Tensor, Tensor]],

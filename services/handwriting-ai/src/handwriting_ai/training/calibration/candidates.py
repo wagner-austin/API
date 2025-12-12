@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from typing import TypedDict
-
 import torch
 
+from handwriting_ai.training.calibration._types import CandidateDict
 from handwriting_ai.training.resources import ResourceLimits, compute_max_batch_size
 
-
-class Candidate(TypedDict):
-    intra_threads: int
-    interop_threads: int | None
-    num_workers: int
-    batch_size: int
+# Candidate is imported from _types to avoid circular imports.
+# Re-export for backwards compatibility.
+Candidate = CandidateDict
 
 
 def _candidate_threads(limits: ResourceLimits) -> list[int]:

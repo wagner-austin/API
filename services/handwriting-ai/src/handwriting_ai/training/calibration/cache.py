@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 from platform_core.json_utils import (
@@ -10,16 +9,18 @@ from platform_core.json_utils import (
     dump_json_str,
     load_json_str,
 )
-from platform_core.logging import get_logger
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.calibration.measure import CalibrationResult
 from handwriting_ai.training.calibration.signature import CalibrationSignature
 
-_LOGGER = get_logger("handwriting_ai.calibration")
+
+def _get_logger() -> _test_hooks.LoggerInstanceProtocol:
+    return _test_hooks.get_logger("handwriting_ai.calibration")
 
 
 def _now_ts() -> float:
-    return time.time()
+    return _test_hooks.now_ts()
 
 
 def _decode_obj_dict(x: JSONValue) -> dict[str, JSONValue] | None:
@@ -39,7 +40,7 @@ def _decode_int(d: dict[str, JSONValue], key: str, default: int) -> int:
         try:
             return int(v)
         except ValueError as exc:
-            _LOGGER.error("calib_parse_int_failed key=%s value=%s error=%s", key, v, exc)
+            _get_logger().error("calib_parse_int_failed key=%s value=%s error=%s", key, v, exc)
             raise JSONTypeError(f"{key}: invalid int") from exc
     return default
 
@@ -54,7 +55,7 @@ def _decode_float(d: dict[str, JSONValue], key: str, default: float) -> float:
         try:
             return float(v)
         except ValueError as exc:
-            _LOGGER.error("calib_parse_float_failed key=%s value=%s error=%s", key, v, exc)
+            _get_logger().error("calib_parse_float_failed key=%s value=%s error=%s", key, v, exc)
             raise JSONTypeError(f"{key}: invalid float") from exc
     return default
 
@@ -66,7 +67,7 @@ def _read_cache(path: Path) -> tuple[CalibrationSignature, CalibrationResult, fl
     try:
         parsed: JSONValue = load_json_str(raw)
     except InvalidJsonError as exc:
-        _LOGGER.error("calib_cache_decode_failed path=%s error=%s", path, exc)
+        _get_logger().error("calib_cache_decode_failed path=%s error=%s", path, exc)
         raise
     root = _decode_obj_dict(parsed)
     if root is None:

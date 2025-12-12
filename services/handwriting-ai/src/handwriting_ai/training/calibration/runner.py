@@ -1,20 +1,29 @@
 from __future__ import annotations
 
 import gc as _gc
-import logging as stdlib_logging
 import multiprocessing as _mp
 import os as _os
 import time as _time
 from collections.abc import Callable
 from contextlib import suppress as _suppress
-from multiprocessing.process import BaseProcess
 from pathlib import Path
-from typing import Protocol, TypedDict, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from PIL import Image as _Image
-from platform_core.logging import get_logger, setup_logging
+from platform_core.logging import (
+    get_logger,
+    load_queue_handler_factory,
+    load_queue_listener_factory,
+    stdlib_logging,
+)
 from torch.utils.data import Dataset as _TorchDataset
 
+from handwriting_ai import _test_hooks
+from handwriting_ai.training.calibration._types import (
+    BudgetConfigDict,
+    CandidateErrorDict,
+    CandidateOutcomeDict,
+)
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import (
     AugmentSpec,
@@ -23,81 +32,29 @@ from handwriting_ai.training.calibration.ds_spec import (
 )
 from handwriting_ai.training.calibration.measure import (
     CalibrationResult,
-    _measure_candidate_internal,
 )
 from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 from handwriting_ai.training.safety import set_memory_guard_config
 
-
-class _QueueListenerProto(Protocol):
-    """Protocol for logging.handlers.QueueListener."""
-
-    def start(self) -> None: ...
-
-    def stop(self) -> None: ...
-
-
-class _QueueHandlerFactory(Protocol):
-    """Protocol for QueueHandler constructor."""
-
-    def __call__(self, queue: _mp.Queue[stdlib_logging.LogRecord]) -> stdlib_logging.Handler: ...
-
-
-class _QueueListenerFactory(Protocol):
-    """Protocol for QueueListener constructor."""
-
-    def __call__(
-        self,
-        queue: _mp.Queue[stdlib_logging.LogRecord],
-        *handlers: stdlib_logging.Handler,
-        respect_handler_level: bool = False,
-    ) -> _QueueListenerProto: ...
-
-
-def _load_queue_handler_factory() -> _QueueHandlerFactory:
-    """Load QueueHandler constructor from logging.handlers."""
-    import logging.handlers as _lh
-
-    factory: _QueueHandlerFactory = _lh.QueueHandler
-    return factory
-
-
-def _load_queue_listener_factory() -> _QueueListenerFactory:
-    """Load QueueListener constructor from logging.handlers."""
-    import logging.handlers as _lh
-
-    factory: _QueueListenerFactory = _lh.QueueListener
-    return factory
-
-
-_QueueHandler = _load_queue_handler_factory()
-_QueueListener = _load_queue_listener_factory()
+_QueueHandler = load_queue_handler_factory()
+_QueueListener = load_queue_listener_factory()
 _LOGGER = get_logger("handwriting_ai")
 
 
-class CandidateError(TypedDict):
-    kind: str  # "timeout" | "oom" | "runtime"
-    message: str
-    exit_code: int | None
+# CandidateError and CandidateOutcome are imported from _types to avoid circular imports.
+# Re-export for backwards compatibility.
+CandidateError = CandidateErrorDict
+CandidateOutcome = CandidateOutcomeDict
 
-
-class CandidateOutcome(TypedDict):
-    ok: bool
-    res: CalibrationResult | None
-    error: CandidateError | None
-
-
-class BudgetConfig(TypedDict):
-    start_pct_max: float
-    abort_pct: float
-    timeout_s: float
-    max_failures: int
+# BudgetConfig is imported from _types to avoid circular imports.
+# Re-export for backwards compatibility.
+BudgetConfig = BudgetConfigDict
 
 
 class CandidateRunner(Protocol):
     def run(
         self,
-        ds: PreprocessDataset | PreprocessSpec,
+        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
         cand: Candidate,
         samples: int,
         budget: BudgetConfig,
@@ -152,7 +109,7 @@ def _child_entry(
     import time as _time
 
     # Child process needs to initialize its own logging
-    setup_logging(
+    _test_hooks.runner_setup_logging(
         level="INFO",
         format_mode="json",
         service_name="handwriting-calibration",
@@ -167,9 +124,8 @@ def _child_entry(
             log.removeHandler(h)
     log.propagate = False
 
-    # Bridge child logs to parent using the provided queue handler (tests may
-    # monkeypatch _QueueHandler with a logging.Handler subclass).
-    q_handler = _QueueHandler(log_q)
+    # Bridge child logs to parent using the queue handler
+    q_handler = _test_hooks.queue_handler_factory(log_q)
     q_handler.setLevel(log.level)
     log.addHandler(q_handler)
     start_entry = _time.perf_counter()
@@ -189,7 +145,7 @@ def _child_entry(
         # Rebuild dataset from spec to avoid pickling large objects
         log.info("calibration_child_building_dataset base_kind=%s", spec["base_kind"])
         start_build = _time.perf_counter()
-        ds = _build_dataset_from_spec(spec)
+        ds = _test_hooks.build_dataset_from_spec(spec)
         build_elapsed = _time.perf_counter() - start_build
         log.info("calibration_child_dataset_built elapsed_ms=%.1f", build_elapsed * 1000)
         # Configure memory guard inside the child for calibration attempts.
@@ -206,14 +162,14 @@ def _child_entry(
 
         # Stream best-so-far so the parent can pick up a viable result early
         def _on_improvement(r: CalibrationResult) -> None:
-            _emit_result_file(out_path, r)
+            _test_hooks.emit_result_file(out_path, r)
 
         start_measure = _time.perf_counter()
         # Inline specs are used for lightweight tests and documentation
         # examples; keep their batch size fixed to the requested candidate
         # value to avoid surprising headroom expansions.
         enable_headroom = spec["base_kind"] != "inline"
-        res = _measure_candidate_internal(
+        res = _test_hooks.measure_candidate_internal(
             ds,
             cand,
             samples,
@@ -224,7 +180,7 @@ def _child_entry(
         log.info("calibration_child_measure_complete elapsed_s=%.1f", measure_elapsed)
 
         # Manual KV encoding of result (executes in child process)
-        _emit_result_file(out_path, res)
+        _test_hooks.emit_result_file(out_path, res)
 
         total_elapsed = _time.perf_counter() - start_entry
         log.info("calibration_child_complete total_s=%.1f", total_elapsed)
@@ -239,20 +195,20 @@ def _child_entry(
 
 class SubprocessRunner:
     def __init__(self) -> None:
-        # Use spawn for consistent behavior across OSes
+        # Use spawn for consistent behavior across OSes.
+        # Use multiprocessing directly since we need the full context API
+        # (Queue, Process) which the test hook Protocol doesn't expose.
         self._ctx = _mp.get_context("spawn")
 
     def run(
         self,
-        ds: PreprocessDataset | PreprocessSpec,
+        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
         cand: Candidate,
         samples: int,
         budget: BudgetConfig,
     ) -> CandidateOutcome:
-        import tempfile as _tmp
-
         log = _LOGGER
-        out_dir = _tmp.mkdtemp(prefix="calib_child_")
+        out_dir = _test_hooks.tempfile_mkdtemp(prefix="calib_child_")
         out_path = _os.path.join(out_dir, "result.txt")
 
         # Always pass a lightweight spec to the child
@@ -264,7 +220,9 @@ class SubprocessRunner:
         _root_handlers = list(stdlib_logging.getLogger().handlers)
         _app_handlers = list(stdlib_logging.getLogger("handwriting_ai").handlers)
         _parent_handlers = tuple(_root_handlers + _app_handlers)
-        listener = _QueueListener(log_q, *_parent_handlers, respect_handler_level=True)
+        listener = _test_hooks.queue_listener_factory(
+            log_q, *_parent_handlers, respect_handler_level=True
+        )
         listener.start()
         proc = self._ctx.Process(
             target=_child_entry,
@@ -298,7 +256,7 @@ class SubprocessRunner:
 
     def _wait_for_outcome(
         self,
-        proc: BaseProcess,
+        proc: _test_hooks.MultiprocessingProcessProtocol,
         out_path: str,
         start: float,
         timeout_s: float,
@@ -309,13 +267,13 @@ class SubprocessRunner:
             if outcome is not None:
                 # Result file found, but child still alive - try to join briefly to
                 # encourage clean exit and log flush; suppress on non-started mocks.
-                remaining_time = timeout_s - (_time.perf_counter() - start)
+                remaining_time = timeout_s - (_test_hooks.perf_counter() - start)
                 if remaining_time > 0.0:
                     join_timeout = min(5.0, max(0.1, remaining_time))
                     with _suppress(Exception):
                         proc.join(timeout=join_timeout)
                 return outcome
-            if (_time.perf_counter() - start) >= timeout_s:
+            if (_test_hooks.perf_counter() - start) >= timeout_s:
                 # Timeout: terminate and mark
                 with _suppress(Exception):
                     proc.terminate()
@@ -367,10 +325,10 @@ class SubprocessRunner:
     ) -> CandidateOutcome | None:
         if not _os.path.exists(out_path):
             return None
-        if not (_os.path.exists(out_path) and _os.access(out_path, _os.R_OK)):
+        if not (_os.path.exists(out_path) and _test_hooks.os_access(out_path, _os.R_OK)):
             return None
         try:
-            with open(out_path, encoding="utf-8") as f:
+            with _test_hooks.file_open(out_path, encoding="utf-8") as f:
                 content = f.read()
         except OSError as exc:
             _LOGGER.debug(
@@ -506,7 +464,7 @@ def _rebuild_mnist_raw_dataset(root: Path, train: bool) -> _MNISTRawDataset:
     return _MNISTRawDataset(imgs, labels, root=root, train=train)
 
 
-def _to_spec(ds: PreprocessDataset | PreprocessSpec) -> PreprocessSpec:
+def _to_spec(ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec) -> PreprocessSpec:
     if isinstance(ds, dict):
         return ds
     k = ds.knobs

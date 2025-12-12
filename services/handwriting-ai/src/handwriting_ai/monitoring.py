@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Protocol, TypedDict
 
-import psutil
 from platform_core.logging import get_logger
 
-# Cgroup v2 paths
-_CGROUP_MEM_CURRENT: Path = Path("/sys/fs/cgroup/memory.current")
-_CGROUP_MEM_MAX: Path = Path("/sys/fs/cgroup/memory.max")
-_CGROUP_MEM_STAT: Path = Path("/sys/fs/cgroup/memory.stat")
+from handwriting_ai import _test_hooks
 
 
 # Minimal protocols for psutil return types
 class _MemInfoProto(Protocol):
-    """Protocol for psutil memory_info() result - read-only rss attribute."""
+    """Protocol for psutil memory_info() result - read-only rss attribute.
+
+    Note: rss is int | str to align with MemoryInfoProtocol in _test_hooks.py,
+    allowing tests to inject bad data for testing runtime isinstance checks.
+    """
 
     @property
-    def rss(self) -> int: ...
+    def rss(self) -> int | str: ...
 
 
 class _ProcessProto(Protocol):
@@ -148,12 +147,12 @@ def _parse_cgroup_stat(content: str) -> dict[str, int]:
 
 def _read_cgroup_usage() -> CgroupMemoryUsage:
     """Read cgroup v2 memory usage and limit."""
-    if not _CGROUP_MEM_CURRENT.exists():
+    if not _test_hooks.cgroup_mem_current.exists():
         msg = "no cgroup memory files found (not in container?)"
         raise RuntimeError(msg)
 
-    usage_bytes = _read_cgroup_int(_CGROUP_MEM_CURRENT)
-    limit_content = _read_cgroup_file(_CGROUP_MEM_MAX)
+    usage_bytes = _read_cgroup_int(_test_hooks.cgroup_mem_current)
+    limit_content = _read_cgroup_file(_test_hooks.cgroup_mem_max)
     if limit_content == "max":
         msg = "cgroup memory.max is 'max' (unlimited)"
         raise RuntimeError(msg)
@@ -174,11 +173,11 @@ def _read_cgroup_breakdown() -> CgroupMemoryBreakdown:
     to ensure we got valid cgroup data.
     """
 
-    if not _CGROUP_MEM_STAT.exists():
+    if not _test_hooks.cgroup_mem_stat.exists():
         msg = "no cgroup memory.stat file found"
         raise RuntimeError(msg)
 
-    stat_content = _read_cgroup_file(_CGROUP_MEM_STAT)
+    stat_content = _read_cgroup_file(_test_hooks.cgroup_mem_stat)
     stats = _parse_cgroup_stat(stat_content)
 
     # Validate we got at least some expected fields
@@ -215,7 +214,7 @@ def _get_worker_processes(parent_pid: int) -> tuple[ProcessMemory, ...]:
     from platform_core.logging import get_logger
 
     try:
-        parent = psutil.Process(parent_pid)
+        parent = _test_hooks.psutil_process(parent_pid)
         children = parent.children(recursive=True)
     except (OSError, ValueError, RuntimeError) as exc:
         get_logger("handwriting_ai").error(
@@ -229,16 +228,16 @@ def _get_worker_processes(parent_pid: int) -> tuple[ProcessMemory, ...]:
             # Type-annotate to use Protocol - overrides Any from psutil
             child_typed: _ProcessProto = child
             mem_info: _MemInfoProto = child_typed.memory_info()
-            rss_val: int = mem_info.rss
+            rss_raw = mem_info.rss  # int | str per Protocol (allows test injection)
             pid_val: int = child_typed.pid
-            if not isinstance(pid_val, int) or not isinstance(rss_val, int):
+            if not isinstance(pid_val, int) or not isinstance(rss_raw, int):
                 get_logger("handwriting_ai").error(
                     "worker_memory_invalid_types pid_type=%s rss_type=%s",
                     type(pid_val).__name__,
-                    type(rss_val).__name__,
+                    type(rss_raw).__name__,
                 )
                 continue
-            workers.append({"pid": pid_val, "rss_bytes": rss_val})
+            workers.append({"pid": pid_val, "rss_bytes": rss_raw})
         except (OSError, ValueError, RuntimeError) as exc:
             get_logger("handwriting_ai").error("worker_memory_read_failed %s", exc)
             raise
@@ -251,10 +250,11 @@ class CgroupMemoryMonitor:
 
     def get_snapshot(self) -> MemorySnapshot:
         """Capture complete memory snapshot including cgroup and worker data."""
-        pid = os.getpid()
-        proc: _ProcessProto = psutil.Process(pid)
+        pid = _test_hooks.os_getpid()
+        proc: _ProcessProto = _test_hooks.psutil_process(pid)
         mem_info: _MemInfoProto = proc.memory_info()
-        main_rss: int = mem_info.rss
+        rss_raw = mem_info.rss  # int | str per Protocol
+        main_rss = rss_raw if isinstance(rss_raw, int) else 0
 
         main_process: ProcessMemory = {"pid": pid, "rss_bytes": main_rss}
         workers = _get_worker_processes(pid)
@@ -305,20 +305,21 @@ class SystemMemoryMonitor:
 
     def __init__(self) -> None:
         # Get system memory total once for consistent "limit"
-        self._system_total = int(psutil.virtual_memory().total)
+        self._system_total = int(_test_hooks.psutil_virtual_memory().total)
 
     def get_snapshot(self) -> MemorySnapshot:
         """Capture basic memory snapshot using system metrics."""
-        pid = os.getpid()
-        proc: _ProcessProto = psutil.Process(pid)
+        pid = _test_hooks.os_getpid()
+        proc: _ProcessProto = _test_hooks.psutil_process(pid)
         mem_info: _MemInfoProto = proc.memory_info()
-        main_rss: int = mem_info.rss
+        rss_raw = mem_info.rss  # int | str per Protocol
+        main_rss = rss_raw if isinstance(rss_raw, int) else 0
 
         main_process: ProcessMemory = {"pid": pid, "rss_bytes": main_rss}
         workers = _get_worker_processes(pid)
 
         # Create synthetic cgroup usage from system memory
-        vm: _VirtualMemoryProto = psutil.virtual_memory()
+        vm: _VirtualMemoryProto = _test_hooks.psutil_virtual_memory()
         usage_bytes = int(vm.used)
         limit_bytes = self._system_total
         percent = (float(usage_bytes) / float(limit_bytes)) * 100.0
@@ -351,7 +352,7 @@ class SystemMemoryMonitor:
 
     def check_pressure(self, threshold_percent: float) -> bool:
         """Return True if system memory usage exceeds threshold."""
-        vm = psutil.virtual_memory()
+        vm = _test_hooks.psutil_virtual_memory()
         percent = (float(vm.used) / float(self._system_total)) * 100.0
         return percent >= threshold_percent
 
@@ -378,7 +379,7 @@ class SystemMemoryMonitor:
 
 def _detect_cgroups_available() -> bool:
     """Detect if cgroup v2 memory files are available."""
-    return _CGROUP_MEM_CURRENT.exists()
+    return _test_hooks.cgroup_mem_current.exists()
 
 
 def is_cgroup_available() -> bool:
@@ -425,8 +426,8 @@ def log_system_info() -> None:
     """Log system CPU and memory information at startup."""
     log = get_logger("handwriting_ai")
     log.setLevel(20)
-    cpu_logical = int(psutil.cpu_count(logical=True) or 0)
-    cpu_physical_val = psutil.cpu_count(logical=False)
+    cpu_logical = int(_test_hooks.psutil_cpu_count(logical=True) or 0)
+    cpu_physical_val = _test_hooks.psutil_cpu_count(logical=False)
     cpu_physical = int(cpu_physical_val) if cpu_physical_val is not None else 0
 
     if _detect_cgroups_available():
@@ -439,7 +440,7 @@ def log_system_info() -> None:
         )
         return
     # Non-container path: use system memory metrics; propagate failures
-    vm = psutil.virtual_memory()
+    vm = _test_hooks.psutil_virtual_memory()
     limit_mb = int(vm.total // (1024 * 1024))
     log.info(
         "system_info "

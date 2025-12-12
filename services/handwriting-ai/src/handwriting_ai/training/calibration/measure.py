@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import gc as _gc
-import multiprocessing as _mp
-import os as _os
 from collections.abc import Callable, Generator
-from multiprocessing.context import BaseContext as _BaseCtx
 from statistics import quantiles
-from typing import Final, Protocol, TypedDict
+from typing import Final, Protocol
 
 import torch
 from platform_core.logging import get_logger
@@ -14,7 +10,9 @@ from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.monitoring import is_cgroup_available
+from handwriting_ai.training.calibration._types import CalibrationResultDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.dataset import DataLoaderConfig, PreprocessDataset
 from handwriting_ai.training.optim import (
@@ -43,36 +41,26 @@ class _BatchIterable(Protocol):
     def __iter__(self) -> _BatchIterator: ...
 
 
-class CalibrationResult(TypedDict):
-    intra_threads: int
-    interop_threads: int | None
-    num_workers: int
-    batch_size: int
-    samples_per_sec: float
-    p95_ms: float
-
-
-class _LoaderIterator(Protocol):
-    def _shutdown_workers(self) -> None: ...
+# CalibrationResult is imported from _types to avoid circular imports.
+# Re-export for backwards compatibility.
+CalibrationResult = CalibrationResultDict
 
 
 # Cache a single calibration model per process to avoid repeated large
 # allocations and allocator fragmentation across successive measurements.
 _CAL_MODEL: Module | None = None
 _CAL_OPT: Optimizer | None = None
-_INTEROP_CONFIGURED: bool = False
 
 
 def _reset_calibration_state(*, reset_interop: bool = False) -> None:
     """Clear cached calibration resources to avoid cross-run memory growth."""
-    global _CAL_MODEL, _CAL_OPT, _INTEROP_CONFIGURED
+    global _CAL_MODEL, _CAL_OPT
     _CAL_MODEL = None
     _CAL_OPT = None
     if reset_interop:
-        _INTEROP_CONFIGURED = False
-    _gc.collect()
-    if hasattr(torch, "cuda") and hasattr(torch.cuda, "empty_cache"):
-        torch.cuda.empty_cache()
+        _test_hooks.interop_configured_setter(False)
+    _test_hooks.gc_collect()
+    _test_hooks.torch_cuda_empty_cache()
 
 
 def _get_calibration_model() -> Module:
@@ -94,12 +82,10 @@ def _get_calibration_optimizer(model: Module) -> Optimizer:
 
 
 def _configure_interop_threads_once(interp_threads: int | None) -> None:
-    global _INTEROP_CONFIGURED
-    if _INTEROP_CONFIGURED:
+    if _test_hooks.interop_configured_getter():
         return
-    if hasattr(torch, "set_num_interop_threads"):
-        torch.set_num_interop_threads(int(interp_threads) if interp_threads is not None else 1)
-    _INTEROP_CONFIGURED = True
+    _test_hooks.torch_set_interop_threads(int(interp_threads) if interp_threads is not None else 1)
+    _test_hooks.interop_configured_setter(True)
 
 
 def _log_candidate_start(cand: Candidate, bs_lo: int, bs_hi: int) -> None:
@@ -211,7 +197,7 @@ def _expand_upper_bound_if_headroom(
 
 def _search_best_batch_size(
     *,
-    ds: PreprocessDataset,
+    ds: _test_hooks.PreprocessDatasetProtocol,
     cand: Candidate,
     samples: int,
     device: torch.device,
@@ -230,7 +216,7 @@ def _search_best_batch_size(
 
     while bs_lo <= bs_hi:
         mid = (bs_lo + bs_hi) // 2
-        loader: DataLoader[tuple[torch.Tensor, torch.Tensor]] | None = None
+        loader: _test_hooks.BatchIterableProtocol | None = None
         try:
             mid = min(mid, int(ds_len))
             cfg_try = DataLoaderConfig(
@@ -242,8 +228,8 @@ def _search_best_batch_size(
                 persistent_workers=False,
                 prefetch_factor=1,
             )
-            loader = _safe_loader(ds, cfg_try)
-            sps, p95, peak_pct, exceeded = _measure_training(
+            loader = _test_hooks.safe_loader(ds, cfg_try)
+            sps, p95, peak_pct, exceeded = _test_hooks.measure_training(
                 int(ds_len),
                 loader,
                 samples,
@@ -311,7 +297,7 @@ def _search_best_batch_size(
             if loader is not None:
                 _shutdown_loader(loader)
                 del loader
-            _gc.collect()
+            _test_hooks.gc_collect()
             _join_active_children()
             _log_cleanup_state(mid)
     return best_bs, best_sps, best_p95
@@ -358,26 +344,36 @@ def _measure_loader(
     return sps, p95
 
 
-def _resolve_worker_context(num_workers: int) -> _BaseCtx | None:
-    """Resolve a stable multiprocessing context for DataLoader workers.
+def _resolve_worker_context(
+    num_workers: int,
+) -> str | None:
+    """Resolve a stable multiprocessing context method for DataLoader workers.
 
     In a spawned calibration child, prefer 'forkserver' on POSIX where
     available to avoid forking a threaded process; otherwise use 'spawn'.
     On Windows, always 'spawn'. Returns None when num_workers <= 0.
+
+    Returns the method name as a string (not a context object) since DataLoader
+    accepts strings directly for multiprocessing_context.
     """
     if int(num_workers) <= 0:
         return None
-    if _os.name == "nt":
-        return _mp.get_context("spawn")
-    methods = set(_mp.get_all_start_methods())
-    method = "forkserver" if "forkserver" in methods else ("spawn" if "spawn" in methods else None)
-    return _mp.get_context(method) if method is not None else None
+    if _test_hooks.os_name == "nt":
+        return "spawn"
+    methods = set(_test_hooks.mp_get_all_start_methods())
+    return "forkserver" if "forkserver" in methods else ("spawn" if "spawn" in methods else None)
 
 
 def _safe_loader(
-    ds: PreprocessDataset, cfg: DataLoaderConfig
+    ds: _test_hooks.PreprocessDatasetProtocol,
+    cfg: _test_hooks.DataLoaderConfigProtocol,
 ) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
-    ctx = _resolve_worker_context(int(cfg["num_workers"]))
+    ctx_method = _resolve_worker_context(int(cfg["num_workers"]))
+    # Import PreprocessDataset here to check type at runtime
+    from handwriting_ai.training.dataset import PreprocessDataset
+
+    if not isinstance(ds, PreprocessDataset):
+        raise TypeError(f"Expected PreprocessDataset, got {type(ds).__name__}")
     return DataLoader(
         ds,
         batch_size=int(cfg["batch_size"]),
@@ -386,17 +382,18 @@ def _safe_loader(
         pin_memory=bool(cfg["pin_memory"]),
         prefetch_factor=(int(cfg["prefetch_factor"]) if cfg["num_workers"] > 0 else None),
         persistent_workers=(bool(cfg["persistent_workers"]) if cfg["num_workers"] > 0 else False),
-        multiprocessing_context=ctx,
+        multiprocessing_context=ctx_method,
     )
 
 
-def _shutdown_loader(loader: DataLoader[tuple[torch.Tensor, torch.Tensor]]) -> None:
-    """Forcefully shut down DataLoader workers to prevent lingering processes."""
-    iterator_obj_raw: _LoaderIterator | None = getattr(loader, "_iterator", None)
-    if iterator_obj_raw is None:
-        return
-    iterator_obj_raw._shutdown_workers()
-    loader._iterator = None
+def _shutdown_loader(loader: _test_hooks.BatchIterableProtocol) -> None:
+    """Forcefully shut down DataLoader workers to prevent lingering processes.
+
+    This function handles both real DataLoader objects (which have _iterator)
+    and test fakes (which don't need shutdown).
+    """
+    # Delegate to hook for cleanup - allows tests to use fakes
+    _test_hooks.shutdown_loader(loader)
 
 
 def _join_active_children() -> None:
@@ -411,7 +408,7 @@ def _join_active_children() -> None:
     while attempt < max_passes:
         attempt += 1
         alive_after_pass = False
-        children = list(_mp.active_children())
+        children = _test_hooks.mp_active_children()
         if not children:
             break
         for child in children:
@@ -423,7 +420,7 @@ def _join_active_children() -> None:
                 child.join(timeout=0.25)
                 if child.is_alive():
                     alive_after_pass = True
-        if not alive_after_pass and not _mp.active_children():
+        if not alive_after_pass and not _test_hooks.mp_active_children():
             break
 
 
@@ -531,7 +528,7 @@ def _measure_candidate(
 
 
 def _measure_candidate_internal(
-    ds: PreprocessDataset,
+    ds: _test_hooks.PreprocessDatasetProtocol,
     cand: Candidate,
     samples: int,
     on_improvement: Callable[[CalibrationResult], None] | None,
@@ -539,7 +536,6 @@ def _measure_candidate_internal(
     enable_headroom: bool,
 ) -> CalibrationResult:
     """Measure a candidate using real training steps with binary search for safe batch size."""
-
     torch.set_num_threads(int(cand["intra_threads"]))
     _configure_interop_threads_once(cand["interop_threads"])
     device = torch.device("cpu")

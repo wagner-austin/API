@@ -5,24 +5,24 @@ from typing import Annotated
 
 from fastapi import Depends
 from platform_core.config import _require_env_str
-from platform_core.logging import get_logger
 from platform_core.queues import DIGITS_QUEUE
-from platform_workers.redis import RedisStrProto, redis_for_kv, redis_raw_for_rq
-from platform_workers.rq_harness import RQClientQueue, RQJobLike, rq_queue
+from platform_workers.redis import RedisStrProto
+from platform_workers.rq_harness import RQClientQueue, RQJobLike
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import LoggerInstanceProtocol
 from handwriting_ai.api.types import (
-    LoggerProtocol,
     QueueProtocol,
     RQRetryLike,
     UnknownJson,
     _EnqCallable,
 )
-from handwriting_ai.config import Settings, load_settings
+from handwriting_ai.config import Settings
 
 
 def get_settings() -> Settings:
     """Dependency: typed application settings from environment."""
-    return load_settings()
+    return _test_hooks.load_settings()
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -36,16 +36,16 @@ def _get_redis_url() -> str:
 def get_redis() -> Generator[RedisStrProto, None, None]:
     """Dependency: typed Redis (strings) using URL from env; closes on teardown."""
     redis_url = _get_redis_url()
-    client = redis_for_kv(redis_url)
+    client = _test_hooks.redis_factory(redis_url)
     try:
         yield client
     finally:
         client.close()
 
 
-def get_request_logger() -> LoggerProtocol:
+def get_request_logger() -> LoggerInstanceProtocol:
     """Dependency: request-scoped logger (delegates to global logger)."""
-    return get_logger(__name__)
+    return _test_hooks.get_logger(__name__)
 
 
 def get_queue() -> QueueProtocol:
@@ -74,8 +74,8 @@ def get_queue() -> QueueProtocol:
             description: str | None = None,
         ) -> RQJobLike:
             fref = func if isinstance(func, str) else str(func)
-            conn = redis_raw_for_rq(self._url)
-            q: RQClientQueue = rq_queue(self._name, connection=conn)
+            conn = _test_hooks.rq_conn(self._url)
+            q: RQClientQueue = _test_hooks.rq_queue_factory(self._name, conn)
             job: RQJobLike = q.enqueue(
                 fref,
                 *args,
@@ -91,5 +91,5 @@ def get_queue() -> QueueProtocol:
 
 
 RedisDep = Annotated[RedisStrProto, Depends(get_redis)]
-LoggerDep = Annotated[LoggerProtocol, Depends(get_request_logger)]
+LoggerDep = Annotated[LoggerInstanceProtocol, Depends(get_request_logger)]
 QueueDep = Annotated[QueueProtocol, Depends(get_queue)]

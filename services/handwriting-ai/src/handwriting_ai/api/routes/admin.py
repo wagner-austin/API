@@ -12,10 +12,9 @@ from platform_core.errors import AppError, HandwritingErrorCode, handwriting_sta
 from platform_core.logging import get_logger
 from platform_core.security import ApiKeyCheckFn
 
+from ... import _test_hooks
 from ...config import Settings
 from ...inference.engine import InferenceEngine
-from ...inference.engine import _load_state_dict_file as _engine_load_state_dict_file
-from ...inference.engine import _validate_state_dict as _engine_validate_state_dict
 from ...inference.manifest import from_json_manifest
 
 # Non-recursive JSON value type for flat API responses
@@ -67,9 +66,8 @@ def build_router(
         except ValueError:
             code = HandwritingErrorCode.preprocessing_failed
             raise AppError(code, "Invalid manifest", handwriting_status_for(code)) from None
-        from ...preprocess import preprocess_signature as _sig
 
-        if man["preprocess_hash"] != _sig():
+        if man["preprocess_hash"] != _test_hooks.preprocess_signature():
             code = HandwritingErrorCode.preprocessing_failed
             raise AppError(code, "Preprocess signature mismatch", handwriting_status_for(code))
         if man["model_id"] != model_id:
@@ -97,8 +95,8 @@ def build_router(
         if activate:
             load_errors = (RuntimeError, ValueError, TypeError, OSError, pickle.UnpicklingError)
             try:
-                sd = _engine_load_state_dict_file(dest / "model.pt")
-                _engine_validate_state_dict(sd, man["arch"], int(man["n_classes"]))
+                sd = _test_hooks.load_state_dict_file(dest / "model.pt")
+                _test_hooks.validate_state_dict(sd, man["arch"], int(man["n_classes"]))
             except load_errors:
                 raise AppError(
                     HandwritingErrorCode.invalid_model,

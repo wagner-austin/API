@@ -11,9 +11,9 @@ from typing import Final, NamedTuple, Protocol, Self, TypeGuard
 import torch
 from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
-from platform_ml import ArtifactStore
 from torch import Tensor
 
+from .. import _test_hooks
 from ..config import Settings, ensure_settings
 from .manifest import ModelManifest, from_path_manifest
 from .types import PredictOutput
@@ -57,6 +57,11 @@ class InferenceEngine:
         return self._manifest
 
     def submit_predict(self, preprocessed: Tensor) -> Future[PredictOutput]:
+        override = _test_hooks.submit_predict_override
+        if override is not None:
+            # Use test hook for injecting fake futures
+            fut: Future[PredictOutput] = override(preprocessed)
+            return fut
         return self._pool.submit(self._predict_impl, preprocessed)
 
     def _predict_impl(self, preprocessed: Tensor) -> PredictOutput:
@@ -108,7 +113,9 @@ class InferenceEngine:
     def _load_and_validate_model(self, manifest: ModelManifest, model_path: Path) -> TorchModel:
         """Build model architecture and load state dict with validation."""
         try:
-            model = _build_model(arch=manifest["arch"], n_classes=int(manifest["n_classes"]))
+            model = _test_hooks.build_model(
+                arch=manifest["arch"], n_classes=int(manifest["n_classes"])
+            )
         except (ImportError, AttributeError, RuntimeError, TypeError, ValueError, OSError) as exc:
             self._logger.error("model_build_failed error=%s", exc)
             raise
@@ -163,6 +170,10 @@ class InferenceEngine:
                 raise
 
     def _download_remote_if_needed(self, model_dir: Path, manifest_path: Path) -> None:
+        override = _test_hooks.download_remote_override
+        if override is not None:
+            override(model_dir, manifest_path)
+            return
         # Load raw JSON and detect v2 with file_id
         try:
             raw_text = manifest_path.read_text(encoding="utf-8")
@@ -184,7 +195,7 @@ class InferenceEngine:
         api_key = str(app.get("data_bank_api_key", ""))
         if api_url.strip() == "" or api_key.strip() == "":
             raise RuntimeError("missing data-bank-api configuration for remote download")
-        store = ArtifactStore(api_url, api_key)
+        store = _test_hooks.artifact_store_factory(api_url, api_key)
         expected_root = model_dir.name
         store.download_artifact(
             file_id_val,
@@ -210,10 +221,10 @@ class InferenceEngine:
             return False
 
         # Avoid reading while writer is updating the manifest: require stable size.
-        size1 = manifest_path.stat().st_size
+        size1 = _test_hooks.path_stat(manifest_path).st_size
         if size1 <= 0:
             return False
-        size2 = manifest_path.stat().st_size
+        size2 = _test_hooks.path_stat(manifest_path).st_size
         if size2 != size1:
             return False
 
@@ -240,7 +251,7 @@ class LoadStateResult(NamedTuple):
 class TorchModel(Protocol):
     def eval(self) -> Self: ...
     def __call__(self, x: Tensor) -> Tensor: ...
-    def load_state_dict(self, sd: dict[str, Tensor]) -> LoadStateResult: ...
+    def load_state_dict(self, sd: dict[str, Tensor]) -> _test_hooks.LoadStateResultProtocol: ...
     def train(self, mode: bool = True) -> Self: ...
     def state_dict(self) -> dict[str, Tensor]: ...
     def parameters(self) -> Sequence[torch.nn.Parameter]: ...
@@ -328,11 +339,9 @@ class _ResNet18Builder(Protocol):
 
 
 def _build_model(arch: str, n_classes: int) -> TorchModel:
-    import importlib
-
     import torch.nn as nn
 
-    models_mod: _ModelsModule = importlib.import_module("torchvision.models")
+    models_mod: _ModelsModule = _test_hooks.import_module("torchvision.models")
     resnet_attr = models_mod.resnet18
     if not callable(resnet_attr):
         raise RuntimeError(f"torchvision.models.{arch} is not callable")
@@ -354,7 +363,7 @@ def _build_model(arch: str, n_classes: int) -> TorchModel:
 
 
 def build_fresh_state_dict(arch: str, n_classes: int) -> dict[str, Tensor]:
-    m = _build_model(arch=arch, n_classes=n_classes)
+    m = _test_hooks.build_model(arch=arch, n_classes=n_classes)
     sd_obj = m.state_dict()
     if not isinstance(sd_obj, dict):
         raise RuntimeError("state_dict() did not return a dict")
@@ -434,13 +443,13 @@ class _TorchLoadFn(Protocol):
 def _is_wrapped_state_dict(
     value: LoadedStateDict | WrappedStateDict,
 ) -> TypeGuard[WrappedStateDict]:
-    return set(value.keys()) == {"state_dict"}
+    return _test_hooks.is_wrapped_state_dict(value)
 
 
 def _is_flat_state_dict(
     value: LoadedStateDict | WrappedStateDict,
 ) -> TypeGuard[LoadedStateDict]:
-    return not _is_wrapped_state_dict(value)
+    return _test_hooks.is_flat_state_dict(value)
 
 
 def _load_state_dict_file(path: Path) -> dict[str, Tensor]:
@@ -509,9 +518,9 @@ def _collect_artifact_mtimes(manifest_path: Path, model_path: Path) -> tuple[flo
     last_m1: float | None = None
     last_m2: float | None = None
     for _ in range(16):
-        last_m1 = manifest_path.stat().st_mtime
-        last_m2 = model_path.stat().st_mtime
+        last_m1 = _test_hooks.path_stat(manifest_path).st_mtime
+        last_m2 = _test_hooks.path_stat(model_path).st_mtime
     return (
-        last_m1 if last_m1 is not None else manifest_path.stat().st_mtime,
-        last_m2 if last_m2 is not None else model_path.stat().st_mtime,
+        last_m1 if last_m1 is not None else _test_hooks.path_stat(manifest_path).st_mtime,
+        last_m2 if last_m2 is not None else _test_hooks.path_stat(model_path).st_mtime,
     )

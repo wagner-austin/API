@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-from typing import TypedDict
-
 import torch
 
+from handwriting_ai import _test_hooks
+
 from .dataset import DataLoaderConfig
-from .resources import ResourceLimits, detect_resource_limits
+from .resources import ResourceLimits
 from .train_config import TrainConfig
 
-
-class EffectiveConfig(TypedDict):
-    intra_threads: int
-    interop_threads: int | None
-    batch_size: int
-    loader_cfg: DataLoaderConfig
+# EffectiveConfig is now an alias to the canonical _test_hooks.EffectiveConfigDict
+# to avoid duplication and ensure consistent types across the codebase.
+EffectiveConfig = _test_hooks.EffectiveConfigDict
 
 
-def build_effective_config(cfg: TrainConfig) -> tuple[EffectiveConfig, ResourceLimits]:
-    limits = detect_resource_limits()
+def build_effective_config(
+    cfg: TrainConfig,
+) -> tuple[_test_hooks.EffectiveConfigDict, ResourceLimits]:
+    limits = _test_hooks.detect_resource_limits()
     eff_threads = int(cfg["threads"]) if int(cfg["threads"]) > 0 else int(limits["optimal_threads"])
     # Clamp threads further under low-memory conditions to reduce allocator pressure
     mem_b = limits["memory_bytes"]
@@ -54,7 +53,7 @@ def build_effective_config(cfg: TrainConfig) -> tuple[EffectiveConfig, ResourceL
     }, limits
 
 
-def apply_threads(ec: EffectiveConfig) -> None:
+def apply_threads(ec: _test_hooks.EffectiveConfigDict) -> None:
     # Apply intra-op threads post-calibration; interop is set once before any parallel work
     torch.set_num_threads(int(ec["intra_threads"]))
 
@@ -64,5 +63,4 @@ __all__ = [
     "ResourceLimits",
     "apply_threads",
     "build_effective_config",
-    "detect_resource_limits",
 ]

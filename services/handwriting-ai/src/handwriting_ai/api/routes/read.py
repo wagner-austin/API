@@ -16,9 +16,10 @@ from platform_core.logging import get_logger
 from platform_core.security import ApiKeyCheckFn
 from starlette.datastructures import FormData
 
+from ... import _test_hooks
 from ...config import Limits, Settings
 from ...inference.engine import InferenceEngine
-from ...preprocess import PreprocessOptions, run_preprocess
+from ...preprocess import PreprocessOptions
 from ..schemas import PredictResponse
 
 # Non-recursive JSON value type for flat API responses
@@ -71,7 +72,7 @@ def _strict_validate_multipart(form: FormData) -> None:
 
 def _open_image_bytes(raw: bytes) -> Image.Image:
     try:
-        return Image.open(io.BytesIO(raw))
+        return _test_hooks.pil_image_open(io.BytesIO(raw))
     except UnidentifiedImageError:
         raise AppError(
             HandwritingErrorCode.invalid_image,
@@ -151,7 +152,7 @@ def build_router(
         }
 
         t0 = time.perf_counter()
-        pre = run_preprocess(img, opts)
+        pre = _test_hooks.run_preprocess(img, opts)
 
         from concurrent.futures import TimeoutError as _FutTimeout
 

@@ -4,10 +4,7 @@ from typing import TypedDict
 
 from platform_core.logging import get_logger
 
-from handwriting_ai.monitoring import (
-    check_memory_pressure,
-    get_memory_snapshot,
-)
+from handwriting_ai import _test_hooks
 
 from .memory_diagnostics import record_batch_memory
 
@@ -91,7 +88,7 @@ def on_batch_check() -> bool:
     global _last_warning_pct
     if not _cfg["enabled"]:
         return False
-    snap = get_memory_snapshot()
+    snap = _test_hooks.get_memory_snapshot()
     # Track diagnostics using the already captured snapshot to avoid duplicate sampling
     record_batch_memory(snapshot=snap)
     pct = snap["cgroup_usage"]["percent"]
@@ -122,7 +119,7 @@ def on_batch_check() -> bool:
         )
     # Enforce based on configured threshold irrespective of cgroup availability.
     # Monitoring.check_memory_pressure already adapts to cgroup or system metrics.
-    pressed = check_memory_pressure(threshold_percent=thr)
+    pressed = _test_hooks.check_memory_pressure(threshold_percent=thr)
     if pressed:
         _consecutive += 1
         req = int(_cfg["required_consecutive"])

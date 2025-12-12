@@ -2,22 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from platform_core.logging import get_logger
-
-from handwriting_ai.monitoring import get_memory_snapshot
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.dataset import AugmentConfig, DataLoaderConfig
 from handwriting_ai.training.resources import ResourceLimits
-from handwriting_ai.training.runtime import EffectiveConfig
 
 from .cache import _read_cache, _valid_cache, _write_cache
 from .candidates import _generate_candidates
 from .ds_spec import PreprocessSpec
 from .measure import CalibrationResult
-from .orchestrator import Orchestrator
 from .runner import BudgetConfig, SubprocessRunner
 from .signature import make_signature as _make_signature
 
-_LOGGER = get_logger("handwriting_ai.calibration")
+
+def _get_logger() -> _test_hooks.LoggerInstanceProtocol:
+    return _test_hooks.get_logger("handwriting_ai.calibration")
 
 
 class CalibrationError(RuntimeError):
@@ -26,7 +24,7 @@ class CalibrationError(RuntimeError):
     pass
 
 
-def _result_to_effective(res: CalibrationResult) -> EffectiveConfig:
+def _result_to_effective(res: CalibrationResult) -> _test_hooks.EffectiveConfigDict:
     loader_cfg = DataLoaderConfig(
         batch_size=res["batch_size"],
         num_workers=res["num_workers"],
@@ -51,8 +49,8 @@ def calibrate_input_pipeline(
     cache_path: Path,
     ttl_seconds: int,
     force: bool,
-) -> EffectiveConfig:
-    log = _LOGGER
+) -> _test_hooks.EffectiveConfigDict:
+    log = _get_logger()
     sig = _make_signature(limits)
     if not force:
         cached = _valid_cache(sig, _read_cache(cache_path), ttl_seconds)
@@ -76,7 +74,7 @@ def calibrate_input_pipeline(
 
     # Compute budgets based on observed environment and thresholds (subprocess-only)
     # Use current snapshot for start gate; use conservative aborts for <1GB tiers
-    snap = get_memory_snapshot()
+    snap = _test_hooks.get_memory_snapshot()
     mem_limit_mb = snap["cgroup_usage"]["limit_bytes"] // (1024 * 1024)
     stage_a_budget: BudgetConfig
     stage_b_budget: BudgetConfig
@@ -111,7 +109,7 @@ def calibrate_input_pipeline(
     log.info("calibration_stage_a_start candidates=%d samples=%d", len(cands), samples)
     runner = SubprocessRunner()
     ckpt_path = cache_path.with_suffix(".ckpt.json")
-    orch = Orchestrator(
+    orch = _test_hooks.orchestrator_factory(
         runner=runner,
         config={
             "stage_a_budget": stage_a_budget,

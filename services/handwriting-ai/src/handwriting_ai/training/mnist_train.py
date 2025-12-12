@@ -12,9 +12,9 @@ from torch.optim.lr_scheduler import LRScheduler
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader, Dataset
 
-from handwriting_ai.monitoring import log_memory_snapshot, log_system_info
+from handwriting_ai import _test_hooks
+from handwriting_ai.monitoring import log_memory_snapshot
 
-from .calibrate import calibrate_input_pipeline
 from .calibration.ds_spec import AugmentSpec, MNISTSpec, PreprocessSpec
 from .dataset import MNISTLike
 from .dataset import make_loaders as _make_loaders_impl
@@ -119,8 +119,8 @@ def _run_training_loop(
 
 def _configure_interop_threads(interp_threads: int | None) -> None:
     # Helper must propagate RuntimeError for tests that validate raising
-    if hasattr(torch, "set_num_interop_threads") and interp_threads is not None:
-        torch.set_num_interop_threads(int(interp_threads))
+    if _test_hooks.torch_has_set_num_interop_threads() and interp_threads is not None:
+        _test_hooks.torch_set_interop_threads(int(interp_threads))
 
 
 def make_loaders(
@@ -153,9 +153,7 @@ def _train_epoch(
     ep_total: int,
     total_batches: int,
 ) -> float:
-    from .loops import train_epoch as _te
-
-    return _te(
+    return _test_hooks.train_epoch(
         model,
         train_loader,
         device,
@@ -176,7 +174,7 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
         extra_fields=None,
     )
     # Surface system info at training start for diagnostics
-    log_system_info()
+    _test_hooks.log_system_info()
     log = get_logger("handwriting_ai")
     _set_seed(cfg["seed"])
     device = torch.device(cfg["device"])
@@ -202,7 +200,7 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
     ttl_s = 7 * 24 * 60 * 60
     # Build explicit dataset spec for calibration (no dataset pickling across processes)
     ds_spec = _build_calibration_spec(cfg)
-    ec = calibrate_input_pipeline(
+    ec = _test_hooks.calibrate_input_pipeline(
         ds_spec,
         limits=limits,
         requested_batch_size=int(ec["batch_size"]),
@@ -218,7 +216,9 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
         # Log threading and device configuration
         intra = torch.get_num_threads()
         interop = (
-            torch.get_num_interop_threads() if hasattr(torch, "get_num_interop_threads") else None
+            _test_hooks.torch_get_num_interop_threads()
+            if _test_hooks.torch_has_get_num_interop_threads()
+            else None
         )
         if interop is not None:
             log.info(
@@ -243,9 +243,7 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
             train_base, test_base, cfg, loader_cfg
         )
         # Limit OpenMP/BLAS thread pools alongside ATen threads
-        from handwriting_ai.training.threadpool import limit_thread_pools
-
-        with limit_thread_pools(limits=ec["intra_threads"]):
+        with _test_hooks.limit_thread_pools(limits=ec["intra_threads"]):
             model = _build_model()
             log.info("model_built_starting_training")
             opt, sch = _build_optimizer_and_scheduler(model, cfg)

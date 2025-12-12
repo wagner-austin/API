@@ -116,12 +116,12 @@ def torch_allocator_stats() -> tuple[bool, int, int, int]:
     Values are bytes; when CUDA is unavailable or on CPU-only builds, returns
     (False, 0, 0, 0). Safe across environments.
     """
-    torch_mod: _TorchModule = __import__("torch")
-    cuda: _CudaModule = torch_mod.cuda
-    if not cuda.is_available():
+    from handwriting_ai import _test_hooks
+
+    if not _test_hooks.torch_cuda_is_available():
         return False, 0, 0, 0
-    dev: int = cuda.current_device()
-    allocated = int(cuda.memory_allocated(dev))
-    reserved = int(cuda.memory_reserved(dev))
-    max_alloc = int(cuda.max_memory_allocated(dev))
+    dev: int = _test_hooks.torch_cuda_current_device()
+    allocated = int(_test_hooks.torch_cuda_memory_allocated(dev))
+    reserved = int(_test_hooks.torch_cuda_memory_reserved(dev))
+    max_alloc = int(_test_hooks.torch_cuda_max_memory_allocated(dev))
     return True, allocated, reserved, max_alloc

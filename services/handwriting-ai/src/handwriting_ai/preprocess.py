@@ -10,6 +10,11 @@ import torch
 from PIL import Image, ImageOps
 from platform_core.errors import AppError, HandwritingErrorCode, handwriting_status_for
 
+# Import _test_hooks for dependency injection. The hooks allow tests to inject
+# fakes for PIL functions like exif_transpose, histogram, and principal_angle.
+# Note: _test_hooks imports from this module only inside functions (default
+# implementations), not at module level, so this does not create a circular import.
+from . import _test_hooks
 from .inference.types import PreprocessOutput
 
 _MNIST_MEAN: Final[float] = 0.1307
@@ -61,7 +66,7 @@ def preprocess_signature() -> str:
 
 
 def _load_to_grayscale(img: Image.Image) -> Image.Image:
-    tmp = ImageOps.exif_transpose(img)
+    tmp = _test_hooks.exif_transpose(img)
     if tmp is None:
         code = HandwritingErrorCode.invalid_image
         raise AppError(code, "EXIF transpose failed", handwriting_status_for(code))
@@ -78,7 +83,7 @@ def _load_to_grayscale(img: Image.Image) -> Image.Image:
 
 
 def _estimate_background_is_dark(gray: Image.Image) -> bool:
-    hist = gray.histogram()
+    hist = _test_hooks.pil_histogram(gray)
     total = sum(hist)
     if total == 0:
         return False
@@ -89,7 +94,7 @@ def _estimate_background_is_dark(gray: Image.Image) -> bool:
 
 
 def _otsu_binarize(gray: Image.Image) -> Image.Image:
-    hist = gray.histogram()
+    hist = _test_hooks.pil_histogram(gray)
     total = sum(hist)
     sum_total = sum(i * hist[i] for i in range(256))
     sum_b = 0
@@ -111,6 +116,10 @@ def _otsu_binarize(gray: Image.Image) -> Image.Image:
             threshold = t
     # binary image
     return gray.point(lambda p: 255 if p > threshold else 0, mode="L")
+
+
+# Set the hook for _center_on_square to use
+_test_hooks.otsu_binarize = _otsu_binarize
 
 
 def _largest_component_crop(bw: Image.Image) -> Image.Image:
@@ -182,7 +191,7 @@ def _component_bbox_bytes(
 
 def _deskew_if_needed(img: Image.Image) -> Image.Image:
     width, height = img.size
-    ac = _principal_angle_confidence(img, width, height)
+    ac = _test_hooks.principal_angle_confidence(img, width, height)
     if ac is None:
         return img
     angle_deg, conf = ac
@@ -265,7 +274,7 @@ def _principal_angle_confidence(
 
 
 def _center_on_square(img: Image.Image) -> Image.Image:
-    bw = _otsu_binarize(img)
+    bw = _test_hooks.otsu_binarize(img)
     pix = bw.load()
     if pix is None:
         return img

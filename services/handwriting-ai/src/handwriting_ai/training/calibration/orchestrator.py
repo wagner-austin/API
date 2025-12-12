@@ -3,12 +3,11 @@ from __future__ import annotations
 import gc as _gc
 import time as _time
 from collections.abc import Sequence
-from pathlib import Path
-from typing import TypedDict
 
 from platform_core.logging import get_logger
 
-from handwriting_ai.monitoring import get_memory_snapshot, is_cgroup_available
+from handwriting_ai import _test_hooks
+from handwriting_ai.training.calibration._types import OrchestratorConfigDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.checkpoint import (
     CalibrationStage,
@@ -22,13 +21,10 @@ from handwriting_ai.training.calibration.runner import (
     CandidateOutcome,
     CandidateRunner,
 )
-from handwriting_ai.training.dataset import PreprocessDataset
 
-
-class OrchestratorConfig(TypedDict):
-    stage_a_budget: BudgetConfig
-    stage_b_budget: BudgetConfig
-    checkpoint_path: Path
+# OrchestratorConfig is imported from _types to avoid circular imports.
+# Re-export for backwards compatibility.
+OrchestratorConfig = OrchestratorConfigDict
 
 
 class Orchestrator:
@@ -42,14 +38,14 @@ class Orchestrator:
         # available (container environments). In non-cgroup environments,
         # system-wide memory utilization can be high and noisy; allow
         # calibration to proceed to avoid false aborts.
-        if not is_cgroup_available():
+        if not _test_hooks.is_cgroup_available():
             return True
-        snap = get_memory_snapshot()
+        snap = _test_hooks.get_memory_snapshot()
         return float(snap["cgroup_usage"]["percent"]) <= float(start_pct_max)
 
     def _gc_and_log(self, stage: str, idx: int) -> None:
         _gc.collect()
-        snap = get_memory_snapshot()
+        snap = _test_hooks.get_memory_snapshot()
         mem_pct = float(snap["cgroup_usage"]["percent"])
         main_mb = snap["main_process"]["rss_bytes"] // (1024 * 1024)
         workers_mb = sum(w["rss_bytes"] for w in snap["workers"]) // (1024 * 1024)
@@ -79,7 +75,7 @@ class Orchestrator:
     def _run_stage(
         self,
         stage: CalibrationStage,
-        ds: PreprocessDataset | PreprocessSpec,
+        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
         items: Sequence[Candidate],
         samples: int,
         budget: BudgetConfig,
@@ -188,7 +184,10 @@ class Orchestrator:
         return results
 
     def run_stage_a(
-        self, ds: PreprocessDataset | PreprocessSpec, cands: list[Candidate], samples: int
+        self,
+        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
+        cands: list[Candidate],
+        samples: int,
     ) -> list[CalibrationResult]:
         # Attempt resume
         ckpt = read_checkpoint(self._cfg["checkpoint_path"])
@@ -209,7 +208,7 @@ class Orchestrator:
 
     def run_stage_b(
         self,
-        ds: PreprocessDataset | PreprocessSpec,
+        ds: _test_hooks.PreprocessDatasetProtocol | PreprocessSpec,
         shortlist: list[CalibrationResult],
         samples: int,
     ) -> list[CalibrationResult]:

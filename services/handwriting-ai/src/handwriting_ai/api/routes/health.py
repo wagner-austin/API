@@ -6,8 +6,9 @@ from fastapi import APIRouter, Response
 from platform_core.config import _require_env_str
 from platform_core.health import HealthResponse, ReadyResponse, healthz
 from platform_workers.health import readyz_redis_with_workers
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.redis import RedisStrProto
 
+from ... import _test_hooks
 from ...inference.engine import InferenceEngine
 
 
@@ -21,7 +22,7 @@ def build_router(engine: InferenceEngine) -> APIRouter:
     async def _readyz(response: Response) -> ReadyResponse:
         # First verify Redis connectivity and worker presence
         redis_url = _require_env_str("REDIS_URL")
-        client: RedisStrProto = redis_for_kv(redis_url)
+        client: RedisStrProto = _test_hooks.redis_factory(redis_url)
         try:
             redis_status = readyz_redis_with_workers(client)
         finally:

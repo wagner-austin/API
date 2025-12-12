@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import random
 from typing import Final
 
 from PIL import Image, ImageFilter, ImageOps
+
+from handwriting_ai import _test_hooks
 
 _MODE_L: Final[str] = "L"
 
@@ -17,11 +18,11 @@ def ensure_l_mode(img: Image.Image) -> Image.Image:
 def apply_affine(img: Image.Image, deg_max: float, tx_frac: float) -> Image.Image:
     d = max(0.0, float(deg_max))
     t = max(0.0, min(0.5, float(tx_frac)))
-    angle = random.uniform(-d, d)
+    angle = _test_hooks.random_uniform(-d, d)
     dx = round(t * img.width)
     dy = round(t * img.height)
-    tx = random.randint(-dx, dx)
-    ty = random.randint(-dy, dy)
+    tx = _test_hooks.random_randint(-dx, dx)
+    ty = _test_hooks.random_randint(-dy, dy)
     rotated = img.rotate(angle, resample=Image.Resampling.BILINEAR, fillcolor=0)
     translated = Image.new(_MODE_L, rotated.size, 0)
     translated.paste(rotated, (tx, ty))
@@ -40,9 +41,9 @@ def maybe_add_noise(img: Image.Image, prob: float, salt_vs_pepper: float) -> Ima
     assert pix is not None
     for y in range(h):
         for x in range(w):
-            if random.random() < p:
+            if _test_hooks.random_random() < p:
                 # salt (white) vs pepper (black)
-                v = 255 if random.random() < sp else 0
+                v = 255 if _test_hooks.random_random() < sp else 0
                 pix[x, y] = int(v)
     return out
 
@@ -56,13 +57,13 @@ def maybe_add_dots(img: Image.Image, prob: float, count: int, size_px: int) -> I
     out = g.copy()
     pix = out.load()
     assert pix is not None
-    if random.random() >= p:
+    if _test_hooks.random_random() >= p:
         return out
     s = int(size_px)
     for _ in range(int(count)):
-        cx = random.randint(0, max(0, w - 1))
-        cy = random.randint(0, max(0, h - 1))
-        val = 0 if random.random() < 0.5 else 255
+        cx = _test_hooks.random_randint(0, max(0, w - 1))
+        cy = _test_hooks.random_randint(0, max(0, h - 1))
+        val = 0 if _test_hooks.random_random() < 0.5 else 255
         for dy in range(s):
             for dx in range(s):
                 x = cx + dx

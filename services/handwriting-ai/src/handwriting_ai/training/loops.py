@@ -4,16 +4,14 @@ from typing import Protocol
 
 import torch
 import torch.nn.functional as functional
-from platform_core.logging import get_logger
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
-from handwriting_ai.monitoring import check_memory_pressure, get_memory_snapshot
+from handwriting_ai import _test_hooks
 
 from .memory_diagnostics import log_memory_diagnostics
-from .progress import emit_batch as _emit_batch
-from .safety import get_memory_guard_config, on_batch_check
+from .safety import get_memory_guard_config
 from .train_utils import bytes_of_model_and_grads, torch_allocator_stats
 
 
@@ -59,7 +57,7 @@ def train_epoch(
 ) -> float:
     import time as _time
 
-    log = get_logger("handwriting_ai")
+    log = _test_hooks.get_logger("handwriting_ai")
     model.train()
     total = 0
     loss_sum = 0.0
@@ -77,7 +75,7 @@ def train_epoch(
         torch.autograd.backward((loss,))
         optimizer.step()
         # Proactive memory guard: check every batch (not only on log cadence)
-        if on_batch_check():
+        if _test_hooks.on_batch_check():
             log.info("mem_guard_abort e=%s b=%s", ep, (batch_idx + 1))
             raise RuntimeError("memory_pressure_guard_triggered")
         total += y.size(0)
@@ -93,10 +91,10 @@ def train_epoch(
                 batch_acc = float((preds == y).float().mean().item())
             dt = _time.perf_counter() - t0
             ips = (int(y.size(0)) / dt) if dt > 0 else 0.0
-            snap = get_memory_snapshot()
+            snap = _test_hooks.get_memory_snapshot()
             _mg = get_memory_guard_config()
             thr = float(_mg["threshold_percent"])
-            pressed = check_memory_pressure(threshold_percent=thr)
+            pressed = _test_hooks.check_memory_pressure(threshold_percent=thr)
             press = "true" if pressed else "false"
 
             # Model and gradient memory
@@ -134,7 +132,7 @@ def train_epoch(
             )
             # Supplementary diagnostics for trend and prediction using the same snapshot
             log_memory_diagnostics(context="train_batch", snapshot=snap)
-            _emit_batch(
+            _test_hooks.emit_batch(
                 {
                     "epoch": ep,
                     "total_epochs": ep_total,

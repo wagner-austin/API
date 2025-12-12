@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from types import ModuleType
 from typing import Final, Literal, TypedDict
 
 from platform_core.config import _optional_env_str
@@ -21,11 +20,12 @@ from platform_core.job_events import JobDomain, default_events_channel
 from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import DIGITS_QUEUE as _DIGITS_QUEUE
-from platform_workers.job_context import JobContext, make_job_context
-from platform_workers.redis import RedisStrProto, redis_for_kv
+from platform_workers.job_context import JobContext
+from platform_workers.redis import RedisStrProto
 from platform_workers.rq_harness import get_current_job
 
-from handwriting_ai.config import Settings, load_settings
+from handwriting_ai import _test_hooks
+from handwriting_ai.config import Settings
 from handwriting_ai.training.dataset import load_mnist_dataset
 from handwriting_ai.training.metrics import BatchMetrics
 from handwriting_ai.training.mnist_train import (
@@ -34,8 +34,6 @@ from handwriting_ai.training.mnist_train import (
     train_with_config,
 )
 from handwriting_ai.training.progress import BatchProgressEmitter, BestEmitter, EpochEmitter
-from handwriting_ai.training.runtime import detect_resource_limits
-from handwriting_ai.training.safety import get_memory_guard_config as _get_mg_cfg
 
 _DIGITS_DOMAIN: JobDomain = "digits"
 DEFAULT_EVENTS_CHANNEL: Final[str] = default_events_channel(_DIGITS_DOMAIN)
@@ -60,7 +58,9 @@ def _get_env(name: str, default: str) -> str:
 
 
 def _load_settings() -> Settings:
-    return load_settings()
+    from handwriting_ai import _test_hooks
+
+    return _test_hooks.load_settings()
 
 
 def _build_cfg(payload: DigitsTrainJobV1) -> TrainConfig:
@@ -106,6 +106,13 @@ def _build_cfg(payload: DigitsTrainJobV1) -> TrainConfig:
 
 
 def _run_training(cfg: TrainConfig) -> TrainingResult:
+    from handwriting_ai import _test_hooks
+
+    return _test_hooks.run_training(cfg)
+
+
+def _run_training_impl(cfg: TrainConfig) -> TrainingResult:
+    """Real implementation of training."""
     train_ds = load_mnist_dataset(cfg["data_root"], train=True)
     test_ds = load_mnist_dataset(cfg["data_root"], train=False)
     return train_with_config(cfg, (train_ds, test_ds))
@@ -113,7 +120,7 @@ def _run_training(cfg: TrainConfig) -> TrainingResult:
 
 def _summarize_training_exception(exc: BaseException) -> str:
     if isinstance(exc, RuntimeError) and str(exc) == "memory_pressure_guard_triggered":
-        mg = _get_mg_cfg()
+        mg = _test_hooks.get_memory_guard_config()
         thr = float(mg["threshold_percent"])
         return (
             f"Training aborted due to sustained memory pressure (>= {thr:.1f}%). "
@@ -166,7 +173,7 @@ def _decode_payload(payload: dict[str, JSONValue]) -> DigitsTrainJobV1:
 
 
 def _build_config_event(p: DigitsTrainJobV1, cfg: TrainConfig, queue: str) -> DigitsMetricsEventV1:
-    _limits = detect_resource_limits()
+    _limits = _test_hooks.detect_resource_limits()
     _mem_mb = (
         int(_limits["memory_bytes"] // (1024 * 1024))
         if isinstance(_limits["memory_bytes"], int)
@@ -267,12 +274,12 @@ def _decode_and_process_train_job(payload: dict[str, JSONValue]) -> None:
     redis_url = _optional_env_str("REDIS_URL")
     if not redis_url:
         raise RuntimeError("REDIS_URL not configured")
-    redis_client: RedisStrProto = redis_for_kv(redis_url)
+    redis_client: RedisStrProto = _test_hooks.redis_factory(redis_url)
 
     job_ctx: JobContext | None = None
-    training_progress_module: ModuleType | None = None
+    training_progress_module: _test_hooks.TrainingProgressModuleProtocol | None = None
     try:
-        job_ctx = make_job_context(
+        job_ctx = _test_hooks.make_job_context(
             redis=redis_client,
             domain=_DIGITS_DOMAIN,
             events_channel=default_events_channel(_DIGITS_DOMAIN),
@@ -283,7 +290,7 @@ def _decode_and_process_train_job(payload: dict[str, JSONValue]) -> None:
         if job_ctx is None:
             raise RuntimeError("JobContext could not be created")
 
-        from handwriting_ai.training import progress as training_progress
+        training_progress = _test_hooks.get_training_progress_module()
 
         if training_progress is None:
             raise RuntimeError("training progress module not available")
@@ -346,7 +353,6 @@ def _upload_and_finalize(
     from datetime import UTC, datetime
 
     from platform_core.json_utils import dump_json_str
-    from platform_ml import ArtifactStore
     from platform_ml.manifest import ModelManifestV2
 
     from handwriting_ai.config import MNIST_N_CLASSES
@@ -384,7 +390,7 @@ def _upload_and_finalize(
         },
     }
 
-    store = ArtifactStore(api_url, api_key)
+    store = _test_hooks.artifact_store_factory(api_url, api_key)
     resp = store.upload_artifact(
         model_dir, artifact_name=result["model_id"], request_id=p["request_id"]
     )

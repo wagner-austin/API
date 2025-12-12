@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Final, TypedDict
+from typing import TypedDict
 
 from platform_core.logging import get_logger
+
+from handwriting_ai import _test_hooks
 
 
 class ResourceLimits(TypedDict):
@@ -14,21 +15,8 @@ class ResourceLimits(TypedDict):
     max_batch_size: int | None
 
 
-_CGROUP_CPU_MAX: Final[Path] = Path("/sys/fs/cgroup/cpu.max")
-_CGROUP_MEM_MAX: Final[Path] = Path("/sys/fs/cgroup/memory.max")
-
-
-def _read_text_file(path: Path) -> str:
-    """Strict text read for resource files.
-
-    Callers must check file existence before calling. All OSErrors are
-    propagated to ensure strong error signaling at the right layer.
-    """
-    return path.read_text(encoding="utf-8").strip()
-
-
 def _detect_cpu_cores() -> int:
-    cpu_max = _read_text_file(_CGROUP_CPU_MAX)
+    cpu_max = _test_hooks.read_text_file(_test_hooks.cgroup_cpu_max)
     if cpu_max and cpu_max != "max":
         parts = cpu_max.split()
         if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
@@ -36,13 +24,11 @@ def _detect_cpu_cores() -> int:
             period = int(parts[1]) or 100_000
             if quota > 0 and period > 0:
                 return max(1, quota // period)
-    import os
-
-    return max(1, os.cpu_count() or 1)
+    return max(1, _test_hooks.os_cpu_count() or 1)
 
 
 def _detect_memory_limit_bytes() -> int | None:
-    mem_max = _read_text_file(_CGROUP_MEM_MAX)
+    mem_max = _test_hooks.read_text_file(_test_hooks.cgroup_mem_max)
     if mem_max and mem_max.isdigit():
         val = int(mem_max)
         return None if val <= 0 else val
@@ -93,15 +79,10 @@ def _compute_optimal_workers(cores: int, memory_bytes: int | None) -> int:
 
 def detect_resource_limits() -> ResourceLimits:
     # Existence-gated reads to avoid invalid I/O on non-container systems
-    has_cpu_cg = _CGROUP_CPU_MAX.exists()
-    has_mem_cg = _CGROUP_MEM_MAX.exists()
+    has_cpu_cg = _test_hooks.cgroup_cpu_max.exists()
+    has_mem_cg = _test_hooks.cgroup_mem_max.exists()
 
-    if has_cpu_cg:
-        cpu_cores = _detect_cpu_cores()
-    else:
-        import os as _os
-
-        cpu_cores = max(1, _os.cpu_count() or 1)
+    cpu_cores = _detect_cpu_cores() if has_cpu_cg else max(1, _test_hooks.os_cpu_count() or 1)
 
     mem_bytes = _detect_memory_limit_bytes() if has_mem_cg else None
     optimal_threads = _compute_optimal_threads(cpu_cores)
