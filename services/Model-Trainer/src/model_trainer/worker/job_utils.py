@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
+from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_metrics_events import (
@@ -35,7 +36,7 @@ from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.core.services.tokenizer.spm_backend import SentencePieceBackend
 
-EVENTS_CHANNEL = "trainer:events"
+EVENTS_CHANNEL = default_events_channel("trainer")
 
 
 def redis_client(settings: Settings) -> RedisStrProto:
