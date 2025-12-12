@@ -2,7 +2,7 @@
 
 Complete API documentation for the handwriting-ai digit recognition service.
 
-**Base URL:** `http://localhost:8081` (default)
+**Base URL:** `http://localhost:8000` (default)
 
 ---
 
@@ -129,7 +129,7 @@ Classify a handwritten digit image.
 
 **Example - curl:**
 ```bash
-curl -X POST http://localhost:8081/v1/read \
+curl -X POST http://localhost:8000/v1/read \
   -H "X-Api-Key: your-api-key" \
   -F "file=@digit.png;type=image/png" \
   -F "center=true" \
@@ -142,7 +142,7 @@ import httpx
 
 with open("digit.png", "rb") as f:
     response = httpx.post(
-        "http://localhost:8081/v1/read",
+        "http://localhost:8000/v1/read",
         headers={"X-Api-Key": "your-api-key"},
         files={"file": ("digit.png", f, "image/png")},
         data={"center": "true", "visualize": "false"},
@@ -159,7 +159,7 @@ import base64
 import httpx
 
 response = httpx.post(
-    "http://localhost:8081/v1/read",
+    "http://localhost:8000/v1/read",
     files={"file": ("digit.png", open("digit.png", "rb"), "image/png")},
     data={"visualize": "true"},
 )
@@ -207,7 +207,7 @@ Upload a new model to the service.
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8081/v1/admin/models/upload \
+curl -X POST http://localhost:8000/v1/admin/models/upload \
   -H "X-Api-Key: your-api-key" \
   -F "model_id=mnist_resnet18_v2" \
   -F "activate=true" \
@@ -287,7 +287,7 @@ Enqueue a new model training job for background processing.
 
 **Example - curl:**
 ```bash
-curl -X POST http://localhost:8081/api/v1/training/jobs \
+curl -X POST http://localhost:8000/api/v1/training/jobs \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -374,13 +374,14 @@ SECURITY__API_KEY=your-secret-key
 
 **Send API key:**
 ```bash
-curl -H "X-Api-Key: your-secret-key" http://localhost:8081/v1/read ...
+curl -H "X-Api-Key: your-secret-key" http://localhost:8000/v1/read ...
 ```
 
 **Protected endpoints:**
 - `POST /v1/read`
 - `POST /v1/predict`
 - `POST /v1/admin/models/upload`
+- `POST /api/v1/training/jobs`
 
 **Unprotected endpoints:**
 - `GET /healthz`
@@ -393,10 +394,11 @@ curl -H "X-Api-Key: your-secret-key" http://localhost:8081/v1/read ...
 
 | Constraint | Default | Environment Variable |
 |------------|---------|---------------------|
-| Max image size | 2 MB | `DIGITS__MAX_IMAGE_MB` |
-| Max image dimension | 1024 px | `DIGITS__MAX_IMAGE_SIDE_PX` |
+| Max image size | 10 MB | `DIGITS__MAX_IMAGE_MB` |
+| Max image dimension | 2048 px | `DIGITS__MAX_IMAGE_SIDE_PX` |
 | Prediction timeout | 5 seconds | `DIGITS__PREDICT_TIMEOUT_SECONDS` |
-| Uncertainty threshold | 0.85 | `DIGITS__UNCERTAIN_THRESHOLD` |
+| Uncertainty threshold | 0.7 | `DIGITS__UNCERTAIN_THRESHOLD` |
+| Max visualization size | 64 KB | `DIGITS__VISUALIZE_MAX_KB` |
 
 ---
 

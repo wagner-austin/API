@@ -31,20 +31,20 @@ poetry install --with dev
 
 ```bash
 # Development
-poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind 0.0.0.0:8081 --reload
+poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind 0.0.0.0:8000 --reload
 
 # Production
-poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind [::]:${PORT:-8081}
+poetry run hypercorn 'handwriting_ai.api.main:create_app()' --bind [::]:${PORT:-8000}
 ```
 
 ### Verify
 
 ```bash
-curl http://localhost:8081/healthz
+curl http://localhost:8000/healthz
 # {"status": "ok"}
 
-curl http://localhost:8081/readyz
-# {"status": "ready", "model_loaded": true, "model_id": "mnist_resnet18_v1", ...}
+curl http://localhost:8000/readyz
+# {"status": "ready", "reason": null}
 ```
 
 ## API Reference
@@ -77,17 +77,18 @@ data_root = "/data"
 artifacts_root = "/data/artifacts"
 logs_root = "/data/logs"
 threads = 0                    # 0 = auto-detect
-port = 8081
+port = 8000
 
 [digits]
 model_dir = "/data/digits/models"
 active_model = "mnist_resnet18_v1"
 tta = false                    # Test-time augmentation
-uncertain_threshold = 0.85     # Flag as uncertain below this
-max_image_mb = 2               # Max upload size
-max_image_side_px = 1024       # Max dimension
+uncertain_threshold = 0.7      # Flag as uncertain below this
+max_image_mb = 10              # Max upload size
+max_image_side_px = 2048       # Max dimension
 predict_timeout_seconds = 5    # Inference timeout
-visualize_max_kb = 16          # Max visualization size
+visualize_max_kb = 64          # Max visualization size
+retention_keep_runs = 5        # Training runs to keep
 
 [security]
 api_key_enabled = false
@@ -96,21 +97,36 @@ api_key_enabled = false
 
 ### Environment Variables
 
+**Required for production:**
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `HANDWRITING_DATA_ROOT` | string | Data storage directory |
+| `HANDWRITING_ARTIFACTS_ROOT` | string | Training artifacts directory |
+| `HANDWRITING_LOGS_ROOT` | string | Log files directory |
+| `HANDWRITING_MODEL_ID` | string | Active model ID |
+| `HANDWRITING_API_KEY` | string | API key value |
+| `REDIS_URL` | string | Redis URL (for worker and health checks) |
+
+**Optional overrides:**
+
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `APP__PORT` | int | `8081` | Server port |
+| `APP__PORT` | int | `8000` | Server port |
 | `APP__THREADS` | int | `0` | Worker threads (0 = auto) |
-| `DIGITS__MODEL_DIR` | string | `/data/digits/models` | Model directory |
-| `DIGITS__ACTIVE_MODEL` | string | - | Active model ID |
+| `DIGITS__MODEL_DIR` | string | `models` | Model directory |
+| `DIGITS__ACTIVE_MODEL` | string | - | Override active model ID |
 | `DIGITS__TTA` | bool | `false` | Enable test-time augmentation |
-| `DIGITS__UNCERTAIN_THRESHOLD` | float | `0.85` | Confidence threshold |
-| `DIGITS__MAX_IMAGE_MB` | int | `2` | Max upload size (MB) |
-| `DIGITS__MAX_IMAGE_SIDE_PX` | int | `1024` | Max image dimension |
+| `DIGITS__UNCERTAIN_THRESHOLD` | float | `0.7` | Confidence threshold |
+| `DIGITS__MAX_IMAGE_MB` | int | `10` | Max upload size (MB) |
+| `DIGITS__MAX_IMAGE_SIDE_PX` | int | `2048` | Max image dimension |
 | `DIGITS__PREDICT_TIMEOUT_SECONDS` | int | `5` | Inference timeout |
-| `SECURITY__API_KEY_ENABLED` | bool | `false` | Require API key |
-| `SECURITY__API_KEY` | string | - | API key value |
-| `REDIS_URL` | string | - | Redis URL (for worker) |
+| `DIGITS__VISUALIZE_MAX_KB` | int | `64` | Max visualization size (KB) |
+| `DIGITS__RETENTION_KEEP_RUNS` | int | `5` | Training runs to keep |
+| `SECURITY__API_KEY_ENABLED` | bool | `true` | Require API key |
+| `SECURITY__API_KEY` | string | - | Override API key value |
 | `HANDWRITING_VERSION` | string | - | Version override |
+| `HANDWRITING_ALLOWED_HOSTS` | string | - | CSV of allowed CORS hosts |
 
 ---
 
@@ -437,9 +453,14 @@ docker build --target api -t handwriting-ai:latest .
 docker build --target worker -t handwriting-ai-worker:latest .
 
 # Run API
-docker run -p 8081:8081 \
+docker run -p 8000:8000 \
   -v ./models:/data/digits/models \
-  -e DIGITS__ACTIVE_MODEL=mnist_resnet18_v1 \
+  -e HANDWRITING_DATA_ROOT=/data \
+  -e HANDWRITING_ARTIFACTS_ROOT=/data/artifacts \
+  -e HANDWRITING_LOGS_ROOT=/data/logs \
+  -e HANDWRITING_MODEL_ID=mnist_resnet18_v1 \
+  -e HANDWRITING_API_KEY=your-api-key \
+  -e REDIS_URL=redis://redis:6379/0 \
   handwriting-ai:latest
 
 # Run Worker
@@ -456,13 +477,17 @@ services:
   handai:
     build: .
     ports:
-      - "8081:8081"
+      - "8000:8000"
     volumes:
       - ./config:/app/config:ro
       - ./models:/data/digits/models
     environment:
-      - APP__PORT=8081
-      - DIGITS__ACTIVE_MODEL=mnist_resnet18_v1
+      - HANDWRITING_DATA_ROOT=/data
+      - HANDWRITING_ARTIFACTS_ROOT=/data/artifacts
+      - HANDWRITING_LOGS_ROOT=/data/logs
+      - HANDWRITING_MODEL_ID=mnist_resnet18_v1
+      - HANDWRITING_API_KEY=your-api-key
+      - REDIS_URL=redis://redis:6379/0
 ```
 
 ### Railway

@@ -66,7 +66,7 @@ FROM runtime-base AS api
 EXPOSE 8000
 
 # Launch hypercorn (PORT may be injected by platform)
-CMD ["sh", "-c", "exec hypercorn 'handwriting_ai.api.app:create_app()' --bind [::]:${PORT:-8000}"]
+CMD ["sh", "-c", "exec hypercorn 'handwriting_ai.api.main:create_app()' --bind [::]:${PORT:-8000}"]
 
 # ---------- Worker target ----------
 FROM runtime-base AS worker
