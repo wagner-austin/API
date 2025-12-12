@@ -197,27 +197,13 @@ Generate an OAuth2 invite URL for the bot.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `TRANSCRIPT_PROVIDER` | string | `api` | Provider type (`api`) |
+| `TRANSCRIPT_PROVIDER` | string | `api` | Provider type (must be `api`) |
 | `TRANSCRIPT_RATE_LIMIT` | int | `2` | Requests per window |
 | `TRANSCRIPT_RATE_WINDOW_SECONDS` | int | `60` | Rate limit window |
 | `TRANSCRIPT_PUBLIC_RESPONSES` | bool | `false` | Show responses publicly |
-| `TRANSCRIPT_MAX_ATTACHMENT_MB` | int | `25` | Max attachment size |
-| `TRANSCRIPT_MAX_FILE_MB` | int | `25` | Max file size |
-| `TRANSCRIPT_MAX_MESSAGE_CHARS` | int | `1800` | Max message characters |
-| `TRANSCRIPT_PREFERRED_LANGS` | string | `en,en-US,en-GB` | Preferred languages |
-| `TRANSCRIPT_STT_RTF` | float | `0.5` | Speech-to-text real-time factor |
-| `TRANSCRIPT_DL_MIB_PER_SEC` | float | `4.0` | Download speed estimate |
-| `TRANSCRIPT_STT_API_TIMEOUT_SECONDS` | int | `900` | STT API timeout |
-| `TRANSCRIPT_STT_API_MAX_RETRIES` | int | `2` | STT API max retries |
-| `TRANSCRIPT_ENABLE_CHUNKING` | bool | `true` | Enable audio chunking |
-| `TRANSCRIPT_CHUNK_THRESHOLD_MB` | float | `20.0` | Chunk threshold size |
-| `TRANSCRIPT_TARGET_CHUNK_MB` | float | `20.0` | Target chunk size |
-| `TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS` | float | `600.0` | Max chunk duration |
-| `TRANSCRIPT_MAX_CONCURRENT_CHUNKS` | int | `3` | Max concurrent chunks |
-| `TRANSCRIPT_COOKIES_TEXT` | string | - | YouTube cookies (text) |
-| `TRANSCRIPT_COOKIES_PATH` | string | - | YouTube cookies (file path) |
-| `YOUTUBE_API_KEY` | string | - | YouTube Data API key |
-| `OPENAI_API_KEY` | string | - | OpenAI API key (for Whisper) |
+| `TRANSCRIPT_MAX_ATTACHMENT_MB` | int | `25` | Max attachment size (MB) |
+| `TRANSCRIPT_PREFERRED_LANGS` | string | `en,en-US,en-GB` | Preferred caption languages |
+| `TRANSCRIPT_STT_API_TIMEOUT_SECONDS` | int | `900` | API request timeout |
 
 #### Digits Settings
 
@@ -234,17 +220,6 @@ Generate an OAuth2 invite URL for the bot.
 |----------|------|---------|-------------|
 | `MODEL_TRAINER_RATE_LIMIT` | int | `1` | Requests per window |
 | `MODEL_TRAINER_RATE_WINDOW_SECONDS` | int | `10` | Rate limit window |
-
-#### Redis / Job Queue Settings
-
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `JOB_QUEUE_BRPOP_TIMEOUT_SECONDS` | int | `0` | BRPOP timeout (0 = blocking) |
-| `RQ_TRANSCRIPT_JOB_TIMEOUT_SEC` | int | `600` | Transcript job timeout |
-| `RQ_TRANSCRIPT_RESULT_TTL_SEC` | int | `86400` | Result TTL (24 hours) |
-| `RQ_TRANSCRIPT_FAILURE_TTL_SEC` | int | `604800` | Failure TTL (7 days) |
-| `RQ_TRANSCRIPT_RETRY_MAX` | int | `2` | Max retries |
-| `RQ_TRANSCRIPT_RETRY_INTERVALS_SEC` | string | `60,300` | Retry intervals (CSV) |
 
 ### Example .env
 
@@ -389,27 +364,36 @@ src/clubbot/
 
 ### Notifier Pattern
 
-Event notifiers extend `BotEventSubscriber` for standardized lifecycle and DM notifications:
+Event notifiers are thin wrappers extending `BotEventSubscriber`. Event decoding and handling logic lives in `platform_discord` domain kits:
 
 ```python
 from platform_discord.bot_subscriber import BotEventSubscriber
+from platform_discord.domain import (
+    DomainEventV1,
+    DomainRuntime,
+    decode_domain_event_safe,
+    handle_domain_event,
+    new_runtime,
+)
 from platform_discord.protocols import BotProto
 
 class DomainEventSubscriber(BotEventSubscriber[DomainEventV1]):
+    __slots__ = ("_runtime",)
+
     def __init__(self, *, bot: BotProto, redis_url: str) -> None:
         super().__init__(
             bot,
             redis_url=redis_url,
             events_channel="domain:events",
             task_name="domain-subscriber",
-            decode=decode_domain_event,
+            decode=decode_domain_event_safe,  # from platform_discord
         )
-        self._runtime = new_runtime()
+        self._runtime: DomainRuntime = new_runtime()
 
     async def _handle_event(self, ev: DomainEventV1) -> None:
-        action = handle_event(self._runtime, ev)
+        action = handle_domain_event(self._runtime, ev)  # from platform_discord
         if action is not None:
-            await self.notify(action["user_id"], action["request_id"], action["embed"])
+            await self._maybe_notify(action)
 ```
 
 ---
