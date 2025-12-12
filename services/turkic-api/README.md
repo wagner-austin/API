@@ -234,6 +234,35 @@ The project uses guard scripts to enforce code quality:
 
 Run manually: `poetry run python -m scripts.guard`
 
+## Discord Bot Integration
+
+Job progress is published to Redis for Discord bot notifications:
+
+**Channel:** `turkic:events`
+
+**Event Types:**
+- `turkic.job.started.v1` — Job enqueued and processing started
+- `turkic.job.progress.v1` — Processing progress update (every 50 sentences)
+- `turkic.job.completed.v1` — Job finished, result uploaded to data-bank
+- `turkic.job.failed.v1` — Job failed with error
+
+**Event Schema (via `platform_core.job_events`):**
+```json
+{
+  "type": "turkic.job.progress.v1",
+  "domain": "turkic",
+  "job_id": "abc123",
+  "user_id": 12345,
+  "queue": "turkic",
+  "progress": 50,
+  "message": "processing"
+}
+```
+
+The Discord bot subscribes to these events via `TurkicEventSubscriber` in `clients/DiscordBot` and sends DM notifications to users.
+
+---
+
 ## Architecture
 
 ### Pure Python Transliteration
