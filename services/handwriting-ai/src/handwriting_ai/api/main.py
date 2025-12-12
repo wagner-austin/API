@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from weakref import WeakKeyDictionary
 
@@ -11,6 +10,7 @@ from platform_core.logging import get_logger, setup_logging
 from platform_core.request_context import install_request_id_middleware
 from platform_core.security import ApiKeyCheckFn, create_api_key_dependency
 
+from .. import _test_hooks
 from ..config import Limits, Settings, ensure_settings, limits_from_settings, load_settings
 from ..inference.engine import InferenceEngine
 from .routes import admin as routes_admin
@@ -30,12 +30,12 @@ def _setup_optional_reloader(
     if reload_interval_seconds is None or float(reload_interval_seconds) <= 0.0:
         return
 
-    stop_evt: threading.Event | None = None
-    thread: threading.Thread | None = None
+    stop_evt: _test_hooks.EventProtocol | None = None
+    thread: _test_hooks.ThreadProtocol | None = None
 
     def _start_bg_reloader() -> None:
         nonlocal stop_evt, thread
-        stop_evt = threading.Event()
+        stop_evt = _test_hooks.event_factory()
 
         def _loop() -> None:
             interval = float(reload_interval_seconds)
@@ -44,7 +44,7 @@ def _setup_optional_reloader(
                 engine.reload_if_changed()
                 stop_evt.wait(interval)
 
-        thread = threading.Thread(target=_loop, name="model-reloader", daemon=True)
+        thread = _test_hooks.thread_factory(target=_loop, daemon=True, name="model-reloader")
         thread.start()
 
     def _stop_bg_reloader() -> None:
