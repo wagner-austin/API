@@ -143,31 +143,68 @@ Typed, ready-to-use kits for common domains. Each kit provides strict types, emb
 
 ### Handwriting Kit
 
-Digits training and progress embeds:
+Digits training and progress embeds with event handler:
 
 ```python
-from platform_discord.handwriting.embeds import build_training_started, build_training_progress
-from platform_discord.handwriting.runtime import new_runtime, on_started, on_progress
-from platform_discord.handwriting.types import TrainingState
+from platform_discord.handwriting import (
+    DigitsEventV1,
+    DigitsRuntime,
+    RequestAction,
+    decode_digits_event_safe,
+    handle_digits_event,
+    new_runtime,
+)
+from platform_discord.embed_helpers import unwrap_embed
 
-# Build embeds directly
-embed = build_training_started(job_id="abc", epochs=10)
-
-# Or use runtime for state management
+# Decode and handle events (recommended pattern)
 rt = new_runtime()
-act = on_started(rt, user_id=123, job_id="abc", epochs=10)
-if act["embed"]:
-    await user.send(embed=unwrap_embed(act["embed"]))
+payload = '{"type": "digits.metrics.config.v1", ...}'
+event = decode_digits_event_safe(payload)
+if event is not None:
+    action = handle_digits_event(rt, event)
+    if action is not None and action["embed"] is not None:
+        await user.send(embed=unwrap_embed(action["embed"]))
+
+# Or use runtime functions directly
+from platform_discord.handwriting.runtime import on_started, on_progress, on_completed
+act = on_started(rt, user_id=123, request_id="abc", model_id="mnist", total_epochs=10, queue="digits")
 ```
+
+**Handler Pattern:**
+
+The `handle_digits_event()` function routes decoded events to the appropriate runtime handler:
+
+| Event Type | Handler | Returns Embed |
+|------------|---------|---------------|
+| `digits.metrics.config.v1` | `on_started()` | Yes |
+| `digits.metrics.batch.v1` | `on_batch()` | Yes |
+| `digits.metrics.epoch.v1` | `on_progress()` | Yes |
+| `digits.metrics.best.v1` | `on_best()` | No (state only) |
+| `digits.metrics.artifact.v1` | `on_artifact()` | No (state only) |
+| `digits.metrics.upload.v1` | `on_upload()` | No (state only) |
+| `digits.metrics.prune.v1` | `on_prune()` | No (state only) |
+| `digits.metrics.completed.v1` | `on_completed()` | Yes |
+| `digits.job.failed.v1` | `on_failed()` | Yes |
 
 ### Trainer Kit
 
-Model trainer progress embeds:
+Model trainer progress embeds with event handler:
 
 ```python
-from platform_discord.trainer.embeds import build_trainer_started, build_trainer_progress
-from platform_discord.trainer.runtime import new_runtime, on_started, on_progress
-from platform_discord.trainer.handler import TrainerEventHandler
+from platform_discord.trainer import (
+    TrainerEventV1,
+    decode_trainer_event,
+    handle_trainer_event,
+)
+from platform_discord.trainer.runtime import new_runtime
+
+# Decode and handle events
+rt = new_runtime()
+event = decode_trainer_event(payload)
+if event is not None:
+    action = handle_trainer_event(rt, event)
+    if action is not None and action["embed"] is not None:
+        await user.send(embed=unwrap_embed(action["embed"]))
 ```
 
 ### Turkic Kit
