@@ -289,6 +289,18 @@ class QROptions(TypedDict, total=True):
 
 ---
 
+## Discord Bot Integration
+
+The Discord bot (`clients/DiscordBot`) uses this service via direct HTTP calls:
+
+```
+/qrcode url:<URL>  →  POST /v1/qr  →  PNG response
+```
+
+No Redis pub/sub events are used; the bot makes synchronous HTTP requests and returns the QR code image directly in the Discord response.
+
+---
+
 ## Quality Standards
 
 - **Type Safety**: mypy strict mode, no `Any`, no `cast`
