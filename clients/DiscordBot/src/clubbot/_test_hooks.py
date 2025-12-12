@@ -33,7 +33,6 @@ from platform_core.http_client import build_async_client as _real_build_async_cl
 from platform_core.http_client import build_client as _real_build_client
 from platform_core.logging import LogFormat, LogLevel
 from platform_discord.embed_helpers import EmbedProto
-from platform_discord.handwriting.runtime import DigitsRuntime, RequestAction
 from platform_discord.protocols import (
     BotProto,
     FileProto,
@@ -335,54 +334,6 @@ def _default_qr_service_factory(cfg: DiscordbotSettings) -> QRServiceLike:
 
 # Hook for creating QR service. Tests override for testing.
 qr_service_factory: QRServiceFactoryProtocol = _default_qr_service_factory
-
-
-# =============================================================================
-# Digits Notifier Hooks
-# =============================================================================
-
-
-class OnCompletedProtocol(Protocol):
-    """Protocol for on_completed function from platform_discord.handwriting.runtime."""
-
-    def __call__(
-        self,
-        runtime: DigitsRuntime,
-        *,
-        user_id: int,
-        request_id: str,
-        model_id: str,
-        run_id: str | None,
-        val_acc: float,
-    ) -> RequestAction | None:
-        """Handle completed event. Returns RequestAction or None."""
-        ...
-
-
-def _default_on_completed(
-    runtime: DigitsRuntime,
-    *,
-    user_id: int,
-    request_id: str,
-    model_id: str,
-    run_id: str | None,
-    val_acc: float,
-) -> RequestAction | None:
-    """Production implementation - calls platform_discord on_completed."""
-    from platform_discord.handwriting.runtime import on_completed as _real_on_completed
-
-    return _real_on_completed(
-        runtime,
-        user_id=user_id,
-        request_id=request_id,
-        model_id=model_id,
-        run_id=run_id,
-        val_acc=val_acc,
-    )
-
-
-# Hook for on_completed. Tests override to inject None-returning implementation.
-on_completed: OnCompletedProtocol = _default_on_completed
 
 
 # =============================================================================
@@ -1261,8 +1212,6 @@ __all__ = [
     "DigitsEnqueuerLike",
     "DigitsEventSubscriberFactoryProtocol",
     "DigitsEventSubscriberLike",
-    # Digits notifier protocols
-    "DigitsRuntime",
     "DiscordExceptionTypesProtocol",
     "DiscordInteractionLike",
     "EmbedLike",
@@ -1280,7 +1229,6 @@ __all__ = [
     "InteractionProtoLike",
     "LoadSettingsProtocol",
     "MessageLike",
-    "OnCompletedProtocol",
     "OrchestratorBuildBotHookProtocol",
     "OrchestratorBuildBotProtocol",
     "OrchestratorLike",
@@ -1289,7 +1237,6 @@ __all__ = [
     "QRResultLike",
     "QRServiceFactoryProtocol",
     "QRServiceLike",
-    "RequestAction",
     "ResponseProtoLike",
     "RqBytesClientFactoryProtocol",
     "RqQueueProtocol",
@@ -1334,8 +1281,6 @@ __all__ = [
     "_default_guard_load_orchestrator",
     "_default_load_httpx_module",
     "_default_load_settings",
-    # Digits notifier defaults
-    "_default_on_completed",
     "_default_orchestrator_build_bot",
     # QR service defaults
     "_default_qr_service_factory",
@@ -1370,8 +1315,6 @@ __all__ = [
     "guard_load_orchestrator",
     "load_httpx_module",
     "load_settings",
-    # Digits notifier hooks
-    "on_completed",
     "orchestrator_add_listener_override",
     "orchestrator_build_bot",
     "orchestrator_build_bot_override",
