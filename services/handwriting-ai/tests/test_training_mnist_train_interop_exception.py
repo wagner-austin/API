@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 from typing import Protocol
 
 import pytest
 import torch
 from PIL import Image
-from torch import Tensor
-from torch.nn import Module
-from torch.optim.optimizer import Optimizer
+from torch.nn import Module as TorchModule
+from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
 
-import handwriting_ai.training.mnist_train as mt
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import BatchLoaderProtocol
 from handwriting_ai.training.mnist_train import train_with_config
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
 
@@ -25,11 +24,9 @@ UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float
 
 
 @pytest.fixture(autouse=True)
-def _mock_monitoring(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_monitoring() -> None:
     """Mock monitoring functions that fail on non-container systems."""
-    import handwriting_ai.training.mnist_train as mt
-
-    monkeypatch.setattr(mt, "log_system_info", lambda: None, raising=False)
+    _test_hooks.log_system_info = lambda: None
 
 
 class _TinyBase(Dataset[tuple[Image.Image, int]]):
@@ -70,7 +67,7 @@ def _cfg(tmp: Path) -> TrainConfig:
 
 
 def test_train_with_interop_threads_exception(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, write_mnist_raw: MnistRawWriter
+    tmp_path: Path, write_mnist_raw: MnistRawWriter
 ) -> None:
     cfg = _cfg(tmp_path)
     train_base = _TinyBase(2)
@@ -78,23 +75,25 @@ def test_train_with_interop_threads_exception(
 
     # Speed up training loop to avoid heavy compute
     def _ok_train_epoch(
-        model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        model: TorchModule,
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: Optimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         return 0.0
 
-    monkeypatch.setattr(mt, "_train_epoch", _ok_train_epoch, raising=True)
+    _test_hooks.train_epoch = _ok_train_epoch
 
     # Force branch: interop_threads is not None and set_num_interop_threads raises
-    def _raise_runtime_error(n: int) -> None:
+    # The exception is caught and logged in train_with_config, training continues
+    def _raise_runtime_error(nthreads: int) -> None:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(torch, "set_num_interop_threads", _raise_runtime_error, raising=True)
+    _test_hooks.torch_has_set_num_interop_threads = lambda: True
+    _test_hooks.torch_set_interop_threads = _raise_runtime_error
 
     write_mnist_raw(cfg["data_root"], n=8)
     result = train_with_config(cfg, (train_base, test_base))

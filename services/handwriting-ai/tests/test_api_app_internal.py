@@ -14,7 +14,7 @@ from platform_core.errors import AppError, ErrorCode, HandwritingErrorCode
 from starlette.datastructures import FormData
 from torch import Tensor
 
-from handwriting_ai.api.app import (
+from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,
     create_app,

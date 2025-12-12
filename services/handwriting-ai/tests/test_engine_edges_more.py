@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import types
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -9,6 +9,7 @@ import torch
 from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,
@@ -24,8 +25,6 @@ from handwriting_ai.inference.engine import (
     _validate_state_dict,
     build_fresh_state_dict,
 )
-
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 
 def test_make_pool_uses_threads_when_nonzero() -> None:
@@ -52,7 +51,7 @@ def test_make_pool_uses_threads_when_nonzero() -> None:
     _ = InferenceEngine(s)
 
 
-def test_build_model_not_callable_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_model_not_callable_raises() -> None:
     import importlib
 
     class _FakeModelsModule(types.ModuleType):
@@ -65,35 +64,91 @@ def test_build_model_not_callable_raises(monkeypatch: pytest.MonkeyPatch) -> Non
             return fake_models
         return importlib.import_module(name, package)
 
-    monkeypatch.setattr(importlib, "import_module", _import_module, raising=True)
+    _test_hooks.import_module = _import_module
     with pytest.raises(RuntimeError):
         _ = _build_model("resnet18", 10)
 
 
-def test_build_fresh_state_dict_non_dict_from_model_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _M:
-        def state_dict(self) -> list[int]:
-            return [1, 2, 3]
+class _FakeModelNonDict:
+    """Fake model returning list from state_dict - tests runtime type validation."""
 
-    def _bm(arch: str, n_classes: int) -> _M:
-        return _M()
+    def eval(self) -> _FakeModelNonDict:
+        return self
 
-    target_mod = sys.modules["handwriting_ai.inference.engine"]
-    monkeypatch.setattr(target_mod, "_build_model", _bm, raising=False)
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+        _ = sd
+
+        class _Res:
+            def __init__(self) -> None:
+                self.missing_keys: list[str] = []
+                self.unexpected_keys: list[str] = []
+
+        return _Res()
+
+    def train(self, mode: bool = True) -> _FakeModelNonDict:
+        _ = mode
+        return self
+
+    def state_dict(self) -> dict[str, torch.Tensor]:
+        # Runtime: returns list to test "state_dict() did not return a dict"
+        # Use _test_hooks injection point to return bad data
+        return _test_hooks.inject_bad_state_dict_list()
+
+    def parameters(self) -> Sequence[torch.nn.Parameter]:
+        return []
+
+
+class _FakeModelInvalidEntries:
+    """Fake model returning non-Tensor dict values - tests runtime type validation."""
+
+    def eval(self) -> _FakeModelInvalidEntries:
+        return self
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return x
+
+    def load_state_dict(self, sd: dict[str, torch.Tensor]) -> _test_hooks.LoadStateResultProtocol:
+        _ = sd
+
+        class _Res:
+            def __init__(self) -> None:
+                self.missing_keys: list[str] = []
+                self.unexpected_keys: list[str] = []
+
+        return _Res()
+
+    def train(self, mode: bool = True) -> _FakeModelInvalidEntries:
+        _ = mode
+        return self
+
+    def state_dict(self) -> dict[str, torch.Tensor]:
+        # Runtime: returns ints instead of Tensors to test validation
+        # Use _test_hooks injection point to return bad data
+        return _test_hooks.inject_bad_state_dict_values()
+
+    def parameters(self) -> Sequence[torch.nn.Parameter]:
+        return []
+
+
+def test_build_fresh_state_dict_non_dict_from_model_raises() -> None:
+    def _bm(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+        _ = (arch, n_classes)
+        return _FakeModelNonDict()
+
+    _test_hooks.build_model = _bm
     with pytest.raises(RuntimeError):
         _ = build_fresh_state_dict("resnet18", 10)
 
 
-def test_build_fresh_state_dict_invalid_entries_raise(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _M:
-        def state_dict(self) -> dict[str, int]:
-            return {"fc.weight": 5}
+def test_build_fresh_state_dict_invalid_entries_raise() -> None:
+    def _bm(arch: str, n_classes: int) -> _test_hooks.InferenceTorchModelProtocol:
+        _ = (arch, n_classes)
+        return _FakeModelInvalidEntries()
 
-    def _bm(arch: str, n_classes: int) -> _M:
-        return _M()
-
-    target_mod = sys.modules["handwriting_ai.inference.engine"]
-    monkeypatch.setattr(target_mod, "_build_model", _bm, raising=False)
+    _test_hooks.build_model = _bm
     with pytest.raises(RuntimeError):
         _ = build_fresh_state_dict("resnet18", 10)
 
@@ -110,7 +165,7 @@ def test_augment_for_tta_noop_for_non4d() -> None:
     assert out is t3
 
 
-def test_load_state_dict_file_not_dict(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_state_dict_file_not_dict(tmp_path: Path) -> None:
     # Create a real file that torch.load will read as an int
     p = tmp_path / "model.pt"
     torch.save(123, p.as_posix())
@@ -118,9 +173,7 @@ def test_load_state_dict_file_not_dict(monkeypatch: pytest.MonkeyPatch, tmp_path
         _ = _load_state_dict_file(p)
 
 
-def test_load_state_dict_file_invalid_entry(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_load_state_dict_file_invalid_entry(tmp_path: Path) -> None:
     # Create a real file that torch.load will read as a dict with invalid values
     p = tmp_path / "model.pt"
     torch.save({"fc.weight": 5}, p.as_posix())

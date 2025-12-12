@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from platform_core.json_utils import JSONValue, load_json_str
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings, ensure_settings
 from handwriting_ai.inference.engine import InferenceEngine
 

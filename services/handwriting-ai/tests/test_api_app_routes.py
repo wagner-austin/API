@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import io
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from platform_core.errors import ErrorCode
@@ -14,7 +12,7 @@ from platform_core.json_utils import JSONValue
 from platform_core.logging import JsonFormatter, get_logger
 from torch import Tensor
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine
 from handwriting_ai.inference.manifest import ModelManifest
@@ -63,9 +61,7 @@ def test_read_returns_service_unavailable_when_model_missing(tmp_path: Path) -> 
     assert body["code"] == ErrorCode.SERVICE_UNAVAILABLE
 
 
-def test_structured_logs_include_request_and_latency(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_structured_logs_include_request_and_latency(tmp_path: Path) -> None:
     s = _mk_settings(tmp_path)
 
     class _T(InferenceEngine):
@@ -115,9 +111,10 @@ def test_structured_logs_include_request_and_latency(
     assert '"uncertain":false' in normalized
 
 
-def test_optional_reloader_not_started_when_disabled(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_optional_reloader_not_started_when_disabled(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+    from handwriting_ai._test_hooks import ThreadProtocol, ThreadTargetProtocol
+
     s = _mk_settings(tmp_path)
     started = {"count": 0}
 
@@ -131,10 +128,17 @@ def test_optional_reloader_not_started_when_disabled(
         def start(self) -> None:
             return None
 
-    def _fake_thread(target: Callable[[], None], name: str, daemon: bool) -> _DummyThread:
+        def join(self, timeout: float | None = None) -> None:
+            return None
+
+    def _fake_thread(
+        *, target: ThreadTargetProtocol, daemon: bool = True, name: str | None = None
+    ) -> ThreadProtocol:
+        _ = (target, daemon, name)
         return _DummyThread()
 
-    monkeypatch.setattr("handwriting_ai.api.app.threading.Thread", _fake_thread)
+    _test_hooks.thread_factory = _fake_thread
+
     _ = create_app(
         s, engine_provider=_fake_engine, reload_interval_seconds=0, enforce_api_key=False
     )

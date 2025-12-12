@@ -10,6 +10,8 @@ import torch
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import JsonFormatter, get_logger
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import InferenceTorchModelProtocol
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,
@@ -46,9 +48,7 @@ def _make_engine_with_root(root: Path, active: str) -> InferenceEngine:
     return InferenceEngine(s)
 
 
-def test_try_load_active_model_build_failure_is_logged_and_not_ready(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_try_load_active_model_build_failure_is_logged_and_not_ready() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         model_dir = root / "models"
@@ -71,13 +71,11 @@ def test_try_load_active_model_build_failure_is_logged_and_not_ready(
         sd = build_fresh_state_dict("resnet18", 10)
         torch.save(sd, (active_dir / "model.pt").as_posix())
 
-        # Force _build_model to raise
-        from handwriting_ai import inference as _inf
-
-        def _boom(arch: str, n_classes: int) -> None:
+        # Force build_model hook to raise
+        def _boom(arch: str, n_classes: int) -> InferenceTorchModelProtocol:
             raise RuntimeError("broken torchvision")
 
-        monkeypatch.setattr(_inf.engine, "_build_model", _boom, raising=True)
+        _test_hooks.build_model = _boom
 
         eng = _make_engine_with_root(model_dir, active)
         buf = io.StringIO()

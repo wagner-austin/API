@@ -9,7 +9,7 @@ import torch
 from fastapi.testclient import TestClient
 from platform_core.json_utils import dump_json_str
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
 from handwriting_ai.inference.engine import build_fresh_state_dict
 from handwriting_ai.preprocess import preprocess_signature

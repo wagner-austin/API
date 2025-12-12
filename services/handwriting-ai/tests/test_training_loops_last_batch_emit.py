@@ -3,14 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import overload
 
-import pytest
 import torch
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
-import handwriting_ai.training.loops as loops
-from handwriting_ai.training.metrics import BatchMetrics
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import BatchMetricsDict
+from handwriting_ai.training import loops
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
@@ -58,15 +58,15 @@ def _loader(n: int) -> list[tuple[torch.Tensor, torch.Tensor]]:
     return out
 
 
-def test_train_epoch_emits_last_batch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_train_epoch_emits_last_batch() -> None:
     # Capture batches emitted by loops
     seen: list[int] = []
 
-    def _cap_emit_batch(metrics: BatchMetrics) -> None:
+    def _cap_emit_batch(metrics: BatchMetricsDict) -> None:
         seen.append(metrics["batch"])
 
-    monkeypatch.setattr(loops, "_emit_batch", _cap_emit_batch, raising=True)
-    monkeypatch.setattr(loops, "on_batch_check", lambda: False, raising=True)
+    _test_hooks.emit_batch = _cap_emit_batch
+    _test_hooks.on_batch_check = lambda: False
 
     model = _Model()
     opt = _NoopOpt()

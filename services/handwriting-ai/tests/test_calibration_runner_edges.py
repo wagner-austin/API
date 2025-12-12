@@ -8,6 +8,12 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    CalibrationRunnerResultDict,
+    PreprocessDatasetProtocol,
+)
+from handwriting_ai.training.calibration._types import CandidateDict
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
 from handwriting_ai.training.calibration.runner import (
@@ -15,97 +21,60 @@ from handwriting_ai.training.calibration.runner import (
     _mnist_find_raw_dir,
     _mnist_read_images_labels,
 )
-from handwriting_ai.training.dataset import PreprocessDataset
-from handwriting_ai.training.train_config import TrainConfig
+from handwriting_ai.training.dataset import AugmentConfig, PreprocessDataset
 
 
-class _TinyDS(PreprocessDataset):
-    def __init__(self) -> None:
-        cfg: TrainConfig = {
-            "data_root": Path("."),
-            "out_dir": Path("."),
-            "model_id": "m",
-            "epochs": 1,
-            "batch_size": 1,
-            "lr": 1e-3,
-            "weight_decay": 1e-2,
-            "seed": 0,
-            "device": "cpu",
-            "optim": "adamw",
-            "scheduler": "none",
-            "step_size": 1,
-            "gamma": 0.5,
-            "min_lr": 1e-5,
-            "patience": 0,
-            "min_delta": 0.0,
-            "threads": 0,
-            "augment": False,
-            "aug_rotate": 0.0,
-            "aug_translate": 0.0,
-            "noise_prob": 0.0,
-            "noise_salt_vs_pepper": 0.5,
-            "dots_prob": 0.0,
-            "dots_count": 0,
-            "dots_size_px": 1,
-            "blur_sigma": 0.0,
-            "morph": "none",
-            "morph_kernel_px": 1,
-            "progress_every_epochs": 1,
-            "progress_every_batches": 0,
-            "calibrate": False,
-            "calibration_samples": 0,
-            "force_calibration": False,
-            "memory_guard": False,
-        }
+class _Base:
+    """Minimal base dataset for testing."""
 
-        class _Base:
-            def __len__(self) -> int:
-                return 1
+    def __len__(self) -> int:
+        return 1
 
-            def __getitem__(self, idx: int) -> tuple[Image.Image, int]:
-                from PIL import Image
-
-                return Image.new("L", (28, 28), 0), int(idx)
-
-        super().__init__(_Base(), cfg)
+    def __getitem__(self, idx: int) -> tuple[Image.Image, int]:
+        return Image.new("L", (28, 28), 0), int(idx)
 
 
-def test_child_entry_emits_logs_and_writes_result(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    class _StubQueueHandler(logging.Handler):
-        def __init__(self, queue: mp.Queue[logging.LogRecord]) -> None:
-            super().__init__()
-            self._queue = queue
+_CFG: AugmentConfig = {
+    "augment": False,
+    "aug_rotate": 0.0,
+    "aug_translate": 0.0,
+    "noise_prob": 0.0,
+    "noise_salt_vs_pepper": 0.5,
+    "dots_prob": 0.0,
+    "dots_count": 0,
+    "dots_size_px": 1,
+    "blur_sigma": 0.0,
+    "morph": "none",
+    "morph_kernel_px": 1,
+    "batch_size": 1,
+}
 
-        def emit(self, record: logging.LogRecord) -> None:
-            self._queue.put(record)
 
-    def _fake_setup_logging(**_: dict[str, str]) -> None:
-        return None
+def test_child_entry_emits_logs_and_writes_result(tmp_path: Path) -> None:
+    """Test that _child_entry emits logs and writes result file."""
+
+    def _fake_setup_logging(
+        *,
+        level: str,
+        format_mode: str,
+        service_name: str,
+        instance_id: str | None,
+        extra_fields: list[str] | None,
+    ) -> None:
+        pass
 
     def _fake_build_dataset_from_spec(spec: PreprocessSpec) -> PreprocessDataset:
-        return _TinyDS()
+        return PreprocessDataset(_Base(), _CFG)
 
     def _fake_measure_candidate_internal(
-        ds: PreprocessDataset,
-        cand: Candidate,
+        ds: PreprocessDatasetProtocol,
+        cand: CandidateDict,
         samples: int,
+        on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
         *,
-        on_improvement: Callable[[dict[str, float | int | None]], None],
         enable_headroom: bool,
-    ) -> dict[str, float | int | None]:
-        on_improvement(
-            {
-                "intra_threads": cand["intra_threads"],
-                "interop_threads": cand["interop_threads"],
-                "num_workers": cand["num_workers"],
-                "batch_size": cand["batch_size"],
-                "samples_per_sec": 1.0,
-                "p95_ms": 1.0,
-            }
-        )
-        return {
+    ) -> CalibrationRunnerResultDict:
+        result: CalibrationRunnerResultDict = {
             "intra_threads": cand["intra_threads"],
             "interop_threads": cand["interop_threads"],
             "num_workers": cand["num_workers"],
@@ -113,22 +82,16 @@ def test_child_entry_emits_logs_and_writes_result(
             "samples_per_sec": 1.0,
             "p95_ms": 1.0,
         }
+        if on_improvement is not None:
+            on_improvement(result)
+        return result
+
+    # Set hooks
+    _test_hooks.runner_setup_logging = _fake_setup_logging
+    _test_hooks.build_dataset_from_spec = _fake_build_dataset_from_spec
+    _test_hooks.measure_candidate_internal = _fake_measure_candidate_internal
 
     log_q: mp.Queue[logging.LogRecord] = mp.Queue()
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.runner._QueueHandler", _StubQueueHandler
-    )
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.runner.setup_logging", _fake_setup_logging
-    )
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.runner._build_dataset_from_spec",
-        _fake_build_dataset_from_spec,
-    )
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.runner._measure_candidate_internal",
-        _fake_measure_candidate_internal,
-    )
 
     spec: PreprocessSpec = {
         "base_kind": "inline",
@@ -171,6 +134,7 @@ def test_child_entry_emits_logs_and_writes_result(
 
 
 def test_mnist_find_raw_dir_prefers_raw(tmp_path: Path) -> None:
+    """Test that _mnist_find_raw_dir prefers MNIST/raw subdirectory."""
     root = tmp_path / "mnist"
     raw = root / "MNIST" / "raw"
     raw.mkdir(parents=True, exist_ok=True)
@@ -178,5 +142,88 @@ def test_mnist_find_raw_dir_prefers_raw(tmp_path: Path) -> None:
 
 
 def test_mnist_read_images_labels_missing_files_raises(tmp_path: Path) -> None:
+    """Test that _mnist_read_images_labels raises when files are missing."""
     with pytest.raises(RuntimeError):
         _ = _mnist_read_images_labels(tmp_path, train=True)
+
+
+def test_child_entry_handler_without_flush(tmp_path: Path) -> None:
+    """Test that _child_entry handles log handlers without flush method (line 190->189)."""
+    from platform_core.logging import stdlib_logging
+
+    def _fake_setup_logging(
+        *,
+        level: str,
+        format_mode: str,
+        service_name: str,
+        instance_id: str | None,
+        extra_fields: list[str] | None,
+    ) -> None:
+        # Inject a handler without flush attribute using the test hook
+        # Use "handwriting_ai" logger since that's what _child_entry uses at line 119
+        log = stdlib_logging.getLogger("handwriting_ai")
+        _test_hooks.inject_no_flush_handler(log)
+
+    def _fake_build_dataset_from_spec(spec: PreprocessSpec) -> PreprocessDataset:
+        return PreprocessDataset(_Base(), _CFG)
+
+    def _fake_measure_candidate_internal(
+        ds: PreprocessDatasetProtocol,
+        cand: CandidateDict,
+        samples: int,
+        on_improvement: Callable[[CalibrationRunnerResultDict], None] | None,
+        *,
+        enable_headroom: bool,
+    ) -> CalibrationRunnerResultDict:
+        result: CalibrationRunnerResultDict = {
+            "intra_threads": cand["intra_threads"],
+            "interop_threads": cand["interop_threads"],
+            "num_workers": cand["num_workers"],
+            "batch_size": cand["batch_size"],
+            "samples_per_sec": 1.0,
+            "p95_ms": 1.0,
+        }
+        return result
+
+    # Set hooks
+    _test_hooks.runner_setup_logging = _fake_setup_logging
+    _test_hooks.build_dataset_from_spec = _fake_build_dataset_from_spec
+    _test_hooks.measure_candidate_internal = _fake_measure_candidate_internal
+
+    log_q: mp.Queue[logging.LogRecord] = mp.Queue()
+
+    spec: PreprocessSpec = {
+        "base_kind": "inline",
+        "mnist": None,
+        "inline": InlineSpec(n=1, sleep_s=0.0, fail=False),
+        "augment": AugmentSpec(
+            augment=False,
+            aug_rotate=0.0,
+            aug_translate=0.0,
+            noise_prob=0.0,
+            noise_salt_vs_pepper=0.5,
+            dots_prob=0.0,
+            dots_count=0,
+            dots_size_px=1,
+            blur_sigma=0.0,
+            morph="none",
+        ),
+    }
+    cand: Candidate = {
+        "intra_threads": 1,
+        "interop_threads": None,
+        "num_workers": 0,
+        "batch_size": 1,
+    }
+
+    out_path = tmp_path / "res.txt"
+    # This should complete without error even with handler lacking flush
+    _child_entry(
+        out_path=out_path.as_posix(),
+        spec=spec,
+        cand=cand,
+        samples=1,
+        abort_pct=90.0,
+        log_q=log_q,
+    )
+    assert out_path.exists()

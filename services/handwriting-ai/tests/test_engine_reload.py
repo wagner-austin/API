@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,6 +8,8 @@ import pytest
 import torch
 from platform_core.json_utils import dump_json_str
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import StatResultProtocol
 from handwriting_ai.config import (
     AppConfig,
     DigitsConfig,
@@ -88,7 +89,7 @@ def test_reload_if_changed_detects_updates() -> None:
         assert eng.reload_if_changed() is False
 
 
-def test_reload_if_changed_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reload_if_changed_branches() -> None:
     # Not ready / no artifacts dir
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -122,22 +123,20 @@ def test_reload_if_changed_branches(monkeypatch: pytest.MonkeyPatch) -> None:
         eng._last_model_mtime = None
         assert eng.reload_if_changed() is False
 
-        # OSError path
-        orig_stat = Path.stat
-
-        def _boom(self: Path, follow_symlinks: bool = True) -> os.stat_result:
-            p = self.as_posix()
+        # OSError path via path_stat hook
+        def _boom_stat(path: Path, *, follow_symlinks: bool = True) -> StatResultProtocol:
+            p = path.as_posix()
             if p.endswith("manifest.json") or p.endswith("model.pt"):
                 raise OSError("nope")
-            return orig_stat(self, follow_symlinks=follow_symlinks)
+            return path.stat(follow_symlinks=follow_symlinks)
 
-        monkeypatch.setattr(Path, "stat", _boom, raising=True)
+        _test_hooks.path_stat = _boom_stat
         # Should raise after logging
         with pytest.raises(OSError, match="nope"):
             eng.reload_if_changed()
 
 
-def test_try_load_active_stat_oserror_sets_last_none(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_try_load_active_stat_oserror_sets_last_none() -> None:
     # Test that OSError when reading mtimes during initial load is raised
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -161,20 +160,19 @@ def test_try_load_active_stat_oserror_sets_last_none(monkeypatch: pytest.MonkeyP
         sd = build_fresh_state_dict("resnet18", 10)
         torch.save(sd, (active_dir / "model.pt").as_posix())
 
-        # Patch stat to raise OSError only after manifest and model are loaded
-        call_count = {"n": 0}
-        orig_stat = Path.stat
+        # Track stat call counts to fail on mtime collection calls
+        call_count: dict[str, int] = {"n": 0}
 
-        def _boom(self: Path, follow_symlinks: bool = True) -> os.stat_result:
-            p = self.as_posix()
+        def _boom_stat(path: Path, *, follow_symlinks: bool = True) -> StatResultProtocol:
+            p = path.as_posix()
             call_count["n"] += 1
             # Let the first few stat calls (for file reading) succeed
             # but fail on the mtime collection calls
             if call_count["n"] > 10 and (p.endswith("manifest.json") or p.endswith("model.pt")):
                 raise OSError("nope")
-            return orig_stat(self, follow_symlinks=follow_symlinks)
+            return path.stat(follow_symlinks=follow_symlinks)
 
-        monkeypatch.setattr(Path, "stat", _boom, raising=True)
+        _test_hooks.path_stat = _boom_stat
         eng = _make_engine_with_root(model_dir, active)
         # Should raise after logging when stat fails during mtime collection
         with pytest.raises(OSError, match="nope"):

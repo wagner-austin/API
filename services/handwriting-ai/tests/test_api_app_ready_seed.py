@@ -6,7 +6,6 @@ from concurrent.futures import TimeoutError as FutTimeout
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
 import torch
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -14,7 +13,7 @@ from platform_core.errors import ErrorCode, HandwritingErrorCode
 from platform_core.json_utils import JSONValue
 from torch import Tensor
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import (
     InferenceEngine,
@@ -23,8 +22,8 @@ from handwriting_ai.inference.engine import (
     build_fresh_state_dict,
 )
 from handwriting_ai.inference.manifest import ModelManifest
-from handwriting_ai.inference.types import PredictOutput, PreprocessOutput
-from handwriting_ai.preprocess import PreprocessOptions, preprocess_signature
+from handwriting_ai.inference.types import PredictOutput
+from handwriting_ai.preprocess import preprocess_signature
 
 
 def _png_bytes() -> bytes:
@@ -143,9 +142,12 @@ def test_read_rejects_extra_form_field(tmp_path: Path) -> None:
     assert body["code"] == HandwritingErrorCode.malformed_multipart.value
 
 
-def test_read_raises_on_timeout_and_cancels_future(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_read_raises_on_timeout_and_cancels_future(tmp_path: Path) -> None:
+    from PIL.Image import Image as PILImage
+
+    from handwriting_ai import _test_hooks
+    from handwriting_ai._test_hooks import PreprocessOptionsDict, PreprocessOutputDict
+
     settings = _settings(tmp_path)
 
     class _TimeoutEngine(_ReadyEngine):
@@ -170,10 +172,11 @@ def test_read_raises_on_timeout_and_cancels_future(
             self.cancel_called = True
             return True
 
-    def _fake_preprocess(_: Image.Image, opts: PreprocessOptions) -> PreprocessOutput:
-        return {"tensor": Tensor(), "visual_png": b""}
+    def _fake_preprocess(img: PILImage, opts: PreprocessOptionsDict) -> PreprocessOutputDict:
+        _ = (img, opts)  # unused
+        return {"tensor": Tensor(), "visual_png": None}
 
-    monkeypatch.setattr("handwriting_ai.api.routes.read.run_preprocess", _fake_preprocess)
+    _test_hooks.run_preprocess = _fake_preprocess
 
     engine = _TimeoutEngine(settings)
     app = create_app(settings, engine_provider=lambda: engine, enforce_api_key=False)
@@ -191,7 +194,7 @@ def test_read_raises_on_timeout_and_cancels_future(
     assert engine.last_future.cancel_called is True
 
 
-def test_seed_startup_copies_seed_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_seed_startup_copies_seed_files(tmp_path: Path) -> None:
     # Use tmp_path for seed_root to isolate from other tests
     seed_base = tmp_path / "seed"
     settings = _settings(tmp_path, seed_root=seed_base)

@@ -7,12 +7,9 @@ import pytest
 from platform_workers.testing import FakeRedisPublishError
 
 import handwriting_ai.jobs.digits as dj
+from handwriting_ai import _test_hooks
 from handwriting_ai.inference.engine import build_fresh_state_dict
-from handwriting_ai.training.train_config import (
-    TrainConfig,
-    TrainingResult,
-    TrainingResultMetadata,
-)
+from handwriting_ai.training.train_config import TrainConfig, TrainingResult
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
@@ -24,35 +21,33 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
     run_rand = secrets.token_hex(3)
     run_id = f"{run_ts}-{run_rand}"
     sd = build_fresh_state_dict(arch="resnet18", n_classes=10)
-    meta: TrainingResultMetadata = {
-        "run_id": run_id,
-        "epochs": int(cfg["epochs"]),
-        "batch_size": int(cfg["batch_size"]),
-        "lr": float(cfg["lr"]),
-        "seed": int(cfg["seed"]),
-        "device": str(cfg["device"]),
-        "optim": str(cfg["optim"]),
-        "scheduler": str(cfg["scheduler"]),
-        "augment": bool(cfg["augment"]),
-    }
     return {
         "model_id": cfg["model_id"],
         "state_dict": sd,
         "val_acc": 0.1,
-        "metadata": meta,
+        "metadata": {
+            "run_id": run_id,
+            "epochs": int(cfg["epochs"]),
+            "batch_size": int(cfg["batch_size"]),
+            "lr": float(cfg["lr"]),
+            "seed": int(cfg["seed"]),
+            "device": str(cfg["device"]),
+            "optim": str(cfg["optim"]),
+            "scheduler": str(cfg["scheduler"]),
+            "augment": bool(cfg["augment"]),
+        },
     }
 
 
-def test_process_train_job_publish_failures_raise_after_logging(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_process_train_job_publish_failures_raise_after_logging() -> None:
     fr = FakeRedisPublishError()
 
-    def _redis_for_kv(_: str) -> FakeRedisPublishError:
+    def _redis_for_error(url: str) -> FakeRedisPublishError:
+        _ = url
         return fr
 
-    monkeypatch.setattr(dj, "redis_for_kv", _redis_for_kv, raising=True)
-    monkeypatch.setattr(dj, "_run_training", _quick_training, raising=True)
+    _test_hooks.redis_factory = _redis_for_error
+    _test_hooks.run_training = _quick_training
 
     payload: dict[str, UnknownJson] = {
         "type": "digits.train.v1",

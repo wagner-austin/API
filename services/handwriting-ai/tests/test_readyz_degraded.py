@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
+from platform_core.config import _test_hooks as config_test_hooks
 from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.testing import make_fake_env
 from platform_workers.testing import FakeRedis
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai import _test_hooks
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings, ensure_settings
 
 
@@ -36,16 +38,15 @@ def _mk_settings(tmp_dir: Path) -> Settings:
     return ensure_settings(base, create_dirs=True)
 
 
-def test_readyz_degraded_no_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("REDIS_URL", "redis://ignored")
-    import handwriting_ai.api.routes.health as health_mod
+def test_readyz_degraded_no_worker(tmp_path: Path) -> None:
+    config_test_hooks.get_env = make_fake_env({"REDIS_URL": "redis://ignored"})
 
     fr = FakeRedis()
 
     def _rf(url: str) -> FakeRedis:
         return fr
 
-    monkeypatch.setattr(health_mod, "redis_for_kv", _rf)
+    _test_hooks.redis_factory = _rf
     app = create_app(settings=_mk_settings(tmp_path))
     client = TestClient(app)
     r = client.get("/readyz")

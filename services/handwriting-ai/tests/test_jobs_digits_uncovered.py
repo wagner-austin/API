@@ -6,15 +6,14 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONValue
+from platform_workers.redis import RedisStrProto
 
-import handwriting_ai.jobs.digits as dj
-from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import JobContextProtocol
+from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import build_fresh_state_dict
-from handwriting_ai.training.train_config import (
-    TrainConfig,
-    TrainingResult,
-    TrainingResultMetadata,
-)
+from handwriting_ai.jobs import digits as dj
+from handwriting_ai.training.train_config import TrainConfig, TrainingResult
 
 pytestmark = pytest.mark.usefixtures("digits_redis")
 
@@ -37,7 +36,7 @@ class _StubJobCtx:
         self.publish_started_count += 1
 
     def publish_progress(
-        self, progress: int, message: str | None = None, payload: JSONValue | None = None
+        self, progress: int, message: str | None = None, *, payload: JSONValue | None = None
     ) -> None:
         self.publish_progress_count += 1
         if self._progress_side_effects:
@@ -55,26 +54,28 @@ class _StubJobCtx:
 
 
 def _make_test_settings(tmp_path: Path) -> Settings:
-    app: AppConfig = {
-        "data_root": tmp_path / "data",
-        "artifacts_root": tmp_path / "artifacts",
-        "logs_root": tmp_path / "logs",
-        "threads": 0,
-        "port": 8081,
+    return {
+        "app": {
+            "data_root": tmp_path / "data",
+            "artifacts_root": tmp_path / "artifacts",
+            "logs_root": tmp_path / "logs",
+            "threads": 0,
+            "port": 8081,
+        },
+        "digits": {
+            "model_dir": tmp_path / "models",
+            "active_model": "mnist_resnet18_v1",
+            "tta": False,
+            "uncertain_threshold": 0.70,
+            "max_image_mb": 2,
+            "max_image_side_px": 1024,
+            "predict_timeout_seconds": 5,
+            "visualize_max_kb": 16,
+            "retention_keep_runs": 3,
+            "allowed_hosts": frozenset(["*"]),
+        },
+        "security": {"api_key": "", "api_key_enabled": False},
     }
-    dig: DigitsConfig = {
-        "model_dir": tmp_path / "models",
-        "active_model": "mnist_resnet18_v1",
-        "tta": False,
-        "uncertain_threshold": 0.70,
-        "max_image_mb": 2,
-        "max_image_side_px": 1024,
-        "predict_timeout_seconds": 5,
-        "visualize_max_kb": 16,
-        "retention_keep_runs": 3,
-    }
-    sec: SecurityConfig = {"api_key": ""}
-    return {"app": app, "digits": dig, "security": sec}
 
 
 def _quick_training(cfg: TrainConfig) -> TrainingResult:
@@ -82,39 +83,49 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
     run_rand = secrets.token_hex(3)
     run_id = f"{run_ts}-{run_rand}"
     sd = build_fresh_state_dict(arch="resnet18", n_classes=10)
-    meta: TrainingResultMetadata = {
-        "run_id": run_id,
-        "epochs": int(cfg["epochs"]),
-        "batch_size": int(cfg["batch_size"]),
-        "lr": float(cfg["lr"]),
-        "seed": int(cfg["seed"]),
-        "device": str(cfg["device"]),
-        "optim": str(cfg["optim"]),
-        "scheduler": str(cfg["scheduler"]),
-        "augment": bool(cfg["augment"]),
-    }
     return {
         "model_id": cfg["model_id"],
         "state_dict": sd,
         "val_acc": 0.5,
-        "metadata": meta,
+        "metadata": {
+            "run_id": run_id,
+            "epochs": int(cfg["epochs"]),
+            "batch_size": int(cfg["batch_size"]),
+            "lr": float(cfg["lr"]),
+            "seed": int(cfg["seed"]),
+            "device": str(cfg["device"]),
+            "optim": str(cfg["optim"]),
+            "scheduler": str(cfg["scheduler"]),
+            "augment": bool(cfg["augment"]),
+        },
     }
 
 
 def test_process_train_job_keyboard_interrupt_publishes_interrupted_and_reraises(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     job_ctx = _StubJobCtx(progress_side_effects=[None, None, None, KeyboardInterrupt()])
 
-    def make_job_context_mock(*args: JSONValue, **kwargs: JSONValue) -> _StubJobCtx:
+    def _fake_make_job_context(
+        *,
+        redis: RedisStrProto,
+        domain: str,
+        events_channel: str,
+        job_id: str,
+        user_id: int,
+        queue_name: str,
+    ) -> JobContextProtocol:
         return job_ctx
 
-    monkeypatch.setattr(dj, "make_job_context", make_job_context_mock, raising=True)
-    monkeypatch.setattr(dj, "_run_training", _quick_training)
+    _test_hooks.make_job_context = _fake_make_job_context
+    _test_hooks.run_training = _quick_training
 
     settings = _make_test_settings(tmp_path)
-    monkeypatch.setattr(dj, "_load_settings", staticmethod(lambda: settings))
+
+    def _fake_load_settings(*, create_dirs: bool = True) -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _fake_load_settings
 
     payload: dict[str, JSONValue] = {
         "type": "digits.train.v1",
@@ -137,19 +148,30 @@ def test_process_train_job_keyboard_interrupt_publishes_interrupted_and_reraises
 
 
 def test_process_train_job_completed_publish_failure(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     job_ctx = _StubJobCtx(completed_exc=OSError("boom-completed"))
 
-    def make_job_context_mock(*args: JSONValue, **kwargs: JSONValue) -> _StubJobCtx:
+    def _fake_make_job_context(
+        *,
+        redis: RedisStrProto,
+        domain: str,
+        events_channel: str,
+        job_id: str,
+        user_id: int,
+        queue_name: str,
+    ) -> JobContextProtocol:
         return job_ctx
 
-    monkeypatch.setattr(dj, "make_job_context", make_job_context_mock, raising=True)
-    monkeypatch.setattr(dj, "_run_training", _quick_training)
+    _test_hooks.make_job_context = _fake_make_job_context
+    _test_hooks.run_training = _quick_training
 
     settings = _make_test_settings(tmp_path)
-    monkeypatch.setattr(dj, "_load_settings", staticmethod(lambda: settings))
+
+    def _fake_load_settings(*, create_dirs: bool = True) -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _fake_load_settings
 
     payload: dict[str, JSONValue] = {
         "type": "digits.train.v1",
@@ -172,19 +194,33 @@ def test_process_train_job_completed_publish_failure(
 
 
 def test_process_train_job_completes_without_publisher(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     """Test job completion when publisher is None (covers job_ctx is None branch)."""
 
-    def _none_ctx(*args: JSONValue, **kwargs: JSONValue) -> None:
-        return None
+    from platform_core.job_events import JobDomain
 
-    monkeypatch.setattr(dj, "make_job_context", _none_ctx, raising=True)
-    monkeypatch.setattr(dj, "_run_training", _quick_training)
+    def _fake_make_job_context(
+        *,
+        redis: RedisStrProto,
+        domain: JobDomain,
+        events_channel: str,
+        job_id: str,
+        user_id: int,
+        queue_name: str,
+    ) -> None:
+        _ = (redis, domain, events_channel, job_id, user_id, queue_name)
+        return
+
+    _test_hooks.make_job_context = _fake_make_job_context
+    _test_hooks.run_training = _quick_training
 
     settings = _make_test_settings(tmp_path)
-    monkeypatch.setattr(dj, "_load_settings", staticmethod(lambda: settings))
+
+    def _fake_load_settings(*, create_dirs: bool = True) -> Settings:
+        return settings
+
+    _test_hooks.load_settings = _fake_load_settings
 
     payload: dict[str, JSONValue] = {
         "type": "digits.train.v1",

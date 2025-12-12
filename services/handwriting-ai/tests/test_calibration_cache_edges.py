@@ -5,40 +5,59 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONTypeError
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import LoggerInstanceProtocol
 from handwriting_ai.training.calibration.cache import _decode_float, _decode_int, _read_cache
 
-LogArg = str | int | float | bool | None
+LogArg = float | int | str | Path | BaseException
+
+
+ExtraDict = dict[str, str | int | float | bool | None]
 
 
 class _LogStub:
     def __init__(self, sink: list[str]) -> None:
         self._sink = sink
 
-    def error(self, msg: str, *args: LogArg) -> None:
+    def info(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+        pass
+
+    def warning(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+        pass
+
+    def error(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
         formatted = msg % args if args else msg
         self._sink.append(formatted)
 
+    def debug(self, msg: str, *args: LogArg, extra: ExtraDict | None = None) -> None:
+        pass
 
-def test_decode_int_logs_and_raises_on_invalid(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+
+def test_decode_int_logs_and_raises_on_invalid() -> None:
     called: list[str] = []
+    stub = _LogStub(called)
 
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.cache._LOGGER",
-        _LogStub(called),
-    )
+    def _fake_get_logger(name: str) -> LoggerInstanceProtocol:
+        _ = name
+        return stub
+
+    _test_hooks.get_logger = _fake_get_logger
+
     with pytest.raises(JSONTypeError):
         _decode_int({"bad": "x"}, "bad", 0)
     assert called, "expected logger.error to be invoked"
 
 
-def test_decode_float_logs_and_raises_on_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_decode_float_logs_and_raises_on_invalid() -> None:
     called: list[str] = []
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.cache._LOGGER",
-        _LogStub(called),
-    )
+    stub = _LogStub(called)
+
+    def _fake_get_logger(name: str) -> LoggerInstanceProtocol:
+        _ = name
+        return stub
+
+    _test_hooks.get_logger = _fake_get_logger
+
     with pytest.raises(JSONTypeError):
         _decode_float({"bad": "x"}, "bad", 0.0)
     assert called, "expected logger.error to be invoked"

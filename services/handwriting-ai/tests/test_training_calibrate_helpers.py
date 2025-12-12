@@ -7,23 +7,23 @@ import pytest
 import torch
 from PIL import Image
 from platform_core.json_utils import JSONTypeError
-from torch.utils.data import DataLoader
 
 import handwriting_ai.training.calibrate as cal
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    BatchIterableProtocol,
+    DataLoaderConfigProtocol,
+    PreprocessDatasetProtocol,
+)
 from handwriting_ai.training.dataset import (
     AugmentConfig,
-    DataLoaderConfig,
     MNISTLike,
     PreprocessDataset,
 )
 from handwriting_ai.training.resources import ResourceLimits
 
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
-
 
 def test_as_obj_dict_and_number_parsers() -> None:
-    import pytest
-
     assert cal._decode_obj_dict(123) is None
     # Test with valid string-keyed dict (JSON only allows string keys)
     d = cal._decode_obj_dict({"a": 7, "b": "x"})
@@ -44,11 +44,7 @@ def test_as_obj_dict_and_number_parsers() -> None:
         cal._decode_float({"k": "not"}, "k", 1.5)
 
 
-def test_read_cache_decode_and_missing_raises_after_logging(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    import pytest
-
+def test_read_cache_decode_and_missing_raises_after_logging(tmp_path: Path) -> None:
     p = tmp_path / "c.json"
     p.write_text("not-json", encoding="utf-8")
     # Should raise on invalid JSON
@@ -68,7 +64,7 @@ def test_read_cache_decode_and_missing_raises_after_logging(
         cal._read_cache(p3)
 
 
-def test_valid_cache_mismatch_and_expire(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_valid_cache_mismatch_and_expire() -> None:
     sig: cal.CalibrationSignature = {
         "cpu_cores": 2,
         "mem_bytes": None,
@@ -85,7 +81,10 @@ def test_valid_cache_mismatch_and_expire(monkeypatch: pytest.MonkeyPatch) -> Non
         "p95_ms": 1.0,
     }
     now = 1000.0
-    monkeypatch.setattr(cal, "_now_ts", lambda: now, raising=True)
+
+    # Use now_ts hook to control time
+    _test_hooks.now_ts = lambda: now
+
     # Mismatch sig
     sig_mismatch: cal.CalibrationSignature = {
         "cpu_cores": 1,
@@ -110,9 +109,8 @@ def test_candidate_workers_zero_cores() -> None:
     assert cal._candidate_workers(limits) == [0]
 
 
-def test_measure_candidate_backoff_raises_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_measure_candidate_backoff_raises_after_retries() -> None:
     # First call to _safe_loader raises, subsequent calls also raise to exhaust backoff
-    import pytest
 
     calls = {"n": 0}
 
@@ -142,15 +140,14 @@ def test_measure_candidate_backoff_raises_after_retries(monkeypatch: pytest.Monk
     ds = PreprocessDataset(_Base(), _cfg)
 
     def _safe(
-        _ds: PreprocessDataset, cfg: DataLoaderConfig
-    ) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
+        ds: PreprocessDatasetProtocol, cfg: DataLoaderConfigProtocol
+    ) -> BatchIterableProtocol:
+        _ = (ds, cfg)  # unused
         calls["n"] += 1
         raise RuntimeError("no memory")
 
-    monkeypatch.setattr(cal, "_safe_loader", _safe, raising=True)
-    import handwriting_ai.training.calibration.measure as _meas
-
-    monkeypatch.setattr(_meas, "_safe_loader", _safe, raising=True)
+    # Use safe_loader hook
+    _test_hooks.safe_loader = _safe
 
     cand: cal.Candidate = {
         "intra_threads": 1,
@@ -184,7 +181,7 @@ def test_measure_loader_paths() -> None:
     assert p952 >= 0.0 and sps2 >= 0.0
 
 
-def test_candidate_workers_is_generic(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_candidate_workers_is_generic() -> None:
     # 1 core -> [0]
     limits1: ResourceLimits = {
         "cpu_cores": 1,
@@ -218,7 +215,7 @@ def test_candidate_workers_is_generic(monkeypatch: pytest.MonkeyPatch) -> None:
     assert w8[0] == 0 and w8[-1] <= 4
 
 
-def test_measure_candidate_interop_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_measure_candidate_interop_branch() -> None:
     class _Base(MNISTLike):
         def __len__(self) -> int:
             return 4
@@ -253,17 +250,17 @@ def test_measure_candidate_interop_branch(monkeypatch: pytest.MonkeyPatch) -> No
     _ = cal._measure_candidate(ds, cand, samples=1)
 
 
-def test_measure_candidate_exhausts_backoff_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_measure_candidate_exhausts_backoff_raises() -> None:
     # Always raise to force while-loop to exhaust backoff
-    import pytest
 
-    def _safe(_ds: PreprocessDataset, _cfg: DataLoaderConfig) -> None:
+    def _safe(
+        ds: PreprocessDatasetProtocol, cfg: DataLoaderConfigProtocol
+    ) -> BatchIterableProtocol:
+        _ = (ds, cfg)  # unused
         raise RuntimeError("no memory")
 
-    monkeypatch.setattr(cal, "_safe_loader", _safe, raising=True)
-    import handwriting_ai.training.calibration.measure as _meas
-
-    monkeypatch.setattr(_meas, "_safe_loader", _safe, raising=True)
+    # Use safe_loader hook
+    _test_hooks.safe_loader = _safe
 
     class _Base(MNISTLike):
         def __len__(self) -> int:

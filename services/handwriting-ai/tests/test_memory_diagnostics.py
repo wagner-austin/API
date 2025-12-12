@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pytest
+import importlib
 
 import handwriting_ai.training.memory_diagnostics as md
 from handwriting_ai.monitoring import (
@@ -26,7 +26,7 @@ def _mk_snap(usage_mb: int, limit_mb: int) -> MemorySnapshot:
     )
 
 
-def test_empty_history_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_empty_history_diagnostics() -> None:
     md.reset_diagnostics()
 
     # Provide a current snapshot so get_memory_snapshot() is not called implicitly
@@ -118,15 +118,15 @@ def test_record_batch_memory_auto_init() -> None:
     assert d["window_size"] >= 1
 
 
-def test_reset_diagnostics_no_history_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reset_diagnostics_no_history_branch() -> None:
     # Exercise the branch where _history is None during reset
-    import handwriting_ai.training.memory_diagnostics as _md
-
-    monkeypatch.setattr(_md, "_history", None, raising=False)
-    _md.reset_diagnostics()
+    # Reload the module to get a fresh state where _history is None
+    importlib.reload(md)
+    # At module load, _history is None - calling reset_diagnostics should not error
+    md.reset_diagnostics()
     # Ensure still usable after
-    _md.record_batch_memory(snapshot=_mk_snap(usage_mb=50, limit_mb=1000))
-    d = _md.get_memory_diagnostics(snapshot=_mk_snap(usage_mb=50, limit_mb=1000))
+    md.record_batch_memory(snapshot=_mk_snap(usage_mb=50, limit_mb=1000))
+    d = md.get_memory_diagnostics(snapshot=_mk_snap(usage_mb=50, limit_mb=1000))
     assert d["window_size"] >= 1
 
 

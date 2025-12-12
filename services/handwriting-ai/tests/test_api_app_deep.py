@@ -7,7 +7,6 @@ from concurrent.futures import Future
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -15,13 +14,14 @@ from platform_core.errors import HandwritingErrorCode, handwriting_status_for
 from platform_core.json_utils import JSONValue
 from torch import Tensor, nn
 
-from handwriting_ai.api import app as app_mod
-from handwriting_ai.api.app import create_app
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import PreprocessOptionsDict, PreprocessOutputDict
+from handwriting_ai.api import main as app_mod
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine, LoadStateResult, TorchModel
 from handwriting_ai.inference.manifest import ModelManifest
-from handwriting_ai.inference.types import PredictOutput, PreprocessOutput
-from handwriting_ai.preprocess import PreprocessOptions
+from handwriting_ai.inference.types import PredictOutput
 
 
 def _png_bytes() -> bytes:
@@ -96,18 +96,15 @@ class _ReadyEngine(InferenceEngine):
         return True
 
 
-def test_read_happy_path_logs_and_returns_prediction(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_read_happy_path_logs_and_returns_prediction(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
 
-    def _fake_preprocess(_: Image.Image, opts: PreprocessOptions) -> PreprocessOutput:
+    def _fake_preprocess(img: Image.Image, opts: PreprocessOptionsDict) -> PreprocessOutputDict:
+        _ = (img, opts)  # unused
         png = base64.b64decode(base64.b64encode(b"x"))
         return {"tensor": Tensor(), "visual_png": png}
 
-    import handwriting_ai.api.routes.read as read_mod
-
-    monkeypatch.setattr(read_mod, "run_preprocess", _fake_preprocess)
+    _test_hooks.run_preprocess = _fake_preprocess
     engine = _ReadyEngine(settings)
     app = create_app(settings, engine_provider=lambda: engine, enforce_api_key=False)
     client = TestClient(app)
@@ -121,7 +118,7 @@ def test_read_happy_path_logs_and_returns_prediction(
     assert data["uncertain"] is False
 
 
-def test_optional_reloader_handlers_can_start_and_stop(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_optional_reloader_handlers_can_start_and_stop() -> None:
     app = FastAPI()
     eng = _ReadyEngine(_settings(Path(".")))
 
@@ -244,11 +241,11 @@ def test_read_timeout_cancels_future(tmp_path: Path) -> None:
     assert resp.status_code == 504  # TIMEOUT default status
 
 
-def test_admin_upload_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_upload_branches(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     settings["security"] = {"api_key": "k", "api_key_enabled": True}
 
-    monkeypatch.setattr("handwriting_ai.preprocess.preprocess_signature", lambda: "sig")
+    _test_hooks.preprocess_signature = lambda: "sig"
 
     app = create_app(settings, engine_provider=lambda: _ReadyEngine(settings), enforce_api_key=None)
     client = TestClient(app)
@@ -293,12 +290,11 @@ def test_admin_upload_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         HandwritingErrorCode.preprocessing_failed
     )
 
-    def _load_fail(_: Path) -> dict[str, Tensor]:
+    def _load_fail(path: Path) -> dict[str, Tensor]:
+        _ = path  # Unused - just raise error
         raise ValueError("bad model")
 
-    import handwriting_ai.api.routes.admin as admin_mod
-
-    monkeypatch.setattr(admin_mod, "_engine_load_state_dict_file", _load_fail)
+    _test_hooks.load_state_dict_file = _load_fail
     files_activate = {
         "manifest": ("manifest.json", manifest_valid, "application/json"),
         "model": ("m.pt", b"bytes", "application/octet-stream"),

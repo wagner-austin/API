@@ -155,7 +155,12 @@ def test_measure_candidate_multiple_batch_sizes_no_leak() -> None:
     This simulates the binary search behavior where multiple batch sizes are tested
     sequentially. Without proper DataLoader cleanup, memory would accumulate.
     """
+    import gc
+
     from handwriting_ai.monitoring import get_memory_snapshot
+
+    # Clean up garbage from previous tests to get a stable baseline
+    gc.collect()
 
     base = _FakeMNIST(256)
     cfg: AugmentConfig = {
@@ -173,6 +178,17 @@ def test_measure_candidate_multiple_batch_sizes_no_leak() -> None:
         "morph_kernel_px": 3,
     }
     ds = PreprocessDataset(base, cfg)
+
+    # Warm up PyTorch allocator before taking baseline - this ensures we measure
+    # actual memory leaks, not normal allocator/cache warm-up behavior
+    warmup_cand: Candidate = {
+        "intra_threads": 1,
+        "interop_threads": None,
+        "num_workers": 0,
+        "batch_size": 64,
+    }
+    _measure._measure_candidate(ds, warmup_cand, samples=1)
+    gc.collect()
 
     _ = get_memory_snapshot()
 
@@ -225,6 +241,7 @@ def test_measure_candidate_with_workers_no_leak() -> None:
     This test verifies that worker processes are terminated and their memory is released
     when DataLoader is deleted between batch size attempts.
     """
+    import gc
     import time
 
     from handwriting_ai.monitoring import get_memory_snapshot
@@ -245,6 +262,18 @@ def test_measure_candidate_with_workers_no_leak() -> None:
         "morph_kernel_px": 3,
     }
     ds = PreprocessDataset(base, cfg)
+
+    # Warm up PyTorch allocator before taking baseline - this ensures we measure
+    # actual memory leaks, not normal allocator/cache warm-up behavior
+    warmup_cand: Candidate = {
+        "intra_threads": 1,
+        "interop_threads": None,
+        "num_workers": 1,
+        "batch_size": 64,
+    }
+    _measure._measure_candidate(ds, warmup_cand, samples=1)
+    time.sleep(0.15)  # Allow worker cleanup
+    gc.collect()
 
     # Test multiple batch sizes with worker processes (production-like)
     batch_sizes = [64, 32, 16, 8, 4, 2]

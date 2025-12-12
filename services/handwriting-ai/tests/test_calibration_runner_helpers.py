@@ -473,7 +473,8 @@ class _MockCtx:
     multiprocessing.context.BaseContext interface.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, method_name: str | None = "spawn") -> None:
+        self.method = method_name
         self._attrs: dict[str, _ProcessFactory | _QueueFactory] = {
             "Process": _ProcessFactory(),
             "Queue": _QueueFactory(),
@@ -513,33 +514,40 @@ def _prepare_child_test_output(tmp_path: Path) -> Path:
     return out_dir
 
 
-def _patch_runner_dependencies(monkeypatch: pytest.MonkeyPatch, out_dir: Path) -> None:
-    """Apply monkeypatches for runner test dependencies."""
-    import tempfile as _tmp
+def _set_runner_hooks(out_dir: Path) -> None:
+    """Set hooks for runner test dependencies."""
+    import multiprocessing as mp
 
-    import handwriting_ai.training.calibration.runner as rmod
+    from platform_core.logging import QueueListenerProtocol
 
-    def _mk(prefix: str) -> str:
-        return str(out_dir)
+    from handwriting_ai import _test_hooks
+
+    _test_hooks.tempfile_mkdtemp = lambda prefix: str(out_dir)
 
     def _make_listener(
-        *args: str | int | float | bool | None, **kwargs: str | int | float | bool | None
-    ) -> _NoopListener:
+        queue: mp.Queue[logging.LogRecord],
+        *handlers: logging.Handler,
+        respect_handler_level: bool = False,
+    ) -> QueueListenerProtocol:
+        _ = (queue, handlers, respect_handler_level)  # unused
         return _NoopListener()
 
-    monkeypatch.setattr(_tmp, "mkdtemp", _mk, raising=True)
-    monkeypatch.setattr(rmod, "_QueueListener", _make_listener, raising=True)
+    _test_hooks.queue_listener_factory = _make_listener
+
+    def _make_mock_ctx(method: str | None) -> _MockCtx:
+        return _MockCtx(method)
+
+    _test_hooks.mp_get_context = _make_mock_ctx
 
 
-def test_run_finally_kills_alive_child(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_run_finally_kills_alive_child(tmp_path: Path) -> None:
     """Test that SubprocessRunner kills alive child processes in finally block."""
     import handwriting_ai.training.calibration.runner as rmod
 
     out_dir = _prepare_child_test_output(tmp_path)
-    _patch_runner_dependencies(monkeypatch, out_dir)
+    _set_runner_hooks(out_dir)
 
     runner = rmod.SubprocessRunner()
-    monkeypatch.setattr(runner, "_ctx", _MockCtx(), raising=True)
 
     ds = PreprocessDataset(_TinyBase(2), _CFG)
     cand: Candidate = {
@@ -558,14 +566,12 @@ def test_run_finally_kills_alive_child(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert out["ok"] and out["res"] is not None and int(out["res"]["batch_size"]) == 1
 
 
-def test_child_entry_flush_branch_no_flush_handler(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_child_entry_flush_branch_no_flush_handler(tmp_path: Path) -> None:
     import logging
     import multiprocessing as mp
     from multiprocessing.queues import Queue as MPQueue
 
-    import handwriting_ai.training.calibration.runner as rmod
+    from handwriting_ai import _test_hooks
 
     class _QH(logging.Handler):
         """Minimal queue handler that appears to lack a usable ``flush``.
@@ -575,13 +581,13 @@ def test_child_entry_flush_branch_no_flush_handler(
         can be called successfully.
         """
 
-        def __init__(self, q: MPQueue[logging.LogRecord]) -> None:
+        def __init__(self, q: mp.Queue[logging.LogRecord]) -> None:
             super().__init__()
-            self.q = q
+            self._queue = q
 
         def emit(self, record: logging.LogRecord) -> None:
             """Emit a record by putting it in the queue."""
-            self.q.put_nowait(record)
+            self._queue.put_nowait(record)
 
         def __getattr__(self, name: str) -> None:
             """Pretend that 'flush' does not exist for hasattr checks."""
@@ -589,7 +595,10 @@ def test_child_entry_flush_branch_no_flush_handler(
                 raise AttributeError(f"'{type(self).__name__}' object has no attribute 'flush'")
             raise AttributeError(name)
 
-    monkeypatch.setattr(rmod, "_QueueHandler", _QH, raising=True)
+    def _make_qh(queue: mp.Queue[logging.LogRecord]) -> _QH:
+        return _QH(queue)
+
+    _test_hooks.queue_handler_factory = _make_qh
 
     aug: AugmentSpec = {
         "augment": False,

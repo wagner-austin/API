@@ -2,18 +2,14 @@ from __future__ import annotations
 
 import secrets
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
 import handwriting_ai.jobs.digits as dj
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import ResourceLimitsDict
 from handwriting_ai.inference.engine import build_fresh_state_dict
-from handwriting_ai.training.resources import ResourceLimits
-from handwriting_ai.training.train_config import (
-    TrainConfig,
-    TrainingResult,
-    TrainingResultMetadata,
-)
+from handwriting_ai.training.train_config import TrainConfig, TrainingResult
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
@@ -21,18 +17,19 @@ pytestmark = pytest.mark.usefixtures("digits_redis")
 
 
 @pytest.fixture(autouse=True)
-def _mock_resources(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mock resource detection for Windows/non-container environments."""
-    limits = ResourceLimits(
-        cpu_cores=4,
-        memory_bytes=4 * 1024 * 1024 * 1024,
-        optimal_threads=2,
-        optimal_workers=0,
-        max_batch_size=64,
-    )
-    import handwriting_ai.training.runtime as rt
+def _mock_resources() -> None:
+    """Configure resource detection for Windows/non-container environments."""
 
-    monkeypatch.setattr(rt, "detect_resource_limits", lambda: limits, raising=False)
+    def _fake_limits() -> ResourceLimitsDict:
+        return {
+            "cpu_cores": 4,
+            "memory_bytes": 4 * 1024 * 1024 * 1024,
+            "optimal_threads": 2,
+            "optimal_workers": 0,
+            "max_batch_size": 64,
+        }
+
+    _test_hooks.detect_resource_limits = _fake_limits
 
 
 def _quick_training(cfg: TrainConfig) -> TrainingResult:
@@ -40,31 +37,30 @@ def _quick_training(cfg: TrainConfig) -> TrainingResult:
     run_rand = secrets.token_hex(3)
     run_id = f"{run_ts}-{run_rand}"
     sd = build_fresh_state_dict(arch="resnet18", n_classes=10)
-    meta: TrainingResultMetadata = {
-        "run_id": run_id,
-        "epochs": int(cfg["epochs"]),
-        "batch_size": int(cfg["batch_size"]),
-        "lr": float(cfg["lr"]),
-        "seed": int(cfg["seed"]),
-        "device": str(cfg["device"]),
-        "optim": str(cfg["optim"]),
-        "scheduler": str(cfg["scheduler"]),
-        "augment": bool(cfg["augment"]),
-    }
     return {
         "model_id": cfg["model_id"],
         "state_dict": sd,
         "val_acc": 0.1,
-        "metadata": meta,
+        "metadata": {
+            "run_id": run_id,
+            "epochs": int(cfg["epochs"]),
+            "batch_size": int(cfg["batch_size"]),
+            "lr": float(cfg["lr"]),
+            "seed": int(cfg["seed"]),
+            "device": str(cfg["device"]),
+            "optim": str(cfg["optim"]),
+            "scheduler": str(cfg["scheduler"]),
+            "augment": bool(cfg["augment"]),
+        },
     }
 
 
-def test_process_train_job_with_no_publisher(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _quick_training_raises(cfg: TrainConfig) -> Path:
+def test_process_train_job_with_no_publisher() -> None:
+    def _quick_training_raises(cfg: TrainConfig) -> TrainingResult:
         # Raise to test that error is raised even without publisher
         raise RuntimeError("training failed")
 
-    monkeypatch.setattr(dj, "_run_training", _quick_training_raises, raising=True)
+    _test_hooks.run_training = _quick_training_raises
 
     payload: dict[str, UnknownJson] = {
         "type": "digits.train.v1",

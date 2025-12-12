@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import pytest
 import torch
 from torch import nn
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.train_utils import (
     bytes_of_model_and_grads,
     torch_allocator_stats,
@@ -41,30 +41,13 @@ def test_torch_allocator_stats_sane() -> None:
         assert allocated >= 0 and reserved >= 0 and max_alloc >= 0
 
 
-def test_torch_allocator_stats_cuda_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_torch_allocator_stats_cuda_branch() -> None:
     # Simulate CUDA available and provide deterministic values
-    import torch
-
-    def _is_available() -> bool:
-        return True
-
-    def _current_device() -> int:
-        return 0
-
-    def _mem_alloc(dev: int) -> int:
-        return 123456
-
-    def _mem_reserved(dev: int) -> int:
-        return 234567
-
-    def _mem_max_alloc(dev: int) -> int:
-        return 345678
-
-    monkeypatch.setattr(torch.cuda, "is_available", _is_available, raising=True)
-    monkeypatch.setattr(torch.cuda, "current_device", _current_device, raising=True)
-    monkeypatch.setattr(torch.cuda, "memory_allocated", _mem_alloc, raising=True)
-    monkeypatch.setattr(torch.cuda, "memory_reserved", _mem_reserved, raising=True)
-    monkeypatch.setattr(torch.cuda, "max_memory_allocated", _mem_max_alloc, raising=True)
+    _test_hooks.torch_cuda_is_available = lambda: True
+    _test_hooks.torch_cuda_current_device = lambda: 0
+    _test_hooks.torch_cuda_memory_allocated = lambda dev: 123456
+    _test_hooks.torch_cuda_memory_reserved = lambda dev: 234567
+    _test_hooks.torch_cuda_max_memory_allocated = lambda dev: 345678
 
     available, allocated, reserved, max_alloc = torch_allocator_stats()
     assert available is True

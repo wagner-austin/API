@@ -4,11 +4,12 @@ import concurrent.futures as cf
 import io
 import time
 from collections.abc import Callable, Sequence
+from concurrent.futures import Future
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol, Self, runtime_checkable
 
-import pytest
+import torch
 import torch.nn as nn
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -16,7 +17,8 @@ from platform_core.errors import AppError, ErrorCode, HandwritingErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 from torch import Tensor
 
-from handwriting_ai.api.app import (
+from handwriting_ai import _test_hooks
+from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,
     create_app,
@@ -33,21 +35,22 @@ from handwriting_ai.inference.manifest import ModelManifest
 from handwriting_ai.inference.types import PredictOutput
 
 
-class _DummyFuture:
-    def __init__(self, result_fn: Callable[[float | None], PredictOutput] | None = None) -> None:
-        self._fn = result_fn
-        self._cancelled = False
+def _make_future(result_fn: Callable[[float | None], PredictOutput]) -> Future[PredictOutput]:
+    """Create a Future that calls result_fn when result() is called.
 
-    def result(self, timeout: float | None = None) -> PredictOutput:
-        assert self._fn is not None
-        return self._fn(timeout)
+    Uses a real Future but executes the callable immediately when result() is called.
+    This allows testing timeout behavior and exceptions.
+    """
 
-    def cancel(self) -> None:
-        self._cancelled = True
+    class _DeferredFuture(Future[PredictOutput]):
+        def __init__(self, fn: Callable[[float | None], PredictOutput]) -> None:
+            super().__init__()
+            self._fn = fn
 
-    @property
-    def cancelled(self) -> bool:
-        return self._cancelled
+        def result(self, timeout: float | None = None) -> PredictOutput:
+            return self._fn(timeout)
+
+    return _DeferredFuture(result_fn)
 
 
 @runtime_checkable
@@ -158,18 +161,23 @@ def test_basic_routes_and_models(tmp_path: Path) -> None:
     assert client.get("/healthz").status_code == 200
 
 
-def test_read_success_uncertain_and_visual(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_success_uncertain_and_visual(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
     engine = InferenceEngine(settings)
 
     probs_tuple = tuple(0.1 for _ in range(10))
     out: PredictOutput = {"digit": 3, "confidence": 0.4, "probs": probs_tuple, "model_id": "m"}
-    fut = _DummyFuture(lambda _t: out)
 
-    def _submit_predict_stub(_: Tensor) -> _DummyFuture:
+    def _result_fn(_t: float | None) -> PredictOutput:
+        return out
+
+    fut: Future[PredictOutput] = _make_future(_result_fn)
+
+    def _submit_predict_stub(preprocessed: Tensor) -> Future[PredictOutput]:
+        _ = preprocessed  # Unused
         return fut
 
-    monkeypatch.setattr(engine, "submit_predict", _submit_predict_stub, raising=True)
+    _test_hooks.submit_predict_override = _submit_predict_stub
 
     app = create_app(settings=settings, engine_provider=lambda: engine)
     client = TestClient(app)
@@ -181,7 +189,7 @@ def test_read_success_uncertain_and_visual(tmp_path: Path, monkeypatch: pytest.M
     assert isinstance(body["visual_png_b64"], str) and len(body["visual_png_b64"]) > 0
 
 
-def test_read_timeout_and_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_timeout_and_not_ready(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
     engine = InferenceEngine(settings)
 
@@ -189,12 +197,13 @@ def test_read_timeout_and_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     def _raise_timeout(_: float | None) -> PredictOutput:
         raise cf.TimeoutError()
 
-    fut_timeout = _DummyFuture(_raise_timeout)
+    fut_timeout: Future[PredictOutput] = _make_future(_raise_timeout)
 
-    def _submit_timeout(_: Tensor) -> _DummyFuture:
+    def _submit_timeout(preprocessed: Tensor) -> Future[PredictOutput]:
+        _ = preprocessed  # Unused
         return fut_timeout
 
-    monkeypatch.setattr(engine, "submit_predict", _submit_timeout, raising=True)
+    _test_hooks.submit_predict_override = _submit_timeout
     app1 = create_app(settings=settings, engine_provider=lambda: engine)
     c1 = TestClient(app1)
     r1 = c1.post("/v1/read", files={"file": ("a.png", _png_bytes(), "image/png")})
@@ -205,12 +214,13 @@ def test_read_timeout_and_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     def _raise_not_ready(_: float | None) -> PredictOutput:
         raise RuntimeError("Model not loaded")
 
-    fut_not_ready = _DummyFuture(_raise_not_ready)
+    fut_not_ready: Future[PredictOutput] = _make_future(_raise_not_ready)
 
-    def _submit_not_ready(_: Tensor) -> _DummyFuture:
+    def _submit_not_ready(preprocessed: Tensor) -> Future[PredictOutput]:
+        _ = preprocessed  # Unused
         return fut_not_ready
 
-    monkeypatch.setattr(engine, "submit_predict", _submit_not_ready, raising=True)
+    _test_hooks.submit_predict_override = _submit_not_ready
     app2 = create_app(settings=settings, engine_provider=lambda: engine)
     c2 = TestClient(app2)
     r2 = c2.post("/v1/read", files={"file": ("a.png", _png_bytes(), "image/png")})
@@ -218,7 +228,7 @@ def test_read_timeout_and_not_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert r2.status_code == 503 and r2_body["code"] == ErrorCode.SERVICE_UNAVAILABLE
 
 
-def test_read_validation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_validation_paths(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
     engine = InferenceEngine(settings)
     # Successful future (not used when validation fails)
@@ -228,10 +238,11 @@ def test_read_validation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     def _return_out(_: float | None) -> PredictOutput:
         return out
 
-    def _submit_success(_: Tensor) -> _DummyFuture:
-        return _DummyFuture(_return_out)
+    def _submit_success(preprocessed: Tensor) -> Future[PredictOutput]:
+        _ = preprocessed  # Unused
+        return _make_future(_return_out)
 
-    monkeypatch.setattr(engine, "submit_predict", _submit_success, raising=True)
+    _test_hooks.submit_predict_override = _submit_success
     app = create_app(settings=settings, engine_provider=lambda: engine)
     client = TestClient(app)
 
@@ -291,7 +302,7 @@ def test_read_validation_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert r5.status_code == 400 and r5_body["code"] == HandwritingErrorCode.bad_dimensions.value
 
 
-def test_admin_upload_activate_and_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_upload_activate_and_errors(tmp_path: Path) -> None:
     settings = _mk_settings(tmp_path)
     engine = InferenceEngine(settings)
     # Active model id matches upload so engine.try_load_active may be called
@@ -330,25 +341,16 @@ def test_admin_upload_activate_and_errors(tmp_path: Path, monkeypatch: pytest.Mo
     }
     man_bytes = dump_json_str(man).encode("utf-8")
 
-    # Patch loader and validator to succeed
-    def __fake_load(_path: Path) -> dict[str, Tensor]:
-        import torch
-
+    # Set hooks for loader and validator to succeed
+    def _fake_load(path: Path) -> dict[str, Tensor]:
+        _ = path  # Unused
         return {"fc.weight": torch.zeros(1), "fc.bias": torch.zeros(1)}
 
-    def __fake_validate(_sd: dict[str, Tensor], _arch: str, _n: int) -> None:
-        pass
+    def _fake_validate(sd: dict[str, Tensor], arch: str, n_classes: int) -> None:
+        _ = (sd, arch, n_classes)  # Unused
 
-    monkeypatch.setattr(
-        "handwriting_ai.api.routes.admin._engine_load_state_dict_file",
-        __fake_load,
-        raising=True,
-    )
-    monkeypatch.setattr(
-        "handwriting_ai.api.routes.admin._engine_validate_state_dict",
-        __fake_validate,
-        raising=True,
-    )
+    _test_hooks.load_state_dict_file = _fake_load
+    _test_hooks.validate_state_dict = _fake_validate
 
     files = {
         "manifest": ("manifest.json", man_bytes, "application/json"),
@@ -381,7 +383,7 @@ def test_admin_upload_activate_and_errors(tmp_path: Path, monkeypatch: pytest.Mo
     assert empty_body["code"] == HandwritingErrorCode.invalid_model.value
 
 
-def test_exception_handlers_and_api_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_exception_handlers_and_api_key(tmp_path: Path) -> None:
     # Require API key
     settings = _mk_settings(tmp_path, api_key="secret")
     engine = InferenceEngine(settings)
@@ -391,10 +393,11 @@ def test_exception_handlers_and_api_key(tmp_path: Path, monkeypatch: pytest.Monk
     def _return_out2(_: float | None) -> PredictOutput:
         return out
 
-    def _submit_success2(_: Tensor) -> _DummyFuture:
-        return _DummyFuture(_return_out2)
+    def _submit_success2(preprocessed: Tensor) -> Future[PredictOutput]:
+        _ = preprocessed  # Unused
+        return _make_future(_return_out2)
 
-    monkeypatch.setattr(engine, "submit_predict", _submit_success2, raising=True)
+    _test_hooks.submit_predict_override = _submit_success2
     app = create_app(settings=settings, engine_provider=lambda: engine)
 
     def _boom_app() -> None:

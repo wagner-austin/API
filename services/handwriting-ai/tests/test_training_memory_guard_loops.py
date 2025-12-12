@@ -9,6 +9,7 @@ from torch import Tensor
 from torch.nn import Module
 from torch.optim.optimizer import Optimizer
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training import loops
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
@@ -57,9 +58,9 @@ class _NoopOpt(Optimizer):
         return None
 
 
-def test_train_epoch_triggers_guard(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Force the guard path in loops
-    monkeypatch.setattr(loops, "on_batch_check", lambda: True, raising=True)
+def test_train_epoch_triggers_guard() -> None:
+    # Force the guard path in loops using hooks
+    _test_hooks.on_batch_check = lambda: True
 
     model = _Model()
     opt = _NoopOpt()

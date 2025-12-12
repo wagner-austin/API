@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 from typing import Protocol
 
 import pytest
 import torch
 from PIL import Image
-from platform_core.logging import get_logger
 from torch import Tensor
 from torch.nn import Module
-from torch.optim.optimizer import Optimizer
+from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import DataLoader, Dataset
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import BatchLoaderProtocol
 from handwriting_ai.training import mnist_train as mt
 from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.mnist_train import (
@@ -34,11 +34,9 @@ class MnistRawWriter(Protocol):
 
 
 @pytest.fixture(autouse=True)
-def _mock_monitoring(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_monitoring() -> None:
     """Mock monitoring functions that fail on non-container systems."""
-    import handwriting_ai.training.mnist_train as mt
-
-    monkeypatch.setattr(mt, "log_system_info", lambda: None, raising=False)
+    _test_hooks.log_system_info = lambda: None
 
 
 class _TinyBase(Dataset[tuple[Image.Image, int]]):
@@ -220,9 +218,7 @@ def test_train_calls_evaluate_in_epoch(tmp_path: Path, write_mnist_raw: MnistRaw
     assert called["n"] >= 1
 
 
-def test_train_interrupt_saves_artifact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_mnist_raw: MnistRawWriter
-) -> None:
+def test_train_interrupt_saves_artifact(tmp_path: Path, write_mnist_raw: MnistRawWriter) -> None:
     # Patch _train_epoch to raise KeyboardInterrupt and ensure artifacts still write
     cfg = _cfg(tmp_path)
     cfg["out_dir"] = tmp_path / "out_interrupt"
@@ -232,17 +228,17 @@ def test_train_interrupt_saves_artifact(
 
     def _boom(
         model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: Optimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         raise KeyboardInterrupt
 
-    # Patch with automatic restoration to avoid cross-test leakage
-    monkeypatch.setattr(mt, "_train_epoch", _boom, raising=True)
+    # Use hook to override train_epoch behavior
+    _test_hooks.train_epoch = _boom
     write_mnist_raw(cfg["data_root"], n=8)
     result = train_with_config(cfg, (train_base, test_base))
     # Even when interrupted, we should still get current/best weights and metadata
@@ -253,37 +249,20 @@ def test_train_interrupt_saves_artifact(
 def test_train_threads_log_branch_no_interop(
     tmp_path: Path, write_mnist_raw: MnistRawWriter
 ) -> None:
-    # Exercise branch where torch has no get_num_interop_threads
+    # Exercise branch where torch has no interop threads functions (line 228)
     cfg = _cfg(tmp_path)
     cfg["out_dir"] = tmp_path / "out_threads"
     cfg["epochs"] = 1
     train_base = _TinyBase(2)
     test_base = _TinyBase(2)
 
-    from collections.abc import Callable
-
-    import torch as _torch
-
-    had_attr = False
-    saved: Callable[[], int] | None = None
-    try:
-        saved = _torch.get_num_interop_threads
-        had_attr = True
-    except AttributeError:
-        # Not available in this build; log to satisfy guard
-
-        get_logger("handwriting_ai").info("get_num_interop_threads_absent")
-        saved = None
-        had_attr = False
-    if had_attr:
-        delattr(_torch, "get_num_interop_threads")
-    try:
-        write_mnist_raw(cfg["data_root"], n=8)
-        result = train_with_config(cfg, (train_base, test_base))
-        assert result["state_dict"]  # has state dict
-    finally:
-        if had_attr and saved is not None:
-            _torch.get_num_interop_threads = saved
+    # Use hooks to simulate torch not having interop thread functions
+    # This covers both the set function (for apply_threads) and get function (for logging)
+    _test_hooks.torch_has_set_num_interop_threads = lambda: False
+    _test_hooks.torch_has_get_num_interop_threads = lambda: False
+    write_mnist_raw(cfg["data_root"], n=8)
+    result = train_with_config(cfg, (train_base, test_base))
+    assert result["state_dict"]  # has state dict
 
 
 def test_ensure_image_guard_and_ok() -> None:

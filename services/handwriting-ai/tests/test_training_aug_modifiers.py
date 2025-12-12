@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from PIL import Image
 from torch import Tensor
 from torch.utils.data import Dataset
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.augment import ensure_l_mode, maybe_add_dots
 from handwriting_ai.training.mnist_train import make_loaders
 from handwriting_ai.training.train_config import default_train_config
@@ -79,11 +79,11 @@ def test_ensure_l_mode_converts_rgb() -> None:
     assert g.mode == "L"
 
 
-def test_maybe_add_dots_early_return(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maybe_add_dots_early_return() -> None:
     img = Image.new("L", (10, 10), 0)
 
     # Force the early return path inside maybe_add_dots (random.random() >= p)
-    monkeypatch.setattr("random.random", lambda: 0.99)
+    _test_hooks.random_random = lambda: 0.99
     out = maybe_add_dots(img, prob=0.5, count=3, size_px=2)
     # Should be identical shape and remain grayscale
     assert out.size == img.size and out.mode == "L"

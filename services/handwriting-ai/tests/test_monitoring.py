@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from io import StringIO
 from pathlib import Path
 
@@ -14,7 +15,11 @@ import handwriting_ai.monitoring as mon
 
 class _DummyMemInfo:
     def __init__(self, rss: int) -> None:
-        self.rss = rss
+        self._rss = rss
+
+    @property
+    def rss(self) -> int:
+        return self._rss
 
 
 class _DummyVM:
@@ -27,14 +32,18 @@ class _DummyVM:
 
 class _DummyProcess:
     def __init__(self, pid: int, rss: int, children: list[_DummyProcess] | None = None) -> None:
-        self.pid = pid
+        self._pid = pid
         self._rss = rss
         self._children = children or []
+
+    @property
+    def pid(self) -> int:
+        return self._pid
 
     def memory_info(self) -> _DummyMemInfo:
         return _DummyMemInfo(self._rss)
 
-    def children(self, recursive: bool = False) -> list[_DummyProcess]:
+    def children(self, recursive: bool = False) -> Sequence[_DummyProcess]:
         return self._children
 
 
@@ -131,14 +140,16 @@ total 400
 # Test cgroup reading functions
 
 
-def test_read_cgroup_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_usage(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
     current_file.write_text("524288000", encoding="utf-8")
     max_file.write_text("1048576000", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
 
     usage = mon._read_cgroup_usage()
     assert usage["usage_bytes"] == 524288000
@@ -146,29 +157,35 @@ def test_read_cgroup_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     assert abs(usage["percent"] - 50.0) < 0.01
 
 
-def test_read_cgroup_usage_unlimited(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_usage_unlimited(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
     current_file.write_text("524288000", encoding="utf-8")
     max_file.write_text("max", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
 
     with pytest.raises(RuntimeError, match="unlimited"):
         mon._read_cgroup_usage()
 
 
-def test_read_cgroup_usage_no_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_usage_no_files(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current = tmp_path / "current"
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current)
+    _test_hooks.cgroup_mem_current = current
 
     with pytest.raises(RuntimeError, match="no cgroup memory files found"):
         mon._read_cgroup_usage()
 
 
-def test_read_cgroup_breakdown(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_breakdown(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     stat_file = tmp_path / "memory.stat"
     stat_content = """anon 100000000
 file 200000000
@@ -177,7 +194,7 @@ slab 25000000
 other_field 12345
 """
     stat_file.write_text(stat_content, encoding="utf-8")
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_stat = stat_file
 
     breakdown = mon._read_cgroup_breakdown()
     assert breakdown["anon_bytes"] == 100000000
@@ -186,13 +203,13 @@ other_field 12345
     assert breakdown["slab_bytes"] == 25000000
 
 
-def test_read_cgroup_breakdown_missing_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_read_cgroup_breakdown_missing_fields(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     stat_file = tmp_path / "memory.stat"
     stat_content = "other_field 12345\n"
     stat_file.write_text(stat_content, encoding="utf-8")
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_stat = stat_file
 
     breakdown = mon._read_cgroup_breakdown()
     assert breakdown["anon_bytes"] == 0
@@ -201,54 +218,58 @@ def test_read_cgroup_breakdown_missing_fields(
     assert breakdown["slab_bytes"] == 0
 
 
-def test_read_cgroup_breakdown_no_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_breakdown_no_files(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     stat = tmp_path / "stat"
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat)
+    _test_hooks.cgroup_mem_stat = stat
 
     with pytest.raises(RuntimeError, match=r"no cgroup memory\.stat file found"):
         mon._read_cgroup_breakdown()
 
 
-def test_read_cgroup_breakdown_empty_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_read_cgroup_breakdown_empty_file(tmp_path: Path) -> None:
     """Test that empty stat file raises RuntimeError"""
+    from handwriting_ai import _test_hooks
+
     stat_file = tmp_path / "memory.stat"
     stat_file.write_text("", encoding="utf-8")
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_stat = stat_file
 
     with pytest.raises(RuntimeError, match="parsing produced no valid entries"):
         mon._read_cgroup_breakdown()
 
 
-def test_read_cgroup_breakdown_all_invalid_lines_raises_after_logging(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_read_cgroup_breakdown_all_invalid_lines_raises_after_logging(tmp_path: Path) -> None:
     """Test that file with all invalid lines raises after logging"""
+    from handwriting_ai import _test_hooks
+
     stat_file = tmp_path / "memory.stat"
     stat_content = """invalid line format
 field1 not_a_number
 single_field
 """
     stat_file.write_text(stat_content, encoding="utf-8")
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_stat = stat_file
 
     # Should raise ValueError from _parse_cgroup_stat after logging
     with pytest.raises(ValueError):
         mon._read_cgroup_breakdown()
 
 
-def test_read_cgroup_breakdown_missing_core_metrics(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_read_cgroup_breakdown_missing_core_metrics(tmp_path: Path) -> None:
     """Test that missing core metrics (anon=0, file=0) logs warning but continues"""
     from io import StringIO
+
+    from handwriting_ai import _test_hooks
 
     stat_file = tmp_path / "memory.stat"
     stat_content = """kernel 50000000
 slab 25000000
 """
     stat_file.write_text(stat_content, encoding="utf-8")
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_stat = stat_file
 
     logger = get_logger("handwriting_ai")
     buf = StringIO()
@@ -274,27 +295,31 @@ slab 25000000
 # Test worker process detection
 
 
-def test_get_worker_processes_no_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_worker_processes_no_workers() -> None:
+    from handwriting_ai import _test_hooks
+
     parent = _DummyProcess(pid=100, rss=100 * 1024 * 1024, children=[])
 
-    def _proc_factory(pid: int) -> _DummyProcess:
+    def _proc_factory(pid: int | None = None) -> _DummyProcess:
         return parent
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
+    _test_hooks.psutil_process = _proc_factory
 
     workers = mon._get_worker_processes(100)
     assert workers == ()
 
 
-def test_get_worker_processes_with_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_worker_processes_with_workers() -> None:
+    from handwriting_ai import _test_hooks
+
     child1 = _DummyProcess(pid=101, rss=50 * 1024 * 1024)
     child2 = _DummyProcess(pid=102, rss=75 * 1024 * 1024)
     parent = _DummyProcess(pid=100, rss=100 * 1024 * 1024, children=[child1, child2])
 
-    def _proc_factory(pid: int) -> _DummyProcess:
+    def _proc_factory(pid: int | None = None) -> _DummyProcess:
         return parent
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
+    _test_hooks.psutil_process = _proc_factory
 
     workers = mon._get_worker_processes(100)
     assert len(workers) == 2
@@ -304,62 +329,75 @@ def test_get_worker_processes_with_workers(monkeypatch: pytest.MonkeyPatch) -> N
     assert workers[1]["rss_bytes"] == 75 * 1024 * 1024
 
 
-def test_get_worker_processes_lookup_failure_raises_after_logging(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_get_worker_processes_lookup_failure_raises_after_logging() -> None:
     """Test that psutil.Process raises OSError after logging"""
+    import psutil
 
-    def _proc_factory(pid: int) -> None:
+    from handwriting_ai import _test_hooks
+
+    def _proc_factory(pid: int | None = None) -> psutil.Process:
         raise OSError("Process not found")
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
+    _test_hooks.psutil_process = _proc_factory
     # Should raise after logging
     with pytest.raises(OSError, match="Process not found"):
         mon._get_worker_processes(100)
 
 
-def test_get_worker_processes_child_memory_failure_raises_after_logging(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_get_worker_processes_child_memory_failure_raises_after_logging() -> None:
     """Test that child.memory_info() raises exception after logging"""
+    from handwriting_ai import _test_hooks
+    from handwriting_ai._test_hooks import MemoryInfoProtocol, PsutilProcessProtocol
 
     class _FailingProcess:
-        pid = 101
+        @property
+        def pid(self) -> int:
+            return 101
 
-        def memory_info(self) -> None:
+        def memory_info(self) -> MemoryInfoProtocol:
             raise OSError("Access denied")
 
-        def children(self, recursive: bool = False) -> list[_FailingProcess]:
+        def children(self, recursive: bool = False) -> Sequence[PsutilProcessProtocol]:
             return [self]
 
-    def _proc_factory(pid: int) -> _FailingProcess:
+    def _proc_factory(pid: int | None = None) -> PsutilProcessProtocol:
         return _FailingProcess()
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
+    _test_hooks.psutil_process = _proc_factory
     # Should raise after logging
     with pytest.raises(OSError, match="Access denied"):
         mon._get_worker_processes(100)
 
 
-def test_get_worker_processes_invalid_types(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test line 185->179: isinstance check fails for non-int pid/rss"""
+def test_get_worker_processes_invalid_types() -> None:
+    """Test line 185->179: isinstance check fails for non-int pid/rss.
+
+    This test deliberately creates a fake that returns wrong types at runtime
+    to verify the production code's isinstance defensive checks work correctly.
+    """
+    from handwriting_ai import _test_hooks
+    from handwriting_ai._test_hooks import MemoryInfoProtocol, PsutilProcessProtocol
 
     class _BadMemInfo:
-        rss = "not_an_int"  # Non-integer value
+        @property
+        def rss(self) -> str:
+            return "not_an_int"
 
     class _BadProcess:
-        pid = 101
+        @property
+        def pid(self) -> int:
+            return 101
 
-        def memory_info(self) -> _BadMemInfo:
+        def memory_info(self) -> MemoryInfoProtocol:
             return _BadMemInfo()
 
-        def children(self, recursive: bool = False) -> list[_BadProcess]:
+        def children(self, recursive: bool = False) -> Sequence[PsutilProcessProtocol]:
             return [self]
 
-    def _proc_factory(pid: int) -> _BadProcess:
+    def _proc_factory(pid: int | None = None) -> PsutilProcessProtocol:
         return _BadProcess()
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
+    _test_hooks.psutil_process = _proc_factory
     workers = mon._get_worker_processes(100)
     # Should skip the bad process and return empty tuple
     assert workers == ()
@@ -368,7 +406,9 @@ def test_get_worker_processes_invalid_types(monkeypatch: pytest.MonkeyPatch) -> 
 # Test CgroupMemoryMonitor
 
 
-def test_cgroup_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_cgroup_monitor_get_snapshot(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     # Set up cgroup files
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
@@ -381,9 +421,9 @@ def test_cgroup_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
+    _test_hooks.cgroup_mem_stat = stat_file
 
     # Mock psutil for main process and workers
     child1 = _DummyProcess(pid=101, rss=50 * 1024 * 1024)
@@ -393,8 +433,8 @@ def test_cgroup_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     def _proc_factory(pid: int | None = None) -> _DummyProcess:
         return parent
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
-    monkeypatch.setattr("handwriting_ai.monitoring.os.getpid", lambda: 100)
+    _test_hooks.psutil_process = _proc_factory
+    _test_hooks.os_getpid = lambda: 100
 
     monitor = mon.CgroupMemoryMonitor()
     snap = monitor.get_snapshot()
@@ -409,21 +449,25 @@ def test_cgroup_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert snap["cgroup_breakdown"]["file_bytes"] == 200000000
 
 
-def test_cgroup_monitor_check_pressure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_cgroup_monitor_check_pressure(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
     current_file.write_text("950000000", encoding="utf-8")
     max_file.write_text("1000000000", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
 
     monitor = mon.CgroupMemoryMonitor()
     assert monitor.check_pressure(threshold_percent=90.0) is True
     assert monitor.check_pressure(threshold_percent=96.0) is False
 
 
-def test_cgroup_monitor_log_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_cgroup_monitor_log_snapshot(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     # Set up minimal cgroup files
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
@@ -433,17 +477,17 @@ def test_cgroup_monitor_log_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     max_file.write_text("200000000", encoding="utf-8")
     stat_file.write_text("anon 10000000\nfile 20000000\nkernel 5000000\nslab 2000000\n")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_STAT", stat_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
+    _test_hooks.cgroup_mem_stat = stat_file
 
     parent = _DummyProcess(pid=100, rss=50 * 1024 * 1024, children=[])
 
     def _proc_factory(pid: int | None = None) -> _DummyProcess:
         return parent
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
-    monkeypatch.setattr("handwriting_ai.monitoring.os.getpid", lambda: 100)
+    _test_hooks.psutil_process = _proc_factory
+    _test_hooks.os_getpid = lambda: 100
 
     monitor = mon.CgroupMemoryMonitor()
     logger = get_logger("handwriting_ai")
@@ -466,7 +510,9 @@ def test_cgroup_monitor_log_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 # Test SystemMemoryMonitor
 
 
-def test_system_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_system_monitor_get_snapshot() -> None:
+    from handwriting_ai import _test_hooks
+
     parent = _DummyProcess(pid=100, rss=100 * 1024 * 1024, children=[])
 
     def _proc_factory(pid: int | None = None) -> _DummyProcess:
@@ -480,9 +526,9 @@ def test_system_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
             percent=50.0,
         )
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.Process", _proc_factory)
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.virtual_memory", _vm)
-    monkeypatch.setattr("handwriting_ai.monitoring.os.getpid", lambda: 100)
+    _test_hooks.psutil_process = _proc_factory
+    _test_hooks.psutil_virtual_memory = _vm
+    _test_hooks.os_getpid = lambda: 100
 
     monitor = mon.SystemMemoryMonitor()
     snap = monitor.get_snapshot()
@@ -500,7 +546,9 @@ def test_system_monitor_get_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
     assert snap["cgroup_breakdown"]["slab_bytes"] == 0
 
 
-def test_system_monitor_check_pressure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_system_monitor_check_pressure() -> None:
+    from handwriting_ai import _test_hooks
+
     def _vm() -> _DummyVM:
         return _DummyVM(
             total=100 * 1024 * 1024,
@@ -509,7 +557,7 @@ def test_system_monitor_check_pressure(monkeypatch: pytest.MonkeyPatch) -> None:
             percent=95.0,
         )
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.virtual_memory", _vm)
+    _test_hooks.psutil_virtual_memory = _vm
 
     monitor = mon.SystemMemoryMonitor()
     assert monitor.check_pressure(threshold_percent=90.0) is True
@@ -519,37 +567,43 @@ def test_system_monitor_check_pressure(monkeypatch: pytest.MonkeyPatch) -> None:
 # Test module-level functions and detection
 
 
-def test_detect_cgroups_available(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_detect_cgroups_available(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current_file = tmp_path / "memory.current"
     current_file.write_text("1000", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
+    _test_hooks.cgroup_mem_current = current_file
 
     assert mon._detect_cgroups_available() is True
 
 
-def test_detect_cgroups_not_available(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_detect_cgroups_not_available(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     current = tmp_path / "current"
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current)
+    _test_hooks.cgroup_mem_current = current
 
     assert mon._detect_cgroups_available() is False
 
 
-def test_log_system_info_container(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_log_system_info_container(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     # Container mode: cgroup files exist
     current_file = tmp_path / "memory.current"
     max_file = tmp_path / "memory.max"
     current_file.write_text("500000000", encoding="utf-8")
     max_file.write_text("1000000000", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
-    monkeypatch.setattr(mon, "_CGROUP_MEM_MAX", max_file)
+    _test_hooks.cgroup_mem_current = current_file
+    _test_hooks.cgroup_mem_max = max_file
 
-    def _cpu_count(logical: bool | None = True) -> int:
+    def _cpu_count(*, logical: bool = True) -> int:
         return 8 if logical else 4
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.cpu_count", _cpu_count)
+    _test_hooks.psutil_cpu_count = _cpu_count
 
     logger = get_logger("handwriting_ai")
     buf = StringIO()
@@ -568,22 +622,22 @@ def test_log_system_info_container(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     assert "cgroup_mem_limit_mb=" in out
 
 
-def test_log_system_info_non_container_raises_when_vm_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_log_system_info_non_container_raises_when_vm_fails(tmp_path: Path) -> None:
+    from handwriting_ai import _test_hooks
+
     # Non-container mode: no cgroup files
     current = tmp_path / "current"
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current)
+    _test_hooks.cgroup_mem_current = current
 
-    def _cpu_count(logical: bool | None = True) -> int:
+    def _cpu_count(*, logical: bool = True) -> int:
         return 8 if logical else 4
 
     def _vm() -> _DummyVM:
         raise RuntimeError("VM info failed")
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.cpu_count", _cpu_count)
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.virtual_memory", _vm)
+    _test_hooks.psutil_cpu_count = _cpu_count
+    _test_hooks.psutil_virtual_memory = _vm
 
     logger = get_logger("handwriting_ai")
     buf = StringIO()
@@ -598,22 +652,26 @@ def test_log_system_info_non_container_raises_when_vm_fails(
         logger.removeHandler(handler)
 
 
-def test_create_monitor_cgroup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_create_monitor_cgroup(tmp_path: Path) -> None:
     """Test _create_monitor returns CgroupMemoryMonitor"""
+    from handwriting_ai import _test_hooks
+
     current_file = tmp_path / "memory.current"
     current_file.write_text("1000", encoding="utf-8")
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current_file)
+    _test_hooks.cgroup_mem_current = current_file
 
     monitor = mon._create_monitor()
     assert type(monitor) is mon.CgroupMemoryMonitor
 
 
-def test_create_monitor_system(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_create_monitor_system(tmp_path: Path) -> None:
     """Test _create_monitor returns SystemMemoryMonitor"""
+    from handwriting_ai import _test_hooks
+
     current = tmp_path / "current"
 
-    monkeypatch.setattr(mon, "_CGROUP_MEM_CURRENT", current)
+    _test_hooks.cgroup_mem_current = current
 
     def _vm() -> _DummyVM:
         return _DummyVM(
@@ -623,7 +681,7 @@ def test_create_monitor_system(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
             percent=50.0,
         )
 
-    monkeypatch.setattr("handwriting_ai.monitoring.psutil.virtual_memory", _vm)
+    _test_hooks.psutil_virtual_memory = _vm
 
     monitor = mon._create_monitor()
     assert type(monitor) is mon.SystemMemoryMonitor

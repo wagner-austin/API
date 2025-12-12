@@ -1,35 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
 
-import pytest
 from PIL import Image
 
-from handwriting_ai.monitoring import (
-    CgroupMemoryBreakdown,
-    CgroupMemoryUsage,
-    MemorySnapshot,
-    ProcessMemory,
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    CandidateRunnerProtocol,
+    MemorySnapshotDict,
+    OrchestratorProtocol,
+    PreprocessDatasetProtocol,
+)
+from handwriting_ai.training.calibration._types import (
+    CalibrationResultDict,
+    CandidateDict,
+    OrchestratorConfigDict,
 )
 from handwriting_ai.training.calibration.calibrator import calibrate_input_pipeline as _cal
-from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
-from handwriting_ai.training.calibration.measure import CalibrationResult
-from handwriting_ai.training.calibration.orchestrator import OrchestratorConfig
-from handwriting_ai.training.calibration.runner import CandidateRunner
-from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.resources import ResourceLimits
-
-
-class _OrchestratorProtocol(Protocol):
-    def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None: ...
-    def run_stage_a(
-        self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-    ) -> list[CalibrationResult]: ...
-    def run_stage_b(
-        self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-    ) -> list[CalibrationResult]: ...
 
 
 class _FakeMNIST:
@@ -43,41 +32,42 @@ class _FakeMNIST:
         return Image.new("L", (28, 28), 0), 0
 
 
-def _make_snapshot(limit_bytes: int) -> MemorySnapshot:
-    """Create a MemorySnapshot TypedDict for testing."""
-    main: ProcessMemory = {"pid": 1, "rss_bytes": 100 * 1024 * 1024}
-    cgroup_usage: CgroupMemoryUsage = {
-        "usage_bytes": 500 * 1024 * 1024,
-        "limit_bytes": limit_bytes,
-        "percent": 50.0,
-    }
-    cgroup_breakdown: CgroupMemoryBreakdown = {
-        "anon_bytes": 400 * 1024 * 1024,
-        "file_bytes": 50 * 1024 * 1024,
-        "kernel_bytes": 30 * 1024 * 1024,
-        "slab_bytes": 20 * 1024 * 1024,
-    }
+def _make_snapshot(limit_bytes: int) -> MemorySnapshotDict:
+    """Create a MemorySnapshotDict for testing."""
     return {
-        "main_process": main,
+        "main_process": {"pid": 1, "rss_bytes": 100 * 1024 * 1024},
         "workers": (),
-        "cgroup_usage": cgroup_usage,
-        "cgroup_breakdown": cgroup_breakdown,
+        "cgroup_usage": {
+            "usage_bytes": 500 * 1024 * 1024,
+            "limit_bytes": limit_bytes,
+            "percent": 50.0,
+        },
+        "cgroup_breakdown": {
+            "anon_bytes": 400 * 1024 * 1024,
+            "file_bytes": 50 * 1024 * 1024,
+            "kernel_bytes": 30 * 1024 * 1024,
+            "slab_bytes": 20 * 1024 * 1024,
+        },
     }
 
 
-def test_calibrator_low_mem_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Monkeypatch orchestrator to capture budgets and avoid subprocess work
-    captured: list[OrchestratorConfig] = []
+def test_calibrator_low_mem_branch() -> None:
+    captured: list[OrchestratorConfigDict] = []
 
     class _Orch:
-        def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None:
+        def __init__(
+            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        ) -> None:
             _ = runner
             captured.append(config)
 
         def run_stage_a(
-            self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-        ) -> list[CalibrationResult]:
-            # return one result per candidate
+            self,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
+            cands: list[CandidateDict],
+            samples: int,
+        ) -> list[CalibrationResultDict]:
+            _ = (ds, samples)
             return [
                 {
                     "intra_threads": int(c["intra_threads"]),
@@ -91,19 +81,25 @@ def test_calibrator_low_mem_branch(monkeypatch: pytest.MonkeyPatch) -> None:
             ]
 
         def run_stage_b(
-            self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-        ) -> list[CalibrationResult]:
+            self,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
+            shortlist: list[CalibrationResultDict],
+            samples: int,
+        ) -> list[CalibrationResultDict]:
+            _ = (ds, samples)
             return shortlist
 
-    _orch_typed: type[_OrchestratorProtocol] = _Orch
+    def _orch_factory(
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+    ) -> OrchestratorProtocol:
+        return _Orch(runner=runner, config=config)
 
-    def _snap_fn() -> MemorySnapshot:
+    def _snap_fn() -> MemorySnapshotDict:
         return _make_snapshot(1024 * 1024 * 1024)  # 1GB
 
-    monkeypatch.setattr("handwriting_ai.training.calibration.calibrator.Orchestrator", _orch_typed)
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.calibrator.get_memory_snapshot", _snap_fn
-    )
+    _test_hooks.orchestrator_factory = _orch_factory
+    _test_hooks.get_memory_snapshot = _snap_fn
+
     aug: AugmentSpec = {
         "augment": False,
         "aug_rotate": 0.0,
@@ -144,18 +140,24 @@ def test_calibrator_low_mem_branch(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cfg["stage_b_budget"]["abort_pct"] == 88.0
 
 
-def test_calibrator_high_mem_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: list[OrchestratorConfig] = []
+def test_calibrator_high_mem_branch() -> None:
+    captured: list[OrchestratorConfigDict] = []
 
     class _Orch:
-        def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None:
+        def __init__(
+            self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+        ) -> None:
             _ = runner
             captured.append(config)
 
         def run_stage_a(
-            self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-        ) -> list[CalibrationResult]:
-            out: list[CalibrationResult] = []
+            self,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
+            cands: list[CandidateDict],
+            samples: int,
+        ) -> list[CalibrationResultDict]:
+            _ = (ds, samples)
+            out: list[CalibrationResultDict] = []
             for c in cands:
                 out.append(
                     {
@@ -170,19 +172,25 @@ def test_calibrator_high_mem_branch(monkeypatch: pytest.MonkeyPatch) -> None:
             return out
 
         def run_stage_b(
-            self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-        ) -> list[CalibrationResult]:
+            self,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
+            shortlist: list[CalibrationResultDict],
+            samples: int,
+        ) -> list[CalibrationResultDict]:
+            _ = (ds, samples)
             return shortlist
 
-    _orch_typed: type[_OrchestratorProtocol] = _Orch
+    def _orch_factory(
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+    ) -> OrchestratorProtocol:
+        return _Orch(runner=runner, config=config)
 
-    def _snap_fn() -> MemorySnapshot:
+    def _snap_fn() -> MemorySnapshotDict:
         return _make_snapshot(4 * 1024 * 1024 * 1024)  # 4GB
 
-    monkeypatch.setattr("handwriting_ai.training.calibration.calibrator.Orchestrator", _orch_typed)
-    monkeypatch.setattr(
-        "handwriting_ai.training.calibration.calibrator.get_memory_snapshot", _snap_fn
-    )
+    _test_hooks.orchestrator_factory = _orch_factory
+    _test_hooks.get_memory_snapshot = _snap_fn
+
     aug: AugmentSpec = {
         "augment": False,
         "aug_rotate": 0.0,

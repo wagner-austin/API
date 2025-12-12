@@ -11,7 +11,8 @@ from platform_workers.testing import FakeRedis, FakeRedisPublishError
 
 import handwriting_ai.jobs.digits as dj
 import handwriting_ai.training.mnist_train as mt
-from handwriting_ai.training.resources import ResourceLimits
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import ResourceLimitsDict
 from handwriting_ai.training.train_config import (
     TrainConfig,
     TrainingResult,
@@ -29,18 +30,19 @@ pytestmark = pytest.mark.usefixtures("digits_redis")
 
 
 @pytest.fixture(autouse=True)
-def _mock_resources(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mock resource detection for Windows/non-container environments."""
-    limits = ResourceLimits(
-        cpu_cores=4,
-        memory_bytes=4 * 1024 * 1024 * 1024,
-        optimal_threads=2,
-        optimal_workers=0,
-        max_batch_size=64,
-    )
-    import handwriting_ai.training.runtime as rt
+def _mock_resources() -> None:
+    """Configure resource detection for Windows/non-container environments."""
 
-    monkeypatch.setattr(rt, "detect_resource_limits", lambda: limits, raising=False)
+    def _fake_limits() -> ResourceLimitsDict:
+        return {
+            "cpu_cores": 4,
+            "memory_bytes": 4 * 1024 * 1024 * 1024,
+            "optimal_threads": 2,
+            "optimal_workers": 0,
+            "max_batch_size": 64,
+        }
+
+    _test_hooks.detect_resource_limits = _fake_limits
 
 
 class _TinyBase:
@@ -59,7 +61,6 @@ class _TinyBase:
 
 
 def test_process_train_job_emits_progress(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     write_mnist_raw: MnistRawWriter,
     digits_redis: FakeRedis,
@@ -95,7 +96,7 @@ def test_process_train_job_emits_progress(
         write_mnist_raw(cfg2["data_root"], n=8)
         return mt.train_with_config(cfg2, (train_base, test_base))
 
-    monkeypatch.setattr(dj, "_run_training", _realish)
+    _test_hooks.run_training = _realish
 
     payload: dict[str, UnknownJson] = {
         "type": "digits.train.v1",
@@ -134,16 +135,15 @@ def test_process_train_job_emits_progress(
     assert "digits.metrics.artifact.v1" in payload_types
 
 
-def test_process_train_job_emitters_with_bad_publisher_raises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_process_train_job_emitters_with_bad_publisher_raises(tmp_path: Path) -> None:
     # Use a Redis stub that raises to exercise error paths inside the emitters
     fr = FakeRedisPublishError()
 
-    def _redis_for_kv(_: str) -> FakeRedisPublishError:
+    def _redis_for_error(url: str) -> FakeRedisPublishError:
+        _ = url
         return fr
 
-    monkeypatch.setattr(dj, "redis_for_kv", _redis_for_kv, raising=True)
+    _test_hooks.redis_factory = _redis_for_error
 
     def _realish(cfg: TrainConfig) -> TrainingResult:
         train_base = _TinyBase(2)
@@ -172,7 +172,7 @@ def test_process_train_job_emitters_with_bad_publisher_raises(
         )
         return mt.train_with_config(cfg2, (train_base, test_base))
 
-    monkeypatch.setattr(dj, "_run_training", _realish)
+    _test_hooks.run_training = _realish
 
     payload: dict[str, UnknownJson] = {
         "type": "digits.train.v1",

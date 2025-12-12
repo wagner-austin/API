@@ -3,8 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.json_utils import JSONTypeError
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import ArtifactStoreProtocol
 from handwriting_ai.config import Settings
 from handwriting_ai.inference.engine import InferenceEngine
 
@@ -96,7 +99,7 @@ def test_download_remote_missing_data_bank_config(tmp_path: Path) -> None:
         engine._download_remote_if_needed(model_dir, manifest_path)
 
 
-def test_download_remote_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_download_remote_success(tmp_path: Path) -> None:
     """Cover engine.py:189-196 - successful remote download path."""
     s = _settings(tmp_path)
     model_dir = s["digits"]["model_dir"] / "m"
@@ -105,8 +108,23 @@ def test_download_remote_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     manifest_path.write_text('{"schema_version":"v2.0","file_id":"abc123"}', encoding="utf-8")
 
     class _FakeStore:
-        def __init__(self, api_url: str, api_key: str) -> None:
+        def __init__(self) -> None:
             pass
+
+        def upload_artifact(
+            self,
+            dir_path: Path,
+            *,
+            artifact_name: str,
+            request_id: str,
+        ) -> FileUploadResponse:
+            return {
+                "file_id": "fake",
+                "size": 0,
+                "sha256": "x",
+                "content_type": "application/gzip",
+                "created_at": None,
+            }
 
         def download_artifact(
             self,
@@ -115,13 +133,19 @@ def test_download_remote_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
             dest_dir: Path,
             request_id: str,
             expected_root: str,
-        ) -> None:
+        ) -> Path:
             # Simulate extracting files
             target = dest_dir / expected_root
             target.mkdir(parents=True, exist_ok=True)
             (target / "model.pt").write_bytes(b"model")
+            return target
 
-    monkeypatch.setattr("handwriting_ai.inference.engine.ArtifactStore", _FakeStore)
+    store: ArtifactStoreProtocol = _FakeStore()
+
+    def _factory(api_url: str, api_key: str) -> ArtifactStoreProtocol:
+        return store
+
+    _test_hooks.artifact_store_factory = _factory
 
     engine = InferenceEngine(s)
     engine._download_remote_if_needed(model_dir, manifest_path)
@@ -129,50 +153,23 @@ def test_download_remote_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert (model_dir / "model.pt").exists()
 
 
-def test_ensure_artifacts_with_manifest_only_triggers_download(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ensure_artifacts_with_manifest_only_triggers_download(tmp_path: Path) -> None:
     """Cover engine.py:99 - model_dir doesn't exist but manifest does triggers download."""
     s = _settings(tmp_path)
     model_dir = s["digits"]["model_dir"] / "m"
-    # Don't create model_dir - it shouldn't exist
-    # But create manifest at the expected location
-    model_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = model_dir / "manifest.json"
-    manifest_path.write_text('{"schema_version":"v1"}', encoding="utf-8")
-    # Remove model_dir to test the branch
-    manifest_path.unlink()
-    model_dir.rmdir()
-
-    # Now create just the manifest without the directory existing properly
-    # This is tricky - we need manifest to exist but model_dir to not exist
-    # Actually the logic is: if not model_dir.exists() -> check manifest
-    # So we need model_dir to NOT exist, but manifest_path to exist
-    # This is contradictory since manifest_path is inside model_dir
-
-    # Re-reading the code:
-    # if not model_dir.exists():
-    #     if manifest_path.exists():  # This can't be true if model_dir doesn't exist
-    # So this branch is effectively dead code unless manifest is elsewhere
-
-    # Let me check line 103-106 instead - that's the reachable branch
-    # if not (manifest_path.exists() and model_path.exists()):
-    #     if manifest_path.exists():
-    #         self._download_remote_if_needed(...)
-    #     if not (manifest_path.exists() and model_path.exists()):
-    #         return None
 
     # Create model_dir and manifest, but not model.pt
     model_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = model_dir / "manifest.json"
     manifest_path.write_text('{"schema_version":"v1"}', encoding="utf-8")
     # model.pt doesn't exist
 
     download_called = {"count": 0}
 
-    def _fake_download(self: InferenceEngine, mdir: Path, mpath: Path) -> None:
+    def _fake_download(model_dir: Path, manifest_path: Path) -> None:
         download_called["count"] += 1
 
-    monkeypatch.setattr(InferenceEngine, "_download_remote_if_needed", _fake_download)
+    _test_hooks.download_remote_override = _fake_download
 
     engine = InferenceEngine(s)
     result = engine._ensure_artifacts_present(model_dir)
@@ -180,9 +177,7 @@ def test_ensure_artifacts_with_manifest_only_triggers_download(
     assert download_called["count"] == 1
 
 
-def test_ensure_artifacts_download_creates_model(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ensure_artifacts_download_creates_model(tmp_path: Path) -> None:
     """Cover engine.py:105->108 - after download, files exist and return paths."""
     s = _settings(tmp_path)
     model_dir = s["digits"]["model_dir"] / "m"
@@ -191,11 +186,12 @@ def test_ensure_artifacts_download_creates_model(
     manifest_path.write_text('{"schema_version":"v1"}', encoding="utf-8")
     # model.pt doesn't exist initially
 
-    def _fake_download(self: InferenceEngine, mdir: Path, mpath: Path) -> None:
+    def _fake_download(model_dir: Path, manifest_path: Path) -> None:
         # Simulate download creating model.pt
-        (mdir / "model.pt").write_bytes(b"model")
+        _ = manifest_path  # Unused
+        (model_dir / "model.pt").write_bytes(b"model")
 
-    monkeypatch.setattr(InferenceEngine, "_download_remote_if_needed", _fake_download)
+    _test_hooks.download_remote_override = _fake_download
 
     engine = InferenceEngine(s)
     result = engine._ensure_artifacts_present(model_dir)

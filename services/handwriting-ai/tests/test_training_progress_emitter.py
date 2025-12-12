@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 from typing import Protocol
 
 import pytest
 import torch
 from PIL import Image
-from torch import Tensor
-from torch.nn import Module
+from torch.nn import Module as TorchModule
+from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
 
 import handwriting_ai.training.mnist_train as mt
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import BatchLoaderProtocol
 from handwriting_ai.training.metrics import BatchMetrics
 from handwriting_ai.training.mnist_train import set_progress_emitter
 from handwriting_ai.training.progress import (
@@ -27,21 +28,6 @@ from handwriting_ai.training.train_config import TrainConfig, default_train_conf
 
 class MnistRawWriter(Protocol):
     def __call__(self, root: Path, n: int = 8) -> None: ...
-
-
-class _TorchOptimizer(Protocol):
-    """Protocol for torch.optim.Optimizer to avoid Any."""
-
-    def step(self) -> None: ...
-    def zero_grad(self) -> None: ...
-
-
-@pytest.fixture(autouse=True)
-def _mock_monitoring(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mock monitoring functions that fail on non-container systems."""
-    import handwriting_ai.training.mnist_train as mt
-
-    monkeypatch.setattr(mt, "log_system_info", lambda: None, raising=False)
 
 
 class _TinyBase(Dataset[tuple[Image.Image, int]]):
@@ -108,26 +94,29 @@ def _cfg(tmp: Path) -> TrainConfig:
 
 
 def test_progress_emitter_receives_epoch_updates(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_mnist_raw: MnistRawWriter
+    tmp_path: Path, write_mnist_raw: MnistRawWriter
 ) -> None:
     cfg = _cfg(tmp_path)
     train_base = _TinyBase(4)
     test_base = _TinyBase(2)
     rec = _Rec()
 
-    # Ensure no stray KeyboardInterrupt from patched tests
+    # Set up hooks for monitoring and training
+    _test_hooks.log_system_info = lambda: None
+
     def _ok_train_epoch(
-        model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        model: TorchModule,
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: _TorchOptimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         return 0.0
 
-    monkeypatch.setattr(mt, "_train_epoch", _ok_train_epoch, raising=True)
+    _test_hooks.train_epoch = _ok_train_epoch
+
     set_progress_emitter(rec)
     try:
         # Ensure MNIST raw files exist for calibration and training
@@ -146,28 +135,32 @@ def test_progress_emitter_receives_epoch_updates(
 
 
 def test_progress_emitter_failure_raises_after_logging(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_mnist_raw: MnistRawWriter
+    tmp_path: Path, write_mnist_raw: MnistRawWriter
 ) -> None:
     cfg = _cfg(tmp_path)
     train_base = _TinyBase(2)
     test_base = _TinyBase(2)
 
+    # Set up hooks for monitoring and training
+    _test_hooks.log_system_info = lambda: None
+
     def _ok_train_epoch(
-        model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        model: TorchModule,
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: _TorchOptimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         return 0.0
 
+    _test_hooks.train_epoch = _ok_train_epoch
+
     class _Bad:
         def emit(self, *, epoch: int, total_epochs: int, val_acc: float | None) -> None:
             raise ValueError("boom")
 
-    monkeypatch.setattr(mt, "_train_epoch", _ok_train_epoch, raising=True)
     set_progress_emitter(_Bad())
     try:
         # Should raise when emitter fails
@@ -179,9 +172,7 @@ def test_progress_emitter_failure_raises_after_logging(
         set_progress_emitter(None)
 
 
-def test_progress_emitter_every_n_epochs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_mnist_raw: MnistRawWriter
-) -> None:
+def test_progress_emitter_every_n_epochs(tmp_path: Path, write_mnist_raw: MnistRawWriter) -> None:
     cfg = _cfg(tmp_path)
     # Increase epochs and set cadence
     cfg_modified: TrainConfig = default_train_config(
@@ -224,19 +215,23 @@ def test_progress_emitter_every_n_epochs(
     train_base = _TinyBase(6)
     test_base = _TinyBase(3)
 
+    # Set up hooks for monitoring and training
+    _test_hooks.log_system_info = lambda: None
+
     def _ok_train_epoch(
-        model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        model: TorchModule,
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: _TorchOptimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         return 0.0
 
+    _test_hooks.train_epoch = _ok_train_epoch
+
     rec = _Rec()
-    monkeypatch.setattr(mt, "_train_epoch", _ok_train_epoch, raising=True)
     set_progress_emitter(rec)
     try:
         # Ensure MNIST raw files exist for calibration and training

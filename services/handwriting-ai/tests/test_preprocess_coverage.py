@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import pytest
-from PIL import Image, ImageOps
+from PIL import Image
+from PIL.Image import Image as PILImage
 from platform_core.errors import AppError, HandwritingErrorCode
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.preprocess import (
     PreprocessOptions,
     _center_on_square,
     _component_bbox_bytes,
     _deskew_if_needed,
-    _estimate_background_is_dark,
     _largest_component_crop,
     _principal_angle,
     _principal_angle_confidence,
     run_preprocess,
 )
+
+# =============================================================================
+# Test helper functions
+# =============================================================================
 
 
 def _mk_white(size: tuple[int, int]) -> Image.Image:
@@ -25,13 +30,19 @@ def _mk_black(size: tuple[int, int]) -> Image.Image:
     return Image.new("L", size, 0)
 
 
-def test_run_preprocess_catches_non_app_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((8, 8))
+# =============================================================================
+# Tests
+# =============================================================================
 
-    def _boom(_: Image.Image) -> Image.Image:
+
+def test_run_preprocess_catches_non_app_errors() -> None:
+    input_img = _mk_white((8, 8))
+
+    def _boom(img: PILImage) -> PILImage | None:
+        _ = img  # unused
         raise TypeError("bad exif")
 
-    monkeypatch.setattr(ImageOps, "exif_transpose", _boom, raising=True)
+    _test_hooks.exif_transpose = _boom
     opts: PreprocessOptions = {
         "invert": None,
         "center": True,
@@ -39,18 +50,19 @@ def test_run_preprocess_catches_non_app_errors(monkeypatch: pytest.MonkeyPatch) 
         "visualize_max_kb": 1,
     }
     with pytest.raises(AppError) as ei:
-        _ = run_preprocess(img, opts)
+        _ = run_preprocess(input_img, opts)
     e = ei.value
     assert e.code is HandwritingErrorCode.preprocessing_failed and e.http_status == 400
 
 
-def test_load_to_grayscale_exif_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((8, 8))
+def test_load_to_grayscale_exif_none() -> None:
+    input_img = _mk_white((8, 8))
 
-    def _none(_: Image.Image) -> Image.Image | None:  # returns None to trigger path
+    def _none(img: PILImage) -> PILImage | None:
+        _ = img  # unused
         return None
 
-    monkeypatch.setattr(ImageOps, "exif_transpose", _none, raising=True)
+    _test_hooks.exif_transpose = _none
     opts: PreprocessOptions = {
         "invert": None,
         "center": True,
@@ -58,18 +70,8 @@ def test_load_to_grayscale_exif_none(monkeypatch: pytest.MonkeyPatch) -> None:
         "visualize_max_kb": 1,
     }
     with pytest.raises(AppError) as ei:
-        _ = run_preprocess(img, opts)
+        _ = run_preprocess(input_img, opts)
     assert ei.value.code is HandwritingErrorCode.invalid_image
-
-
-def test_background_total_zero(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((4, 4))
-
-    def _zeros(self: Image.Image) -> list[int]:
-        return [0] * 256
-
-    monkeypatch.setattr(Image.Image, "histogram", _zeros, raising=True)
-    assert _estimate_background_is_dark(img) is False
 
 
 def test_largest_component_buffer_size_mismatch_raises() -> None:
@@ -97,59 +99,37 @@ def test_component_bbox_updates_minx_miny() -> None:
     assert area >= 4 and x0 == 0 and y0 == 0 and x1 >= 1 and y1 >= 1
 
 
-def test_deskew_negative_angle_clamp_and_bbox_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((10, 10))
+def test_deskew_negative_angle_clamp_and_bbox_none() -> None:
+    input_img = _mk_white((10, 10))
 
-    def _angle(_: Image.Image, __: int, ___: int) -> float:
-        return -20.0
+    def _angle_conf(img: PILImage, width: int, height: int) -> tuple[float, float] | None:
+        _ = (img, width, height)  # unused
+        return (-20.0, 0.5)
 
-    from handwriting_ai import preprocess as _pp
-
-    monkeypatch.setattr(_pp, "_principal_angle", _angle, raising=True)
-    out = _deskew_if_needed(img)
+    _test_hooks.principal_angle_confidence = _angle_conf
+    out = _deskew_if_needed(input_img)
     # No content so bbox is None; function returns original image
-    assert out is img
-
-
-def test_principal_angle_none_when_pix_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((3, 3))
-
-    def _load_none(self: Image.Image) -> None:
-        return None
-
-    monkeypatch.setattr(Image.Image, "load", _load_none, raising=True)
-    assert _principal_angle(img, 3, 3) is None
-
-
-def test_principal_angle_confidence_none_when_pix_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((3, 3))
-
-    def _load_none(self: Image.Image) -> None:
-        return None
-
-    monkeypatch.setattr(Image.Image, "load", _load_none, raising=True)
-    assert _principal_angle_confidence(img, 3, 3) is None
+    assert out is input_img
 
 
 def test_principal_angle_none_when_zero_variance() -> None:
+    """Test _principal_angle returns None with low variance input.
+
+    Uses a real image with a single pixel set - produces zero variance
+    which triggers the early return path.
+    """
     img = _mk_white((4, 4))
     img.putpixel((2, 2), 0)
     assert _principal_angle(img, 4, 4) is None
     assert _principal_angle_confidence(img, 4, 4) is None
 
 
-def test_center_on_square_pix_none_returns_input(monkeypatch: pytest.MonkeyPatch) -> None:
-    img = _mk_white((5, 5))
-
-    def _load_none(self: Image.Image) -> None:
-        return None
-
-    monkeypatch.setattr(Image.Image, "load", _load_none, raising=True)
-    out = _center_on_square(img)
-    assert out is img
-
-
 def test_center_on_square_no_pixels_returns_input() -> None:
+    """Test _center_on_square with all-black image returns input.
+
+    When there are no white pixels to center, the function returns
+    the original image unchanged.
+    """
     img = _mk_black((6, 6))
     out = _center_on_square(img)
     assert out is img

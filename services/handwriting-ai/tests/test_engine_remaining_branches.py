@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from types import ModuleType
-from typing import Protocol, TypeGuard
 
 import pytest
 import torch
 from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 
-import handwriting_ai.inference.engine as eng
+from handwriting_ai import _test_hooks
 from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig
 from handwriting_ai.inference.engine import (
     InferenceEngine,
-    LoadedStateDict,
-    WrappedStateDict,
     _build_model,
     _load_state_dict_file,
 )
@@ -52,14 +48,7 @@ def _engine(tmp: Path) -> InferenceEngine:
     return InferenceEngine({"app": app, "digits": dig, "security": sec})
 
 
-class _Stat(Protocol):
-    st_mtime: float
-    st_size: int
-
-
-def test_reload_if_changed_rejects_zero_and_flapping_sizes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_reload_if_changed_rejects_zero_and_flapping_sizes(tmp_path: Path) -> None:
     # Prepare artifacts dir and set last mtimes older so change detection triggers
     engine = _engine(tmp_path)
     art = tmp_path / "models" / "a"
@@ -72,27 +61,25 @@ def test_reload_if_changed_rejects_zero_and_flapping_sizes(
     engine._last_manifest_mtime = 0.0
     engine._last_model_mtime = 0.0
 
+    # Preserve original hook
+    orig_path_stat = _test_hooks.path_stat
+
     # Case 1: size1 <= 0 returns False
-    orig_stat = Path.stat
-
-    def _wrap(sr: os.stat_result) -> _Stat:
-        return _FakeStat(st_mtime=float(sr.st_mtime), st_size=int(sr.st_size))
-
-    def _stat_zero(self: Path, follow_symlinks: bool = True) -> _Stat:
-        if self.as_posix().endswith("manifest.json"):
+    def _stat_zero(path: Path, *, follow_symlinks: bool = True) -> _test_hooks.StatResultProtocol:
+        if path.as_posix().endswith("manifest.json"):
             return _FakeStat(st_mtime=999999.0, st_size=0)
-        if self.as_posix().endswith("model.pt"):
+        if path.as_posix().endswith("model.pt"):
             return _FakeStat(st_mtime=999999.0, st_size=1)
-        return _wrap(orig_stat(self, follow_symlinks=follow_symlinks))
+        return orig_path_stat(path, follow_symlinks=follow_symlinks)
 
-    monkeypatch.setattr(Path, "stat", _stat_zero, raising=True)
+    _test_hooks.path_stat = _stat_zero
     assert engine.reload_if_changed() is False
 
     # Case 2: second size read differs -> returns False
     calls = {"n": 0}
 
-    def _stat_flap(self: Path, follow_symlinks: bool = True) -> _Stat:
-        if self.as_posix().endswith("manifest.json"):
+    def _stat_flap(path: Path, *, follow_symlinks: bool = True) -> _test_hooks.StatResultProtocol:
+        if path.as_posix().endswith("manifest.json"):
             # Many stat() calls happen inside _collect_artifact_mtimes();
             # trigger flapping exactly for the two size reads that follow that loop.
             calls["n"] += 1
@@ -101,15 +88,15 @@ def test_reload_if_changed_rejects_zero_and_flapping_sizes(
             if calls["n"] == 18:
                 return _FakeStat(st_mtime=999999.0, st_size=20)
             return _FakeStat(st_mtime=999999.0, st_size=10)
-        if self.as_posix().endswith("model.pt"):
+        if path.as_posix().endswith("model.pt"):
             return _FakeStat(st_mtime=999999.0, st_size=1)
-        return _wrap(orig_stat(self, follow_symlinks=follow_symlinks))
+        return orig_path_stat(path, follow_symlinks=follow_symlinks)
 
-    monkeypatch.setattr(Path, "stat", _stat_flap, raising=True)
+    _test_hooks.path_stat = _stat_flap
     assert engine.reload_if_changed() is False
 
 
-def test_build_model_missing_maxpool(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_model_missing_maxpool() -> None:
     import importlib
 
     class _HasConvOnly(torch.nn.Module):
@@ -132,12 +119,12 @@ def test_build_model_missing_maxpool(monkeypatch: pytest.MonkeyPatch) -> None:
 
     fake = _Models()
 
-    def _import_module(name: str) -> ModuleType:
+    def _import_module(name: str, package: str | None = None) -> ModuleType:
         if name == "torchvision.models":
             return fake
-        return importlib.import_module(name)
+        return importlib.import_module(name, package)
 
-    monkeypatch.setattr("importlib.import_module", _import_module)
+    _test_hooks.import_module = _import_module
     with pytest.raises(RuntimeError):
         _ = _build_model("resnet18", 10)
 
@@ -156,22 +143,24 @@ def test_load_state_dict_file_invalid_wrapper_and_key(tmp_path: Path) -> None:
         _ = _load_state_dict_file(p2)
 
 
-def test_load_state_dict_file_unreachable_else_via_monkeypatch(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_load_state_dict_file_unreachable_else_via_hooks(tmp_path: Path) -> None:
     p = tmp_path / "model.pt"
     # Valid dict but guards will be forced to both return False to hit the else branch
     torch.save({}, p.as_posix())
 
     def _always_false_wrapped(
-        value: LoadedStateDict | WrappedStateDict,
-    ) -> TypeGuard[WrappedStateDict]:
+        value: dict[str, torch.Tensor] | dict[str, dict[str, torch.Tensor]],
+    ) -> bool:
+        _ = value
         return False
 
-    def _always_false_flat(value: LoadedStateDict | WrappedStateDict) -> TypeGuard[LoadedStateDict]:
+    def _always_false_flat(
+        value: dict[str, torch.Tensor] | dict[str, dict[str, torch.Tensor]],
+    ) -> bool:
+        _ = value
         return False
 
-    monkeypatch.setattr(eng, "_is_wrapped_state_dict", _always_false_wrapped, raising=True)
-    monkeypatch.setattr(eng, "_is_flat_state_dict", _always_false_flat, raising=True)
+    _test_hooks.is_wrapped_state_dict = _always_false_wrapped
+    _test_hooks.is_flat_state_dict = _always_false_flat
     with pytest.raises(JSONTypeError):
         _ = _load_state_dict_file(p)

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable
 from pathlib import Path
 
-import pytest
-
-from handwriting_ai.api.app import (
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import EventProtocol, ThreadProtocol
+from handwriting_ai.api.main import (
     _debug_invoke_reloader_start,
     _debug_invoke_reloader_stop,
     create_app,
@@ -44,10 +43,12 @@ class _SyncEvent:
 class _SyncThread:
     """Synchronous stand-in for threading.Thread to execute target inline for coverage."""
 
-    def __init__(self, *, target: Callable[[], None], name: str, daemon: bool) -> None:
+    def __init__(
+        self, *, target: Callable[[], None], daemon: bool, name: str | None = None
+    ) -> None:
         self._target: Callable[[], None] = target
-        self.name: str = name
         self.daemon: bool = daemon
+        self._name: str | None = name
 
     def start(self) -> None:
         # Execute inline in the current thread to ensure coverage collection.
@@ -91,14 +92,28 @@ def _settings() -> Settings:
     }
 
 
-def test_bg_reloader_loop_runs_once_with_sync_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+def _sync_event_factory() -> EventProtocol:
+    return _SyncEvent()
+
+
+def _sync_thread_factory(
+    *,
+    target: Callable[[], None],
+    daemon: bool = True,
+    name: str | None = None,
+) -> ThreadProtocol:
+    return _SyncThread(target=target, daemon=daemon, name=name)
+
+
+def test_bg_reloader_loop_runs_once_with_sync_thread() -> None:
     s = _settings()
     eng = _ReloaderEngine(s)
-    app = create_app(s, engine_provider=lambda: eng, reload_interval_seconds=0.01)
 
-    # Ensure the background reloader loop (lines 64-68) executes synchronously
-    monkeypatch.setattr(threading, "Event", _SyncEvent, raising=True)
-    monkeypatch.setattr(threading, "Thread", _SyncThread, raising=True)
+    # Set hooks to use synchronous Event and Thread
+    _test_hooks.event_factory = _sync_event_factory
+    _test_hooks.thread_factory = _sync_thread_factory
+
+    app = create_app(s, engine_provider=lambda: eng, reload_interval_seconds=0.01)
 
     _debug_invoke_reloader_start(app)
     _debug_invoke_reloader_stop(app)

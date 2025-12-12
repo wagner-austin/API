@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 from collections.abc import Sequence
 from pathlib import Path
 from typing import NoReturn
@@ -11,6 +12,7 @@ from platform_core.json_utils import JSONTypeError
 from torch import Tensor
 from torch.optim.sgd import SGD
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.inference.engine import (
     _build_model,
     _load_state_dict_file,
@@ -90,14 +92,15 @@ def test_load_state_dict_file_rejects_invalid_entries(tmp_path: Path) -> None:
         _ = _load_state_dict_file(path)
 
 
-def test_build_model_raises_when_builder_missing_conv(monkeypatch: pytest.MonkeyPatch) -> None:
-    import types
+def test_build_model_raises_when_builder_missing_conv() -> None:
+    import importlib
 
     class _BuilderModule(torch.nn.Module):
         def forward(self, x: Tensor) -> Tensor:
             return x
 
     def _fake_resnet18(*, weights: None, num_classes: int) -> torch.nn.Module:
+        _ = (weights, num_classes)
         return _BuilderModule()
 
     class _ModelsModule(types.ModuleType):
@@ -109,14 +112,14 @@ def test_build_model_raises_when_builder_missing_conv(monkeypatch: pytest.Monkey
             raise AttributeError(name)
 
     models_mod = _ModelsModule()
-    import importlib
 
-    def _fake_import(name: str) -> types.ModuleType:
+    def _fake_import(name: str, package: str | None = None) -> types.ModuleType:
+        _ = package
         if name == "torchvision.models":
             return models_mod
         return importlib.import_module(name)
 
-    monkeypatch.setattr("importlib.import_module", _fake_import)
+    _test_hooks.import_module = _fake_import
 
     with pytest.raises(RuntimeError):
         _ = _build_model("resnet18", 10)

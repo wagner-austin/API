@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    LoggerInstanceProtocol,
+)
 from handwriting_ai.training import loops
 
 
@@ -10,8 +16,44 @@ class _StubLogger:
     def __init__(self) -> None:
         self.messages: list[str] = []
 
-    def info(self, message: str, *args: float | int | str) -> None:
-        formatted = message % args if args else message
+    def info(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        _ = extra
+        formatted = msg % args if args else msg
+        self.messages.append(formatted)
+
+    def warning(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        _ = extra
+        formatted = msg % args if args else msg
+        self.messages.append(formatted)
+
+    def error(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        _ = extra
+        formatted = msg % args if args else msg
+        self.messages.append(formatted)
+
+    def debug(
+        self,
+        msg: str,
+        *args: float | int | str | Path | BaseException,
+        extra: dict[str, str | int | float | bool | None] | None = None,
+    ) -> None:
+        _ = extra
+        formatted = msg % args if args else msg
         self.messages.append(formatted)
 
 
@@ -48,7 +90,7 @@ class _SingleBatchLoader:
         return 1
 
 
-def test_train_epoch_raises_on_memory_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_train_epoch_raises_on_memory_guard() -> None:
     model = _SimpleModel()
     from torch.optim.sgd import SGD
 
@@ -57,11 +99,12 @@ def test_train_epoch_raises_on_memory_guard(monkeypatch: pytest.MonkeyPatch) -> 
 
     logger = _StubLogger()
 
-    def _get_logger(_: str) -> _StubLogger:
+    def _get_logger(name: str) -> LoggerInstanceProtocol:
+        _ = name
         return logger
 
-    monkeypatch.setattr(loops, "get_logger", _get_logger)
-    monkeypatch.setattr(loops, "on_batch_check", lambda: True)
+    _test_hooks.get_logger = _get_logger
+    _test_hooks.on_batch_check = lambda: True
 
     with pytest.raises(RuntimeError):
         _ = loops.train_epoch(

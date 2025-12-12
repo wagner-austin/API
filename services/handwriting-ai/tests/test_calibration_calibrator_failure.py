@@ -1,36 +1,31 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 from PIL import Image
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    CandidateRunnerProtocol,
+    OrchestratorProtocol,
+    PreprocessDatasetProtocol,
+)
+from handwriting_ai.training.calibration._types import (
+    CalibrationResultDict,
+    CandidateDict,
+    OrchestratorConfigDict,
+)
 from handwriting_ai.training.calibration.calibrator import (
     CalibrationError,
 )
 from handwriting_ai.training.calibration.calibrator import (
     calibrate_input_pipeline as _cal,
 )
-from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import AugmentSpec, InlineSpec, PreprocessSpec
-from handwriting_ai.training.calibration.measure import CalibrationResult
-from handwriting_ai.training.calibration.orchestrator import OrchestratorConfig
-from handwriting_ai.training.calibration.runner import CandidateRunner
-from handwriting_ai.training.dataset import PreprocessDataset
 from handwriting_ai.training.resources import ResourceLimits
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
-
-
-class _OrchestratorProtocol(Protocol):
-    def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None: ...
-    def run_stage_a(
-        self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-    ) -> list[CalibrationResult]: ...
-    def run_stage_b(
-        self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-    ) -> list[CalibrationResult]: ...
 
 
 class _FakeMNIST:
@@ -45,49 +40,67 @@ class _FakeMNIST:
 
 
 class _OrchEmpty:
-    def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None:
+    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict) -> None:
         _ = (runner, config)
 
     def run_stage_a(
-        self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-    ) -> list[CalibrationResult]:
+        self,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
+        cands: list[CandidateDict],
+        samples: int,
+    ) -> list[CalibrationResultDict]:
+        _ = (ds, cands, samples)
         return []
 
     def run_stage_b(
-        self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-    ) -> list[CalibrationResult]:
+        self,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
+        shortlist: list[CalibrationResultDict],
+        samples: int,
+    ) -> list[CalibrationResultDict]:
+        _ = (ds, shortlist, samples)
         return []
 
 
 class _OrchEmptyB:
-    def __init__(self, *, runner: CandidateRunner, config: OrchestratorConfig) -> None:
+    def __init__(self, *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict) -> None:
         _ = (runner, config)
 
     def run_stage_a(
-        self, ds: PreprocessDataset, cands: list[Candidate], samples: int
-    ) -> list[CalibrationResult]:
+        self,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
+        cands: list[CandidateDict],
+        samples: int,
+    ) -> list[CalibrationResultDict]:
+        _ = (ds, cands, samples)
         return [
-            CalibrationResult(
-                intra_threads=1,
-                interop_threads=None,
-                num_workers=0,
-                batch_size=2,
-                samples_per_sec=1.0,
-                p95_ms=1.0,
-            )
+            {
+                "intra_threads": 1,
+                "interop_threads": None,
+                "num_workers": 0,
+                "batch_size": 2,
+                "samples_per_sec": 1.0,
+                "p95_ms": 1.0,
+            }
         ]
 
     def run_stage_b(
-        self, ds: PreprocessDataset, shortlist: list[CalibrationResult], samples: int
-    ) -> list[CalibrationResult]:
+        self,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
+        shortlist: list[CalibrationResultDict],
+        samples: int,
+    ) -> list[CalibrationResultDict]:
+        _ = (ds, shortlist, samples)
         return []
 
 
-def test_calibrator_raises_on_empty_stage_a(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    _orch_typed: type[_OrchestratorProtocol] = _OrchEmpty
-    monkeypatch.setattr("handwriting_ai.training.calibration.calibrator.Orchestrator", _orch_typed)
+def test_calibrator_raises_on_empty_stage_a(tmp_path: Path) -> None:
+    def _orch_factory(
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+    ) -> OrchestratorProtocol:
+        return _OrchEmpty(runner=runner, config=config)
+
+    _test_hooks.orchestrator_factory = _orch_factory
 
     aug = AugmentSpec(
         augment=False,
@@ -126,11 +139,13 @@ def test_calibrator_raises_on_empty_stage_a(
         )
 
 
-def test_calibrator_raises_on_empty_stage_b(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    _orch_typed: type[_OrchestratorProtocol] = _OrchEmptyB
-    monkeypatch.setattr("handwriting_ai.training.calibration.calibrator.Orchestrator", _orch_typed)
+def test_calibrator_raises_on_empty_stage_b(tmp_path: Path) -> None:
+    def _orch_factory(
+        *, runner: CandidateRunnerProtocol, config: OrchestratorConfigDict
+    ) -> OrchestratorProtocol:
+        return _OrchEmptyB(runner=runner, config=config)
+
+    _test_hooks.orchestrator_factory = _orch_factory
 
     aug = AugmentSpec(
         augment=False,

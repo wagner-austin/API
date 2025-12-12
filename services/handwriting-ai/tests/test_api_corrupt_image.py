@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from concurrent.futures import Future
 from datetime import UTC, datetime
-from io import BytesIO
 from pathlib import Path
-from typing import Protocol
 
-import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from torch import Tensor
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai import _test_hooks
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import (
     DigitsConfig,
     Settings,
@@ -21,10 +19,6 @@ from handwriting_ai.inference.manifest import ModelManifest
 from handwriting_ai.inference.types import PredictOutput
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
-
-
-class _ImageOpenProtocol(Protocol):
-    def __call__(self, fp: str | Path | BytesIO) -> Image.Image: ...
 
 
 class _T(InferenceEngine):
@@ -83,15 +77,15 @@ def test_invalid_image_bytes_returns_400() -> None:
     assert r.status_code == 400 and "invalid_image" in r.text
 
 
-def test_decompression_bomb_error_returns_413(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _base_app()
+def test_decompression_bomb_error_returns_413() -> None:
+    from typing import BinaryIO
 
-    def _raise_bomb(fp: str | Path | BytesIO) -> Image.Image:
+    def _raise_bomb(fp: BinaryIO | str | Path) -> Image.Image:
         _ = fp
         raise Image.DecompressionBombError("bomb")
 
-    _raise_bomb_typed: _ImageOpenProtocol = _raise_bomb
-    monkeypatch.setattr(Image, "open", _raise_bomb_typed, raising=True)
+    _test_hooks.pil_image_open = _raise_bomb
+    client = _base_app()
     files = {"file": ("img.png", b"header-wont-be-read", "image/png")}
     r = client.post("/v1/read", files=files)
     assert r.status_code == 413 and "Decompression bomb" in r.text

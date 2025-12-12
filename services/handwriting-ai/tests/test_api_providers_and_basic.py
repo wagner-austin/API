@@ -9,7 +9,7 @@ import torch
 from fastapi.testclient import TestClient
 from torch import Tensor
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
 from handwriting_ai.inference.engine import InferenceEngine, LoadStateResult, TorchModel
 from handwriting_ai.inference.manifest import ModelManifest

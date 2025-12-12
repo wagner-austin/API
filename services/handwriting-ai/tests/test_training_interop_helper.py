@@ -1,27 +1,29 @@
 from __future__ import annotations
 
 import pytest
-import torch
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.training.mnist_train import _configure_interop_threads
 
 
-def test_configure_interop_threads_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_interop_threads_ok() -> None:
     called: dict[str, int | None] = {"v": None}
 
-    def _ok(n: int) -> None:
-        called["v"] = int(n)
+    def _ok(nthreads: int) -> None:
+        called["v"] = int(nthreads)
 
-    monkeypatch.setattr(torch, "set_num_interop_threads", _ok, raising=True)
+    _test_hooks.torch_has_set_num_interop_threads = lambda: True
+    _test_hooks.torch_set_interop_threads = _ok
     _configure_interop_threads(2)
     assert called["v"] == 2
 
 
-def test_configure_interop_threads_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _boom(n: int) -> None:
+def test_configure_interop_threads_raises() -> None:
+    def _boom(nthreads: int) -> None:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(torch, "set_num_interop_threads", _boom, raising=True)
+    _test_hooks.torch_has_set_num_interop_threads = lambda: True
+    _test_hooks.torch_set_interop_threads = _boom
     # Should raise after logging
     with pytest.raises(RuntimeError, match="boom"):
         _configure_interop_threads(1)
@@ -32,8 +34,7 @@ def test_configure_interop_threads_skips_on_none() -> None:
     _configure_interop_threads(None)
 
 
-def test_configure_interop_threads_skips_without_attr(monkeypatch: pytest.MonkeyPatch) -> None:
-    if hasattr(torch, "set_num_interop_threads"):
-        # monkeypatch will restore the attribute after the test automatically
-        monkeypatch.delattr(torch, "set_num_interop_threads", raising=False)
+def test_configure_interop_threads_skips_without_attr() -> None:
+    # Simulate torch not having set_num_interop_threads
+    _test_hooks.torch_has_set_num_interop_threads = lambda: False
     _configure_interop_threads(2)

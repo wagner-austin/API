@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, HandwritingErrorCode
 
-from handwriting_ai.api.app import create_app
+from handwriting_ai.api.main import create_app
 from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
 
 

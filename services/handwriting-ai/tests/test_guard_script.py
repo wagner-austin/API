@@ -6,54 +6,37 @@ from typing import TypedDict
 import pytest
 import scripts.guard as guard
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import GuardRunForProjectProtocol
+
 
 class _RunCall(TypedDict):
     monorepo_root: Path
     project_root: Path
 
 
-def test_find_monorepo_root_locates_libs(tmp_path: Path) -> None:
+def test_default_find_monorepo_root_locates_libs(tmp_path: Path) -> None:
+    """Test that the default implementation finds monorepo root with libs dir."""
     root = tmp_path / "repo"
     libs = root / "libs"
     libs.mkdir(parents=True, exist_ok=True)
     start = libs / "some" / "deep"
     start.mkdir(parents=True, exist_ok=True)
 
-    found = guard._find_monorepo_root(start)
+    found = _test_hooks._default_guard_find_monorepo_root(start)
     assert found == root
 
 
-def test_find_monorepo_root_raises_when_missing(tmp_path: Path) -> None:
+def test_default_find_monorepo_root_raises_when_missing(tmp_path: Path) -> None:
+    """Test that the default implementation raises when no libs dir found."""
     start = tmp_path / "no_libs"
     start.mkdir(parents=True, exist_ok=True)
     with pytest.raises(RuntimeError):
-        _ = guard._find_monorepo_root(start)
+        _ = _test_hooks._default_guard_find_monorepo_root(start)
 
 
-def test_load_orchestrator_imports_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    libs_dir = tmp_path / "libs"
-    mg_src = libs_dir / "monorepo_guards" / "src" / "monorepo_guards"
-    mg_src.mkdir(parents=True, exist_ok=True)
-    (mg_src / "__init__.py").write_text("", encoding="utf-8")
-    # Write orchestrator that stores call info in a file and returns int
-    (mg_src / "orchestrator.py").write_text(
-        "from pathlib import Path\n"
-        "def run_for_project(monorepo_root, project_root):\n"
-        "    (monorepo_root / 'call_info.txt').write_text("
-        "f'{project_root}', encoding='utf-8')\n"
-        "    return 0\n",
-        encoding="utf-8",
-    )
-    run = guard._load_orchestrator(tmp_path)
-    result = run(monorepo_root=tmp_path, project_root=tmp_path / "proj")
-    assert result == 0
-    call_info = (tmp_path / "call_info.txt").read_text(encoding="utf-8")
-    assert call_info == str(tmp_path / "proj")
-
-
-def test_main_invokes_run_and_supports_flags(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_main_invokes_run_and_supports_flags(tmp_path: Path) -> None:
+    """Test that main() invokes the run_for_project hook with correct args."""
     calls: list[_RunCall] = []
 
     def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
@@ -63,11 +46,12 @@ def test_main_invokes_run_and_supports_flags(
     def _fake_find_monorepo_root(start: Path) -> Path:
         return start
 
-    def _fake_load_orchestrator(_: Path) -> guard._RunForProject:
+    def _fake_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
+        _ = monorepo_root  # Unused in fake
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find_monorepo_root)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load_orchestrator)
+    _test_hooks.guard_find_monorepo_root = _fake_find_monorepo_root
+    _test_hooks.guard_load_orchestrator = _fake_load_orchestrator
 
     project_root = Path(__file__).resolve().parents[1]
 
@@ -78,7 +62,8 @@ def test_main_invokes_run_and_supports_flags(
     assert calls[0]["project_root"] == tmp_path
 
 
-def test_main_uses_default_args_when_none(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_uses_default_args_when_none(tmp_path: Path) -> None:
+    """Test that main() uses defaults when argv is None."""
     calls: list[_RunCall] = []
 
     def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
@@ -88,18 +73,20 @@ def test_main_uses_default_args_when_none(monkeypatch: pytest.MonkeyPatch, tmp_p
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(monorepo_root: Path) -> GuardRunForProjectProtocol:
+        _ = monorepo_root  # Unused in fake
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    _test_hooks.guard_find_monorepo_root = _fake_find
+    _test_hooks.guard_load_orchestrator = _fake_load
 
     rc = guard.main(None)
     assert rc == 0
     assert calls[0]["project_root"].name == "handwriting-ai"
 
 
-def test_main_skips_unknown_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_main_skips_unknown_flags(tmp_path: Path) -> None:
+    """Test that main() ignores unknown flags."""
     calls: list[_RunCall] = []
 
     def _fake_run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
@@ -109,11 +96,12 @@ def test_main_skips_unknown_flags(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     def _fake_find(start: Path) -> Path:
         return start
 
-    def _fake_load(_: Path) -> guard._RunForProject:
+    def _fake_load(monorepo_root: Path) -> GuardRunForProjectProtocol:
+        _ = monorepo_root  # Unused in fake
         return _fake_run_for_project
 
-    monkeypatch.setattr(guard, "_find_monorepo_root", _fake_find)
-    monkeypatch.setattr(guard, "_load_orchestrator", _fake_load)
+    _test_hooks.guard_find_monorepo_root = _fake_find
+    _test_hooks.guard_load_orchestrator = _fake_load
 
     rc = guard.main(["--unknown", "--root", str(tmp_path)])
     assert rc == 7

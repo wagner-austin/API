@@ -3,14 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image
-from pytest import MonkeyPatch
 
-from handwriting_ai.monitoring import (
-    CgroupMemoryBreakdown,
-    CgroupMemoryUsage,
-    MemorySnapshot,
-    ProcessMemory,
-)
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import MemorySnapshotDict, PreprocessDatasetProtocol
 from handwriting_ai.training.calibration.candidates import Candidate
 from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
 from handwriting_ai.training.calibration.measure import CalibrationResult
@@ -100,7 +95,7 @@ class _FailingRunner:
 
     def run(
         self,
-        ds: PreprocessDataset | PreprocessSpec,
+        ds: PreprocessDatasetProtocol | PreprocessSpec,
         cand: Candidate,
         samples: int,
         budget: BudgetConfig,
@@ -113,7 +108,26 @@ class _FailingRunner:
         return {"ok": True, "res": res, "error": None}
 
 
-def test_orchestrator_preflight_and_abort(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def _make_snapshot(percent: float) -> MemorySnapshotDict:
+    """Create a MemorySnapshot TypedDict for testing with given percent."""
+    return {
+        "main_process": {"pid": 1, "rss_bytes": 100 * 1024 * 1024},
+        "workers": (),
+        "cgroup_usage": {
+            "usage_bytes": 500 * 1024 * 1024,
+            "limit_bytes": 1024 * 1024 * 1024,
+            "percent": percent,
+        },
+        "cgroup_breakdown": {
+            "anon_bytes": 400 * 1024 * 1024,
+            "file_bytes": 50 * 1024 * 1024,
+            "kernel_bytes": 30 * 1024 * 1024,
+            "slab_bytes": 20 * 1024 * 1024,
+        },
+    }
+
+
+def test_orchestrator_preflight_and_abort(tmp_path: Path) -> None:
     ds = PreprocessDataset(_FakeMNIST(8), _TEST_CFG)
     cands = [_make_cand(2), _make_cand(4)]
     runner = _FailingRunner(fails=0)
@@ -124,11 +138,16 @@ def test_orchestrator_preflight_and_abort(tmp_path: Path, monkeypatch: MonkeyPat
     }
     orch = Orchestrator(runner, cfg)
 
-    # Force preflight to fail to exercise abort path and checkpoint write
-    def _pf_ok(_: float) -> bool:
-        return False
+    # Force preflight to fail by setting cgroup available and high memory
+    def _cgroup_available() -> bool:
+        return True
 
-    monkeypatch.setattr(orch, "_preflight_ok", _pf_ok, raising=False)
+    def _high_mem() -> MemorySnapshotDict:
+        return _make_snapshot(99.0)  # Way above the 10% threshold
+
+    _test_hooks.is_cgroup_available = _cgroup_available
+    _test_hooks.get_memory_snapshot = _high_mem
+
     res = orch.run_stage_a(ds, cands, samples=1)
     # Should have written a checkpoint after first failure, then aborted on second
     assert res == []
@@ -145,6 +164,10 @@ def test_orchestrator_resume_stage_a_and_b(tmp_path: Path) -> None:
         "checkpoint_path": tmp_path / "ck.json",
     }
     orch = Orchestrator(runner, cfg)
+
+    # Set up hooks for normal operation
+    _test_hooks.is_cgroup_available = lambda: False
+    _test_hooks.get_memory_snapshot = lambda: _make_snapshot(50.0)
 
     # Write stage A checkpoint to skip first candidate
     from handwriting_ai.training.calibration.checkpoint import (
@@ -186,9 +209,7 @@ def test_orchestrator_resume_stage_a_and_b(tmp_path: Path) -> None:
     assert res_b
 
 
-def test_orchestrator_preflight_recovers_then_runs(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_orchestrator_preflight_recovers_then_runs(tmp_path: Path) -> None:
     # First preflight returns False, then True to exercise continue path
     ds = PreprocessDataset(_FakeMNIST(8), _TEST_CFG)
     cands = [_make_cand(2)]
@@ -199,7 +220,7 @@ def test_orchestrator_preflight_recovers_then_runs(
 
         def run(
             self,
-            ds2: PreprocessDataset | PreprocessSpec,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
             cand: Candidate,
             samples: int,
             budget: BudgetConfig,
@@ -218,11 +239,16 @@ def test_orchestrator_preflight_recovers_then_runs(
 
     calls = {"i": 0}
 
-    def _pf_ok(_: float) -> bool:
+    # First call fails (high memory), subsequent succeed (low memory)
+    def _snap() -> MemorySnapshotDict:
         calls["i"] += 1
-        return calls["i"] > 1
+        if calls["i"] <= 2:  # First two checks fail (preflight + retry)
+            return _make_snapshot(99.0)
+        return _make_snapshot(10.0)  # Then succeed
 
-    monkeypatch.setattr(orch, "_preflight_ok", _pf_ok, raising=False)
+    _test_hooks.is_cgroup_available = lambda: True
+    _test_hooks.get_memory_snapshot = _snap
+
     out = orch.run_stage_a(ds, cands, samples=1)
     # One preflight failure (checkpoint) then success run
     assert len(out) == 1 and runner.calls == 1
@@ -233,10 +259,14 @@ def test_orchestrator_candidate_failure_aborts(tmp_path: Path) -> None:
     ds = PreprocessDataset(_FakeMNIST(4), _TEST_CFG_SMALL)
     cands = [_make_cand(2)]
 
+    # Set up hooks for normal preflight
+    _test_hooks.is_cgroup_available = lambda: False
+    _test_hooks.get_memory_snapshot = lambda: _make_snapshot(50.0)
+
     class _FailRunner:
         def run(
             self,
-            ds2: PreprocessDataset | PreprocessSpec,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
             cand: Candidate,
             samples: int,
             budget: BudgetConfig,
@@ -260,51 +290,71 @@ def test_orchestrator_candidate_failure_aborts(tmp_path: Path) -> None:
     assert res == []
 
 
-def _make_snapshot(percent: float) -> MemorySnapshot:
-    """Create a MemorySnapshot TypedDict for testing with given percent."""
-    main: ProcessMemory = {"pid": 1, "rss_bytes": 100 * 1024 * 1024}
-    cgroup_usage: CgroupMemoryUsage = {
-        "usage_bytes": 500 * 1024 * 1024,
-        "limit_bytes": 1024 * 1024 * 1024,
-        "percent": percent,
-    }
-    cgroup_breakdown: CgroupMemoryBreakdown = {
-        "anon_bytes": 400 * 1024 * 1024,
-        "file_bytes": 50 * 1024 * 1024,
-        "kernel_bytes": 30 * 1024 * 1024,
-        "slab_bytes": 20 * 1024 * 1024,
-    }
-    snap: MemorySnapshot = {
-        "main_process": main,
-        "workers": (),
-        "cgroup_usage": cgroup_usage,
-        "cgroup_breakdown": cgroup_breakdown,
-    }
-    return snap
-
-
-def test_orchestrator_preflight_ok_uses_cgroup_snapshot(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_orchestrator_preflight_ok_uses_cgroup_snapshot(tmp_path: Path) -> None:
     """Exercise _preflight_ok branch when cgroup metrics are available."""
-    import handwriting_ai.training.calibration.orchestrator as orch_mod
-
-    monkeypatch.setattr(orch_mod, "is_cgroup_available", lambda: True, raising=True)
 
     # Below threshold -> True
-    monkeypatch.setattr(orch_mod, "get_memory_snapshot", lambda: _make_snapshot(25.0), raising=True)
+    _test_hooks.is_cgroup_available = lambda: True
+    _test_hooks.get_memory_snapshot = lambda: _make_snapshot(25.0)
+
     cfg_below: OrchestratorConfig = {
         "stage_a_budget": _make_budget(50.0, 1),
         "stage_b_budget": _make_budget(50.0, 1),
         "checkpoint_path": tmp_path / "ck.json",
     }
-    assert orch_mod.Orchestrator(_FailingRunner(0), cfg_below)._preflight_ok(50.0) is True
+    assert Orchestrator(_FailingRunner(0), cfg_below)._preflight_ok(50.0) is True
 
     # Above threshold -> False
-    monkeypatch.setattr(orch_mod, "get_memory_snapshot", lambda: _make_snapshot(75.0), raising=True)
+    _test_hooks.get_memory_snapshot = lambda: _make_snapshot(75.0)
     cfg_above: OrchestratorConfig = {
         "stage_a_budget": _make_budget(50.0, 1),
         "stage_b_budget": _make_budget(50.0, 1),
         "checkpoint_path": tmp_path / "ck2.json",
     }
-    assert orch_mod.Orchestrator(_FailingRunner(0), cfg_above)._preflight_ok(50.0) is False
+    assert Orchestrator(_FailingRunner(0), cfg_above)._preflight_ok(50.0) is False
+
+
+def test_orchestrator_preflight_retry_succeeds(tmp_path: Path) -> None:
+    """Test branch where first preflight fails but retry succeeds (line 96->131)."""
+    ds = PreprocessDataset(_FakeMNIST(8), _TEST_CFG)
+    cands = [_make_cand(2)]
+
+    class _Runner:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def run(
+            self,
+            ds: PreprocessDatasetProtocol | PreprocessSpec,
+            cand: Candidate,
+            samples: int,
+            budget: BudgetConfig,
+        ) -> CandidateOutcome:
+            self.calls += 1
+            res = _make_result(cand)
+            return {"ok": True, "res": res, "error": None}
+
+    runner = _Runner()
+    cfg: OrchestratorConfig = {
+        "stage_a_budget": _make_budget(50.0, 2),
+        "stage_b_budget": _make_budget(50.0, 2),
+        "checkpoint_path": tmp_path / "ck.json",
+    }
+    orch = Orchestrator(runner, cfg)
+
+    check_calls = {"i": 0}
+
+    # First preflight check fails, retry succeeds
+    def _snap() -> MemorySnapshotDict:
+        check_calls["i"] += 1
+        if check_calls["i"] == 1:  # First check fails
+            return _make_snapshot(99.0)
+        return _make_snapshot(10.0)  # Retry succeeds
+
+    _test_hooks.is_cgroup_available = lambda: True
+    _test_hooks.get_memory_snapshot = _snap
+
+    out = orch.run_stage_a(ds, cands, samples=1)
+    # Should run the candidate after retry succeeds
+    assert len(out) == 1
+    assert runner.calls == 1

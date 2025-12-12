@@ -1,32 +1,32 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 import torch
 from PIL import Image
-from torch import Tensor
-from torch.nn import Module
-from torch.optim.optimizer import Optimizer
+from torch.nn import Module as TorchModule
+from torch.optim.optimizer import Optimizer as TorchOptimizer
 from torch.utils.data import Dataset
 
-import handwriting_ai.training.mnist_train as mt
-from handwriting_ai.training.dataset import DataLoaderConfig, MNISTLike
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import (
+    BatchLoaderProtocol,
+    EffectiveConfigDict,
+    ResourceLimitsDict,
+)
+from handwriting_ai.training.calibration.ds_spec import PreprocessSpec
+from handwriting_ai.training.dataset import DataLoaderConfig
 from handwriting_ai.training.mnist_train import train_with_config
-from handwriting_ai.training.resources import ResourceLimits
-from handwriting_ai.training.runtime import EffectiveConfig
 from handwriting_ai.training.train_config import TrainConfig, default_train_config
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 
 @pytest.fixture(autouse=True)
-def _mock_monitoring(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_monitoring() -> None:
     """Mock monitoring functions that fail on non-container systems."""
-    import handwriting_ai.training.mnist_train as mt
-
-    monkeypatch.setattr(mt, "log_system_info", lambda: None, raising=False)
+    _test_hooks.log_system_info = lambda: None
 
 
 class _TinyBase(Dataset[tuple[Image.Image, int]]):
@@ -69,54 +69,53 @@ def _cfg(tmp: Path) -> TrainConfig:
     )
 
 
-def test_train_with_calibration_calls_calibrate(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_train_with_calibration_calls_calibrate(tmp_path: Path) -> None:
     cfg = _cfg(tmp_path)
     train_base = _TinyBase(2)
     test_base = _TinyBase(1)
 
     # Speed up training
     def _ok_train_epoch(
-        model: Module,
-        train_loader: Generator[tuple[Tensor, Tensor], None, None],
+        model: TorchModule,
+        train_loader: BatchLoaderProtocol,
         device: torch.device,
-        optimizer: Optimizer,
+        optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
         return 0.0
 
-    monkeypatch.setattr(mt, "_train_epoch", _ok_train_epoch, raising=True)
+    _test_hooks.train_epoch = _ok_train_epoch
 
-    # Provide a simple EffectiveConfig via calibrate_input_pipeline
-    e = EffectiveConfig(
-        intra_threads=1,
-        interop_threads=None,
+    # Provide a simple EffectiveConfigDict via calibrate_input_pipeline
+    loader_cfg = DataLoaderConfig(
         batch_size=1,
-        loader_cfg=DataLoaderConfig(
-            batch_size=1,
-            num_workers=0,
-            pin_memory=False,
-            persistent_workers=False,
-            prefetch_factor=2,
-        ),
+        num_workers=0,
+        pin_memory=False,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
+    e: EffectiveConfigDict = {
+        "intra_threads": 1,
+        "interop_threads": None,
+        "batch_size": 1,
+        "loader_cfg": loader_cfg,
+    }
 
     def _fake_calibrate(
-        train_base: MNISTLike,
+        ds: PreprocessSpec,
         *,
-        limits: ResourceLimits,
+        limits: ResourceLimitsDict,
         requested_batch_size: int,
         samples: int,
         cache_path: Path,
         ttl_seconds: int,
         force: bool,
-    ) -> EffectiveConfig:
+    ) -> EffectiveConfigDict:
         return e
 
-    monkeypatch.setattr(mt, "calibrate_input_pipeline", _fake_calibrate, raising=True)
+    _test_hooks.calibrate_input_pipeline = _fake_calibrate
 
     result = train_with_config(cfg, (train_base, test_base))
     assert result["state_dict"]  # has state dict

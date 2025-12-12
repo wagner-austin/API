@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from typing import BinaryIO
+
 import pytest
 from PIL import Image
+from PIL.Image import Image as PILImage
 from platform_core.errors import AppError, ErrorCode, HandwritingErrorCode
 
+from handwriting_ai import _test_hooks
 from handwriting_ai.api.routes.read import _open_image_bytes
-
-UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 
 def test_open_image_invalid_bytes_raises_invalid_image() -> None:
@@ -16,15 +18,12 @@ def test_open_image_invalid_bytes_raises_invalid_image() -> None:
     assert e.code is HandwritingErrorCode.invalid_image
 
 
-def test_open_image_decompression_bomb_maps_to_payload_too_large(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import io
-
-    def _raise_bomb(fp: io.BytesIO) -> Image.Image:
+def test_open_image_decompression_bomb_maps_to_payload_too_large() -> None:
+    def _raise_bomb(fp: BinaryIO) -> PILImage:
+        _ = fp  # unused
         raise Image.DecompressionBombError("bomb")
 
-    monkeypatch.setattr(Image, "open", _raise_bomb, raising=True)
+    _test_hooks.pil_image_open = _raise_bomb
     with pytest.raises(AppError) as ei:
         _ = _open_image_bytes(b"header")
     e = ei.value

@@ -4,13 +4,12 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_workers.redis import RedisStrProto
 
 import handwriting_ai.jobs.digits as dj
-from handwriting_ai.training.resources import ResourceLimits
-from handwriting_ai.training.train_config import (
-    TrainConfig,
-    TrainingResult,
-)
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import JobContextProtocol
+from handwriting_ai.training.train_config import TrainConfig, TrainingResult
 
 pytestmark = pytest.mark.usefixtures("digits_redis")
 
@@ -23,7 +22,7 @@ class _StubJobCtx:
         return None
 
     def publish_progress(
-        self, progress: int, message: str | None = None, payload: JSONValue | None = None
+        self, progress: int, message: str | None = None, *, payload: JSONValue | None = None
     ) -> None:
         return None
 
@@ -35,29 +34,33 @@ class _StubJobCtx:
 
 
 @pytest.fixture(autouse=True)
-def _mock_resources(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_resources() -> None:
     """Mock resource detection for Windows/non-container environments."""
-    limits = ResourceLimits(
-        cpu_cores=4,
-        memory_bytes=4 * 1024 * 1024 * 1024,
-        optimal_threads=2,
-        optimal_workers=0,
-        max_batch_size=64,
-    )
-    import handwriting_ai.training.runtime as rt
-
-    monkeypatch.setattr(rt, "detect_resource_limits", lambda: limits, raising=False)
+    limits: _test_hooks.ResourceLimitsDict = {
+        "cpu_cores": 4,
+        "memory_bytes": 4 * 1024 * 1024 * 1024,
+        "optimal_threads": 2,
+        "optimal_workers": 0,
+        "max_batch_size": 64,
+    }
+    _test_hooks.detect_resource_limits = lambda: limits
 
 
-def test_process_train_job_invalid_payload_fields_reraises(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_process_train_job_invalid_payload_fields_reraises() -> None:
     job_ctx = _StubJobCtx()
 
-    def _ctx(*args: JSONValue, **kwargs: JSONValue) -> _StubJobCtx:
+    def _fake_make_job_context(
+        *,
+        redis: RedisStrProto,
+        domain: str,
+        events_channel: str,
+        job_id: str,
+        user_id: int,
+        queue_name: str,
+    ) -> JobContextProtocol:
         return job_ctx
 
-    monkeypatch.setattr(dj, "make_job_context", _ctx, raising=True)
+    _test_hooks.make_job_context = _fake_make_job_context
 
     payload: dict[str, JSONValue] = {
         "type": "digits.train.v1",
@@ -75,20 +78,27 @@ def test_process_train_job_invalid_payload_fields_reraises(
         dj._decode_and_process_train_job(payload)
 
 
-def test_process_train_job_training_error_reraises(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_process_train_job_training_error_reraises(tmp_path: Path) -> None:
     job_ctx = _StubJobCtx()
 
-    def _ctx(*args: JSONValue, **kwargs: JSONValue) -> _StubJobCtx:
+    def _fake_make_job_context(
+        *,
+        redis: RedisStrProto,
+        domain: str,
+        events_channel: str,
+        job_id: str,
+        user_id: int,
+        queue_name: str,
+    ) -> JobContextProtocol:
         return job_ctx
 
-    monkeypatch.setattr(dj, "make_job_context", _ctx, raising=True)
+    _test_hooks.make_job_context = _fake_make_job_context
 
-    def _raise_run(_: TrainConfig) -> TrainingResult:
+    def _raise_run(cfg: TrainConfig) -> TrainingResult:
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(dj, "_run_training", _raise_run)
+    _test_hooks.run_training = _raise_run
+
     payload: dict[str, JSONValue] = {
         "type": "digits.train.v1",
         "request_id": "r1",

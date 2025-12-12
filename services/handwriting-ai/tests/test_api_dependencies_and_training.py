@@ -6,9 +6,14 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
+from platform_core.config import _test_hooks as config_test_hooks
 from platform_core.errors import AppError, ErrorCode
-from platform_workers.testing import FakeRedis
+from platform_core.testing import make_fake_env
+from platform_workers.rq_harness import _RedisBytesClient
+from platform_workers.testing import FakeRedis, FakeRedisBytesClient
 
+from handwriting_ai import _test_hooks
+from handwriting_ai._test_hooks import LoggerInstanceProtocol
 from handwriting_ai.api.dependencies import (
     _get_redis_url,
     get_queue,
@@ -21,6 +26,7 @@ from handwriting_ai.api.routes.training import (
     build_router,
 )
 from handwriting_ai.api.types import JsonDict, RQRetryLike, UnknownJson, _EnqCallable
+from handwriting_ai.config import Settings
 
 
 class _RedisConnectionProto(Protocol):
@@ -32,72 +38,65 @@ class _RedisConnectionProto(Protocol):
 # --- Tests for dependencies.py ---
 
 
-def test_get_settings_returns_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_settings_returns_settings(tmp_path: Path) -> None:
     """Test get_settings() returns loaded settings."""
-    from pathlib import Path
-
-    from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
-
-    fake_app: AppConfig = {
-        "data_root": Path("/tmp/data"),
-        "artifacts_root": Path("/tmp/artifacts"),
-        "logs_root": Path("/tmp/logs"),
-        "threads": 2,
-        "port": 8080,
+    fake_settings: Settings = {
+        "app": {
+            "data_root": tmp_path / "data",
+            "artifacts_root": tmp_path / "artifacts",
+            "logs_root": tmp_path / "logs",
+            "threads": 2,
+            "port": 8080,
+        },
+        "digits": {
+            "model_dir": tmp_path / "models",
+            "active_model": "test-model",
+            "tta": False,
+            "uncertain_threshold": 0.5,
+            "max_image_mb": 10,
+            "max_image_side_px": 2048,
+            "predict_timeout_seconds": 30,
+            "visualize_max_kb": 128,
+            "retention_keep_runs": 5,
+            "allowed_hosts": frozenset(["*"]),
+        },
+        "security": {"api_key": "", "api_key_enabled": False},
     }
-    fake_digits: DigitsConfig = {
-        "model_dir": Path("/tmp/models"),
-        "active_model": "test-model",
-        "tta": False,
-        "uncertain_threshold": 0.5,
-        "max_image_mb": 10,
-        "max_image_side_px": 2048,
-        "predict_timeout_seconds": 30,
-        "visualize_max_kb": 128,
-        "retention_keep_runs": 5,
-        "allowed_hosts": frozenset(["*"]),
-    }
-    fake_security: SecurityConfig = {"api_key": "", "api_key_enabled": False}
-    fake_settings: Settings = {"app": fake_app, "digits": fake_digits, "security": fake_security}
 
     def _fake_load_settings(*, create_dirs: bool = True) -> Settings:
         return fake_settings
 
-    monkeypatch.setattr(
-        "handwriting_ai.api.dependencies.load_settings", _fake_load_settings, raising=True
-    )
+    _test_hooks.load_settings = _fake_load_settings
 
     settings = get_settings()
     assert settings["app"]["threads"] == 2
     assert settings["app"]["port"] == 8080
 
 
-def test_get_redis_url_returns_url(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_url_returns_url() -> None:
     """Test _get_redis_url() returns REDIS_URL from environment."""
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    config_test_hooks.get_env = make_fake_env({"REDIS_URL": "redis://localhost:6379/0"})
     url = _get_redis_url()
     assert url == "redis://localhost:6379/0"
 
 
-def test_get_redis_url_raises_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_url_raises_when_missing() -> None:
     """Test _get_redis_url() raises when REDIS_URL not set."""
-    monkeypatch.delenv("REDIS_URL", raising=False)
+    config_test_hooks.get_env = make_fake_env({})
     with pytest.raises(RuntimeError, match="REDIS_URL"):
         _get_redis_url()
 
 
-def test_get_redis_yields_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_redis_yields_and_closes() -> None:
     """Test get_redis() yields Redis client and closes on teardown."""
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    config_test_hooks.get_env = make_fake_env({"REDIS_URL": "redis://localhost:6379/0"})
 
     redis_instance = FakeRedis()
 
     def _fake_redis_for_kv(url: str) -> FakeRedis:
         return redis_instance
 
-    monkeypatch.setattr(
-        "handwriting_ai.api.dependencies.redis_for_kv", _fake_redis_for_kv, raising=True
-    )
+    _test_hooks.redis_factory = _fake_redis_for_kv
 
     gen = get_redis()
     client = next(gen)
@@ -112,31 +111,55 @@ def test_get_redis_yields_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
     redis_instance.assert_only_called({"close"})
 
 
-def test_get_request_logger_returns_logger(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_request_logger_returns_logger() -> None:
     """Test get_request_logger() returns a logger instance."""
 
     class _FakeLoggerInstance:
-        def info(self, msg: str, **kwargs: UnknownJson) -> None:
+        def info(
+            self,
+            msg: str,
+            *args: float | int | str | Path | BaseException,
+            extra: dict[str, str | int | float | bool | None] | None = None,
+        ) -> None:
             pass
 
-        def error(self, msg: str, **kwargs: UnknownJson) -> None:
+        def warning(
+            self,
+            msg: str,
+            *args: float | int | str | Path | BaseException,
+            extra: dict[str, str | int | float | bool | None] | None = None,
+        ) -> None:
             pass
 
-    def _fake_get_logger(name: str) -> _FakeLoggerInstance:
+        def error(
+            self,
+            msg: str,
+            *args: float | int | str | Path | BaseException,
+            extra: dict[str, str | int | float | bool | None] | None = None,
+        ) -> None:
+            pass
+
+        def debug(
+            self,
+            msg: str,
+            *args: float | int | str | Path | BaseException,
+            extra: dict[str, str | int | float | bool | None] | None = None,
+        ) -> None:
+            pass
+
+    def _fake_get_logger(name: str) -> LoggerInstanceProtocol:
         return _FakeLoggerInstance()
 
-    monkeypatch.setattr(
-        "handwriting_ai.api.dependencies.get_logger", _fake_get_logger, raising=True
-    )
+    _test_hooks.get_logger = _fake_get_logger
 
     logger = get_request_logger()
     if logger is None:
         raise AssertionError("expected logger")
 
 
-def test_get_queue_returns_queue_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_queue_returns_queue_adapter() -> None:
     """Test get_queue() returns a QueueProtocol implementation."""
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    config_test_hooks.get_env = make_fake_env({"REDIS_URL": "redis://localhost:6379/0"})
 
     enqueued: list[dict[str, UnknownJson]] = []
 
@@ -158,21 +181,14 @@ def test_get_queue_returns_queue_adapter(monkeypatch: pytest.MonkeyPatch) -> Non
             enqueued.append({"func": func, "args": list(args)})
             return _FakeRQJob()
 
-    def _fake_redis_raw_for_rq(url: str) -> _RedisConnectionProto:
-        class _FakeConn:
-            pass
+    def _fake_rq_conn(url: str) -> FakeRedisBytesClient:
+        return FakeRedisBytesClient()
 
-        return _FakeConn()
-
-    def _fake_rq_queue(name: str, connection: _RedisConnectionProto) -> _FakeRQQueue:
+    def _fake_rq_queue_factory(name: str, connection: _RedisBytesClient) -> _FakeRQQueue:
         return _FakeRQQueue()
 
-    monkeypatch.setattr(
-        "handwriting_ai.api.dependencies.redis_raw_for_rq",
-        _fake_redis_raw_for_rq,
-        raising=True,
-    )
-    monkeypatch.setattr("handwriting_ai.api.dependencies.rq_queue", _fake_rq_queue, raising=True)
+    _test_hooks.rq_conn = _fake_rq_conn
+    _test_hooks.rq_queue_factory = _fake_rq_queue_factory
 
     queue = get_queue()
     job = queue.enqueue("some.func", {"key": "value"}, job_timeout=60)
@@ -556,16 +572,14 @@ class _FakeRQClientQueueForTest:
         return _FakeRQJobForTrainingTest()
 
 
-def test_create_training_job_via_testclient(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_create_training_job_via_testclient(tmp_path: Path) -> None:
     """Test training job endpoint via TestClient with mocked dependencies."""
     from fastapi.testclient import TestClient
     from platform_core.json_utils import JSONValue, load_json_str
-    from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
+    from platform_workers.rq_harness import RQClientQueue
 
-    from handwriting_ai.api.app import create_app
-    from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig, Settings
+    from handwriting_ai.api.main import create_app
+    from handwriting_ai.config import AppConfig, DigitsConfig, SecurityConfig
 
     # Build settings
     app_cfg: AppConfig = {
@@ -594,14 +608,15 @@ def test_create_training_job_via_testclient(
     call_tracker: dict[str, int] = {"count": 0}
     fake_queue: RQClientQueue = _FakeRQClientQueueForTest(call_tracker)
 
-    def _fake_rq_queue(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+    def _fake_rq_queue_factory(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+        _ = (name, connection)  # unused
         return fake_queue
 
-    # Set REDIS_URL to something (required by get_queue)
-    monkeypatch.setenv("REDIS_URL", "redis://fake:6379/0")
+    # Set REDIS_URL via hook
+    config_test_hooks.get_env = make_fake_env({"REDIS_URL": "redis://fake:6379/0"})
 
-    # Monkeypatch rq_queue at the dependencies module level
-    monkeypatch.setattr("handwriting_ai.api.dependencies.rq_queue", _fake_rq_queue, raising=True)
+    # Set rq_queue_factory hook
+    _test_hooks.rq_queue_factory = _fake_rq_queue_factory
 
     # Create app and test client
     app = create_app(settings, enforce_api_key=False)

@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import importlib
 import types
 
 import pytest
 
 import handwriting_ai.inference.engine as eng
+from handwriting_ai import _test_hooks
 
 UnknownJson = dict[str, "UnknownJson"] | list["UnknownJson"] | str | int | float | bool | None
 
 
-def test_build_model_raises_on_missing_attrs(monkeypatch: pytest.MonkeyPatch) -> None:
-    import importlib
-
+def test_build_model_raises_on_missing_attrs() -> None:
     class _M:
         """Model stub deliberately missing conv1/maxpool attributes."""
 
@@ -31,6 +31,6 @@ def test_build_model_raises_on_missing_attrs(monkeypatch: pytest.MonkeyPatch) ->
             return fake_models
         return real_import(name, package)
 
-    monkeypatch.setattr(importlib, "import_module", _import_module, raising=True)
+    _test_hooks.import_module = _import_module
     with pytest.raises(RuntimeError):
         eng._build_model("resnet18", 10)
