@@ -371,9 +371,7 @@ class LogRecordQueueProtocol(Protocol):
         timeout: float | None = None,
     ) -> None: ...
 
-    def get(
-        self, block: bool = True, timeout: float | None = None
-    ) -> logging.LogRecord: ...
+    def get(self, block: bool = True, timeout: float | None = None) -> logging.LogRecord: ...
 
     def empty(self) -> bool: ...
 
@@ -381,9 +379,7 @@ class LogRecordQueueProtocol(Protocol):
 class QueueHandlerFactory(Protocol):
     """Protocol for QueueHandler constructor."""
 
-    def __call__(
-        self, queue: _mp.Queue[logging.LogRecord]
-    ) -> logging.Handler: ...
+    def __call__(self, queue: _mp.Queue[logging.LogRecord]) -> logging.Handler: ...
 
 
 class QueueListenerFactory(Protocol):

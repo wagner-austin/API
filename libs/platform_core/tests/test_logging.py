@@ -569,3 +569,25 @@ def test_setup_logging_silences_third_party() -> None:
     assert stdlib_logging.getLogger("urllib3").level == stdlib_logging.WARNING
     assert stdlib_logging.getLogger("httpx").level == stdlib_logging.WARNING
     assert stdlib_logging.getLogger("httpcore").level == stdlib_logging.WARNING
+
+
+def test_load_queue_handler_factory_returns_factory() -> None:
+    """Test load_queue_handler_factory returns the QueueHandler class."""
+    import logging.handlers
+
+    from platform_core.logging import QueueHandlerFactory, load_queue_handler_factory
+
+    factory = load_queue_handler_factory()
+    expected: QueueHandlerFactory = logging.handlers.QueueHandler
+    assert factory is expected
+
+
+def test_load_queue_listener_factory_returns_factory() -> None:
+    """Test load_queue_listener_factory returns the QueueListener class."""
+    import logging.handlers
+
+    from platform_core.logging import QueueListenerFactory, load_queue_listener_factory
+
+    factory = load_queue_listener_factory()
+    expected: QueueListenerFactory = logging.handlers.QueueListener
+    assert factory is expected
