@@ -12,6 +12,32 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from ..decode import parse_measurements_request
 
+# OpenAPI response schemas (no type annotation for FastAPI compatibility)
+_MEASUREMENT_EXAMPLE: dict[str, JSONValue] = {
+    "deal_id": {"value": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"},
+    "period_start_iso": "2024-01-01",
+    "period_end_iso": "2024-03-31",
+    "metric_name": "total_debt",
+    "metric_value_scaled": 1000000000,
+}
+
+_MEASUREMENT_EXAMPLE_ARRAY: list[JSONValue] = [_MEASUREMENT_EXAMPLE]
+_MEASUREMENT_EXAMPLE_WRAPPED: dict[str, JSONValue] = {"example": _MEASUREMENT_EXAMPLE}
+
+_LIST_MEASUREMENTS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Array of Measurement objects",
+        "content": {"application/json": {"example": _MEASUREMENT_EXAMPLE_ARRAY}},
+    },
+}
+
+_ADD_MEASUREMENTS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    201: {
+        "description": "Count of measurements added",
+        "content": {"application/json": {"example": {"count": 2}}},
+    },
+}
+
 
 class ContainerProtocol(Protocol):
     """Protocol for service container with measurement_repo method."""
@@ -85,13 +111,27 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     router.add_api_route(
-        "/by-deal/{deal_id}", _list_measurements_for_deal, methods=["GET"], response_model=None
+        "/by-deal/{deal_id}",
+        _list_measurements_for_deal,
+        methods=["GET"],
+        response_model=None,
+        summary="List measurements for deal",
+        description="List all financial measurements for a deal across all periods.",
+        response_description="Array of Measurement objects",
+        responses=_LIST_MEASUREMENTS_RESPONSES,
     )
     router.add_api_route(
         "/by-deal/{deal_id}/period",
         _list_measurements_for_deal_and_period,
         methods=["GET"],
         response_model=None,
+        summary="List measurements for period",
+        description=(
+            "List measurements for a deal within a specific period. "
+            "Query params: period_start, period_end (YYYY-MM-DD)."
+        ),
+        response_description="Array of Measurement objects",
+        responses=_LIST_MEASUREMENTS_RESPONSES,
     )
     router.add_api_route(
         "",
@@ -99,6 +139,13 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=None,
+        summary="Add measurements",
+        description=(
+            "Add financial measurements for deals. Request body: {measurements: [...]} "
+            "with deal_id, period dates, metric_name, and metric_value_scaled."
+        ),
+        response_description="Count of measurements added",
+        responses=_ADD_MEASUREMENTS_RESPONSES,
     )
 
     return router

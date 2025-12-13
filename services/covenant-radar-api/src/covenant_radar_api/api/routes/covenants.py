@@ -12,6 +12,46 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from ..decode import parse_covenant_request
 
+# OpenAPI response schemas (no type annotation for FastAPI compatibility)
+_COVENANT_EXAMPLE: dict[str, JSONValue] = {
+    "id": {"value": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"},
+    "deal_id": {"value": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"},
+    "name": "Max Leverage Ratio",
+    "formula": "total_debt / ebitda",
+    "threshold_value_scaled": 450,
+    "threshold_direction": "<=",
+    "frequency": "QUARTERLY",
+}
+
+_COVENANT_EXAMPLE_ARRAY: list[JSONValue] = [_COVENANT_EXAMPLE]
+_COVENANT_EXAMPLE_WRAPPED: dict[str, JSONValue] = {"example": _COVENANT_EXAMPLE}
+
+_LIST_COVENANTS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Array of Covenant objects",
+        "content": {"application/json": {"example": _COVENANT_EXAMPLE_ARRAY}},
+    },
+}
+
+_CREATE_COVENANT_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    201: {
+        "description": "Created Covenant object",
+        "content": {"application/json": _COVENANT_EXAMPLE_WRAPPED},
+    },
+}
+
+_GET_COVENANT_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Covenant object",
+        "content": {"application/json": _COVENANT_EXAMPLE_WRAPPED},
+    },
+    404: {"description": "Covenant not found"},
+}
+
+_DELETE_COVENANT_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    204: {"description": "Covenant deleted successfully"},
+}
+
 
 class ContainerProtocol(Protocol):
     """Protocol for service container with covenant_repo method."""
@@ -86,7 +126,14 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         return Response(status_code=204)
 
     router.add_api_route(
-        "/by-deal/{deal_id}", _list_covenants_for_deal, methods=["GET"], response_model=None
+        "/by-deal/{deal_id}",
+        _list_covenants_for_deal,
+        methods=["GET"],
+        response_model=None,
+        summary="List covenants for deal",
+        description="List all covenant rules attached to a specific deal.",
+        response_description="Array of Covenant objects",
+        responses=_LIST_COVENANTS_RESPONSES,
     )
     router.add_api_route(
         "",
@@ -94,10 +141,34 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=None,
+        summary="Create a covenant",
+        description=(
+            "Create a new covenant rule for a deal with formula, threshold, "
+            "direction, and frequency."
+        ),
+        response_description="Created Covenant object",
+        responses=_CREATE_COVENANT_RESPONSES,
     )
-    router.add_api_route("/{covenant_id}", _get_covenant, methods=["GET"], response_model=None)
     router.add_api_route(
-        "/{covenant_id}", _delete_covenant, methods=["DELETE"], response_model=None
+        "/{covenant_id}",
+        _get_covenant,
+        methods=["GET"],
+        response_model=None,
+        summary="Get a covenant",
+        description="Get a specific covenant by its UUID.",
+        response_description="Covenant object",
+        responses=_GET_COVENANT_RESPONSES,
+    )
+    router.add_api_route(
+        "/{covenant_id}",
+        _delete_covenant,
+        methods=["DELETE"],
+        response_model=None,
+        status_code=204,
+        summary="Delete a covenant",
+        description="Delete a covenant by UUID.",
+        response_description="No content",
+        responses=_DELETE_COVENANT_RESPONSES,
     )
 
     return router

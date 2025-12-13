@@ -15,6 +15,26 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from ..decode import parse_evaluate_request
 
+# OpenAPI response schemas (no type annotation for FastAPI compatibility)
+_EVALUATE_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Array of CovenantResult objects with compliance status",
+        "content": {
+            "application/json": {
+                "example": [
+                    {
+                        "covenant_id": {"value": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"},
+                        "period_start_iso": "2024-01-01",
+                        "period_end_iso": "2024-03-31",
+                        "calculated_value_scaled": 333,
+                        "status": "OK",
+                    },
+                ],
+            },
+        },
+    },
+}
+
 
 class ContainerProtocol(Protocol):
     """Protocol for service container with evaluation repositories."""
@@ -89,7 +109,20 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             media_type="application/json",
         )
 
-    router.add_api_route("", _evaluate, methods=["POST"], response_model=None)
+    router.add_api_route(
+        "",
+        _evaluate,
+        methods=["POST"],
+        response_model=None,
+        summary="Evaluate covenant compliance",
+        description=(
+            "Evaluate all covenants for a deal and period. Calculates metric values using "
+            "covenant formulas and determines compliance status (OK, NEAR_BREACH, BREACH) "
+            "based on thresholds and tolerance ratio."
+        ),
+        response_description="Array of CovenantResult objects with status",
+        responses=_EVALUATE_RESPONSES,
+    )
 
     return router
 

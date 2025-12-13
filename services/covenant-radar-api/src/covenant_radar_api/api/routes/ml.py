@@ -18,10 +18,89 @@ from covenant_persistence import (
     MeasurementRepository,
 )
 from fastapi import APIRouter, Request, Response
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.errors import AppError, ErrorCode
+from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from platform_workers.rq_harness import RQClientQueue
 
-from ..decode import PredictResponse, TrainResponse, parse_predict_request, parse_train_request
+from ..decode import (
+    PredictResponse,
+    TrainResponse,
+    parse_external_train_request,
+    parse_predict_request,
+    parse_train_request,
+)
+
+# OpenAPI response schemas (no type annotation for FastAPI compatibility)
+_PREDICT_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Successful prediction",
+        "content": {
+            "application/json": {
+                "example": {
+                    "deal_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                    "probability": 0.23,
+                    "risk_tier": "LOW",
+                },
+            },
+        },
+    },
+}
+
+_TRAIN_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Training job queued",
+        "content": {
+            "application/json": {
+                "example": {"job_id": "train-job-uuid", "status": "queued"},
+            },
+        },
+    },
+}
+
+_TRAIN_EXTERNAL_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Training job queued",
+        "content": {
+            "application/json": {
+                "example": {"job_id": "train-job-uuid", "status": "queued"},
+            },
+        },
+    },
+}
+
+_MODEL_INFO_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Active model info",
+        "content": {
+            "application/json": {
+                "example": {
+                    "model_id": "model-2024-01-15",
+                    "model_path": "/data/models/active.ubj",
+                    "is_loaded": True,
+                },
+            },
+        },
+    },
+}
+
+_JOB_STATUS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Job status with optional result",
+        "content": {
+            "application/json": {
+                "example": {
+                    "job_id": "train-job-uuid",
+                    "status": "finished",
+                    "result": {
+                        "model_id": "model-2024-01-15",
+                        "best_val_auc": 0.94,
+                        "feature_importances": [{"name": "X6", "importance": 0.18, "rank": 1}],
+                    },
+                },
+            },
+        },
+    },
+}
 
 
 class ModelInfo(TypedDict, total=True):
@@ -62,17 +141,7 @@ class ContainerProtocol(Protocol):
     def get_job_status(self, job_id: str) -> JobStatus: ...
 
 
-def build_router(get_container: ContainerProtocol) -> APIRouter:
-    """Build FastAPI router for ML operations.
-
-    Args:
-        get_container: Container instance with ML dependencies.
-
-    Returns:
-        Configured router with prediction and training endpoints.
-    """
-    router = APIRouter(prefix="/ml", tags=["ml"])
-
+def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _predict(request: Request) -> Response:
         """Predict breach risk for a deal.
 
@@ -101,7 +170,6 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         recent_results = result_repo.list_for_deal(deal_id)
 
         # Build metric dictionaries from measurements
-        # Group measurements by period and find current/historical periods
         periods: dict[str, dict[str, int]] = {}
         for m in measurements:
             period_key = f"{m['period_start_iso']}_{m['period_end_iso']}"
@@ -111,7 +179,6 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
 
         # Sort periods and get current, 1 period ago, 4 periods ago
         sorted_periods = sorted(periods.keys(), reverse=True)
-
         metrics_current = periods[sorted_periods[0]] if len(sorted_periods) > 0 else {}
         metrics_1p = periods[sorted_periods[1]] if len(sorted_periods) > 1 else {}
         metrics_4p = periods[sorted_periods[4]] if len(sorted_periods) > 4 else {}
@@ -144,38 +211,30 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             "probability": response["probability"],
             "risk_tier": response["risk_tier"],
         }
-        return Response(
-            content=dump_json_str(body),
-            media_type="application/json",
-        )
+        return Response(content=dump_json_str(body), media_type="application/json")
 
+    router.add_api_route(
+        "/predict",
+        _predict,
+        methods=["POST"],
+        response_model=None,
+        summary="Predict breach risk",
+        description=(
+            "Predict covenant breach probability for a deal based on financial metrics. "
+            "Returns probability score (0.0-1.0) and risk tier (LOW/MEDIUM/HIGH)."
+        ),
+        response_description="Prediction with probability and risk tier",
+        responses=_PREDICT_RESPONSES,
+    )
+
+
+def _register_train(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _train(request: Request) -> Response:
         """Enqueue XGBoost model training job on internal deal data.
 
         Supports GPU training via device parameter. Class imbalance is handled
         automatically: if scale_pos_weight is omitted, it's calculated as
         (n_negative / n_positive) from the training set.
-
-        Request body:
-            learning_rate: float - Learning rate (e.g. 0.1)
-            max_depth: int - Max tree depth (e.g. 6)
-            n_estimators: int - Number of boosting rounds (e.g. 100)
-            subsample: float - Row subsample ratio (e.g. 0.8)
-            colsample_bytree: float - Column subsample ratio (e.g. 0.8)
-            random_state: int - Random seed for reproducibility
-            train_ratio: float - Training set ratio (e.g. 0.7)
-            val_ratio: float - Validation set ratio (e.g. 0.15)
-            test_ratio: float - Test set ratio (e.g. 0.15)
-            early_stopping_rounds: int - Stop if no improvement (e.g. 10)
-            device: "cpu" | "cuda" | "auto" - "cpu" forces CPU, "cuda" forces GPU,
-                "auto" uses GPU if available (default "auto")
-            reg_alpha: float - L1 regularization (default 0.0)
-            reg_lambda: float - L2 regularization (default 1.0)
-            scale_pos_weight: float (optional) - Auto-calculated as
-                (n_negative / n_positive) if omitted
-
-        Returns:
-            202 with {job_id, status: "queued"}. Poll /ml/jobs/{job_id} for results.
         """
         body_bytes = await request.body()
         config: TrainConfig = parse_train_request(body_bytes)
@@ -218,76 +277,38 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             status_code=202,
         )
 
-    def _get_model_info() -> Response:
-        """Get information about the active ML model.
+    router.add_api_route(
+        "/train",
+        _train,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Train model on internal data",
+        description=(
+            "Enqueue XGBoost model training job using internal deal/measurement data. "
+            "Supports GPU training via device parameter ('cpu', 'cuda', 'auto'). "
+            "Class imbalance is handled automatically if scale_pos_weight is omitted."
+        ),
+        response_description="Job ID for polling status",
+        responses=_TRAIN_RESPONSES,
+    )
 
-        Returns:
-            JSON object with model_id, model_path, is_loaded.
-        """
-        info = get_container.get_model_info()
-        body: dict[str, JSONValue] = {
-            "model_id": info["model_id"],
-            "model_path": info["model_path"],
-            "is_loaded": info["is_loaded"],
-        }
-        return Response(
-            content=dump_json_str(body),
-            media_type="application/json",
-        )
 
-    def _get_job_status(job_id: str) -> Response:
-        """Get status of a background job.
-
-        Args:
-            job_id: The job UUID string
-
-        Returns:
-            JSON object with job_id, status, and result (if finished).
-        """
-        status = get_container.get_job_status(job_id)
-        body: dict[str, JSONValue] = {
-            "job_id": status["job_id"],
-            "status": status["status"],
-        }
-        if status["result"] is not None:
-            body["result"] = status["result"]
-        return Response(
-            content=dump_json_str(body),
-            media_type="application/json",
-        )
-
+def _register_train_external(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _train_external(request: Request) -> Response:
-        """Train XGBoost on external bankruptcy datasets with automatic feature selection.
+        """Train model on external bankruptcy datasets with pluggable backend.
 
-        Supports GPU training via device parameter. XGBoost trains on ALL columns
-        and ranks features by importance. Class imbalance is handled automatically:
-        if scale_pos_weight is omitted, it's calculated as (n_negative / n_positive).
-
-        Available datasets:
-            - taiwan: 6,819 samples, 95 financial ratio features
-            - us: 78,682 samples, 18 features
-            - polish: 7,027 samples, 64 financial ratio features
-
-        Request body:
-            dataset: "taiwan" | "us" | "polish" - Which dataset to train on
-            learning_rate: float - Learning rate (e.g. 0.1)
-            max_depth: int - Max tree depth (e.g. 6)
-            n_estimators: int - Number of boosting rounds (e.g. 100)
-            subsample: float - Row subsample ratio (e.g. 0.8)
-            colsample_bytree: float - Column subsample ratio (e.g. 0.8)
-            random_state: int - Random seed for reproducibility
-            device: "cpu" | "cuda" | "auto" - "cpu" forces CPU, "cuda" forces GPU,
-                "auto" uses GPU if available (default "auto")
-            reg_alpha: float (optional, default 0.0) - L1 regularization
-            reg_lambda: float (optional, default 1.0) - L2 regularization
-            scale_pos_weight: float (optional) - Auto-calculated as
-                (n_negative / n_positive) if omitted
-
-        Returns:
-            202 with {job_id, status: "queued"}. Poll /ml/jobs/{job_id} for results
-            including feature_importances ranking and scale_pos_weight used.
+        Supports both XGBoost and MLP (neural network) backends via the 'backend'
+        field. Performs automatic feature selection using model importance.
         """
         body_bytes = await request.body()
+        # Validate request at the API edge to prevent bad jobs from entering the queue
+        try:
+            _ = parse_external_train_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
         config_json = body_bytes.decode("utf-8")
 
         queue = get_container.rq_queue()
@@ -307,12 +328,84 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
             status_code=202,
         )
 
-    router.add_api_route("/predict", _predict, methods=["POST"], response_model=None)
-    router.add_api_route("/train", _train, methods=["POST"], response_model=None)
-    router.add_api_route("/train-external", _train_external, methods=["POST"], response_model=None)
-    router.add_api_route("/models/active", _get_model_info, methods=["GET"], response_model=None)
-    router.add_api_route("/jobs/{job_id}", _get_job_status, methods=["GET"], response_model=None)
+    router.add_api_route(
+        "/train-external",
+        _train_external,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Train model on external datasets",
+        description=(
+            "Train on external bankruptcy datasets (taiwan, us, polish) with pluggable "
+            "ML backends. Supports XGBoost (gradient boosting with feature importance) "
+            "and MLP (neural network). GPU training supported via device parameter. "
+            "XGBoost returns ranked feature importances; MLP does not."
+        ),
+        response_description="Job ID for polling status",
+        responses=_TRAIN_EXTERNAL_RESPONSES,
+    )
 
+
+def _register_model_info(router: APIRouter, get_container: ContainerProtocol) -> None:
+    def _get_model_info() -> Response:
+        info = get_container.get_model_info()
+        body: dict[str, JSONValue] = {
+            "model_id": info["model_id"],
+            "model_path": info["model_path"],
+            "is_loaded": info["is_loaded"],
+        }
+        return Response(content=dump_json_str(body), media_type="application/json")
+
+    router.add_api_route(
+        "/models/active",
+        _get_model_info,
+        methods=["GET"],
+        response_model=None,
+        summary="Get active model info",
+        description=(
+            "Get information about the currently loaded ML model "
+            "including model ID, path, and load status."
+        ),
+        response_description="Active model information",
+        responses=_MODEL_INFO_RESPONSES,
+    )
+
+
+def _register_job_status(router: APIRouter, get_container: ContainerProtocol) -> None:
+    def _get_job_status(job_id: str) -> Response:
+        status_obj = get_container.get_job_status(job_id)
+        body: dict[str, JSONValue] = {
+            "job_id": status_obj["job_id"],
+            "status": status_obj["status"],
+        }
+        if status_obj["result"] is not None:
+            body["result"] = status_obj["result"]
+        return Response(content=dump_json_str(body), media_type="application/json")
+
+    router.add_api_route(
+        "/jobs/{job_id}",
+        _get_job_status,
+        methods=["GET"],
+        response_model=None,
+        summary="Get job status",
+        description=(
+            "Get status of a background training job. Status can be: queued, started, "
+            "finished, failed, or not_found. When finished, includes full training "
+            "results with metrics and feature importances."
+        ),
+        response_description="Job status and result",
+        responses=_JOB_STATUS_RESPONSES,
+    )
+
+
+def build_router(get_container: ContainerProtocol) -> APIRouter:
+    """Build FastAPI router for ML operations."""
+    router = APIRouter(prefix="/ml", tags=["ml"])
+    _register_predict(router, get_container)
+    _register_train(router, get_container)
+    _register_train_external(router, get_container)
+    _register_model_info(router, get_container)
+    _register_job_status(router, get_container)
     return router
 
 

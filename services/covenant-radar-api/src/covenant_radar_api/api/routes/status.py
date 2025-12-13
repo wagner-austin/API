@@ -15,6 +15,31 @@ from ...core.container import ModelInfo
 
 _log = get_logger(__name__)
 
+# OpenAPI response schema (no type annotation for FastAPI compatibility)
+_STATUS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Service status with dependencies, model, and data counts",
+        "content": {
+            "application/json": {
+                "example": {
+                    "service": "covenant-radar-api",
+                    "version": "0.1.0",
+                    "dependencies": [
+                        {"name": "redis", "status": "ok", "message": None},
+                        {"name": "postgres", "status": "ok", "message": None},
+                    ],
+                    "model": {
+                        "model_id": "default",
+                        "model_path": "/data/models/active.ubj",
+                        "is_loaded": False,
+                    },
+                    "data": {"deals": 5},
+                },
+            },
+        },
+    },
+}
+
 
 class DependencyStatus(TypedDict, total=True):
     """Status of a service dependency."""
@@ -123,7 +148,20 @@ def build_router(get_container: StatusContainerProtocol) -> APIRouter:
             media_type="application/json",
         )
 
-    router.add_api_route("/status", _status, methods=["GET"], response_model=None)
+    router.add_api_route(
+        "/status",
+        _status,
+        methods=["GET"],
+        response_model=None,
+        summary="Service status",
+        description=(
+            "Comprehensive service status with dependency health (Redis, PostgreSQL), "
+            "active ML model info, and data counts."
+        ),
+        response_description="Service status with dependencies, model, and data",
+        responses=_STATUS_RESPONSES,
+        tags=["health"],
+    )
     return router
 
 
