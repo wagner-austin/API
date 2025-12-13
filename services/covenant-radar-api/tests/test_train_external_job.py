@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from covenant_ml.types import MLPConfig, TrainConfig
 from platform_core.json_utils import (
     InvalidJsonError,
     JSONTypeError,
@@ -160,11 +161,11 @@ class TestParseExternalTrainConfig:
                 "random_state": 42,
             }
         )
-        config, dataset = _parse_external_train_config(config_json)
+        result = _parse_external_train_config(config_json)
 
-        assert dataset == "taiwan"
-        assert config["learning_rate"] == 0.1
-        assert config["device"] == "auto"  # default
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["learning_rate"] == 0.1
+        assert result["config"]["device"] == "auto"  # default
 
     def test_parse_config_valid_us(self) -> None:
         """Parse valid config for US dataset."""
@@ -179,8 +180,8 @@ class TestParseExternalTrainConfig:
                 "random_state": 99,
             }
         )
-        _, dataset = _parse_external_train_config(config_json)
-        assert dataset == "us"
+        result = _parse_external_train_config(config_json)
+        assert result["dataset"] == "us"
 
     def test_parse_config_valid_polish(self) -> None:
         """Parse valid config for Polish dataset."""
@@ -195,8 +196,8 @@ class TestParseExternalTrainConfig:
                 "random_state": 7,
             }
         )
-        _, dataset = _parse_external_train_config(config_json)
-        assert dataset == "polish"
+        result = _parse_external_train_config(config_json)
+        assert result["dataset"] == "polish"
 
     def test_parse_config_invalid_dataset(self) -> None:
         """Invalid dataset name raises ValueError."""
@@ -259,10 +260,10 @@ class TestParseExternalTrainConfig:
                 "test_ratio": 0.1,
             }
         )
-        config, _ = _parse_external_train_config(config_json)
-        assert config["train_ratio"] == 0.8
-        assert config["val_ratio"] == 0.1
-        assert config["test_ratio"] == 0.1
+        result = _parse_external_train_config(config_json)
+        assert result["config"]["train_ratio"] == 0.8
+        assert result["config"]["val_ratio"] == 0.1
+        assert result["config"]["test_ratio"] == 0.1
 
     def test_parse_config_with_scale_pos_weight(self) -> None:
         """Config with scale_pos_weight is parsed correctly."""
@@ -278,8 +279,198 @@ class TestParseExternalTrainConfig:
                 "scale_pos_weight": 2.5,
             }
         )
-        config, _ = _parse_external_train_config(config_json)
-        assert config.get("scale_pos_weight") == 2.5
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "xgboost"
+        xgb_config: TrainConfig = result["config"]  # type narrowed by backend check
+        assert xgb_config.get("scale_pos_weight") == 2.5
+
+    def test_parse_config_mlp_backend(self) -> None:
+        """Parse valid config for MLP backend."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "taiwan",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64, 32],
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "mlp"
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["learning_rate"] == 0.001
+        assert result["config"]["hidden_sizes"] == (64, 32)
+
+    def test_parse_config_mlp_precision_fp16(self) -> None:
+        """Parse MLP config with fp16 precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64],
+                "precision": "fp16",
+                "optimizer": "adam",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "mlp"
+        mlp_config: MLPConfig = result["config"]
+        assert mlp_config["precision"] == "fp16"
+        assert mlp_config["optimizer"] == "adam"
+
+    def test_parse_config_mlp_precision_bf16(self) -> None:
+        """Parse MLP config with bf16 precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64],
+                "precision": "bf16",
+                "optimizer": "sgd",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "mlp"
+        mlp_config: MLPConfig = result["config"]
+        assert mlp_config["precision"] == "bf16"
+        assert mlp_config["optimizer"] == "sgd"
+
+    def test_parse_config_mlp_precision_auto(self) -> None:
+        """Parse MLP config with auto precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64],
+                "precision": "auto",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "mlp"
+        mlp_config: MLPConfig = result["config"]
+        assert mlp_config["precision"] == "auto"
+
+    def test_parse_config_mlp_invalid_precision(self) -> None:
+        """Invalid precision raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64],
+                "precision": "invalid",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="precision must be"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_mlp_invalid_optimizer(self) -> None:
+        """Invalid optimizer raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64],
+                "precision": "fp32",
+                "optimizer": "invalid",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="optimizer must be"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_mlp_invalid_hidden_sizes_not_list(self) -> None:
+        """hidden_sizes not a list raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": "not_a_list",
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="hidden_sizes must be list"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_mlp_invalid_hidden_sizes_not_ints(self) -> None:
+        """hidden_sizes with non-int elements raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_sizes": [64, "not_int"],
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="hidden_sizes must be list"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_invalid_scale_pos_weight_type(self) -> None:
+        """scale_pos_weight with non-number value raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "learning_rate": 0.1,
+                "max_depth": 3,
+                "n_estimators": 10,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "random_state": 42,
+                "scale_pos_weight": "not_a_number",
+            }
+        )
+        with pytest.raises(JSONTypeError, match="scale_pos_weight must be a number"):
+            _parse_external_train_config(config_json)
 
 
 class TestLoadDataset:
@@ -334,6 +525,7 @@ class TestMetricsToJson:
 
         metrics: EvalMetrics = {
             "loss": 0.25,
+            "ppl": 1.284,
             "auc": 0.85,
             "accuracy": 0.80,
             "precision": 0.75,
@@ -449,6 +641,39 @@ class TestRunExternalTraining:
         assert result["status"] == "complete"
         assert result["dataset"] == "polish"
         assert result["n_features"] == 64
+
+    def test_train_mlp_backend_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains MLP model on Taiwan data."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _write_taiwan_dataset(external_dir)
+
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "taiwan",
+                "learning_rate": 0.01,
+                "batch_size": 4,
+                "n_epochs": 5,  # Enough epochs to learn from small dataset
+                "dropout": 0.0,
+                "hidden_sizes": [8, 4],
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        # MLP produces a .pt file
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".pt"
 
 
 class TestProcessExternalTrainJob:

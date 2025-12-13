@@ -9,10 +9,18 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
-from covenant_ml.trainer import train_model_with_validation
-from covenant_ml.types import EvalMetrics, FeatureImportance, TrainConfig, TrainOutcome
+from covenant_ml.backends.registry import ClassifierRegistry
+from covenant_ml.base_trainer import BaseTabularTrainer
+from covenant_ml.types import (
+    ClassifierTrainConfig,
+    EvalMetrics,
+    FeatureImportance,
+    MLPConfig,
+    TrainConfig,
+    TrainOutcome,
+)
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
 
@@ -65,13 +73,134 @@ def _optional_int(data: JSONObject, key: str, default: int) -> int:
     raise JSONTypeError(f"Field '{key}' must be a number")
 
 
-def _parse_external_train_config(config_json: str) -> tuple[TrainConfig, DatasetName]:
+def _parse_mlp_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse and validate MLP precision field."""
+    precision_val = raw.get("precision")
+    if precision_val == "fp32":
+        return "fp32"
+    if precision_val == "fp16":
+        return "fp16"
+    if precision_val == "bf16":
+        return "bf16"
+    if precision_val == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
+
+
+def _parse_mlp_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:
+    """Parse and validate MLP optimizer field."""
+    optimizer_val = raw.get("optimizer")
+    if optimizer_val == "adamw":
+        return "adamw"
+    if optimizer_val == "adam":
+        return "adam"
+    if optimizer_val == "sgd":
+        return "sgd"
+    raise JSONTypeError("optimizer must be adamw, adam, or sgd")
+
+
+def _parse_mlp_hidden_sizes(raw: JSONObject) -> tuple[int, ...]:
+    """Parse and validate hidden_sizes as tuple of ints."""
+    hidden_sizes_val = raw.get("hidden_sizes")
+    if not isinstance(hidden_sizes_val, list):
+        raise JSONTypeError("hidden_sizes must be list of ints for mlp")
+    result: list[int] = []
+    for item in hidden_sizes_val:
+        if not isinstance(item, int):
+            raise JSONTypeError("hidden_sizes must be list of ints for mlp")
+        result.append(item)
+    return tuple(result)
+
+
+def _parse_mlp_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> MLPConfig:
+    """Parse MLP backend config from JSON object."""
+    from platform_core.json_utils import require_float, require_int
+
+    return {
+        "device": device,
+        "precision": _parse_mlp_precision(raw),
+        "optimizer": _parse_mlp_optimizer(raw),
+        "hidden_sizes": _parse_mlp_hidden_sizes(raw),
+        "learning_rate": require_float(raw, "learning_rate"),
+        "batch_size": require_int(raw, "batch_size"),
+        "n_epochs": require_int(raw, "n_epochs"),
+        "dropout": require_float(raw, "dropout"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
+    }
+
+
+def _parse_xgboost_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> TrainConfig:
+    """Parse XGBoost backend config from JSON object."""
+    from platform_core.json_utils import require_float, require_int
+
+    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
+    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
+    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
+    xgb_cfg: TrainConfig = {
+        "device": device,
+        "learning_rate": require_float(raw, "learning_rate"),
+        "max_depth": require_int(raw, "max_depth"),
+        "n_estimators": require_int(raw, "n_estimators"),
+        "subsample": require_float(raw, "subsample"),
+        "colsample_bytree": require_float(raw, "colsample_bytree"),
+        "random_state": require_int(raw, "random_state"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "early_stopping_rounds": early_stopping_rounds,
+        "reg_alpha": reg_alpha,
+        "reg_lambda": reg_lambda,
+    }
+    scale_pos_weight_raw = raw.get("scale_pos_weight")
+    if isinstance(scale_pos_weight_raw, (int, float)):
+        xgb_cfg["scale_pos_weight"] = float(scale_pos_weight_raw)
+    elif scale_pos_weight_raw is not None:
+        raise JSONTypeError("scale_pos_weight must be a number")
+    return xgb_cfg
+
+
+class XGBoostParseResult(TypedDict, total=True):
+    """Result of parsing XGBoost config."""
+
+    backend: Literal["xgboost"]
+    config: TrainConfig
+    dataset: DatasetName
+
+
+class MLPParseResult(TypedDict, total=True):
+    """Result of parsing MLP config."""
+
+    backend: Literal["mlp"]
+    config: MLPConfig
+    dataset: DatasetName
+
+
+ParseResult = XGBoostParseResult | MLPParseResult
+
+
+def _parse_external_train_config(config_json: str) -> ParseResult:
     """Parse training config for external data.
 
     Returns:
-        Tuple of (TrainConfig, dataset_name)
+        ParseResult with backend, config, and dataset_name
     """
-    from platform_core.json_utils import require_float, require_int, require_str
+    from platform_core.json_utils import require_str
 
     raw = load_json_str(config_json)
     if not isinstance(raw, dict):
@@ -89,13 +218,10 @@ def _parse_external_train_config(config_json: str) -> tuple[TrainConfig, Dataset
     else:
         raise ValueError(f"dataset must be one of: taiwan, us, polish (got {dataset})")
 
-    # Optional parameters with defaults
+    # Common split defaults
     train_ratio = _optional_float(raw, "train_ratio", 0.7)
     val_ratio = _optional_float(raw, "val_ratio", 0.15)
     test_ratio = _optional_float(raw, "test_ratio", 0.15)
-    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
-    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
-    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
 
     # Validate ratios sum to 1.0
     total = train_ratio + val_ratio + test_ratio
@@ -107,27 +233,21 @@ def _parse_external_train_config(config_json: str) -> tuple[TrainConfig, Dataset
 
     device = _parse_device(raw.get("device"))
 
-    config: TrainConfig = {
-        "device": device,
-        "learning_rate": require_float(raw, "learning_rate"),
-        "max_depth": require_int(raw, "max_depth"),
-        "n_estimators": require_int(raw, "n_estimators"),
-        "subsample": require_float(raw, "subsample"),
-        "colsample_bytree": require_float(raw, "colsample_bytree"),
-        "random_state": require_int(raw, "random_state"),
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "early_stopping_rounds": early_stopping_rounds,
-        "reg_alpha": reg_alpha,
-        "reg_lambda": reg_lambda,
+    # Backend selection (optional; default xgboost)
+    backend_val = raw.get("backend")
+    if backend_val == "mlp":
+        mlp_result: MLPParseResult = {
+            "backend": "mlp",
+            "config": _parse_mlp_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return mlp_result
+    xgb_result: XGBoostParseResult = {
+        "backend": "xgboost",
+        "config": _parse_xgboost_config(raw, device, train_ratio, val_ratio, test_ratio),
+        "dataset": dataset_name,
     }
-
-    scale_pos_weight_raw = raw.get("scale_pos_weight")
-    if isinstance(scale_pos_weight_raw, (int, float)):
-        config["scale_pos_weight"] = float(scale_pos_weight_raw)
-
-    return config, dataset_name
+    return xgb_result
 
 
 def _load_dataset(dataset_name: DatasetName, external_dir: Path) -> RawDataset:
@@ -181,6 +301,27 @@ def _importance_to_json(imp: FeatureImportance) -> dict[str, JSONValue]:
     }
 
 
+def _build_xgboost_log(config: TrainConfig) -> dict[str, JSONValue]:
+    """Build log dict for XGBoost config."""
+    return {
+        "learning_rate": config["learning_rate"],
+        "n_estimators": config["n_estimators"],
+        "max_depth": config["max_depth"],
+        "reg_alpha": config["reg_alpha"],
+        "reg_lambda": config["reg_lambda"],
+    }
+
+
+def _build_mlp_log(config: MLPConfig) -> dict[str, JSONValue]:
+    """Build log dict for MLP config."""
+    return {
+        "learning_rate": config["learning_rate"],
+        "hidden_sizes": list(config["hidden_sizes"]),
+        "n_epochs": config["n_epochs"],
+        "dropout": config["dropout"],
+    }
+
+
 def run_external_training(
     config_json: str,
     external_dir: Path,
@@ -198,10 +339,20 @@ def run_external_training(
     Returns:
         Training result with model info, metrics, and feature importances
     """
-    config, dataset_name = _parse_external_train_config(config_json)
+    parse_result = _parse_external_train_config(config_json)
+    dataset_name = parse_result["dataset"]
+    backend_name = parse_result["backend"]
 
     # Load raw dataset with all columns
     dataset = _load_dataset(dataset_name, external_dir)
+
+    # Build config log info based on backend (discriminated union narrowing)
+    if parse_result["backend"] == "xgboost":
+        config_log = _build_xgboost_log(parse_result["config"])
+        train_config: ClassifierTrainConfig = parse_result["config"]
+    else:
+        config_log = _build_mlp_log(parse_result["config"])
+        train_config = parse_result["config"]
 
     _log.info(
         "Starting external training",
@@ -211,23 +362,26 @@ def run_external_training(
             "n_features": dataset["n_features"],
             "n_bankrupt": dataset["n_bankrupt"],
             "n_healthy": dataset["n_healthy"],
-            "config": {
-                "learning_rate": config["learning_rate"],
-                "n_estimators": config["n_estimators"],
-                "max_depth": config["max_depth"],
-                "reg_alpha": config["reg_alpha"],
-                "reg_lambda": config["reg_lambda"],
-            },
+            "backend": backend_name,
+            "config": config_log,
         },
     )
 
-    # Train with automatic feature selection
-    outcome: TrainOutcome = train_model_with_validation(
+    # Train via unified base trainer using default registry
+    from covenant_radar_api.worker import _test_hooks as hooks
+
+    reg_factory = hooks.registry_factory
+    registry: ClassifierRegistry = reg_factory()
+    trainer = BaseTabularTrainer(registry)
+
+    outcome: TrainOutcome = trainer.train(
+        backend=backend_name,
         x_features=dataset["x"],
         y_labels=dataset["y"],
-        config=config,
-        output_dir=output_dir,
         feature_names=dataset["feature_names"],
+        config=train_config,
+        output_dir=output_dir,
+        progress=None,
     )
 
     # Copy to active.ubj (use copyfile to avoid permission issues on Docker volumes)
