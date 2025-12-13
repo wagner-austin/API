@@ -16,15 +16,17 @@ Usage:
 from __future__ import annotations
 
 from collections.abc import Mapping
+from types import TracebackType
 from typing import Final, Protocol
 
+import numpy as np
+from numpy.typing import NDArray
 from platform_core.json_utils import JSONValue
 
 from .torch_types import (
     DeviceProtocol,
     DTypeProtocol,
     TensorProtocol,
-    _CudaModuleProtocol,
 )
 
 # ---------------------------------------------------------------------------
@@ -300,30 +302,54 @@ class FakeTensor:
     def tolist(self) -> list[float]:
         return []
 
-    def detach(self) -> TensorProtocol:
+    def detach(self) -> FakeTensor:
         return self
 
-    def cpu(self) -> TensorProtocol:
+    def cpu(self) -> FakeTensor:
         return FakeTensor(shape=self._shape, device_type="cpu")
 
-    def clone(self) -> TensorProtocol:
+    def clone(self) -> FakeTensor:
         return FakeTensor(shape=self._shape, device_type=self._device.type)
 
-    def cuda(self, device: int | None = None) -> TensorProtocol:
+    def cuda(self, device: int | None = None) -> FakeTensor:
         return FakeTensor(shape=self._shape, device_type="cuda")
 
-    def to(self, device: DeviceProtocol | str) -> TensorProtocol:
+    def to(self, device: DeviceProtocol | str) -> FakeTensor:
         device_type = device if isinstance(device, str) else device.type
         return FakeTensor(shape=self._shape, device_type=device_type)
 
-    def __add__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+    def backward(self) -> None:
+        pass
+
+    def numpy(self) -> NDArray[np.float64]:
+        return np.zeros(self._shape, dtype=np.float64)
+
+    def argmax(self, dim: int | None = None) -> FakeTensor:
+        return FakeTensor(shape=self._shape, device_type=self._device.type)
+
+    def __add__(self, other: TensorProtocol | float | int) -> FakeTensor:
         return self
 
-    def __mul__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+    def __mul__(self, other: TensorProtocol | float | int) -> FakeTensor:
         return self
 
-    def __truediv__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+    def __truediv__(self, other: TensorProtocol | float | int) -> FakeTensor:
         return self
+
+
+class FakeNoGradContext:
+    """Fake no_grad context manager."""
+
+    def __enter__(self) -> None:
+        pass
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        pass
 
 
 class FakeCudaModule:
@@ -370,24 +396,78 @@ class FakeTorchModule:
         self.manual_seed_calls: list[int] = []
 
     @property
-    def cuda(self) -> _CudaModuleProtocol:
+    def cuda(self) -> FakeCudaModule:
         return self._cuda
 
     def set_num_threads(self, num: int) -> None:
         self.set_num_threads_calls.append(num)
 
-    def manual_seed(self, seed: int) -> TensorProtocol:
+    def manual_seed(self, seed: int) -> FakeTensor:
         self.manual_seed_calls.append(seed)
         return FakeTensor()
 
     def get_num_threads(self) -> int:
         return self._num_threads
 
+    def tensor(
+        self,
+        data: NDArray[np.float64] | NDArray[np.int64] | NDArray[np.int32] | list[float] | list[int],
+        dtype: DTypeProtocol | None = None,
+        device: DeviceProtocol | str | None = None,
+    ) -> FakeTensor:
+        if isinstance(data, list):
+            shape: tuple[int, ...] = (len(data),)
+        else:
+            # data is NDArray - get shape as tuple of ints
+            shape = tuple(int(d) for d in data.shape)
+        return FakeTensor(shape=shape)
+
+    def zeros(
+        self,
+        *size: int,
+        dtype: DTypeProtocol | None = None,
+        device: DeviceProtocol | str | None = None,
+    ) -> FakeTensor:
+        return FakeTensor(shape=size)
+
+    def from_numpy(self, ndarray: NDArray[np.float64]) -> FakeTensor:
+        return FakeTensor(shape=tuple(ndarray.shape))
+
+    def no_grad(self) -> FakeNoGradContext:
+        return FakeNoGradContext()
+
+    def save(self, obj: dict[str, TensorProtocol], f: str) -> None:
+        pass
+
+    def load(self, f: str) -> dict[str, TensorProtocol]:
+        return {}
+
+    @property
+    def float32(self) -> FakeDType:
+        return FakeDType()
+
+    @property
+    def float16(self) -> FakeDType:
+        return FakeDType()
+
+    @property
+    def bfloat16(self) -> FakeDType:
+        return FakeDType()
+
+    @property
+    def long(self) -> FakeDType:
+        return FakeDType()
+
+    @property
+    def int64(self) -> FakeDType:
+        return FakeDType()
+
 
 __all__ = [
     "FakeCudaModule",
     "FakeDType",
     "FakeDevice",
+    "FakeNoGradContext",
     "FakeTensor",
     "FakeTorchModule",
     "LoadWandbModuleCallable",
