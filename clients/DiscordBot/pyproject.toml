@@ -95,7 +95,7 @@ fail_under = 100
 pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope"
+addopts = "-v -n auto --dist loadscope -p no:cacheprovider"
 filterwarnings = [
   "ignore:'audioop' is deprecated:DeprecationWarning:discord.player",
 ]

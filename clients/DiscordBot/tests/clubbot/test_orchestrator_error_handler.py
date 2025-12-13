@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import NoReturn
 
@@ -116,19 +115,20 @@ def _build_orchestrator(command_sync_global: bool = False) -> BotOrchestrator:
     return orch
 
 
-def test_on_app_command_error_branches() -> None:
+@pytest.mark.asyncio
+async def test_on_app_command_error_branches() -> None:
     """Test error handler uses followup when response is done, else response."""
     # No need to build orchestrator - use the hook directly
     handler = _test_hooks.app_command_error_handler
 
     # When response.is_done is True -> followup.send
     inter1 = _Interaction(done=True)
-    asyncio.get_event_loop().run_until_complete(handler(inter1, RuntimeError("x")))
+    await handler(inter1, RuntimeError("x"))
     assert inter1.followup.sent and not inter1.response.sent
 
     # When response.is_done is False -> response.send_message
     inter2 = _Interaction(done=False)
-    asyncio.get_event_loop().run_until_complete(handler(inter2, RuntimeError("y")))
+    await handler(inter2, RuntimeError("y"))
     assert inter2.response.sent
 
 
@@ -173,7 +173,8 @@ class _HTTPError(Exception):
     """Test exception for HTTP errors - name contains 'HTTP'."""
 
 
-def test_sync_commands_exception_paths() -> None:
+@pytest.mark.asyncio
+async def test_sync_commands_exception_paths() -> None:
     """Test sync_commands handles Forbidden and HTTP exceptions correctly."""
     orch = _build_orchestrator()
 
@@ -185,15 +186,16 @@ def test_sync_commands_exception_paths() -> None:
 
     # Test Forbidden path - should log warning and not re-raise
     _test_hooks.orchestrator_sync_global_override = raise_forbidden
-    asyncio.get_event_loop().run_until_complete(orch.sync_commands())
+    await orch.sync_commands()
 
     # Test HTTP path - should re-raise
     _test_hooks.orchestrator_sync_global_override = raise_http
     with pytest.raises(_HTTPError):
-        asyncio.get_event_loop().run_until_complete(orch.sync_commands())
+        await orch.sync_commands()
 
 
-def test_sync_commands_unknown_exception_to_runtime_error() -> None:
+@pytest.mark.asyncio
+async def test_sync_commands_unknown_exception_to_runtime_error() -> None:
     """Test sync_commands converts unknown exceptions to RuntimeError."""
     orch = _build_orchestrator()
 
@@ -205,7 +207,7 @@ def test_sync_commands_unknown_exception_to_runtime_error() -> None:
 
     _test_hooks.orchestrator_sync_global_override = raise_weird
     with pytest.raises(RuntimeError):
-        asyncio.get_event_loop().run_until_complete(orch.sync_commands())
+        await orch.sync_commands()
 
 
 @pytest.mark.asyncio
@@ -277,7 +279,8 @@ class _InterRaises:
         self.user: UserProto = _FakeUser()
 
 
-def test_on_app_command_error_send_failure_raises() -> None:
+@pytest.mark.asyncio
+async def test_on_app_command_error_send_failure_raises() -> None:
     """Test error handler re-raises when send fails with Discord exceptions."""
     # Use the hook directly - no need to build orchestrator
     handler = _test_hooks.app_command_error_handler
@@ -287,7 +290,7 @@ def test_on_app_command_error_send_failure_raises() -> None:
 
     inter = _InterRaises()
     with pytest.raises(_MyEError):
-        asyncio.get_event_loop().run_until_complete(handler(inter, RuntimeError("x")))
+        await handler(inter, RuntimeError("x"))
 
 
 def test_preflight_app_id_mismatch_debug_no_raise() -> None:
