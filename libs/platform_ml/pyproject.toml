@@ -14,10 +14,16 @@ packages = [
 readme = "README.md"
 include = ["src/platform_ml/py.typed"]
 
+[[tool.poetry.source]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
 sentencepiece = "^0.2.1"
+torch = {version = "^2.5", source = "pytorch-cu124"}
 wandb = { version = "^0.18", optional = true }
 
 [tool.poetry.extras]
@@ -30,6 +36,8 @@ pytest-cov = "^7.0.0"
 mypy = "^1.13.0"
 ruff = "^0.14.4"
 typing-extensions = "^4.12.0"
+wandb = "^0.18"
+numpy = "^2.3"
 
 [tool.mypy]
 python_version = "3.11"

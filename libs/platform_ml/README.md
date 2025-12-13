@@ -231,6 +231,77 @@ from platform_ml import (
 )
 ```
 
+## Device Selection
+
+Centralized device detection and configuration for ML training across services. Prevents drift by providing a single source of truth for device resolution, precision selection, and batch size recommendations.
+
+```python
+from platform_ml import (
+    RequestedDevice,
+    ResolvedDevice,
+    RequestedPrecision,
+    ResolvedPrecision,
+    resolve_device,
+    resolve_precision,
+    recommended_batch_size,
+)
+
+# Resolve device: "auto" detects CUDA availability
+device: ResolvedDevice = resolve_device("auto")  # "cuda" or "cpu"
+device: ResolvedDevice = resolve_device("cuda")  # passthrough
+device: ResolvedDevice = resolve_device("cpu")   # passthrough
+
+# Resolve precision based on device
+precision: ResolvedPrecision = resolve_precision("auto", device)
+# "auto" on CUDA -> "fp16", "auto" on CPU -> "fp32"
+precision: ResolvedPrecision = resolve_precision("fp16", "cuda")  # OK
+# resolve_precision("fp16", "cpu")  # RuntimeError: fp16 not supported on CPU
+
+# Recommended batch size (bumps small batches on CUDA)
+batch_size = recommended_batch_size(4, "cuda")  # 8
+batch_size = recommended_batch_size(4, "cpu")   # 4
+batch_size = recommended_batch_size(16, "cuda") # 16 (preserved)
+```
+
+### Device Types
+
+| Type | Values | Description |
+|------|--------|-------------|
+| `RequestedDevice` | `"cpu"`, `"cuda"`, `"auto"` | User-requested device |
+| `ResolvedDevice` | `"cpu"`, `"cuda"` | Concrete device after resolution |
+| `RequestedPrecision` | `"fp32"`, `"fp16"`, `"bf16"`, `"auto"` | User-requested precision |
+| `ResolvedPrecision` | `"fp32"`, `"fp16"`, `"bf16"` | Concrete precision after resolution |
+
+### Device Functions
+
+| Function | Description |
+|----------|-------------|
+| `resolve_device(requested)` | Resolve "auto" to concrete device via CUDA check |
+| `resolve_precision(requested, device)` | Resolve precision based on device capabilities |
+| `recommended_batch_size(current, device)` | Recommend batch size (bump small batches on CUDA) |
+
+### Testing Device Selection
+
+Use `FakeTorchModule` from `platform_ml.testing` to test device paths without GPU hardware:
+
+```python
+from platform_ml import torch_types, resolve_device
+from platform_ml.testing import FakeTorchModule
+from platform_ml.torch_types import _TorchModuleProtocol
+
+# Test CUDA available path
+fake_torch = FakeTorchModule(cuda_available=True)
+def _fake_import() -> _TorchModuleProtocol:
+    return fake_torch
+torch_types._import_torch = _fake_import
+assert resolve_device("auto") == "cuda"
+
+# Test CPU fallback path
+fake_torch = FakeTorchModule(cuda_available=False)
+torch_types._import_torch = _fake_import
+assert resolve_device("auto") == "cpu"
+```
+
 ## API Reference
 
 ### Artifact Store
@@ -271,6 +342,18 @@ from platform_ml import (
 | `WandbFinalMetrics` | Final metrics TypedDict |
 | `WandbTableRow` | Table row type |
 | `WandbInitResult` | Init result TypedDict |
+
+### Device Selection
+
+| Type | Description |
+|------|-------------|
+| `RequestedDevice` | Device requested by user (`"cpu"`, `"cuda"`, `"auto"`) |
+| `ResolvedDevice` | Concrete device after resolution (`"cpu"`, `"cuda"`) |
+| `RequestedPrecision` | Precision requested by user |
+| `ResolvedPrecision` | Concrete precision after resolution |
+| `resolve_device` | Resolve device with CUDA auto-detection |
+| `resolve_precision` | Resolve precision based on device |
+| `recommended_batch_size` | Device-aware batch size recommendation |
 
 ## Development
 

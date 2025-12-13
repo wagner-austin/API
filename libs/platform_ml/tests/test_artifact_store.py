@@ -14,7 +14,7 @@ import httpx
 from platform_core import DataBankClient
 
 from platform_ml import _test_hooks
-from platform_ml._test_hooks import CreateTarballCallable
+from platform_ml._test_hooks import _CreateTarballProtocol
 from platform_ml.artifact_store import ArtifactStore, ArtifactStoreError
 from platform_ml.tarball import TarballError
 
@@ -319,8 +319,8 @@ def test_artifact_store_upload_tarball_creation_fails(tmp_path: Path) -> None:
         def __call__(self, src_dir: Path, dest_file: Path, *, root_name: str) -> Path:
             raise TarballError("simulated failure")
 
-    failing_creator: CreateTarballCallable = FailingTarballCreator()
-    _test_hooks.hooks.create_tarball = failing_creator
+    failing_creator: _CreateTarballProtocol = FailingTarballCreator()
+    _test_hooks.create_tarball = failing_creator
 
     transport = FakeHttpTransport()
     client = _make_client(transport)

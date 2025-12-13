@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 from .artifact_store import ArtifactStore, ArtifactStoreError
+from .device_selector import (
+    RequestedDevice,
+    RequestedPrecision,
+    ResolvedDevice,
+    ResolvedPrecision,
+    recommended_batch_size,
+    resolve_device,
+    resolve_precision,
+)
 from .manifest import (
     MANIFEST_SCHEMA_VERSION,
     ModelManifestV2,
@@ -9,6 +18,20 @@ from .manifest import (
     from_path_manifest_v2,
 )
 from .tarball import TarballError, create_tarball, extract_tarball
+from .torch_types import (
+    DeviceProtocol,
+    DTypeProtocol,
+    ImageClassificationDataset,
+    PILImage,
+    TensorIterable,
+    TensorIterator,
+    TensorProtocol,
+    ThreadConfig,
+    TrainableModel,
+    configure_torch_threads,
+    get_num_threads,
+    set_manual_seed,
+)
 from .wandb_publisher import WandbPublisher, WandbUnavailableError
 from .wandb_types import (
     WandbEpochMetrics,
@@ -24,8 +47,21 @@ __all__ = [
     "MANIFEST_SCHEMA_VERSION",
     "ArtifactStore",
     "ArtifactStoreError",
+    "DTypeProtocol",
+    "DeviceProtocol",
+    "ImageClassificationDataset",
     "ModelManifestV2",
+    "PILImage",
+    "RequestedDevice",
+    "RequestedPrecision",
+    "ResolvedDevice",
+    "ResolvedPrecision",
     "TarballError",
+    "TensorIterable",
+    "TensorIterator",
+    "TensorProtocol",
+    "ThreadConfig",
+    "TrainableModel",
     "TrainingRunMetadata",
     "WandbEpochMetrics",
     "WandbFinalMetrics",
@@ -36,8 +72,14 @@ __all__ = [
     "WandbStepMetrics",
     "WandbTableRow",
     "WandbUnavailableError",
+    "configure_torch_threads",
     "create_tarball",
     "extract_tarball",
     "from_json_manifest_v2",
     "from_path_manifest_v2",
+    "get_num_threads",
+    "recommended_batch_size",
+    "resolve_device",
+    "resolve_precision",
+    "set_manual_seed",
 ]

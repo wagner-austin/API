@@ -20,6 +20,13 @@ from typing import Final, Protocol
 
 from platform_core.json_utils import JSONValue
 
+from .torch_types import (
+    DeviceProtocol,
+    DTypeProtocol,
+    TensorProtocol,
+    _CudaModuleProtocol,
+)
+
 # ---------------------------------------------------------------------------
 # Wandb hooks - external service, needs hooks
 # ---------------------------------------------------------------------------
@@ -220,7 +227,169 @@ def reset_hooks() -> None:
 set_production_hooks()
 
 
+# ---------------------------------------------------------------------------
+# Torch test fakes - complete implementations for testing
+# ---------------------------------------------------------------------------
+
+
+class FakeDType:
+    """Fake dtype that satisfies DTypeProtocol."""
+
+
+class FakeDevice:
+    """Fake device that satisfies DeviceProtocol."""
+
+    def __init__(self, *, device_type: str = "cpu", index: int | None = None) -> None:
+        self._type = device_type
+        self._index = index
+
+    @property
+    def type(self) -> str:
+        return self._type
+
+    @property
+    def index(self) -> int | None:
+        return self._index
+
+
+class FakeTensor:
+    """Fake tensor that satisfies TensorProtocol.
+
+    Provides complete implementation for all TensorProtocol methods.
+    All operations return self for chaining.
+    """
+
+    def __init__(
+        self,
+        *,
+        shape: tuple[int, ...] = (),
+        device_type: str = "cpu",
+    ) -> None:
+        self._shape = shape
+        self._device = FakeDevice(device_type=device_type)
+        self._dtype = FakeDType()
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        return self._shape
+
+    @property
+    def dtype(self) -> DTypeProtocol:
+        return self._dtype
+
+    @property
+    def device(self) -> DeviceProtocol:
+        return self._device
+
+    @property
+    def grad(self) -> TensorProtocol | None:
+        return None
+
+    def numel(self) -> int:
+        result = 1
+        for dim in self._shape:
+            result *= dim
+        return result
+
+    def element_size(self) -> int:
+        return 4
+
+    def item(self) -> float:
+        return 0.0
+
+    def tolist(self) -> list[float]:
+        return []
+
+    def detach(self) -> TensorProtocol:
+        return self
+
+    def cpu(self) -> TensorProtocol:
+        return FakeTensor(shape=self._shape, device_type="cpu")
+
+    def clone(self) -> TensorProtocol:
+        return FakeTensor(shape=self._shape, device_type=self._device.type)
+
+    def cuda(self, device: int | None = None) -> TensorProtocol:
+        return FakeTensor(shape=self._shape, device_type="cuda")
+
+    def to(self, device: DeviceProtocol | str) -> TensorProtocol:
+        device_type = device if isinstance(device, str) else device.type
+        return FakeTensor(shape=self._shape, device_type=device_type)
+
+    def __add__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+        return self
+
+    def __mul__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+        return self
+
+    def __truediv__(self, other: TensorProtocol | float | int) -> TensorProtocol:
+        return self
+
+
+class FakeCudaModule:
+    """Fake cuda module that satisfies _CudaModuleProtocol.
+
+    Configure cuda_available to control is_available() return value.
+    """
+
+    def __init__(self, *, cuda_available: bool = False) -> None:
+        self._available = cuda_available
+        self.is_available_call_count = 0
+
+    def is_available(self) -> bool:
+        self.is_available_call_count += 1
+        return self._available
+
+
+class FakeTorchModule:
+    """Fake torch module that satisfies _TorchModuleProtocol.
+
+    Configure via constructor parameters:
+    - cuda_module: Optional FakeCudaModule instance for call verification
+    - cuda_available: Controls cuda.is_available() return value (ignored if cuda_module provided)
+    - num_threads: Controls get_num_threads() return value
+
+    Records calls for verification:
+    - set_num_threads_calls: List of arguments passed to set_num_threads
+    - manual_seed_calls: List of seeds passed to manual_seed
+    """
+
+    def __init__(
+        self,
+        *,
+        cuda_module: FakeCudaModule | None = None,
+        cuda_available: bool = False,
+        num_threads: int = 1,
+    ) -> None:
+        if cuda_module is not None:
+            self._cuda = cuda_module
+        else:
+            self._cuda = FakeCudaModule(cuda_available=cuda_available)
+        self._num_threads = num_threads
+        self.set_num_threads_calls: list[int] = []
+        self.manual_seed_calls: list[int] = []
+
+    @property
+    def cuda(self) -> _CudaModuleProtocol:
+        return self._cuda
+
+    def set_num_threads(self, num: int) -> None:
+        self.set_num_threads_calls.append(num)
+
+    def manual_seed(self, seed: int) -> TensorProtocol:
+        self.manual_seed_calls.append(seed)
+        return FakeTensor()
+
+    def get_num_threads(self) -> int:
+        return self._num_threads
+
+
 __all__ = [
+    "FakeCudaModule",
+    "FakeDType",
+    "FakeDevice",
+    "FakeTensor",
+    "FakeTorchModule",
     "LoadWandbModuleCallable",
     "WandbConfigProtocol",
     "WandbModuleProtocol",

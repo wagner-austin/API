@@ -52,7 +52,7 @@ class ArtifactStore:
             tmp_dir = Path(tmp)
             tar_path = tmp_dir / f"{name}.tar.gz"
             try:
-                _test_hooks.hooks.create_tarball(dir_path, tar_path, root_name=name)
+                _test_hooks.create_tarball(dir_path, tar_path, root_name=name)
             except TarballError as exc:
                 raise ArtifactStoreError(f"tarball creation failed: {exc}") from exc
             # Compute sha256 for observability (server returns its own)
