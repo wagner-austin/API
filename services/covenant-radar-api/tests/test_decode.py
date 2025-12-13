@@ -12,6 +12,7 @@ from covenant_radar_api.api.decode import (
     parse_deal_id_request,
     parse_deal_request,
     parse_evaluate_request,
+    parse_external_train_request,
     parse_measurements_request,
     parse_predict_request,
     parse_train_request,
@@ -521,3 +522,305 @@ class TestParseTrainRequest:
         body = b"""{"learning_rate": 0.1}"""
         with pytest.raises(JSONTypeError, match="Missing required field"):
             parse_train_request(body)
+
+
+class TestParseExternalTrainRequest:
+    """Tests for parse_external_train_request."""
+
+    def test_valid_xgboost_request_defaults_to_xgboost(self) -> None:
+        """Test parsing valid XGBoost request with default backend."""
+        body = b"""{
+            "dataset": "taiwan",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "xgboost"
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["learning_rate"] == 0.1
+        assert result["config"]["max_depth"] == 6
+        assert result["config"]["n_estimators"] == 100
+        assert result["config"]["device"] == "auto"
+        assert result["config"]["train_ratio"] == 0.7
+        assert result["config"]["val_ratio"] == 0.15
+        assert result["config"]["test_ratio"] == 0.15
+        assert result["config"]["early_stopping_rounds"] == 10
+        assert result["config"]["reg_alpha"] == 0.0
+        assert result["config"]["reg_lambda"] == 1.0
+
+    def test_valid_xgboost_request_explicit_backend(self) -> None:
+        """Test parsing valid XGBoost request with explicit backend."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "xgboost",
+            "learning_rate": 0.2,
+            "max_depth": 4,
+            "n_estimators": 50,
+            "subsample": 0.9,
+            "colsample_bytree": 0.7,
+            "random_state": 7,
+            "device": "cpu",
+            "scale_pos_weight": 2.5
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "xgboost"
+        assert result["dataset"] == "us"
+        assert result["config"]["device"] == "cpu"
+        assert result["config"]["scale_pos_weight"] == 2.5
+
+    def test_valid_mlp_request(self) -> None:
+        """Test parsing valid MLP request."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, 32],
+            "precision": "fp32",
+            "optimizer": "adamw",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "mlp"
+        assert result["dataset"] == "polish"
+        assert result["config"]["learning_rate"] == 0.001
+        assert result["config"]["batch_size"] == 32
+        assert result["config"]["n_epochs"] == 100
+        assert result["config"]["dropout"] == 0.2
+        assert result["config"]["hidden_sizes"] == (64, 32)
+        assert result["config"]["precision"] == "fp32"
+        assert result["config"]["optimizer"] == "adamw"
+        assert result["config"]["random_state"] == 42
+        assert result["config"]["early_stopping_patience"] == 10
+        assert result["config"]["device"] == "auto"
+        assert result["config"]["train_ratio"] == 0.7
+
+    def test_mlp_request_with_cuda_and_fp16(self) -> None:
+        """Test parsing MLP request with CUDA device and fp16 precision."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "learning_rate": 0.01,
+            "batch_size": 64,
+            "n_epochs": 50,
+            "dropout": 0.1,
+            "hidden_sizes": [128, 64, 32],
+            "precision": "fp16",
+            "optimizer": "adam",
+            "random_state": 123,
+            "early_stopping_patience": 5,
+            "device": "cuda"
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "mlp"
+        assert result["config"]["device"] == "cuda"
+        assert result["config"]["precision"] == "fp16"
+        assert result["config"]["optimizer"] == "adam"
+        assert result["config"]["hidden_sizes"] == (128, 64, 32)
+
+    def test_mlp_request_with_bf16_and_sgd(self) -> None:
+        """Test parsing MLP request with bf16 precision and SGD optimizer."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "mlp",
+            "learning_rate": 0.1,
+            "batch_size": 16,
+            "n_epochs": 200,
+            "dropout": 0.0,
+            "hidden_sizes": [32],
+            "precision": "bf16",
+            "optimizer": "sgd",
+            "random_state": 0,
+            "early_stopping_patience": 20
+        }"""
+        result = parse_external_train_request(body)
+
+        # Use if for type narrowing (discriminated union)
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["config"]["precision"] == "bf16"
+        assert result["config"]["optimizer"] == "sgd"
+
+    def test_mlp_request_with_auto_precision(self) -> None:
+        """Test parsing MLP request with auto precision."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, 32],
+            "precision": "auto",
+            "optimizer": "adamw",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        result = parse_external_train_request(body)
+
+        # Use if for type narrowing (discriminated union)
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["config"]["precision"] == "auto"
+
+    def test_request_with_custom_split_ratios(self) -> None:
+        """Test parsing request with custom split ratios."""
+        body = b"""{
+            "dataset": "taiwan",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "train_ratio": 0.6,
+            "val_ratio": 0.2,
+            "test_ratio": 0.2
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["config"]["train_ratio"] == 0.6
+        assert result["config"]["val_ratio"] == 0.2
+        assert result["config"]["test_ratio"] == 0.2
+
+    def test_invalid_dataset_raises_value_error(self) -> None:
+        """Test that invalid dataset raises ValueError."""
+        body = b"""{
+            "dataset": "invalid_dataset",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        with pytest.raises(ValueError, match="dataset must be one of"):
+            parse_external_train_request(body)
+
+    def test_missing_dataset_raises_json_type_error(self) -> None:
+        """Test that missing dataset raises JSONTypeError."""
+        body = b"""{
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'dataset'"):
+            parse_external_train_request(body)
+
+    def test_invalid_ratios_sum_raises_value_error(self) -> None:
+        """Test that split ratios not summing to 1.0 raises ValueError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "train_ratio": 0.5,
+            "val_ratio": 0.2,
+            "test_ratio": 0.2
+        }"""
+        with pytest.raises(ValueError, match=r"Split ratios must sum to 1\.0"):
+            parse_external_train_request(body)
+
+    def test_invalid_precision_raises_json_type_error(self) -> None:
+        """Test that invalid precision raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, 32],
+            "precision": "invalid",
+            "optimizer": "adamw",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="precision must be fp32, fp16, bf16, or auto"):
+            parse_external_train_request(body)
+
+    def test_invalid_optimizer_raises_json_type_error(self) -> None:
+        """Test that invalid optimizer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, 32],
+            "precision": "fp32",
+            "optimizer": "invalid",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="optimizer must be adamw, adam, or sgd"):
+            parse_external_train_request(body)
+
+    def test_invalid_hidden_sizes_not_list_raises_json_type_error(self) -> None:
+        """Test that hidden_sizes not being a list raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": 64,
+            "precision": "fp32",
+            "optimizer": "adamw",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="hidden_sizes must be list of ints"):
+            parse_external_train_request(body)
+
+    def test_invalid_hidden_sizes_contains_non_int_raises_json_type_error(self) -> None:
+        """Test that hidden_sizes containing non-int raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, "invalid"],
+            "precision": "fp32",
+            "optimizer": "adamw",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="hidden_sizes must be list of ints"):
+            parse_external_train_request(body)
+
+    def test_xgboost_invalid_scale_pos_weight_raises_json_type_error(self) -> None:
+        """Test that invalid scale_pos_weight raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "scale_pos_weight": "heavy"
+        }"""
+        with pytest.raises(JSONTypeError, match="scale_pos_weight must be a number"):
+            parse_external_train_request(body)

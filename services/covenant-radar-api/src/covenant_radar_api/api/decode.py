@@ -22,7 +22,10 @@ from covenant_domain import (
     decode_deal_id,
     decode_measurement,
 )
-from covenant_ml.types import TrainConfig
+from covenant_ml.types import (
+    MLPConfig,
+    TrainConfig,
+)
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -318,20 +321,249 @@ def parse_train_request(body: bytes) -> TrainConfig:
     return train_config
 
 
+# --- External Training Request Parsing ---
+
+
+DatasetName = Literal["taiwan", "us", "polish"]
+
+
+class XGBoostParseResult(TypedDict, total=True):
+    """Result of parsing XGBoost config from external train request."""
+
+    backend: Literal["xgboost"]
+    config: TrainConfig
+    dataset: DatasetName
+
+
+class MLPParseResult(TypedDict, total=True):
+    """Result of parsing MLP config from external train request."""
+
+    backend: Literal["mlp"]
+    config: MLPConfig
+    dataset: DatasetName
+
+
+ExternalTrainParseResult = XGBoostParseResult | MLPParseResult
+
+
+def _parse_mlp_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse and validate MLP precision field."""
+    precision_val = raw.get("precision")
+    if precision_val == "fp32":
+        return "fp32"
+    if precision_val == "fp16":
+        return "fp16"
+    if precision_val == "bf16":
+        return "bf16"
+    if precision_val == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
+
+
+def _parse_mlp_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:
+    """Parse and validate MLP optimizer field."""
+    optimizer_val = raw.get("optimizer")
+    if optimizer_val == "adamw":
+        return "adamw"
+    if optimizer_val == "adam":
+        return "adam"
+    if optimizer_val == "sgd":
+        return "sgd"
+    raise JSONTypeError("optimizer must be adamw, adam, or sgd")
+
+
+def _parse_mlp_hidden_sizes(raw: JSONObject) -> tuple[int, ...]:
+    """Parse and validate hidden_sizes as tuple of ints."""
+    hidden_sizes_val = raw.get("hidden_sizes")
+    if not isinstance(hidden_sizes_val, list):
+        raise JSONTypeError("hidden_sizes must be list of ints for mlp")
+    result: list[int] = []
+    for item in hidden_sizes_val:
+        if not isinstance(item, int):
+            raise JSONTypeError("hidden_sizes must be list of ints for mlp")
+        result.append(item)
+    return tuple(result)
+
+
+def _parse_dataset_name(raw: JSONObject) -> DatasetName:
+    """Parse and validate dataset name."""
+    dataset = require_str(raw, "dataset")
+    if dataset == "taiwan":
+        return "taiwan"
+    if dataset == "us":
+        return "us"
+    if dataset == "polish":
+        return "polish"
+    raise ValueError(f"dataset must be one of: taiwan, us, polish (got {dataset})")
+
+
+def _parse_mlp_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> MLPConfig:
+    """Parse MLP backend config from JSON object."""
+    return {
+        "device": device,
+        "precision": _parse_mlp_precision(raw),
+        "optimizer": _parse_mlp_optimizer(raw),
+        "hidden_sizes": _parse_mlp_hidden_sizes(raw),
+        "learning_rate": require_float(raw, "learning_rate"),
+        "batch_size": require_int(raw, "batch_size"),
+        "n_epochs": require_int(raw, "n_epochs"),
+        "dropout": require_float(raw, "dropout"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
+    }
+
+
+def _parse_xgboost_external_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> TrainConfig:
+    """Parse XGBoost backend config from JSON object for external training."""
+    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
+    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
+    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
+    xgb_cfg: TrainConfig = {
+        "device": device,
+        "learning_rate": require_float(raw, "learning_rate"),
+        "max_depth": require_int(raw, "max_depth"),
+        "n_estimators": require_int(raw, "n_estimators"),
+        "subsample": require_float(raw, "subsample"),
+        "colsample_bytree": require_float(raw, "colsample_bytree"),
+        "random_state": require_int(raw, "random_state"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "early_stopping_rounds": early_stopping_rounds,
+        "reg_alpha": reg_alpha,
+        "reg_lambda": reg_lambda,
+    }
+    scale_pos_weight_raw = raw.get("scale_pos_weight")
+    if isinstance(scale_pos_weight_raw, (int, float)):
+        xgb_cfg["scale_pos_weight"] = float(scale_pos_weight_raw)
+    elif scale_pos_weight_raw is not None:
+        raise JSONTypeError("scale_pos_weight must be a number")
+    return xgb_cfg
+
+
+def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
+    """Parse request body for external training into backend-specific config.
+
+    Supports both XGBoost and MLP backends via the 'backend' field.
+    Default backend is 'xgboost' if not specified.
+
+    Request format for XGBoost:
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "xgboost",  // optional, default
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
+            "device": "auto",  // optional
+            "train_ratio": 0.7,  // optional
+            "val_ratio": 0.15,  // optional
+            "test_ratio": 0.15,  // optional
+            "early_stopping_rounds": 10,  // optional
+            "reg_alpha": 0.0,  // optional
+            "reg_lambda": 1.0,  // optional
+            "scale_pos_weight": 2.5  // optional
+        }
+
+    Request format for MLP:
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "mlp",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_sizes": [64, 32],
+            "precision": "fp32" | "fp16" | "bf16" | "auto",
+            "optimizer": "adamw" | "adam" | "sgd",
+            "random_state": 42,
+            "early_stopping_patience": 10,
+            "device": "auto",  // optional
+            "train_ratio": 0.7,  // optional
+            "val_ratio": 0.15,  // optional
+            "test_ratio": 0.15  // optional
+        }
+
+    Returns:
+        ExternalTrainParseResult with backend type, config, and dataset name.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset name or split ratios don't sum to 1.0.
+    """
+    raw = _parse_body_as_dict(body)
+
+    # Dataset selection (required)
+    dataset_name = _parse_dataset_name(raw)
+
+    # Common split defaults
+    train_ratio = _optional_float(raw, "train_ratio", 0.7)
+    val_ratio = _optional_float(raw, "val_ratio", 0.15)
+    test_ratio = _optional_float(raw, "test_ratio", 0.15)
+
+    # Validate ratios sum to 1.0
+    total = train_ratio + val_ratio + test_ratio
+    if abs(total - 1.0) > 0.01:
+        raise ValueError(
+            f"Split ratios must sum to 1.0, got {total:.3f} "
+            f"(train={train_ratio}, val={val_ratio}, test={test_ratio})"
+        )
+
+    device = _parse_device(raw.get("device"))
+
+    # Backend selection (optional; default xgboost)
+    backend_val = raw.get("backend")
+    if backend_val == "mlp":
+        mlp_result: MLPParseResult = {
+            "backend": "mlp",
+            "config": _parse_mlp_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return mlp_result
+    xgb_result: XGBoostParseResult = {
+        "backend": "xgboost",
+        "config": _parse_xgboost_external_config(raw, device, train_ratio, val_ratio, test_ratio),
+        "dataset": dataset_name,
+    }
+    return xgb_result
+
+
 __all__ = [
     "AddMeasurementsRequest",
     "CreateCovenantRequest",
     "CreateDealRequest",
+    "DatasetName",
     "EvaluateRequest",
+    "ExternalTrainParseResult",
+    "MLPParseResult",
     "PredictRequest",
     "PredictResponse",
     "TrainResponse",
     "UpdateDealRequest",
+    "XGBoostParseResult",
     "parse_covenant_id_request",
     "parse_covenant_request",
     "parse_deal_id_request",
     "parse_deal_request",
     "parse_evaluate_request",
+    "parse_external_train_request",
     "parse_measurements_request",
     "parse_predict_request",
     "parse_train_request",

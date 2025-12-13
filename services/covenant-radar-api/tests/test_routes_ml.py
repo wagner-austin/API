@@ -388,3 +388,32 @@ class TestTrainExternalEndpoint:
         # Verify raw JSON was passed
         enqueued = container_with_store.queue.jobs[-1]
         assert "us" in str(enqueued.args[0])
+
+    def test_train_external_invalid_dataset_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid dataset triggers edge validation and results in error (unhandled in tests)."""
+        client = _create_test_client(container_with_store)
+        # Missing/invalid dataset value to trigger ValueError in decoder
+        response = client.post(
+            "/ml/train-external",
+            content=(
+                b'{"dataset":"invalid","learning_rate":0.1,"max_depth":6,'
+                b'"n_estimators":100,"subsample":0.8,"colsample_bytree":0.8,'
+                b'"random_state":42}'
+            ),
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_train_external_non_object_json_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Non-object JSON (e.g., list) triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external",
+            content=b"[]",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
