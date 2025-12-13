@@ -7,6 +7,7 @@ from .postgres import (
     PostgresCovenantResultRepository,
     PostgresDealRepository,
     PostgresMeasurementRepository,
+    ensure_schema,
 )
 from .protocols import (
     ConnectCallable,
@@ -34,4 +35,5 @@ __all__ = [
     "PostgresDealRepository",
     "PostgresMeasurementRepository",
     "connect",
+    "ensure_schema",
 ]

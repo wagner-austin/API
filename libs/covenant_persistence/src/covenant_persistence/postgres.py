@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Literal
 
 from covenant_domain.models import (
@@ -15,6 +16,22 @@ from covenant_domain.models import (
 )
 
 from .protocols import ConnectionProtocol
+
+
+def ensure_schema(conn: ConnectionProtocol) -> None:
+    """Create database tables if they don't exist.
+
+    Reads and executes schema.sql to create all required tables.
+    Uses CREATE TABLE IF NOT EXISTS so it's safe to call multiple times.
+
+    Args:
+        conn: Database connection to execute schema on.
+    """
+    schema_path = Path(__file__).parent / "schema.sql"
+    schema_sql = schema_path.read_text(encoding="utf-8")
+    cursor = conn.cursor()
+    cursor.execute(schema_sql)
+    conn.commit()
 
 
 class PostgresDealRepository:
@@ -482,4 +499,5 @@ __all__ = [
     "PostgresCovenantResultRepository",
     "PostgresDealRepository",
     "PostgresMeasurementRepository",
+    "ensure_schema",
 ]
