@@ -21,6 +21,8 @@ from covenant_ml.trainer import (
     train_model_with_validation,
 )
 from covenant_ml.types import (
+    DMatrixFactory,
+    DMatrixProtocol,
     TrainProgress,
     XGBBoosterProtocol,
     XGBClassifierFactory,
@@ -62,9 +64,26 @@ class _FakeCore:
         return {"USE_CUDA": self._available}
 
 
+class _FakeDMatrix:
+    def set_info(self, *, feature_names: list[str] | None) -> None:
+        _ = feature_names
+
+
+class _FakeDMatrixFactory:
+    def __call__(self, data: NDArray[np.float64]) -> DMatrixProtocol:
+        _ = data
+        return _FakeDMatrix()
+
+
 class _FakeBooster:
     def save_model(self, fname: str) -> None:
         _ = fname
+
+    def predict(self, data: DMatrixProtocol) -> NDArray[np.float32]:
+        _ = data
+        result: NDArray[np.float32] = np.zeros(1, dtype=np.float32)
+        result[0] = 0.5
+        return result
 
 
 class _FakeXGBModel:
@@ -168,6 +187,7 @@ class _FakeXGBModule:
     def __init__(self, available: bool) -> None:
         self.core: _XGBCoreProto = _FakeCore(available)
         self.XGBClassifier: XGBClassifierFactory = _FakeClassifierFactory()
+        self.DMatrix: DMatrixFactory = _FakeDMatrixFactory()
 
 
 def test_train_model_returns_fitted_model() -> None:
@@ -562,3 +582,134 @@ def test_train_model_with_validation_wrong_feature_names_length() -> None:
     wrong_names = ["feat_0", "feat_1"]  # Only 2 names, model has 8 features
     with pytest.raises(ValueError, match=r"feature_names length.*must match model features"):
         extract_feature_importances(model, wrong_names)
+
+
+def _make_imbalanced_data(
+    n_samples: int = 100,
+    positive_ratio: float = 0.1,
+    seed: int = 42,
+) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
+    """Create imbalanced training data for class weight testing."""
+    x_features: NDArray[np.float64] = np.zeros((n_samples, 8), dtype=np.float64)
+    y_labels: NDArray[np.int64] = np.zeros(n_samples, dtype=np.int64)
+
+    n_positive = int(n_samples * positive_ratio)
+    for i in range(n_samples):
+        first_feat = ((i + seed) % 100) / 100.0
+        for j in range(8):
+            x_features[i, j] = (first_feat + j * 0.1) % 1.0
+        # Create imbalanced labels
+        y_labels[i] = 1 if i < n_positive else 0
+
+    return x_features, y_labels
+
+
+def test_train_model_auto_calculates_scale_pos_weight() -> None:
+    """train_model auto-calculates scale_pos_weight when not provided."""
+    # Create imbalanced data: 10% positive, 90% negative
+    x_features, y_labels = _make_imbalanced_data(100, positive_ratio=0.1)
+    config = make_train_config(reg_alpha=1.0, reg_lambda=5.0)
+
+    # No scale_pos_weight in config
+    assert "scale_pos_weight" not in config
+
+    # Training should succeed (auto-calculation happens internally)
+    model = train_model(x_features, y_labels, config)
+    proba = model.predict_proba(x_features)
+    assert proba.shape == (100, 2)
+
+
+def test_train_model_uses_provided_scale_pos_weight() -> None:
+    """train_model uses provided scale_pos_weight when given."""
+    x_features, y_labels = _make_imbalanced_data(100, positive_ratio=0.1)
+    config = make_train_config(scale_pos_weight=5.0, reg_alpha=1.0, reg_lambda=5.0)
+
+    assert config["scale_pos_weight"] == 5.0
+
+    model = train_model(x_features, y_labels, config)
+    proba = model.predict_proba(x_features)
+    assert proba.shape == (100, 2)
+
+
+def test_train_model_with_validation_returns_computed_scale_pos_weight() -> None:
+    """train_model_with_validation includes auto-calculated scale_pos_weight in outcome."""
+    # Create imbalanced data: 10% positive, 90% negative
+    x_features, y_labels = _make_imbalanced_data(100, positive_ratio=0.1)
+    config = make_train_config(
+        n_estimators=3,
+        early_stopping_rounds=10,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
+    )
+
+    # No scale_pos_weight in config
+    assert "scale_pos_weight" not in config
+
+    feature_names = [f"feat_{i}" for i in range(8)]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        outcome = train_model_with_validation(
+            x_features, y_labels, config, Path(tmpdir), feature_names=feature_names
+        )
+
+        # Should have computed scale_pos_weight
+        computed = outcome["scale_pos_weight_computed"]
+        assert computed > 0.0
+
+        # Expected ratio: ~90 negative / ~7 positive in training set (70% of 100)
+        # Training set has 70 samples, with 10% positive ratio = 7 positive, 63 negative
+        # Expected scale_pos_weight = 63 / 7 = 9.0
+        assert 7.0 <= computed <= 11.0  # Allow some variance from stratified split
+
+
+def test_train_model_with_validation_uses_provided_scale_pos_weight() -> None:
+    """train_model_with_validation uses provided scale_pos_weight."""
+    x_features, y_labels = _make_imbalanced_data(100, positive_ratio=0.1)
+    config = make_train_config(
+        n_estimators=3,
+        scale_pos_weight=15.0,  # Explicit value
+        early_stopping_rounds=10,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
+    )
+
+    feature_names = [f"feat_{i}" for i in range(8)]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        outcome = train_model_with_validation(
+            x_features, y_labels, config, Path(tmpdir), feature_names=feature_names
+        )
+
+        # Should use provided value exactly
+        assert outcome["scale_pos_weight_computed"] == 15.0
+
+
+def test_train_model_raises_on_no_positive_samples() -> None:
+    """train_model raises ValueError when no positive samples exist."""
+    x_features: NDArray[np.float64] = np.zeros((100, 8), dtype=np.float64)
+    y_labels: NDArray[np.int64] = np.zeros(100, dtype=np.int64)  # All zeros
+
+    config = make_train_config(reg_alpha=1.0, reg_lambda=5.0)
+
+    with pytest.raises(ValueError, match=r"no positive samples"):
+        train_model(x_features, y_labels, config)
+
+
+def test_train_model_with_validation_raises_on_no_positive_samples() -> None:
+    """train_model_with_validation raises ValueError when no positive samples exist."""
+    x_features: NDArray[np.float64] = np.zeros((100, 8), dtype=np.float64)
+    y_labels: NDArray[np.int64] = np.zeros(100, dtype=np.int64)  # All zeros
+
+    config = make_train_config(
+        n_estimators=3,
+        early_stopping_rounds=10,
+        reg_alpha=1.0,
+        reg_lambda=5.0,
+    )
+
+    feature_names = [f"feat_{i}" for i in range(8)]
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(ValueError, match=r"no positive samples"),
+    ):
+        train_model_with_validation(
+            x_features, y_labels, config, Path(tmpdir), feature_names=feature_names
+        )

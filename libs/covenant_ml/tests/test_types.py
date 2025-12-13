@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 
 from covenant_ml import TrainConfig
 from covenant_ml.types import (
+    DMatrixProtocol,
     EvalMetrics,
     FeatureImportance,
     Proba2DProtocol,
@@ -90,6 +91,12 @@ class _FakeBooster:
 
     def save_model(self, fname: str) -> None:
         self.saved.append(fname)
+
+    def predict(self, data: DMatrixProtocol) -> NDArray[np.float32]:
+        _ = data
+        result: NDArray[np.float32] = np.zeros(1, dtype=np.float32)
+        result[0] = 0.5
+        return result
 
 
 class _FakeXGBModel:
@@ -255,6 +262,7 @@ def test_protocols_are_callable() -> None:
             FeatureImportance(name="feat1", importance=0.6, rank=1),
             FeatureImportance(name="feat2", importance=0.4, rank=2),
         ],
+        "scale_pos_weight_computed": 1.0,
     }
     progress: TrainProgress = {
         "round": 1,

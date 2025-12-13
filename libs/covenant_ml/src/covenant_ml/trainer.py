@@ -22,6 +22,8 @@ from platform_core.logging import get_logger
 
 from .metrics import compute_all_metrics, format_metrics_str
 from .types import (
+    DMatrixFactory,
+    DMatrixProtocol,
     FeatureImportance,
     RequestedDevice,
     ResolvedDevice,
@@ -88,6 +90,7 @@ class _XGBCoreProto(Protocol):
 class _XGBModuleProto(Protocol):
     core: _XGBCoreProto
     XGBClassifier: XGBClassifierFactory
+    DMatrix: DMatrixFactory
 
 
 _cuda_available_hook: TypingCallable[[], bool] | None = None
@@ -230,13 +233,57 @@ def stratified_split(
 def _get_probabilities(
     model: XGBModelProtocol,
     x_features: NDArray[np.float64],
+    xgb_module: _XGBModuleProto,
 ) -> NDArray[np.float64]:
-    """Get probability predictions for class 1 (breach)."""
-    proba_2d = model.predict_proba(x_features)
-    # Extract probability for class 1 (breach)
-    n_samples = proba_2d.shape[0]
-    probs: list[float] = [float(proba_2d[i, 1]) for i in range(n_samples)]
-    return np.array(probs, dtype=np.float64)
+    """Get probability predictions for class 1 (breach).
+
+    Uses DMatrix and booster.predict() - works on both CPU and GPU.
+    """
+    dmatrix: DMatrixProtocol = xgb_module.DMatrix(x_features)
+    booster = model.get_booster()
+    raw_preds: NDArray[np.float32] = booster.predict(dmatrix)
+    return np.asarray(raw_preds, dtype=np.float64)
+
+
+def _compute_scale_pos_weight(
+    y_labels: NDArray[np.int64],
+    config_value: float | None,
+) -> float:
+    """Compute scale_pos_weight from labels or return provided value.
+
+    Args:
+        y_labels: Binary labels array
+        config_value: Optional provided scale_pos_weight value
+
+    Returns:
+        scale_pos_weight value (provided or auto-calculated)
+
+    Raises:
+        ValueError: If no positive samples exist and no value provided
+    """
+    if config_value is not None:
+        _log.info(
+            "Using provided scale_pos_weight",
+            extra={"scale_pos_weight": config_value},
+        )
+        return config_value
+
+    pos_mask: NDArray[np.bool_] = y_labels == 1
+    neg_mask: NDArray[np.bool_] = y_labels == 0
+    n_positive = int(np.count_nonzero(pos_mask))
+    n_negative = int(np.count_nonzero(neg_mask))
+    if n_positive == 0:
+        raise ValueError("Training set has no positive samples (bankruptcies)")
+    computed = float(n_negative) / float(n_positive)
+    _log.info(
+        "Auto-calculated scale_pos_weight",
+        extra={
+            "n_positive": n_positive,
+            "n_negative": n_negative,
+            "scale_pos_weight": computed,
+        },
+    )
+    return computed
 
 
 def extract_feature_importances(
@@ -324,7 +371,21 @@ def train_model_with_validation(
     classifier_factory: XGBClassifierFactory = xgb_module.XGBClassifier
     resolved_device = _resolve_device(config["device"], xgb_module)
     n_jobs = max(1, int(os.cpu_count() or 1))
-    scale_pos_weight = config.get("scale_pos_weight")
+
+    # Split data first (needed for auto-calculating scale_pos_weight)
+    splits = stratified_split(
+        x_features,
+        y_labels,
+        train_ratio=config["train_ratio"],
+        val_ratio=config["val_ratio"],
+        test_ratio=config["test_ratio"],
+        random_state=config["random_state"],
+    )
+
+    # Calculate scale_pos_weight from training set if not provided
+    scale_pos_weight_computed = _compute_scale_pos_weight(
+        splits.y_train, config.get("scale_pos_weight")
+    )
 
     def _build_classifier(total_estimators: int) -> XGBModelProtocol:
         return classifier_factory(
@@ -339,20 +400,10 @@ def train_model_with_validation(
             n_jobs=n_jobs,
             tree_method="hist",
             device=resolved_device,
-            scale_pos_weight=scale_pos_weight,
+            scale_pos_weight=scale_pos_weight_computed,
             reg_alpha=config["reg_alpha"],
             reg_lambda=config["reg_lambda"],
         )
-
-    # Split data
-    splits = stratified_split(
-        x_features,
-        y_labels,
-        train_ratio=config["train_ratio"],
-        val_ratio=config["val_ratio"],
-        test_ratio=config["test_ratio"],
-        random_state=config["random_state"],
-    )
 
     n_estimators = config["n_estimators"]
     early_stopping_rounds = config["early_stopping_rounds"]
@@ -387,8 +438,8 @@ def train_model_with_validation(
             model.fit(splits.x_train, splits.y_train, verbose=False)
 
         # Evaluate on train and validation sets
-        train_proba = _get_probabilities(model, splits.x_train)
-        val_proba = _get_probabilities(model, splits.x_val)
+        train_proba = _get_probabilities(model, splits.x_train, xgb_module)
+        val_proba = _get_probabilities(model, splits.x_val, xgb_module)
 
         train_metrics = compute_all_metrics(splits.y_train, train_proba)
         val_metrics = compute_all_metrics(splits.y_val, val_proba)
@@ -466,9 +517,9 @@ def train_model_with_validation(
         raise RuntimeError("Model not trained - n_estimators must be >= 1")
 
     # Final evaluation on all splits
-    train_proba = _get_probabilities(model, splits.x_train)
-    val_proba = _get_probabilities(model, splits.x_val)
-    test_proba = _get_probabilities(model, splits.x_test)
+    train_proba = _get_probabilities(model, splits.x_train, xgb_module)
+    val_proba = _get_probabilities(model, splits.x_val, xgb_module)
+    test_proba = _get_probabilities(model, splits.x_test, xgb_module)
 
     final_train_metrics = compute_all_metrics(splits.y_train, train_proba)
     final_val_metrics = compute_all_metrics(splits.y_val, val_proba)
@@ -523,6 +574,7 @@ def train_model_with_validation(
         early_stopped=early_stopped,
         config=config,
         feature_importances=importances,
+        scale_pos_weight_computed=scale_pos_weight_computed,
     )
 
 
@@ -533,7 +585,8 @@ def train_model(
 ) -> XGBModelProtocol:
     """Train XGBoost classifier (simple API without validation).
 
-    For backwards compatibility. Prefer train_model_with_validation.
+    Auto-calculates scale_pos_weight if not provided.
+    Prefer train_model_with_validation for production use.
 
     Args:
         x_features: Feature matrix (n_samples, n_features)
@@ -548,7 +601,9 @@ def train_model(
     classifier_factory: XGBClassifierFactory = xgb_module.XGBClassifier
     resolved_device = _resolve_device(config["device"], xgb_module)
     n_jobs = max(1, int(os.cpu_count() or 1))
-    scale_pos_weight = config.get("scale_pos_weight")
+
+    # Auto-calculate scale_pos_weight if not provided
+    scale_pos_weight_computed = _compute_scale_pos_weight(y_labels, config.get("scale_pos_weight"))
 
     model = classifier_factory(
         learning_rate=config["learning_rate"],
@@ -562,7 +617,7 @@ def train_model(
         n_jobs=n_jobs,
         tree_method="hist",
         device=resolved_device,
-        scale_pos_weight=scale_pos_weight,
+        scale_pos_weight=scale_pos_weight_computed,
         reg_alpha=config["reg_alpha"],
         reg_lambda=config["reg_lambda"],
     )

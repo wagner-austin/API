@@ -80,6 +80,8 @@ class TrainOutcome(TypedDict, total=True):
     early_stopped: bool
     config: TrainConfig
     feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
+    # Class weight used for training (auto-calculated if not provided in config)
+    scale_pos_weight_computed: float
 
 
 class TrainProgress(TypedDict, total=True):
@@ -106,10 +108,18 @@ class Proba2DProtocol(Protocol):
     def __getitem__(self, idx: tuple[int, int]) -> float: ...
 
 
+class DMatrixProtocol(Protocol):
+    """Protocol for XGBoost DMatrix interface."""
+
+    def set_info(self, *, feature_names: list[str] | None) -> None: ...
+
+
 class XGBBoosterProtocol(Protocol):
     """Protocol for XGBoost Booster (core model) interface."""
 
     def save_model(self, fname: str) -> None: ...
+
+    def predict(self, data: DMatrixProtocol) -> NDArray[np.float32]: ...
 
 
 class XGBParams(TypedDict, total=False):
@@ -181,7 +191,15 @@ class XGBClassifierLoader(Protocol):
     def __call__(self) -> XGBModelProtocol: ...
 
 
+class DMatrixFactory(Protocol):
+    """Protocol for XGBoost DMatrix constructor."""
+
+    def __call__(self, data: NDArray[np.float64]) -> DMatrixProtocol: ...
+
+
 __all__ = [
+    "DMatrixFactory",
+    "DMatrixProtocol",
     "EvalMetrics",
     "FeatureImportance",
     "Proba2DProtocol",
