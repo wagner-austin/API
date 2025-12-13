@@ -1,4 +1,7 @@
-"""Type definitions for covenant ML training and prediction."""
+"""Type definitions for covenant ML training and prediction.
+
+Strict typing only. No Any, casts, or stubs.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +12,9 @@ from numpy.typing import NDArray
 
 RequestedDevice = Literal["cpu", "cuda", "auto"]
 ResolvedDevice = Literal["cpu", "cuda"]
+
+# Pluggable backend naming
+BackendName = Literal["xgboost", "mlp"]
 
 
 class TrainConfigRequired(TypedDict, total=True):
@@ -55,6 +61,7 @@ class EvalMetrics(TypedDict, total=True):
     """Evaluation metrics for a dataset split."""
 
     loss: float  # Log loss (cross-entropy)
+    ppl: float  # Perplexity (exp(loss))
     auc: float  # Area under ROC curve
     accuracy: float  # Classification accuracy
     precision: float  # Precision for breach class
@@ -78,10 +85,42 @@ class TrainOutcome(TypedDict, total=True):
     best_round: int
     total_rounds: int
     early_stopped: bool
-    config: TrainConfig
+    config: TrainConfig | MLPConfig  # Union inlined to avoid forward reference
     feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
     # Class weight used for training (auto-calculated if not provided in config)
     scale_pos_weight_computed: float
+
+
+# MLP backend configuration (tabular classifier)
+# Precision/device types use platform_ml conventions (no runtime import here).
+MLPPrecision = Literal["fp32", "fp16", "bf16", "auto"]
+MLPOptimizer = Literal["adamw", "adam", "sgd"]
+
+
+class MLPConfig(TypedDict, total=True):
+    """Strict configuration for MLP backend training.
+
+    Includes explicit train/val/test splits, deterministic seed, and early stopping.
+    Optimizer is pluggable and narrowed to a small, supported set.
+    """
+
+    device: RequestedDevice
+    precision: MLPPrecision
+    optimizer: MLPOptimizer
+    hidden_sizes: tuple[int, ...]
+    learning_rate: float
+    batch_size: int
+    n_epochs: int
+    dropout: float
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_patience: int
+
+
+# Union of backend-specific train configs
+ClassifierTrainConfig = TrainConfig | MLPConfig
 
 
 class TrainProgress(TypedDict, total=True):
@@ -198,10 +237,14 @@ class DMatrixFactory(Protocol):
 
 
 __all__ = [
+    "BackendName",
+    "ClassifierTrainConfig",
     "DMatrixFactory",
     "DMatrixProtocol",
     "EvalMetrics",
     "FeatureImportance",
+    "MLPConfig",
+    "MLPPrecision",
     "Proba2DProtocol",
     "TrainConfig",
     "TrainConfigRequired",

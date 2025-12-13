@@ -20,6 +20,13 @@ covenant-domain = { path = "../covenant_domain", develop = true }
 xgboost = "^3.1"
 numpy = "^2.3"
 scikit-learn = "^1.7"
+platform-ml = { path = "../platform_ml", develop = true }
+torch = {version = "^2.5", source = "pytorch-cu124"}
+
+[[tool.poetry.source]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

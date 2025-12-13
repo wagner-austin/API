@@ -6,6 +6,8 @@ All functions are deterministic and type-safe.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -196,6 +198,7 @@ def compute_all_metrics(
 
     # Compute all metrics
     loss = compute_log_loss(y_true, y_prob)
+    ppl = float(math.exp(loss))
     auc = compute_auc(y_true, y_prob)
     accuracy = compute_accuracy(y_true, y_pred)
     precision = compute_precision(y_true, y_pred)
@@ -204,6 +207,7 @@ def compute_all_metrics(
 
     return EvalMetrics(
         loss=loss,
+        ppl=ppl,
         auc=auc,
         accuracy=accuracy,
         precision=precision,
@@ -223,6 +227,7 @@ def format_metrics_str(metrics: EvalMetrics) -> str:
     """
     return (
         f"loss={metrics['loss']:.4f} "
+        f"ppl={metrics['ppl']:.4f} "
         f"auc={metrics['auc']:.4f} "
         f"acc={metrics['accuracy']:.4f} "
         f"P={metrics['precision']:.4f} "

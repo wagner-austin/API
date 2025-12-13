@@ -231,6 +231,7 @@ def test_protocols_are_callable() -> None:
         "samples_test": 0,
         "train_metrics": EvalMetrics(
             loss=0.0,
+            ppl=1.0,
             auc=0.0,
             accuracy=0.0,
             precision=0.0,
@@ -239,6 +240,7 @@ def test_protocols_are_callable() -> None:
         ),
         "val_metrics": EvalMetrics(
             loss=0.0,
+            ppl=1.0,
             auc=0.0,
             accuracy=0.0,
             precision=0.0,
@@ -247,6 +249,7 @@ def test_protocols_are_callable() -> None:
         ),
         "test_metrics": EvalMetrics(
             loss=0.0,
+            ppl=1.0,
             auc=0.0,
             accuracy=0.0,
             precision=0.0,

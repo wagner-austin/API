@@ -1,6 +1,6 @@
 # covenant-ml
 
-XGBoost wrapper for covenant breach risk prediction: training, validation, and inference.
+Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports XGBoost (gradient boosting) and MLP (neural networks).
 
 ## Installation
 
@@ -8,7 +8,7 @@ XGBoost wrapper for covenant breach risk prediction: training, validation, and i
 poetry add covenant-ml
 ```
 
-Requires `covenant-domain`, `xgboost`, `scikit-learn`, and `numpy` for runtime.
+Requires `covenant-domain`, `xgboost`, `torch`, `scikit-learn`, and `numpy` for runtime.
 
 ## Quick Start
 
@@ -114,6 +114,60 @@ outcome = train_model_with_validation(
     progress_callback=on_progress,
 )
 ```
+
+## MLP Neural Network Backend
+
+Train an MLP classifier with configurable architecture:
+
+```python
+from pathlib import Path
+from covenant_ml.types import MLPConfig
+from covenant_ml.backends.mlp import MLPBackend
+
+# Configure MLP training
+config: MLPConfig = {
+    "device": "auto",
+    "precision": "fp32",
+    "optimizer": "adamw",
+    "hidden_sizes": (64, 32),
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "n_epochs": 100,
+    "dropout": 0.2,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_patience": 10,
+}
+
+# Create backend and train
+backend = MLPBackend()
+prepared = backend.prepare(X, y, config, feature_names)
+outcome = backend.train(prepared, Path("/models"))
+
+# Result includes metrics but no feature importances
+print(f"Test AUC: {outcome['test_metrics']['auc']}")
+print(f"Model format: {outcome['model_format']}")  # "pt"
+```
+
+### MLPConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device` | str | `"cpu"`, `"cuda"`, or `"auto"` |
+| `precision` | str | `"fp32"`, `"fp16"`, `"bf16"`, or `"auto"` |
+| `optimizer` | str | `"adamw"`, `"adam"`, or `"sgd"` |
+| `hidden_sizes` | tuple[int, ...] | Hidden layer sizes (e.g., `(64, 32)`) |
+| `learning_rate` | float | Learning rate |
+| `batch_size` | int | Training batch size |
+| `n_epochs` | int | Maximum training epochs |
+| `dropout` | float | Dropout rate (0.0-1.0) |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `early_stopping_patience` | int | Epochs without improvement before stopping |
 
 ### TrainOutcome Fields
 
@@ -233,7 +287,8 @@ print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 
 | Type | Description |
 |------|-------------|
-| `TrainConfig` | Training configuration |
+| `TrainConfig` | XGBoost training configuration |
+| `MLPConfig` | MLP neural network configuration |
 | `TrainOutcome` | Complete training result |
 | `TrainProgress` | Progress update during training |
 | `EvalMetrics` | Evaluation metrics for a split |
@@ -241,14 +296,29 @@ print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 | `DataSplits` | Train/val/test data splits |
 | `ProgressCallback` | Callback type for progress updates |
 
+### Manifest Types
+
+TypedDicts for model manifest serialization:
+
+| Type | Description |
+|------|-------------|
+| `ClassifierManifest` | Complete model manifest with all metadata |
+| `ManifestVersions` | Library versions (covenant_ml, python, xgboost, torch, etc.) |
+| `ManifestSystem` | System info (platform, device_used, cuda_version, gpu_name) |
+| `ManifestDataset` | Dataset info (samples, features, class distribution) |
+| `ManifestTraining` | Training info (backend, config, rounds, duration) |
+| `ManifestMetrics` | Train/val/test metrics and best_val_auc |
+
 ### Protocols
 
 | Protocol | Description |
 |----------|-------------|
-| `XGBModelProtocol` | Model with predict_proba |
-| `XGBBoosterProtocol` | Low-level booster |
-| `XGBClassifierFactory` | Classifier constructor |
-| `XGBClassifierLoader` | Model loader |
+| `ClassifierBackend` | Backend interface (prepare, train, load, predict) |
+| `PreparedClassifier` | Prepared classifier ready for training |
+| `XGBModelProtocol` | XGBoost model with predict_proba |
+| `XGBBoosterProtocol` | Low-level XGBoost booster |
+| `XGBClassifierFactory` | XGBoost classifier constructor |
+| `XGBClassifierLoader` | XGBoost model loader |
 | `Proba2DProtocol` | 2D probability array |
 
 ## Testing
@@ -275,7 +345,19 @@ make check  # lint + test
 
 - Python 3.11+
 - covenant-domain
-- xgboost 2.0.0+
+- xgboost 2.0.0+ (gradient boosting backend)
+- torch 2.0.0+ (MLP neural network backend)
 - scikit-learn 1.5.0+
 - numpy 1.26.0+
 - 100% test coverage enforced
+
+## Backend Comparison
+
+| Aspect | XGBoost | MLP |
+|--------|---------|-----|
+| Model format | `.ubj` | `.pt` |
+| Feature importances | Yes (ranked) | No |
+| GPU support | CUDA | CUDA (fp16/bf16) |
+| Best for | Tabular data | Non-linear patterns |
+| Training speed | Faster | Slower |
+| Interpretability | High | Low |

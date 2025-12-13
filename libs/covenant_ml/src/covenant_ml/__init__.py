@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from .manifest import (
+    ClassifierManifest,
+    ManifestDataset,
+    ManifestMetrics,
+    ManifestSystem,
+    ManifestTraining,
+    ManifestVersions,
+)
 from .metrics import (
     compute_accuracy,
     compute_all_metrics,
@@ -35,9 +43,15 @@ from .types import (
 )
 
 __all__ = [
+    "ClassifierManifest",
     "DataSplits",
     "EvalMetrics",
     "FeatureImportance",
+    "ManifestDataset",
+    "ManifestMetrics",
+    "ManifestSystem",
+    "ManifestTraining",
+    "ManifestVersions",
     "Proba2DProtocol",
     "ProgressCallback",
     "TrainConfig",
