@@ -369,3 +369,53 @@ make check   # Run both lint and test
 - platform-core (for DataBankClient, JSON utilities)
 - wandb (optional, for experiment tracking)
 - 100% test coverage enforced
+
+## Torch Protocols and Test Fakes
+
+Strict, framework-agnostic interfaces for PyTorch-like functionality, with public fakes for tests. This enables deterministic, fully-typed ML backends without importing `torch` when unavailable.
+
+### Strict Protocols (no Any)
+
+Provided in `platform_ml.torch_types`:
+- `_TorchModuleProtocol`, `_CudaModuleProtocol` — minimal surface for device checks, seeding, tensor creation, save/load
+- `TensorProtocol`, `DeviceProtocol`, `DTypeProtocol` — tensor/device/dtype primitives used by backends
+
+Dynamic import pattern with immediate Protocol annotation (no Any leaks):
+
+```python
+from platform_ml.torch_types import _TorchModuleProtocol, _import_torch
+
+torch: _TorchModuleProtocol = _import_torch()  # returns real torch or compat module
+torch.set_num_threads(1)
+torch.manual_seed(42)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+x = torch.zeros(2, 3, device=device)
+```
+
+All attributes used from `torch` must exist on the Protocol. When you need new capabilities, extend the Protocols (and the fakes) rather than using untyped access.
+
+### Fake Torch for Tests
+
+Provided in `platform_ml.testing`:
+- `FakeTorchModule`, `FakeCudaModule`, `FakeDevice`, `FakeDType`, `FakeNoGradContext`
+- `FakeTensor` supports methods used by typical training loops (`tolist`, `detach`, `cpu`, `clone`, `to`, `backward`, `numpy`, `argmax`)
+
+Usage example in tests:
+
+```python
+from platform_ml.testing import FakeTorchModule
+
+torch = FakeTorchModule()  # satisfies _TorchModuleProtocol
+torch.set_num_threads(1)
+torch.manual_seed(123)
+
+with torch.no_grad():
+    t = torch.zeros(2, 3)
+    assert t.numpy().shape == (2, 3)
+```
+
+### Determinism Guidance
+
+- Seed at component prep with a single source of truth (e.g., `config["random_state"]`).
+- Use `set_num_threads(1)` for reproducible CPU behavior where appropriate.
+- Backend-specific deterministic toggles (e.g., CUDA) should live in the training library; the Protocol remains minimal and portable.

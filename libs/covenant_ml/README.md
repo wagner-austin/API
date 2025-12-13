@@ -117,7 +117,7 @@ outcome = train_model_with_validation(
 
 ## MLP Neural Network Backend
 
-Train an MLP classifier with configurable architecture:
+Train an MLP classifier with configurable architecture and deterministic setup:
 
 ```python
 from pathlib import Path
@@ -150,6 +150,12 @@ outcome = backend.train(prepared, Path("/models"))
 print(f"Test AUC: {outcome['test_metrics']['auc']}")
 print(f"Model format: {outcome['model_format']}")  # "pt"
 ```
+
+### Determinism
+
+- Seeds are applied from `config["random_state"]` at component preparation.
+- CUDA deterministic algorithms are enabled when feasible and safe.
+- A tiny learning-rate warmup is used at the start of training to stabilize early updates on small datasets.
 
 ### MLPConfig Fields
 
@@ -315,6 +321,7 @@ TypedDicts for model manifest serialization:
 |----------|-------------|
 | `ClassifierBackend` | Backend interface (prepare, train, load, predict) |
 | `PreparedClassifier` | Prepared classifier ready for training |
+| `ClassifierRegistry` | Backend registry used by `BaseTabularTrainer` |
 | `XGBModelProtocol` | XGBoost model with predict_proba |
 | `XGBBoosterProtocol` | Low-level XGBoost booster |
 | `XGBClassifierFactory` | XGBoost classifier constructor |
@@ -332,6 +339,8 @@ model = MockXGBModel(default_proba=0.5)
 proba = model.predict_proba([[1, 2, 3]])
 # Returns [[0.5, 0.5]]
 ```
+
+End-to-end MLP tests verify loss progression, optimizer variants, dropout, CUDA device handling, and early stopping. All tests run with 100% statement and branch coverage and enforce strict typing (no Any/casts/ignores).
 
 ## Development
 
