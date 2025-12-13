@@ -13,8 +13,8 @@ from platform_core.data_bank_client import DataBankClientError
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.logging import get_logger
 from platform_workers.testing import FakeRedis
-from tests.conftest import make_probs
 
+from tests.conftest import make_probs
 from turkic_api import _test_hooks
 from turkic_api.api.config import Settings
 from turkic_api.api.jobs import process_corpus_impl
