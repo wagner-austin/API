@@ -39,10 +39,14 @@ class _LM(LMModelProto):
         return None
 
     def forward(self: _LM, *, input_ids: torch.Tensor, labels: torch.Tensor) -> ForwardOutProto:
+        # Capture parameter reference for use in nested class
+        param = self._p
+
         class _Out(ForwardOutProto):
             @property
             def loss(self: _Out) -> torch.Tensor:
-                return torch.tensor(0.0, requires_grad=True)
+                # Loss must depend on model parameter for gradients to flow
+                return (param * 0.0).sum() + 0.1
 
         return _Out()
 
@@ -872,15 +876,12 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
 
     dl = DataLoader(_DS(), batch_size=1, shuffle=False)
 
-    class _Opt(OptimizerProto):
-        def __init__(self: _Opt) -> None:
-            pass
+    # Create a real model with trainable parameters for proper GradScaler integration
+    model = _LM()
 
-        def zero_grad(self: _Opt, *, set_to_none: bool = False) -> None:
-            return None
-
-        def step(self: _Opt) -> None:
-            return None
+    # Use a real optimizer that GradScaler can properly interact with
+    # Access _p directly since model.parameters() returns ParameterLike protocol
+    optim = torch.optim.SGD([model._p], lr=0.01)
 
     # Create config with fp16 precision
     cfg: ModelTrainConfig = {**_make_cfg(), "precision": "fp16"}
@@ -903,9 +904,9 @@ def test_train_one_epoch_fp16_scaler_paths() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         out = trainer._train_one_epoch(
-            model=_LM(),
+            model=model,
             dataloader=dl,
-            optim=_Opt(),
+            optim=optim,
             epoch=0,
             device="cpu",  # Actually runs on CPU but scaler logic still executes
             start_step=0,

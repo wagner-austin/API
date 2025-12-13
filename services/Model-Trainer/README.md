@@ -70,6 +70,33 @@ Usage notes:
 - Explicit precision options: `"fp32"` (full precision), `"fp16"` (mixed precision with loss scaling), `"bf16"` (mixed precision, CUDA only).
 - To override the PyTorch CUDA wheel index, set `TORCH_INDEX` in `.env` before building.
 
+### Device Selection (platform_ml)
+
+Device and precision resolution uses the centralized `platform_ml` library to ensure consistent behavior across all ML services:
+
+```python
+from platform_ml import (
+    RequestedDevice,      # "cpu", "cuda", "auto"
+    ResolvedDevice,       # "cpu", "cuda"
+    RequestedPrecision,   # "fp32", "fp16", "bf16", "auto"
+    ResolvedPrecision,    # "fp32", "fp16", "bf16"
+    resolve_device,
+    resolve_precision,
+    recommended_batch_size,
+)
+
+# Device resolution
+device = resolve_device("auto")  # Returns "cuda" if available, else "cpu"
+
+# Precision resolution (raises on fp16/bf16 + CPU)
+precision = resolve_precision("auto", device)  # "fp16" on CUDA, "fp32" on CPU
+
+# Batch size recommendation (bumps small batches on CUDA)
+batch = recommended_batch_size(4, device)  # 8 on CUDA, 4 on CPU
+```
+
+Model-Trainer extends this with model-family-specific batch sizing via `recommended_batch_size_for(model_family, batch, device)`.
+
 ### Local Development
 
 ```bash
@@ -546,6 +573,7 @@ services:
 | `datasets` | Data loading |
 | `torch` | Training framework |
 | `platform-core` | Logging, errors, config |
+| `platform-ml` | Device selection, artifact storage |
 | `platform-workers` | RQ worker harness |
 
 ### Development

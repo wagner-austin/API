@@ -4,9 +4,11 @@ import os
 
 import pytest
 from platform_core.json_utils import JSONValue
+from platform_ml import torch_types as platform_ml_torch_types
+from platform_ml.testing import FakeTorchModule
+from platform_ml.torch_types import _TorchModuleProtocol
 
 from model_trainer.api.validators.runs import _decode_train_request
-from model_trainer.core import _test_hooks
 from model_trainer.core.compute.device_selector import (
     recommended_batch_size,
     recommended_batch_size_for,
@@ -68,12 +70,22 @@ def test_decode_train_request_device_explicit_cpu() -> None:
 
 
 def test_resolve_device_auto_cuda() -> None:
-    _test_hooks.cuda_is_available = lambda: True
+    fake_torch = FakeTorchModule(cuda_available=True)
+
+    def _fake_import() -> _TorchModuleProtocol:
+        return fake_torch
+
+    platform_ml_torch_types._import_torch = _fake_import
     assert resolve_device("auto") == "cuda"
 
 
 def test_resolve_device_auto_cpu() -> None:
-    _test_hooks.cuda_is_available = lambda: False
+    fake_torch = FakeTorchModule(cuda_available=False)
+
+    def _fake_import() -> _TorchModuleProtocol:
+        return fake_torch
+
+    platform_ml_torch_types._import_torch = _fake_import
     assert resolve_device("auto") == "cpu"
 
 
@@ -94,7 +106,12 @@ def test_resolve_device_passthrough_cpu() -> None:
 
 def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
     # CUDA available -> auto resolves to cuda and batch size increases to gpt2 default (32)
-    _test_hooks.cuda_is_available = lambda: True
+    fake_torch = FakeTorchModule(cuda_available=True)
+
+    def _fake_import() -> _TorchModuleProtocol:
+        return fake_torch
+
+    platform_ml_torch_types._import_torch = _fake_import
     req: TrainRequestPayload = {
         "model_family": "gpt2",
         "model_size": "small",
@@ -127,7 +144,12 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
 
 
 def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
-    _test_hooks.cuda_is_available = lambda: False
+    fake_torch = FakeTorchModule(cuda_available=False)
+
+    def _fake_import() -> _TorchModuleProtocol:
+        return fake_torch
+
+    platform_ml_torch_types._import_torch = _fake_import
     req: TrainRequestPayload = {
         "model_family": "gpt2",
         "model_size": "small",

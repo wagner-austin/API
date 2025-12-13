@@ -15,13 +15,12 @@ from platform_core.trainer_metrics_events import (
     make_config_event,
     make_progress_metrics_event,
 )
+from platform_ml import RequestedDevice, ResolvedDevice
 from platform_workers.redis import RedisStrProto
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.compute.device_selector import (
-    RequestedDevice,
     RequestedPrecision,
-    ResolvedDevice,
     ResolvedPrecision,
     recommended_batch_size_for,
     resolve_device,

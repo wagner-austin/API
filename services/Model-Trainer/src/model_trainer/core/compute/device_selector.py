@@ -1,53 +1,35 @@
+"""Device selection utilities for Model-Trainer.
+
+Re-exports types and functions from platform_ml for centralized device detection,
+precision resolution, and batch size recommendations. Adds model-family-specific
+batch size logic that is unique to Model-Trainer.
+"""
+
 from __future__ import annotations
 
 from typing import Final, Literal
 
-from model_trainer.core import _test_hooks
+from platform_ml import RequestedDevice as RequestedDevice
+from platform_ml import RequestedPrecision as RequestedPrecision
+from platform_ml import ResolvedDevice as ResolvedDevice
+from platform_ml import ResolvedPrecision as ResolvedPrecision
+from platform_ml import recommended_batch_size as recommended_batch_size
+from platform_ml import resolve_device as resolve_device
+from platform_ml import resolve_precision as resolve_precision
 
-RequestedDevice = Literal["cpu", "cuda", "auto"]
-ResolvedDevice = Literal["cpu", "cuda"]
-RequestedPrecision = Literal["fp32", "fp16", "bf16", "auto"]
-ResolvedPrecision = Literal["fp32", "fp16", "bf16"]
 ModelFamily = Literal["gpt2", "llama", "qwen", "char_lstm"]
 
 _CUDA: Final[ResolvedDevice] = "cuda"
 _CPU: Final[ResolvedDevice] = "cpu"
-_FP32: Final[ResolvedPrecision] = "fp32"
-_FP16: Final[ResolvedPrecision] = "fp16"
-_BF16: Final[ResolvedPrecision] = "bf16"
-
-
-def resolve_device(requested: RequestedDevice) -> ResolvedDevice:
-    """Resolve requested device to a concrete device.
-
-    This function centralizes device detection logic so other modules do not import
-    torch directly. It performs a single check using torch.cuda.is_available() when
-    'auto' is requested; otherwise returns the requested concrete device.
-    """
-    if requested == _CUDA:
-        return _CUDA
-    if requested == _CPU:
-        return _CPU
-
-    # Use hook for CUDA availability check - allows testing without torch import
-    return _CUDA if _test_hooks.cuda_is_available() else _CPU
-
-
-def recommended_batch_size(current: int, device: ResolvedDevice) -> int:
-    """Return a recommended batch size given the resolved device.
-
-    We avoid implicit overrides: only bump modestly when device is CUDA and the
-    current batch size is at or below the conservative default of 4.
-    """
-    if device == _CUDA and current <= 4:
-        return 8
-    return current
 
 
 def recommended_batch_size_for(
     model_family: ModelFamily, current: int, device: ResolvedDevice
 ) -> int:
     """Recommend a batch size based on model family and device.
+
+    This is Model-Trainer-specific logic that extends platform_ml's generic
+    recommended_batch_size with model-family-aware defaults.
 
     - On CUDA, increase conservative defaults to backend-appropriate values when
       users provided very small batches (<=4).
@@ -63,38 +45,3 @@ def recommended_batch_size_for(
         return 32
     # Other families default to a modest bump
     return 16
-
-
-def resolve_precision(requested: RequestedPrecision, device: ResolvedDevice) -> ResolvedPrecision:
-    """Resolve requested precision to a concrete precision.
-
-    Resolution rules:
-    - "auto" on CUDA resolves to "fp16" (safe default for modern GPUs)
-    - "auto" on CPU resolves to "fp32" (mixed precision not useful on CPU)
-    - Explicit "fp32" is always valid on any device
-    - Explicit "fp16" or "bf16" on CPU raises RuntimeError
-
-    Args:
-        requested: The precision requested by the user.
-        device: The resolved device (must be concrete, not "auto").
-
-    Returns:
-        Concrete precision to use for training.
-
-    Raises:
-        RuntimeError: If fp16/bf16 is requested on CPU.
-    """
-    if requested == _FP32:
-        return _FP32
-    if requested == _FP16:
-        if device == _CPU:
-            raise RuntimeError("fp16 precision is not supported on CPU")
-        return _FP16
-    if requested == _BF16:
-        if device == _CPU:
-            raise RuntimeError("bf16 precision is not supported on CPU")
-        return _BF16
-    # requested == "auto"
-    if device == _CUDA:
-        return _FP16
-    return _FP32

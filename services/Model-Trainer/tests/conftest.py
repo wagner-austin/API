@@ -7,6 +7,7 @@ from typing import Literal, Protocol
 import pytest
 from platform_core.config import config_test_hooks
 from platform_ml import sentencepiece as _spm_init
+from platform_ml import torch_types as platform_ml_torch_types
 from platform_workers.testing import (
     FakeQueue,
     FakeRedis,
@@ -101,6 +102,8 @@ def _reset_test_hooks_impl(
     orig_guard_load_orchestrator = _test_hooks.guard_load_orchestrator
     # Platform core config hooks
     orig_get_env = config_test_hooks.get_env
+    # Platform ML torch hooks (for device resolution)
+    orig_platform_ml_import_torch = platform_ml_torch_types._import_torch
 
     # Set up fake factories
     _test_hooks.kv_store_factory = fake_kv_store_factory
@@ -175,6 +178,8 @@ def _reset_test_hooks_impl(
     _test_hooks.guard_load_orchestrator = orig_guard_load_orchestrator
     # Platform core config hooks
     config_test_hooks.get_env = orig_get_env
+    # Platform ML torch hooks
+    platform_ml_torch_types._import_torch = orig_platform_ml_import_torch
 
 
 fake_redis = pytest.fixture(_make_fake_redis)
