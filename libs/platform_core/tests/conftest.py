@@ -8,7 +8,6 @@ import pytest
 from scripts import guard as guard_mod
 
 from platform_core import json_utils as json_utils_mod
-from platform_core import torch_types as torch_types_mod
 from platform_core.config import _test_hooks
 
 
@@ -36,11 +35,3 @@ def _restore_guard_hooks() -> Generator[None, None, None]:
     original_is_dir = guard_mod._is_dir
     yield
     guard_mod._is_dir = original_is_dir
-
-
-@pytest.fixture(autouse=True)
-def _restore_torch_types_hooks() -> Generator[None, None, None]:
-    """Restore torch_types hooks after each test."""
-    original_import_torch = torch_types_mod._import_torch
-    yield
-    torch_types_mod._import_torch = original_import_torch
