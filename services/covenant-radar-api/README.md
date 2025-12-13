@@ -1,6 +1,6 @@
 # Covenant Radar API
 
-Loan covenant monitoring and breach prediction API service. Features deterministic rule evaluation, XGBoost-based breach risk prediction, and PostgreSQL persistence.
+Loan covenant monitoring and breach prediction API service. Features deterministic rule evaluation, pluggable ML backends (XGBoost + MLP neural networks), and PostgreSQL persistence.
 
 ## Features
 
@@ -8,7 +8,9 @@ Loan covenant monitoring and breach prediction API service. Features determinist
 - **Covenant Definitions**: Configurable rules with formulas, thresholds, and frequencies
 - **Financial Measurements**: Time-series metric ingestion for covenant calculations
 - **Rule Evaluation**: Deterministic covenant compliance checking with OK/NEAR_BREACH/BREACH status
-- **Breach Prediction**: XGBoost classifier for risk tier prediction (LOW/MEDIUM/HIGH)
+- **Breach Prediction**: Pluggable ML backends for risk tier prediction (LOW/MEDIUM/HIGH)
+  - XGBoost: Gradient boosting with feature importance ranking
+  - MLP: Neural network with configurable architecture (hidden layers, dropout, precision)
 - **Background Training**: Redis + RQ worker for model training jobs
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
@@ -435,18 +437,33 @@ This creates 12 sample deals (6 safe, 6 risky) with covenants, measurements, and
 
 ## ML Model Training
 
+### Pluggable Backends
+
+The API supports two ML backends for breach risk prediction:
+
+| Backend | Format | Best For | Feature Importance |
+|---------|--------|----------|-------------------|
+| `xgboost` | `.ubj` | Tabular data, interpretability | Yes (ranked list) |
+| `mlp` | `.pt` | Non-linear patterns, deep learning | No |
+
 ### GPU Training
 
-XGBoost supports GPU acceleration via the `device` parameter:
+Both backends support GPU acceleration via the `device` parameter:
 - `"cpu"` - Force CPU training
 - `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
 - `"auto"` - Auto-detect: uses GPU if available, falls back to CPU (default)
 
+MLP also supports precision modes for GPU training:
+- `"fp32"` - Full precision (most compatible)
+- `"fp16"` - Half precision (faster on GPU)
+- `"bf16"` - BFloat16 (faster on Ampere+ GPUs)
+- `"auto"` - Auto-detect based on device
+
 ### Class Imbalance Handling
 
-The `scale_pos_weight` parameter handles imbalanced classes (few bankruptcies vs many healthy companies):
-- If omitted, auto-calculated as `(n_negative / n_positive)` from training data
-- Returned in job result so you can see what value was used
+Both backends handle imbalanced classes (few bankruptcies vs many healthy companies):
+- XGBoost: `scale_pos_weight` parameter (auto-calculated if omitted)
+- MLP: Weighted BCE loss based on class distribution
 
 ### Train on Internal Data
 
@@ -486,9 +503,9 @@ curl http://localhost:8007/ml/jobs/{job_id}
 # }
 ```
 
-### Train on External Datasets (with Automatic Feature Selection)
+### Train on External Datasets - XGBoost
 
-Train on real-world bankruptcy datasets. XGBoost automatically determines which features are most predictive:
+Train on real-world bankruptcy datasets with automatic feature importance:
 
 ```bash
 # Train on Taiwan bankruptcy data (GPU, auto class balancing)
@@ -496,6 +513,7 @@ curl -X POST http://localhost:8007/ml/train-external \
   -H "Content-Type: application/json" \
   -d '{
     "dataset": "taiwan",
+    "backend": "xgboost",
     "learning_rate": 0.1,
     "max_depth": 6,
     "n_estimators": 100,
@@ -509,13 +527,49 @@ curl -X POST http://localhost:8007/ml/train-external \
 curl http://localhost:8007/ml/jobs/{job_id}
 # {
 #   "result": {
+#     "backend": "xgboost",
+#     "model_format": "ubj",
 #     "test_metrics": {"auc": 0.93, ...},
-#     "scale_pos_weight": 29.99,
 #     "feature_importances": [
 #       {"name": "X6", "importance": 0.18, "rank": 1},
 #       {"name": "X1", "importance": 0.09, "rank": 2},
 #       ...
 #     ]
+#   }
+# }
+```
+
+### Train on External Datasets - MLP Neural Network
+
+Train an MLP neural network with configurable architecture:
+
+```bash
+# Train MLP on Taiwan bankruptcy data
+curl -X POST http://localhost:8007/ml/train-external \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "backend": "mlp",
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "n_epochs": 100,
+    "dropout": 0.2,
+    "hidden_sizes": [64, 32],
+    "precision": "fp32",
+    "optimizer": "adamw",
+    "random_state": 42,
+    "early_stopping_patience": 10,
+    "device": "auto"
+  }'
+
+# Poll for results (no feature importances for MLP)
+curl http://localhost:8007/ml/jobs/{job_id}
+# {
+#   "result": {
+#     "backend": "mlp",
+#     "model_format": "pt",
+#     "test_metrics": {"auc": 0.91, ...},
+#     "feature_importances": []
 #   }
 # }
 ```
@@ -552,14 +606,15 @@ curl -X POST http://localhost:8007/ml/predict \
 | `redis` | Job queue backend |
 | `rq` | Redis Queue |
 | `psycopg[binary,pool]` | PostgreSQL driver |
-| `xgboost` | ML model |
+| `xgboost` | Gradient boosting backend |
+| `torch` | MLP neural network backend |
 | `scikit-learn` | Feature processing |
 | `numpy` | Numerical operations |
 | `platform-core` | Logging, errors, config |
 | `platform-workers` | RQ worker harness |
 | `covenant-domain` | Domain models |
 | `covenant-persistence` | Repository layer |
-| `covenant-ml` | ML utilities |
+| `covenant-ml` | Pluggable ML backends |
 
 ### Development
 

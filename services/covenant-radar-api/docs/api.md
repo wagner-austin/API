@@ -766,23 +766,45 @@ Poll `/ml/jobs/{job_id}` to get the result:
 
 ### POST /ml/train-external
 
-Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automatic feature selection. XGBoost trains on all columns and determines feature importance.
+Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggable ML backends. Supports XGBoost (gradient boosting) and MLP (neural network) backends.
 
-**Request Body:**
+**Common Request Fields:**
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `dataset` | string | Yes | - | Dataset to use: `taiwan`, `us`, or `polish` |
+| `backend` | string | No | `xgboost` | Backend to use: `xgboost` or `mlp` |
 | `learning_rate` | float | Yes | - | Learning rate |
-| `max_depth` | int | Yes | - | XGBoost max tree depth |
+| `random_state` | int | Yes | - | Random seed |
+| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
+| `train_ratio` | float | No | `0.7` | Training set ratio |
+| `val_ratio` | float | No | `0.15` | Validation set ratio |
+| `test_ratio` | float | No | `0.15` | Test set ratio |
+
+**XGBoost-Specific Fields (`backend: "xgboost"`):**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `max_depth` | int | Yes | - | Max tree depth |
 | `n_estimators` | int | Yes | - | Number of trees |
 | `subsample` | float | Yes | - | Row subsample ratio |
 | `colsample_bytree` | float | Yes | - | Column subsample ratio |
-| `random_state` | int | Yes | - | Random seed |
-| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
+| `early_stopping_rounds` | int | No | `10` | Early stopping patience |
 | `reg_alpha` | float | No | `0.0` | L1 regularization strength |
 | `reg_lambda` | float | No | `1.0` | L2 regularization strength |
-| `scale_pos_weight` | float | No | auto | Class weight for positives. Auto-calculated as (n_negative / n_positive) if omitted |
+| `scale_pos_weight` | float | No | auto | Class weight (auto-calculated if omitted) |
+
+**MLP-Specific Fields (`backend: "mlp"`):**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `hidden_sizes` | array[int] | Yes | - | Hidden layer sizes (e.g., `[64, 32]`) |
+| `batch_size` | int | Yes | - | Training batch size |
+| `n_epochs` | int | Yes | - | Maximum training epochs |
+| `dropout` | float | Yes | - | Dropout rate (0.0 to 1.0) |
+| `precision` | string | Yes | - | `fp32`, `fp16`, `bf16`, or `auto` |
+| `optimizer` | string | Yes | - | `adamw`, `adam`, or `sgd` |
+| `early_stopping_patience` | int | Yes | - | Epochs without improvement before stopping |
 
 **Available Datasets:**
 - `taiwan`: 6,819 samples, 95 financial ratio features
@@ -794,9 +816,15 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automat
 - `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
 - `"auto"` - Auto-detect: uses GPU if available, falls back to CPU
 
-**Class Imbalance:** If `scale_pos_weight` is omitted, it's automatically calculated as (n_negative / n_positive) from the training data.
+**MLP Precision Options:**
+- `"fp32"` - Full precision (default, most compatible)
+- `"fp16"` - Half precision (faster on GPU, requires CUDA)
+- `"bf16"` - BFloat16 (faster on Ampere+ GPUs)
+- `"auto"` - Auto-detect based on device
 
-**Request Example (GPU with auto-detect):**
+**Class Imbalance:** For XGBoost, if `scale_pos_weight` is omitted, it's automatically calculated as (n_negative / n_positive). MLP uses weighted loss based on class distribution.
+
+**Request Example - XGBoost (default):**
 ```json
 {
   "dataset": "taiwan",
@@ -810,6 +838,24 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automat
 }
 ```
 
+**Request Example - MLP Neural Network:**
+```json
+{
+  "dataset": "taiwan",
+  "backend": "mlp",
+  "learning_rate": 0.001,
+  "batch_size": 32,
+  "n_epochs": 100,
+  "dropout": 0.2,
+  "hidden_sizes": [64, 32],
+  "precision": "fp32",
+  "optimizer": "adamw",
+  "random_state": 42,
+  "early_stopping_patience": 10,
+  "device": "auto"
+}
+```
+
 **Response (202):**
 ```json
 {
@@ -818,7 +864,7 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automat
 }
 ```
 
-**Job Result (when complete):**
+**Job Result - XGBoost (when complete):**
 
 Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ranking:
 
@@ -828,9 +874,11 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
   "status": "finished",
   "result": {
     "status": "complete",
+    "backend": "xgboost",
     "dataset": "taiwan",
     "model_id": "model-2024-01-15-143052",
     "model_path": "/data/models/model-2024-01-15-143052.ubj",
+    "model_format": "ubj",
     "active_model_path": "/data/models/active.ubj",
     "samples_total": 6819,
     "samples_train": 4773,
@@ -844,6 +892,7 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
     "early_stopped": true,
     "train_metrics": {
       "loss": 0.18,
+      "ppl": 1.20,
       "auc": 0.98,
       "accuracy": 0.94,
       "precision": 0.91,
@@ -852,6 +901,7 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
     },
     "val_metrics": {
       "loss": 0.24,
+      "ppl": 1.27,
       "auc": 0.94,
       "accuracy": 0.91,
       "precision": 0.87,
@@ -860,6 +910,7 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
     },
     "test_metrics": {
       "loss": 0.26,
+      "ppl": 1.30,
       "auc": 0.93,
       "accuracy": 0.90,
       "precision": 0.86,
@@ -877,16 +928,76 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
 }
 ```
 
-**Additional Result Fields (vs /ml/train):**
+**Job Result - MLP (when complete):**
+
+MLP neural network results use PyTorch format and don't include feature importances:
+
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "backend": "mlp",
+    "dataset": "taiwan",
+    "model_id": "model-2024-01-15-143052",
+    "model_path": "/data/models/model-2024-01-15-143052.pt",
+    "model_format": "pt",
+    "active_model_path": "/data/models/active.pt",
+    "samples_total": 6819,
+    "samples_train": 4773,
+    "samples_val": 1023,
+    "samples_test": 1023,
+    "n_features": 95,
+    "scale_pos_weight": 29.99,
+    "best_val_auc": 0.92,
+    "best_round": 45,
+    "total_rounds": 100,
+    "early_stopped": true,
+    "train_metrics": {
+      "loss": 0.22,
+      "ppl": 1.25,
+      "auc": 0.96,
+      "accuracy": 0.92,
+      "precision": 0.89,
+      "recall": 0.86,
+      "f1_score": 0.87
+    },
+    "val_metrics": {
+      "loss": 0.28,
+      "ppl": 1.32,
+      "auc": 0.92,
+      "accuracy": 0.89,
+      "precision": 0.85,
+      "recall": 0.82,
+      "f1_score": 0.83
+    },
+    "test_metrics": {
+      "loss": 0.30,
+      "ppl": 1.35,
+      "auc": 0.91,
+      "accuracy": 0.88,
+      "precision": 0.84,
+      "recall": 0.81,
+      "f1_score": 0.82
+    },
+    "feature_importances": []
+  }
+}
+```
+
+**Result Fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `backend` | string | Backend used (`xgboost` or `mlp`) |
 | `dataset` | string | Dataset used (`taiwan`, `us`, or `polish`) |
+| `model_format` | string | Model file format (`ubj` for XGBoost, `pt` for MLP) |
 | `n_features` | int | Number of features in the dataset |
 | `scale_pos_weight` | float | Class weight used (auto-calculated if not provided) |
-| `feature_importances` | array | Ranked list of feature importances |
+| `feature_importances` | array | Ranked list of feature importances (XGBoost only, empty for MLP) |
 
-**Feature Importance Fields:**
+**Feature Importance Fields (XGBoost only):**
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -894,7 +1005,16 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
 | `importance` | float | XGBoost feature importance score (0.0-1.0) |
 | `rank` | int | Rank by importance (1 = most important) |
 
-The `feature_importances` array contains ALL features ranked by importance, allowing you to identify which financial ratios are most predictive of bankruptcy/default.
+**Backend Differences:**
+
+| Aspect | XGBoost | MLP |
+|--------|---------|-----|
+| Model format | `.ubj` (Universal Binary JSON) | `.pt` (PyTorch) |
+| Feature importances | Ranked list with importance scores | Empty (neural networks lack built-in feature importance) |
+| GPU requirement | Optional (CUDA) | Optional (CUDA for fp16/bf16) |
+| Training speed | Faster for tabular data | Slower but may capture non-linear patterns |
+
+The `feature_importances` array for XGBoost contains ALL features ranked by importance, allowing you to identify which financial ratios are most predictive of bankruptcy/default. For MLP, use techniques like SHAP values for feature importance analysis.
 
 ---
 
