@@ -92,6 +92,25 @@ def test_scan_finds_xls_files(tmp_path: Path) -> None:
     assert result == 0
 
 
+def test_scan_skips_already_processed_files(tmp_path: Path) -> None:
+    """Test scan skips files that match processed paths (line 95)."""
+    # Create a file structure that matches one of the processed paths
+    # The processed path "Notebooks/Emily Truong Notebook/Chem_Inv.xlsx" should be skipped
+    notebook_dir = tmp_path / "Notebooks" / "Emily Truong Notebook"
+    notebook_dir.mkdir(parents=True)
+
+    # Create the file that matches a processed path - should be skipped (line 95)
+    processed_file = notebook_dir / "Chem_Inv.xlsx"
+    processed_file.touch()
+
+    # Also create a file that has a keyword but is NOT in processed paths - should be found
+    unprocessed_file = tmp_path / "new_inventory.xlsx"
+    unprocessed_file.touch()
+
+    result = scan_for_missing_data(tmp_path)
+    assert result == 0
+
+
 def test_scan_default_base_path() -> None:
     """Test scan uses default base path when None."""
     import logging

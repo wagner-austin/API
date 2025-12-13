@@ -71,6 +71,25 @@ class TestStandardsExtractorValidation:
         assert extractor._is_valid_chemical_name("MT1") is False
         assert extractor._is_valid_chemical_name("Unknown5") is False
 
+    def test_is_valid_chemical_name_skip_contains(self) -> None:
+        """Test names containing skip substrings (line 186)."""
+        extractor = StandardsExtractor()
+        # Test each skip_contains pattern
+        assert extractor._is_valid_chemical_name("path\\data-ms\\file") is False
+        assert extractor._is_valid_chemical_name("sample-d\\result") is False
+        assert extractor._is_valid_chemical_name("compound injected here") is False
+        assert extractor._is_valid_chemical_name("compound response factor test") is False
+        assert extractor._is_valid_chemical_name("value and units") is False
+        assert extractor._is_valid_chemical_name("Standard ran? (y/n) test") is False
+
+    def test_is_valid_chemical_name_formula_pattern(self) -> None:
+        """Test formula/equation strings are rejected (line 194)."""
+        extractor = StandardsExtractor()
+        # Pattern: *x + (equations like y = 2*x + 5)
+        assert extractor._is_valid_chemical_name("y = 2*x + 5") is False
+        assert extractor._is_valid_chemical_name("slope*x + intercept") is False
+        assert extractor._is_valid_chemical_name("m*x  +  b") is False
+
     def test_is_valid_chemical_name_pure_numbers(self) -> None:
         """Test pure number strings are rejected."""
         extractor = StandardsExtractor()
@@ -325,6 +344,34 @@ class TestStandardsExtractorProcessMethods:
         assert "Response Factors" in extractor.file_stats
         assert extractor.file_stats["Response Factors"]["extracted"] == 0
 
+    def test_process_response_factors_empty_chem_values(self, tmp_path: Path) -> None:
+        """Test response factors with empty chemical values (branch 354->352)."""
+        wb = _create_workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.cell(row=1, column=1, value="Chemical Name")
+        ws.cell(row=1, column=2, value="Density (g/mL)")
+        # Row with empty chemical name - triggers the `if chem:` false branch
+        ws.cell(row=2, column=1, value="")
+        ws.cell(row=2, column=2, value="0.85")
+        # Row with None chemical name
+        ws.cell(row=3, column=1, value=None)
+        ws.cell(row=3, column=2, value="0.90")
+        # Row with valid chemical
+        ws.cell(row=4, column=1, value="Limonene")
+        ws.cell(row=4, column=2, value="0.84")
+
+        file_path = tmp_path / "response_factors.xlsx"
+        wb.save(file_path)
+        wb.close()
+
+        extractor = StandardsExtractor()
+        extractor._process_response_factors(file_path)
+
+        assert "Response Factors" in extractor.file_stats
+        # Only the valid Limonene should be extracted
+        assert extractor.file_stats["Response Factors"]["extracted"] >= 1
+
     def test_process_chiral_standards(self, tmp_path: Path) -> None:
         """Test processing chiral standards file."""
         wb = _create_workbook()
@@ -360,6 +407,34 @@ class TestStandardsExtractorProcessMethods:
 
         assert "ChiralStandards" in extractor.file_stats
         assert extractor.file_stats["ChiralStandards"]["extracted"] == 0
+
+    def test_process_chiral_standards_empty_compound_values(self, tmp_path: Path) -> None:
+        """Test chiral standards with empty Compound values (branch 754->753)."""
+        wb = _create_workbook()
+        ws = wb.active
+        ws.title = "Retention Times"
+        ws.cell(row=1, column=1, value="Compound")
+        ws.cell(row=1, column=2, value="RT")
+        # Row with empty compound - triggers the `if val:` false branch
+        ws.cell(row=2, column=1, value="")
+        ws.cell(row=2, column=2, value=1.5)
+        # Row with None compound
+        ws.cell(row=3, column=1, value=None)
+        ws.cell(row=3, column=2, value=2.5)
+        # Row with valid compound
+        ws.cell(row=4, column=1, value="(R)-Limonene")
+        ws.cell(row=4, column=2, value=3.5)
+
+        file_path = tmp_path / "chiral.xlsx"
+        wb.save(file_path)
+        wb.close()
+
+        extractor = StandardsExtractor()
+        extractor._process_chiral_standards(file_path)
+
+        assert "ChiralStandards" in extractor.file_stats
+        # Only the valid (R)-Limonene should be extracted
+        assert extractor.file_stats["ChiralStandards"]["extracted"] >= 1
 
     def test_process_standards_and_cals(self, tmp_path: Path) -> None:
         """Test processing standards and cals file."""
@@ -397,6 +472,34 @@ class TestStandardsExtractorProcessMethods:
 
         assert "StandardsAndCals" in extractor.file_stats
         assert extractor.file_stats["StandardsAndCals"]["extracted"] == 0
+
+    def test_process_standards_and_cals_empty_mixture_values(self, tmp_path: Path) -> None:
+        """Test standards and cals with empty mixture values (branch 723->722)."""
+        wb = _create_workbook()
+        ws = wb.active
+        ws.title = "Work list"
+        ws.cell(row=1, column=1, value="Mixture Arrangment")
+        ws.cell(row=1, column=2, value="Notes")
+        # Row with empty mixture - triggers the `if val:` false branch
+        ws.cell(row=2, column=1, value="")
+        ws.cell(row=2, column=2, value="empty entry")
+        # Row with None mixture
+        ws.cell(row=3, column=1, value=None)
+        ws.cell(row=3, column=2, value="null entry")
+        # Row with valid mixture
+        ws.cell(row=4, column=1, value="Limonene / Pinene")
+        ws.cell(row=4, column=2, value="valid entry")
+
+        file_path = tmp_path / "standards.xlsx"
+        wb.save(file_path)
+        wb.close()
+
+        extractor = StandardsExtractor()
+        extractor._process_standards_and_cals(file_path)
+
+        assert "StandardsAndCals" in extractor.file_stats
+        # Only the valid mixture should result in extractions
+        assert extractor.file_stats["StandardsAndCals"]["extracted"] >= 1
 
     def test_process_jasmine_2024(self, tmp_path: Path) -> None:
         """Test processing Jasmine 2024 file."""
@@ -801,6 +904,37 @@ class TestProcessAvisaCalc:
         extractor._process_avisa_calc(file_path)
 
         assert "Avisa Calc" in extractor.file_stats
+
+    def test_process_avisa_calc_empty_and_short_compound_values(self, tmp_path: Path) -> None:
+        """Test avisa calc with empty and short compound values (branch 533->530)."""
+        wb = _create_workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.cell(row=1, column=1, value="compound")
+        ws.cell(row=1, column=2, value="amount")
+        # Row with empty compound - triggers the `if val and len(val.strip()) > 2` false branch
+        ws.cell(row=2, column=1, value="")
+        ws.cell(row=2, column=2, value=100)
+        # Row with short compound (<= 2 chars after strip)
+        ws.cell(row=3, column=1, value="ab")
+        ws.cell(row=3, column=2, value=200)
+        # Row with whitespace only
+        ws.cell(row=4, column=1, value="   ")
+        ws.cell(row=4, column=2, value=300)
+        # Row with valid compound
+        ws.cell(row=5, column=1, value="Limonene")
+        ws.cell(row=5, column=2, value=400)
+
+        file_path = tmp_path / "avisa_calc.xlsx"
+        wb.save(file_path)
+        wb.close()
+
+        extractor = StandardsExtractor()
+        extractor._process_avisa_calc(file_path)
+
+        assert "Avisa Calc" in extractor.file_stats
+        # Only the valid Limonene should be extracted
+        assert extractor.file_stats["Avisa Calc"]["extracted"] >= 1
 
 
 class TestProcess8mix:

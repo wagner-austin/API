@@ -6,12 +6,12 @@ SHELL := powershell.exe
 # Lint: venv cleanup, guards, Ruff, Mypy (run from repo root)
 lint:
 	# Clean stale venv if mypy not runnable; do not fail
-	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; poetry env remove --all | Out-Null }; exit 0
-	# Run guard module entry (no fallbacks)
-	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
-	# Ensure dependencies (including type hints) are installed before type checking
+	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
+	# Ensure dependencies are installed before guards (guards may import project modules)
 	poetry lock
 	poetry install --with dev
+	# Run guard module entry (no fallbacks)
+	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE } }
 	# Ruff format first (fixes line length), then check, then Mypy
 	poetry run ruff format .
 	poetry run ruff check . --fix
