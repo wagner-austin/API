@@ -14,6 +14,11 @@ packages = [
 readme = "README.md"
 include = ["src/covenant_radar_api/py.typed"]
 
+[[tool.poetry.source]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.124"

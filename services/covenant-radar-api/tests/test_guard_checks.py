@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from pytest import raises
+
 from scripts import guard as guard_mod
 
 
