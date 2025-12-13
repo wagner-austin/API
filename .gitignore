@@ -55,6 +55,9 @@ Thumbs.db
 # Claude Code
 .claude/
 
+# Gemini
+.gemini/
+
 # Data directories (each service manages its own)
 **/data/
 **/datasets/
