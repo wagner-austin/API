@@ -96,6 +96,7 @@ def test_train_epoch_smoke_with_fake_data() -> None:
         model,
         loader,
         device,
+        "fp32",
         optimizer,
         ep=1,
         ep_total=1,

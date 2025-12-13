@@ -143,6 +143,7 @@ def _rebuild_preprocess_dataset(base: MNISTLike, knobs: _AugmentKnobs) -> Prepro
         "weight_decay": 0.01,
         "seed": 42,
         "device": "cpu",
+        "precision": "fp32",
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 10,

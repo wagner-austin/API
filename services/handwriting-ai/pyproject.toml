@@ -16,8 +16,8 @@ readme = "README.md"
 include = ["src/handwriting_ai/py.typed"]
 
 [[tool.poetry.source]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
 priority = "explicit"
 
 [tool.poetry.dependencies]
@@ -28,9 +28,9 @@ Pillow = "^10.4.0"
 numpy = ">=1.26,<3"
 python-multipart = "^0.0.20"
 typing-extensions = "^4.12.2"
-# Torch CPU only (explicit CPU wheels)
-torch = {version = "==2.4.1+cpu", source = "pytorch-cpu", markers = "platform_system != 'Darwin' or platform_machine != 'arm64'"}
-torchvision = {version = "==0.19.1+cpu", source = "pytorch-cpu", markers = "platform_system != 'Darwin' or platform_machine != 'arm64'"}
+# Torch CUDA 12.4 (explicit CUDA wheels for GPU support)
+torch = {version = "^2.5", source = "pytorch-cu124"}
+torchvision = {version = "^0.20", source = "pytorch-cu124"}
 redis = "^7.1"
 rq = "^2.3"
 httpx = "^0.28"

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from PIL import Image
-from platform_core.torch_types import (
+from platform_ml.torch_types import (
     ThreadConfig,
     configure_torch_threads,
     set_manual_seed,

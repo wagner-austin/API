@@ -111,6 +111,7 @@ def test_train_epoch_raises_on_memory_guard() -> None:
             model,
             loader,
             torch.device("cpu"),
+            "fp32",
             opt,
             ep=1,
             ep_total=1,

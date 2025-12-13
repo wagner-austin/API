@@ -29,6 +29,7 @@ def test_process_train_job_invokes_decoder_with_dict() -> None:
                 "lr": 0.01,
                 "seed": 1,
                 "device": "cpu",
+                "precision": "fp32",
                 "optim": "adamw",
                 "scheduler": "none",
                 "augment": False,

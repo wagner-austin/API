@@ -77,6 +77,7 @@ def test_train_epoch_emits_last_batch() -> None:
         model=model,
         train_loader=data,
         device=device,
+        precision="fp32",
         optimizer=opt,
         ep=1,
         ep_total=1,

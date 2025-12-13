@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Literal, Protocol
 
 import torch
 import torch.nn.functional as functional
@@ -49,6 +49,7 @@ def train_epoch(
     model: Module,
     train_loader: _BatchLoader,
     device: torch.device,
+    precision: Literal["fp32", "fp16", "bf16"],
     optimizer: Optimizer,
     *,
     ep: int,
@@ -63,6 +64,12 @@ def train_epoch(
     loss_sum = 0.0
     batch_idx: int = 0
     batch: tuple[Tensor, Tensor]
+
+    # Precision setup: fp16 on CUDA uses GradScaler, bf16 and fp32 do not
+    use_fp16_scaler = precision == "fp16" and device.type == "cuda"
+    autocast_ctx = _test_hooks.get_autocast_context(precision, device)
+    scaler = _test_hooks.create_grad_scaler() if use_fp16_scaler else None
+
     for batch_idx, batch in enumerate(train_loader):
         t0 = _time.perf_counter()
         x: Tensor = batch[0]
@@ -70,10 +77,26 @@ def train_epoch(
         x = x.to(device)
         y = y.to(device)
         optimizer.zero_grad(set_to_none=True)
-        logits: Tensor = model(x)
-        loss: Tensor = functional.cross_entropy(logits, y)
-        torch.autograd.backward((loss,))
-        optimizer.step()
+
+        # Forward pass with autocast (no-op for fp32 or CPU)
+        with autocast_ctx:
+            logits: Tensor = model(x)
+            loss: Tensor = functional.cross_entropy(logits, y)
+
+        # Backward pass: scaled for fp16, standard for fp32/bf16
+        if scaler is not None:
+            scaled_loss = scaler.scale(loss)
+            torch.autograd.backward((scaled_loss,))
+            scaler.unscale_(optimizer)
+        else:
+            torch.autograd.backward((loss,))
+
+        # Optimizer step: through scaler for fp16, standard otherwise
+        if scaler is not None:
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            optimizer.step()
         # Proactive memory guard: check every batch (not only on log cadence)
         if _test_hooks.on_batch_check():
             log.info("mem_guard_abort e=%s b=%s", ep, (batch_idx + 1))

@@ -3,6 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+from platform_ml import (
+    RequestedDevice,
+    RequestedPrecision,
+    ResolvedDevice,
+    ResolvedPrecision,
+)
 from torch import Tensor
 
 
@@ -14,7 +20,8 @@ class TrainingResultMetadata(TypedDict):
     batch_size: int
     lr: float
     seed: int
-    device: str
+    device: ResolvedDevice
+    precision: ResolvedPrecision
     optim: str
     scheduler: str
     augment: bool
@@ -41,7 +48,8 @@ class TrainConfig(TypedDict):
     lr: float
     weight_decay: float
     seed: int
-    device: str
+    device: RequestedDevice
+    precision: RequestedPrecision
     optim: str
     scheduler: str
     step_size: int
@@ -79,7 +87,8 @@ def default_train_config(
     lr: float = 1e-3,
     weight_decay: float = 1e-2,
     seed: int = 0,
-    device: str = "cpu",
+    device: RequestedDevice = "auto",
+    precision: RequestedPrecision = "auto",
     optim: str = "adamw",
     scheduler: str = "none",
     step_size: int = 10,
@@ -121,6 +130,7 @@ def default_train_config(
         weight_decay=weight_decay,
         seed=seed,
         device=device,
+        precision=precision,
         optim=optim,
         scheduler=scheduler,
         step_size=step_size,

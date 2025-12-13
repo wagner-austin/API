@@ -54,3 +54,14 @@ def test_torch_allocator_stats_cuda_branch() -> None:
     assert allocated == 123456
     assert reserved == 234567
     assert max_alloc == 345678
+
+
+def test_torch_allocator_stats_cuda_unavailable() -> None:
+    """Test the CUDA unavailable branch explicitly via hook."""
+    _test_hooks.torch_cuda_is_available = lambda: False
+
+    available, allocated, reserved, max_alloc = torch_allocator_stats()
+    assert available is False
+    assert allocated == 0
+    assert reserved == 0
+    assert max_alloc == 0

@@ -10,6 +10,7 @@ import pytest
 from platform_core.config import _test_hooks as config_test_hooks
 from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.testing import make_fake_env
+from platform_ml import torch_types as platform_ml_torch_types
 from platform_workers.rq_harness import _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
 
@@ -228,6 +229,13 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     # Store original values - training progress module hook
     original_get_training_progress_module = _test_hooks.get_training_progress_module
 
+    # Store original values - platform_ml torch hooks (for device resolution)
+    original_platform_ml_import_torch = platform_ml_torch_types._import_torch
+
+    # Store original values - mixed-precision training hooks
+    original_get_autocast_context = _test_hooks.get_autocast_context
+    original_create_grad_scaler = _test_hooks.create_grad_scaler
+
     yield
 
     # Restore original values - platform hooks
@@ -364,6 +372,13 @@ def _reset_test_hooks() -> Generator[None, None, None]:
 
     # Restore original values - training progress module hook
     _test_hooks.get_training_progress_module = original_get_training_progress_module
+
+    # Restore original values - platform_ml torch hooks
+    platform_ml_torch_types._import_torch = original_platform_ml_import_torch
+
+    # Restore original values - mixed-precision training hooks
+    _test_hooks.get_autocast_context = original_get_autocast_context
+    _test_hooks.create_grad_scaler = original_create_grad_scaler
 
 
 # =============================================================================

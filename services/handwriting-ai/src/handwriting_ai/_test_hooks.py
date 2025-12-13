@@ -24,8 +24,8 @@ from collections.abc import Callable, Generator, Sequence
 from concurrent.futures import Future
 from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
-from types import ModuleType
-from typing import BinaryIO, Protocol, Self, TextIO, TypedDict
+from types import ModuleType, TracebackType
+from typing import BinaryIO, Literal, Protocol, Self, TextIO, TypedDict
 
 # Third-party imports
 import psutil
@@ -2055,6 +2055,7 @@ class TrainEpochProtocol(Protocol):
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
+        precision: Literal["fp32", "fp16", "bf16"],
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
@@ -2066,6 +2067,7 @@ def _default_train_epoch(
     model: TorchModule,
     train_loader: BatchLoaderProtocol,
     device: torch.device,
+    precision: Literal["fp32", "fp16", "bf16"],
     optimizer: TorchOptimizer,
     ep: int,
     ep_total: int,
@@ -2078,6 +2080,7 @@ def _default_train_epoch(
         model,
         train_loader,
         device,
+        precision,
         optimizer,
         ep=ep,
         ep_total=ep_total,
@@ -2451,3 +2454,93 @@ def inject_no_flush_handler(log: stdlib_logging.Logger) -> None:
     code = compile("log.handlers.append(handler)", "<test>", "exec")
     globs: dict[str, stdlib_logging.Logger | _MinimalHandler] = {"log": log, "handler": handler}
     exec(code, globs)
+
+
+# =============================================================================
+# Mixed-precision training hooks (used by training/loops.py)
+# =============================================================================
+
+
+class GradScalerProtocol(Protocol):
+    """Protocol for torch.amp.GradScaler."""
+
+    def scale(self, loss: torch.Tensor) -> torch.Tensor: ...
+
+    def unscale_(self, optimizer: TorchOptimizer) -> None: ...
+
+    def step(self, optimizer: TorchOptimizer) -> None: ...
+
+    def update(self) -> None: ...
+
+
+class AutocastContextProtocol(Protocol):
+    """Protocol for autocast context manager."""
+
+    def __enter__(self) -> None: ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
+
+
+class GetAutocastContextProtocol(Protocol):
+    """Protocol for get_autocast_context function."""
+
+    def __call__(
+        self, precision: Literal["fp32", "fp16", "bf16"], device: torch.device
+    ) -> AbstractContextManager[None]: ...
+
+
+class CreateGradScalerProtocol(Protocol):
+    """Protocol for create_grad_scaler function."""
+
+    def __call__(self) -> GradScalerProtocol: ...
+
+
+def _default_get_autocast_context(
+    precision: Literal["fp32", "fp16", "bf16"], device: torch.device
+) -> AbstractContextManager[None]:
+    """Production implementation - get autocast context based on precision and device.
+
+    Args:
+        precision: The precision to use ("fp32", "fp16", "bf16").
+        device: The device (cpu or cuda).
+
+    Returns:
+        A context manager for autocast, or nullcontext for fp32.
+
+    Note:
+        By the time this is called, precision has been validated by resolve_precision.
+        fp16/bf16 on CPU raises in resolve_precision, so we only reach here with CUDA.
+    """
+    from contextlib import nullcontext as _nullcontext
+
+    if precision == "fp32":
+        return _nullcontext()
+    # fp16/bf16 requires CUDA - resolve_precision enforces this upstream
+    # Get autocast from torch.amp (PyTorch 2.0+ API)
+    torch_amp = __import__("torch.amp", fromlist=["autocast"])
+    dtype = torch.float16 if precision == "fp16" else torch.bfloat16
+    ctx: AbstractContextManager[None] = torch_amp.autocast(device_type=device.type, dtype=dtype)
+    return ctx
+
+
+def _default_create_grad_scaler() -> GradScalerProtocol:
+    """Production implementation - create a GradScaler for fp16 mixed precision training.
+
+    Returns:
+        A GradScaler instance for scaling gradients.
+    """
+    torch_amp = __import__("torch.amp", fromlist=["GradScaler"])
+    scaler: GradScalerProtocol = torch_amp.GradScaler()
+    return scaler
+
+
+# Hook for get_autocast_context. Tests can override to inject fakes.
+get_autocast_context: GetAutocastContextProtocol = _default_get_autocast_context
+
+# Hook for create_grad_scaler. Tests can override to inject fakes.
+create_grad_scaler: CreateGradScalerProtocol = _default_create_grad_scaler

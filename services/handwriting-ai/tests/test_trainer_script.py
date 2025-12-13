@@ -42,6 +42,7 @@ def test_preprocess_dataset_shapes() -> None:
         weight_decay=1e-2,
         seed=0,
         device="cpu",
+        precision="auto",
         optim="adamw",
         scheduler="none",
         step_size=1,

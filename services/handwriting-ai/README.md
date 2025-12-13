@@ -287,6 +287,44 @@ poetry run handwriting-rq-worker
 - **Memory Guards**: Prevent runaway memory during training
 - **Progress Events**: Publish to Redis for Discord bot integration
 - **Temperature Scaling**: Post-hoc confidence calibration
+- **GPU Acceleration**: Automatic CUDA detection and device selection
+
+### Device Selection
+
+Training automatically detects and uses CUDA GPUs when available. Device selection uses the centralized `platform_ml` library.
+
+```python
+from platform_ml import RequestedDevice, ResolvedDevice, resolve_device
+
+# In training config
+device: RequestedDevice = "auto"  # or "cpu", "cuda"
+
+# Resolved at training start
+resolved: ResolvedDevice = resolve_device(device)  # "cuda" or "cpu"
+```
+
+| Device Config | Result |
+|---------------|--------|
+| `"auto"` | Uses CUDA if available, otherwise CPU |
+| `"cuda"` | Forces CUDA (fails if unavailable) |
+| `"cpu"` | Forces CPU (useful for debugging) |
+
+**Training Job with Device:**
+
+```json
+{
+  "type": "digits.train.v1",
+  "request_id": "uuid",
+  "user_id": 12345,
+  "model_id": "mnist_resnet18_v2",
+  "device": "auto",
+  "epochs": 10,
+  "batch_size": 64,
+  "lr": 0.001,
+  "seed": 42,
+  "augment": true
+}
+```
 
 ### Augmentation Options
 
@@ -516,6 +554,7 @@ railway up
 | `redis` | Job queue backend |
 | `rq` | Background job processing |
 | `platform-core` | Logging, errors, config |
+| `platform-ml` | Device selection, ML utilities |
 | `platform-workers` | RQ worker harness |
 | `platform-discord` | Discord integration |
 

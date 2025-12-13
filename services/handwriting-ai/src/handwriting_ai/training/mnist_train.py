@@ -6,6 +6,7 @@ from typing import Protocol
 
 import torch
 from platform_core.logging import get_logger, setup_logging
+from platform_ml import ResolvedDevice, ResolvedPrecision, resolve_device, resolve_precision
 from torch import Tensor
 from torch.nn import Module
 from torch.optim.lr_scheduler import LRScheduler
@@ -57,6 +58,7 @@ def _run_training_loop(
     train_loader: DataLoader[tuple[Tensor, Tensor]],
     test_loader: DataLoader[tuple[Tensor, Tensor]],
     device: torch.device,
+    precision: ResolvedPrecision,
     cfg: TrainConfig,
     optimizer: Optimizer,
     scheduler: LRScheduler | None,
@@ -76,6 +78,7 @@ def _run_training_loop(
             model,
             train_loader,
             device,
+            precision,
             optimizer,
             ep=ep,
             ep_total=cfg["epochs"],
@@ -148,7 +151,9 @@ def _train_epoch(
     model: Module,
     train_loader: DataLoader[tuple[Tensor, Tensor]],
     device: torch.device,
+    precision: ResolvedPrecision,
     optimizer: Optimizer,
+    *,
     ep: int,
     ep_total: int,
     total_batches: int,
@@ -157,6 +162,7 @@ def _train_epoch(
         model,
         train_loader,
         device,
+        precision,
         optimizer,
         ep=ep,
         ep_total=ep_total,
@@ -177,7 +183,11 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
     _test_hooks.log_system_info()
     log = get_logger("handwriting_ai")
     _set_seed(cfg["seed"])
-    device = torch.device(cfg["device"])
+    # Resolve device once at training start ("auto" -> concrete device)
+    resolved_device: ResolvedDevice = resolve_device(cfg["device"])
+    device = torch.device(resolved_device)
+    # Resolve precision based on device ("auto" -> fp16 on CUDA, fp32 on CPU)
+    resolved_precision: ResolvedPrecision = resolve_precision(cfg["precision"], resolved_device)
     # Compute initial effective configuration
     ec, limits = build_effective_config(cfg)
 
@@ -226,7 +236,7 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
             )
         else:
             log.info(f"threads_configured requested={cfg['threads']} intra={intra}")
-        log.info(f"device={device}")
+        log.info(f"device={device} precision={resolved_precision}")
 
         # DataLoader configuration from resource limits
         loader_cfg = ec["loader_cfg"]
@@ -245,13 +255,14 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
         # Limit OpenMP/BLAS thread pools alongside ATen threads
         with _test_hooks.limit_thread_pools(limits=ec["intra_threads"]):
             model = _build_model()
+            model = model.to(device)
             log.info("model_built_starting_training")
             opt, sch = _build_optimizer_and_scheduler(model, cfg)
             best_sd: dict[str, Tensor] | None = None
             best_val: float = -1.0
             try:
                 best_sd, best_val = _run_training_loop(
-                    model, train_loader, test_loader, device, cfg, opt, sch
+                    model, train_loader, test_loader, device, resolved_precision, cfg, opt, sch
                 )
             except KeyboardInterrupt as exc:
                 get_logger("handwriting_ai").error("training_interrupted_by_user error=%s", exc)
@@ -281,7 +292,8 @@ def train_with_config(cfg: TrainConfig, bases: tuple[MNISTLike, MNISTLike]) -> T
             "batch_size": persist_bs,
             "lr": float(cfg["lr"]),
             "seed": int(cfg["seed"]),
-            "device": str(cfg["device"]),
+            "device": resolved_device,
+            "precision": resolved_precision,
             "optim": str(cfg["optim"]),
             "scheduler": str(cfg["scheduler"]),
             "augment": bool(cfg["augment"]),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import pytest
 import torch
@@ -155,6 +155,7 @@ def test_make_loaders_and_train_epoch_augment(tmp_path: Path) -> None:
         model,
         train_loader,
         torch.device("cpu"),
+        "fp32",
         opt,
         ep=1,
         ep_total=1,
@@ -230,11 +231,13 @@ def test_train_interrupt_saves_artifact(tmp_path: Path, write_mnist_raw: MnistRa
         model: Module,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
+        precision: Literal["fp32", "fp16", "bf16"],
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
+        _ = precision  # unused in fake
         raise KeyboardInterrupt
 
     # Use hook to override train_epoch behavior

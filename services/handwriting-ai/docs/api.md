@@ -241,8 +241,16 @@ Enqueue a new model training job for background processing.
 | `batch_size` | int | Yes | - | Training batch size |
 | `lr` | float | Yes | - | Learning rate |
 | `seed` | int | Yes | - | Random seed for reproducibility |
+| `device` | string | No | `"auto"` | Device selection: `"cpu"`, `"cuda"`, or `"auto"` |
 | `augment` | bool | No | `false` | Enable data augmentation |
 | `notes` | string | No | `null` | Optional notes about this training run |
+
+**Device Selection:**
+- `"auto"` (default): Uses CUDA if available, otherwise CPU
+- `"cuda"`: Forces CUDA (fails if unavailable)
+- `"cpu"`: Forces CPU (useful for debugging or resource constraints)
+
+Device resolution uses the centralized `platform_ml` library.
 
 **Request Example:**
 ```json
@@ -253,6 +261,7 @@ Enqueue a new model training job for background processing.
   "batch_size": 64,
   "lr": 0.001,
   "seed": 42,
+  "device": "auto",
   "augment": true,
   "notes": "Experiment with augmentation"
 }
@@ -297,6 +306,7 @@ curl -X POST http://localhost:8000/api/v1/training/jobs \
     "batch_size": 64,
     "lr": 0.001,
     "seed": 42,
+    "device": "auto",
     "augment": true
   }'
 ```

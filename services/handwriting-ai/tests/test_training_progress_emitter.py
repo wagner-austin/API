@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import pytest
 import torch
@@ -108,11 +108,13 @@ def test_progress_emitter_receives_epoch_updates(
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
+        precision: Literal["fp32", "fp16", "bf16"],
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
+        _ = precision  # unused in fake
         return 0.0
 
     _test_hooks.train_epoch = _ok_train_epoch
@@ -148,11 +150,13 @@ def test_progress_emitter_failure_raises_after_logging(
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
+        precision: Literal["fp32", "fp16", "bf16"],
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
+        _ = precision  # unused in fake
         return 0.0
 
     _test_hooks.train_epoch = _ok_train_epoch
@@ -222,11 +226,13 @@ def test_progress_emitter_every_n_epochs(tmp_path: Path, write_mnist_raw: MnistR
         model: TorchModule,
         train_loader: BatchLoaderProtocol,
         device: torch.device,
+        precision: Literal["fp32", "fp16", "bf16"],
         optimizer: TorchOptimizer,
         ep: int,
         ep_total: int,
         total_batches: int,
     ) -> float:
+        _ = precision  # unused in fake
         return 0.0
 
     _test_hooks.train_epoch = _ok_train_epoch

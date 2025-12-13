@@ -62,6 +62,7 @@ def _mk_ds(n: int = 32, *, sleep_s: float = 0.0, fail: bool = False) -> Preproce
         "weight_decay": 0.01,
         "seed": 42,
         "device": "cpu",
+        "precision": "auto",
         "optim": "adamw",
         "scheduler": "none",
         "step_size": 10,
