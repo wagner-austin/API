@@ -6,7 +6,7 @@
 # Lint: venv cleanup, guards, Ruff, Mypy
 lint:
 	# Clean stale venv if mypy not runnable; do not fail
-	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; poetry env remove --all | Out-Null }; exit 0
+	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
 	# Ensure dependencies (including type hints) are installed before type checking
 	poetry lock
 	poetry install --with dev
