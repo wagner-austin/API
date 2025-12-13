@@ -33,6 +33,11 @@ covenant-domain = { path = "../../libs/covenant_domain", develop = true }
 covenant-ml = { path = "../../libs/covenant_ml", develop = true }
 covenant-persistence = { path = "../../libs/covenant_persistence", develop = true }
 
+[[tool.poetry.source]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+priority = "explicit"
+
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
 pytest-asyncio = "^1.3.0"
