@@ -66,6 +66,19 @@ _TRAIN_EXTERNAL_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
             },
         },
     },
+    400: {
+        "description": "Invalid configuration",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "Split ratios must sum to 1.0",
+                    }
+                }
+            }
+        },
+    },
 }
 
 _MODEL_INFO_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
