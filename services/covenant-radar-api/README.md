@@ -435,12 +435,25 @@ This creates 12 sample deals (6 safe, 6 risky) with covenants, measurements, and
 
 ## ML Model Training
 
+### GPU Training
+
+XGBoost supports GPU acceleration via the `device` parameter:
+- `"cpu"` - Force CPU training
+- `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
+- `"auto"` - Auto-detect: uses GPU if available, falls back to CPU (default)
+
+### Class Imbalance Handling
+
+The `scale_pos_weight` parameter handles imbalanced classes (few bankruptcies vs many healthy companies):
+- If omitted, auto-calculated as `(n_negative / n_positive)` from training data
+- Returned in job result so you can see what value was used
+
 ### Train on Internal Data
 
 Train an XGBoost model on seeded deal/measurement data:
 
 ```bash
-# Trigger training job
+# Trigger training job (GPU auto-detect, auto class balancing)
 curl -X POST http://localhost:8007/ml/train \
   -H "Content-Type: application/json" \
   -d '{
@@ -453,7 +466,8 @@ curl -X POST http://localhost:8007/ml/train \
     "train_ratio": 0.7,
     "val_ratio": 0.15,
     "test_ratio": 0.15,
-    "early_stopping_rounds": 10
+    "early_stopping_rounds": 10,
+    "device": "auto"
   }'
 # {"job_id": "uuid", "status": "queued"}
 
@@ -465,6 +479,7 @@ curl http://localhost:8007/ml/jobs/{job_id}
 #   "result": {
 #     "model_id": "model-2024-01-15",
 #     "best_val_auc": 0.89,
+#     "scale_pos_weight": 14.5,
 #     "test_metrics": {"auc": 0.87, "accuracy": 0.82, ...},
 #     ...
 #   }
@@ -476,7 +491,7 @@ curl http://localhost:8007/ml/jobs/{job_id}
 Train on real-world bankruptcy datasets. XGBoost automatically determines which features are most predictive:
 
 ```bash
-# Train on Taiwan bankruptcy data (95 financial ratios)
+# Train on Taiwan bankruptcy data (GPU, auto class balancing)
 curl -X POST http://localhost:8007/ml/train-external \
   -H "Content-Type: application/json" \
   -d '{
@@ -486,7 +501,8 @@ curl -X POST http://localhost:8007/ml/train-external \
     "n_estimators": 100,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
-    "random_state": 42
+    "random_state": 42,
+    "device": "auto"
   }'
 
 # Poll for results with feature importance ranking
@@ -494,6 +510,7 @@ curl http://localhost:8007/ml/jobs/{job_id}
 # {
 #   "result": {
 #     "test_metrics": {"auc": 0.93, ...},
+#     "scale_pos_weight": 29.99,
 #     "feature_importances": [
 #       {"name": "X6", "importance": 0.18, "rank": 1},
 #       {"name": "X1", "importance": 0.09, "rank": 2},
@@ -505,8 +522,8 @@ curl http://localhost:8007/ml/jobs/{job_id}
 
 **Available Datasets:**
 - `taiwan` - Taiwan bankruptcy data (6,819 samples, 95 features)
-- `us` - US bankruptcy data
-- `polish` - Polish bankruptcy data
+- `us` - US bankruptcy data (78,682 samples, 18 features)
+- `polish` - Polish bankruptcy data (7,027 samples, 64 features)
 
 ### Predict Breach Risk
 

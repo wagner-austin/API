@@ -230,9 +230,9 @@ def run_external_training(
         feature_names=dataset["feature_names"],
     )
 
-    # Copy to active.ubj
+    # Copy to active.ubj (use copyfile to avoid permission issues on Docker volumes)
     active_model_path = output_dir / "active.ubj"
-    shutil.copy(outcome["model_path"], active_model_path)
+    shutil.copyfile(outcome["model_path"], active_model_path)
 
     # Log top features
     top_features = outcome["feature_importances"][:10]
@@ -260,6 +260,7 @@ def run_external_training(
         "samples_val": outcome["samples_val"],
         "samples_test": outcome["samples_test"],
         "n_features": dataset["n_features"],
+        "scale_pos_weight": outcome["scale_pos_weight_computed"],
         "best_val_auc": outcome["best_val_auc"],
         "best_round": outcome["best_round"],
         "total_rounds": outcome["total_rounds"],

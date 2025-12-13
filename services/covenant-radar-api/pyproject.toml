@@ -14,11 +14,6 @@ packages = [
 readme = "README.md"
 include = ["src/covenant_radar_api/py.typed"]
 
-[[tool.poetry.source]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
-priority = "explicit"
-
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.124"
@@ -34,7 +29,6 @@ scikit-learn = "^1.7"
 # Monorepo libs
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
-platform-ml = { path = "../../libs/platform_ml", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
 covenant-ml = { path = "../../libs/covenant_ml", develop = true }
 covenant-persistence = { path = "../../libs/covenant_persistence", develop = true }

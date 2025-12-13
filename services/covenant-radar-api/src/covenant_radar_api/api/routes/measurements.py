@@ -31,7 +31,11 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
     router = APIRouter(prefix="/measurements", tags=["measurements"])
 
     def _list_measurements_for_deal(deal_id: str) -> Response:
-        """List all measurements for a specific deal."""
+        """List all financial measurements for a deal.
+
+        Returns array of Measurement objects with deal_id, period_start_iso,
+        period_end_iso, metric_name, and metric_value_scaled.
+        """
         repo = get_container.measurement_repo()
         id_obj = DealId(value=deal_id)
         measurements: Sequence[Measurement] = repo.list_for_deal(id_obj)
@@ -46,7 +50,11 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         period_start: str,
         period_end: str,
     ) -> Response:
-        """List measurements for a deal and period."""
+        """List measurements for a deal within a specific period.
+
+        Query params: period_start (YYYY-MM-DD), period_end (YYYY-MM-DD).
+        Returns measurements where the period matches exactly.
+        """
         repo = get_container.measurement_repo()
         id_obj = DealId(value=deal_id)
         measurements: Sequence[Measurement] = repo.list_for_deal_and_period(
@@ -59,7 +67,12 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _add_measurements(request: Request) -> Response:
-        """Add new measurements for a deal."""
+        """Add financial measurements for deals.
+
+        Request body: {"measurements": [...]} with each measurement containing
+        deal_id, period_start_iso, period_end_iso, metric_name, metric_value_scaled.
+        Returns 201 with {"count": N} indicating measurements added.
+        """
         body_bytes = await request.body()
         measurements = parse_measurements_request(body_bytes)
         repo = get_container.measurement_repo()

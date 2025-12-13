@@ -22,6 +22,7 @@ from covenant_persistence import (
     PostgresCovenantResultRepository,
     PostgresDealRepository,
     PostgresMeasurementRepository,
+    ensure_schema,
 )
 from platform_core.json_utils import JSONValue
 from platform_core.queues import COVENANT_QUEUE
@@ -154,6 +155,8 @@ class ServiceContainer:
         database_url = settings["database_url"]
         redis: RedisStrProto = _test_hooks.kv_factory(redis_url)
         db_conn = _test_hooks.connection_factory(database_url)
+        # Ensure database schema exists (safe to call multiple times)
+        ensure_schema(db_conn)
         redis_rq = _test_hooks.rq_client_factory(redis_url)
         output_dir = (
             model_output_dir

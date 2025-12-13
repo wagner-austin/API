@@ -49,7 +49,6 @@ COPY --from=builder /workspace/libs /workspace/libs
 RUN pip install /workspace/dist/*.whl \
     /workspace/libs/platform_core \
     /workspace/libs/platform_workers \
-    /workspace/libs/platform_ml \
     /workspace/libs/covenant_domain \
     /workspace/libs/covenant_ml \
     /workspace/libs/covenant_persistence \

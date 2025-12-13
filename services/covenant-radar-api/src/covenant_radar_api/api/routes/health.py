@@ -27,9 +27,21 @@ def build_router(get_container: HealthContainerProtocol) -> APIRouter:
     router = APIRouter()
 
     def _healthz() -> HealthResponse:
+        """Liveness probe for container orchestration.
+
+        Returns {"status": "ok"} if the service is running.
+        Use this endpoint for Kubernetes liveness probes.
+        """
         return healthz_endpoint()
 
     def _readyz(resp: Response) -> ReadyResponse:
+        """Readiness probe checking Redis connectivity and worker availability.
+
+        Returns 200 with {"status": "ready"} if all dependencies are healthy.
+        Returns 503 with {"status": "degraded", "reason": "..."} if:
+        - Redis is unavailable ("redis-unavailable")
+        - No RQ workers are registered ("no-worker")
+        """
         result = readyz_endpoint(redis=get_container.redis)
         if result["status"] == "degraded":
             resp.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

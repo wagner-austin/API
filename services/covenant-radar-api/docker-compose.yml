@@ -56,6 +56,13 @@ services:
     restart: unless-stopped
     networks:
       - platform-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 networks:
   platform-network:

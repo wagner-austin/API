@@ -640,9 +640,16 @@ Enqueue a model training job using internal deal/measurement data.
 | `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
 | `reg_alpha` | float | No | `0.0` | L1 regularization strength |
 | `reg_lambda` | float | No | `1.0` | L2 regularization strength |
-| `scale_pos_weight` | float | No | - | Class weight for positives |
+| `scale_pos_weight` | float | No | auto | Class weight for positives. Auto-calculated as (n_negative / n_positive) if omitted |
 
-**Request Example:**
+**Device Options:**
+- `"cpu"` - Force CPU training (slower but always available)
+- `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
+- `"auto"` - Auto-detect: uses GPU if available, falls back to CPU
+
+**Class Imbalance:** If `scale_pos_weight` is omitted, it's automatically calculated as (n_negative / n_positive) from the training data.
+
+**Request Example (GPU with auto-detect):**
 ```json
 {
   "learning_rate": 0.1,
@@ -655,10 +662,7 @@ Enqueue a model training job using internal deal/measurement data.
   "val_ratio": 0.15,
   "test_ratio": 0.15,
   "early_stopping_rounds": 10,
-  "device": "auto",
-  "reg_alpha": 0.0,
-  "reg_lambda": 1.0,
-  "scale_pos_weight": 1.5
+  "device": "auto"
 }
 ```
 
@@ -778,9 +782,21 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with automat
 | `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
 | `reg_alpha` | float | No | `0.0` | L1 regularization strength |
 | `reg_lambda` | float | No | `1.0` | L2 regularization strength |
-| `scale_pos_weight` | float | No | - | Class weight for positives |
+| `scale_pos_weight` | float | No | auto | Class weight for positives. Auto-calculated as (n_negative / n_positive) if omitted |
 
-**Request Example:**
+**Available Datasets:**
+- `taiwan`: 6,819 samples, 95 financial ratio features
+- `us`: 78,682 samples, 18 features
+- `polish`: 7,027 samples, 64 financial ratio features
+
+**Device Options:**
+- `"cpu"` - Force CPU training (slower but always available)
+- `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
+- `"auto"` - Auto-detect: uses GPU if available, falls back to CPU
+
+**Class Imbalance:** If `scale_pos_weight` is omitted, it's automatically calculated as (n_negative / n_positive) from the training data.
+
+**Request Example (GPU with auto-detect):**
 ```json
 {
   "dataset": "taiwan",
@@ -821,6 +837,7 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
     "samples_val": 1023,
     "samples_test": 1023,
     "n_features": 95,
+    "scale_pos_weight": 29.99,
     "best_val_auc": 0.94,
     "best_round": 67,
     "total_rounds": 100,
@@ -866,6 +883,7 @@ Poll `/ml/jobs/{job_id}` to get the result with automatic feature importance ran
 |-------|------|-------------|
 | `dataset` | string | Dataset used (`taiwan`, `us`, or `polish`) |
 | `n_features` | int | Number of features in the dataset |
+| `scale_pos_weight` | float | Class weight used (auto-calculated if not provided) |
 | `feature_importances` | array | Ranked list of feature importances |
 
 **Feature Importance Fields:**

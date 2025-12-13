@@ -31,7 +31,11 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
     router = APIRouter(prefix="/covenants", tags=["covenants"])
 
     def _list_covenants_for_deal(deal_id: str) -> Response:
-        """List all covenants for a specific deal."""
+        """List all covenants attached to a specific deal.
+
+        Returns array of Covenant objects with id, deal_id, name, formula,
+        threshold_value_scaled, threshold_direction, and frequency.
+        """
         repo = get_container.covenant_repo()
         id_obj = DealId(value=deal_id)
         covenants: Sequence[Covenant] = repo.list_for_deal(id_obj)
@@ -42,7 +46,12 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _create_covenant(request: Request) -> Response:
-        """Create a new covenant."""
+        """Create a new covenant rule for a deal.
+
+        Request body requires: id, deal_id, name, formula (e.g. "total_debt / ebitda"),
+        threshold_value_scaled, threshold_direction ("<=" or ">="), frequency.
+        Returns 201 with the created Covenant object.
+        """
         body_bytes = await request.body()
         covenant = parse_covenant_request(body_bytes)
         repo = get_container.covenant_repo()
@@ -54,7 +63,10 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     def _get_covenant(covenant_id: str) -> Response:
-        """Get a covenant by ID."""
+        """Get a covenant by its UUID.
+
+        Returns the Covenant object or 404 if not found.
+        """
         repo = get_container.covenant_repo()
         id_obj = CovenantId(value=covenant_id)
         covenant = repo.get(id_obj)
@@ -64,7 +76,10 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     def _delete_covenant(covenant_id: str) -> Response:
-        """Delete a covenant by ID."""
+        """Delete a covenant by UUID.
+
+        Returns 204 No Content on success.
+        """
         repo = get_container.covenant_repo()
         id_obj = CovenantId(value=covenant_id)
         repo.delete(id_obj)

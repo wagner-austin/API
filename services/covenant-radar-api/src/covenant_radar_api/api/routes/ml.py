@@ -150,22 +150,32 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _train(request: Request) -> Response:
-        """Enqueue a model training job.
+        """Enqueue XGBoost model training job on internal deal data.
+
+        Supports GPU training via device parameter. Class imbalance is handled
+        automatically: if scale_pos_weight is omitted, it's calculated as
+        (n_negative / n_positive) from the training set.
 
         Request body:
-            learning_rate: float
-            max_depth: int
-            n_estimators: int
-            subsample: float
-            colsample_bytree: float
-            random_state: int
-            device: "cpu" | "cuda" | "auto"
-            reg_alpha: float
-            reg_lambda: float
-            scale_pos_weight: float (optional)
+            learning_rate: float - Learning rate (e.g. 0.1)
+            max_depth: int - Max tree depth (e.g. 6)
+            n_estimators: int - Number of boosting rounds (e.g. 100)
+            subsample: float - Row subsample ratio (e.g. 0.8)
+            colsample_bytree: float - Column subsample ratio (e.g. 0.8)
+            random_state: int - Random seed for reproducibility
+            train_ratio: float - Training set ratio (e.g. 0.7)
+            val_ratio: float - Validation set ratio (e.g. 0.15)
+            test_ratio: float - Test set ratio (e.g. 0.15)
+            early_stopping_rounds: int - Stop if no improvement (e.g. 10)
+            device: "cpu" | "cuda" | "auto" - "cpu" forces CPU, "cuda" forces GPU,
+                "auto" uses GPU if available (default "auto")
+            reg_alpha: float - L1 regularization (default 0.0)
+            reg_lambda: float - L2 regularization (default 1.0)
+            scale_pos_weight: float (optional) - Auto-calculated as
+                (n_negative / n_positive) if omitted
 
         Returns:
-            JSON object with job_id and status.
+            202 with {job_id, status: "queued"}. Poll /ml/jobs/{job_id} for results.
         """
         body_bytes = await request.body()
         config: TrainConfig = parse_train_request(body_bytes)
@@ -247,26 +257,35 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _train_external(request: Request) -> Response:
-        """Train on external CSV data (Taiwan/US/Polish) with automatic feature selection.
+        """Train XGBoost on external bankruptcy datasets with automatic feature selection.
 
-        XGBoost trains on ALL columns and determines which features are most important.
+        Supports GPU training via device parameter. XGBoost trains on ALL columns
+        and ranks features by importance. Class imbalance is handled automatically:
+        if scale_pos_weight is omitted, it's calculated as (n_negative / n_positive).
+
+        Available datasets:
+            - taiwan: 6,819 samples, 95 financial ratio features
+            - us: 78,682 samples, 18 features
+            - polish: 7,027 samples, 64 financial ratio features
 
         Request body:
-            dataset: "taiwan" | "us" | "polish"
-            learning_rate: float
-            max_depth: int
-            n_estimators: int
-            subsample: float
-            colsample_bytree: float
-            random_state: int
-            device: "cpu" | "cuda" | "auto" (optional, default "auto")
-            reg_alpha: float (optional, default 0.0)
-            reg_lambda: float (optional, default 1.0)
-            scale_pos_weight: float (optional)
+            dataset: "taiwan" | "us" | "polish" - Which dataset to train on
+            learning_rate: float - Learning rate (e.g. 0.1)
+            max_depth: int - Max tree depth (e.g. 6)
+            n_estimators: int - Number of boosting rounds (e.g. 100)
+            subsample: float - Row subsample ratio (e.g. 0.8)
+            colsample_bytree: float - Column subsample ratio (e.g. 0.8)
+            random_state: int - Random seed for reproducibility
+            device: "cpu" | "cuda" | "auto" - "cpu" forces CPU, "cuda" forces GPU,
+                "auto" uses GPU if available (default "auto")
+            reg_alpha: float (optional, default 0.0) - L1 regularization
+            reg_lambda: float (optional, default 1.0) - L2 regularization
+            scale_pos_weight: float (optional) - Auto-calculated as
+                (n_negative / n_positive) if omitted
 
         Returns:
-            JSON with job_id and status. Use /ml/jobs/{job_id} to get results
-            including feature_importances ranking.
+            202 with {job_id, status: "queued"}. Poll /ml/jobs/{job_id} for results
+            including feature_importances ranking and scale_pos_weight used.
         """
         body_bytes = await request.body()
         config_json = body_bytes.decode("utf-8")

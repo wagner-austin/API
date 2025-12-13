@@ -31,7 +31,11 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
     router = APIRouter(prefix="/deals", tags=["deals"])
 
     def _list_deals() -> Response:
-        """List all deals."""
+        """List all deals in the system.
+
+        Returns array of Deal objects with id, name, borrower, sector, region,
+        commitment_amount_cents, currency, and maturity_date_iso.
+        """
         repo = get_container.deal_repo()
         deals: Sequence[Deal] = repo.list_all()
         body: list[dict[str, JSONValue]] = [encode_deal(d) for d in deals]
@@ -41,7 +45,12 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _create_deal(request: Request) -> Response:
-        """Create a new deal."""
+        """Create a new loan deal.
+
+        Request body requires: id, name, borrower, sector, region,
+        commitment_amount_cents, currency, maturity_date_iso.
+        Returns 201 with the created Deal object.
+        """
         body_bytes = await request.body()
         deal = parse_deal_request(body_bytes)
         repo = get_container.deal_repo()
@@ -53,7 +62,10 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     def _get_deal(deal_id: str) -> Response:
-        """Get a deal by ID."""
+        """Get a deal by its UUID.
+
+        Returns the Deal object or 404 if not found.
+        """
         repo = get_container.deal_repo()
         id_obj = DealId(value=deal_id)
         deal = repo.get(id_obj)
@@ -63,7 +75,11 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     async def _update_deal(deal_id: str, request: Request) -> Response:
-        """Update an existing deal."""
+        """Update an existing deal by UUID.
+
+        Request body requires all deal fields (full replacement).
+        Returns the updated Deal object or 404 if not found.
+        """
         body_bytes = await request.body()
         id_obj = DealId(value=deal_id)
         deal = parse_update_deal_request(body_bytes, id_obj)
@@ -75,7 +91,10 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         )
 
     def _delete_deal(deal_id: str) -> Response:
-        """Delete a deal by ID."""
+        """Delete a deal by UUID.
+
+        Returns 204 No Content on success. Also deletes associated covenants and measurements.
+        """
         repo = get_container.deal_repo()
         id_obj = DealId(value=deal_id)
         repo.delete(id_obj)

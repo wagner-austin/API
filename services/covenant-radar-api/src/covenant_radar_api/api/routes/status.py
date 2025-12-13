@@ -77,10 +77,13 @@ def build_router(get_container: StatusContainerProtocol) -> APIRouter:
     router = APIRouter()
 
     def _status() -> Response:
-        """Get comprehensive service status.
+        """Comprehensive service status with dependency health, model info, and data counts.
 
-        Returns:
-            JSON with service info, dependency health, model info, and data counts.
+        Returns JSON with:
+        - service: Service name and version
+        - dependencies: Health status of Redis and PostgreSQL
+        - model: Active ML model info (model_id, path, is_loaded)
+        - data: Entity counts (deals)
         """
         redis_status = _check_redis(get_container.redis)
         db_status, deal_count = _check_database(get_container.deal_repo())
