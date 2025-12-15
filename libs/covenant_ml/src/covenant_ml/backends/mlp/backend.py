@@ -28,7 +28,7 @@ from platform_ml.torch_types import (
 )
 
 from ...metrics import compute_all_metrics
-from ...trainer import DataSplits, stratified_split
+from ...trainer import normalize_data_splits, stratified_split
 from ...types import (
     BackendName,
     ClassifierTrainConfig,
@@ -41,6 +41,29 @@ from ...types import (
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
 
 _log = get_logger(__name__)
+
+
+class _SplitsProtocol(Protocol):
+    """Protocol for data splits (DataSplits or NormalizedDataSplits)."""
+
+    x_train: NDArray[np.float64]
+    y_train: NDArray[np.int64]
+    x_val: NDArray[np.float64]
+    y_val: NDArray[np.int64]
+    x_test: NDArray[np.float64]
+    y_test: NDArray[np.int64]
+
+    @property
+    def n_train(self) -> int: ...
+
+    @property
+    def n_val(self) -> int: ...
+
+    @property
+    def n_test(self) -> int: ...
+
+    @property
+    def n_total(self) -> int: ...
 
 
 def _is_mlp_config(cfg: ClassifierTrainConfig) -> TypeGuard[MLPConfig]:
@@ -59,6 +82,10 @@ class _OptimizerCtor(Protocol):
 
 class _LossProto(Protocol):
     def __call__(self, logits: TensorProtocol, targets: TensorProtocol) -> TensorProtocol: ...
+
+
+class _WeightedLossCtor(Protocol):
+    def __call__(self, weight: TensorProtocol) -> _LossProto: ...
 
 
 class _LossCtor(Protocol):
@@ -195,11 +222,40 @@ class _TrainComponents(TypedDict):
     loss_fn: _LossProto
     autocast: _AutocastFactory
     scaler: _GradScalerProto | None
+    scale_pos_weight_computed: float
+
+
+def _compute_class_weight(y_train: NDArray[np.int64]) -> float:
+    """Compute scale_pos_weight from training labels.
+
+    Returns:
+        scale_pos_weight = n_negative / n_positive
+
+    Raises:
+        ValueError: If no positive samples exist
+    """
+    pos_mask: NDArray[np.bool_] = y_train == 1
+    neg_mask: NDArray[np.bool_] = y_train == 0
+    n_positive = int(np.count_nonzero(pos_mask))
+    n_negative = int(np.count_nonzero(neg_mask))
+    if n_positive == 0:
+        raise ValueError("Training set has no positive samples")
+    computed = float(n_negative) / float(n_positive)
+    _log.info(
+        "Auto-calculated scale_pos_weight",
+        extra={
+            "n_positive": n_positive,
+            "n_negative": n_negative,
+            "scale_pos_weight": computed,
+        },
+    )
+    return computed
 
 
 def _prepare_components(
     *,
     n_features: int,
+    y_train: NDArray[np.int64],
     cfg: MLPConfig,
     device: str,
     precision: str,
@@ -209,8 +265,16 @@ def _prepare_components(
     Also seeds PyTorch RNG for reproducibility and configures deterministic
     behavior on CUDA when feasible.
     """
+    torch = _import_torch()
     nn_mod = __import__("torch.nn", fromlist=["CrossEntropyLoss"])
-    loss_ctor: _LossCtor = nn_mod.CrossEntropyLoss
+    loss_ctor: _WeightedLossCtor = nn_mod.CrossEntropyLoss
+
+    # Compute class weights for imbalanced data
+    scale_pos_weight = _compute_class_weight(y_train)
+    # CrossEntropyLoss weight tensor: [class_0_weight, class_1_weight]
+    class_weights = torch.tensor([1.0, scale_pos_weight], dtype=torch.float32)
+    if device == "cuda":
+        class_weights = class_weights.cuda()
 
     # Seed PyTorch RNG deterministically for reproducible training runs
     set_manual_seed(int(cfg["random_state"]))
@@ -239,9 +303,10 @@ def _prepare_components(
     return {
         "model": model,
         "optimizer": opt,
-        "loss_fn": loss_ctor(),
+        "loss_fn": loss_ctor(weight=class_weights),
         "autocast": autocast,
         "scaler": scaler,
+        "scale_pos_weight_computed": scale_pos_weight,
     }
 
 
@@ -369,7 +434,7 @@ class _EarlyStopState(TypedDict):
 def _run_training_loop(
     *,
     components: _TrainComponents,
-    splits: DataSplits,
+    splits: _SplitsProtocol,
     cfg: MLPConfig,
     device: str,
     output_dir: Path,
@@ -458,7 +523,7 @@ def _finalize_metrics(
     *,
     model: TrainableModel,
     device: str,
-    splits: DataSplits,
+    splits: _SplitsProtocol,
 ) -> tuple[EvalMetrics, EvalMetrics, EvalMetrics]:
     """Compute final metrics on train/val/test splits for the given model."""
     torch = _import_torch()
@@ -517,7 +582,7 @@ class MLPBackend(ClassifierBackend):
         device = resolve_device(cfg["device"])
         precision = resolve_precision(cfg["precision"], device)
 
-        splits = stratified_split(
+        raw_splits = stratified_split(
             x_features,
             y_labels,
             train_ratio=cfg["train_ratio"],
@@ -526,8 +591,13 @@ class MLPBackend(ClassifierBackend):
             random_state=cfg["random_state"],
         )
 
+        # Normalize features using training data statistics only (prevents data leakage)
+        # This is critical for MLP performance - neural networks require normalized inputs
+        splits = normalize_data_splits(raw_splits)
+
         components = _prepare_components(
             n_features=int(splits.x_train.shape[1]),
+            y_train=splits.y_train,
             cfg=cfg,
             device=device,
             precision=precision,
@@ -575,7 +645,7 @@ class MLPBackend(ClassifierBackend):
             early_stopped=state["early_stopped"],
             config=cfg,
             feature_importances=[],
-            scale_pos_weight_computed=1.0,
+            scale_pos_weight_computed=components["scale_pos_weight_computed"],
         )
 
     def evaluate(
