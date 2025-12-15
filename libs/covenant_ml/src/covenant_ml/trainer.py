@@ -47,6 +47,94 @@ class SplitData(Protocol):
     y: NDArray[np.int64]
 
 
+class FeatureScaler:
+    """Stores mean/std per feature column for standardization.
+
+    Computes statistics from training data only (to avoid data leakage).
+    Applies: x_normalized = (x - mean) / std
+
+    Attributes:
+        mean: Per-column mean values, shape (n_features,)
+        std: Per-column standard deviation values, shape (n_features,)
+        n_features: Number of features
+    """
+
+    def __init__(
+        self,
+        mean: NDArray[np.float64],
+        std: NDArray[np.float64],
+    ) -> None:
+        if mean.shape != std.shape:
+            raise ValueError(f"mean and std must have same shape: {mean.shape} vs {std.shape}")
+        if mean.ndim != 1:
+            raise ValueError(f"mean must be 1D array, got {mean.ndim}D")
+        self._mean = mean
+        self._std = std
+        self._n_features = len(mean)
+
+    @property
+    def mean(self) -> NDArray[np.float64]:
+        """Per-column mean values."""
+        return self._mean
+
+    @property
+    def std(self) -> NDArray[np.float64]:
+        """Per-column standard deviation values."""
+        return self._std
+
+    @property
+    def n_features(self) -> int:
+        """Number of features."""
+        return self._n_features
+
+    def transform(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Apply standardization: (x - mean) / std.
+
+        Args:
+            x: Feature matrix, shape (n_samples, n_features)
+
+        Returns:
+            Normalized feature matrix with same shape
+
+        Raises:
+            ValueError: If x has wrong number of features
+        """
+        n_cols: int = int(x.shape[1])
+        if n_cols != self._n_features:
+            raise ValueError(f"Expected {self._n_features} features, got {n_cols}")
+        return (x - self._mean) / self._std
+
+
+def compute_feature_scaler(x_train: NDArray[np.float64]) -> FeatureScaler:
+    """Compute feature scaling statistics from training data.
+
+    Uses StandardScaler approach: mean=0, std=1 per column.
+    Handles zero-variance columns by setting std=1.0 (no scaling).
+
+    Args:
+        x_train: Training feature matrix, shape (n_samples, n_features)
+
+    Returns:
+        FeatureScaler with mean/std computed from x_train
+    """
+    mean: NDArray[np.float64] = np.mean(x_train, axis=0)
+    std: NDArray[np.float64] = np.std(x_train, axis=0)
+
+    # Replace zero std with 1.0 to avoid division by zero
+    # (columns with zero variance are effectively constant)
+    zero_std_mask: NDArray[np.bool_] = std == 0.0
+    std_safe: NDArray[np.float64] = np.where(zero_std_mask, 1.0, std)
+
+    n_zero_std = int(np.count_nonzero(zero_std_mask))
+    if n_zero_std > 0:
+        _log.info(
+            "Feature scaler found zero-variance columns",
+            extra={"n_zero_variance_cols": n_zero_std},
+        )
+
+    return FeatureScaler(mean=mean, std=std_safe)
+
+
 class DataSplits:
     """Container for train/val/test data splits."""
 
@@ -81,6 +169,83 @@ class DataSplits:
     @property
     def n_total(self) -> int:
         return self.n_train + self.n_val + self.n_test
+
+
+class NormalizedDataSplits:
+    """Container for normalized train/val/test data splits.
+
+    Feature normalization is applied using statistics computed from
+    training data only (to avoid data leakage).
+    """
+
+    def __init__(
+        self,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.int64],
+        x_val: NDArray[np.float64],
+        y_val: NDArray[np.int64],
+        x_test: NDArray[np.float64],
+        y_test: NDArray[np.int64],
+        scaler: FeatureScaler,
+    ) -> None:
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_val = x_val
+        self.y_val = y_val
+        self.x_test = x_test
+        self.y_test = y_test
+        self.scaler = scaler
+
+    @property
+    def n_train(self) -> int:
+        return len(self.y_train)
+
+    @property
+    def n_val(self) -> int:
+        return len(self.y_val)
+
+    @property
+    def n_test(self) -> int:
+        return len(self.y_test)
+
+    @property
+    def n_total(self) -> int:
+        return self.n_train + self.n_val + self.n_test
+
+
+def normalize_data_splits(splits: DataSplits) -> NormalizedDataSplits:
+    """Normalize data splits using statistics from training data only.
+
+    Computes mean/std from x_train, then applies standardization to
+    all splits. This prevents data leakage from val/test into training.
+
+    Args:
+        splits: Unnormalized data splits
+
+    Returns:
+        NormalizedDataSplits with standardized features (mean=0, std=1)
+    """
+    scaler = compute_feature_scaler(splits.x_train)
+
+    _log.info(
+        "Normalizing data splits",
+        extra={
+            "n_features": scaler.n_features,
+            "n_train": splits.n_train,
+            "n_val": splits.n_val,
+            "n_test": splits.n_test,
+        },
+    )
+
+    return NormalizedDataSplits(
+        x_train=scaler.transform(splits.x_train),
+        y_train=splits.y_train,
+        x_val=scaler.transform(splits.x_val),
+        y_val=splits.y_val,
+        x_test=scaler.transform(splits.x_test),
+        y_test=splits.y_test,
+        scaler=scaler,
+    )
 
 
 class _XGBCoreProto(Protocol):
@@ -637,8 +802,12 @@ def save_model(model: XGBModelProtocol, path: str) -> None:
 
 __all__ = [
     "DataSplits",
+    "FeatureScaler",
+    "NormalizedDataSplits",
     "ProgressCallback",
+    "compute_feature_scaler",
     "extract_feature_importances",
+    "normalize_data_splits",
     "save_model",
     "stratified_split",
     "train_model",
