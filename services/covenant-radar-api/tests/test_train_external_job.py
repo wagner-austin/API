@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from shutil import copyfile
 
 import pytest
 from covenant_ml.types import MLPConfig, TrainConfig
@@ -26,6 +27,70 @@ from covenant_radar_api.worker.train_external_job import (
     process_external_train_job,
     run_external_training,
 )
+
+
+def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full Taiwan dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
+    if not src.exists():
+        raise FileNotFoundError("Taiwan dataset not found in repository data")
+    dst_dir = external_root / "taiwan_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "data.csv"
+    copyfile(str(src), str(dst))
+    header = (dst.read_text(encoding="utf-8").splitlines())[0]
+    cols = [c.strip() for c in header.split(",")]
+    feature_names = cols[1:]  # all columns after label
+    n_rows = sum(1 for _ in dst.open(encoding="utf-8")) - 1
+    return dst, n_rows, feature_names
+
+
+def _copy_real_us(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full US dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "us_data" / "american_bankruptcy.csv"
+    if not src.exists():
+        raise FileNotFoundError("US dataset not found in repository data")
+    dst_dir = external_root / "us_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "american_bankruptcy.csv"
+    copyfile(str(src), str(dst))
+    header = (dst.read_text(encoding="utf-8-sig").splitlines())[0]
+    cols = [c.strip() for c in header.split(",")]
+    # Features are columns starting with "X" (X1..X18). Non-feature columns include
+    # company_name, status_label, and year.
+    feature_names = [c for c in cols if c.startswith("X")]
+    n_rows = sum(1 for _ in dst.open(encoding="utf-8-sig")) - 1
+    return dst, n_rows, feature_names
+
+
+def _copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full Polish dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "polish_data" / "1year.arff"
+    if not src.exists():
+        raise FileNotFoundError("Polish dataset not found in repository data")
+    dst_dir = external_root / "polish_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "1year.arff"
+    copyfile(str(src), str(dst))
+    lines = dst.read_text(encoding="utf-8").splitlines()
+    # Find '@data' marker (case-insensitive)
+    data_idx = -1
+    for i, line in enumerate(lines):
+        if line.strip().lower() == "@data":
+            data_idx = i
+            break
+    if data_idx < 0:
+        raise RuntimeError("ARFF file missing @data section")
+    n_rows = len(lines) - (data_idx + 1)
+    # Extract attributes (exclude 'class')
+    feature_names: list[str] = []
+    for line in lines[: data_idx + 1]:
+        s = line.strip()
+        if s.lower().startswith("@attribute"):
+            parts = s.split()
+            if len(parts) >= 2 and parts[1].lower() != "class":
+                feature_names.append(parts[1])
+    return dst, n_rows, feature_names
 
 
 def _write_taiwan_dataset(base_dir: Path) -> Path:
@@ -477,28 +542,28 @@ class TestLoadDataset:
     """Tests for _load_dataset function."""
 
     def test_load_taiwan_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads Taiwan data successfully."""
-        _write_taiwan_dataset(tmp_path)
+        """_load_dataset loads Taiwan data successfully (full dataset)."""
+        _, n_rows, feature_names = _copy_real_taiwan(tmp_path)
         dataset = _load_dataset("taiwan", tmp_path)
 
-        assert dataset["n_samples"] == 15
-        assert dataset["n_features"] == 3
+        assert dataset["n_samples"] == n_rows
+        assert dataset["n_features"] == len(feature_names)
 
     def test_load_us_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads US data successfully."""
-        _write_us_dataset(tmp_path)
+        """_load_dataset loads US data successfully (full dataset)."""
+        _, n_rows_us, feature_names_us = _copy_real_us(tmp_path)
         dataset = _load_dataset("us", tmp_path)
 
-        assert dataset["n_samples"] == 15
-        assert dataset["n_features"] == 18
+        assert dataset["n_samples"] == n_rows_us
+        assert dataset["n_features"] == len(feature_names_us)
 
     def test_load_polish_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads Polish data successfully."""
-        _write_polish_dataset(tmp_path)
+        """_load_dataset loads Polish data successfully (full dataset)."""
+        _, n_rows_pl, feature_names_pl = _copy_real_polish(tmp_path)
         dataset = _load_dataset("polish", tmp_path)
 
-        assert dataset["n_samples"] == 15
-        assert dataset["n_features"] == 64
+        assert dataset["n_samples"] == n_rows_pl
+        assert dataset["n_features"] == len(feature_names_pl)
 
     def test_load_dataset_missing_taiwan(self, tmp_path: Path) -> None:
         """_load_dataset raises FileNotFoundError for missing Taiwan data."""
@@ -551,7 +616,8 @@ class TestRunExternalTraining:
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_taiwan_dataset(external_dir)
+        # Use full real dataset
+        _, n_rows, feature_names = _copy_real_taiwan(external_dir)
 
         config_json = dump_json_str(
             {
@@ -569,8 +635,8 @@ class TestRunExternalTraining:
 
         assert result["status"] == "complete"
         assert result["dataset"] == "taiwan"
-        assert result["samples_total"] == 15
-        assert result["n_features"] == 3
+        assert result["samples_total"] == n_rows
+        assert result["n_features"] == len(feature_names)
 
         # Verify model files were created
         model_path = Path(str(result["model_path"]))
@@ -582,12 +648,12 @@ class TestRunExternalTraining:
         # Verify feature importances
         importances = result["feature_importances"]
         assert type(importances) is list
-        assert len(importances) == 3  # 3 features
+        assert len(importances) == len(feature_names)
 
-        # First importance should have rank 1
+        # First importance should have rank 1 and be a real feature name
         first_imp = narrow_json_to_dict(importances[0])
         assert require_int(first_imp, "rank") == 1
-        assert require_str(first_imp, "name") in ["Feat1", "Feat2", "Feat3"]
+        assert require_str(first_imp, "name") in feature_names
         assert require_float(first_imp, "importance") >= 0.0
 
     def test_train_us_produces_model(self, tmp_path: Path) -> None:
@@ -596,7 +662,8 @@ class TestRunExternalTraining:
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_us_dataset(external_dir)
+        # Use full real dataset
+        _, _n_rows_us, feature_names_us = _copy_real_us(external_dir)
 
         config_json = dump_json_str(
             {
@@ -614,7 +681,7 @@ class TestRunExternalTraining:
 
         assert result["status"] == "complete"
         assert result["dataset"] == "us"
-        assert result["n_features"] == 18
+        assert result["n_features"] == len(feature_names_us)
 
     def test_train_polish_produces_model(self, tmp_path: Path) -> None:
         """run_external_training trains model on Polish data."""
@@ -622,7 +689,8 @@ class TestRunExternalTraining:
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_polish_dataset(external_dir)
+        # Use full real dataset
+        _, _n_rows_pl, feature_names_pl = _copy_real_polish(external_dir)
 
         config_json = dump_json_str(
             {
@@ -640,29 +708,37 @@ class TestRunExternalTraining:
 
         assert result["status"] == "complete"
         assert result["dataset"] == "polish"
-        assert result["n_features"] == 64
+        assert result["n_features"] == len(feature_names_pl)
 
     def test_train_mlp_backend_produces_model(self, tmp_path: Path) -> None:
-        """run_external_training trains MLP model on Taiwan data."""
+        """run_external_training trains MLP model on the full Taiwan dataset."""
         external_dir = tmp_path / "external"
         output_dir = tmp_path / "models"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_taiwan_dataset(external_dir)
+        # Copy the real Taiwan dataset into the test external directory
+        taiwan_dir = external_dir / "taiwan_data"
+        taiwan_dir.mkdir(parents=True, exist_ok=True)
+        real_tw = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
+        assert real_tw.exists(), "Taiwan dataset not found in repository data"
+        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
 
         config_json = dump_json_str(
             {
                 "backend": "mlp",
                 "dataset": "taiwan",
                 "learning_rate": 0.01,
-                "batch_size": 4,
-                "n_epochs": 5,  # Enough epochs to learn from small dataset
-                "dropout": 0.0,
-                "hidden_sizes": [8, 4],
+                "batch_size": 1024,
+                "n_epochs": 3,
+                "dropout": 0.1,
+                "hidden_sizes": [64, 32],
                 "precision": "fp32",
                 "optimizer": "adamw",
                 "random_state": 42,
-                "early_stopping_patience": 5,
+                "early_stopping_patience": 2,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
             }
         )
 
@@ -674,6 +750,58 @@ class TestRunExternalTraining:
         model_path = Path(str(result["model_path"]))
         assert model_path.exists()
         assert model_path.suffix == ".pt"
+
+    def test_train_mlp_on_full_us_dataset(self, tmp_path: Path) -> None:
+        """run_external_training trains MLP on the full US dataset (no fabrication)."""
+        # Prepare external directory and copy real US dataset into it
+        external_dir = tmp_path / "external"
+        us_dir = external_dir / "us_data"
+        us_dir.mkdir(parents=True, exist_ok=True)
+        real_us = (
+            Path(__file__).parent.parent
+            / "data"
+            / "external"
+            / "us_data"
+            / "american_bankruptcy.csv"
+        )
+        assert real_us.exists(), "US dataset not found in repository data"
+        target_us = us_dir / "american_bankruptcy.csv"
+        copyfile(str(real_us), str(target_us))
+
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Modest epochs with large batch to keep runtime reasonable on CPU
+        config_json = dump_json_str(
+            {
+                "backend": "mlp",
+                "dataset": "us",
+                "learning_rate": 0.05,
+                "batch_size": 1024,
+                "n_epochs": 3,
+                "dropout": 0.1,
+                "hidden_sizes": [64, 32],
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 2,
+                # Use explicit splits (defaults would be fine too)
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "us"
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists() and model_path.suffix == ".pt"
+        # Ensure we actually established a best checkpoint via val improvement
+        from platform_core.json_utils import require_float as _req_f
+
+        assert _req_f(result, "best_val_auc") >= 0.5
 
 
 class TestProcessExternalTrainJob:

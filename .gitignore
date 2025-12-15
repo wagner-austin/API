@@ -63,6 +63,8 @@ Thumbs.db
 
 # Data directories (each service manages its own)
 **/data/
+# Allow covenant-radar-api external datasets to be versioned for tests/benchmarks
+!services/covenant-radar-api/data/external/**
 **/datasets/
 **/outputs/
 **/checkpoints/
