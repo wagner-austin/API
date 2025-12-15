@@ -544,6 +544,34 @@ def test_mlp_backend_train_zero_epochs_raises(tmp_path: Path) -> None:
         _invoke_mlp_train(backend, x, y, names, config, tmp_path)
 
 
+def test_mlp_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
+    """MLPBackend raises ValueError when training data has no positive samples."""
+    backend = create_mlp_backend()
+    # Create dataset with only negative samples (all zeros)
+    x = np.random.default_rng(42).random((40, 3)).astype(np.float64)
+    y = np.zeros(40, dtype=np.int64)  # All negative, no positive
+    names = ["f0", "f1", "f2"]
+
+    config: MLPConfig = {
+        "device": "cpu",
+        "precision": "fp32",
+        "optimizer": "adamw",
+        "hidden_sizes": (4,),
+        "learning_rate": 0.01,
+        "batch_size": 8,
+        "n_epochs": 5,
+        "dropout": 0.0,
+        "train_ratio": 0.6,
+        "val_ratio": 0.2,
+        "test_ratio": 0.2,
+        "random_state": 42,
+        "early_stopping_patience": 5,
+    }
+
+    with pytest.raises(ValueError, match="no positive samples"):
+        _invoke_mlp_train(backend, x, y, names, config, tmp_path)
+
+
 def test_mlp_model_factory_protocol_exported() -> None:
     """MLPFactory Protocol is exported from model module."""
     from covenant_ml.backends.mlp.model import MLPFactory, __all__
