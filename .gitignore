@@ -2,6 +2,9 @@
 # Root .gitignore for API Monorepo
 # =============================================================================
 
+# Models
+*.ubj
+
 # Python
 __pycache__/
 *.py[cod]
