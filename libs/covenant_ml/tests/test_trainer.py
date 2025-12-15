@@ -713,3 +713,204 @@ def test_train_model_with_validation_raises_on_no_positive_samples() -> None:
         train_model_with_validation(
             x_features, y_labels, config, Path(tmpdir), feature_names=feature_names
         )
+
+
+# =============================================================================
+# Feature Scaler Tests
+# =============================================================================
+
+
+def _make_1d_array(values: tuple[float, ...]) -> NDArray[np.float64]:
+    """Create a 1D float64 array from a tuple of floats."""
+    arr: NDArray[np.float64] = np.zeros(len(values), dtype=np.float64)
+    for i, v in enumerate(values):
+        arr[i] = v
+    return arr
+
+
+def _make_2d_array(rows: tuple[tuple[float, ...], ...]) -> NDArray[np.float64]:
+    """Create a 2D float64 array from nested tuples."""
+    n_rows = len(rows)
+    n_cols = len(rows[0]) if n_rows > 0 else 0
+    arr: NDArray[np.float64] = np.zeros((n_rows, n_cols), dtype=np.float64)
+    for i, row in enumerate(rows):
+        for j, v in enumerate(row):
+            arr[i, j] = v
+    return arr
+
+
+def test_feature_scaler_constructor_validates_shape_mismatch() -> None:
+    """FeatureScaler raises ValueError when mean and std shapes differ."""
+    from covenant_ml.trainer import FeatureScaler
+
+    mean = _make_1d_array((0.0, 1.0, 2.0))
+    std = _make_1d_array((1.0, 1.0))  # Different shape
+
+    with pytest.raises(ValueError, match=r"must have same shape"):
+        FeatureScaler(mean=mean, std=std)
+
+
+def test_feature_scaler_constructor_validates_1d_array() -> None:
+    """FeatureScaler raises ValueError when mean is not 1D."""
+    from covenant_ml.trainer import FeatureScaler
+
+    mean = _make_2d_array(((0.0, 1.0), (2.0, 3.0)))  # 2D
+    std = _make_2d_array(((1.0, 1.0), (1.0, 1.0)))
+
+    with pytest.raises(ValueError, match=r"must be 1D array"):
+        FeatureScaler(mean=mean, std=std)
+
+
+def test_feature_scaler_properties() -> None:
+    """FeatureScaler properties return correct values."""
+    from covenant_ml.trainer import FeatureScaler
+
+    mean = _make_1d_array((0.0, 1.0, 2.0))
+    std = _make_1d_array((1.0, 2.0, 0.5))
+
+    scaler = FeatureScaler(mean=mean, std=std)
+
+    assert scaler.n_features == 3
+    np.testing.assert_array_equal(scaler.mean, mean)
+    np.testing.assert_array_equal(scaler.std, std)
+
+
+def test_feature_scaler_transform_normalizes_correctly() -> None:
+    """FeatureScaler.transform applies standardization correctly."""
+    from covenant_ml.trainer import FeatureScaler
+
+    mean = _make_1d_array((10.0, 20.0))
+    std = _make_1d_array((2.0, 5.0))
+    scaler = FeatureScaler(mean=mean, std=std)
+
+    x = _make_2d_array(((10.0, 20.0), (12.0, 25.0), (8.0, 15.0)))
+    result = scaler.transform(x)
+
+    # Expected: (x - mean) / std
+    expected = _make_2d_array(((0.0, 0.0), (1.0, 1.0), (-1.0, -1.0)))
+    np.testing.assert_array_almost_equal(result, expected)
+
+
+def test_feature_scaler_transform_raises_on_wrong_features() -> None:
+    """FeatureScaler.transform raises ValueError on wrong feature count."""
+    from covenant_ml.trainer import FeatureScaler
+
+    mean = _make_1d_array((0.0, 1.0, 2.0))
+    std = _make_1d_array((1.0, 1.0, 1.0))
+    scaler = FeatureScaler(mean=mean, std=std)
+
+    x = _make_2d_array(((1.0, 2.0),))  # 2 features, expected 3
+
+    with pytest.raises(ValueError, match=r"Expected 3 features, got 2"):
+        scaler.transform(x)
+
+
+def _compute_mean(arr: NDArray[np.float64]) -> float:
+    """Compute mean with explicit typing (avoids numpy Any returns)."""
+    total = 0.0
+    n = 0
+    for elem in arr.flat:
+        val: float = float(elem.item())
+        total += val
+        n += 1
+    return total / n
+
+
+def _compute_std(arr: NDArray[np.float64]) -> float:
+    """Compute standard deviation with explicit typing."""
+    mean_val = _compute_mean(arr)
+    variance_sum = 0.0
+    n = 0
+    for elem in arr.flat:
+        val: float = float(elem.item())
+        variance_sum += (val - mean_val) ** 2
+        n += 1
+    std_val: float = (variance_sum / n) ** 0.5
+    return std_val
+
+
+def test_compute_feature_scaler_computes_correct_stats() -> None:
+    """compute_feature_scaler computes mean and std from training data."""
+    from covenant_ml.trainer import compute_feature_scaler
+
+    x_train = _make_2d_array(((10.0, 100.0), (20.0, 200.0), (30.0, 300.0)))
+
+    scaler = compute_feature_scaler(x_train)
+
+    assert scaler.n_features == 2
+    expected_mean = _make_1d_array((20.0, 200.0))
+    np.testing.assert_array_almost_equal(scaler.mean, expected_mean)
+    # std for [10,20,30] = sqrt(((10-20)^2+(20-20)^2+(30-20)^2)/3) = sqrt(200/3)
+    col0: NDArray[np.float64] = x_train[:, 0]
+    col1: NDArray[np.float64] = x_train[:, 1]
+    expected_std_0: float = _compute_std(col0)
+    expected_std_1: float = _compute_std(col1)
+    expected_std = _make_1d_array((expected_std_0, expected_std_1))
+    np.testing.assert_array_almost_equal(scaler.std, expected_std)
+
+
+def test_compute_feature_scaler_handles_zero_variance() -> None:
+    """compute_feature_scaler replaces zero std with 1.0 to avoid division by zero."""
+    from covenant_ml.trainer import compute_feature_scaler
+
+    # Column 1 has zero variance (all same value)
+    x_train = _make_2d_array(((10.0, 5.0), (20.0, 5.0), (30.0, 5.0)))
+
+    scaler = compute_feature_scaler(x_train)
+
+    # Second column should have std=1.0 (not 0.0)
+    std_arr: NDArray[np.float64] = scaler.std
+    std_col1: float = float(std_arr.flat[1])
+    assert std_col1 == 1.0
+    # Transform should work without division by zero
+    result = scaler.transform(x_train)
+    # Second column: (5.0 - 5.0) / 1.0 = 0.0
+    expected_col1 = _make_1d_array((0.0, 0.0, 0.0))
+    result_col1: NDArray[np.float64] = result[:, 1]
+    np.testing.assert_array_almost_equal(result_col1, expected_col1)
+
+
+def _compute_column_std(x: NDArray[np.float64], col: int) -> float:
+    """Compute std of a column with explicit typing."""
+    col_data: NDArray[np.float64] = x[:, col]
+    return _compute_std(col_data)
+
+
+def test_normalize_data_splits_normalizes_all_splits() -> None:
+    """normalize_data_splits normalizes train/val/test using training stats."""
+    from covenant_ml.trainer import normalize_data_splits, stratified_split
+
+    # Create data with clear mean/std
+    rng = np.random.default_rng(42)
+    x: NDArray[np.float64] = (rng.standard_normal((100, 4)) * 10 + 50).astype(np.float64)
+    y: NDArray[np.int64] = np.zeros(100, dtype=np.int64)
+    y[70:] = 1  # 30 positive samples
+    rng.shuffle(y)
+
+    splits = stratified_split(
+        x, y, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, random_state=42
+    )
+    normalized = normalize_data_splits(splits)
+
+    # Training data should have mean~0, std~1 (approximately)
+    # Check each column individually with explicit typing
+    for col in range(4):
+        col_data: NDArray[np.float64] = normalized.x_train[:, col]
+        col_mean: float = _compute_mean(col_data)
+        col_std: float = _compute_std(col_data)
+        assert abs(col_mean) < 0.2, f"Column {col} mean should be ~0, got {col_mean}"
+        assert abs(col_std - 1.0) < 0.2, f"Column {col} std should be ~1, got {col_std}"
+
+    # Labels should be unchanged
+    np.testing.assert_array_equal(normalized.y_train, splits.y_train)
+    np.testing.assert_array_equal(normalized.y_val, splits.y_val)
+    np.testing.assert_array_equal(normalized.y_test, splits.y_test)
+
+    # Scaler should be attached
+    assert normalized.scaler.n_features == 4
+
+    # Properties should work
+    assert normalized.n_train == splits.n_train
+    assert normalized.n_val == splits.n_val
+    assert normalized.n_test == splits.n_test
+    assert normalized.n_total == splits.n_total
