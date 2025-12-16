@@ -268,28 +268,79 @@ def set_cuda_available_hook(hook: TypingCallable[[], bool] | None) -> None:
 
 
 def _detect_cuda_available(xgb_mod: _XGBModuleProto) -> bool:
-    """Detect whether xgboost was built with CUDA support."""
+    """Detect whether XGBoost was built with CUDA/GPU support.
+
+    Checks XGBoost's build configuration via xgb.core.build_info()['USE_CUDA'].
+    This indicates whether the XGBoost binary includes GPU acceleration code.
+
+    Note: XGBoost 3.x does NOT accept device='auto' directly. This function
+    is used by _resolve_device() to convert 'auto' → 'cuda' or 'cpu' before
+    creating XGBClassifier instances.
+
+    Returns:
+        True if XGBoost was compiled with CUDA support, False otherwise.
+    """
     info = xgb_mod.core.build_info()
     return bool(info.get("USE_CUDA", False))
 
 
 def _cuda_is_available(xgb_mod: _XGBModuleProto) -> bool:
-    """Check CUDA availability with optional test hook."""
+    """Check CUDA availability with optional test hook.
+
+    Combines build-time CUDA check with optional runtime test hook.
+    Used by _resolve_device() for 'auto' mode device selection.
+    """
     if _cuda_available_hook is not None:
         return bool(_cuda_available_hook()) and _detect_cuda_available(xgb_mod)
     return _detect_cuda_available(xgb_mod)
 
 
 def _resolve_device(requested: RequestedDevice, xgb_mod: _XGBModuleProto) -> ResolvedDevice:
-    """Resolve requested device to a concrete device."""
+    """Resolve 'auto' device to concrete 'cuda' or 'cpu' for XGBoost.
+
+    IMPORTANT: XGBoost 3.x does NOT support device='auto' natively.
+    This function MUST be called to convert 'auto' before passing to XGBClassifier.
+
+    Resolution logic:
+        - 'cpu'  → 'cpu' (passthrough)
+        - 'cuda' → 'cuda' (validates CUDA available, raises if not)
+        - 'auto' → 'cuda' if GPU available, else 'cpu'
+
+    Args:
+        requested: User-requested device ('cpu', 'cuda', or 'auto')
+        xgb_mod: XGBoost module for CUDA availability check
+
+    Returns:
+        Resolved device: 'cpu' or 'cuda' (never 'auto')
+
+    Raises:
+        RuntimeError: If 'cuda' explicitly requested but not available
+
+    Example:
+        >>> resolved = _resolve_device('auto', xgb)
+        >>> # resolved is 'cuda' on GPU systems, 'cpu' otherwise
+        >>> model = xgb.XGBClassifier(device=resolved, ...)  # Valid!
+    """
     if requested == "cpu":
-        return "cpu"
-    if requested == "cuda":
+        resolved: ResolvedDevice = "cpu"
+    elif requested == "cuda":
         if not _cuda_is_available(xgb_mod):
             raise RuntimeError("CUDA requested but not available")
-        return "cuda"
-    # requested == "auto"
-    return "cuda" if _cuda_is_available(xgb_mod) else "cpu"
+        resolved = "cuda"
+    else:
+        # requested == "auto": auto-detect based on CUDA availability
+        resolved = "cuda" if _cuda_is_available(xgb_mod) else "cpu"
+
+    # Log device resolution for visibility
+    _log.info(
+        "Device resolution",
+        extra={
+            "requested": requested,
+            "resolved": resolved,
+            "cuda_available": _cuda_is_available(xgb_mod),
+        },
+    )
+    return resolved
 
 
 def stratified_split(

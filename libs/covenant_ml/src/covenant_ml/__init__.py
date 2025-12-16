@@ -2,6 +2,17 @@
 
 from __future__ import annotations
 
+from .features import (
+    EngineeredFeatures,
+    FeatureEngineeringConfig,
+    FeaturePreset,
+    compute_log_transforms,
+    compute_pairwise_products,
+    compute_pairwise_ratios,
+    default_feature_config,
+    engineer_features,
+    get_feature_config_for_preset,
+)
 from .manifest import (
     ClassifierManifest,
     ManifestDataset,
@@ -45,8 +56,11 @@ from .types import (
 __all__ = [
     "ClassifierManifest",
     "DataSplits",
+    "EngineeredFeatures",
     "EvalMetrics",
+    "FeatureEngineeringConfig",
     "FeatureImportance",
+    "FeaturePreset",
     "ManifestDataset",
     "ManifestMetrics",
     "ManifestSystem",
@@ -66,9 +80,15 @@ __all__ = [
     "compute_auc",
     "compute_f1_score",
     "compute_log_loss",
+    "compute_log_transforms",
+    "compute_pairwise_products",
+    "compute_pairwise_ratios",
     "compute_precision",
     "compute_recall",
+    "default_feature_config",
+    "engineer_features",
     "format_metrics_str",
+    "get_feature_config_for_preset",
     "load_model",
     "predict_probabilities",
     "save_model",

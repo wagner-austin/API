@@ -147,6 +147,16 @@ class Proba2DProtocol(Protocol):
     def __getitem__(self, idx: tuple[int, int]) -> float: ...
 
 
+class PredictorProtocol(Protocol):
+    """Minimal protocol for models that can predict probabilities.
+
+    Both XGBoost and MLP models implement this interface.
+    Used by predict_probabilities for inference.
+    """
+
+    def predict_proba(self, x_features: NDArray[np.float64]) -> Proba2DProtocol: ...
+
+
 class DMatrixProtocol(Protocol):
     """Protocol for XGBoost DMatrix interface."""
 
@@ -245,6 +255,7 @@ __all__ = [
     "FeatureImportance",
     "MLPConfig",
     "MLPPrecision",
+    "PredictorProtocol",
     "Proba2DProtocol",
     "TrainConfig",
     "TrainConfigRequired",

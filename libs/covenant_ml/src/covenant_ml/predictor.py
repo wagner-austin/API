@@ -8,7 +8,7 @@ import numpy as np
 from covenant_domain.features import LoanFeatures
 from numpy.typing import NDArray
 
-from .types import Proba2DProtocol, XGBClassifierLoader, XGBModelProtocol
+from .types import PredictorProtocol, Proba2DProtocol, XGBClassifierLoader, XGBModelProtocol
 
 
 def _extract_feature_values(feat: LoanFeatures) -> tuple[float, ...]:
@@ -57,7 +57,7 @@ def _extract_positive_class_probabilities(proba: Proba2DProtocol) -> list[float]
 
 
 def predict_probabilities(
-    model: XGBModelProtocol,
+    model: PredictorProtocol,
     features: Sequence[LoanFeatures],
 ) -> list[float]:
     """
