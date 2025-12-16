@@ -78,6 +78,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/ml/predict` | POST | Predict breach risk |
 | `/ml/train` | POST | Enqueue model training |
 | `/ml/train-external` | POST | Train on external CSV datasets |
+| `/ml/optimize` | POST | Optimize hyperparameters with Optuna TPE |
 | `/ml/jobs/{job_id}` | GET | Get training job status |
 | `/ml/models/active` | GET | Get active model info |
 
@@ -578,6 +579,48 @@ curl http://localhost:8007/ml/jobs/{job_id}
 - `taiwan` - Taiwan bankruptcy data (6,819 samples, 95 features)
 - `us` - US bankruptcy data (78,682 samples, 18 features)
 - `polish` - Polish bankruptcy data (7,027 samples, 64 features)
+
+### Hyperparameter Optimization with Optuna
+
+Automatically find optimal XGBoost hyperparameters using Bayesian optimization:
+
+```bash
+# Run hyperparameter optimization with Optuna TPE
+curl -X POST http://localhost:8007/ml/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "n_trials": 50,
+    "device": "auto",
+    "space_profile": "default"
+  }'
+# {"job_id": "uuid", "status": "queued"}
+
+# Poll for best hyperparameters
+curl http://localhost:8007/ml/jobs/{job_id}
+# {
+#   "result": {
+#     "status": "complete",
+#     "best_val_auc": 0.94,
+#     "best_max_depth": 5,
+#     "best_n_estimators": 150,
+#     "best_learning_rate": 0.08,
+#     "recommended_config": {
+#       "device": "auto",
+#       "max_depth": 5,
+#       "n_estimators": 150,
+#       "learning_rate": 0.08,
+#       ...
+#     }
+#   }
+# }
+```
+
+**Search Space Profiles:**
+- `default` - Wide continuous ranges with log-scale for learning_rate (recommended for thorough search)
+- `categorical` - Fixed choice sets for faster grid-like search
+
+The `recommended_config` in the result can be used directly with `/ml/train-external`.
 
 ### Predict Breach Risk
 

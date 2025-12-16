@@ -1018,6 +1018,129 @@ The `feature_importances` array for XGBoost contains ALL features ranked by impo
 
 ---
 
+### POST /ml/optimize
+
+Run Bayesian hyperparameter optimization using Optuna's Tree-structured Parzen Estimator (TPE) to find optimal XGBoost hyperparameters on external bankruptcy datasets.
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `dataset` | string | Yes | - | Dataset to optimize on: `taiwan`, `us`, or `polish` |
+| `n_trials` | int | Yes | - | Number of optimization trials to run |
+| `timeout_seconds` | int | No | null | Maximum time in seconds (null = no timeout) |
+| `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
+| `space_profile` | string | No | `default` | Search space profile: `default` or `categorical` |
+| `random_state` | int | No | `42` | Random seed for reproducibility |
+
+**Search Space Profiles:**
+
+| Profile | Description | Best For |
+|---------|-------------|----------|
+| `default` | Wide continuous ranges with log-scale for learning_rate | Thorough exploration, production optimization |
+| `categorical` | Fixed choice sets for faster grid-like search | Quick experiments, debugging |
+
+**Request Example:**
+```json
+{
+  "dataset": "taiwan",
+  "n_trials": 50,
+  "timeout_seconds": 3600,
+  "device": "auto",
+  "space_profile": "default",
+  "random_state": 42
+}
+```
+
+**Response (202):**
+```json
+{
+  "job_id": "optimize-job-uuid",
+  "status": "queued"
+}
+```
+
+**Job Result (when complete):**
+
+Poll `/ml/jobs/{job_id}` to get the result:
+
+```json
+{
+  "job_id": "optimize-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "dataset": "taiwan",
+    "n_samples": 6819,
+    "n_features": 95,
+    "n_trials_complete": 50,
+    "n_trials_pruned": 0,
+    "n_trials_failed": 0,
+    "best_trial_number": 35,
+    "best_val_auc": 0.94,
+    "best_max_depth": 5,
+    "best_n_estimators": 150,
+    "best_learning_rate": 0.08,
+    "best_reg_alpha": 0.01,
+    "best_reg_lambda": 1.5,
+    "best_subsample": 0.85,
+    "best_colsample_bytree": 0.9,
+    "duration_seconds": 542.3,
+    "recommended_config": {
+      "device": "auto",
+      "learning_rate": 0.08,
+      "max_depth": 5,
+      "n_estimators": 150,
+      "subsample": 0.85,
+      "colsample_bytree": 0.9,
+      "random_state": 42,
+      "train_ratio": 0.7,
+      "val_ratio": 0.15,
+      "test_ratio": 0.15,
+      "early_stopping_rounds": 20,
+      "reg_alpha": 0.01,
+      "reg_lambda": 1.5
+    }
+  }
+}
+```
+
+**Result Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dataset` | string | Dataset used for optimization |
+| `n_samples` | int | Number of samples in dataset |
+| `n_features` | int | Number of features in dataset |
+| `n_trials_complete` | int | Number of trials completed |
+| `n_trials_pruned` | int | Number of trials pruned early |
+| `n_trials_failed` | int | Number of trials that failed |
+| `best_trial_number` | int | Trial number that found best result |
+| `best_val_auc` | float | Best validation AUC achieved |
+| `best_*` | varies | Best hyperparameter values found |
+| `duration_seconds` | float | Total optimization time |
+| `recommended_config` | object | Ready-to-use TrainConfig for `/train-external` |
+
+**Workflow Example:**
+
+1. Run optimization to find best hyperparameters:
+   ```bash
+   curl -X POST http://localhost:8007/ml/optimize \
+     -H "Content-Type: application/json" \
+     -d '{"dataset": "taiwan", "n_trials": 50}'
+   ```
+
+2. Poll for completion and get `recommended_config`
+
+3. Use `recommended_config` with `/train-external` for final model training:
+   ```bash
+   curl -X POST http://localhost:8007/ml/train-external \
+     -H "Content-Type: application/json" \
+     -d '{...recommended_config fields...}'
+   ```
+
+---
+
 ### GET /ml/jobs/{job_id}
 
 Get training job status.
