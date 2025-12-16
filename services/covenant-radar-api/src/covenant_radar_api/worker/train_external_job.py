@@ -284,6 +284,7 @@ def _metrics_to_json(metrics: EvalMetrics) -> dict[str, JSONValue]:
     """Convert EvalMetrics to JSON-serializable dict."""
     return {
         "loss": metrics["loss"],
+        "ppl": metrics["ppl"],
         "auc": metrics["auc"],
         "accuracy": metrics["accuracy"],
         "precision": metrics["precision"],
@@ -384,8 +385,10 @@ def run_external_training(
         progress=None,
     )
 
-    # Copy to active.ubj (use copyfile to avoid permission issues on Docker volumes)
-    active_model_path = output_dir / "active.ubj"
+    # Copy to backend-specific active file (use copyfile to avoid permission issues)
+    # XGBoost uses .ubj format, MLP uses .pt format
+    active_filename = "active_xgb.ubj" if backend_name == "xgboost" else "active_mlp.pt"
+    active_model_path = output_dir / active_filename
     shutil.copyfile(outcome["model_path"], active_model_path)
 
     # Log top features

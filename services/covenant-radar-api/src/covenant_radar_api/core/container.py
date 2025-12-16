@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 from covenant_ml.predictor import load_model
-from covenant_ml.types import XGBModelProtocol
+from covenant_ml.types import PredictorProtocol
 from covenant_persistence import (
     ConnectionProtocol,
     CovenantRepository,
@@ -24,6 +24,7 @@ from covenant_persistence import (
     PostgresMeasurementRepository,
     ensure_schema,
 )
+from platform_core.config import MLBackend
 from platform_core.json_utils import JSONValue
 from platform_core.queues import COVENANT_QUEUE
 from platform_workers.redis import RedisStrProto
@@ -76,19 +77,21 @@ class ServiceContainer:
         redis: Redis client for job queue and health checks.
         db_conn: Database connection for repository operations.
         _redis_rq: Redis client for RQ operations.
-        _model: Cached XGBoost model (lazy loaded).
+        _model: Cached model (lazy loaded, backend-aware).
         _model_info: Information about current model.
+        _ml_backend: ML backend type for inference (xgboost or mlp).
     """
 
     settings: Settings
     redis: RedisStrProto
     db_conn: ConnectionProtocol
     _redis_rq: _RedisBytesClient
-    _model: XGBModelProtocol | None
+    _model: PredictorProtocol | None
     _model_info: ModelInfo
     _sector_encoder: dict[str, int]
     _region_encoder: dict[str, int]
     _model_output_dir: Path
+    _ml_backend: MLBackend
 
     def __init__(
         self: ServiceContainer,
@@ -100,6 +103,7 @@ class ServiceContainer:
         model_output_dir: Path,
         sector_encoder: dict[str, int],
         region_encoder: dict[str, int],
+        ml_backend: MLBackend,
     ) -> None:
         """Initialize container with dependencies.
 
@@ -112,6 +116,7 @@ class ServiceContainer:
             model_output_dir: Directory for new model output.
             sector_encoder: Sector to int encoding.
             region_encoder: Region to int encoding.
+            ml_backend: ML backend type for inference (xgboost or mlp).
         """
         self.settings = settings
         self.redis = redis
@@ -126,6 +131,7 @@ class ServiceContainer:
         self._model_output_dir = model_output_dir
         self._sector_encoder = sector_encoder
         self._region_encoder = region_encoder
+        self._ml_backend = ml_backend
 
     @classmethod
     def from_settings(
@@ -163,6 +169,9 @@ class ServiceContainer:
             if model_output_dir is not None
             else Path(settings["app"]["models_root"])
         )
+        # Get ML backend from settings (defaults to xgboost)
+        ml_backend: MLBackend = settings["app"]["ml_backend"]
+        # active_model_path is pre-resolved by config loader based on ml_backend
         resolved_model_path = model_path if model_path else settings["app"]["active_model_path"]
         default_sector_encoder: dict[str, int] = (
             sector_encoder if sector_encoder is not None else DEFAULT_SECTOR_ENCODER
@@ -179,6 +188,7 @@ class ServiceContainer:
             model_output_dir=output_dir,
             sector_encoder=default_sector_encoder,
             region_encoder=default_region_encoder,
+            ml_backend=ml_backend,
         )
 
         if eager_load_model:
@@ -216,6 +226,40 @@ class ServiceContainer:
         """Get RQ queue client for enqueueing jobs."""
         return _test_hooks.queue_factory(COVENANT_QUEUE, self._redis_rq)
 
+    def _load_xgboost_model(self: ServiceContainer, model_path: str) -> PredictorProtocol:
+        """Load XGBoost model from file.
+
+        Args:
+            model_path: Path to the XGBoost .ubj model file.
+
+        Returns:
+            Loaded XGBoost model as PredictorProtocol.
+        """
+        model: PredictorProtocol = load_model(model_path)
+        return model
+
+    def _load_mlp_model(self: ServiceContainer, model_path: str) -> PredictorProtocol:
+        """Load MLP model from file.
+
+        Args:
+            model_path: Path to the PyTorch .pt model file.
+
+        Returns:
+            Loaded MLP model as PredictorProtocol.
+
+        Raises:
+            RuntimeError: MLP inference requires model metadata.
+        """
+        # MLP loading requires model architecture metadata (hidden_sizes, n_features)
+        # which must be saved alongside the .pt file during training.
+        # For now, raise a clear error explaining this requirement.
+        raise RuntimeError(
+            f"MLP model inference not yet supported. "
+            f"Model path: {model_path}. "
+            f"MLP models are currently only supported for training/benchmarking. "
+            f"Set APP__ML_BACKEND=xgboost to use XGBoost inference."
+        )
+
     def load_model_now(self: ServiceContainer) -> bool:
         """Eagerly load the ML model into memory.
 
@@ -236,11 +280,16 @@ class ServiceContainer:
         if not model_path.exists():
             log.warning(
                 "Model file not found, predictions will fail until model is trained",
-                extra={"model_path": str(model_path)},
+                extra={"model_path": str(model_path), "backend": self._ml_backend},
             )
             return False
 
-        self._model = load_model(str(model_path))
+        # Load model based on configured backend
+        if self._ml_backend == "xgboost":
+            self._model = self._load_xgboost_model(str(model_path))
+        else:
+            self._model = self._load_mlp_model(str(model_path))
+
         self._model_info = ModelInfo(
             model_id=self._model_info["model_id"],
             model_path=self._model_info["model_path"],
@@ -248,18 +297,25 @@ class ServiceContainer:
         )
         log.info(
             "ML model loaded successfully",
-            extra={"model_path": str(model_path)},
+            extra={"model_path": str(model_path), "backend": self._ml_backend},
         )
         return True
 
-    def get_model(self: ServiceContainer) -> XGBModelProtocol:
-        """Get the XGBoost model, loading it if necessary.
+    def get_model(self: ServiceContainer) -> PredictorProtocol:
+        """Get the ML model, loading it if necessary.
+
+        Returns:
+            Loaded model implementing PredictorProtocol.
 
         Raises:
             FileNotFoundError: If model file doesn't exist.
+            RuntimeError: If MLP backend is configured (not yet supported).
         """
         if self._model is None:
-            self._model = load_model(self._model_info["model_path"])
+            if self._ml_backend == "xgboost":
+                self._model = self._load_xgboost_model(self._model_info["model_path"])
+            else:
+                self._model = self._load_mlp_model(self._model_info["model_path"])
             self._model_info = ModelInfo(
                 model_id=self._model_info["model_id"],
                 model_path=self._model_info["model_path"],

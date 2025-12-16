@@ -331,8 +331,9 @@ def run_training(
         feature_names=FEATURE_NAMES,
     )
 
-    # Copy to active.ubj for API to load
-    active_model_path = output_dir / "active.ubj"
+    # Copy to XGBoost-specific active file for API to load
+    # This job only supports XGBoost backend
+    active_model_path = output_dir / "active_xgb.ubj"
     shutil.copy(outcome["model_path"], active_model_path)
 
     _log.info(
