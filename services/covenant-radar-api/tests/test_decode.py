@@ -14,6 +14,7 @@ from covenant_radar_api.api.decode import (
     parse_evaluate_request,
     parse_external_train_request,
     parse_measurements_request,
+    parse_optimize_request,
     parse_predict_request,
     parse_train_request,
     parse_update_deal_request,
@@ -824,3 +825,230 @@ class TestParseExternalTrainRequest:
         }"""
         with pytest.raises(JSONTypeError, match="scale_pos_weight must be a number"):
             parse_external_train_request(body)
+
+
+class TestParseOptimizeRequest:
+    """Tests for parse_optimize_request."""
+
+    def test_valid_optimize_request_minimal(self) -> None:
+        """Test parsing valid optimize request with minimal fields."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["n_trials"] == 50
+        assert result["config"]["timeout_seconds"] is None
+        assert result["device"] == "auto"
+        assert result["feature_preset"] == "none"
+        assert result["config"]["random_state"] == 42
+
+    def test_valid_optimize_request_full(self) -> None:
+        """Test parsing valid optimize request with all fields."""
+        body = b"""{
+            "dataset": "us",
+            "n_trials": 100,
+            "timeout_seconds": 3600,
+            "device": "cuda",
+            "space_profile": "categorical",
+            "feature_preset": "full",
+            "random_state": 123
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["dataset"] == "us"
+        assert result["config"]["n_trials"] == 100
+        assert result["config"]["timeout_seconds"] == 3600
+        assert result["device"] == "cuda"
+        assert result["feature_preset"] == "full"
+        assert result["config"]["random_state"] == 123
+
+    def test_valid_optimize_request_polish_dataset(self) -> None:
+        """Test parsing optimize request for polish dataset."""
+        body = b"""{
+            "dataset": "polish",
+            "n_trials": 25
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["dataset"] == "polish"
+        assert result["config"]["n_trials"] == 25
+
+    def test_valid_optimize_request_categorical_space(self) -> None:
+        """Test parsing optimize request with categorical space profile."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "space_profile": "categorical"
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["dataset"] == "taiwan"
+        # Verify categorical space has categorical param types
+        lr_spec = result["search_space"]["learning_rate"]
+        assert lr_spec["param_type"] == "categorical_float"
+
+    def test_valid_optimize_request_default_space(self) -> None:
+        """Test parsing optimize request with default space profile."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "space_profile": "default"
+        }"""
+        result = parse_optimize_request(body)
+
+        # Verify default space has float param types with log_scale
+        lr_spec = result["search_space"]["learning_rate"]
+        assert lr_spec["param_type"] == "float"
+
+    def test_valid_optimize_request_cpu_device(self) -> None:
+        """Test parsing optimize request with CPU device."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "device": "cpu"
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["device"] == "cpu"
+
+    def test_invalid_dataset_raises_value_error(self) -> None:
+        """Test that invalid dataset raises ValueError."""
+        body = b"""{
+            "dataset": "invalid_dataset",
+            "n_trials": 50
+        }"""
+        with pytest.raises(ValueError, match="dataset must be one of"):
+            parse_optimize_request(body)
+
+    def test_missing_dataset_raises_json_type_error(self) -> None:
+        """Test that missing dataset raises JSONTypeError."""
+        body = b"""{
+            "n_trials": 50
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'dataset'"):
+            parse_optimize_request(body)
+
+    def test_missing_n_trials_raises_json_type_error(self) -> None:
+        """Test that missing n_trials raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan"
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'n_trials'"):
+            parse_optimize_request(body)
+
+    def test_invalid_device_raises_json_type_error(self) -> None:
+        """Test that invalid device raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "device": "tpu"
+        }"""
+        with pytest.raises(JSONTypeError, match="device must be one of: cpu, cuda, auto"):
+            parse_optimize_request(body)
+
+    def test_invalid_space_profile_raises_json_type_error(self) -> None:
+        """Test that invalid space_profile raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "space_profile": "invalid"
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be one of"):
+            parse_optimize_request(body)
+
+    def test_invalid_timeout_type_raises_json_type_error(self) -> None:
+        """Test that non-integer timeout raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "timeout_seconds": "fast"
+        }"""
+        with pytest.raises(JSONTypeError, match="timeout_seconds must be an integer"):
+            parse_optimize_request(body)
+
+    def test_non_string_device_raises_json_type_error(self) -> None:
+        """Test that non-string device raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "device": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="device must be a string"):
+            parse_optimize_request(body)
+
+    def test_non_string_space_profile_raises_json_type_error(self) -> None:
+        """Test that non-string space_profile raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "space_profile": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
+            parse_optimize_request(body)
+
+    def test_null_timeout_allowed(self) -> None:
+        """Test that null timeout is allowed and results in None."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "timeout_seconds": null
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["config"]["timeout_seconds"] is None
+
+    def test_valid_feature_preset_log_only(self) -> None:
+        """Test parsing optimize request with log_only feature preset."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "feature_preset": "log_only"
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["feature_preset"] == "log_only"
+
+    def test_valid_feature_preset_ratios_only(self) -> None:
+        """Test parsing optimize request with ratios_only feature preset."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "feature_preset": "ratios_only"
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["feature_preset"] == "ratios_only"
+
+    def test_valid_feature_preset_none(self) -> None:
+        """Test parsing optimize request with explicit none feature preset."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "feature_preset": "none"
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["feature_preset"] == "none"
+
+    def test_invalid_feature_preset_raises_json_type_error(self) -> None:
+        """Test that invalid feature_preset raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "feature_preset": "invalid"
+        }"""
+        with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
+            parse_optimize_request(body)
+
+    def test_non_string_feature_preset_raises_json_type_error(self) -> None:
+        """Test that non-string feature_preset raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "n_trials": 50,
+            "feature_preset": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
+            parse_optimize_request(body)

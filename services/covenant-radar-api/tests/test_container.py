@@ -8,10 +8,12 @@ import numpy as np
 from covenant_domain import Covenant, CovenantId, Deal, DealId, Measurement
 from covenant_ml.testing import make_train_config
 from covenant_ml.trainer import save_model, train_model
-from covenant_persistence.testing import InMemoryStore
+from covenant_persistence.testing import InMemoryConnection, InMemoryStore
 from numpy.typing import NDArray
+from platform_workers.testing import FakeRedis, FakeRedisBytesClient
 
 from covenant_radar_api.core import ServiceContainer
+from covenant_radar_api.core.config import Settings
 
 from .conftest import ContainerAndStore
 
@@ -553,3 +555,99 @@ def test_container_load_model_now_returns_true_when_file_exists(
     result = container_with_store.container.load_model_now()
     assert result is True
     assert container_with_store.container.get_model_info()["is_loaded"] is True
+
+
+# =============================================================================
+# Tests for MLP backend (raises RuntimeError)
+# =============================================================================
+
+
+def test_container_load_mlp_model_raises_runtime_error(
+    container_with_store: ContainerAndStore,
+    tmp_path: Path,
+) -> None:
+    """Test _load_mlp_model raises RuntimeError with clear message."""
+    import pytest
+
+    container = container_with_store.container
+    model_path = str(tmp_path / "test_mlp.pt")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        container._load_mlp_model(model_path)
+
+    error_message = str(exc_info.value)
+    assert "MLP model inference not yet supported" in error_message
+    assert model_path in error_message
+    assert "APP__ML_BACKEND=xgboost" in error_message
+
+
+def test_container_load_model_now_mlp_backend_raises_runtime_error(
+    tmp_path: Path,
+    in_memory_store: InMemoryStore,
+    fake_kv_client: FakeRedis,
+    fake_rq_client: FakeRedisBytesClient,
+    test_settings: Settings,
+) -> None:
+    """Test load_model_now raises RuntimeError when MLP backend is configured."""
+    import pytest
+
+    # Create a model file so load_model_now tries to load it
+    model_path = tmp_path / "test_mlp.pt"
+    model_path.write_text("fake mlp model")
+
+    # Create container with MLP backend
+    container = ServiceContainer(
+        settings=test_settings,
+        redis=fake_kv_client,
+        db_conn=InMemoryConnection(in_memory_store),
+        redis_rq=fake_rq_client,
+        model_path=str(model_path),
+        model_output_dir=tmp_path,
+        sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
+        region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
+        ml_backend="mlp",
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        container.load_model_now()
+
+    error_message = str(exc_info.value)
+    assert "MLP model inference not yet supported" in error_message
+    container.close()
+    # sadd is called during fixture setup (adds worker to rq:workers)
+    fake_kv_client.assert_only_called({"sadd", "close"})
+    assert fake_rq_client.closed is True
+
+
+def test_container_get_model_mlp_backend_raises_runtime_error(
+    tmp_path: Path,
+    in_memory_store: InMemoryStore,
+    fake_kv_client: FakeRedis,
+    fake_rq_client: FakeRedisBytesClient,
+    test_settings: Settings,
+) -> None:
+    """Test get_model raises RuntimeError when MLP backend is configured."""
+    import pytest
+
+    # Create container with MLP backend
+    container = ServiceContainer(
+        settings=test_settings,
+        redis=fake_kv_client,
+        db_conn=InMemoryConnection(in_memory_store),
+        redis_rq=fake_rq_client,
+        model_path=str(tmp_path / "test_mlp.pt"),
+        model_output_dir=tmp_path,
+        sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
+        region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
+        ml_backend="mlp",
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        container.get_model()
+
+    error_message = str(exc_info.value)
+    assert "MLP model inference not yet supported" in error_message
+    container.close()
+    # sadd is called during fixture setup (adds worker to rq:workers)
+    fake_kv_client.assert_only_called({"sadd", "close"})
+    assert fake_rq_client.closed is True

@@ -417,3 +417,111 @@ class TestTrainExternalEndpoint:
         )
         # AppError is unhandled in these route tests, so FastAPI returns 500
         assert response.status_code == 500
+
+
+class TestOptimizeEndpoint:
+    """Tests for POST /ml/optimize."""
+
+    def test_optimize_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
+        """Test optimization job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "n_trials": 50
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
+
+        # Verify job was enqueued with correct function
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_optimize_job" in enqueued.func
+
+    def test_optimize_with_all_options(self, container_with_store: ContainerAndStore) -> None:
+        """Test optimization with all options specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "us",
+                "n_trials": 100,
+                "timeout_seconds": 3600,
+                "device": "cuda",
+                "space_profile": "categorical",
+                "feature_preset": "log_only",
+                "random_state": 123
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        # Verify job payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert "us" in config_str
+        assert "cuda" in config_str
+        assert "log_only" in config_str
+
+    def test_optimize_invalid_dataset_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid dataset triggers edge validation and results in error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "invalid",
+                "n_trials": 50
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_optimize_missing_n_trials_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Missing n_trials triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_optimize_invalid_device_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid device triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "n_trials": 50,
+                "device": "tpu"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_optimize_non_object_json_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Non-object JSON (e.g., list) triggers TypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"[]",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500

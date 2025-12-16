@@ -79,7 +79,10 @@ def _make_test_settings() -> Settings:
             "data_root": "/data",
             "models_root": "/data/models",
             "logs_root": "/data/logs",
-            "active_model_path": "/data/models/active.ubj",
+            "active_model_path": "/data/models/active_xgb.ubj",
+            "ml_backend": "xgboost",
+            "active_model_path_xgb": "/data/models/active_xgb.ubj",
+            "active_model_path_mlp": "/data/models/active_mlp.pt",
         },
         database_url="postgresql://test:test@localhost/test",
     )
@@ -117,12 +120,17 @@ def _make_container_with_store(
     _test_hooks.rq_client_factory = rq_client_factory
     _test_hooks.queue_factory = queue_factory
 
-    container = ServiceContainer.from_settings(
-        test_settings,
+    # Pass ml_backend explicitly since ServiceContainer.__init__ now requires it
+    container = ServiceContainer(
+        settings=test_settings,
+        redis=fake_kv_client,
+        db_conn=InMemoryConnection(in_memory_store),
+        redis_rq=fake_rq_client,
         model_path=str(tmp_path / "test_model.ubj"),
         model_output_dir=tmp_path,
         sector_encoder={"Technology": 0, "Finance": 1, "Healthcare": 2},
         region_encoder={"North America": 0, "Europe": 1, "Asia": 2},
+        ml_backend="xgboost",
     )
 
     yield ContainerAndStore(container, in_memory_store, fake_queue)
