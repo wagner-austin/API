@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from covenant_ml.optimizer import use_real_optuna
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
@@ -16,6 +17,9 @@ from .routes import health as routes_health
 from .routes import measurements as routes_measurements
 from .routes import ml as routes_ml
 from .routes import status as routes_status
+
+# Wire real Optuna at module load for hyperparameter optimization
+use_real_optuna()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

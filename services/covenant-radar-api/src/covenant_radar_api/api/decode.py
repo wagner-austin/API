@@ -22,6 +22,14 @@ from covenant_domain import (
     decode_deal_id,
     decode_measurement,
 )
+from covenant_ml import FeaturePreset
+from covenant_ml.optimizer import (
+    OptimizationConfig,
+    XGBoostSearchSpace,
+    make_default_optimization_config,
+    make_xgboost_categorical_space,
+    make_xgboost_default_space,
+)
 from covenant_ml.types import (
     MLPConfig,
     TrainConfig,
@@ -545,6 +553,139 @@ def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
     return xgb_result
 
 
+# --- Optimization Request Parsing ---
+
+
+SpaceProfile = Literal["default", "categorical"]
+
+
+class OptimizeRequest(TypedDict, total=True):
+    """Request body for hyperparameter optimization."""
+
+    dataset: DatasetName
+    n_trials: int
+    timeout_seconds: int | None
+    device: Literal["cpu", "cuda", "auto"]
+    space_profile: SpaceProfile
+    feature_preset: FeaturePreset
+    random_state: int
+
+
+class OptimizeResponse(TypedDict, total=True):
+    """Response body for optimization job submission."""
+
+    job_id: str
+    status: Literal["queued"]
+
+
+class OptimizeParseResult(TypedDict, total=True):
+    """Parsed optimization request with config and search space."""
+
+    dataset: DatasetName
+    config: OptimizationConfig
+    search_space: XGBoostSearchSpace
+    device: Literal["cpu", "cuda", "auto"]
+    feature_preset: FeaturePreset
+
+
+def _parse_space_profile(raw: JSONValue | None) -> SpaceProfile:
+    """Parse space profile, defaulting to 'default'."""
+    if raw is None:
+        return "default"
+    if not isinstance(raw, str):
+        raise JSONTypeError("space_profile must be a string")
+    if raw == "default":
+        return "default"
+    if raw == "categorical":
+        return "categorical"
+    raise JSONTypeError("space_profile must be one of: default, categorical")
+
+
+def _parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
+    """Parse feature preset, defaulting to 'none'."""
+    if raw is None:
+        return "none"
+    if not isinstance(raw, str):
+        raise JSONTypeError("feature_preset must be a string")
+    if raw == "none":
+        return "none"
+    if raw == "log_only":
+        return "log_only"
+    if raw == "ratios_only":
+        return "ratios_only"
+    if raw == "full":
+        return "full"
+    raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
+
+
+def _get_search_space(profile: SpaceProfile) -> XGBoostSearchSpace:
+    """Get search space based on profile name."""
+    if profile == "default":
+        return make_xgboost_default_space()
+    return make_xgboost_categorical_space()
+
+
+def parse_optimize_request(body: bytes) -> OptimizeParseResult:
+    """Parse request body for hyperparameter optimization.
+
+    Request format:
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "n_trials": 50,  // required
+            "timeout_seconds": 3600,  // optional, null for no timeout
+            "device": "auto",  // optional, default "auto"
+            "space_profile": "default",  // optional: default, categorical
+            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
+            "random_state": 42  // optional, default 42
+        }
+
+    Returns:
+        OptimizeParseResult with dataset, config, search_space, and feature_preset.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset name.
+    """
+    raw = _parse_body_as_dict(body)
+
+    # Dataset selection (required)
+    dataset_name = _parse_dataset_name(raw)
+
+    # Required field
+    n_trials = require_int(raw, "n_trials")
+
+    # Optional fields
+    timeout_raw = raw.get("timeout_seconds")
+    timeout_seconds: int | None = None
+    if timeout_raw is not None:
+        if not isinstance(timeout_raw, int):
+            raise JSONTypeError("timeout_seconds must be an integer or null")
+        timeout_seconds = timeout_raw
+
+    device = _parse_device(raw.get("device"))
+    space_profile = _parse_space_profile(raw.get("space_profile"))
+    feature_preset = _parse_feature_preset(raw.get("feature_preset"))
+    random_state = _optional_int(raw, "random_state", 42)
+
+    # Build optimization config
+    config = make_default_optimization_config(
+        n_trials=n_trials,
+        timeout_seconds=timeout_seconds,
+        random_state=random_state,
+    )
+
+    # Get search space based on profile
+    search_space = _get_search_space(space_profile)
+
+    return OptimizeParseResult(
+        dataset=dataset_name,
+        config=config,
+        search_space=search_space,
+        device=device,
+        feature_preset=feature_preset,
+    )
+
+
 __all__ = [
     "AddMeasurementsRequest",
     "CreateCovenantRequest",
@@ -553,8 +694,12 @@ __all__ = [
     "EvaluateRequest",
     "ExternalTrainParseResult",
     "MLPParseResult",
+    "OptimizeParseResult",
+    "OptimizeRequest",
+    "OptimizeResponse",
     "PredictRequest",
     "PredictResponse",
+    "SpaceProfile",
     "TrainResponse",
     "UpdateDealRequest",
     "XGBoostParseResult",
@@ -565,6 +710,7 @@ __all__ = [
     "parse_evaluate_request",
     "parse_external_train_request",
     "parse_measurements_request",
+    "parse_optimize_request",
     "parse_predict_request",
     "parse_train_request",
     "parse_update_deal_request",

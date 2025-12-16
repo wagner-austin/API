@@ -11,7 +11,7 @@ from covenant_domain.features import (
     extract_features,
 )
 from covenant_ml.predictor import predict_probabilities
-from covenant_ml.types import TrainConfig, XGBModelProtocol
+from covenant_ml.types import PredictorProtocol, TrainConfig
 from covenant_persistence import (
     CovenantResultRepository,
     DealRepository,
@@ -23,9 +23,11 @@ from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from platform_workers.rq_harness import RQClientQueue
 
 from ..decode import (
+    OptimizeResponse,
     PredictResponse,
     TrainResponse,
     parse_external_train_request,
+    parse_optimize_request,
     parse_predict_request,
     parse_train_request,
 )
@@ -115,6 +117,30 @@ _JOB_STATUS_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
     },
 }
 
+_OPTIMIZE_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Optimization job queued",
+        "content": {
+            "application/json": {
+                "example": {"job_id": "optimize-job-uuid", "status": "queued"},
+            },
+        },
+    },
+    400: {
+        "description": "Invalid configuration",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "dataset must be one of: taiwan, us, polish",
+                    }
+                }
+            }
+        },
+    },
+}
+
 
 class ModelInfo(TypedDict, total=True):
     """Information about the active ML model."""
@@ -143,7 +169,7 @@ class ContainerProtocol(Protocol):
 
     def rq_queue(self) -> RQClientQueue: ...
 
-    def get_model(self) -> XGBModelProtocol: ...
+    def get_model(self) -> PredictorProtocol: ...
 
     def get_model_info(self) -> ModelInfo: ...
 
@@ -359,6 +385,97 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
     )
 
 
+def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> None:
+    async def _optimize(request: Request) -> Response:
+        """Enqueue hyperparameter optimization job using Optuna TPE.
+
+        Runs Bayesian optimization on external bankruptcy datasets to find
+        optimal XGBoost hyperparameters. Results include best hyperparameters
+        and a recommended TrainConfig for subsequent training.
+        """
+        body_bytes = await request.body()
+        # Validate request at the API edge
+        try:
+            parsed = parse_optimize_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+
+        # Build JSON payload for the worker
+        payload: dict[str, JSONValue] = {
+            "dataset": parsed["dataset"],
+            "n_trials": parsed["config"]["n_trials"],
+            "device": parsed["device"],
+            "random_state": parsed["config"]["random_state"],
+            "feature_preset": parsed["feature_preset"],
+        }
+        timeout_seconds = parsed["config"]["timeout_seconds"]
+        if timeout_seconds is not None:
+            payload["timeout_seconds"] = timeout_seconds
+
+        # Determine space profile from search space (reverse map)
+        # Default space uses float (log-scale), categorical uses categorical_float
+        space = parsed["search_space"]
+        lr_spec = space["learning_rate"]
+        if lr_spec["param_type"] == "categorical_float":
+            payload["space_profile"] = "categorical"
+        else:
+            # Default profile uses float param_type
+            payload["space_profile"] = "default"
+
+        config_json = dump_json_str(payload)
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.optimize_job.process_optimize_job",
+            config_json,
+            job_timeout=7200,  # 2 hours for optimization
+            result_ttl=86400,
+            failure_ttl=86400,
+            description="Hyperparameter optimization with Optuna TPE",
+        )
+
+        response = OptimizeResponse(job_id=job.get_id(), status="queued")
+        body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
+    router.add_api_route(
+        "/optimize",
+        _optimize,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Optimize XGBoost hyperparameters with Optuna TPE",
+        description=(
+            "Run Bayesian hyperparameter optimization using Optuna's Tree-structured "
+            "Parzen Estimator (TPE) on external bankruptcy datasets. Supported datasets: "
+            "taiwan (Taiwan Economic Journal), us (American bankruptcy), polish (Polish "
+            "companies).\n\n"
+            "**Search Space Profiles:**\n"
+            "- `default`: Wide continuous ranges with log-scale for learning_rate\n"
+            "- `categorical`: Fixed choice sets for faster grid-like search\n\n"
+            "**Feature Engineering Presets:**\n"
+            "- `none`: Original features only (default)\n"
+            "- `log_only`: Original + signed log transforms\n"
+            "- `ratios_only`: Original + pairwise ratios (Xi/Xj)\n"
+            "- `full`: Original + ratios + products + log transforms\n\n"
+            "**Job Result:**\n"
+            "When complete, the job result includes:\n"
+            "- Best hyperparameters found\n"
+            "- Validation AUC achieved\n"
+            "- Feature preset used\n"
+            "- Recommended TrainConfig for use with /train-external\n\n"
+            "Poll /ml/jobs/{job_id} for status and results."
+        ),
+        response_description="Job ID for polling status",
+        responses=_OPTIMIZE_RESPONSES,
+    )
+
+
 def _register_model_info(router: APIRouter, get_container: ContainerProtocol) -> None:
     def _get_model_info() -> Response:
         info = get_container.get_model_info()
@@ -417,6 +534,7 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
     _register_predict(router, get_container)
     _register_train(router, get_container)
     _register_train_external(router, get_container)
+    _register_optimize(router, get_container)
     _register_model_info(router, get_container)
     _register_job_status(router, get_container)
     return router
