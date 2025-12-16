@@ -1,0 +1,12 @@
+
+
+
+
+
+
+{"backend": "xgboost", "dataset": "us", "elapsed_sec": 1.5992225000227336, "best_val_auc": 0.6993522088933586, "early_stopped": false, "val_ppl": 1.8622182394961642, "test_ppl": 1.8524547748150093, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\xgboost_us\\covenant_model_21d9b4d3.ubj"}
+{"backend": "mlp", "dataset": "us", "elapsed_sec": 2.6338787999993656, "best_val_auc": 0.6923794429288186, "early_stopped": false, "val_ppl": 1.7993708084389304, "test_ppl": 1.7941009514389992, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\mlp_us\\mlp_final.pt"}
+{"backend": "xgboost", "dataset": "taiwan", "elapsed_sec": 1.0910207999986596, "best_val_auc": 0.9450872359963268, "early_stopped": false, "val_ppl": 1.2481833335153862, "test_ppl": 1.2750779755459518, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\xgboost_taiwan\\covenant_model_8fd48b23.ubj"}
+{"backend": "mlp", "dataset": "taiwan", "elapsed_sec": 2.046341899986146, "best_val_auc": 0.9293541475359657, "early_stopped": true, "val_ppl": 2.1002759064848515, "test_ppl": 2.1361107841367666, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\mlp_taiwan\\mlp_final.pt"}
+{"backend": "xgboost", "dataset": "polish", "elapsed_sec": 0.9602834999968763, "best_val_auc": 0.9140442539667253, "early_stopped": false, "val_ppl": 1.3519638166159818, "test_ppl": 1.3394049061049165, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\xgboost_polish\\covenant_model_c99ce683.ubj"}
+{"backend": "mlp", "dataset": "polish", "elapsed_sec": 1.990487699978985, "best_val_auc": 0.7436977824862158, "early_stopped": false, "val_ppl": 1.9637667581100249, "test_ppl": 1.9807925327971034, "model_path": "C:\\Users\\Test\\PROJECTS\\API\\services\\covenant-radar-api\\models\\benchmark\\mlp_polish\\mlp_final.pt"}

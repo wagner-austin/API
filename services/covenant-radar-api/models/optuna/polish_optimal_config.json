@@ -1,0 +1,1 @@
+{"device":"cuda","learning_rate":0.12282198973038651,"max_depth":9,"n_estimators":125,"subsample":0.9651894345657961,"colsample_bytree":0.8711200508336994,"random_state":42,"train_ratio":0.7,"val_ratio":0.15,"test_ratio":0.15,"early_stopping_rounds":20,"reg_alpha":0.23859410780017407,"reg_lambda":0.8482593884482071}
