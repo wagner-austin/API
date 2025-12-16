@@ -11,7 +11,8 @@ from monorepo_guards.util import read_lines
 class LoggingRule:
     name = "logging"
 
-    _pat_print = re.compile(r"\bprint\s*\(")
+    # Matches bare print calls but NOT method calls like console.print
+    _pat_bare_print = re.compile(r"(?<![.\w])print\s*\(")
     _pat_import_logging = re.compile(r"^\s*import\s+logging(\s+as\s+(?P<alias>\w+))?\b")
     _pat_from_logging = re.compile(r"^\s*from\s+logging\s+import\s+(?P<imports>.+)$")
 
@@ -95,7 +96,7 @@ class LoggingRule:
 
         for idx, raw in enumerate(lines, start=1):
             line = raw.rstrip("\n")
-            if self._pat_print.search(line):
+            if self._pat_bare_print.search(line):
                 violations.append(Violation(file=path, line_no=idx, kind="print", line=line))
                 continue
 
