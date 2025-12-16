@@ -18,6 +18,7 @@ include = ["src/platform_core/py.typed"]
 python = "^3.11"
 fastapi = "^0.124"
 httpx = "^0.28"
+rich = "^14.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

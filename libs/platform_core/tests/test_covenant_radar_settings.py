@@ -21,7 +21,11 @@ def test_load_covenant_radar_settings_success() -> None:
     assert settings["app"]["models_root"] == "/data/models"
     assert settings["app"]["logs_root"] == "/data/logs"
     assert settings["app"]["data_root"] == "/data"
-    assert settings["app"]["active_model_path"] == "/data/models/active.ubj"
+    # Backend defaults to xgboost, so active_model_path resolves to XGB path
+    assert settings["app"]["ml_backend"] == "xgboost"
+    assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
+    assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
+    assert settings["app"]["active_model_path"] == "/data/models/active_xgb.ubj"
     assert settings["rq"]["queue_name"] == "covenant"
     assert settings["logging"]["level"] == "INFO"
     assert settings["app_env"] == "dev"
@@ -48,14 +52,18 @@ def test_load_covenant_radar_settings_custom_app_config() -> None:
     env.set("APP__DATA_ROOT", "/custom/data")
     env.set("APP__MODELS_ROOT", "/custom/models")
     env.set("APP__LOGS_ROOT", "/custom/logs")
-    env.set("APP__ACTIVE_MODEL_PATH", "/custom/models/my_model.ubj")
+    env.set("APP__ACTIVE_MODEL_PATH_XGB", "/custom/models/my_xgb.ubj")
+    env.set("APP__ACTIVE_MODEL_PATH_MLP", "/custom/models/my_mlp.pt")
 
     settings = load_covenant_radar_settings()
 
     assert settings["app"]["data_root"] == "/custom/data"
     assert settings["app"]["models_root"] == "/custom/models"
     assert settings["app"]["logs_root"] == "/custom/logs"
-    assert settings["app"]["active_model_path"] == "/custom/models/my_model.ubj"
+    assert settings["app"]["active_model_path_xgb"] == "/custom/models/my_xgb.ubj"
+    assert settings["app"]["active_model_path_mlp"] == "/custom/models/my_mlp.pt"
+    # Default backend is xgboost, so active_model_path resolves to XGB path
+    assert settings["app"]["active_model_path"] == "/custom/models/my_xgb.ubj"
 
 
 def test_load_covenant_radar_settings_custom_rq_config() -> None:
@@ -136,3 +144,32 @@ def test_covenant_radar_settings_is_typed_dict() -> None:
     assert "logging" in annotations
     assert "rq" in annotations
     assert "app_env" in annotations
+
+
+def test_load_covenant_radar_settings_mlp_backend() -> None:
+    """Test load_covenant_radar_settings with MLP backend."""
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test:6379/0")
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
+    env.set("APP__ML_BACKEND", "mlp")
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["app"]["ml_backend"] == "mlp"
+    # active_model_path should resolve to MLP path when backend is mlp
+    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
+    assert settings["app"]["active_model_path_xgb"] == "/data/models/active_xgb.ubj"
+    assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
+
+
+def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
+    """Test load_covenant_radar_settings raises for invalid backend."""
+    import pytest
+
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test:6379/0")
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
+    env.set("APP__ML_BACKEND", "invalid_backend")
+
+    with pytest.raises(ValueError, match="must be 'xgboost' or 'mlp'"):
+        load_covenant_radar_settings()

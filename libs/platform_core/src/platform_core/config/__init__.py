@@ -20,6 +20,7 @@ from .covenant_radar import (
     CovenantRadarRedisConfig,
     CovenantRadarRQConfig,
     CovenantRadarSettings,
+    MLBackend,
     load_covenant_radar_settings,
 )
 from .data_bank import DataBankSettings, load_data_bank_settings
@@ -77,6 +78,7 @@ __all__ = [
     "HandwritingAiSecurityConfig",
     "HandwritingAiSettings",
     "HandwritingConfig",
+    "MLBackend",
     "ModelTrainerAppConfig",
     "ModelTrainerCleanupConfig",
     "ModelTrainerConfig",

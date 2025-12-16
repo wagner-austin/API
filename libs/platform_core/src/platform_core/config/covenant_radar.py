@@ -6,6 +6,9 @@ from platform_core.logging import LogLevel
 
 from ._utils import _parse_bool, _parse_int, _parse_str
 
+# ML backend type - matches covenant_ml.types.BackendName
+MLBackend = Literal["xgboost", "mlp"]
+
 
 class CovenantRadarLoggingConfig(TypedDict, total=True):
     """Logging configuration."""
@@ -36,6 +39,9 @@ class CovenantRadarAppConfig(TypedDict, total=True):
     models_root: str
     logs_root: str
     active_model_path: str
+    ml_backend: MLBackend
+    active_model_path_xgb: str
+    active_model_path_mlp: str
 
 
 class CovenantRadarSettings(TypedDict, total=True):
@@ -47,6 +53,16 @@ class CovenantRadarSettings(TypedDict, total=True):
     rq: CovenantRadarRQConfig
     app: CovenantRadarAppConfig
     database_url: str
+
+
+def _parse_ml_backend(env_var: str, default: MLBackend) -> MLBackend:
+    """Parse ML backend from environment variable."""
+    value = _parse_str(env_var, default)
+    if value == "xgboost":
+        return "xgboost"
+    if value == "mlp":
+        return "mlp"
+    raise ValueError(f"{env_var} must be 'xgboost' or 'mlp', got '{value}'")
 
 
 def load_covenant_radar_settings() -> CovenantRadarSettings:
@@ -64,6 +80,9 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         APP__DATA_ROOT: Data root directory (default: /data)
         APP__MODELS_ROOT: Models directory (default: /data/models)
         APP__LOGS_ROOT: Logs directory (default: /data/logs)
+        APP__ML_BACKEND: ML backend for inference (xgboost/mlp, default: xgboost)
+        APP__ACTIVE_MODEL_PATH_XGB: Active XGBoost model path (default: /data/models/active_xgb.ubj)
+        APP__ACTIVE_MODEL_PATH_MLP: Active MLP model path (default: /data/models/active_mlp.pt)
         DATABASE_URL: PostgreSQL connection URL (required)
     """
     level_str = _parse_str("LOGGING__LEVEL", "INFO")
@@ -98,11 +117,22 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "failure_ttl_sec": _parse_int("RQ__FAILURE_TTL_SEC", 7 * 86_400),
     }
 
+    # Parse ML backend and backend-specific active model paths
+    ml_backend = _parse_ml_backend("APP__ML_BACKEND", "xgboost")
+    active_model_path_xgb = _parse_str("APP__ACTIVE_MODEL_PATH_XGB", "/data/models/active_xgb.ubj")
+    active_model_path_mlp = _parse_str("APP__ACTIVE_MODEL_PATH_MLP", "/data/models/active_mlp.pt")
+
+    # Resolve active_model_path based on backend for backward compatibility
+    active_model_path = active_model_path_xgb if ml_backend == "xgboost" else active_model_path_mlp
+
     app_cfg: CovenantRadarAppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
         "models_root": _parse_str("APP__MODELS_ROOT", "/data/models"),
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
-        "active_model_path": _parse_str("APP__ACTIVE_MODEL_PATH", "/data/models/active.ubj"),
+        "active_model_path": active_model_path,
+        "ml_backend": ml_backend,
+        "active_model_path_xgb": active_model_path_xgb,
+        "active_model_path_mlp": active_model_path_mlp,
     }
 
     app_env_str = _parse_str("APP_ENV", "dev")
@@ -124,5 +154,6 @@ __all__ = [
     "CovenantRadarRQConfig",
     "CovenantRadarRedisConfig",
     "CovenantRadarSettings",
+    "MLBackend",
     "load_covenant_radar_settings",
 ]
