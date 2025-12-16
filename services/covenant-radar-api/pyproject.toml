@@ -25,6 +25,7 @@ httpx = "^0.28"
 xgboost = "^3.1"
 numpy = "^2.3"
 scikit-learn = "^1.7"
+rich = "^14.2"
 
 # Monorepo libs
 platform-core = { path = "../../libs/platform_core", develop = true }

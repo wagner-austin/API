@@ -14,10 +14,10 @@ if (-not (Get-Command poetry -ErrorAction SilentlyContinue)) {
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 
 if ([string]::IsNullOrWhiteSpace($ExternalDir)) {
-    $ExternalDir = Join-Path $scriptRoot '..' 'data' 'external'
+    $ExternalDir = Join-Path (Join-Path (Join-Path $scriptRoot '..') 'data') 'external'
 }
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = Join-Path $scriptRoot '..' 'models' 'benchmark'
+    $OutputDir = Join-Path (Join-Path (Join-Path $scriptRoot '..') 'models') 'benchmark'
 }
 
 $ExternalDir = (Resolve-Path $ExternalDir).Path
