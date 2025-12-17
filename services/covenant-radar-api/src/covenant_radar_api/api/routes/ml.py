@@ -24,9 +24,13 @@ from platform_workers.rq_harness import RQClientQueue
 
 from ..decode import (
     ExplainResponse,
+    LightGBMOptimizeParseResult,
+    LSTMOptimizeParseResult,
+    MLPOptimizeParseResult,
     OptimizeResponse,
     PredictResponse,
     TrainResponse,
+    XGBoostOptimizeParseResult,
     parse_explain_request,
     parse_external_train_request,
     parse_optimize_request,
@@ -413,7 +417,7 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
 
 
 def _build_xgboost_optimize_payload(
-    parsed: "XGBoostOptimizeParseResult",
+    parsed: XGBoostOptimizeParseResult,
 ) -> dict[str, JSONValue]:
     """Build JSON payload for XGBoost optimization worker.
 
@@ -438,7 +442,7 @@ def _build_xgboost_optimize_payload(
 
 
 def _build_mlp_optimize_payload(
-    parsed: "MLPOptimizeParseResult",
+    parsed: MLPOptimizeParseResult,
 ) -> dict[str, JSONValue]:
     """Build JSON payload for MLP optimization worker.
 
@@ -466,7 +470,7 @@ def _build_mlp_optimize_payload(
 
 
 def _build_lightgbm_optimize_payload(
-    parsed: "LightGBMOptimizeParseResult",
+    parsed: LightGBMOptimizeParseResult,
 ) -> dict[str, JSONValue]:
     """Build JSON payload for LightGBM optimization worker.
 
@@ -491,7 +495,7 @@ def _build_lightgbm_optimize_payload(
 
 
 def _build_lstm_optimize_payload(
-    parsed: "LSTMOptimizeParseResult",
+    parsed: LSTMOptimizeParseResult,
 ) -> dict[str, JSONValue]:
     """Build JSON payload for LSTM optimization worker.
 
@@ -519,15 +523,6 @@ def _build_lstm_optimize_payload(
     return payload
 
 
-# Import type hints for payload builders
-from ..decode import (
-    LightGBMOptimizeParseResult,
-    LSTMOptimizeParseResult,
-    MLPOptimizeParseResult,
-    XGBoostOptimizeParseResult,
-)
-
-
 def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _optimize(request: Request) -> Response:
         """Enqueue hyperparameter optimization job using Optuna TPE.
@@ -547,24 +542,21 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
             raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
 
         # Dispatch to backend-specific worker job
-        backend = parsed["backend"]
         queue = get_container.rq_queue()
 
-        if backend == "xgboost":
-            xgb_parsed: XGBoostOptimizeParseResult = parsed
-            payload = _build_xgboost_optimize_payload(xgb_parsed)
+        if parsed["backend"] == "xgboost":
+            payload = _build_xgboost_optimize_payload(parsed)
             config_json = dump_json_str(payload)
             job = queue.enqueue(
-                "covenant_radar_api.worker.optimize_job.process_optimize_job",
+                "covenant_radar_api.worker.optimize_xgboost_job.process_xgboost_optimize_job",
                 config_json,
                 job_timeout=7200,
                 result_ttl=86400,
                 failure_ttl=86400,
                 description="XGBoost hyperparameter optimization with Optuna TPE",
             )
-        elif backend == "mlp":
-            mlp_parsed: MLPOptimizeParseResult = parsed
-            payload = _build_mlp_optimize_payload(mlp_parsed)
+        elif parsed["backend"] == "mlp":
+            payload = _build_mlp_optimize_payload(parsed)
             config_json = dump_json_str(payload)
             job = queue.enqueue(
                 "covenant_radar_api.worker.optimize_mlp_job.process_mlp_optimize_job",
@@ -574,9 +566,8 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
                 failure_ttl=86400,
                 description="MLP hyperparameter optimization with Optuna TPE",
             )
-        elif backend == "lightgbm":
-            lgbm_parsed: LightGBMOptimizeParseResult = parsed
-            payload = _build_lightgbm_optimize_payload(lgbm_parsed)
+        elif parsed["backend"] == "lightgbm":
+            payload = _build_lightgbm_optimize_payload(parsed)
             config_json = dump_json_str(payload)
             job = queue.enqueue(
                 "covenant_radar_api.worker.optimize_lightgbm_job.process_lightgbm_optimize_job",
@@ -586,9 +577,9 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
                 failure_ttl=86400,
                 description="LightGBM hyperparameter optimization with Optuna TPE",
             )
-        elif backend == "lstm":
-            lstm_parsed: LSTMOptimizeParseResult = parsed
-            payload = _build_lstm_optimize_payload(lstm_parsed)
+        else:
+            # parsed["backend"] == "lstm" - exhaustive match
+            payload = _build_lstm_optimize_payload(parsed)
             config_json = dump_json_str(payload)
             job = queue.enqueue(
                 "covenant_radar_api.worker.optimize_lstm_job.process_lstm_optimize_job",
@@ -597,13 +588,6 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
                 result_ttl=86400,
                 failure_ttl=86400,
                 description="LSTM hyperparameter optimization with Optuna TPE",
-            )
-        else:
-            # Type narrowing - this branch is unreachable due to parse validation
-            raise AppError(
-                code=ErrorCode.INVALID_INPUT,
-                message=f"Unknown backend: {backend}",
-                http_status=400,
             )
 
         response = OptimizeResponse(job_id=job.get_id(), status="queued")
