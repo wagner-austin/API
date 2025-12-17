@@ -18,6 +18,7 @@ include = ["src/covenant_ml/py.typed"]
 python = "^3.11"
 covenant-domain = { path = "../covenant_domain", develop = true }
 xgboost = "^3.1"
+lightgbm = "^4.6.0"
 numpy = "^2.3"
 scikit-learn = "^1.7"
 platform-ml = { path = "../platform_ml", develop = true }
