@@ -7,7 +7,7 @@ from platform_core.logging import LogLevel
 from ._utils import _parse_bool, _parse_int, _parse_str
 
 # ML backend type - matches covenant_ml.types.BackendName
-MLBackend = Literal["xgboost", "mlp"]
+MLBackend = Literal["xgboost", "mlp", "lstm", "lightgbm"]
 
 
 class CovenantRadarLoggingConfig(TypedDict, total=True):
@@ -62,7 +62,11 @@ def _parse_ml_backend(env_var: str, default: MLBackend) -> MLBackend:
         return "xgboost"
     if value == "mlp":
         return "mlp"
-    raise ValueError(f"{env_var} must be 'xgboost' or 'mlp', got '{value}'")
+    if value == "lstm":
+        return "lstm"
+    if value == "lightgbm":
+        return "lightgbm"
+    raise ValueError(f"{env_var} must be 'xgboost', 'mlp', 'lstm', or 'lightgbm', got '{value}'")
 
 
 def load_covenant_radar_settings() -> CovenantRadarSettings:
@@ -80,7 +84,7 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         APP__DATA_ROOT: Data root directory (default: /data)
         APP__MODELS_ROOT: Models directory (default: /data/models)
         APP__LOGS_ROOT: Logs directory (default: /data/logs)
-        APP__ML_BACKEND: ML backend for inference (xgboost/mlp, default: xgboost)
+        APP__ML_BACKEND: ML backend for inference (xgboost/mlp/lstm/lightgbm, default: xgboost)
         APP__ACTIVE_MODEL_PATH_XGB: Active XGBoost model path (default: /data/models/active_xgb.ubj)
         APP__ACTIVE_MODEL_PATH_MLP: Active MLP model path (default: /data/models/active_mlp.pt)
         DATABASE_URL: PostgreSQL connection URL (required)

@@ -162,6 +162,34 @@ def test_load_covenant_radar_settings_mlp_backend() -> None:
     assert settings["app"]["active_model_path_mlp"] == "/data/models/active_mlp.pt"
 
 
+def test_load_covenant_radar_settings_lstm_backend() -> None:
+    """Test load_covenant_radar_settings with LSTM backend."""
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test:6379/0")
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
+    env.set("APP__ML_BACKEND", "lstm")
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["app"]["ml_backend"] == "lstm"
+    # active_model_path resolves to MLP path for non-xgboost backends (legacy behavior)
+    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
+
+
+def test_load_covenant_radar_settings_lightgbm_backend() -> None:
+    """Test load_covenant_radar_settings with LightGBM backend."""
+    env = make_fake_env()
+    env.set("REDIS_URL", "redis://test:6379/0")
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
+    env.set("APP__ML_BACKEND", "lightgbm")
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["app"]["ml_backend"] == "lightgbm"
+    # active_model_path resolves to MLP path for non-xgboost backends (legacy behavior)
+    assert settings["app"]["active_model_path"] == "/data/models/active_mlp.pt"
+
+
 def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
     """Test load_covenant_radar_settings raises for invalid backend."""
     import pytest
@@ -171,5 +199,5 @@ def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
     env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("APP__ML_BACKEND", "invalid_backend")
 
-    with pytest.raises(ValueError, match="must be 'xgboost' or 'mlp'"):
+    with pytest.raises(ValueError, match="must be 'xgboost', 'mlp', 'lstm', or 'lightgbm'"):
         load_covenant_radar_settings()
