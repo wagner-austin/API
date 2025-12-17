@@ -25,9 +25,15 @@ from covenant_domain import (
 from covenant_ml import FeaturePreset
 from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.optimizer import (
+    LightGBMSearchSpace,
+    LSTMSearchSpace,
+    MLPSearchSpace,
     OptimizationConfig,
     XGBoostSearchSpace,
     make_default_optimization_config,
+    make_lightgbm_default_space,
+    make_lstm_default_space,
+    make_mlp_default_space,
     make_xgboost_categorical_space,
     make_xgboost_default_space,
 )
