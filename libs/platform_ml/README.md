@@ -302,6 +302,250 @@ torch_types._import_torch = _fake_import
 assert resolve_device("auto") == "cpu"
 ```
 
+## Feature Importance Explainers
+
+Pluggable feature importance explainers for ML models. Provides three methods with different trade-offs between accuracy, speed, and model requirements.
+
+### SHAP Integration
+
+The `shap` library has poor typing (`Any` everywhere), which violates our strict MyPy standards. We provide two approaches:
+
+1. **Custom Explainers** (below): Fully typed alternatives that don't depend on SHAP
+2. **ShapTreeWrapper**: Anti-corruption layer for SHAP TreeExplainer with strict typing
+
+For tree-based models (XGBoost, LightGBM, sklearn GradientBoosting), use `ShapTreeWrapper` to get SHAP's fast TreeExplainer with full type safety. See the ShapTreeWrapper section below.
+
+### Available Explainers
+
+| Explainer | Model Requirements | Speed | Accuracy |
+|-----------|-------------------|-------|----------|
+| `PermutationExplainer` | Any predictor | Medium | Good |
+| `GradientExplainer` | Differentiable (neural nets) | Fast | Moderate |
+| `IntegratedGradientsExplainer` | Differentiable (neural nets) | Slow | High |
+
+### Quick Start
+
+```python
+from platform_ml.explainers import (
+    PermutationExplainer,
+    PermutationConfig,
+    create_permutation_explainer,
+    FeatureImportanceScore,
+)
+
+# Configure explainer
+config: PermutationConfig = {"n_repeats": 10, "random_state": 42}
+explainer = create_permutation_explainer(config)
+
+# Compute feature importance
+importance: list[FeatureImportanceScore] = explainer.compute_importance(
+    model=model,           # Any model with predict_proba()
+    x_data=x_test,         # NDArray[np.float64]
+    feature_names=["age", "income", "score"],
+    target_class=1,        # Class index for importance
+)
+
+# Results are ranked by importance
+for score in importance:
+    print(f"{score['rank']}. {score['name']}: {score['importance']:.4f}")
+```
+
+### PermutationExplainer
+
+Model-agnostic method that measures prediction change when features are shuffled. Works with any model implementing `PredictorProtocol`.
+
+```python
+from platform_ml.explainers import (
+    PermutationExplainer,
+    PermutationConfig,
+    PERMUTATION_CAPABILITIES,
+)
+
+config: PermutationConfig = {
+    "n_repeats": 10,      # Number of shuffle repeats
+    "random_state": 42,   # For reproducibility
+}
+explainer = PermutationExplainer(config)
+
+# Check capabilities
+caps = explainer.capabilities()
+assert caps["requires_gradients"] is False  # Works with any model
+assert caps["computational_cost"] == "medium"
+```
+
+### GradientExplainer
+
+Fast gradient-based attribution for neural networks. Requires models implementing `GradientModelProtocol`.
+
+```python
+from platform_ml.explainers import (
+    GradientExplainer,
+    GradientConfig,
+    GRADIENT_CAPABILITIES,
+)
+
+config: GradientConfig = {
+    "multiply_by_input": True,   # Gradient * input attribution
+    "absolute_value": True,      # Use absolute gradients
+}
+explainer = GradientExplainer(config)
+
+# Check capabilities
+caps = explainer.capabilities()
+assert caps["requires_gradients"] is True  # Neural networks only
+assert caps["computational_cost"] == "low"
+```
+
+### IntegratedGradientsExplainer
+
+Accurate path-integrated gradients (Sundararajan et al., 2017). More accurate than simple gradients but computationally expensive.
+
+```python
+from platform_ml.explainers import (
+    IntegratedGradientsExplainer,
+    IntegratedGradientsConfig,
+    INTEGRATED_GRADIENTS_CAPABILITIES,
+)
+
+config: IntegratedGradientsConfig = {
+    "n_steps": 50,              # Integration steps (more = accurate)
+    "baseline_mode": "zeros",   # "zeros" or "mean"
+}
+explainer = IntegratedGradientsExplainer(config)
+
+# Check capabilities
+caps = explainer.capabilities()
+assert caps["requires_gradients"] is True
+assert caps["requires_background_data"] is True
+assert caps["computational_cost"] == "high"
+```
+
+### Model Protocols
+
+Models must implement the appropriate protocol:
+
+```python
+from platform_ml.explainers import PredictorProtocol, GradientModelProtocol
+
+# For PermutationExplainer - any model with predict_proba
+class MyClassifier:
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        # Return shape (n_samples, n_classes)
+        ...
+
+# For GradientExplainer/IntegratedGradientsExplainer - neural networks
+class MyNeuralNet:
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        ...
+
+    def compute_gradients(
+        self, x: NDArray[np.float64], target_class: int
+    ) -> NDArray[np.float64]:
+        # Return gradients with shape (n_samples, n_features)
+        ...
+```
+
+### Explainer Types
+
+| Type | Description |
+|------|-------------|
+| `ExplainerName` | `Literal["permutation", "gradient", "integrated_gradients"]` |
+| `ComputationalCost` | `Literal["low", "medium", "high"]` |
+| `ExplainerCapabilities` | TypedDict with requirements and cost |
+| `FeatureImportanceScore` | TypedDict with name, importance, rank |
+| `PermutationConfig` | Config for PermutationExplainer |
+| `GradientConfig` | Config for GradientExplainer |
+| `IntegratedGradientsConfig` | Config for IntegratedGradientsExplainer |
+| `PredictorProtocol` | Protocol for models with predict_proba |
+| `GradientModelProtocol` | Protocol for models with gradients |
+| `FeatureExplainer` | Protocol for all explainers |
+
+### Factory Functions
+
+```python
+from platform_ml.explainers import (
+    create_permutation_explainer,
+    create_gradient_explainer,
+    create_integrated_gradients_explainer,
+)
+
+# Each returns the corresponding explainer type
+explainer = create_permutation_explainer(config)
+explainer = create_gradient_explainer(config)
+explainer = create_integrated_gradients_explainer(config)
+```
+
+### ShapTreeWrapper
+
+Type-safe wrapper for SHAP TreeExplainer. Provides local (per-sample) Shapley value explanations for tree-based models while maintaining strict typing.
+
+```python
+from platform_ml import ShapTreeWrapper, LocalExplanation, TreeModelProtocol
+import numpy as np
+from numpy.typing import NDArray
+
+# Any tree-based model with predict_proba works
+# (XGBoost, LightGBM, sklearn GradientBoosting, RandomForest)
+model = train_gradient_boosting_classifier(x_train, y_train)
+
+# Create wrapper (dynamically imports shap internally)
+wrapper = ShapTreeWrapper(model)
+
+# Compute local explanations
+x_test: NDArray[np.float64] = get_test_data()
+feature_names = ["age", "income", "credit_score"]
+
+explanations: list[LocalExplanation] = wrapper.explain_local(x_test, feature_names)
+
+# Each explanation contains:
+for expl in explanations:
+    print(f"Base value: {expl['base_value']}")      # Model's expected output
+    print(f"Features: {expl['feature_names']}")     # Feature names
+    print(f"SHAP values: {expl['values']}")         # Per-feature contributions
+```
+
+#### TreeModelProtocol
+
+Models must implement `predict_proba` returning class probabilities:
+
+```python
+from platform_ml import TreeModelProtocol
+
+class MyTreeModel:
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Predict class probabilities.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Probabilities with shape (n_samples, n_classes).
+        """
+        ...
+```
+
+#### LocalExplanation TypedDict
+
+```python
+from platform_ml import LocalExplanation
+
+# TypedDict structure
+explanation: LocalExplanation = {
+    "base_value": 0.5,                    # float: model's expected output
+    "feature_names": ["a", "b", "c"],     # list[str]: feature names
+    "values": [0.1, -0.2, 0.15],          # list[float]: SHAP values per feature
+}
+```
+
+#### Anti-Corruption Pattern
+
+ShapTreeWrapper uses dynamic import to isolate the untyped `shap` library:
+
+- No top-level `import shap` (avoids untyped module pollution)
+- Protocol-typed assignment: `TreeExplainerConstructor` Protocol overrides `Any` from `getattr`
+- TypeGuard for safe type narrowing of `expected_value` (can be float or ndarray)
+- All outputs converted to strict Python types (`float`, `list[float]`)
+
 ## API Reference
 
 ### Artifact Store
@@ -354,6 +598,31 @@ assert resolve_device("auto") == "cpu"
 | `resolve_device` | Resolve device with CUDA auto-detection |
 | `resolve_precision` | Resolve precision based on device |
 | `recommended_batch_size` | Device-aware batch size recommendation |
+
+### Explainers
+
+| Type | Description |
+|------|-------------|
+| `PermutationExplainer` | Model-agnostic permutation importance |
+| `GradientExplainer` | Gradient-based feature attribution |
+| `IntegratedGradientsExplainer` | Path-integrated gradients |
+| `ShapTreeWrapper` | Type-safe wrapper for SHAP TreeExplainer |
+| `PermutationConfig` | Permutation explainer config |
+| `GradientConfig` | Gradient explainer config |
+| `IntegratedGradientsConfig` | Integrated gradients config |
+| `FeatureImportanceScore` | Importance result TypedDict |
+| `LocalExplanation` | SHAP local explanation TypedDict |
+| `ExplainerCapabilities` | Explainer requirements TypedDict |
+| `PredictorProtocol` | Protocol for any predictor |
+| `GradientModelProtocol` | Protocol for gradient-capable models |
+| `TreeModelProtocol` | Protocol for tree-based models |
+| `FeatureExplainer` | Protocol for all explainers |
+| `create_permutation_explainer` | Factory for PermutationExplainer |
+| `create_gradient_explainer` | Factory for GradientExplainer |
+| `create_integrated_gradients_explainer` | Factory for IntegratedGradientsExplainer |
+| `PERMUTATION_CAPABILITIES` | Permutation explainer capabilities |
+| `GRADIENT_CAPABILITIES` | Gradient explainer capabilities |
+| `INTEGRATED_GRADIENTS_CAPABILITIES` | Integrated gradients capabilities |
 
 ## Development
 
