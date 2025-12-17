@@ -197,13 +197,14 @@ make up-music
 
 ## covenant-radar-api
 
-Loan covenant monitoring and breach prediction service using XGBoost.
+Loan covenant monitoring and breach prediction service with pluggable ML backends.
 
 **Features:**
 - CRUD operations for loan deals and covenant definitions
 - Financial measurement ingestion
 - Deterministic covenant rule evaluation
-- XGBoost-based breach risk prediction
+- Pluggable ML backends: XGBoost, LightGBM, MLP neural networks, LSTM
+- Optuna hyperparameter optimization
 - Background training jobs via RQ
 
 **Key Endpoints:**
