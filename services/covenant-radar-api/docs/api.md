@@ -766,45 +766,73 @@ Poll `/ml/jobs/{job_id}` to get the result:
 
 ### POST /ml/train-external
 
-Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggable ML backends. Supports XGBoost (gradient boosting) and MLP (neural network) backends.
+Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggable ML backends. Supports four backends: XGBoost, MLP, LightGBM, and LSTM.
 
 **Common Request Fields:**
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `dataset` | string | Yes | - | Dataset to use: `taiwan`, `us`, or `polish` |
-| `backend` | string | No | `xgboost` | Backend to use: `xgboost` or `mlp` |
+| `backend` | string | No | `xgboost` | Backend: `xgboost`, `mlp`, `lightgbm`, or `lstm` |
 | `learning_rate` | float | Yes | - | Learning rate |
 | `random_state` | int | Yes | - | Random seed |
 | `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
-| `train_ratio` | float | No | `0.7` | Training set ratio |
-| `val_ratio` | float | No | `0.15` | Validation set ratio |
-| `test_ratio` | float | No | `0.15` | Test set ratio |
+| `train_ratio` | float | Yes | - | Training set ratio (e.g., 0.7) |
+| `val_ratio` | float | Yes | - | Validation set ratio (e.g., 0.15) |
+| `test_ratio` | float | Yes | - | Test set ratio (e.g., 0.15) |
 
 **XGBoost-Specific Fields (`backend: "xgboost"`):**
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `max_depth` | int | Yes | - | Max tree depth |
-| `n_estimators` | int | Yes | - | Number of trees |
-| `subsample` | float | Yes | - | Row subsample ratio |
-| `colsample_bytree` | float | Yes | - | Column subsample ratio |
-| `early_stopping_rounds` | int | No | `10` | Early stopping patience |
-| `reg_alpha` | float | No | `0.0` | L1 regularization strength |
-| `reg_lambda` | float | No | `1.0` | L2 regularization strength |
-| `scale_pos_weight` | float | No | auto | Class weight (auto-calculated if omitted) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `max_depth` | int | Yes | Max tree depth |
+| `n_estimators` | int | Yes | Number of trees |
+| `subsample` | float | Yes | Row subsample ratio |
+| `colsample_bytree` | float | Yes | Column subsample ratio |
+| `reg_alpha` | float | Yes | L1 regularization strength |
+| `reg_lambda` | float | Yes | L2 regularization strength |
+| `early_stopping_rounds` | int | Yes | Early stopping patience |
+| `scale_pos_weight` | float | No | Class weight (auto-calculated if omitted) |
 
 **MLP-Specific Fields (`backend: "mlp"`):**
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `hidden_sizes` | array[int] | Yes | - | Hidden layer sizes (e.g., `[64, 32]`) |
-| `batch_size` | int | Yes | - | Training batch size |
-| `n_epochs` | int | Yes | - | Maximum training epochs |
-| `dropout` | float | Yes | - | Dropout rate (0.0 to 1.0) |
-| `precision` | string | Yes | - | `fp32`, `fp16`, `bf16`, or `auto` |
-| `optimizer` | string | Yes | - | `adamw`, `adam`, or `sgd` |
-| `early_stopping_patience` | int | Yes | - | Epochs without improvement before stopping |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `precision` | string | Yes | `fp32`, `fp16`, `bf16`, or `auto` |
+| `optimizer` | string | Yes | `adamw`, `adam`, or `sgd` |
+| `hidden_sizes` | array[int] | Yes | Hidden layer sizes (e.g., `[64, 32]`) |
+| `batch_size` | int | Yes | Training batch size |
+| `n_epochs` | int | Yes | Maximum training epochs |
+| `dropout` | float | Yes | Dropout rate (0.0 to 1.0) |
+| `early_stopping_patience` | int | Yes | Epochs without improvement before stopping |
+
+**LightGBM-Specific Fields (`backend: "lightgbm"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `max_depth` | int | Yes | Max tree depth |
+| `n_estimators` | int | Yes | Number of trees |
+| `num_leaves` | int | Yes | Maximum leaves per tree |
+| `min_child_samples` | int | Yes | Minimum samples per leaf |
+| `subsample` | float | Yes | Row subsample ratio |
+| `colsample_bytree` | float | Yes | Column subsample ratio |
+| `reg_alpha` | float | Yes | L1 regularization strength |
+| `reg_lambda` | float | Yes | L2 regularization strength |
+| `early_stopping_rounds` | int | Yes | Early stopping patience |
+
+**LSTM-Specific Fields (`backend: "lstm"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `precision` | string | Yes | `fp32`, `fp16`, `bf16`, or `auto` |
+| `hidden_size` | int | Yes | LSTM hidden state dimension |
+| `num_layers` | int | Yes | Number of stacked LSTM layers |
+| `dropout` | float | Yes | Dropout rate between layers (0.0 to 1.0) |
+| `bidirectional` | bool | Yes | Process sequences in both directions |
+| `sequence_length` | int | Yes | Number of time periods per sequence |
+| `batch_size` | int | Yes | Training batch size |
+| `n_epochs` | int | Yes | Maximum training epochs |
+| `early_stopping_patience` | int | Yes | Epochs without improvement before stopping |
 
 **Available Datasets:**
 - `taiwan`: 6,819 samples, 95 financial ratio features
@@ -816,25 +844,35 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggab
 - `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
 - `"auto"` - Auto-detect: uses GPU if available, falls back to CPU
 
-**MLP Precision Options:**
+**Precision Options (MLP/LSTM):**
 - `"fp32"` - Full precision (default, most compatible)
 - `"fp16"` - Half precision (faster on GPU, requires CUDA)
 - `"bf16"` - BFloat16 (faster on Ampere+ GPUs)
 - `"auto"` - Auto-detect based on device
 
-**Class Imbalance:** For XGBoost, if `scale_pos_weight` is omitted, it's automatically calculated as (n_negative / n_positive). MLP uses weighted loss based on class distribution.
+**Class Imbalance:**
+- XGBoost: `scale_pos_weight` auto-calculated as (n_negative / n_positive) if omitted
+- MLP/LSTM: Weighted BCE loss based on class distribution
+- LightGBM: Auto-computed class weights
 
-**Request Example - XGBoost (default):**
+**Request Example - XGBoost:**
 ```json
 {
   "dataset": "taiwan",
+  "backend": "xgboost",
+  "device": "auto",
   "learning_rate": 0.1,
   "max_depth": 6,
   "n_estimators": 100,
   "subsample": 0.8,
   "colsample_bytree": 0.8,
+  "reg_alpha": 0.0,
+  "reg_lambda": 1.0,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
   "random_state": 42,
-  "device": "auto"
+  "early_stopping_rounds": 10
 }
 ```
 
@@ -843,16 +881,65 @@ Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggab
 {
   "dataset": "taiwan",
   "backend": "mlp",
+  "device": "auto",
+  "precision": "fp32",
+  "optimizer": "adamw",
+  "hidden_sizes": [64, 32],
   "learning_rate": 0.001,
   "batch_size": 32,
   "n_epochs": 100,
   "dropout": 0.2,
-  "hidden_sizes": [64, 32],
-  "precision": "fp32",
-  "optimizer": "adamw",
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
   "random_state": 42,
-  "early_stopping_patience": 10,
-  "device": "auto"
+  "early_stopping_patience": 10
+}
+```
+
+**Request Example - LightGBM:**
+```json
+{
+  "dataset": "taiwan",
+  "backend": "lightgbm",
+  "device": "auto",
+  "learning_rate": 0.1,
+  "max_depth": 6,
+  "n_estimators": 100,
+  "num_leaves": 31,
+  "min_child_samples": 20,
+  "subsample": 0.8,
+  "colsample_bytree": 0.8,
+  "reg_alpha": 0.0,
+  "reg_lambda": 1.0,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "random_state": 42,
+  "early_stopping_rounds": 10
+}
+```
+
+**Request Example - LSTM:**
+```json
+{
+  "dataset": "taiwan",
+  "backend": "lstm",
+  "device": "auto",
+  "precision": "fp32",
+  "hidden_size": 64,
+  "num_layers": 2,
+  "dropout": 0.2,
+  "bidirectional": true,
+  "sequence_length": 5,
+  "learning_rate": 0.001,
+  "batch_size": 32,
+  "n_epochs": 100,
+  "train_ratio": 0.7,
+  "val_ratio": 0.15,
+  "test_ratio": 0.15,
+  "random_state": 42,
+  "early_stopping_patience": 10
 }
 ```
 
@@ -986,35 +1073,157 @@ MLP neural network results use PyTorch format and don't include feature importan
 }
 ```
 
+**Job Result - LightGBM (when complete):**
+
+LightGBM results include feature importances similar to XGBoost:
+
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "backend": "lightgbm",
+    "dataset": "taiwan",
+    "model_id": "model-2024-01-15-143052",
+    "model_path": "/data/models/model-2024-01-15-143052.txt",
+    "model_format": "txt",
+    "active_model_path": "/data/models/active.txt",
+    "samples_total": 6819,
+    "samples_train": 4773,
+    "samples_val": 1023,
+    "samples_test": 1023,
+    "n_features": 95,
+    "scale_pos_weight": 29.99,
+    "best_val_auc": 0.93,
+    "best_round": 58,
+    "total_rounds": 100,
+    "early_stopped": true,
+    "train_metrics": {
+      "loss": 0.20,
+      "ppl": 1.22,
+      "auc": 0.97,
+      "accuracy": 0.93,
+      "precision": 0.90,
+      "recall": 0.87,
+      "f1_score": 0.88
+    },
+    "val_metrics": {
+      "loss": 0.26,
+      "ppl": 1.30,
+      "auc": 0.93,
+      "accuracy": 0.90,
+      "precision": 0.86,
+      "recall": 0.83,
+      "f1_score": 0.84
+    },
+    "test_metrics": {
+      "loss": 0.28,
+      "ppl": 1.32,
+      "auc": 0.92,
+      "accuracy": 0.89,
+      "precision": 0.85,
+      "recall": 0.82,
+      "f1_score": 0.83
+    },
+    "feature_importances": [
+      {"name": "X6", "importance": 0.1523, "rank": 1},
+      {"name": "X1", "importance": 0.0891, "rank": 2},
+      {"name": "X5", "importance": 0.0812, "rank": 3}
+    ]
+  }
+}
+```
+
+**Job Result - LSTM (when complete):**
+
+LSTM results use PyTorch format and don't include feature importances:
+
+```json
+{
+  "job_id": "train-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "backend": "lstm",
+    "dataset": "taiwan",
+    "model_id": "model-2024-01-15-143052",
+    "model_path": "/data/models/model-2024-01-15-143052.pt",
+    "model_format": "pt",
+    "active_model_path": "/data/models/active.pt",
+    "samples_total": 6819,
+    "samples_train": 4773,
+    "samples_val": 1023,
+    "samples_test": 1023,
+    "n_features": 95,
+    "scale_pos_weight": 29.99,
+    "best_val_auc": 0.90,
+    "best_round": 52,
+    "total_rounds": 100,
+    "early_stopped": true,
+    "train_metrics": {
+      "loss": 0.25,
+      "ppl": 1.28,
+      "auc": 0.94,
+      "accuracy": 0.90,
+      "precision": 0.87,
+      "recall": 0.84,
+      "f1_score": 0.85
+    },
+    "val_metrics": {
+      "loss": 0.32,
+      "ppl": 1.38,
+      "auc": 0.90,
+      "accuracy": 0.87,
+      "precision": 0.83,
+      "recall": 0.80,
+      "f1_score": 0.81
+    },
+    "test_metrics": {
+      "loss": 0.34,
+      "ppl": 1.40,
+      "auc": 0.89,
+      "accuracy": 0.86,
+      "precision": 0.82,
+      "recall": 0.79,
+      "f1_score": 0.80
+    },
+    "feature_importances": []
+  }
+}
+```
+
 **Result Fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `backend` | string | Backend used (`xgboost` or `mlp`) |
+| `backend` | string | Backend used (`xgboost`, `mlp`, `lightgbm`, or `lstm`) |
 | `dataset` | string | Dataset used (`taiwan`, `us`, or `polish`) |
-| `model_format` | string | Model file format (`ubj` for XGBoost, `pt` for MLP) |
+| `model_format` | string | Model file format (`ubj`, `pt`, or `txt`) |
 | `n_features` | int | Number of features in the dataset |
 | `scale_pos_weight` | float | Class weight used (auto-calculated if not provided) |
-| `feature_importances` | array | Ranked list of feature importances (XGBoost only, empty for MLP) |
+| `feature_importances` | array | Ranked list (XGBoost/LightGBM only, empty for MLP/LSTM) |
 
-**Feature Importance Fields (XGBoost only):**
+**Feature Importance Fields (XGBoost/LightGBM only):**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | Feature/column name from the dataset |
-| `importance` | float | XGBoost feature importance score (0.0-1.0) |
+| `importance` | float | Feature importance score (0.0-1.0) |
 | `rank` | int | Rank by importance (1 = most important) |
 
 **Backend Differences:**
 
-| Aspect | XGBoost | MLP |
-|--------|---------|-----|
-| Model format | `.ubj` (Universal Binary JSON) | `.pt` (PyTorch) |
-| Feature importances | Ranked list with importance scores | Empty (neural networks lack built-in feature importance) |
-| GPU requirement | Optional (CUDA) | Optional (CUDA for fp16/bf16) |
-| Training speed | Faster for tabular data | Slower but may capture non-linear patterns |
+| Aspect | XGBoost | MLP | LightGBM | LSTM |
+|--------|---------|-----|----------|------|
+| Model format | `.ubj` | `.pt` | `.txt` | `.pt` |
+| Feature importances | Yes (ranked) | No | Yes (ranked) | No |
+| GPU support | CUDA | CUDA (fp16/bf16) | CUDA | CUDA (fp16/bf16) |
+| Training speed | Fast | Moderate | Very fast | Slow |
+| Best for | Tabular data | Non-linear patterns | Large datasets | Temporal sequences |
+| Interpretability | High | Low | High | Low |
 
-The `feature_importances` array for XGBoost contains ALL features ranked by importance, allowing you to identify which financial ratios are most predictive of bankruptcy/default. For MLP, use techniques like SHAP values for feature importance analysis.
+The `feature_importances` array for XGBoost and LightGBM contains ALL features ranked by importance, allowing you to identify which financial ratios are most predictive of bankruptcy/default. For MLP/LSTM, use `platform_ml.ShapTreeWrapper` for type-safe SHAP-based feature importance analysis.
 
 ---
 
@@ -1138,6 +1347,91 @@ Poll `/ml/jobs/{job_id}` to get the result:
      -H "Content-Type: application/json" \
      -d '{...recommended_config fields...}'
    ```
+
+---
+
+### POST /ml/explain
+
+Run feature importance explanation on a trained model using various explainer methods.
+
+**Request Body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `dataset` | string | Yes | - | Dataset: `taiwan`, `us`, or `polish` |
+| `backend` | string | Yes | - | Backend: `xgboost`, `mlp`, `lightgbm`, or `lstm` |
+| `model_path` | string | Yes | - | Path to trained model file |
+| `explainer` | string | Yes | - | Explainer method (see compatibility below) |
+| `target_class` | int | No | `1` | Target class for importance computation |
+| `n_samples` | int | No | `1000` | Number of samples for explanation |
+| `random_state` | int | No | `42` | Random seed for reproducibility |
+
+**Supported Explainers:**
+
+| Explainer | Description | Compatible Backends |
+|-----------|-------------|---------------------|
+| `permutation` | Permutation feature importance | All (xgboost, mlp, lightgbm, lstm) |
+| `gradient` | Gradient-based importance | Neural networks only (mlp, lstm) |
+| `integrated_gradients` | Integrated gradients | Neural networks only (mlp, lstm) |
+| `shap_tree` | SHAP TreeExplainer | Tree models only (xgboost, lightgbm) |
+
+**Request Example:**
+```json
+{
+  "dataset": "taiwan",
+  "backend": "xgboost",
+  "model_path": "/data/models/xgboost/taiwan_xgboost_best.ubj",
+  "explainer": "permutation",
+  "target_class": 1,
+  "n_samples": 1000,
+  "random_state": 42
+}
+```
+
+**Response (202):**
+```json
+{
+  "job_id": "explain-job-uuid",
+  "status": "queued"
+}
+```
+
+**Job Result (when complete):**
+
+Poll `/ml/jobs/{job_id}` to get the result:
+
+```json
+{
+  "job_id": "explain-job-uuid",
+  "status": "finished",
+  "result": {
+    "status": "complete",
+    "backend": "xgboost",
+    "explainer": "permutation",
+    "n_samples_used": 1000,
+    "n_features": 95,
+    "target_class": 1,
+    "feature_importances": [
+      {"name": "X6", "importance": 0.1842},
+      {"name": "X1", "importance": 0.0923},
+      {"name": "X5", "importance": 0.0856}
+    ],
+    "duration_seconds": 12.5
+  }
+}
+```
+
+**Result Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `backend` | string | Backend used for the model |
+| `explainer` | string | Explainer method used |
+| `n_samples_used` | int | Actual number of samples used |
+| `n_features` | int | Number of features in the dataset |
+| `target_class` | int | Target class for importance |
+| `feature_importances` | array | Ranked feature importances |
+| `duration_seconds` | float | Computation time |
 
 ---
 
