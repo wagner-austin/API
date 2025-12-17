@@ -680,43 +680,76 @@ curl http://localhost:8007/ml/jobs/{job_id}
 
 ### Hyperparameter Optimization with Optuna
 
-Automatically find optimal XGBoost hyperparameters using Bayesian optimization:
+Automatically find optimal hyperparameters for any backend using Bayesian optimization:
 
 ```bash
-# Run hyperparameter optimization with Optuna TPE
+# XGBoost optimization (default backend)
 curl -X POST http://localhost:8007/ml/optimize \
   -H "Content-Type: application/json" \
   -d '{
     "dataset": "taiwan",
+    "backend": "xgboost",
     "n_trials": 50,
     "device": "auto",
-    "space_profile": "default"
+    "space_profile": "default",
+    "feature_preset": "full"
   }'
-# {"job_id": "uuid", "status": "queued"}
+
+# MLP optimization
+curl -X POST http://localhost:8007/ml/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "backend": "mlp",
+    "n_trials": 50,
+    "precision": "fp16",
+    "optimizer": "adamw",
+    "n_epochs": 100,
+    "early_stopping_patience": 15
+  }'
+
+# LightGBM optimization
+curl -X POST http://localhost:8007/ml/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "polish",
+    "backend": "lightgbm",
+    "n_trials": 30,
+    "early_stopping_rounds": 20
+  }'
+
+# LSTM optimization
+curl -X POST http://localhost:8007/ml/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "us",
+    "backend": "lstm",
+    "n_trials": 25,
+    "precision": "bf16",
+    "sequence_length": 10,
+    "bidirectional": true
+  }'
 
 # Poll for best hyperparameters
 curl http://localhost:8007/ml/jobs/{job_id}
 # {
 #   "result": {
+#     "backend": "xgboost",
 #     "status": "complete",
 #     "best_val_auc": 0.94,
-#     "best_max_depth": 5,
-#     "best_n_estimators": 150,
-#     "best_learning_rate": 0.08,
-#     "recommended_config": {
-#       "device": "auto",
-#       "max_depth": 5,
-#       "n_estimators": 150,
-#       "learning_rate": 0.08,
-#       ...
-#     }
+#     "recommended_config": {...}
 #   }
 # }
 ```
 
-**Search Space Profiles:**
-- `default` - Wide continuous ranges with log-scale for learning_rate (recommended for thorough search)
-- `categorical` - Fixed choice sets for faster grid-like search
+**Backend-Specific Options:**
+
+| Backend | Specific Options |
+|---------|------------------|
+| `xgboost` | `space_profile` (`default`, `categorical`) |
+| `mlp` | `precision`, `optimizer`, `n_epochs`, `early_stopping_patience` |
+| `lightgbm` | `early_stopping_rounds` |
+| `lstm` | `precision`, `n_epochs`, `early_stopping_patience`, `sequence_length`, `bidirectional` |
 
 The `recommended_config` in the result can be used directly with `/ml/train-external`.
 
