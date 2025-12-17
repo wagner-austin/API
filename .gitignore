@@ -5,6 +5,11 @@
 # Models
 *.ubj
 services/covenant-radar-api/models/*.pt
+services/covenant-radar-api/models/xgboost/
+services/covenant-radar-api/models/lightgbm/
+services/covenant-radar-api/models/mlp/
+services/covenant-radar-api/models/lstm/
+services/covenant-radar-api/models/optimization_history.jsonl
 
 # Python
 __pycache__/
@@ -17,6 +22,7 @@ __pycache__/
 .coverage
 .coverage.*
 coverage.xml
+coverage_output.txt
 htmlcov/
 
 # Virtual environments
