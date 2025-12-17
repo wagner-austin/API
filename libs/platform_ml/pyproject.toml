@@ -22,7 +22,9 @@ priority = "explicit"
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
+numpy = "^2.3.5"
 sentencepiece = "^0.2.1"
+shap = "^0.50"
 torch = {version = "^2.5", source = "pytorch-cu124"}
 wandb = { version = "^0.18", optional = true }
 
@@ -37,7 +39,7 @@ mypy = "^1.13.0"
 ruff = "^0.14.4"
 typing-extensions = "^4.12.0"
 wandb = "^0.18"
-numpy = "^2.3"
+scikit-learn = "^1.8"
 
 [tool.mypy]
 python_version = "3.11"
