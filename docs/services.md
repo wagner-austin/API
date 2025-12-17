@@ -204,19 +204,26 @@ Loan covenant monitoring and breach prediction service with pluggable ML backend
 - Financial measurement ingestion
 - Deterministic covenant rule evaluation
 - Pluggable ML backends: XGBoost, LightGBM, MLP neural networks, LSTM
-- Optuna hyperparameter optimization
-- Background training jobs via RQ
+- Feature importance ranking for tree-based models (XGBoost, LightGBM)
+- Model explainability with multiple explainer methods (permutation, gradient, integrated gradients, SHAP)
+- Optuna hyperparameter optimization with Bayesian TPE
+- External dataset training (Taiwan, US, Polish bankruptcy datasets)
+- Background training and optimization jobs via RQ
 
 **Key Endpoints:**
 ```
-POST /deals              Create loan deal
-GET  /deals              List all deals
-POST /covenants          Create covenant rule
-POST /measurements       Add financial measurements
-POST /evaluate           Evaluate covenants for period
-POST /ml/predict         Predict breach probability
-POST /ml/train           Train new model (background job)
-GET  /ml/models/active   Get active model info
+POST /deals                  Create loan deal
+GET  /deals                  List all deals
+POST /covenants              Create covenant rule
+POST /measurements           Add financial measurements
+POST /evaluate               Evaluate covenants for period
+POST /ml/predict             Predict breach probability
+POST /ml/train               Train model on internal data (background job)
+POST /ml/train-external      Train model on external datasets (background job)
+POST /ml/optimize            Optimize hyperparameters with Optuna (background job)
+POST /ml/explain             Run feature importance explanation (background job)
+GET  /ml/jobs/{job_id}       Get training/optimization job status
+GET  /ml/models/active       Get active model info
 ```
 
 **Start:**
@@ -224,7 +231,7 @@ GET  /ml/models/active   Get active model info
 make up-covenant
 ```
 
-**Docs:** [README](../services/covenant-radar-api/README.md)
+**Docs:** [README](../services/covenant-radar-api/README.md) | [API](../services/covenant-radar-api/docs/api.md)
 
 ---
 
