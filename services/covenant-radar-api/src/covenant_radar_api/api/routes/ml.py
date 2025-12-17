@@ -23,9 +23,11 @@ from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from platform_workers.rq_harness import RQClientQueue
 
 from ..decode import (
+    ExplainResponse,
     OptimizeResponse,
     PredictResponse,
     TrainResponse,
+    parse_explain_request,
     parse_external_train_request,
     parse_optimize_request,
     parse_predict_request,
@@ -134,6 +136,31 @@ _OPTIMIZE_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
                     "error": {
                         "code": "INVALID_INPUT",
                         "message": "dataset must be one of: taiwan, us, polish",
+                    }
+                }
+            }
+        },
+    },
+}
+
+_EXPLAIN_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Explanation job queued",
+        "content": {
+            "application/json": {
+                "example": {"job_id": "explain-job-uuid", "status": "queued"},
+            },
+        },
+    },
+    400: {
+        "description": "Invalid configuration",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "explainer must be one of: permutation, gradient, "
+                        "integrated_gradients, shap_tree",
                     }
                 }
             }
@@ -476,6 +503,72 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
     )
 
 
+def _register_explain(router: APIRouter, get_container: ContainerProtocol) -> None:
+    async def _explain(request: Request) -> Response:
+        """Enqueue feature importance explanation job.
+
+        Computes feature importances using pluggable explainers on trained models.
+        Supports permutation, gradient, integrated_gradients, and shap_tree explainers.
+        """
+        body_bytes = await request.body()
+        # Validate request at the API edge
+        try:
+            parsed = parse_explain_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+
+        # Pass the raw JSON to the worker
+        config_json = body_bytes.decode("utf-8")
+
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.explain_job.process_explain_job",
+            config_json,
+            job_timeout=3600,  # 1 hour for explanations
+            result_ttl=86400,
+            failure_ttl=86400,
+            description=f"Feature importance explanation ({parsed['explainer']})",
+        )
+
+        response = ExplainResponse(job_id=job.get_id(), status="queued")
+        body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
+    router.add_api_route(
+        "/explain",
+        _explain,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Compute feature importance explanations",
+        description=(
+            "Compute feature importances for a trained model using pluggable explainers. "
+            "Supported explainers depend on the backend:\n\n"
+            "**XGBoost/LightGBM backends:**\n"
+            "- `permutation`: Shuffles features and measures prediction change\n"
+            "- `shap_tree`: TreeSHAP values (fast, exact for tree models)\n\n"
+            "**MLP/LSTM backends:**\n"
+            "- `gradient`: Input gradients (fast)\n"
+            "- `integrated_gradients`: Path-integrated gradients (more accurate)\n"
+            "- `permutation`: Feature permutation (model-agnostic)\n\n"
+            "**Job Result:**\n"
+            "When complete, the job result includes:\n"
+            "- Ranked feature importance scores\n"
+            "- Number of samples used\n"
+            "- Computation time\n\n"
+            "Poll /ml/jobs/{job_id} for status and results."
+        ),
+        response_description="Job ID for polling status",
+        responses=_EXPLAIN_RESPONSES,
+    )
+
+
 def _register_model_info(router: APIRouter, get_container: ContainerProtocol) -> None:
     def _get_model_info() -> Response:
         info = get_container.get_model_info()
@@ -535,6 +628,7 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
     _register_train(router, get_container)
     _register_train_external(router, get_container)
     _register_optimize(router, get_container)
+    _register_explain(router, get_container)
     _register_model_info(router, get_container)
     _register_job_status(router, get_container)
     return router

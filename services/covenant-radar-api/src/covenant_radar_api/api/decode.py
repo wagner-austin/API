@@ -23,6 +23,7 @@ from covenant_domain import (
     decode_measurement,
 )
 from covenant_ml import FeaturePreset
+from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.optimizer import (
     OptimizationConfig,
     XGBoostSearchSpace,
@@ -31,6 +32,9 @@ from covenant_ml.optimizer import (
     make_xgboost_default_space,
 )
 from covenant_ml.types import (
+    BackendName,
+    LightGBMConfig,
+    LSTMConfig,
     MLPConfig,
     TrainConfig,
 )
@@ -351,7 +355,25 @@ class MLPParseResult(TypedDict, total=True):
     dataset: DatasetName
 
 
-ExternalTrainParseResult = XGBoostParseResult | MLPParseResult
+class LSTMParseResult(TypedDict, total=True):
+    """Result of parsing LSTM config from external train request."""
+
+    backend: Literal["lstm"]
+    config: LSTMConfig
+    dataset: DatasetName
+
+
+class LightGBMParseResult(TypedDict, total=True):
+    """Result of parsing LightGBM config from external train request."""
+
+    backend: Literal["lightgbm"]
+    config: LightGBMConfig
+    dataset: DatasetName
+
+
+ExternalTrainParseResult = (
+    XGBoostParseResult | MLPParseResult | LSTMParseResult | LightGBMParseResult
+)
 
 
 def _parse_mlp_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
@@ -430,6 +452,80 @@ def _parse_mlp_config(
     }
 
 
+def _parse_lstm_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse and validate LSTM precision field."""
+    precision_val = raw.get("precision")
+    if precision_val == "fp32":
+        return "fp32"
+    if precision_val == "fp16":
+        return "fp16"
+    if precision_val == "bf16":
+        return "bf16"
+    if precision_val == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
+
+
+def _parse_lstm_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> LSTMConfig:
+    """Parse LSTM backend config from JSON object."""
+    bidirectional_val = raw.get("bidirectional")
+    if not isinstance(bidirectional_val, bool):
+        raise JSONTypeError("bidirectional must be a boolean")
+    return {
+        "device": device,
+        "precision": _parse_lstm_precision(raw),
+        "hidden_size": require_int(raw, "hidden_size"),
+        "num_layers": require_int(raw, "num_layers"),
+        "dropout": require_float(raw, "dropout"),
+        "bidirectional": bidirectional_val,
+        "sequence_length": require_int(raw, "sequence_length"),
+        "learning_rate": require_float(raw, "learning_rate"),
+        "batch_size": require_int(raw, "batch_size"),
+        "n_epochs": require_int(raw, "n_epochs"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
+    }
+
+
+def _parse_lightgbm_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> LightGBMConfig:
+    """Parse LightGBM backend config from JSON object."""
+    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
+    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
+    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
+    return {
+        "device": device,
+        "learning_rate": require_float(raw, "learning_rate"),
+        "max_depth": require_int(raw, "max_depth"),
+        "n_estimators": require_int(raw, "n_estimators"),
+        "num_leaves": require_int(raw, "num_leaves"),
+        "min_child_samples": require_int(raw, "min_child_samples"),
+        "subsample": require_float(raw, "subsample"),
+        "colsample_bytree": require_float(raw, "colsample_bytree"),
+        "reg_alpha": reg_alpha,
+        "reg_lambda": reg_lambda,
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_rounds": early_stopping_rounds,
+    }
+
+
 def _parse_xgboost_external_config(
     raw: JSONObject,
     device: Literal["cpu", "cuda", "auto"],
@@ -467,47 +563,8 @@ def _parse_xgboost_external_config(
 def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
     """Parse request body for external training into backend-specific config.
 
-    Supports both XGBoost and MLP backends via the 'backend' field.
+    Supports XGBoost, MLP, LSTM, and LightGBM backends via the 'backend' field.
     Default backend is 'xgboost' if not specified.
-
-    Request format for XGBoost:
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "xgboost",  // optional, default
-            "learning_rate": 0.1,
-            "max_depth": 6,
-            "n_estimators": 100,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
-            "random_state": 42,
-            "device": "auto",  // optional
-            "train_ratio": 0.7,  // optional
-            "val_ratio": 0.15,  // optional
-            "test_ratio": 0.15,  // optional
-            "early_stopping_rounds": 10,  // optional
-            "reg_alpha": 0.0,  // optional
-            "reg_lambda": 1.0,  // optional
-            "scale_pos_weight": 2.5  // optional
-        }
-
-    Request format for MLP:
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "mlp",
-            "learning_rate": 0.001,
-            "batch_size": 32,
-            "n_epochs": 100,
-            "dropout": 0.2,
-            "hidden_sizes": [64, 32],
-            "precision": "fp32" | "fp16" | "bf16" | "auto",
-            "optimizer": "adamw" | "adam" | "sgd",
-            "random_state": 42,
-            "early_stopping_patience": 10,
-            "device": "auto",  // optional
-            "train_ratio": 0.7,  // optional
-            "val_ratio": 0.15,  // optional
-            "test_ratio": 0.15  // optional
-        }
 
     Returns:
         ExternalTrainParseResult with backend type, config, and dataset name.
@@ -545,6 +602,20 @@ def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
             "dataset": dataset_name,
         }
         return mlp_result
+    if backend_val == "lstm":
+        lstm_result: LSTMParseResult = {
+            "backend": "lstm",
+            "config": _parse_lstm_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return lstm_result
+    if backend_val == "lightgbm":
+        lgbm_result: LightGBMParseResult = {
+            "backend": "lightgbm",
+            "config": _parse_lightgbm_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return lgbm_result
     xgb_result: XGBoostParseResult = {
         "backend": "xgboost",
         "config": _parse_xgboost_external_config(raw, device, train_ratio, val_ratio, test_ratio),
@@ -686,13 +757,178 @@ def parse_optimize_request(body: bytes) -> OptimizeParseResult:
     )
 
 
+# --- Explain Request Parsing ---
+
+
+class ExplainRequest(TypedDict, total=True):
+    """Request body for feature importance explanation.
+
+    Args:
+        dataset: Dataset name for loading data.
+        backend: ML backend used for the model.
+        model_path: Path to the trained model file.
+        explainer: Which explainer to use.
+        target_class: Class index for importance computation.
+        n_samples: Number of samples to use for explanation.
+        random_state: Random seed for reproducibility.
+    """
+
+    dataset: DatasetName
+    backend: BackendName
+    model_path: str
+    explainer: SupportedExplainer
+    target_class: int
+    n_samples: int
+    random_state: int
+
+
+class ExplainResponse(TypedDict, total=True):
+    """Response body for explain job submission."""
+
+    job_id: str
+    status: Literal["queued"]
+
+
+class ExplainParseResult(TypedDict, total=True):
+    """Parsed explanation request for the worker job.
+
+    Args:
+        dataset: Dataset name for loading data.
+        backend: ML backend used for the model.
+        model_path: Path to the trained model file.
+        explainer: Which explainer to use.
+        target_class: Class index for importance computation.
+        n_samples: Number of samples to use for explanation.
+        random_state: Random seed for reproducibility.
+    """
+
+    dataset: DatasetName
+    backend: BackendName
+    model_path: str
+    explainer: SupportedExplainer
+    target_class: int
+    n_samples: int
+    random_state: int
+
+
+def _parse_explainer(raw: JSONValue) -> SupportedExplainer:
+    """Parse and validate explainer name.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Validated SupportedExplainer literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid explainer name.
+    """
+    if not isinstance(raw, str):
+        raise JSONTypeError("explainer must be a string")
+    if raw == "permutation":
+        return "permutation"
+    if raw == "gradient":
+        return "gradient"
+    if raw == "integrated_gradients":
+        return "integrated_gradients"
+    if raw == "shap_tree":
+        return "shap_tree"
+    raise JSONTypeError(
+        "explainer must be one of: permutation, gradient, integrated_gradients, shap_tree"
+    )
+
+
+def _parse_backend_name(raw: JSONValue) -> BackendName:
+    """Parse and validate backend name.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Validated BackendName literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid backend name.
+    """
+    if not isinstance(raw, str):
+        raise JSONTypeError("backend must be a string")
+    if raw == "xgboost":
+        return "xgboost"
+    if raw == "mlp":
+        return "mlp"
+    if raw == "lstm":
+        return "lstm"
+    if raw == "lightgbm":
+        return "lightgbm"
+    raise JSONTypeError("backend must be one of: xgboost, mlp, lstm, lightgbm")
+
+
+def parse_explain_request(body: bytes) -> ExplainParseResult:
+    """Parse request body for feature importance explanation.
+
+    Request format:
+        {
+            "dataset": "taiwan" | "us" | "polish",  // required
+            "backend": "xgboost" | "mlp" | "lstm" | "lightgbm",  // required
+            "model_path": "/path/to/model.ubj",  // required
+            "explainer": "permutation" | "gradient" | ...,  // required
+            "target_class": 1,  // optional, default 1
+            "n_samples": 1000,  // optional, default 1000
+            "random_state": 42  // optional, default 42
+        }
+
+    Returns:
+        ExplainParseResult with all explanation parameters.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset name.
+    """
+    raw = _parse_body_as_dict(body)
+
+    # Required fields
+    dataset_name = _parse_dataset_name(raw)
+
+    backend_raw = raw.get("backend")
+    if backend_raw is None:
+        raise JSONTypeError("Missing required field 'backend'")
+    backend = _parse_backend_name(backend_raw)
+
+    model_path = require_str(raw, "model_path")
+
+    explainer_raw = raw.get("explainer")
+    if explainer_raw is None:
+        raise JSONTypeError("Missing required field 'explainer'")
+    explainer = _parse_explainer(explainer_raw)
+
+    # Optional fields with defaults
+    target_class = _optional_int(raw, "target_class", 1)
+    n_samples = _optional_int(raw, "n_samples", 1000)
+    random_state = _optional_int(raw, "random_state", 42)
+
+    return ExplainParseResult(
+        dataset=dataset_name,
+        backend=backend,
+        model_path=model_path,
+        explainer=explainer,
+        target_class=target_class,
+        n_samples=n_samples,
+        random_state=random_state,
+    )
+
+
 __all__ = [
     "AddMeasurementsRequest",
     "CreateCovenantRequest",
     "CreateDealRequest",
     "DatasetName",
     "EvaluateRequest",
+    "ExplainParseResult",
+    "ExplainRequest",
+    "ExplainResponse",
     "ExternalTrainParseResult",
+    "LSTMParseResult",
+    "LightGBMParseResult",
     "MLPParseResult",
     "OptimizeParseResult",
     "OptimizeRequest",
@@ -708,6 +944,7 @@ __all__ = [
     "parse_deal_id_request",
     "parse_deal_request",
     "parse_evaluate_request",
+    "parse_explain_request",
     "parse_external_train_request",
     "parse_measurements_request",
     "parse_optimize_request",
