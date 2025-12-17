@@ -12,6 +12,7 @@ from covenant_radar_api.api.decode import (
     parse_deal_id_request,
     parse_deal_request,
     parse_evaluate_request,
+    parse_explain_request,
     parse_external_train_request,
     parse_measurements_request,
     parse_optimize_request,
@@ -695,6 +696,214 @@ class TestParseExternalTrainRequest:
         assert result["config"]["val_ratio"] == 0.2
         assert result["config"]["test_ratio"] == 0.2
 
+    def test_valid_lstm_request(self) -> None:
+        """Test parsing valid LSTM request."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "bidirectional": true,
+            "sequence_length": 5,
+            "precision": "fp32",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "lstm"
+        assert result["dataset"] == "taiwan"
+        # Use if for type narrowing (discriminated union)
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["config"]["learning_rate"] == 0.001
+        assert result["config"]["batch_size"] == 32
+        assert result["config"]["n_epochs"] == 100
+        assert result["config"]["dropout"] == 0.2
+        assert result["config"]["hidden_size"] == 64
+        assert result["config"]["num_layers"] == 2
+        assert result["config"]["bidirectional"] is True
+        assert result["config"]["sequence_length"] == 5
+        assert result["config"]["precision"] == "fp32"
+        assert result["config"]["random_state"] == 42
+        assert result["config"]["early_stopping_patience"] == 10
+        assert result["config"]["device"] == "auto"
+
+    def test_lstm_request_with_cuda_and_fp16(self) -> None:
+        """Test parsing LSTM request with CUDA device and fp16 precision."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "lstm",
+            "learning_rate": 0.01,
+            "batch_size": 64,
+            "n_epochs": 50,
+            "dropout": 0.1,
+            "hidden_size": 128,
+            "num_layers": 3,
+            "bidirectional": false,
+            "sequence_length": 10,
+            "precision": "fp16",
+            "random_state": 123,
+            "early_stopping_patience": 5,
+            "device": "cuda"
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["config"]["device"] == "cuda"
+        assert result["config"]["precision"] == "fp16"
+        assert result["config"]["bidirectional"] is False
+
+    def test_lstm_request_with_bf16_and_auto_precision(self) -> None:
+        """Test parsing LSTM request with bf16 and auto precision modes."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "lstm",
+            "learning_rate": 0.1,
+            "batch_size": 16,
+            "n_epochs": 200,
+            "dropout": 0.0,
+            "hidden_size": 32,
+            "num_layers": 1,
+            "bidirectional": true,
+            "sequence_length": 3,
+            "precision": "bf16",
+            "random_state": 0,
+            "early_stopping_patience": 20
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["config"]["precision"] == "bf16"
+
+    def test_lstm_request_auto_precision(self) -> None:
+        """Test parsing LSTM request with auto precision."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "bidirectional": true,
+            "sequence_length": 5,
+            "precision": "auto",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["config"]["precision"] == "auto"
+
+    def test_lstm_missing_bidirectional_raises_error(self) -> None:
+        """Test that missing bidirectional field raises error."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "sequence_length": 5,
+            "precision": "fp32",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="bidirectional must be a boolean"):
+            parse_external_train_request(body)
+
+    def test_lstm_invalid_precision_raises_error(self) -> None:
+        """Test that invalid precision for LSTM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "learning_rate": 0.001,
+            "batch_size": 32,
+            "n_epochs": 100,
+            "dropout": 0.2,
+            "hidden_size": 64,
+            "num_layers": 2,
+            "bidirectional": true,
+            "sequence_length": 5,
+            "precision": "invalid_precision",
+            "random_state": 42,
+            "early_stopping_patience": 10
+        }"""
+        with pytest.raises(JSONTypeError, match="precision must be fp32, fp16, bf16, or auto"):
+            parse_external_train_request(body)
+
+    def test_valid_lightgbm_request(self) -> None:
+        """Test parsing valid LightGBM request."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "learning_rate": 0.1,
+            "max_depth": 6,
+            "n_estimators": 100,
+            "num_leaves": 31,
+            "min_child_samples": 20,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "lightgbm"
+        assert result["dataset"] == "taiwan"
+        if result["backend"] != "lightgbm":
+            raise AssertionError("Expected lightgbm backend")
+        assert result["config"]["learning_rate"] == 0.1
+        assert result["config"]["max_depth"] == 6
+        assert result["config"]["n_estimators"] == 100
+        assert result["config"]["num_leaves"] == 31
+        assert result["config"]["min_child_samples"] == 20
+        assert result["config"]["subsample"] == 0.8
+        assert result["config"]["colsample_bytree"] == 0.8
+        assert result["config"]["random_state"] == 42
+        assert result["config"]["device"] == "auto"
+        assert result["config"]["early_stopping_rounds"] == 10
+        assert result["config"]["reg_alpha"] == 0.0
+        assert result["config"]["reg_lambda"] == 1.0
+
+    def test_lightgbm_request_with_custom_regularization(self) -> None:
+        """Test parsing LightGBM request with custom regularization."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "lightgbm",
+            "learning_rate": 0.05,
+            "max_depth": 8,
+            "n_estimators": 200,
+            "num_leaves": 63,
+            "min_child_samples": 10,
+            "subsample": 0.9,
+            "colsample_bytree": 0.7,
+            "random_state": 123,
+            "device": "cuda",
+            "early_stopping_rounds": 20,
+            "reg_alpha": 1.0,
+            "reg_lambda": 5.0
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "lightgbm":
+            raise AssertionError("Expected lightgbm backend")
+        assert result["config"]["device"] == "cuda"
+        assert result["config"]["early_stopping_rounds"] == 20
+        assert result["config"]["reg_alpha"] == 1.0
+        assert result["config"]["reg_lambda"] == 5.0
+
     def test_invalid_dataset_raises_value_error(self) -> None:
         """Test that invalid dataset raises ValueError."""
         body = b"""{
@@ -1052,3 +1261,245 @@ class TestParseOptimizeRequest:
         }"""
         with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
             parse_optimize_request(body)
+
+
+class TestParseExplainRequest:
+    """Tests for parse_explain_request."""
+
+    def test_valid_explain_request_full(self) -> None:
+        """Test parsing valid explain request with all fields."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/xgboost.ubj",
+            "explainer": "permutation",
+            "target_class": 1,
+            "n_samples": 500,
+            "random_state": 42
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["dataset"] == "taiwan"
+        assert result["backend"] == "xgboost"
+        assert result["model_path"] == "/models/xgboost.ubj"
+        assert result["explainer"] == "permutation"
+        assert result["target_class"] == 1
+        assert result["n_samples"] == 500
+        assert result["random_state"] == 42
+
+    def test_valid_explain_request_minimal(self) -> None:
+        """Test parsing valid explain request with defaults for optional fields."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "mlp",
+            "model_path": "/models/mlp.pt",
+            "explainer": "gradient"
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["dataset"] == "us"
+        assert result["backend"] == "mlp"
+        assert result["model_path"] == "/models/mlp.pt"
+        assert result["explainer"] == "gradient"
+        assert result["target_class"] == 1
+        assert result["n_samples"] == 1000
+        assert result["random_state"] == 42
+
+    def test_valid_explainer_integrated_gradients(self) -> None:
+        """Test parsing with integrated_gradients explainer."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "lstm",
+            "model_path": "/models/lstm.pt",
+            "explainer": "integrated_gradients"
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["explainer"] == "integrated_gradients"
+        assert result["backend"] == "lstm"
+
+    def test_valid_explainer_shap_tree(self) -> None:
+        """Test parsing with shap_tree explainer."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "model_path": "/models/lgbm.txt",
+            "explainer": "shap_tree"
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["explainer"] == "shap_tree"
+        assert result["backend"] == "lightgbm"
+
+    def test_all_valid_backends(self) -> None:
+        """Test parsing with all valid backend types."""
+        backends = ["xgboost", "mlp", "lstm", "lightgbm"]
+        for backend in backends:
+            body = f'''{{
+                "dataset": "taiwan",
+                "backend": "{backend}",
+                "model_path": "/models/model",
+                "explainer": "permutation"
+            }}'''.encode()
+            result = parse_explain_request(body)
+            assert result["backend"] == backend
+
+    def test_all_valid_datasets(self) -> None:
+        """Test parsing with all valid dataset types."""
+        datasets = ["taiwan", "us", "polish"]
+        for dataset in datasets:
+            body = f'''{{
+                "dataset": "{dataset}",
+                "backend": "xgboost",
+                "model_path": "/models/model.ubj",
+                "explainer": "permutation"
+            }}'''.encode()
+            result = parse_explain_request(body)
+            assert result["dataset"] == dataset
+
+    def test_missing_dataset_raises_json_type_error(self) -> None:
+        """Test that missing dataset raises JSONTypeError."""
+        body = b"""{
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'dataset'"):
+            parse_explain_request(body)
+
+    def test_missing_backend_raises_json_type_error(self) -> None:
+        """Test that missing backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'backend'"):
+            parse_explain_request(body)
+
+    def test_missing_model_path_raises_json_type_error(self) -> None:
+        """Test that missing model_path raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'model_path'"):
+            parse_explain_request(body)
+
+    def test_missing_explainer_raises_json_type_error(self) -> None:
+        """Test that missing explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj"
+        }"""
+        with pytest.raises(JSONTypeError, match="Missing required field 'explainer'"):
+            parse_explain_request(body)
+
+    def test_invalid_dataset_raises_value_error(self) -> None:
+        """Test that invalid dataset raises ValueError."""
+        body = b"""{
+            "dataset": "invalid_dataset",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(ValueError, match="dataset must be one of"):
+            parse_explain_request(body)
+
+    def test_invalid_backend_raises_json_type_error(self) -> None:
+        """Test that invalid backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "invalid_backend",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="backend must be one of"):
+            parse_explain_request(body)
+
+    def test_invalid_explainer_raises_json_type_error(self) -> None:
+        """Test that invalid explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "invalid_explainer"
+        }"""
+        with pytest.raises(JSONTypeError, match="explainer must be one of"):
+            parse_explain_request(body)
+
+    def test_non_string_backend_raises_json_type_error(self) -> None:
+        """Test that non-string backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": 123,
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_explain_request(body)
+
+    def test_non_string_explainer_raises_json_type_error(self) -> None:
+        """Test that non-string explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="explainer must be a string"):
+            parse_explain_request(body)
+
+    def test_invalid_target_class_type_raises_json_type_error(self) -> None:
+        """Test that non-numeric target_class raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation",
+            "target_class": "one"
+        }"""
+        with pytest.raises(JSONTypeError, match="Field 'target_class' must be a number"):
+            parse_explain_request(body)
+
+    def test_invalid_n_samples_type_raises_json_type_error(self) -> None:
+        """Test that non-numeric n_samples raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation",
+            "n_samples": "many"
+        }"""
+        with pytest.raises(JSONTypeError, match="Field 'n_samples' must be a number"):
+            parse_explain_request(body)
+
+    def test_target_class_zero(self) -> None:
+        """Test parsing with target_class set to 0."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "model_path": "/models/model.ubj",
+            "explainer": "permutation",
+            "target_class": 0
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["target_class"] == 0
+
+    def test_custom_n_samples_and_random_state(self) -> None:
+        """Test parsing with custom n_samples and random_state."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "mlp",
+            "model_path": "/models/mlp.pt",
+            "explainer": "gradient",
+            "n_samples": 2000,
+            "random_state": 123
+        }"""
+        result = parse_explain_request(body)
+
+        assert result["n_samples"] == 2000
+        assert result["random_state"] == 123

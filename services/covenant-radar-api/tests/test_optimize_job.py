@@ -5,9 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from shutil import copyfile
 
-import numpy as np
 import pytest
-from numpy.typing import NDArray
 from platform_core.json_utils import (
     JSONTypeError,
     dump_json_str,
@@ -16,14 +14,16 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from covenant_radar_api.worker._optimize_common import (
+    build_optimization_config,
+    load_dataset,
+    optional_int,
+    parse_backend_name,
+    parse_device,
+    parse_feature_preset,
+)
 from covenant_radar_api.worker.optimize_job import (
-    _cuda_available,
     _get_search_space,
-    _get_xgb_classifier,
-    _load_dataset,
-    _optional_int,
-    _parse_device,
-    _parse_feature_preset,
     _parse_optimize_config,
     _parse_space_profile,
     process_optimize_job,
@@ -92,33 +92,33 @@ def _copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
 
 
 class TestParseDevice:
-    """Tests for _parse_device function."""
+    """Tests for parse_device function."""
 
     def test_parse_device_defaults_to_auto(self) -> None:
         """None input returns 'auto'."""
-        assert _parse_device(None) == "auto"
+        assert parse_device(None) == "auto"
 
     def test_parse_device_accepts_cpu(self) -> None:
         """'cpu' is accepted."""
-        assert _parse_device("cpu") == "cpu"
+        assert parse_device("cpu") == "cpu"
 
     def test_parse_device_accepts_cuda(self) -> None:
         """'cuda' is accepted."""
-        assert _parse_device("cuda") == "cuda"
+        assert parse_device("cuda") == "cuda"
 
     def test_parse_device_accepts_auto(self) -> None:
         """'auto' is accepted."""
-        assert _parse_device("auto") == "auto"
+        assert parse_device("auto") == "auto"
 
     def test_parse_device_rejects_invalid_string(self) -> None:
         """Invalid device string raises ValueError."""
         with pytest.raises(ValueError, match="device must be one of"):
-            _parse_device("tpu")
+            parse_device("tpu")
 
     def test_parse_device_rejects_non_string(self) -> None:
         """Non-string input raises JSONTypeError."""
         with pytest.raises(JSONTypeError, match="device must be a string"):
-            _parse_device(123)
+            parse_device(123)
 
 
 class TestParseSpaceProfile:
@@ -148,58 +148,92 @@ class TestParseSpaceProfile:
 
 
 class TestParseFeaturePreset:
-    """Tests for _parse_feature_preset function."""
+    """Tests for parse_feature_preset function."""
 
     def test_parse_feature_preset_defaults_to_none(self) -> None:
         """None input returns 'none'."""
-        assert _parse_feature_preset(None) == "none"
+        assert parse_feature_preset(None) == "none"
 
     def test_parse_feature_preset_accepts_none(self) -> None:
         """'none' is accepted."""
-        assert _parse_feature_preset("none") == "none"
+        assert parse_feature_preset("none") == "none"
 
     def test_parse_feature_preset_accepts_log_only(self) -> None:
         """'log_only' is accepted."""
-        assert _parse_feature_preset("log_only") == "log_only"
+        assert parse_feature_preset("log_only") == "log_only"
 
     def test_parse_feature_preset_accepts_ratios_only(self) -> None:
         """'ratios_only' is accepted."""
-        assert _parse_feature_preset("ratios_only") == "ratios_only"
+        assert parse_feature_preset("ratios_only") == "ratios_only"
 
     def test_parse_feature_preset_accepts_full(self) -> None:
         """'full' is accepted."""
-        assert _parse_feature_preset("full") == "full"
+        assert parse_feature_preset("full") == "full"
 
     def test_parse_feature_preset_rejects_invalid_string(self) -> None:
         """Invalid feature_preset string raises JSONTypeError."""
         with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
-            _parse_feature_preset("invalid")
+            parse_feature_preset("invalid")
 
     def test_parse_feature_preset_rejects_non_string(self) -> None:
         """Non-string input raises JSONTypeError."""
         with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
-            _parse_feature_preset(123)
+            parse_feature_preset(123)
+
+
+class TestParseBackendName:
+    """Tests for parse_backend_name function."""
+
+    def test_parse_backend_name_defaults_to_xgboost(self) -> None:
+        """None input returns 'xgboost'."""
+        assert parse_backend_name(None) == "xgboost"
+
+    def test_parse_backend_name_accepts_xgboost(self) -> None:
+        """'xgboost' is accepted."""
+        assert parse_backend_name("xgboost") == "xgboost"
+
+    def test_parse_backend_name_accepts_mlp(self) -> None:
+        """'mlp' is accepted."""
+        assert parse_backend_name("mlp") == "mlp"
+
+    def test_parse_backend_name_accepts_lstm(self) -> None:
+        """'lstm' is accepted."""
+        assert parse_backend_name("lstm") == "lstm"
+
+    def test_parse_backend_name_accepts_lightgbm(self) -> None:
+        """'lightgbm' is accepted."""
+        assert parse_backend_name("lightgbm") == "lightgbm"
+
+    def test_parse_backend_name_rejects_invalid_string(self) -> None:
+        """Invalid backend name raises ValueError."""
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_backend_name("invalid")
+
+    def test_parse_backend_name_rejects_non_string(self) -> None:
+        """Non-string input raises JSONTypeError."""
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_backend_name(123)
 
 
 class TestOptionalInt:
-    """Tests for _optional_int function."""
+    """Tests for optional_int function."""
 
     def test_optional_int_returns_default_on_missing(self) -> None:
-        """_optional_int returns default when key is missing."""
-        assert _optional_int({}, "missing", 10) == 10
+        """optional_int returns default when key is missing."""
+        assert optional_int({}, "missing", 10) == 10
 
     def test_optional_int_returns_value_when_present(self) -> None:
-        """_optional_int returns value when present."""
-        assert _optional_int({"val": 20}, "val", 10) == 20
+        """optional_int returns value when present."""
+        assert optional_int({"val": 20}, "val", 10) == 20
 
     def test_optional_int_converts_float_to_int(self) -> None:
-        """_optional_int converts float to int."""
-        assert _optional_int({"val": 15.5}, "val", 0) == 15
+        """optional_int converts float to int."""
+        assert optional_int({"val": 15.5}, "val", 0) == 15
 
     def test_optional_int_raises_on_invalid_type(self) -> None:
-        """_optional_int raises JSONTypeError on invalid type."""
+        """optional_int raises JSONTypeError on invalid type."""
         with pytest.raises(JSONTypeError, match="must be a number"):
-            _optional_int({"val": "string"}, "val", 0)
+            optional_int({"val": "string"}, "val", 0)
 
 
 class TestGetSearchSpace:
@@ -315,165 +349,57 @@ class TestParseOptimizeConfig:
 
 
 class TestLoadDataset:
-    """Tests for _load_dataset function."""
+    """Tests for load_dataset function."""
 
     def test_load_taiwan_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads Taiwan data successfully."""
+        """load_dataset loads Taiwan data successfully."""
         _, n_rows, feature_names = _copy_real_taiwan(tmp_path)
-        dataset = _load_dataset("taiwan", tmp_path)
+        dataset = load_dataset("taiwan", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows
-        assert dataset["n_features"] == len(feature_names)
+        assert meta["n_samples"] == n_rows
+        assert meta["n_features"] == len(feature_names)
 
     def test_load_us_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads US data successfully."""
+        """load_dataset loads US data successfully."""
         _, n_rows_us, feature_names_us = _copy_real_us(tmp_path)
-        dataset = _load_dataset("us", tmp_path)
+        dataset = load_dataset("us", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows_us
-        assert dataset["n_features"] == len(feature_names_us)
+        assert meta["n_samples"] == n_rows_us
+        assert meta["n_features"] == len(feature_names_us)
 
     def test_load_polish_dataset(self, tmp_path: Path) -> None:
-        """_load_dataset loads Polish data successfully."""
+        """load_dataset loads Polish data successfully."""
         _, n_rows_pl, feature_names_pl = _copy_real_polish(tmp_path)
-        dataset = _load_dataset("polish", tmp_path)
+        dataset = load_dataset("polish", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows_pl
-        assert dataset["n_features"] == len(feature_names_pl)
+        assert meta["n_samples"] == n_rows_pl
+        assert meta["n_features"] == len(feature_names_pl)
 
     def test_load_dataset_missing_taiwan(self, tmp_path: Path) -> None:
-        """_load_dataset raises FileNotFoundError for missing Taiwan data."""
-        with pytest.raises(FileNotFoundError, match="Taiwan dataset not found"):
-            _load_dataset("taiwan", tmp_path)
+        """load_dataset raises FileNotFoundError for missing Taiwan data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("taiwan", tmp_path)
 
     def test_load_dataset_missing_us(self, tmp_path: Path) -> None:
-        """_load_dataset raises FileNotFoundError for missing US data."""
-        with pytest.raises(FileNotFoundError, match="US dataset not found"):
-            _load_dataset("us", tmp_path)
+        """load_dataset raises FileNotFoundError for missing US data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("us", tmp_path)
 
     def test_load_dataset_missing_polish(self, tmp_path: Path) -> None:
-        """_load_dataset raises FileNotFoundError for missing Polish data."""
-        with pytest.raises(FileNotFoundError, match="Polish dataset not found"):
-            _load_dataset("polish", tmp_path)
-
-
-class TestGetXgbClassifier:
-    """Tests for _get_xgb_classifier function."""
-
-    def test_get_xgb_classifier_returns_class(self) -> None:
-        """_get_xgb_classifier returns a usable class."""
-        cls = _get_xgb_classifier()
-        # Verify it's callable and has the expected name
-        assert callable(cls)
-        assert cls.__name__ == "XGBClassifier"
-
-
-class TestCudaAvailable:
-    """Tests for _cuda_available function."""
-
-    def test_cuda_available_returns_true_or_false(self) -> None:
-        """_cuda_available returns True or False."""
-        result = _cuda_available()
-        # Use value comparison instead of isinstance
-        assert result is True or result is False
-
-
-class TestXGBoostObjective:
-    """Tests for _XGBoostObjective class."""
-
-    def test_objective_initialization(self, tmp_path: Path) -> None:
-        """_XGBoostObjective can be initialized with data."""
-        from covenant_radar_api.worker.optimize_job import _XGBoostObjective
-
-        # Create minimal test data
-        rng = np.random.default_rng(42)
-        x_features: NDArray[np.float64] = rng.random((100, 10)).astype(np.float64)
-        y_labels: NDArray[np.int64] = rng.integers(0, 2, 100).astype(np.int64)
-        feature_names = [f"f{i}" for i in range(10)]
-
-        objective = _XGBoostObjective(x_features, y_labels, feature_names, "cpu", "none")
-        assert objective._device == "cpu"
-
-    def test_objective_with_feature_engineering(self, tmp_path: Path) -> None:
-        """_XGBoostObjective applies feature engineering when preset is not 'none'."""
-        from covenant_radar_api.worker.optimize_job import _XGBoostObjective
-
-        # Create minimal test data
-        rng = np.random.default_rng(42)
-        x_features: NDArray[np.float64] = rng.random((100, 10)).astype(np.float64)
-        y_labels: NDArray[np.int64] = rng.integers(0, 2, 100).astype(np.int64)
-        feature_names = [f"f{i}" for i in range(10)]
-
-        # Use log_only preset to trigger feature engineering
-        objective = _XGBoostObjective(x_features, y_labels, feature_names, "cpu", "log_only")
-        assert objective._device == "cpu"
-        # With log_only, features should be doubled (original + log transforms)
-        n_engineered: int = int(objective._splits.x_train.shape[1])
-        assert n_engineered == 20  # 10 original + 10 log
-
-    def test_objective_call_returns_float(self, tmp_path: Path) -> None:
-        """_XGBoostObjective __call__ returns a float AUC value."""
-        from covenant_radar_api.worker.optimize_job import _XGBoostObjective
-
-        # Create minimal test data with some class balance
-        rng = np.random.default_rng(42)
-        x_features: NDArray[np.float64] = rng.random((100, 10)).astype(np.float64)
-        y_labels: NDArray[np.int64] = np.zeros(100, dtype=np.int64)
-        y_labels[:30] = 1  # 30% positive
-        feature_names = [f"f{i}" for i in range(10)]
-
-        objective = _XGBoostObjective(x_features, y_labels, feature_names, "cpu", "none")
-
-        # Call with hyperparameters
-        result = objective(
-            x_features=x_features,
-            y_labels=y_labels,
-            feature_names=["f" + str(i) for i in range(10)],
-            max_depth=3,
-            n_estimators=10,
-            learning_rate=0.1,
-            reg_alpha=0.0,
-            reg_lambda=1.0,
-            subsample=1.0,
-            colsample_bytree=1.0,
-            random_state=42,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-        )
-
-        # AUC should be between 0 and 1 (value assertion implies float)
-        assert 0.0 <= result <= 1.0
-
-
-class TestCreateXgboostObjective:
-    """Tests for _create_xgboost_objective function."""
-
-    def test_create_objective_returns_protocol(self) -> None:
-        """_create_xgboost_objective returns an XGBoostObjectiveProtocol instance."""
-        from covenant_radar_api.worker.optimize_job import _create_xgboost_objective
-
-        # Create minimal test data
-        rng = np.random.default_rng(42)
-        x_features: NDArray[np.float64] = rng.random((100, 10)).astype(np.float64)
-        y_labels: NDArray[np.int64] = np.zeros(100, dtype=np.int64)
-        y_labels[:30] = 1
-        feature_names = [f"f{i}" for i in range(10)]
-
-        objective = _create_xgboost_objective(x_features, y_labels, feature_names, "cpu", "none")
-
-        # Verify it's callable
-        assert callable(objective)
+        """load_dataset raises FileNotFoundError for missing Polish data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("polish", tmp_path)
 
 
 class TestBuildOptimizationConfig:
-    """Tests for _build_optimization_config function."""
+    """Tests for build_optimization_config function."""
 
     def test_build_config_with_timeout(self) -> None:
-        """_build_optimization_config creates config with timeout."""
-        from covenant_radar_api.worker.optimize_job import _build_optimization_config
-
-        config = _build_optimization_config(
+        """build_optimization_config creates config with timeout."""
+        config = build_optimization_config(
             n_trials=50,
             timeout_seconds=3600,
             random_state=42,
@@ -484,10 +410,8 @@ class TestBuildOptimizationConfig:
         assert config["random_state"] == 42
 
     def test_build_config_without_timeout(self) -> None:
-        """_build_optimization_config creates config without timeout."""
-        from covenant_radar_api.worker.optimize_job import _build_optimization_config
-
-        config = _build_optimization_config(
+        """build_optimization_config creates config without timeout."""
+        config = build_optimization_config(
             n_trials=25,
             timeout_seconds=None,
             random_state=123,
@@ -514,13 +438,17 @@ class TestGenerateTrainConfig:
             "n_trials_failed": 0,
             "best_trial_number": 25,
             "best_value": 0.85,
-            "best_max_depth": 5,
-            "best_n_estimators": 100,
-            "best_learning_rate": 0.1,
-            "best_reg_alpha": 0.01,
-            "best_reg_lambda": 1.0,
-            "best_subsample": 0.8,
-            "best_colsample_bytree": 0.8,
+            "best_int_params": {
+                "max_depth": 5,
+                "n_estimators": 100,
+            },
+            "best_float_params": {
+                "learning_rate": 0.1,
+                "reg_alpha": 0.01,
+                "reg_lambda": 1.0,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+            },
             "total_duration_seconds": 120.5,
         }
 

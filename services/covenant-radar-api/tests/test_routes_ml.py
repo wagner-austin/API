@@ -525,3 +525,135 @@ class TestOptimizeEndpoint:
         )
         # AppError is unhandled in these route tests, so FastAPI returns 500
         assert response.status_code == 500
+
+
+class TestExplainEndpoint:
+    """Tests for POST /ml/explain."""
+
+    def test_explain_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
+        """Test explanation job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "xgboost",
+                "model_path": "/models/xgboost.ubj",
+                "explainer": "permutation"
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
+
+        # Verify job was enqueued with correct function
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_explain_job" in enqueued.func
+
+    def test_explain_with_all_options(self, container_with_store: ContainerAndStore) -> None:
+        """Test explanation with all options specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "us",
+                "backend": "mlp",
+                "model_path": "/models/mlp.pt",
+                "explainer": "gradient",
+                "target_class": 0,
+                "n_samples": 500,
+                "random_state": 123
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        # Verify job payload contains all options
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert "us" in config_str
+        assert "mlp" in config_str
+        assert "gradient" in config_str
+
+    def test_explain_invalid_dataset_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid dataset triggers edge validation and results in error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "invalid",
+                "backend": "xgboost",
+                "model_path": "/models/model.ubj",
+                "explainer": "permutation"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_explain_invalid_backend_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid backend triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "invalid",
+                "model_path": "/models/model.ubj",
+                "explainer": "permutation"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_explain_invalid_explainer_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid explainer triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "xgboost",
+                "model_path": "/models/model.ubj",
+                "explainer": "invalid"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_explain_missing_required_field_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Missing required field triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "xgboost",
+                "model_path": "/models/model.ubj"
+            }""",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+    def test_explain_non_object_json_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Non-object JSON (e.g., list) triggers TypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain",
+            content=b"[]",
+        )
+        # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500

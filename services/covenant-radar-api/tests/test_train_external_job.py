@@ -6,7 +6,7 @@ from pathlib import Path
 from shutil import copyfile
 
 import pytest
-from covenant_ml.types import MLPConfig, TrainConfig
+from covenant_ml.types import LightGBMConfig, LSTMConfig, MLPConfig, TrainConfig
 from platform_core.json_utils import (
     InvalidJsonError,
     JSONTypeError,
@@ -18,6 +18,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.train_external_job import (
+    _get_meta_filename,
     _load_dataset,
     _metrics_to_json,
     _optional_float,
@@ -537,6 +538,206 @@ class TestParseExternalTrainConfig:
         with pytest.raises(JSONTypeError, match="scale_pos_weight must be a number"):
             _parse_external_train_config(config_json)
 
+    def test_parse_config_lstm_backend(self) -> None:
+        """Parse valid config for LSTM backend."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "taiwan",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "bidirectional": True,
+                "sequence_length": 5,
+                "precision": "fp32",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lstm"
+        assert result["dataset"] == "taiwan"
+        lstm_config: LSTMConfig = result["config"]
+        assert lstm_config["learning_rate"] == 0.001
+        assert lstm_config["hidden_size"] == 64
+        assert lstm_config["num_layers"] == 2
+        assert lstm_config["bidirectional"] is True
+        assert lstm_config["sequence_length"] == 5
+
+    def test_parse_config_lstm_precision_fp16(self) -> None:
+        """Parse LSTM config with fp16 precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "us",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "bidirectional": False,
+                "sequence_length": 5,
+                "precision": "fp16",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lstm"
+        lstm_config: LSTMConfig = result["config"]
+        assert lstm_config["precision"] == "fp16"
+        assert lstm_config["bidirectional"] is False
+
+    def test_parse_config_lstm_precision_bf16(self) -> None:
+        """Parse LSTM config with bf16 precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "polish",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "bidirectional": True,
+                "sequence_length": 3,
+                "precision": "bf16",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lstm"
+        lstm_config: LSTMConfig = result["config"]
+        assert lstm_config["precision"] == "bf16"
+
+    def test_parse_config_lstm_precision_auto(self) -> None:
+        """Parse LSTM config with auto precision."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "taiwan",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "bidirectional": True,
+                "sequence_length": 5,
+                "precision": "auto",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lstm"
+        lstm_config: LSTMConfig = result["config"]
+        assert lstm_config["precision"] == "auto"
+
+    def test_parse_config_lstm_invalid_precision(self) -> None:
+        """Invalid LSTM precision raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "taiwan",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "bidirectional": True,
+                "sequence_length": 5,
+                "precision": "invalid",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="precision must be"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_lstm_missing_bidirectional(self) -> None:
+        """Missing bidirectional raises JSONTypeError."""
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "taiwan",
+                "learning_rate": 0.001,
+                "batch_size": 32,
+                "n_epochs": 10,
+                "dropout": 0.2,
+                "hidden_size": 64,
+                "num_layers": 2,
+                "sequence_length": 5,
+                "precision": "fp32",
+                "random_state": 42,
+                "early_stopping_patience": 5,
+            }
+        )
+        with pytest.raises(JSONTypeError, match="bidirectional must be a boolean"):
+            _parse_external_train_config(config_json)
+
+    def test_parse_config_lightgbm_backend(self) -> None:
+        """Parse valid config for LightGBM backend."""
+        config_json = dump_json_str(
+            {
+                "backend": "lightgbm",
+                "dataset": "taiwan",
+                "learning_rate": 0.1,
+                "max_depth": 6,
+                "n_estimators": 100,
+                "num_leaves": 31,
+                "min_child_samples": 20,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "random_state": 42,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lightgbm"
+        assert result["dataset"] == "taiwan"
+        lgbm_config: LightGBMConfig = result["config"]
+        assert lgbm_config["learning_rate"] == 0.1
+        assert lgbm_config["num_leaves"] == 31
+        assert lgbm_config["min_child_samples"] == 20
+        assert lgbm_config["early_stopping_rounds"] == 10  # default
+        assert lgbm_config["reg_alpha"] == 0.0  # default
+        assert lgbm_config["reg_lambda"] == 1.0  # default
+
+    def test_parse_config_lightgbm_with_regularization(self) -> None:
+        """Parse LightGBM config with custom regularization."""
+        config_json = dump_json_str(
+            {
+                "backend": "lightgbm",
+                "dataset": "us",
+                "learning_rate": 0.05,
+                "max_depth": 8,
+                "n_estimators": 200,
+                "num_leaves": 63,
+                "min_child_samples": 10,
+                "subsample": 0.9,
+                "colsample_bytree": 0.7,
+                "random_state": 123,
+                "device": "cuda",
+                "early_stopping_rounds": 20,
+                "reg_alpha": 1.0,
+                "reg_lambda": 5.0,
+            }
+        )
+        result = _parse_external_train_config(config_json)
+        assert result["backend"] == "lightgbm"
+        lgbm_config: LightGBMConfig = result["config"]
+        assert lgbm_config["device"] == "cuda"
+        assert lgbm_config["early_stopping_rounds"] == 20
+        assert lgbm_config["reg_alpha"] == 1.0
+        assert lgbm_config["reg_lambda"] == 5.0
+
 
 class TestLoadDataset:
     """Tests for _load_dataset function."""
@@ -545,39 +746,42 @@ class TestLoadDataset:
         """_load_dataset loads Taiwan data successfully (full dataset)."""
         _, n_rows, feature_names = _copy_real_taiwan(tmp_path)
         dataset = _load_dataset("taiwan", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows
-        assert dataset["n_features"] == len(feature_names)
+        assert meta["n_samples"] == n_rows
+        assert meta["n_features"] == len(feature_names)
 
     def test_load_us_dataset(self, tmp_path: Path) -> None:
         """_load_dataset loads US data successfully (full dataset)."""
         _, n_rows_us, feature_names_us = _copy_real_us(tmp_path)
         dataset = _load_dataset("us", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows_us
-        assert dataset["n_features"] == len(feature_names_us)
+        assert meta["n_samples"] == n_rows_us
+        assert meta["n_features"] == len(feature_names_us)
 
     def test_load_polish_dataset(self, tmp_path: Path) -> None:
         """_load_dataset loads Polish data successfully (full dataset)."""
         _, n_rows_pl, feature_names_pl = _copy_real_polish(tmp_path)
         dataset = _load_dataset("polish", tmp_path)
+        meta = dataset["meta"]
 
-        assert dataset["n_samples"] == n_rows_pl
-        assert dataset["n_features"] == len(feature_names_pl)
+        assert meta["n_samples"] == n_rows_pl
+        assert meta["n_features"] == len(feature_names_pl)
 
     def test_load_dataset_missing_taiwan(self, tmp_path: Path) -> None:
         """_load_dataset raises FileNotFoundError for missing Taiwan data."""
-        with pytest.raises(FileNotFoundError, match="Taiwan dataset not found"):
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
             _load_dataset("taiwan", tmp_path)
 
     def test_load_dataset_missing_us(self, tmp_path: Path) -> None:
         """_load_dataset raises FileNotFoundError for missing US data."""
-        with pytest.raises(FileNotFoundError, match="US dataset not found"):
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
             _load_dataset("us", tmp_path)
 
     def test_load_dataset_missing_polish(self, tmp_path: Path) -> None:
         """_load_dataset raises FileNotFoundError for missing Polish data."""
-        with pytest.raises(FileNotFoundError, match="Polish dataset not found"):
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
             _load_dataset("polish", tmp_path)
 
 
@@ -803,6 +1007,92 @@ class TestRunExternalTraining:
 
         assert _req_f(result, "best_val_auc") >= 0.5
 
+    def test_train_lstm_backend_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains LSTM model on the full Taiwan dataset."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy the real Taiwan dataset into the test external directory
+        taiwan_dir = external_dir / "taiwan_data"
+        taiwan_dir.mkdir(parents=True, exist_ok=True)
+        real_tw = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
+        assert real_tw.exists(), "Taiwan dataset not found in repository data"
+        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
+
+        config_json = dump_json_str(
+            {
+                "backend": "lstm",
+                "dataset": "taiwan",
+                "learning_rate": 0.01,
+                "batch_size": 1024,
+                "n_epochs": 2,
+                "dropout": 0.0,
+                "hidden_size": 32,
+                "num_layers": 1,
+                "bidirectional": False,
+                "sequence_length": 4,
+                "precision": "fp32",
+                "optimizer": "adamw",
+                "random_state": 42,
+                "early_stopping_patience": 2,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        # LSTM produces a .pt file
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".pt"
+
+    def test_train_lightgbm_backend_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains LightGBM model on the full Taiwan dataset."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy the real Taiwan dataset into the test external directory
+        taiwan_dir = external_dir / "taiwan_data"
+        taiwan_dir.mkdir(parents=True, exist_ok=True)
+        real_tw = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
+        assert real_tw.exists(), "Taiwan dataset not found in repository data"
+        copyfile(str(real_tw), str(taiwan_dir / "data.csv"))
+
+        config_json = dump_json_str(
+            {
+                "backend": "lightgbm",
+                "dataset": "taiwan",
+                "learning_rate": 0.1,
+                "n_estimators": 10,
+                "max_depth": 3,
+                "num_leaves": 8,
+                "min_child_samples": 20,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "reg_alpha": 0.0,
+                "reg_lambda": 0.0,
+                "random_state": 42,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        # LightGBM produces a .txt file
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".txt"
+
 
 class TestProcessExternalTrainJob:
     """Tests for process_external_train_job RQ entry point."""
@@ -855,3 +1145,27 @@ class TestProcessExternalTrainJob:
             assert model_path.exists()
         finally:
             config_hooks.get_env = orig_get_env
+
+
+class TestGetMetaFilename:
+    """Tests for _get_meta_filename function."""
+
+    def test_get_meta_filename_mlp(self) -> None:
+        """Test _get_meta_filename returns correct filename for MLP."""
+        assert _get_meta_filename("mlp") == "active_mlp_meta.json"
+
+    def test_get_meta_filename_lstm(self) -> None:
+        """Test _get_meta_filename returns correct filename for LSTM."""
+        assert _get_meta_filename("lstm") == "active_lstm_meta.json"
+
+    def test_get_meta_filename_lightgbm(self) -> None:
+        """Test _get_meta_filename returns correct filename for LightGBM."""
+        assert _get_meta_filename("lightgbm") == "active_lgbm_meta.json"
+
+    def test_get_meta_filename_xgboost(self) -> None:
+        """Test _get_meta_filename returns empty string for XGBoost.
+
+        XGBoost uses a self-describing format (.ubj) that doesn't
+        require external metadata.
+        """
+        assert _get_meta_filename("xgboost") == ""
