@@ -145,11 +145,31 @@ class _CudnnConfigProto(Protocol):
     benchmark: bool
 
 
+class _EnableGradFactory(Protocol):
+    """Protocol for torch.enable_grad context manager factory."""
+
+    def __call__(self) -> AbstractContextManager[None]: ...
+
+
 class _MLPPrepared:
+    """Prepared MLP model for inference and gradient computation.
+
+    Implements both PredictorProtocol and GradientModelProtocol from
+    platform_ml.explainers.protocol for use with feature importance explainers.
+    """
+
     def __init__(self, model: TrainableModel) -> None:
         self._model = model
 
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Return class probabilities for input samples.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Class probabilities with shape (n_samples, n_classes).
+        """
         torch = _import_torch()
         tensor: _TensorCtor = torch.tensor
         no_grad: _NoGradFactory = torch.no_grad
@@ -163,6 +183,67 @@ class _MLPPrepared:
             sm = softmax(dim=1)
             proba = sm(logits).cpu().numpy()
         return proba.astype(np.float64)
+
+    def compute_gradients(
+        self,
+        x: NDArray[np.float64],
+        target_class: int,
+    ) -> NDArray[np.float64]:
+        """Compute gradients of output w.r.t. input features.
+
+        Computes d(output[target_class]) / d(input) for each sample.
+        Used by gradient-based explainers (GradientExplainer, IntegratedGradientsExplainer).
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+            target_class: Class index for which to compute gradients.
+
+        Returns:
+            Gradients with shape (n_samples, n_features).
+        """
+        torch_mod = __import__("torch")
+        nn_mod = __import__("torch.nn", fromlist=["Softmax"])
+        enable_grad: _EnableGradFactory = torch_mod.enable_grad
+        tensor: _TensorCtor = torch_mod.tensor
+        float32: DTypeProtocol = torch_mod.float32
+
+        # Put model in eval mode
+        self._model.eval()
+
+        # Create softmax function
+        softmax: _SoftmaxCtor = nn_mod.Softmax
+        softmax_fn = softmax(dim=1)
+
+        # Create input tensor and enable gradients
+        x_tensor: TensorProtocol = tensor(x, dtype=float32)
+        x_tensor = x_tensor.requires_grad_(True)
+
+        with enable_grad():
+            # Forward pass through model
+            logits: TensorProtocol = self._model(x_tensor)
+
+            # Apply softmax
+            proba: TensorProtocol = softmax_fn(logits)
+
+            # Select target class probabilities using select()
+            # proba shape: (n_samples, n_classes), select dim=1 (classes), index=target_class
+            target_proba: TensorProtocol = proba.select(1, target_class)
+
+            # Sum to get scalar for backward (gradients will be per-sample)
+            scalar_output: TensorProtocol = target_proba.sum()
+
+            # Backward pass to compute gradients w.r.t. input
+            scalar_output.backward()
+
+        # Extract gradients from input tensor
+        # Note: grad is always populated since requires_grad=True and backward() was called
+        grad_tensor = x_tensor.grad
+        assert grad_tensor is not None, "Gradient tensor should not be None after backward()"
+        grad_cpu: TensorProtocol = grad_tensor.cpu()
+        grad_numpy = grad_cpu.numpy()
+        gradients: NDArray[np.float64] = grad_numpy.astype(np.float64)
+
+        return gradients
 
 
 MLP_CAPABILITIES: BackendCapabilities = {
