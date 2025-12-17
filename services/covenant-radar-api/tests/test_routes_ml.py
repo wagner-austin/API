@@ -440,7 +440,7 @@ class TestOptimizeEndpoint:
 
         # Verify job was enqueued with correct function
         enqueued = container_with_store.queue.jobs[-1]
-        assert "process_optimize_job" in enqueued.func
+        assert "process_xgboost_optimize_job" in enqueued.func
 
     def test_optimize_with_all_options(self, container_with_store: ContainerAndStore) -> None:
         """Test optimization with all options specified."""
@@ -525,6 +525,236 @@ class TestOptimizeEndpoint:
         )
         # AppError is unhandled in these route tests, so FastAPI returns 500
         assert response.status_code == 500
+
+    def test_optimize_mlp_backend_enqueues_correct_job(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test MLP optimization enqueues correct worker job."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "mlp",
+                "n_trials": 50,
+                "precision": "fp16",
+                "optimizer": "adam",
+                "n_epochs": 100,
+                "early_stopping_patience": 15
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        # Verify MLP job was enqueued
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_mlp_optimize_job" in enqueued.func
+
+        # Verify payload contains MLP-specific fields
+        config_str = str(enqueued.args[0])
+        assert '"precision":"fp16"' in config_str
+        assert '"optimizer":"adam"' in config_str
+        assert '"n_epochs":100' in config_str
+
+    def test_optimize_lightgbm_backend_enqueues_correct_job(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LightGBM optimization enqueues correct worker job."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "polish",
+                "backend": "lightgbm",
+                "n_trials": 30,
+                "early_stopping_rounds": 20,
+                "device": "cuda"
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        # Verify LightGBM job was enqueued
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_lightgbm_optimize_job" in enqueued.func
+
+        # Verify payload contains LightGBM-specific fields
+        config_str = str(enqueued.args[0])
+        assert '"early_stopping_rounds":20' in config_str
+        assert '"device":"cuda"' in config_str
+
+    def test_optimize_lstm_backend_enqueues_correct_job(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LSTM optimization enqueues correct worker job."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "us",
+                "backend": "lstm",
+                "n_trials": 25,
+                "precision": "bf16",
+                "n_epochs": 75,
+                "early_stopping_patience": 8,
+                "sequence_length": 10,
+                "bidirectional": true
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        # Verify LSTM job was enqueued
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_lstm_optimize_job" in enqueued.func
+
+        # Verify payload contains LSTM-specific fields
+        config_str = str(enqueued.args[0])
+        assert '"precision":"bf16"' in config_str
+        assert '"sequence_length":10' in config_str
+        assert '"bidirectional":true' in config_str
+
+    def test_optimize_mlp_backend_with_defaults(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test MLP optimization with default values."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "mlp",
+                "n_trials": 50
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify default values in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"precision":"fp32"' in config_str
+        assert '"optimizer":"adamw"' in config_str
+        assert '"n_epochs":50' in config_str
+        assert '"early_stopping_patience":10' in config_str
+
+    def test_optimize_lightgbm_backend_with_defaults(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LightGBM optimization with default values."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "lightgbm",
+                "n_trials": 50
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify default values in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"early_stopping_rounds":10' in config_str
+        assert '"device":"auto"' in config_str
+
+    def test_optimize_lstm_backend_with_defaults(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LSTM optimization with default values."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "lstm",
+                "n_trials": 50
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify default values in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"precision":"fp32"' in config_str
+        assert '"n_epochs":50' in config_str
+        assert '"sequence_length":5' in config_str
+        assert '"bidirectional":false' in config_str
+
+    def test_optimize_mlp_backend_with_timeout(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test MLP optimization with timeout specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "mlp",
+                "n_trials": 50,
+                "timeout_seconds": 3600
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify timeout in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"timeout_seconds":3600' in config_str
+
+    def test_optimize_lightgbm_backend_with_timeout(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LightGBM optimization with timeout specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "lightgbm",
+                "n_trials": 50,
+                "timeout_seconds": 1800
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify timeout in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"timeout_seconds":1800' in config_str
+
+    def test_optimize_lstm_backend_with_timeout(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test LSTM optimization with timeout specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "lstm",
+                "n_trials": 50,
+                "timeout_seconds": 7200
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify timeout in payload
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert '"timeout_seconds":7200' in config_str
 
 
 class TestExplainEndpoint:

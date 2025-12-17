@@ -22,11 +22,11 @@ from covenant_radar_api.worker._optimize_common import (
     parse_device,
     parse_feature_preset,
 )
-from covenant_radar_api.worker.optimize_job import (
+from covenant_radar_api.worker.optimize_xgboost_job import (
     _get_search_space,
     _parse_optimize_config,
     _parse_space_profile,
-    process_optimize_job,
+    process_xgboost_optimize_job,
     run_optimization,
 )
 
@@ -429,7 +429,7 @@ class TestGenerateTrainConfig:
         """_generate_train_config creates correct TrainConfig from summary."""
         from covenant_ml.optimizer import OptimizationSummary
 
-        from covenant_radar_api.worker.optimize_job import _generate_train_config
+        from covenant_radar_api.worker.optimize_xgboost_job import _generate_train_config
 
         summary: OptimizationSummary = {
             "n_trials_total": 50,
@@ -623,7 +623,7 @@ class TestRunOptimization:
 
     def test_run_optimization_with_progress_callback(self, tmp_path: Path) -> None:
         """run_optimization calls progress callback with trial info."""
-        from covenant_radar_api.worker.optimize_job import TrialProgressInfo
+        from covenant_radar_api.worker.optimize_xgboost_job import TrialProgressInfo
 
         external_dir = tmp_path / "external"
         _copy_real_taiwan(external_dir)
@@ -661,10 +661,10 @@ class TestRunOptimization:
 
 
 class TestProcessOptimizeJob:
-    """Integration tests for process_optimize_job entry point."""
+    """Integration tests for process_xgboost_optimize_job entry point."""
 
     def test_process_job_loads_settings_and_runs(self, tmp_path: Path) -> None:
-        """process_optimize_job loads settings from env and runs optimization."""
+        """process_xgboost_optimize_job loads settings from env and runs optimization."""
         from platform_core.config import _test_hooks as config_hooks
         from platform_core.testing import FakeEnv
 
@@ -700,7 +700,7 @@ class TestProcessOptimizeJob:
                 }
             )
 
-            result = process_optimize_job(config_json)
+            result = process_xgboost_optimize_job(config_json)
 
             assert result["status"] == "complete"
             assert result["dataset"] == "taiwan"

@@ -1262,6 +1262,374 @@ class TestParseOptimizeRequest:
         with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
             parse_optimize_request(body)
 
+    def test_explicit_xgboost_backend(self) -> None:
+        """Test parsing optimize request with explicit xgboost backend."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "xgboost",
+            "n_trials": 50
+        }"""
+        result = parse_optimize_request(body)
+
+        assert result["backend"] == "xgboost"
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["n_trials"] == 50
+
+    def test_mlp_backend(self) -> None:
+        """Test parsing optimize request for MLP backend."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": "fp16",
+            "optimizer": "adam",
+            "n_epochs": 100,
+            "early_stopping_patience": 15
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["dataset"] == "taiwan"
+        assert result["config"]["n_trials"] == 50
+        assert result["precision"] == "fp16"
+        assert result["optimizer"] == "adam"
+        assert result["n_epochs"] == 100
+        assert result["early_stopping_patience"] == 15
+        assert result["device"] == "auto"
+
+    def test_mlp_backend_defaults(self) -> None:
+        """Test MLP backend with default values."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "mlp",
+            "n_trials": 25
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["precision"] == "fp32"
+        assert result["optimizer"] == "adamw"
+        assert result["n_epochs"] == 50
+        assert result["early_stopping_patience"] == 10
+
+    def test_lightgbm_backend(self) -> None:
+        """Test parsing optimize request for LightGBM backend."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "early_stopping_rounds": 20,
+            "device": "cuda"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lightgbm":
+            raise AssertionError("Expected lightgbm backend")
+        assert result["dataset"] == "polish"
+        assert result["config"]["n_trials"] == 50
+        assert result["early_stopping_rounds"] == 20
+        assert result["device"] == "cuda"
+
+    def test_lightgbm_backend_defaults(self) -> None:
+        """Test LightGBM backend with default values."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "n_trials": 30
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lightgbm":
+            raise AssertionError("Expected lightgbm backend")
+        assert result["early_stopping_rounds"] == 10
+        assert result["device"] == "auto"
+
+    def test_lstm_backend(self) -> None:
+        """Test parsing optimize request for LSTM backend."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "lstm",
+            "n_trials": 50,
+            "precision": "bf16",
+            "n_epochs": 75,
+            "early_stopping_patience": 8,
+            "sequence_length": 10,
+            "bidirectional": true
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["dataset"] == "us"
+        assert result["config"]["n_trials"] == 50
+        assert result["precision"] == "bf16"
+        assert result["n_epochs"] == 75
+        assert result["early_stopping_patience"] == 8
+        assert result["sequence_length"] == 10
+        assert result["bidirectional"] is True
+
+    def test_lstm_backend_defaults(self) -> None:
+        """Test LSTM backend with default values."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "lstm",
+            "n_trials": 40
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["precision"] == "fp32"
+        assert result["n_epochs"] == 50
+        assert result["early_stopping_patience"] == 10
+        assert result["sequence_length"] == 5
+        assert result["bidirectional"] is False
+
+    def test_invalid_backend_raises_json_type_error(self) -> None:
+        """Test that invalid backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "random_forest",
+            "n_trials": 50
+        }"""
+        with pytest.raises(JSONTypeError, match="backend must be one of"):
+            parse_optimize_request(body)
+
+    def test_mlp_invalid_space_profile_raises_json_type_error(self) -> None:
+        """Test that invalid space_profile for MLP raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "space_profile": "categorical"
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
+            parse_optimize_request(body)
+
+    def test_lightgbm_invalid_space_profile_raises_json_type_error(self) -> None:
+        """Test that invalid space_profile for LightGBM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "space_profile": "categorical"
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
+            parse_optimize_request(body)
+
+    def test_lstm_invalid_space_profile_raises_json_type_error(self) -> None:
+        """Test that invalid space_profile for LSTM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "n_trials": 50,
+            "space_profile": "categorical"
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
+            parse_optimize_request(body)
+
+    def test_mlp_invalid_precision_raises_json_type_error(self) -> None:
+        """Test that invalid precision for MLP raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": "fp8"
+        }"""
+        with pytest.raises(JSONTypeError, match="precision must be one of"):
+            parse_optimize_request(body)
+
+    def test_mlp_invalid_optimizer_raises_json_type_error(self) -> None:
+        """Test that invalid optimizer for MLP raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "optimizer": "lbfgs"
+        }"""
+        with pytest.raises(JSONTypeError, match="optimizer must be one of"):
+            parse_optimize_request(body)
+
+    def test_lstm_invalid_bidirectional_raises_json_type_error(self) -> None:
+        """Test that invalid bidirectional for LSTM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "n_trials": 50,
+            "bidirectional": "yes"
+        }"""
+        with pytest.raises(JSONTypeError, match="bidirectional must be a boolean"):
+            parse_optimize_request(body)
+
+    def test_mlp_precision_auto(self) -> None:
+        """Test MLP with auto precision."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": "auto"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["precision"] == "auto"
+
+    def test_mlp_optimizer_sgd(self) -> None:
+        """Test MLP with SGD optimizer."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "optimizer": "sgd"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["optimizer"] == "sgd"
+
+    def test_lstm_precision_auto(self) -> None:
+        """Test LSTM with auto precision."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "n_trials": 50,
+            "precision": "auto"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["precision"] == "auto"
+
+    def test_mlp_non_string_precision_raises_json_type_error(self) -> None:
+        """Test that non-string precision raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": 16
+        }"""
+        with pytest.raises(JSONTypeError, match="precision must be a string"):
+            parse_optimize_request(body)
+
+    def test_mlp_non_string_optimizer_raises_json_type_error(self) -> None:
+        """Test that non-string optimizer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "optimizer": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="optimizer must be a string"):
+            parse_optimize_request(body)
+
+    def test_mlp_explicit_default_space_profile(self) -> None:
+        """Test MLP with explicit default space_profile."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "space_profile": "default"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["space_profile"] == "default"
+
+    def test_lightgbm_explicit_default_space_profile(self) -> None:
+        """Test LightGBM with explicit default space_profile."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "space_profile": "default"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lightgbm":
+            raise AssertionError("Expected lightgbm backend")
+        assert result["space_profile"] == "default"
+
+    def test_lstm_explicit_default_space_profile(self) -> None:
+        """Test LSTM with explicit default space_profile."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "n_trials": 50,
+            "space_profile": "default"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "lstm":
+            raise AssertionError("Expected lstm backend")
+        assert result["space_profile"] == "default"
+
+    def test_mlp_non_string_space_profile_raises_json_type_error(self) -> None:
+        """Test that non-string space_profile for MLP raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "space_profile": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
+            parse_optimize_request(body)
+
+    def test_lightgbm_non_string_space_profile_raises_json_type_error(self) -> None:
+        """Test that non-string space_profile for LightGBM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "space_profile": 456
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
+            parse_optimize_request(body)
+
+    def test_lstm_non_string_space_profile_raises_json_type_error(self) -> None:
+        """Test that non-string space_profile for LSTM raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "lstm",
+            "n_trials": 50,
+            "space_profile": 789
+        }"""
+        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
+            parse_optimize_request(body)
+
+    def test_mlp_explicit_fp32_precision(self) -> None:
+        """Test MLP with explicit fp32 precision."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": "fp32"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["precision"] == "fp32"
+
+    def test_mlp_explicit_adamw_optimizer(self) -> None:
+        """Test MLP with explicit adamw optimizer."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "mlp",
+            "n_trials": 50,
+            "optimizer": "adamw"
+        }"""
+        result = parse_optimize_request(body)
+
+        if result["backend"] != "mlp":
+            raise AssertionError("Expected mlp backend")
+        assert result["optimizer"] == "adamw"
+
 
 class TestParseExplainRequest:
     """Tests for parse_explain_request."""
