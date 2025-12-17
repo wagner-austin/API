@@ -11,6 +11,8 @@ Loan covenant monitoring and breach prediction API service. Features determinist
 - **Breach Prediction**: Pluggable ML backends for risk tier prediction (LOW/MEDIUM/HIGH)
   - XGBoost: Gradient boosting with feature importance ranking
   - MLP: Neural network with configurable architecture (hidden layers, dropout, precision)
+  - LSTM: Recurrent network for temporal bankruptcy sequences (bidirectional support)
+  - LightGBM: Fast gradient boosting for large-scale datasets
 - **Background Training**: Redis + RQ worker for model training jobs
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
@@ -440,21 +442,23 @@ This creates 12 sample deals (6 safe, 6 risky) with covenants, measurements, and
 
 ### Pluggable Backends
 
-The API supports two ML backends for breach risk prediction:
+The API supports four ML backends for breach risk prediction:
 
 | Backend | Format | Best For | Feature Importance |
 |---------|--------|----------|-------------------|
 | `xgboost` | `.ubj` | Tabular data, interpretability | Yes (ranked list) |
 | `mlp` | `.pt` | Non-linear patterns, deep learning | No |
+| `lstm` | `.pt` | Temporal sequences, time-series | No |
+| `lightgbm` | `.txt` | Large datasets, fast training | Yes (ranked list) |
 
 ### GPU Training
 
-Both backends support GPU acceleration via the `device` parameter:
+All four backends support GPU acceleration via the `device` parameter:
 - `"cpu"` - Force CPU training
 - `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
 - `"auto"` - Auto-detect: uses GPU if available, falls back to CPU (default)
 
-MLP also supports precision modes for GPU training:
+MLP and LSTM also support precision modes for GPU training:
 - `"fp32"` - Full precision (most compatible)
 - `"fp16"` - Half precision (faster on GPU)
 - `"bf16"` - BFloat16 (faster on Ampere+ GPUs)
@@ -462,9 +466,10 @@ MLP also supports precision modes for GPU training:
 
 ### Class Imbalance Handling
 
-Both backends handle imbalanced classes (few bankruptcies vs many healthy companies):
+All backends handle imbalanced classes (few bankruptcies vs many healthy companies):
 - XGBoost: `scale_pos_weight` parameter (auto-calculated if omitted)
-- MLP: Weighted BCE loss based on class distribution
+- MLP/LSTM: Weighted BCE loss based on class distribution
+- LightGBM: Auto-computed class weights
 
 ### Train on Internal Data
 
@@ -515,13 +520,19 @@ curl -X POST http://localhost:8007/ml/train-external \
   -d '{
     "dataset": "taiwan",
     "backend": "xgboost",
+    "device": "auto",
     "learning_rate": 0.1,
     "max_depth": 6,
     "n_estimators": 100,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
+    "reg_alpha": 0.0,
+    "reg_lambda": 1.0,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
     "random_state": 42,
-    "device": "auto"
+    "early_stopping_rounds": 10
   }'
 
 # Poll for results with feature importance ranking
@@ -551,16 +562,19 @@ curl -X POST http://localhost:8007/ml/train-external \
   -d '{
     "dataset": "taiwan",
     "backend": "mlp",
+    "device": "auto",
+    "precision": "fp32",
+    "optimizer": "adamw",
+    "hidden_sizes": [64, 32],
     "learning_rate": 0.001,
     "batch_size": 32,
     "n_epochs": 100,
     "dropout": 0.2,
-    "hidden_sizes": [64, 32],
-    "precision": "fp32",
-    "optimizer": "adamw",
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
     "random_state": 42,
-    "early_stopping_patience": 10,
-    "device": "auto"
+    "early_stopping_patience": 10
   }'
 
 # Poll for results (no feature importances for MLP)
@@ -570,6 +584,90 @@ curl http://localhost:8007/ml/jobs/{job_id}
 #     "backend": "mlp",
 #     "model_format": "pt",
 #     "test_metrics": {"auc": 0.91, ...},
+#     "feature_importances": []
+#   }
+# }
+```
+
+### Train on External Datasets - LightGBM
+
+Train a LightGBM gradient boosting model with fast training and feature importance:
+
+```bash
+# Train LightGBM on Taiwan bankruptcy data
+curl -X POST http://localhost:8007/ml/train-external \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "backend": "lightgbm",
+    "device": "auto",
+    "learning_rate": 0.1,
+    "max_depth": 6,
+    "n_estimators": 100,
+    "num_leaves": 31,
+    "min_child_samples": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.0,
+    "reg_lambda": 1.0,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_rounds": 10
+  }'
+
+# Poll for results with feature importance ranking
+curl http://localhost:8007/ml/jobs/{job_id}
+# {
+#   "result": {
+#     "backend": "lightgbm",
+#     "model_format": "txt",
+#     "test_metrics": {"auc": 0.92, ...},
+#     "feature_importances": [
+#       {"name": "X6", "importance": 0.15, "rank": 1},
+#       {"name": "X1", "importance": 0.08, "rank": 2},
+#       ...
+#     ]
+#   }
+# }
+```
+
+### Train on External Datasets - LSTM
+
+Train an LSTM recurrent network for temporal sequence modeling:
+
+```bash
+# Train LSTM on Taiwan bankruptcy data (bidirectional)
+curl -X POST http://localhost:8007/ml/train-external \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "backend": "lstm",
+    "device": "auto",
+    "precision": "fp32",
+    "hidden_size": 64,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "bidirectional": true,
+    "sequence_length": 5,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "n_epochs": 100,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_patience": 10
+  }'
+
+# Poll for results (no feature importances for LSTM)
+curl http://localhost:8007/ml/jobs/{job_id}
+# {
+#   "result": {
+#     "backend": "lstm",
+#     "model_format": "pt",
+#     "test_metrics": {"auc": 0.90, ...},
 #     "feature_importances": []
 #   }
 # }
@@ -621,6 +719,59 @@ curl http://localhost:8007/ml/jobs/{job_id}
 - `categorical` - Fixed choice sets for faster grid-like search
 
 The `recommended_config` in the result can be used directly with `/ml/train-external`.
+
+### Optimization CLI
+
+For local development and benchmarking, use the CLI directly instead of the API:
+
+```bash
+# Run optimization with defaults (taiwan, 300 trials, full features, cuda)
+poetry run python -m scripts.optimize
+
+# Quick test run
+poetry run python -m scripts.optimize -n 10 -d taiwan -f full --device cpu
+
+# Compare all feature presets on a dataset
+poetry run python -m scripts.optimize -c -n 50 -d us
+
+# Run on all datasets (taiwan, us, polish)
+poetry run python -m scripts.optimize -a -n 100
+
+# With timeout (seconds)
+poetry run python -m scripts.optimize -n 300 -t 3600
+
+# Verbose logging
+poetry run python -m scripts.optimize -v -n 50
+```
+
+**CLI Options:**
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--dataset` | `-d` | `taiwan` | Dataset: `taiwan`, `us`, `polish` |
+| `--n-trials` | `-n` | `300` | Number of Optuna trials |
+| `--feature-preset` | `-f` | `full` | Features: `none`, `log_only`, `ratios_only`, `full` |
+| `--device` | | `cuda` | Device: `cpu`, `cuda`, `auto` |
+| `--timeout` | `-t` | None | Timeout in seconds |
+| `--compare-presets` | `-c` | False | Compare all 4 feature presets |
+| `--all-datasets` | `-a` | False | Run on all 3 datasets |
+| `--verbose` | `-v` | False | Enable verbose logging |
+
+**Feature Presets:**
+
+| Preset | Description |
+|--------|-------------|
+| `none` | Original features only |
+| `log_only` | Original + log transforms |
+| `ratios_only` | Original + financial ratios |
+| `full` | Original + log + ratios + products |
+
+**History Tracking:**
+
+The CLI tracks all optimization runs in `models/optimization_history.jsonl` and displays progression:
+- Compares current run against previous run for the same dataset/preset
+- Shows all-time best AUC with delta indicators
+- Marks new records with visual indicators
 
 ### Predict Breach Risk
 
