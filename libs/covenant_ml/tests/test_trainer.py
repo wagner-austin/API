@@ -258,9 +258,9 @@ def test_train_model_produces_valid_probabilities() -> None:
     model = train_model(x_features, y_labels, config)
     proba = model.predict_proba(x_features)
 
-    for i in range(proba.shape[0]):
-        for j in range(proba.shape[1]):
-            p = float(proba[i, j])
+    proba_list: list[list[float]] = proba.tolist()
+    for row in proba_list:
+        for p in row:
             assert 0.0 <= p <= 1.0
 
 
@@ -275,8 +275,10 @@ def test_train_model_deterministic_with_same_seed() -> None:
     proba1 = model1.predict_proba(x_features)
     proba2 = model2.predict_proba(x_features)
 
-    for i in range(proba1.shape[0]):
-        assert float(proba1[i, 1]) == float(proba2[i, 1])
+    proba1_list: list[list[float]] = proba1.tolist()
+    proba2_list: list[list[float]] = proba2.tolist()
+    for p1_row, p2_row in zip(proba1_list, proba2_list, strict=True):
+        assert p1_row[1] == p2_row[1]
 
 
 def test_save_model_creates_file() -> None:
