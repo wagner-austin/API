@@ -7,10 +7,14 @@ from covenant_ml.optimizer.types import (
     CategoricalIntSpec,
     FloatRangeSpec,
     IntRangeSpec,
+    LightGBMSearchSpace,
+    LSTMSearchSpace,
     MLPSearchSpace,
     OptimizationConfig,
     OptimizationSummary,
-    ParamSpec,
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
     TrialResult,
     XGBoostSearchSpace,
 )
@@ -64,36 +68,6 @@ def test_categorical_int_spec_construction() -> None:
     assert spec["choices"] == (3, 5, 7, 10)
 
 
-def test_param_spec_union_accepts_all_types() -> None:
-    """ParamSpec union accepts all parameter specification types."""
-    float_spec: ParamSpec = {
-        "param_type": "float",
-        "low": 0.0,
-        "high": 1.0,
-        "log_scale": False,
-    }
-    int_spec: ParamSpec = {
-        "param_type": "int",
-        "low": 1,
-        "high": 10,
-        "log_scale": False,
-    }
-    cat_float: ParamSpec = {
-        "param_type": "categorical_float",
-        "choices": (0.1, 0.2),
-    }
-    cat_int: ParamSpec = {
-        "param_type": "categorical_int",
-        "choices": (1, 2),
-    }
-
-    # Verify all are valid ParamSpec
-    assert float_spec["param_type"] == "float"
-    assert int_spec["param_type"] == "int"
-    assert cat_float["param_type"] == "categorical_float"
-    assert cat_int["param_type"] == "categorical_int"
-
-
 def test_xgboost_search_space_construction() -> None:
     """XGBoostSearchSpace can be constructed with all required fields."""
     lr_spec: FloatRangeSpec = {
@@ -143,17 +117,74 @@ def test_mlp_search_space_construction() -> None:
     assert space["batch_size"]["param_type"] == "categorical_int"
 
 
+def test_lstm_search_space_construction() -> None:
+    """LSTMSearchSpace can be constructed with all required fields."""
+    space: LSTMSearchSpace = {
+        "hidden_size": {"param_type": "categorical_int", "choices": (64, 128, 256)},
+        "num_layers": {"param_type": "int", "low": 1, "high": 3, "log_scale": False},
+        "dropout": {"param_type": "float", "low": 0.0, "high": 0.5, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 1e-5, "high": 1e-2, "log_scale": True},
+        "batch_size": {"param_type": "categorical_int", "choices": (16, 32, 64)},
+    }
+    assert space["hidden_size"]["param_type"] == "categorical_int"
+    assert space["num_layers"]["param_type"] == "int"
+
+
+def test_lightgbm_search_space_construction() -> None:
+    """LightGBMSearchSpace can be constructed with all required fields."""
+    space: LightGBMSearchSpace = {
+        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
+        "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
+        "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+    }
+    assert space["max_depth"]["param_type"] == "int"
+    assert space["num_leaves"]["param_type"] == "int"
+
+
+def test_sampled_int_params_construction() -> None:
+    """SampledIntParams can be constructed with optional fields."""
+    params: SampledIntParams = {
+        "max_depth": 5,
+        "n_estimators": 100,
+    }
+    assert params["max_depth"] == 5
+    assert params["n_estimators"] == 100
+
+
+def test_sampled_float_params_construction() -> None:
+    """SampledFloatParams can be constructed with optional fields."""
+    params: SampledFloatParams = {
+        "learning_rate": 0.1,
+        "dropout": 0.2,
+        "subsample": 0.8,
+    }
+    assert params["learning_rate"] == 0.1
+    assert params["dropout"] == 0.2
+    assert params["subsample"] == 0.8
+
+
 def test_trial_result_construction() -> None:
     """TrialResult can be constructed with all required fields."""
+    int_params: SampledIntParams = {
+        "max_depth": 5,
+        "n_estimators": 100,
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": 0.1,
+        "reg_alpha": 1.0,
+        "reg_lambda": 2.0,
+        "subsample": 0.8,
+        "colsample_bytree": 0.9,
+    }
     result: TrialResult = {
         "trial_number": 0,
-        "params_max_depth": 5,
-        "params_n_estimators": 100,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 1.0,
-        "params_reg_lambda": 2.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.9,
+        "int_params": int_params,
+        "float_params": float_params,
         "value": 0.85,
         "state": "complete",
         "duration_seconds": 1.5,
@@ -161,19 +192,15 @@ def test_trial_result_construction() -> None:
     assert result["trial_number"] == 0
     assert result["value"] == 0.85
     assert result["state"] == "complete"
+    assert result["int_params"]["max_depth"] == 5
 
 
 def test_trial_result_complete_state() -> None:
     """TrialResult accepts complete state."""
     result: TrialResult = {
         "trial_number": 0,
-        "params_max_depth": 3,
-        "params_n_estimators": 50,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 0.0,
-        "params_reg_lambda": 1.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.8,
+        "int_params": {"max_depth": 3},
+        "float_params": {"learning_rate": 0.1},
         "value": 0.5,
         "state": "complete",
         "duration_seconds": 1.0,
@@ -185,13 +212,8 @@ def test_trial_result_pruned_state() -> None:
     """TrialResult accepts pruned state."""
     result: TrialResult = {
         "trial_number": 1,
-        "params_max_depth": 3,
-        "params_n_estimators": 50,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 0.0,
-        "params_reg_lambda": 1.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.8,
+        "int_params": {"max_depth": 3},
+        "float_params": {"learning_rate": 0.1},
         "value": 0.4,
         "state": "pruned",
         "duration_seconds": 0.5,
@@ -203,13 +225,8 @@ def test_trial_result_failed_state() -> None:
     """TrialResult accepts failed state."""
     result: TrialResult = {
         "trial_number": 2,
-        "params_max_depth": 3,
-        "params_n_estimators": 50,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 0.0,
-        "params_reg_lambda": 1.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.8,
+        "int_params": {"max_depth": 3},
+        "float_params": {"learning_rate": 0.1},
         "value": 0.0,
         "state": "failed",
         "duration_seconds": 0.1,
@@ -221,13 +238,8 @@ def test_trial_result_running_state() -> None:
     """TrialResult accepts running state."""
     result: TrialResult = {
         "trial_number": 3,
-        "params_max_depth": 3,
-        "params_n_estimators": 50,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 0.0,
-        "params_reg_lambda": 1.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.8,
+        "int_params": {"max_depth": 3},
+        "float_params": {"learning_rate": 0.1},
         "value": 0.0,
         "state": "running",
         "duration_seconds": 0.0,
@@ -237,16 +249,22 @@ def test_trial_result_running_state() -> None:
 
 def test_optimization_summary_construction() -> None:
     """OptimizationSummary can be constructed with all required fields."""
+    best_int_params: SampledIntParams = {
+        "max_depth": 6,
+        "n_estimators": 150,
+    }
+    best_float_params: SampledFloatParams = {
+        "learning_rate": 0.08,
+        "reg_alpha": 0.5,
+        "reg_lambda": 2.0,
+        "subsample": 0.85,
+        "colsample_bytree": 0.9,
+    }
     summary: OptimizationSummary = {
         "best_trial_number": 5,
         "best_value": 0.92,
-        "best_max_depth": 6,
-        "best_n_estimators": 150,
-        "best_learning_rate": 0.08,
-        "best_reg_alpha": 0.5,
-        "best_reg_lambda": 2.0,
-        "best_subsample": 0.85,
-        "best_colsample_bytree": 0.9,
+        "best_int_params": best_int_params,
+        "best_float_params": best_float_params,
         "n_trials_total": 50,
         "n_trials_complete": 48,
         "n_trials_pruned": 2,
@@ -257,6 +275,7 @@ def test_optimization_summary_construction() -> None:
     assert summary["best_value"] == 0.92
     assert summary["n_trials_total"] == 50
     assert summary["n_trials_complete"] == 48
+    assert summary["best_int_params"]["max_depth"] == 6
 
 
 def test_optimization_config_construction() -> None:
@@ -293,3 +312,64 @@ def test_optimization_config_null_timeout() -> None:
     assert config["timeout_seconds"] is None
     assert config["direction"] == "minimize"
     assert config["pruning_enabled"] is False
+
+
+def test_search_space_union_accepts_xgboost() -> None:
+    """SearchSpace union accepts XGBoostSearchSpace."""
+    xgb_space: XGBoostSearchSpace = {
+        "max_depth": {"param_type": "int", "low": 3, "high": 10, "log_scale": False},
+        "n_estimators": {"param_type": "int", "low": 50, "high": 300, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+    }
+    space: SearchSpace = xgb_space
+    assert "max_depth" in space
+    assert "n_estimators" in space
+
+
+def test_search_space_union_accepts_mlp() -> None:
+    """SearchSpace union accepts MLPSearchSpace."""
+    mlp_space: MLPSearchSpace = {
+        "n_layers": {"param_type": "int", "low": 1, "high": 4, "log_scale": False},
+        "hidden_size": {"param_type": "int", "low": 32, "high": 256, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.0001, "high": 0.01, "log_scale": True},
+        "dropout": {"param_type": "float", "low": 0.0, "high": 0.5, "log_scale": False},
+        "batch_size": {"param_type": "categorical_int", "choices": (16, 32, 64, 128)},
+    }
+    space: SearchSpace = mlp_space
+    assert "n_layers" in space
+    assert "hidden_size" in space
+
+
+def test_search_space_union_accepts_lstm() -> None:
+    """SearchSpace union accepts LSTMSearchSpace."""
+    lstm_space: LSTMSearchSpace = {
+        "hidden_size": {"param_type": "categorical_int", "choices": (64, 128, 256)},
+        "num_layers": {"param_type": "int", "low": 1, "high": 3, "log_scale": False},
+        "dropout": {"param_type": "float", "low": 0.0, "high": 0.5, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 1e-5, "high": 1e-2, "log_scale": True},
+        "batch_size": {"param_type": "categorical_int", "choices": (16, 32, 64)},
+    }
+    space: SearchSpace = lstm_space
+    assert "num_layers" in space
+    assert "hidden_size" in space
+
+
+def test_search_space_union_accepts_lightgbm() -> None:
+    """SearchSpace union accepts LightGBMSearchSpace."""
+    lgbm_space: LightGBMSearchSpace = {
+        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
+        "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
+        "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+    }
+    space: SearchSpace = lgbm_space
+    assert "num_leaves" in space
+    assert "max_depth" in space

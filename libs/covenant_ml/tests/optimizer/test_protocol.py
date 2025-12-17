@@ -6,14 +6,21 @@ import numpy as np
 from numpy.typing import NDArray
 
 from covenant_ml.optimizer.protocol import (
+    LightGBMOptimizerProtocol,
+    LSTMOptimizerProtocol,
+    MLPOptimizerProtocol,
+    ObjectiveProtocol,
     TrialCallbackProtocol,
-    XGBoostObjectiveCallable,
-    XGBoostObjectiveProtocol,
     XGBoostOptimizerProtocol,
 )
 from covenant_ml.optimizer.types import (
+    LightGBMSearchSpace,
+    LSTMSearchSpace,
+    MLPSearchSpace,
     OptimizationConfig,
     OptimizationSummary,
+    SampledFloatParams,
+    SampledIntParams,
     TrialResult,
     XGBoostSearchSpace,
 )
@@ -38,15 +45,18 @@ def test_trial_callback_protocol_implementation() -> None:
     concrete_callback = _ConcreteTrialCallback()
     callback: TrialCallbackProtocol = concrete_callback
 
+    int_params: SampledIntParams = {"max_depth": 5, "n_estimators": 100}
+    float_params: SampledFloatParams = {
+        "learning_rate": 0.1,
+        "reg_alpha": 0.0,
+        "reg_lambda": 1.0,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+    }
     result: TrialResult = {
         "trial_number": 0,
-        "params_max_depth": 5,
-        "params_n_estimators": 100,
-        "params_learning_rate": 0.1,
-        "params_reg_alpha": 0.0,
-        "params_reg_lambda": 1.0,
-        "params_subsample": 0.8,
-        "params_colsample_bytree": 0.8,
+        "int_params": int_params,
+        "float_params": float_params,
         "value": 0.85,
         "state": "complete",
         "duration_seconds": 1.5,
@@ -59,8 +69,8 @@ def test_trial_callback_protocol_implementation() -> None:
     assert concrete_callback.results[0]["trial_number"] == 0
 
 
-class _ConcreteXGBoostObjective:
-    """Concrete implementation of XGBoostObjectiveProtocol."""
+class _ConcreteObjective:
+    """Concrete implementation of ObjectiveProtocol."""
 
     def __init__(self, return_value: float = 0.85) -> None:
         self._return_value = return_value
@@ -71,62 +81,56 @@ class _ConcreteXGBoostObjective:
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        max_depth: int,
-        n_estimators: int,
-        learning_rate: float,
-        reg_alpha: float,
-        reg_lambda: float,
-        subsample: float,
-        colsample_bytree: float,
-        random_state: int,
+        int_params: SampledIntParams,
+        float_params: SampledFloatParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
+        random_state: int,
     ) -> float:
         _ = (
             x_features,
             y_labels,
             feature_names,
-            max_depth,
-            n_estimators,
-            learning_rate,
-            reg_alpha,
-            reg_lambda,
-            subsample,
-            colsample_bytree,
-            random_state,
+            int_params,
+            float_params,
             train_ratio,
             val_ratio,
             test_ratio,
+            random_state,
         )
         self.call_count += 1
         return self._return_value
 
 
-def test_xgboost_objective_protocol_implementation() -> None:
-    """Concrete class can implement XGBoostObjectiveProtocol."""
-    concrete_objective = _ConcreteXGBoostObjective(return_value=0.92)
-    objective: XGBoostObjectiveProtocol = concrete_objective
+def test_objective_protocol_implementation() -> None:
+    """Concrete class can implement ObjectiveProtocol."""
+    concrete_objective = _ConcreteObjective(return_value=0.92)
+    objective: ObjectiveProtocol = concrete_objective
 
     x = np.zeros((10, 4), dtype=np.float64)
     y = np.zeros(10, dtype=np.int64)
     names = ["f0", "f1", "f2", "f3"]
 
+    int_params: SampledIntParams = {"max_depth": 5, "n_estimators": 100}
+    float_params: SampledFloatParams = {
+        "learning_rate": 0.1,
+        "reg_alpha": 1.0,
+        "reg_lambda": 2.0,
+        "subsample": 0.8,
+        "colsample_bytree": 0.9,
+    }
+
     result = objective(
         x_features=x,
         y_labels=y,
         feature_names=names,
-        max_depth=5,
-        n_estimators=100,
-        learning_rate=0.1,
-        reg_alpha=1.0,
-        reg_lambda=2.0,
-        subsample=0.8,
-        colsample_bytree=0.9,
-        random_state=42,
+        int_params=int_params,
+        float_params=float_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
+        random_state=42,
     )
 
     assert result == 0.92
@@ -146,7 +150,7 @@ class _ConcreteXGBoostOptimizer:
         feature_names: list[str],
         search_space: XGBoostSearchSpace,
         config: OptimizationConfig,
-        objective: XGBoostObjectiveProtocol,
+        objective: ObjectiveProtocol,
         trial_callback: TrialCallbackProtocol | None = None,
     ) -> OptimizationSummary:
         _ = (
@@ -160,16 +164,19 @@ class _ConcreteXGBoostOptimizer:
         )
         self.optimize_called = True
 
+        best_int_params: SampledIntParams = {"max_depth": 5, "n_estimators": 100}
+        best_float_params: SampledFloatParams = {
+            "learning_rate": 0.1,
+            "reg_alpha": 1.0,
+            "reg_lambda": 2.0,
+            "subsample": 0.8,
+            "colsample_bytree": 0.9,
+        }
         summary: OptimizationSummary = {
             "best_trial_number": 0,
             "best_value": 0.9,
-            "best_max_depth": 5,
-            "best_n_estimators": 100,
-            "best_learning_rate": 0.1,
-            "best_reg_alpha": 1.0,
-            "best_reg_lambda": 2.0,
-            "best_subsample": 0.8,
-            "best_colsample_bytree": 0.9,
+            "best_int_params": best_int_params,
+            "best_float_params": best_float_params,
             "n_trials_total": 1,
             "n_trials_complete": 1,
             "n_trials_pruned": 0,
@@ -210,7 +217,7 @@ def test_xgboost_optimizer_protocol_implementation() -> None:
         "test_ratio": 0.15,
     }
 
-    objective = _ConcreteXGBoostObjective()
+    objective = _ConcreteObjective()
 
     summary = optimizer.optimize(
         x_features=x,
@@ -257,7 +264,7 @@ def test_xgboost_optimizer_protocol_with_callback() -> None:
         "test_ratio": 0.15,
     }
 
-    objective = _ConcreteXGBoostObjective()
+    objective = _ConcreteObjective()
 
     _ = optimizer.optimize(
         x_features=x,
@@ -274,7 +281,310 @@ def test_xgboost_optimizer_protocol_with_callback() -> None:
 
 
 # =============================================================================
-# Callable Type Alias Tests
+# MLP Optimizer Protocol Tests
+# =============================================================================
+
+
+class _ConcreteMLPOptimizer:
+    """Concrete implementation of MLPOptimizerProtocol."""
+
+    def __init__(self) -> None:
+        self.optimize_called = False
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: MLPSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        _ = (
+            x_features,
+            y_labels,
+            feature_names,
+            search_space,
+            config,
+            objective,
+            trial_callback,
+        )
+        self.optimize_called = True
+
+        best_int_params: SampledIntParams = {
+            "n_layers": 2,
+            "hidden_size": 128,
+            "batch_size": 64,
+        }
+        best_float_params: SampledFloatParams = {
+            "learning_rate": 0.001,
+            "dropout": 0.2,
+        }
+        summary: OptimizationSummary = {
+            "best_trial_number": 0,
+            "best_value": 0.88,
+            "best_int_params": best_int_params,
+            "best_float_params": best_float_params,
+            "n_trials_total": 1,
+            "n_trials_complete": 1,
+            "n_trials_pruned": 0,
+            "n_trials_failed": 0,
+            "total_duration_seconds": 2.0,
+        }
+        return summary
+
+
+def test_mlp_optimizer_protocol_implementation() -> None:
+    """Concrete class can implement MLPOptimizerProtocol."""
+    concrete_optimizer = _ConcreteMLPOptimizer()
+    optimizer: MLPOptimizerProtocol = concrete_optimizer
+
+    x = np.zeros((10, 4), dtype=np.float64)
+    y = np.zeros(10, dtype=np.int64)
+    names = ["f0", "f1", "f2", "f3"]
+
+    space: MLPSearchSpace = {
+        "n_layers": {"param_type": "int", "low": 1, "high": 4, "log_scale": False},
+        "hidden_size": {"param_type": "int", "low": 32, "high": 256, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.0001, "high": 0.01, "log_scale": True},
+        "dropout": {"param_type": "float", "low": 0.0, "high": 0.5, "log_scale": False},
+        "batch_size": {"param_type": "categorical_int", "choices": (16, 32, 64, 128)},
+    }
+
+    config: OptimizationConfig = {
+        "n_trials": 1,
+        "timeout_seconds": None,
+        "n_startup_trials": 1,
+        "random_state": 42,
+        "direction": "maximize",
+        "pruning_enabled": False,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+    }
+
+    objective = _ConcreteObjective()
+
+    summary = optimizer.optimize(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        search_space=space,
+        config=config,
+        objective=objective,
+    )
+
+    assert summary["best_value"] == 0.88
+    assert concrete_optimizer.optimize_called is True
+
+
+# =============================================================================
+# LSTM Optimizer Protocol Tests
+# =============================================================================
+
+
+class _ConcreteLSTMOptimizer:
+    """Concrete implementation of LSTMOptimizerProtocol."""
+
+    def __init__(self) -> None:
+        self.optimize_called = False
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: LSTMSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        _ = (
+            x_features,
+            y_labels,
+            feature_names,
+            search_space,
+            config,
+            objective,
+            trial_callback,
+        )
+        self.optimize_called = True
+
+        best_int_params: SampledIntParams = {
+            "hidden_size": 128,
+            "num_layers": 2,
+            "batch_size": 32,
+        }
+        best_float_params: SampledFloatParams = {
+            "learning_rate": 0.001,
+            "dropout": 0.3,
+        }
+        summary: OptimizationSummary = {
+            "best_trial_number": 0,
+            "best_value": 0.91,
+            "best_int_params": best_int_params,
+            "best_float_params": best_float_params,
+            "n_trials_total": 1,
+            "n_trials_complete": 1,
+            "n_trials_pruned": 0,
+            "n_trials_failed": 0,
+            "total_duration_seconds": 5.0,
+        }
+        return summary
+
+
+def test_lstm_optimizer_protocol_implementation() -> None:
+    """Concrete class can implement LSTMOptimizerProtocol."""
+    concrete_optimizer = _ConcreteLSTMOptimizer()
+    optimizer: LSTMOptimizerProtocol = concrete_optimizer
+
+    x = np.zeros((10, 4), dtype=np.float64)
+    y = np.zeros(10, dtype=np.int64)
+    names = ["f0", "f1", "f2", "f3"]
+
+    space: LSTMSearchSpace = {
+        "hidden_size": {"param_type": "categorical_int", "choices": (64, 128, 256)},
+        "num_layers": {"param_type": "int", "low": 1, "high": 3, "log_scale": False},
+        "dropout": {"param_type": "float", "low": 0.0, "high": 0.5, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 1e-5, "high": 1e-2, "log_scale": True},
+        "batch_size": {"param_type": "categorical_int", "choices": (16, 32, 64)},
+    }
+
+    config: OptimizationConfig = {
+        "n_trials": 1,
+        "timeout_seconds": None,
+        "n_startup_trials": 1,
+        "random_state": 42,
+        "direction": "maximize",
+        "pruning_enabled": False,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+    }
+
+    objective = _ConcreteObjective()
+
+    summary = optimizer.optimize(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        search_space=space,
+        config=config,
+        objective=objective,
+    )
+
+    assert summary["best_value"] == 0.91
+    assert concrete_optimizer.optimize_called is True
+
+
+# =============================================================================
+# LightGBM Optimizer Protocol Tests
+# =============================================================================
+
+
+class _ConcreteLightGBMOptimizer:
+    """Concrete implementation of LightGBMOptimizerProtocol."""
+
+    def __init__(self) -> None:
+        self.optimize_called = False
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: LightGBMSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        _ = (
+            x_features,
+            y_labels,
+            feature_names,
+            search_space,
+            config,
+            objective,
+            trial_callback,
+        )
+        self.optimize_called = True
+
+        best_int_params: SampledIntParams = {
+            "max_depth": 6,
+            "n_estimators": 200,
+            "num_leaves": 50,
+        }
+        best_float_params: SampledFloatParams = {
+            "learning_rate": 0.05,
+            "reg_alpha": 0.5,
+            "reg_lambda": 1.0,
+            "subsample": 0.9,
+            "colsample_bytree": 0.85,
+        }
+        summary: OptimizationSummary = {
+            "best_trial_number": 0,
+            "best_value": 0.93,
+            "best_int_params": best_int_params,
+            "best_float_params": best_float_params,
+            "n_trials_total": 1,
+            "n_trials_complete": 1,
+            "n_trials_pruned": 0,
+            "n_trials_failed": 0,
+            "total_duration_seconds": 3.0,
+        }
+        return summary
+
+
+def test_lightgbm_optimizer_protocol_implementation() -> None:
+    """Concrete class can implement LightGBMOptimizerProtocol."""
+    concrete_optimizer = _ConcreteLightGBMOptimizer()
+    optimizer: LightGBMOptimizerProtocol = concrete_optimizer
+
+    x = np.zeros((10, 4), dtype=np.float64)
+    y = np.zeros(10, dtype=np.int64)
+    names = ["f0", "f1", "f2", "f3"]
+
+    space: LightGBMSearchSpace = {
+        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
+        "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
+        "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+    }
+
+    config: OptimizationConfig = {
+        "n_trials": 1,
+        "timeout_seconds": None,
+        "n_startup_trials": 1,
+        "random_state": 42,
+        "direction": "maximize",
+        "pruning_enabled": False,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+    }
+
+    objective = _ConcreteObjective()
+
+    summary = optimizer.optimize(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        search_space=space,
+        config=config,
+        objective=objective,
+    )
+
+    assert summary["best_value"] == 0.93
+    assert concrete_optimizer.optimize_called is True
+
+
+# =============================================================================
+# Standalone Function Tests
 # =============================================================================
 
 
@@ -282,61 +592,49 @@ def _standalone_objective(
     x_features: NDArray[np.float64],
     y_labels: NDArray[np.int64],
     feature_names: list[str],
-    max_depth: int,
-    n_estimators: int,
-    learning_rate: float,
-    reg_alpha: float,
-    reg_lambda: float,
-    subsample: float,
-    colsample_bytree: float,
-    random_state: int,
+    int_params: SampledIntParams,
+    float_params: SampledFloatParams,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,
+    random_state: int,
 ) -> float:
-    """Standalone function that matches XGBoostObjectiveCallable signature."""
+    """Standalone function that matches ObjectiveProtocol signature."""
     _ = (
         x_features,
         y_labels,
         feature_names,
-        max_depth,
-        n_estimators,
-        learning_rate,
-        reg_alpha,
-        reg_lambda,
-        subsample,
-        colsample_bytree,
-        random_state,
+        int_params,
+        float_params,
         train_ratio,
         val_ratio,
         test_ratio,
+        random_state,
     )
     return 0.88
 
 
-def test_xgboost_objective_callable_type_alias() -> None:
-    """Standalone function can be typed as XGBoostObjectiveCallable."""
-    objective: XGBoostObjectiveCallable = _standalone_objective
+def test_standalone_function_matches_objective_protocol() -> None:
+    """Standalone function can be used as ObjectiveProtocol."""
+    objective: ObjectiveProtocol = _standalone_objective
 
     x = np.zeros((10, 4), dtype=np.float64)
     y = np.zeros(10, dtype=np.int64)
     names = ["f0", "f1", "f2", "f3"]
 
+    int_params: SampledIntParams = {"max_depth": 5}
+    float_params: SampledFloatParams = {"learning_rate": 0.1}
+
     result = objective(
-        x,
-        y,
-        names,
-        5,
-        100,
-        0.1,
-        1.0,
-        2.0,
-        0.8,
-        0.9,
-        42,
-        0.7,
-        0.15,
-        0.15,
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
     )
 
     assert result == 0.88
