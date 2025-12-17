@@ -10,7 +10,6 @@ from covenant_ml.types import (
     DMatrixProtocol,
     EvalMetrics,
     FeatureImportance,
-    Proba2DProtocol,
     TrainOutcome,
     TrainProgress,
     XGBBoosterProtocol,
@@ -135,8 +134,8 @@ class _FakeXGBModel:
         _ = x_features, y_labels, verbose
         return self
 
-    def predict_proba(self, x_features: NDArray[np.float64]) -> Proba2DProtocol:
-        _ = x_features
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        _ = x
         result: NDArray[np.float64] = np.zeros((1, 2), dtype=np.float64)
         return result
 

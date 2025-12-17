@@ -13,8 +13,8 @@ from numpy.typing import NDArray
 RequestedDevice = Literal["cpu", "cuda", "auto"]
 ResolvedDevice = Literal["cpu", "cuda"]
 
-# Pluggable backend naming
-BackendName = Literal["xgboost", "mlp"]
+# Pluggable backend naming - all supported classifier backends
+BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm"]
 
 
 class TrainConfigRequired(TypedDict, total=True):
@@ -85,7 +85,8 @@ class TrainOutcome(TypedDict, total=True):
     best_round: int
     total_rounds: int
     early_stopped: bool
-    config: TrainConfig | MLPConfig  # Union inlined to avoid forward reference
+    # Union inlined to avoid forward ref
+    config: TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
     feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
     # Class weight used for training (auto-calculated if not provided in config)
     scale_pos_weight_computed: float
@@ -119,8 +120,142 @@ class MLPConfig(TypedDict, total=True):
     early_stopping_patience: int
 
 
+# LSTM backend configuration (temporal sequence classifier)
+LSTMPrecision = Literal["fp32", "fp16", "bf16", "auto"]
+
+
+class LSTMConfig(TypedDict, total=True):
+    """Strict configuration for LSTM backend training.
+
+    LSTM processes temporal sequences of financial data for bankruptcy prediction.
+    Each sequence contains multiple years of data for a single company.
+
+    The backend accepts either:
+    - Pre-sequenced data: (n_sequences, seq_len, n_features) with sequence_length set
+    - Flat data: (n_samples, n_features) reshaped to pseudo-sequences internally
+
+    For proper temporal modeling, use SequenceBuilder to prepare data with
+    entity_ids and years before training.
+    """
+
+    device: RequestedDevice
+    precision: LSTMPrecision
+    hidden_size: int  # LSTM hidden state dimension
+    num_layers: int  # Number of stacked LSTM layers
+    dropout: float  # Dropout between LSTM layers (only if num_layers > 1)
+    bidirectional: bool  # Process sequences in both directions
+    sequence_length: int  # Number of time periods in each sequence
+    learning_rate: float
+    batch_size: int
+    n_epochs: int
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_patience: int
+
+
+# LightGBM backend configuration
+class LightGBMConfig(TypedDict, total=True):
+    """Strict configuration for LightGBM backend training.
+
+    LightGBM is a gradient boosting framework that uses tree-based learning.
+    It's faster than XGBoost and handles large datasets efficiently.
+
+    Key differences from XGBoost:
+    - num_leaves: Controls tree complexity (instead of just max_depth)
+    - min_child_samples: Minimum data in a leaf
+    - Uses leaf-wise tree growth (vs level-wise in XGBoost)
+    """
+
+    device: RequestedDevice
+    learning_rate: float
+    max_depth: int
+    n_estimators: int
+    num_leaves: int  # LightGBM-specific: controls complexity
+    min_child_samples: int  # LightGBM-specific: minimum data in leaf
+    subsample: float
+    colsample_bytree: float
+    reg_alpha: float  # L1 regularization
+    reg_lambda: float  # L2 regularization
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_rounds: int
+
+
 # Union of backend-specific train configs
-ClassifierTrainConfig = TrainConfig | MLPConfig
+ClassifierTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
+
+
+# =============================================================================
+# Model Metadata for Inference Loading
+# =============================================================================
+# These TypedDicts store the minimal architecture info needed to reconstruct
+# models from saved state dicts (MLP/LSTM) or verify model compatibility.
+
+
+class MLPModelMeta(TypedDict, total=True):
+    """Metadata required to reconstruct an MLP model for inference.
+
+    Stored as JSON alongside the .pt state dict file. Contains only the
+    architecture parameters needed to call _build_model() before loading
+    the state dict.
+
+    Args:
+        backend: Literal discriminator for union type narrowing.
+        n_features: Number of input features the model was trained on.
+        hidden_sizes: List of hidden layer sizes (JSON doesn't support tuples).
+        dropout: Dropout rate used in the model architecture.
+    """
+
+    backend: Literal["mlp"]
+    n_features: int
+    hidden_sizes: list[int]
+    dropout: float
+
+
+class LSTMModelMeta(TypedDict, total=True):
+    """Metadata required to reconstruct an LSTM model for inference.
+
+    Stored as JSON alongside the .pt state dict file. Contains the full
+    architecture specification needed to rebuild the LSTM network.
+
+    Args:
+        backend: Literal discriminator for union type narrowing.
+        n_features: Number of input features per time step.
+        sequence_length: Number of time steps in each sequence.
+        hidden_size: LSTM hidden state dimension.
+        num_layers: Number of stacked LSTM layers.
+        bidirectional: Whether LSTM processes sequences in both directions.
+        dropout: Dropout rate between LSTM layers.
+    """
+
+    backend: Literal["lstm"]
+    n_features: int
+    sequence_length: int
+    hidden_size: int
+    num_layers: int
+    bidirectional: bool
+    dropout: float
+
+
+class LightGBMModelMeta(TypedDict, total=True):
+    """Metadata for LightGBM model.
+
+    LightGBM's .txt format is self-describing, so minimal metadata is needed.
+    The backend field enables consistent discriminated union handling.
+
+    Args:
+        backend: Literal discriminator for union type narrowing.
+    """
+
+    backend: Literal["lightgbm"]
+
+
+# Union of model metadata types for type-safe dispatch
+ModelMeta = MLPModelMeta | LSTMModelMeta | LightGBMModelMeta
 
 
 class TrainProgress(TypedDict, total=True):
@@ -154,7 +289,7 @@ class PredictorProtocol(Protocol):
     Used by predict_probabilities for inference.
     """
 
-    def predict_proba(self, x_features: NDArray[np.float64]) -> Proba2DProtocol: ...
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
 
 
 class DMatrixProtocol(Protocol):
@@ -199,8 +334,8 @@ class XGBModelProtocol(Protocol):
 
     def predict_proba(
         self,
-        x_features: NDArray[np.float64],
-    ) -> Proba2DProtocol: ...
+        x: NDArray[np.float64],
+    ) -> NDArray[np.float64]: ...
 
     def get_xgb_params(self) -> XGBParams: ...
 
@@ -253,8 +388,15 @@ __all__ = [
     "DMatrixProtocol",
     "EvalMetrics",
     "FeatureImportance",
+    "LSTMConfig",
+    "LSTMModelMeta",
+    "LSTMPrecision",
+    "LightGBMConfig",
+    "LightGBMModelMeta",
     "MLPConfig",
+    "MLPModelMeta",
     "MLPPrecision",
+    "ModelMeta",
     "PredictorProtocol",
     "Proba2DProtocol",
     "TrainConfig",
