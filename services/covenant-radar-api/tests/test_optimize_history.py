@@ -27,10 +27,12 @@ from scripts.optimize.history import (
     xgboost_result_to_entry,
 )
 
-from covenant_radar_api.worker.optimize_job import OptimizationResult as XGBoostOptimizationResult
 from covenant_radar_api.worker.optimize_lightgbm_job import LightGBMOptimizationResult
 from covenant_radar_api.worker.optimize_lstm_job import LSTMOptimizationResult
 from covenant_radar_api.worker.optimize_mlp_job import MLPOptimizationResult
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    OptimizationResult as XGBoostOptimizationResult,
+)
 
 
 def _make_xgboost_history_entry(

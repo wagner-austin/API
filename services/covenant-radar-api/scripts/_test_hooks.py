@@ -32,18 +32,6 @@ from covenant_ml.explainers.registry import (
     default_explainer_registry,
 )
 
-from covenant_radar_api.worker.optimize_job import (
-    OptimizationResult as XGBoostOptimizationResult,
-)
-from covenant_radar_api.worker.optimize_job import (
-    TrialProgressCallbackProtocol as XGBoostProgressCallbackProtocol,
-)
-from covenant_radar_api.worker.optimize_job import (
-    TrialProgressInfo as XGBoostProgressInfo,
-)
-from covenant_radar_api.worker.optimize_job import (
-    run_optimization as run_xgboost_optimization,
-)
 from covenant_radar_api.worker.optimize_lightgbm_job import (
     LightGBMOptimizationResult,
     LightGBMTrialProgressCallbackProtocol,
@@ -61,6 +49,18 @@ from covenant_radar_api.worker.optimize_mlp_job import (
     MLPTrialProgressCallbackProtocol,
     MLPTrialProgressInfo,
     run_mlp_optimization,
+)
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    OptimizationResult as XGBoostOptimizationResult,
+)
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    TrialProgressCallbackProtocol as XGBoostProgressCallbackProtocol,
+)
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    TrialProgressInfo as XGBoostProgressInfo,
+)
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    run_optimization as run_xgboost_optimization,
 )
 
 # =============================================================================

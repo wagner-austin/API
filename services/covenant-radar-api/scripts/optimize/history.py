@@ -25,12 +25,12 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
-from covenant_radar_api.worker.optimize_job import (
-    OptimizationResult as XGBoostOptimizationResult,
-)
 from covenant_radar_api.worker.optimize_lightgbm_job import LightGBMOptimizationResult
 from covenant_radar_api.worker.optimize_lstm_job import LSTMOptimizationResult
 from covenant_radar_api.worker.optimize_mlp_job import MLPOptimizationResult
+from covenant_radar_api.worker.optimize_xgboost_job import (
+    OptimizationResult as XGBoostOptimizationResult,
+)
 from scripts.optimize.cli import DatasetName, FeaturePreset
 
 logger = get_logger(__name__)
