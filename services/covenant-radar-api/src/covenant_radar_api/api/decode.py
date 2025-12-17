@@ -633,7 +633,10 @@ def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
 # --- Optimization Request Parsing ---
 
 
-SpaceProfile = Literal["default", "categorical"]
+XGBoostSpaceProfile = Literal["default", "categorical"]
+MLPSpaceProfile = Literal["default"]
+LightGBMSpaceProfile = Literal["default"]
+LSTMSpaceProfile = Literal["default"]
 
 
 class OptimizeRequest(TypedDict, total=True):
@@ -643,7 +646,7 @@ class OptimizeRequest(TypedDict, total=True):
     n_trials: int
     timeout_seconds: int | None
     device: Literal["cpu", "cuda", "auto"]
-    space_profile: SpaceProfile
+    space_profile: XGBoostSpaceProfile
     feature_preset: FeaturePreset
     random_state: int
 
@@ -655,18 +658,134 @@ class OptimizeResponse(TypedDict, total=True):
     status: Literal["queued"]
 
 
-class OptimizeParseResult(TypedDict, total=True):
-    """Parsed optimization request with config and search space."""
+class XGBoostOptimizeParseResult(TypedDict, total=True):
+    """Parsed XGBoost optimization request.
 
+    Args:
+        backend: Backend identifier literal "xgboost".
+        dataset: Dataset name for optimization.
+        config: Optimization configuration.
+        search_space: XGBoost-specific search space.
+        space_profile: Search space profile used.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+    """
+
+    backend: Literal["xgboost"]
     dataset: DatasetName
     config: OptimizationConfig
     search_space: XGBoostSearchSpace
+    space_profile: XGBoostSpaceProfile
     device: Literal["cpu", "cuda", "auto"]
     feature_preset: FeaturePreset
 
 
-def _parse_space_profile(raw: JSONValue | None) -> SpaceProfile:
-    """Parse space profile, defaulting to 'default'."""
+class MLPOptimizeParseResult(TypedDict, total=True):
+    """Parsed MLP optimization request.
+
+    Args:
+        backend: Backend identifier literal "mlp".
+        dataset: Dataset name for optimization.
+        config: Optimization configuration.
+        search_space: MLP-specific search space.
+        space_profile: Search space profile used.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+        precision: Floating-point precision.
+        optimizer: Optimizer name.
+        n_epochs: Number of training epochs per trial.
+        early_stopping_patience: Early stopping patience.
+    """
+
+    backend: Literal["mlp"]
+    dataset: DatasetName
+    config: OptimizationConfig
+    search_space: MLPSearchSpace
+    space_profile: MLPSpaceProfile
+    device: Literal["cpu", "cuda", "auto"]
+    feature_preset: FeaturePreset
+    precision: Literal["fp32", "fp16", "bf16", "auto"]
+    optimizer: Literal["adamw", "adam", "sgd"]
+    n_epochs: int
+    early_stopping_patience: int
+
+
+class LightGBMOptimizeParseResult(TypedDict, total=True):
+    """Parsed LightGBM optimization request.
+
+    Args:
+        backend: Backend identifier literal "lightgbm".
+        dataset: Dataset name for optimization.
+        config: Optimization configuration.
+        search_space: LightGBM-specific search space.
+        space_profile: Search space profile used.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+        early_stopping_rounds: Early stopping rounds per trial.
+    """
+
+    backend: Literal["lightgbm"]
+    dataset: DatasetName
+    config: OptimizationConfig
+    search_space: LightGBMSearchSpace
+    space_profile: LightGBMSpaceProfile
+    device: Literal["cpu", "cuda", "auto"]
+    feature_preset: FeaturePreset
+    early_stopping_rounds: int
+
+
+class LSTMOptimizeParseResult(TypedDict, total=True):
+    """Parsed LSTM optimization request.
+
+    Args:
+        backend: Backend identifier literal "lstm".
+        dataset: Dataset name for optimization.
+        config: Optimization configuration.
+        search_space: LSTM-specific search space.
+        space_profile: Search space profile used.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+        precision: Floating-point precision.
+        n_epochs: Number of training epochs per trial.
+        early_stopping_patience: Early stopping patience.
+        sequence_length: Sequence length for LSTM.
+        bidirectional: Whether LSTM is bidirectional.
+    """
+
+    backend: Literal["lstm"]
+    dataset: DatasetName
+    config: OptimizationConfig
+    search_space: LSTMSearchSpace
+    space_profile: LSTMSpaceProfile
+    device: Literal["cpu", "cuda", "auto"]
+    feature_preset: FeaturePreset
+    precision: Literal["fp32", "fp16", "bf16", "auto"]
+    n_epochs: int
+    early_stopping_patience: int
+    sequence_length: int
+    bidirectional: bool
+
+
+OptimizeParseResult = (
+    XGBoostOptimizeParseResult
+    | MLPOptimizeParseResult
+    | LightGBMOptimizeParseResult
+    | LSTMOptimizeParseResult
+)
+
+
+def _parse_xgboost_space_profile(raw: JSONValue | None) -> XGBoostSpaceProfile:
+    """Parse XGBoost space profile, defaulting to 'default'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        XGBoostSpaceProfile literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid profile.
+    """
     if raw is None:
         return "default"
     if not isinstance(raw, str):
@@ -678,8 +797,81 @@ def _parse_space_profile(raw: JSONValue | None) -> SpaceProfile:
     raise JSONTypeError("space_profile must be one of: default, categorical")
 
 
+def _parse_mlp_space_profile(raw: JSONValue | None) -> MLPSpaceProfile:
+    """Parse MLP space profile, defaulting to 'default'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        MLPSpaceProfile literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid profile.
+    """
+    if raw is None:
+        return "default"
+    if not isinstance(raw, str):
+        raise JSONTypeError("space_profile must be a string")
+    if raw == "default":
+        return "default"
+    raise JSONTypeError("space_profile must be: default (mlp backend)")
+
+
+def _parse_lightgbm_space_profile(raw: JSONValue | None) -> LightGBMSpaceProfile:
+    """Parse LightGBM space profile, defaulting to 'default'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        LightGBMSpaceProfile literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid profile.
+    """
+    if raw is None:
+        return "default"
+    if not isinstance(raw, str):
+        raise JSONTypeError("space_profile must be a string")
+    if raw == "default":
+        return "default"
+    raise JSONTypeError("space_profile must be: default (lightgbm backend)")
+
+
+def _parse_lstm_space_profile(raw: JSONValue | None) -> LSTMSpaceProfile:
+    """Parse LSTM space profile, defaulting to 'default'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        LSTMSpaceProfile literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid profile.
+    """
+    if raw is None:
+        return "default"
+    if not isinstance(raw, str):
+        raise JSONTypeError("space_profile must be a string")
+    if raw == "default":
+        return "default"
+    raise JSONTypeError("space_profile must be: default (lstm backend)")
+
+
 def _parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
-    """Parse feature preset, defaulting to 'none'."""
+    """Parse feature preset, defaulting to 'none'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        FeaturePreset literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid preset.
+    """
     if raw is None:
         return "none"
     if not isinstance(raw, str):
@@ -695,43 +887,109 @@ def _parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
     raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
 
 
-def _get_search_space(profile: SpaceProfile) -> XGBoostSearchSpace:
-    """Get search space based on profile name."""
+def _parse_optimize_precision(raw: JSONValue | None) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse precision for neural network optimization.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Precision literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid precision.
+    """
+    if raw is None:
+        return "fp32"
+    if not isinstance(raw, str):
+        raise JSONTypeError("precision must be a string")
+    if raw == "fp32":
+        return "fp32"
+    if raw == "fp16":
+        return "fp16"
+    if raw == "bf16":
+        return "bf16"
+    if raw == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be one of: fp32, fp16, bf16, auto")
+
+
+def _parse_optimize_nn_optimizer(raw: JSONValue | None) -> Literal["adamw", "adam", "sgd"]:
+    """Parse optimizer for neural network optimization.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Optimizer literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid optimizer.
+    """
+    if raw is None:
+        return "adamw"
+    if not isinstance(raw, str):
+        raise JSONTypeError("optimizer must be a string")
+    if raw == "adamw":
+        return "adamw"
+    if raw == "adam":
+        return "adam"
+    if raw == "sgd":
+        return "sgd"
+    raise JSONTypeError("optimizer must be one of: adamw, adam, sgd")
+
+
+def _parse_bidirectional(raw: JSONValue | None) -> bool:
+    """Parse bidirectional flag for LSTM optimization.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Boolean value.
+
+    Raises:
+        JSONTypeError: If value is not a boolean.
+    """
+    if raw is None:
+        return False
+    if not isinstance(raw, bool):
+        raise JSONTypeError("bidirectional must be a boolean")
+    return raw
+
+
+def _get_xgboost_search_space(profile: XGBoostSpaceProfile) -> XGBoostSearchSpace:
+    """Get XGBoost search space based on profile name.
+
+    Args:
+        profile: Search space profile name.
+
+    Returns:
+        XGBoostSearchSpace with appropriate ranges.
+    """
     if profile == "default":
         return make_xgboost_default_space()
     return make_xgboost_categorical_space()
 
 
-def parse_optimize_request(body: bytes) -> OptimizeParseResult:
-    """Parse request body for hyperparameter optimization.
+def _parse_common_optimize_fields(
+    raw: JSONObject,
+) -> tuple[DatasetName, OptimizationConfig, Literal["cpu", "cuda", "auto"], FeaturePreset]:
+    """Parse common optimization fields shared by all backends.
 
-    Request format:
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "n_trials": 50,  // required
-            "timeout_seconds": 3600,  // optional, null for no timeout
-            "device": "auto",  // optional, default "auto"
-            "space_profile": "default",  // optional: default, categorical
-            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
-            "random_state": 42  // optional, default 42
-        }
+    Args:
+        raw: Parsed JSON object.
 
     Returns:
-        OptimizeParseResult with dataset, config, search_space, and feature_preset.
+        Tuple of (dataset, config, device, feature_preset).
 
     Raises:
-        JSONTypeError: Missing required field or invalid field type.
-        ValueError: Invalid dataset name.
+        JSONTypeError: If required fields are missing or invalid.
+        ValueError: If dataset name is invalid.
     """
-    raw = _parse_body_as_dict(body)
-
-    # Dataset selection (required)
     dataset_name = _parse_dataset_name(raw)
-
-    # Required field
     n_trials = require_int(raw, "n_trials")
 
-    # Optional fields
     timeout_raw = raw.get("timeout_seconds")
     timeout_seconds: int | None = None
     if timeout_raw is not None:
@@ -740,27 +998,220 @@ def parse_optimize_request(body: bytes) -> OptimizeParseResult:
         timeout_seconds = timeout_raw
 
     device = _parse_device(raw.get("device"))
-    space_profile = _parse_space_profile(raw.get("space_profile"))
     feature_preset = _parse_feature_preset(raw.get("feature_preset"))
     random_state = _optional_int(raw, "random_state", 42)
 
-    # Build optimization config
     config = make_default_optimization_config(
         n_trials=n_trials,
         timeout_seconds=timeout_seconds,
         random_state=random_state,
     )
 
-    # Get search space based on profile
-    search_space = _get_search_space(space_profile)
+    return dataset_name, config, device, feature_preset
 
-    return OptimizeParseResult(
+
+def _parse_xgboost_optimize(raw: JSONObject) -> XGBoostOptimizeParseResult:
+    """Parse XGBoost-specific optimization request.
+
+    Args:
+        raw: Parsed JSON object.
+
+    Returns:
+        XGBoostOptimizeParseResult with all parameters.
+
+    Raises:
+        JSONTypeError: If fields are invalid.
+        ValueError: If dataset name is invalid.
+    """
+    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
+    space_profile = _parse_xgboost_space_profile(raw.get("space_profile"))
+    search_space = _get_xgboost_search_space(space_profile)
+
+    return XGBoostOptimizeParseResult(
+        backend="xgboost",
         dataset=dataset_name,
         config=config,
         search_space=search_space,
+        space_profile=space_profile,
         device=device,
         feature_preset=feature_preset,
     )
+
+
+def _parse_mlp_optimize(raw: JSONObject) -> MLPOptimizeParseResult:
+    """Parse MLP-specific optimization request.
+
+    Args:
+        raw: Parsed JSON object.
+
+    Returns:
+        MLPOptimizeParseResult with all parameters.
+
+    Raises:
+        JSONTypeError: If fields are invalid.
+        ValueError: If dataset name is invalid.
+    """
+    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
+    space_profile = _parse_mlp_space_profile(raw.get("space_profile"))
+    precision = _parse_optimize_precision(raw.get("precision"))
+    optimizer = _parse_optimize_nn_optimizer(raw.get("optimizer"))
+    n_epochs = _optional_int(raw, "n_epochs", 50)
+    early_stopping_patience = _optional_int(raw, "early_stopping_patience", 10)
+
+    return MLPOptimizeParseResult(
+        backend="mlp",
+        dataset=dataset_name,
+        config=config,
+        search_space=make_mlp_default_space(),
+        space_profile=space_profile,
+        device=device,
+        feature_preset=feature_preset,
+        precision=precision,
+        optimizer=optimizer,
+        n_epochs=n_epochs,
+        early_stopping_patience=early_stopping_patience,
+    )
+
+
+def _parse_lightgbm_optimize(raw: JSONObject) -> LightGBMOptimizeParseResult:
+    """Parse LightGBM-specific optimization request.
+
+    Args:
+        raw: Parsed JSON object.
+
+    Returns:
+        LightGBMOptimizeParseResult with all parameters.
+
+    Raises:
+        JSONTypeError: If fields are invalid.
+        ValueError: If dataset name is invalid.
+    """
+    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
+    space_profile = _parse_lightgbm_space_profile(raw.get("space_profile"))
+    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
+
+    return LightGBMOptimizeParseResult(
+        backend="lightgbm",
+        dataset=dataset_name,
+        config=config,
+        search_space=make_lightgbm_default_space(),
+        space_profile=space_profile,
+        device=device,
+        feature_preset=feature_preset,
+        early_stopping_rounds=early_stopping_rounds,
+    )
+
+
+def _parse_lstm_optimize(raw: JSONObject) -> LSTMOptimizeParseResult:
+    """Parse LSTM-specific optimization request.
+
+    Args:
+        raw: Parsed JSON object.
+
+    Returns:
+        LSTMOptimizeParseResult with all parameters.
+
+    Raises:
+        JSONTypeError: If fields are invalid.
+        ValueError: If dataset name is invalid.
+    """
+    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
+    space_profile = _parse_lstm_space_profile(raw.get("space_profile"))
+    precision = _parse_optimize_precision(raw.get("precision"))
+    n_epochs = _optional_int(raw, "n_epochs", 50)
+    early_stopping_patience = _optional_int(raw, "early_stopping_patience", 10)
+    sequence_length = _optional_int(raw, "sequence_length", 5)
+    bidirectional = _parse_bidirectional(raw.get("bidirectional"))
+
+    return LSTMOptimizeParseResult(
+        backend="lstm",
+        dataset=dataset_name,
+        config=config,
+        search_space=make_lstm_default_space(),
+        space_profile=space_profile,
+        device=device,
+        feature_preset=feature_preset,
+        precision=precision,
+        n_epochs=n_epochs,
+        early_stopping_patience=early_stopping_patience,
+        sequence_length=sequence_length,
+        bidirectional=bidirectional,
+    )
+
+
+def parse_optimize_request(body: bytes) -> OptimizeParseResult:
+    """Parse request body for hyperparameter optimization.
+
+    Supports XGBoost, MLP, LightGBM, and LSTM backends via the 'backend' field.
+    Default backend is 'xgboost' if not specified.
+
+    Request format (XGBoost):
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "xgboost",  // optional, default "xgboost"
+            "n_trials": 50,  // required
+            "timeout_seconds": 3600,  // optional, null for no timeout
+            "device": "auto",  // optional, default "auto"
+            "space_profile": "default",  // optional: default, categorical
+            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
+            "random_state": 42  // optional, default 42
+        }
+
+    Request format (MLP):
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "mlp",
+            "n_trials": 50,
+            "precision": "fp32",  // optional: fp32, fp16, bf16, auto
+            "optimizer": "adamw",  // optional: adamw, adam, sgd
+            "n_epochs": 50,  // optional, default 50
+            "early_stopping_patience": 10  // optional, default 10
+        }
+
+    Request format (LightGBM):
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "early_stopping_rounds": 10  // optional, default 10
+        }
+
+    Request format (LSTM):
+        {
+            "dataset": "taiwan" | "us" | "polish",
+            "backend": "lstm",
+            "n_trials": 50,
+            "precision": "fp32",
+            "n_epochs": 50,
+            "early_stopping_patience": 10,
+            "sequence_length": 5,  // optional, default 5
+            "bidirectional": false  // optional, default false
+        }
+
+    Args:
+        body: Raw request body bytes.
+
+    Returns:
+        OptimizeParseResult union with backend-specific parameters.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset name.
+    """
+    raw = _parse_body_as_dict(body)
+
+    # Backend selection (optional; default xgboost)
+    backend_val = raw.get("backend")
+    if backend_val == "mlp":
+        return _parse_mlp_optimize(raw)
+    if backend_val == "lightgbm":
+        return _parse_lightgbm_optimize(raw)
+    if backend_val == "lstm":
+        return _parse_lstm_optimize(raw)
+    # Default to xgboost (including explicit "xgboost" or None)
+    if backend_val is not None and backend_val != "xgboost":
+        raise JSONTypeError("backend must be one of: xgboost, mlp, lightgbm, lstm")
+    return _parse_xgboost_optimize(raw)
 
 
 # --- Explain Request Parsing ---
@@ -933,18 +1384,25 @@ __all__ = [
     "ExplainRequest",
     "ExplainResponse",
     "ExternalTrainParseResult",
+    "LSTMOptimizeParseResult",
     "LSTMParseResult",
+    "LightGBMOptimizeParseResult",
     "LightGBMParseResult",
+    "LightGBMSpaceProfile",
+    "LSTMSpaceProfile",
+    "MLPOptimizeParseResult",
     "MLPParseResult",
+    "MLPSpaceProfile",
     "OptimizeParseResult",
     "OptimizeRequest",
     "OptimizeResponse",
     "PredictRequest",
     "PredictResponse",
-    "SpaceProfile",
     "TrainResponse",
     "UpdateDealRequest",
+    "XGBoostOptimizeParseResult",
     "XGBoostParseResult",
+    "XGBoostSpaceProfile",
     "parse_covenant_id_request",
     "parse_covenant_request",
     "parse_deal_id_request",

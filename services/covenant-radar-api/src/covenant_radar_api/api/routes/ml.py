@@ -412,13 +412,130 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
     )
 
 
+def _build_xgboost_optimize_payload(
+    parsed: "XGBoostOptimizeParseResult",
+) -> dict[str, JSONValue]:
+    """Build JSON payload for XGBoost optimization worker.
+
+    Args:
+        parsed: Parsed XGBoost optimization request.
+
+    Returns:
+        JSON-serializable payload dict.
+    """
+    payload: dict[str, JSONValue] = {
+        "dataset": parsed["dataset"],
+        "n_trials": parsed["config"]["n_trials"],
+        "device": parsed["device"],
+        "random_state": parsed["config"]["random_state"],
+        "feature_preset": parsed["feature_preset"],
+        "space_profile": parsed["space_profile"],
+    }
+    timeout_seconds = parsed["config"]["timeout_seconds"]
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
+    return payload
+
+
+def _build_mlp_optimize_payload(
+    parsed: "MLPOptimizeParseResult",
+) -> dict[str, JSONValue]:
+    """Build JSON payload for MLP optimization worker.
+
+    Args:
+        parsed: Parsed MLP optimization request.
+
+    Returns:
+        JSON-serializable payload dict.
+    """
+    payload: dict[str, JSONValue] = {
+        "dataset": parsed["dataset"],
+        "n_trials": parsed["config"]["n_trials"],
+        "device": parsed["device"],
+        "random_state": parsed["config"]["random_state"],
+        "feature_preset": parsed["feature_preset"],
+        "precision": parsed["precision"],
+        "optimizer": parsed["optimizer"],
+        "n_epochs": parsed["n_epochs"],
+        "early_stopping_patience": parsed["early_stopping_patience"],
+    }
+    timeout_seconds = parsed["config"]["timeout_seconds"]
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
+    return payload
+
+
+def _build_lightgbm_optimize_payload(
+    parsed: "LightGBMOptimizeParseResult",
+) -> dict[str, JSONValue]:
+    """Build JSON payload for LightGBM optimization worker.
+
+    Args:
+        parsed: Parsed LightGBM optimization request.
+
+    Returns:
+        JSON-serializable payload dict.
+    """
+    payload: dict[str, JSONValue] = {
+        "dataset": parsed["dataset"],
+        "n_trials": parsed["config"]["n_trials"],
+        "device": parsed["device"],
+        "random_state": parsed["config"]["random_state"],
+        "feature_preset": parsed["feature_preset"],
+        "early_stopping_rounds": parsed["early_stopping_rounds"],
+    }
+    timeout_seconds = parsed["config"]["timeout_seconds"]
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
+    return payload
+
+
+def _build_lstm_optimize_payload(
+    parsed: "LSTMOptimizeParseResult",
+) -> dict[str, JSONValue]:
+    """Build JSON payload for LSTM optimization worker.
+
+    Args:
+        parsed: Parsed LSTM optimization request.
+
+    Returns:
+        JSON-serializable payload dict.
+    """
+    payload: dict[str, JSONValue] = {
+        "dataset": parsed["dataset"],
+        "n_trials": parsed["config"]["n_trials"],
+        "device": parsed["device"],
+        "random_state": parsed["config"]["random_state"],
+        "feature_preset": parsed["feature_preset"],
+        "precision": parsed["precision"],
+        "n_epochs": parsed["n_epochs"],
+        "early_stopping_patience": parsed["early_stopping_patience"],
+        "sequence_length": parsed["sequence_length"],
+        "bidirectional": parsed["bidirectional"],
+    }
+    timeout_seconds = parsed["config"]["timeout_seconds"]
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
+    return payload
+
+
+# Import type hints for payload builders
+from ..decode import (
+    LightGBMOptimizeParseResult,
+    LSTMOptimizeParseResult,
+    MLPOptimizeParseResult,
+    XGBoostOptimizeParseResult,
+)
+
+
 def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _optimize(request: Request) -> Response:
         """Enqueue hyperparameter optimization job using Optuna TPE.
 
         Runs Bayesian optimization on external bankruptcy datasets to find
-        optimal XGBoost hyperparameters. Results include best hyperparameters
-        and a recommended TrainConfig for subsequent training.
+        optimal hyperparameters for the selected backend. Supports XGBoost,
+        MLP, LightGBM, and LSTM backends. Results include best hyperparameters
+        and a recommended config for subsequent training.
         """
         body_bytes = await request.body()
         # Validate request at the API edge
@@ -429,38 +546,65 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
         except JSONTypeError as exc:
             raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
 
-        # Build JSON payload for the worker
-        payload: dict[str, JSONValue] = {
-            "dataset": parsed["dataset"],
-            "n_trials": parsed["config"]["n_trials"],
-            "device": parsed["device"],
-            "random_state": parsed["config"]["random_state"],
-            "feature_preset": parsed["feature_preset"],
-        }
-        timeout_seconds = parsed["config"]["timeout_seconds"]
-        if timeout_seconds is not None:
-            payload["timeout_seconds"] = timeout_seconds
-
-        # Determine space profile from search space (reverse map)
-        # Default space uses float (log-scale), categorical uses categorical_float
-        space = parsed["search_space"]
-        lr_spec = space["learning_rate"]
-        if lr_spec["param_type"] == "categorical_float":
-            payload["space_profile"] = "categorical"
-        else:
-            # Default profile uses float param_type
-            payload["space_profile"] = "default"
-
-        config_json = dump_json_str(payload)
+        # Dispatch to backend-specific worker job
+        backend = parsed["backend"]
         queue = get_container.rq_queue()
-        job = queue.enqueue(
-            "covenant_radar_api.worker.optimize_job.process_optimize_job",
-            config_json,
-            job_timeout=7200,  # 2 hours for optimization
-            result_ttl=86400,
-            failure_ttl=86400,
-            description="Hyperparameter optimization with Optuna TPE",
-        )
+
+        if backend == "xgboost":
+            xgb_parsed: XGBoostOptimizeParseResult = parsed
+            payload = _build_xgboost_optimize_payload(xgb_parsed)
+            config_json = dump_json_str(payload)
+            job = queue.enqueue(
+                "covenant_radar_api.worker.optimize_job.process_optimize_job",
+                config_json,
+                job_timeout=7200,
+                result_ttl=86400,
+                failure_ttl=86400,
+                description="XGBoost hyperparameter optimization with Optuna TPE",
+            )
+        elif backend == "mlp":
+            mlp_parsed: MLPOptimizeParseResult = parsed
+            payload = _build_mlp_optimize_payload(mlp_parsed)
+            config_json = dump_json_str(payload)
+            job = queue.enqueue(
+                "covenant_radar_api.worker.optimize_mlp_job.process_mlp_optimize_job",
+                config_json,
+                job_timeout=7200,
+                result_ttl=86400,
+                failure_ttl=86400,
+                description="MLP hyperparameter optimization with Optuna TPE",
+            )
+        elif backend == "lightgbm":
+            lgbm_parsed: LightGBMOptimizeParseResult = parsed
+            payload = _build_lightgbm_optimize_payload(lgbm_parsed)
+            config_json = dump_json_str(payload)
+            job = queue.enqueue(
+                "covenant_radar_api.worker.optimize_lightgbm_job.process_lightgbm_optimize_job",
+                config_json,
+                job_timeout=7200,
+                result_ttl=86400,
+                failure_ttl=86400,
+                description="LightGBM hyperparameter optimization with Optuna TPE",
+            )
+        elif backend == "lstm":
+            lstm_parsed: LSTMOptimizeParseResult = parsed
+            payload = _build_lstm_optimize_payload(lstm_parsed)
+            config_json = dump_json_str(payload)
+            job = queue.enqueue(
+                "covenant_radar_api.worker.optimize_lstm_job.process_lstm_optimize_job",
+                config_json,
+                job_timeout=7200,
+                result_ttl=86400,
+                failure_ttl=86400,
+                description="LSTM hyperparameter optimization with Optuna TPE",
+            )
+        else:
+            # Type narrowing - this branch is unreachable due to parse validation
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"Unknown backend: {backend}",
+                http_status=400,
+            )
 
         response = OptimizeResponse(job_id=job.get_id(), status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
@@ -476,13 +620,20 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
         methods=["POST"],
         response_model=None,
         status_code=202,
-        summary="Optimize XGBoost hyperparameters with Optuna TPE",
+        summary="Optimize hyperparameters with Optuna TPE",
         description=(
             "Run Bayesian hyperparameter optimization using Optuna's Tree-structured "
-            "Parzen Estimator (TPE) on external bankruptcy datasets. Supported datasets: "
-            "taiwan (Taiwan Economic Journal), us (American bankruptcy), polish (Polish "
-            "companies).\n\n"
-            "**Search Space Profiles:**\n"
+            "Parzen Estimator (TPE) on external bankruptcy datasets.\n\n"
+            "**Supported Backends:**\n"
+            "- `xgboost`: XGBoost gradient boosting (default)\n"
+            "- `mlp`: Multi-layer perceptron neural network\n"
+            "- `lightgbm`: LightGBM gradient boosting\n"
+            "- `lstm`: Long short-term memory recurrent network\n\n"
+            "**Supported Datasets:**\n"
+            "- `taiwan`: Taiwan Economic Journal bankruptcy data\n"
+            "- `us`: American bankruptcy dataset\n"
+            "- `polish`: Polish companies dataset\n\n"
+            "**Search Space Profiles (XGBoost only):**\n"
             "- `default`: Wide continuous ranges with log-scale for learning_rate\n"
             "- `categorical`: Fixed choice sets for faster grid-like search\n\n"
             "**Feature Engineering Presets:**\n"
@@ -495,7 +646,7 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
             "- Best hyperparameters found\n"
             "- Validation AUC achieved\n"
             "- Feature preset used\n"
-            "- Recommended TrainConfig for use with /train-external\n\n"
+            "- Recommended config for use with /train-external\n\n"
             "Poll /ml/jobs/{job_id} for status and results."
         ),
         response_description="Job ID for polling status",
