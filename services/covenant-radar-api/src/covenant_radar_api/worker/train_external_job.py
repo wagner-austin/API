@@ -8,32 +8,38 @@ engineering required.
 from __future__ import annotations
 
 import shutil
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Literal, TypedDict
 
 from covenant_ml.backends.registry import ClassifierRegistry
 from covenant_ml.base_trainer import BaseTabularTrainer
+from covenant_ml.datasets import LoadedDataset
 from covenant_ml.types import (
+    BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
+    LightGBMConfig,
+    LightGBMModelMeta,
+    LSTMConfig,
+    LSTMModelMeta,
     MLPConfig,
+    MLPModelMeta,
+    ModelMeta,
     TrainConfig,
     TrainOutcome,
 )
-from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
+from platform_core.json_utils import (
+    JSONObject,
+    JSONTypeError,
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+)
 from platform_core.logging import get_logger
 
-from covenant_radar_api.seeding.real_data import (
-    RawDataset,
-    load_polish_raw,
-    load_taiwan_raw,
-    load_us_raw,
-)
-
 _log = get_logger(__name__)
-
-DatasetName = Literal["taiwan", "us", "polish"]
 
 
 def _parse_device(raw: JSONValue | None) -> Literal["cpu", "cuda", "auto"]:
@@ -175,12 +181,90 @@ def _parse_xgboost_config(
     return xgb_cfg
 
 
+def _parse_lstm_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse and validate LSTM precision field."""
+    precision_val = raw.get("precision")
+    if precision_val == "fp32":
+        return "fp32"
+    if precision_val == "fp16":
+        return "fp16"
+    if precision_val == "bf16":
+        return "bf16"
+    if precision_val == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
+
+
+def _parse_lstm_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> LSTMConfig:
+    """Parse LSTM backend config from JSON object."""
+    from platform_core.json_utils import require_float, require_int
+
+    bidirectional_val = raw.get("bidirectional")
+    if not isinstance(bidirectional_val, bool):
+        raise JSONTypeError("bidirectional must be a boolean")
+    return {
+        "device": device,
+        "precision": _parse_lstm_precision(raw),
+        "hidden_size": require_int(raw, "hidden_size"),
+        "num_layers": require_int(raw, "num_layers"),
+        "dropout": require_float(raw, "dropout"),
+        "bidirectional": bidirectional_val,
+        "sequence_length": require_int(raw, "sequence_length"),
+        "learning_rate": require_float(raw, "learning_rate"),
+        "batch_size": require_int(raw, "batch_size"),
+        "n_epochs": require_int(raw, "n_epochs"),
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
+    }
+
+
+def _parse_lightgbm_config(
+    raw: JSONObject,
+    device: Literal["cpu", "cuda", "auto"],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> LightGBMConfig:
+    """Parse LightGBM backend config from JSON object."""
+    from platform_core.json_utils import require_float, require_int
+
+    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
+    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
+    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
+    return {
+        "device": device,
+        "learning_rate": require_float(raw, "learning_rate"),
+        "max_depth": require_int(raw, "max_depth"),
+        "n_estimators": require_int(raw, "n_estimators"),
+        "num_leaves": require_int(raw, "num_leaves"),
+        "min_child_samples": require_int(raw, "min_child_samples"),
+        "subsample": require_float(raw, "subsample"),
+        "colsample_bytree": require_float(raw, "colsample_bytree"),
+        "reg_alpha": reg_alpha,
+        "reg_lambda": reg_lambda,
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "test_ratio": test_ratio,
+        "random_state": require_int(raw, "random_state"),
+        "early_stopping_rounds": early_stopping_rounds,
+    }
+
+
 class XGBoostParseResult(TypedDict, total=True):
     """Result of parsing XGBoost config."""
 
     backend: Literal["xgboost"]
     config: TrainConfig
-    dataset: DatasetName
+    dataset: str
 
 
 class MLPParseResult(TypedDict, total=True):
@@ -188,10 +272,26 @@ class MLPParseResult(TypedDict, total=True):
 
     backend: Literal["mlp"]
     config: MLPConfig
-    dataset: DatasetName
+    dataset: str
 
 
-ParseResult = XGBoostParseResult | MLPParseResult
+class LSTMParseResult(TypedDict, total=True):
+    """Result of parsing LSTM config."""
+
+    backend: Literal["lstm"]
+    config: LSTMConfig
+    dataset: str
+
+
+class LightGBMParseResult(TypedDict, total=True):
+    """Result of parsing LightGBM config."""
+
+    backend: Literal["lightgbm"]
+    config: LightGBMConfig
+    dataset: str
+
+
+ParseResult = XGBoostParseResult | MLPParseResult | LSTMParseResult | LightGBMParseResult
 
 
 def _parse_external_train_config(config_json: str) -> ParseResult:
@@ -206,17 +306,15 @@ def _parse_external_train_config(config_json: str) -> ParseResult:
     if not isinstance(raw, dict):
         raise JSONTypeError("config must be a JSON object")
 
-    # Dataset selection (required)
+    # Dataset selection (required) - validate against registry
+    from covenant_radar_api.worker import _test_hooks as hooks
+
     dataset = require_str(raw, "dataset")
-    dataset_name: DatasetName
-    if dataset == "taiwan":
-        dataset_name = "taiwan"
-    elif dataset == "us":
-        dataset_name = "us"
-    elif dataset == "polish":
-        dataset_name = "polish"
-    else:
-        raise ValueError(f"dataset must be one of: taiwan, us, polish (got {dataset})")
+    registry = hooks.dataset_registry_factory()
+    if dataset not in registry:
+        available = ", ".join(registry.list_names())
+        raise ValueError(f"dataset must be one of: {available} (got {dataset})")
+    dataset_name = dataset
 
     # Common split defaults
     train_ratio = _optional_float(raw, "train_ratio", 0.7)
@@ -242,6 +340,20 @@ def _parse_external_train_config(config_json: str) -> ParseResult:
             "dataset": dataset_name,
         }
         return mlp_result
+    if backend_val == "lstm":
+        lstm_result: LSTMParseResult = {
+            "backend": "lstm",
+            "config": _parse_lstm_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return lstm_result
+    if backend_val == "lightgbm":
+        lgbm_result: LightGBMParseResult = {
+            "backend": "lightgbm",
+            "config": _parse_lightgbm_config(raw, device, train_ratio, val_ratio, test_ratio),
+            "dataset": dataset_name,
+        }
+        return lgbm_result
     xgb_result: XGBoostParseResult = {
         "backend": "xgboost",
         "config": _parse_xgboost_config(raw, device, train_ratio, val_ratio, test_ratio),
@@ -250,34 +362,26 @@ def _parse_external_train_config(config_json: str) -> ParseResult:
     return xgb_result
 
 
-def _load_dataset(dataset_name: DatasetName, external_dir: Path) -> RawDataset:
-    """Load the specified dataset with all columns.
+def _load_dataset(dataset_name: str, external_dir: Path) -> LoadedDataset:
+    """Load the specified dataset using pluggable loader.
 
     Args:
-        dataset_name: Which dataset to load ('taiwan', 'us', or 'polish')
-        external_dir: Path to data/external directory
+        dataset_name: Name of dataset in registry.
+        external_dir: Path to data/external directory.
 
     Returns:
-        RawDataset with feature matrix, labels, and column names
+        LoadedDataset with feature matrix, labels, and metadata.
 
     Raises:
-        FileNotFoundError: If dataset file doesn't exist
+        KeyError: If dataset not in registry.
+        FileNotFoundError: If dataset file doesn't exist.
+        ValueError: If data doesn't match expected format.
     """
-    if dataset_name == "taiwan":
-        data_path = external_dir / "taiwan_data" / "data.csv"
-        if not data_path.exists():
-            raise FileNotFoundError(f"Taiwan dataset not found at {data_path}")
-        return load_taiwan_raw(data_path)
-    if dataset_name == "us":
-        data_path = external_dir / "us_data" / "american_bankruptcy.csv"
-        if not data_path.exists():
-            raise FileNotFoundError(f"US dataset not found at {data_path}")
-        return load_us_raw(data_path)
-    # dataset_name == "polish"
-    data_path = external_dir / "polish_data" / "1year.arff"
-    if not data_path.exists():
-        raise FileNotFoundError(f"Polish dataset not found at {data_path}")
-    return load_polish_raw(data_path)
+    from covenant_radar_api.worker import _test_hooks as hooks
+
+    registry = hooks.dataset_registry_factory()
+    config = registry.get(dataset_name)
+    return hooks.dataset_loader(config, external_dir)
 
 
 def _metrics_to_json(metrics: EvalMetrics) -> dict[str, JSONValue]:
@@ -323,6 +427,167 @@ def _build_mlp_log(config: MLPConfig) -> dict[str, JSONValue]:
     }
 
 
+def _build_lstm_log(config: LSTMConfig) -> dict[str, JSONValue]:
+    """Build log dict for LSTM config."""
+    return {
+        "learning_rate": config["learning_rate"],
+        "hidden_size": config["hidden_size"],
+        "num_layers": config["num_layers"],
+        "n_epochs": config["n_epochs"],
+        "bidirectional": config["bidirectional"],
+        "sequence_length": config["sequence_length"],
+    }
+
+
+def _build_lightgbm_log(config: LightGBMConfig) -> dict[str, JSONValue]:
+    """Build log dict for LightGBM config."""
+    return {
+        "learning_rate": config["learning_rate"],
+        "n_estimators": config["n_estimators"],
+        "max_depth": config["max_depth"],
+        "num_leaves": config["num_leaves"],
+        "reg_alpha": config["reg_alpha"],
+        "reg_lambda": config["reg_lambda"],
+    }
+
+
+def _get_active_filename(backend_name: str) -> str:
+    """Get active model filename for backend."""
+    if backend_name == "xgboost":
+        return "active_xgb.ubj"
+    if backend_name == "mlp":
+        return "active_mlp.pt"
+    if backend_name == "lstm":
+        return "active_lstm.pt"
+    # lightgbm
+    return "active_lgbm.txt"
+
+
+def _get_meta_filename(backend_name: BackendName) -> str:
+    """Get metadata filename for backend.
+
+    Args:
+        backend_name: Name of the ML backend.
+
+    Returns:
+        Filename for the metadata JSON file.
+    """
+    if backend_name == "mlp":
+        return "active_mlp_meta.json"
+    if backend_name == "lstm":
+        return "active_lstm_meta.json"
+    if backend_name == "lightgbm":
+        return "active_lgbm_meta.json"
+    # xgboost doesn't need metadata (self-describing format)
+    return ""
+
+
+def _build_mlp_metadata(config: MLPConfig, n_features: int) -> MLPModelMeta:
+    """Build MLP model metadata.
+
+    Args:
+        config: MLP training configuration.
+        n_features: Number of input features.
+
+    Returns:
+        MLPModelMeta TypedDict.
+    """
+    return {
+        "backend": "mlp",
+        "n_features": n_features,
+        "hidden_sizes": list(config["hidden_sizes"]),
+        "dropout": config["dropout"],
+    }
+
+
+def _build_lstm_metadata(config: LSTMConfig, n_features: int) -> LSTMModelMeta:
+    """Build LSTM model metadata.
+
+    Args:
+        config: LSTM training configuration.
+        n_features: Number of input features.
+
+    Returns:
+        LSTMModelMeta TypedDict.
+    """
+    return {
+        "backend": "lstm",
+        "n_features": n_features,
+        "sequence_length": config["sequence_length"],
+        "hidden_size": config["hidden_size"],
+        "num_layers": config["num_layers"],
+        "bidirectional": config["bidirectional"],
+        "dropout": config["dropout"],
+    }
+
+
+class _MetadataBuilder(ABC):
+    """Abstract base for metadata builders.
+
+    Each builder captures the config in the narrowed type context,
+    then can build metadata once n_features is known.
+    """
+
+    @abstractmethod
+    def build(self, n_features: int) -> ModelMeta:
+        """Build model metadata with the given feature count."""
+
+
+class _MlpMetadataBuilder(_MetadataBuilder):
+    """Builds MLP model metadata."""
+
+    def __init__(self, config: MLPConfig) -> None:
+        self._config = config
+
+    def build(self, n_features: int) -> MLPModelMeta:
+        return _build_mlp_metadata(self._config, n_features)
+
+
+class _LstmMetadataBuilder(_MetadataBuilder):
+    """Builds LSTM model metadata."""
+
+    def __init__(self, config: LSTMConfig) -> None:
+        self._config = config
+
+    def build(self, n_features: int) -> LSTMModelMeta:
+        return _build_lstm_metadata(self._config, n_features)
+
+
+class _LightgbmMetadataBuilder(_MetadataBuilder):
+    """Builds LightGBM model metadata."""
+
+    def build(self, n_features: int) -> LightGBMModelMeta:
+        return {"backend": "lightgbm"}
+
+
+def _write_model_metadata(
+    backend_name: BackendName,
+    meta: ModelMeta,
+    output_dir: Path,
+) -> Path:
+    """Write model metadata JSON to disk.
+
+    Args:
+        backend_name: Name of the ML backend.
+        meta: Model metadata to save.
+        output_dir: Directory where model is saved.
+
+    Returns:
+        Path to the saved metadata file.
+    """
+    meta_filename = _get_meta_filename(backend_name)
+    meta_path = output_dir / meta_filename
+    json_str = dump_json_str(meta, compact=False, indent=2)
+    meta_path.write_text(json_str, encoding="utf-8")
+
+    _log.info(
+        "Saved model metadata",
+        extra={"backend": backend_name, "meta_path": str(meta_path)},
+    )
+
+    return meta_path
+
+
 def run_external_training(
     config_json: str,
     external_dir: Path,
@@ -348,21 +613,36 @@ def run_external_training(
     dataset = _load_dataset(dataset_name, external_dir)
 
     # Build config log info based on backend (discriminated union narrowing)
+    # Also prepare metadata builder for inference support (MLP/LSTM/LightGBM)
+    config_log: dict[str, JSONValue]
+    train_config: ClassifierTrainConfig
+    metadata_builder: _MetadataBuilder | None = None
     if parse_result["backend"] == "xgboost":
         config_log = _build_xgboost_log(parse_result["config"])
-        train_config: ClassifierTrainConfig = parse_result["config"]
-    else:
+        train_config = parse_result["config"]
+        # XGBoost doesn't need metadata (self-describing format)
+    elif parse_result["backend"] == "mlp":
         config_log = _build_mlp_log(parse_result["config"])
         train_config = parse_result["config"]
+        metadata_builder = _MlpMetadataBuilder(parse_result["config"])
+    elif parse_result["backend"] == "lstm":
+        config_log = _build_lstm_log(parse_result["config"])
+        train_config = parse_result["config"]
+        metadata_builder = _LstmMetadataBuilder(parse_result["config"])
+    else:
+        # lightgbm
+        config_log = _build_lightgbm_log(parse_result["config"])
+        train_config = parse_result["config"]
+        metadata_builder = _LightgbmMetadataBuilder()
 
     _log.info(
         "Starting external training",
         extra={
             "dataset": dataset_name,
-            "n_samples": dataset["n_samples"],
-            "n_features": dataset["n_features"],
-            "n_bankrupt": dataset["n_bankrupt"],
-            "n_healthy": dataset["n_healthy"],
+            "n_samples": dataset["meta"]["n_samples"],
+            "n_features": dataset["meta"]["n_features"],
+            "n_positive": dataset["meta"]["n_positive"],
+            "n_negative": dataset["meta"]["n_negative"],
             "backend": backend_name,
             "config": config_log,
         },
@@ -379,17 +659,23 @@ def run_external_training(
         backend=backend_name,
         x_features=dataset["x"],
         y_labels=dataset["y"],
-        feature_names=dataset["feature_names"],
+        feature_names=list(dataset["meta"]["feature_names"]),
         config=train_config,
         output_dir=output_dir,
         progress=None,
     )
 
     # Copy to backend-specific active file (use copyfile to avoid permission issues)
-    # XGBoost uses .ubj format, MLP uses .pt format
-    active_filename = "active_xgb.ubj" if backend_name == "xgboost" else "active_mlp.pt"
+    # XGBoost=.ubj, MLP/LSTM=.pt, LightGBM=.txt
+    active_filename = _get_active_filename(backend_name)
     active_model_path = output_dir / active_filename
     shutil.copyfile(outcome["model_path"], active_model_path)
+
+    # Save model metadata for inference loading (MLP/LSTM/LightGBM)
+    meta_path: Path | None = None
+    if metadata_builder is not None:
+        meta = metadata_builder.build(dataset["meta"]["n_features"])
+        meta_path = _write_model_metadata(backend_name, meta, output_dir)
 
     # Log top features
     top_features = outcome["feature_importances"][:10]
@@ -412,11 +698,12 @@ def run_external_training(
         "model_id": outcome["model_id"],
         "model_path": outcome["model_path"],
         "active_model_path": str(active_model_path),
+        "active_meta_path": str(meta_path) if meta_path is not None else None,
         "samples_total": outcome["samples_total"],
         "samples_train": outcome["samples_train"],
         "samples_val": outcome["samples_val"],
         "samples_test": outcome["samples_test"],
-        "n_features": dataset["n_features"],
+        "n_features": dataset["meta"]["n_features"],
         "scale_pos_weight": outcome["scale_pos_weight_computed"],
         "best_val_auc": outcome["best_val_auc"],
         "best_round": outcome["best_round"],
