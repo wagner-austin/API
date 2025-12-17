@@ -1,6 +1,6 @@
 # covenant-ml
 
-Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports XGBoost (gradient boosting) and MLP (neural networks).
+Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports four backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), and LightGBM (large-scale datasets).
 
 ## Installation
 
@@ -157,6 +157,151 @@ print(f"Model format: {outcome['model_format']}")  # "pt"
 - CUDA deterministic algorithms are enabled when feasible and safe.
 - A tiny learning-rate warmup is used at the start of training to stabilize early updates on small datasets.
 
+## LSTM Backend
+
+Train an LSTM classifier for temporal bankruptcy sequences:
+
+```python
+from pathlib import Path
+from covenant_ml.types import LSTMConfig
+from covenant_ml.backends.lstm import create_lstm_backend
+
+# Configure LSTM training
+config: LSTMConfig = {
+    "device": "auto",
+    "precision": "fp32",
+    "hidden_size": 64,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "bidirectional": True,
+    "sequence_length": 5,
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "n_epochs": 100,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_patience": 10,
+}
+
+# Create backend and train
+backend = create_lstm_backend()
+outcome = backend.train(
+    x_features=X,
+    y_labels=y,
+    feature_names=feature_names,
+    config=config,
+    output_dir=Path("/models"),
+    progress=on_progress,
+)
+
+print(f"Test AUC: {outcome['test_metrics']['auc']}")
+print(f"Model format: {outcome['model_format']}")  # "pt"
+```
+
+### LSTMConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device` | str | `"cpu"`, `"cuda"`, or `"auto"` |
+| `precision` | str | `"fp32"`, `"fp16"`, `"bf16"`, or `"auto"` |
+| `hidden_size` | int | LSTM hidden state size |
+| `num_layers` | int | Number of stacked LSTM layers |
+| `dropout` | float | Dropout rate between layers (0.0-1.0) |
+| `bidirectional` | bool | Use bidirectional LSTM |
+| `sequence_length` | int | Number of time periods per sequence |
+| `learning_rate` | float | Learning rate |
+| `batch_size` | int | Training batch size |
+| `n_epochs` | int | Maximum training epochs |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `early_stopping_patience` | int | Epochs without improvement before stopping |
+
+## LightGBM Backend
+
+Train a LightGBM classifier for large-scale tabular data:
+
+```python
+from pathlib import Path
+from covenant_ml.types import LightGBMConfig
+from covenant_ml.backends.lightgbm import create_lightgbm_backend
+
+# Configure LightGBM training
+config: LightGBMConfig = {
+    "device": "auto",
+    "learning_rate": 0.1,
+    "max_depth": 6,
+    "n_estimators": 100,
+    "num_leaves": 31,
+    "min_child_samples": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.0,
+    "reg_lambda": 1.0,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_rounds": 10,
+}
+
+# Create backend and train
+backend = create_lightgbm_backend()
+outcome = backend.train(
+    x_features=X,
+    y_labels=y,
+    feature_names=feature_names,
+    config=config,
+    output_dir=Path("/models"),
+    progress=on_progress,
+)
+
+print(f"Test AUC: {outcome['test_metrics']['auc']}")
+print(f"Top feature: {outcome['feature_importances'][0]['name']}")
+```
+
+### LightGBMConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device` | str | `"cpu"`, `"cuda"`, or `"auto"` |
+| `learning_rate` | float | Learning rate (alias: eta) |
+| `max_depth` | int | Maximum tree depth |
+| `n_estimators` | int | Number of boosting rounds |
+| `num_leaves` | int | Maximum leaves per tree (LightGBM-specific) |
+| `min_child_samples` | int | Minimum samples per leaf (LightGBM-specific) |
+| `subsample` | float | Row sampling ratio |
+| `colsample_bytree` | float | Column sampling ratio |
+| `reg_alpha` | float | L1 regularization |
+| `reg_lambda` | float | L2 regularization |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `early_stopping_rounds` | int | Rounds without improvement before stopping |
+
+### TrainConfig Fields (XGBoost)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device` | str | `"cpu"`, `"cuda"`, or `"auto"` |
+| `learning_rate` | float | Learning rate (alias: eta) |
+| `max_depth` | int | Maximum tree depth |
+| `n_estimators` | int | Number of boosting rounds |
+| `subsample` | float | Row sampling ratio |
+| `colsample_bytree` | float | Column sampling ratio |
+| `reg_alpha` | float | L1 regularization |
+| `reg_lambda` | float | L2 regularization |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `early_stopping_rounds` | int | Rounds without improvement before stopping |
+| `scale_pos_weight` | float | Optional: positive class weight for imbalanced data |
+
 ### MLPConfig Fields
 
 | Field | Type | Description |
@@ -180,7 +325,7 @@ print(f"Model format: {outcome['model_format']}")  # "pt"
 | Field | Type | Description |
 |-------|------|-------------|
 | `model_id` | str | Unique model identifier |
-| `model_path` | str | Path to saved .ubj file |
+| `model_path` | str | Path to saved model file |
 | `samples_total` | int | Total samples |
 | `samples_train` | int | Training samples |
 | `samples_val` | int | Validation samples |
@@ -192,8 +337,40 @@ print(f"Model format: {outcome['model_format']}")  # "pt"
 | `train_metrics` | EvalMetrics | Training set metrics |
 | `val_metrics` | EvalMetrics | Validation set metrics |
 | `test_metrics` | EvalMetrics | Test set metrics |
-| `feature_importances` | list[FeatureImportance] | Ranked feature importances |
-| `config` | TrainConfig | Training configuration used |
+| `feature_importances` | list[FeatureImportance] | Ranked feature importances (XGBoost/LightGBM only) |
+| `config` | ClassifierTrainConfig | Training configuration (union of all config types) |
+| `scale_pos_weight_computed` | float | Auto-calculated class weight used for training |
+
+### EvalMetrics Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `loss` | float | Log loss (cross-entropy) |
+| `ppl` | float | Perplexity (exp(loss)) |
+| `auc` | float | Area under ROC curve |
+| `accuracy` | float | Classification accuracy |
+| `precision` | float | Precision for breach class |
+| `recall` | float | Recall for breach class |
+| `f1_score` | float | F1 score |
+
+### FeatureImportance Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | str | Feature name |
+| `importance` | float | Importance score (gain-based) |
+| `rank` | int | Rank (1 = most important) |
+
+### TrainProgress Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `round` | int | Current training round |
+| `total_rounds` | int | Total training rounds |
+| `train_loss` | float | Training loss |
+| `train_auc` | float | Training AUC |
+| `val_loss` | float \| None | Validation loss (None if no validation) |
+| `val_auc` | float \| None | Validation AUC (None if no validation) |
 
 ## Inference
 
@@ -295,12 +472,16 @@ print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 |------|-------------|
 | `TrainConfig` | XGBoost training configuration |
 | `MLPConfig` | MLP neural network configuration |
+| `LSTMConfig` | LSTM sequence model configuration |
+| `LightGBMConfig` | LightGBM gradient boosting configuration |
+| `ClassifierTrainConfig` | Union of all backend config types |
 | `TrainOutcome` | Complete training result |
 | `TrainProgress` | Progress update during training |
 | `EvalMetrics` | Evaluation metrics for a split |
 | `FeatureImportance` | Feature importance entry (name, importance, rank) |
 | `DataSplits` | Train/val/test data splits |
 | `ProgressCallback` | Callback type for progress updates |
+| `BackendName` | Literal type: `"xgboost" | "mlp" | "lstm" | "lightgbm"` |
 
 ### Manifest Types
 
@@ -326,7 +507,69 @@ TypedDicts for model manifest serialization:
 | `XGBBoosterProtocol` | Low-level XGBoost booster |
 | `XGBClassifierFactory` | XGBoost classifier constructor |
 | `XGBClassifierLoader` | XGBoost model loader |
-| `Proba2DProtocol` | 2D probability array |
+| `PredictorProtocol` | Any model with predict_proba |
+
+### Feature Engineering
+
+| Type/Function | Description |
+|---------------|-------------|
+| `FeatureEngineeringConfig` | TypedDict for transform configuration |
+| `EngineeredFeatures` | TypedDict with transformed features and counts |
+| `FeaturePreset` | Literal type: `"minimal" \| "standard" \| "full"` |
+| `engineer_features()` | Apply all configured transforms |
+| `default_feature_config()` | Get default configuration |
+| `get_feature_config_for_preset()` | Get config for a preset |
+| `compute_pairwise_ratios()` | Compute Xi/Xj ratio features |
+| `compute_pairwise_products()` | Compute Xi*Xj product features |
+| `compute_log_transforms()` | Compute log(1+\|x\|)*sign(x) features |
+
+### Dataset Loading (covenant_ml.datasets)
+
+| Type | Description |
+|------|-------------|
+| `DatasetConfig` | TypedDict for dataset configuration |
+| `LoadedDataset` | TypedDict with loaded features, labels, names |
+| `DatasetMeta` | TypedDict with dataset metadata |
+| `TargetColumnSpec` | TypedDict for target column configuration |
+| `FileFormat` | Literal type: `"csv" \| "arff"` |
+| `FileEncoding` | Literal type: `"utf-8" \| "latin-1" \| ...` |
+| `DatasetRegistry` | Registry of dataset configurations |
+| `DatasetLoader` | Loads datasets from files |
+| `DatasetLoaderProtocol` | Protocol for dataset loaders |
+| `make_default_registry()` | Create registry with pre-configured datasets |
+| `create_dataset_loader()` | Create default dataset loader |
+
+### Explainers (covenant_ml.explainers)
+
+| Type | Description |
+|------|-------------|
+| `ExplainerRegistry` | Registry of available explainers |
+| `ExplainerRegistration` | Registration entry with factory and metadata |
+| `FeatureImportanceScore` | TypedDict with name, importance, rank |
+| `SupportedExplainer` | Literal type of explainer names |
+| `ExplainerCapabilities` | TypedDict with requirements and cost |
+| `PermutationConfig` | Config for permutation explainer |
+| `GradientConfig` | Config for gradient explainer |
+| `IntegratedGradientsConfig` | Config for integrated gradients |
+| `default_explainer_registry()` | Create registry with all explainers |
+
+### Hyperparameter Optimization (covenant_ml.optimizer)
+
+| Type | Description |
+|------|-------------|
+| `OptimizationConfig` | TypedDict for optimization settings |
+| `OptimizationSummary` | TypedDict with optimization results |
+| `TrialResult` | TypedDict for single trial result |
+| `XGBoostSearchSpace` | TypedDict for XGBoost hyperparameters |
+| `LightGBMSearchSpace` | TypedDict for LightGBM hyperparameters |
+| `MLPSearchSpace` | TypedDict for MLP hyperparameters |
+| `LSTMSearchSpace` | TypedDict for LSTM hyperparameters |
+| `FloatRangeSpec` | Float parameter range specification |
+| `IntRangeSpec` | Integer parameter range specification |
+| `OptunaXGBoostOptimizer` | XGBoost hyperparameter optimizer |
+| `OptunaLightGBMOptimizer` | LightGBM hyperparameter optimizer |
+| `OptunaMLPOptimizer` | MLP hyperparameter optimizer |
+| `OptunaLSTMOptimizer` | LSTM hyperparameter optimizer |
 
 ## Testing
 
@@ -354,19 +597,304 @@ make check  # lint + test
 
 - Python 3.11+
 - covenant-domain
-- xgboost 2.0.0+ (gradient boosting backend)
-- torch 2.0.0+ (MLP neural network backend)
+- xgboost 2.0.0+ (XGBoost backend)
+- torch 2.0.0+ (MLP and LSTM backends)
+- lightgbm 4.0.0+ (LightGBM backend)
 - scikit-learn 1.5.0+
 - numpy 1.26.0+
+- optuna 3.0.0+ (hyperparameter optimization)
 - 100% test coverage enforced
 
 ## Backend Comparison
 
-| Aspect | XGBoost | MLP |
-|--------|---------|-----|
-| Model format | `.ubj` | `.pt` |
-| Feature importances | Yes (ranked) | No |
-| GPU support | CUDA | CUDA (fp16/bf16) |
-| Best for | Tabular data | Non-linear patterns |
-| Training speed | Faster | Slower |
-| Interpretability | High | Low |
+| Aspect | XGBoost | MLP | LSTM | LightGBM |
+|--------|---------|-----|------|----------|
+| Model format | `.ubj` | `.pt` | `.pt` | `.txt` |
+| Feature importances | Yes | No | No | Yes |
+| GPU support | CUDA | CUDA (fp16/bf16) | CUDA (fp16/bf16) | CUDA |
+| Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets |
+| Training speed | Fast | Moderate | Slow | Very fast |
+| Interpretability | High | Low | Low | High |
+| Early stopping | Yes | Yes | Yes | Yes |
+| Bidirectional | N/A | N/A | Yes | N/A |
+
+## Feature Engineering
+
+Create derived features from raw financial ratios to improve model performance:
+
+```python
+from covenant_ml import (
+    engineer_features,
+    default_feature_config,
+    get_feature_config_for_preset,
+    FeatureEngineeringConfig,
+    EngineeredFeatures,
+)
+import numpy as np
+
+# Raw features
+X = np.array([[0.5, 1.2, 3.0], [0.8, 0.9, 2.5]])
+feature_names = ["debt_ratio", "interest_cover", "current_ratio"]
+
+# Use default config
+config = default_feature_config()
+result: EngineeredFeatures = engineer_features(X, feature_names, config)
+
+print(f"Original: {result['n_original']} features")
+print(f"Ratios: {result['n_ratios']} features")
+print(f"Products: {result['n_products']} features")
+print(f"Log transforms: {result['n_log']} features")
+print(f"Total: {len(result['feature_names'])} features")
+
+# Use preset for different scenarios
+config = get_feature_config_for_preset("minimal")  # Original + log only
+config = get_feature_config_for_preset("standard")  # + ratios
+config = get_feature_config_for_preset("full")      # + products
+```
+
+### Feature Transforms
+
+| Transform | Description | Example |
+|-----------|-------------|---------|
+| Pairwise Ratios | Xi/Xj for relative relationships | debt_ratio/interest_cover |
+| Pairwise Products | Xi*Xj for interaction effects | debt_ratio*current_ratio |
+| Log Transforms | log(1 + \|x\|) * sign(x) for skewed data | log_debt_ratio |
+
+### FeatureEngineeringConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `use_ratios` | bool | Include pairwise ratio features |
+| `use_products` | bool | Include pairwise product features |
+| `use_log_transforms` | bool | Include log-transformed features |
+| `max_ratio_features` | int | Limit ratio features (0 = no limit) |
+| `max_product_features` | int | Limit product features (0 = no limit) |
+
+### FeaturePreset Options
+
+| Preset | Ratios | Products | Log | Description |
+|--------|--------|----------|-----|-------------|
+| `"minimal"` | No | No | Yes | Original + log transforms only |
+| `"standard"` | Yes | No | Yes | Default: ratios but no products |
+| `"full"` | Yes | Yes | Yes | All transforms enabled |
+
+## Dataset Loading
+
+Pluggable dataset loading system with auto-detection of target columns:
+
+```python
+from pathlib import Path
+from covenant_ml.datasets import (
+    make_default_registry,
+    create_dataset_loader,
+    DatasetConfig,
+    LoadedDataset,
+)
+
+# Get registry with pre-configured datasets
+registry = make_default_registry()
+
+# List available datasets
+print(registry.list())  # ["taiwan", "polish", "us", ...]
+
+# Get config for a specific dataset
+config: DatasetConfig = registry.get("taiwan")
+print(f"Format: {config['format']}")  # "csv"
+print(f"Target: {config['target_column']}")
+
+# Load dataset
+loader = create_dataset_loader()
+dataset: LoadedDataset = loader.load(config, Path("data/external"))
+
+print(f"Features: {dataset['x'].shape}")  # (n_samples, n_features)
+print(f"Labels: {dataset['y'].shape}")    # (n_samples,)
+print(f"Feature names: {dataset['feature_names']}")
+```
+
+### Supported Formats
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| `"csv"` | `.csv` | Comma-separated values |
+| `"arff"` | `.arff` | Weka ARFF format |
+
+### DatasetConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | str | Dataset identifier |
+| `path` | str | Relative path within data directory |
+| `format` | FileFormat | `"csv"` or `"arff"` |
+| `target_column` | TargetColumnSpec | Target column config (name/index + positive value) |
+| `encoding` | FileEncoding | `"utf-8"`, `"latin-1"`, etc. |
+| `description` | str | Human-readable description |
+
+### LoadedDataset Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `x` | NDArray[np.float64] | Feature matrix (n_samples, n_features) |
+| `y` | NDArray[np.int64] | Labels (n_samples,) - 0=healthy, 1=breach |
+| `feature_names` | list[str] | Feature column names |
+| `meta` | DatasetMeta | Dataset metadata (samples, features, positive ratio) |
+
+## Feature Importance Explainers
+
+Registry-based feature importance explainers with backend compatibility:
+
+```python
+from covenant_ml.explainers import (
+    default_explainer_registry,
+    ExplainerRegistry,
+    FeatureImportanceScore,
+)
+
+# Get default registry with all explainers
+registry = default_explainer_registry()
+
+# List all explainers
+print(registry.list_explainers())
+# ["gradient", "integrated_gradients", "permutation", "shap_tree"]
+
+# List compatible explainers for a backend
+compatible = registry.list_compatible_explainers("mlp")
+# ["gradient", "integrated_gradients", "permutation"]
+
+compatible = registry.list_compatible_explainers("xgboost")
+# ["permutation", "shap_tree"]
+
+# Check compatibility
+if registry.is_compatible("gradient", "mlp"):
+    explainer = registry.get("gradient")
+
+    importance: list[FeatureImportanceScore] = explainer.compute_importance(
+        model=model,
+        x_data=x_test,
+        feature_names=["debt_ratio", "interest_cover", "current_ratio"],
+        target_class=1,
+    )
+
+    for score in importance:
+        print(f"{score['rank']}. {score['name']}: {score['importance']:.4f}")
+```
+
+### Available Explainers
+
+| Explainer | Compatible Backends | Requires Gradients | Speed |
+|-----------|--------------------|--------------------|-------|
+| `permutation` | All (xgboost, lightgbm, mlp, lstm) | No | Medium |
+| `gradient` | Neural nets (mlp, lstm) | Yes | Fast |
+| `integrated_gradients` | Neural nets (mlp, lstm) | Yes | Slow |
+| `shap_tree` | Tree models (xgboost, lightgbm) | No | Medium |
+
+### Explainer Types
+
+| Type | Description |
+|------|-------------|
+| `ExplainerRegistry` | Registry of available explainers |
+| `ExplainerRegistration` | Registration entry with factory and metadata |
+| `FeatureImportanceScore` | Result with name, importance, rank |
+| `SupportedExplainer` | Literal type of explainer names |
+| `ExplainerCapabilities` | TypedDict with requirements and cost |
+
+## Hyperparameter Optimization
+
+Bayesian optimization using Optuna's TPE algorithm:
+
+```python
+from pathlib import Path
+from covenant_ml.optimizer import (
+    create_xgboost_optimizer,
+    create_xgboost_objective,
+    make_xgboost_default_space,
+    make_default_optimization_config,
+    use_real_optuna,
+    OptimizationSummary,
+)
+
+# Set up Optuna hook at application startup
+use_real_optuna()
+
+# Create optimizer, objective, and search space
+optimizer = create_xgboost_optimizer()
+objective = create_xgboost_objective(output_dir=Path("/models"))
+space = make_xgboost_default_space()
+config = make_default_optimization_config(n_trials=100)
+
+# Run optimization
+summary: OptimizationSummary = optimizer.optimize(
+    x_features=X,
+    y_labels=y,
+    feature_names=feature_names,
+    search_space=space,
+    config=config,
+    objective=objective,
+)
+
+print(f"Best AUC: {summary['best_value']:.4f}")
+print(f"Best params: {summary['best_params']}")
+print(f"Trials: {summary['n_trials']}")
+```
+
+### Optimizer Factory Functions
+
+| Function | Backend | Description |
+|----------|---------|-------------|
+| `create_xgboost_optimizer()` | XGBoost | Create XGBoost hyperparameter optimizer |
+| `create_lightgbm_optimizer()` | LightGBM | Create LightGBM hyperparameter optimizer |
+| `create_mlp_optimizer()` | MLP | Create MLP hyperparameter optimizer |
+| `create_lstm_optimizer()` | LSTM | Create LSTM hyperparameter optimizer |
+
+### Search Space Functions
+
+| Function | Description |
+|----------|-------------|
+| `make_xgboost_default_space()` | Default XGBoost search space |
+| `make_xgboost_focused_space()` | Narrower space for fine-tuning |
+| `make_lightgbm_default_space()` | Default LightGBM search space |
+| `make_mlp_default_space()` | Default MLP search space |
+| `make_lstm_default_space()` | Default LSTM search space |
+| `make_default_optimization_config(n_trials)` | Default optimization config |
+
+### OptimizationConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `n_trials` | int | Number of optimization trials |
+| `timeout_seconds` | int \| None | Optional timeout |
+| `n_jobs` | int | Parallel jobs (-1 = all cores) |
+| `direction` | str | `"maximize"` or `"minimize"` |
+| `sampler_seed` | int | Random seed for reproducibility |
+
+### OptimizationSummary Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `best_value` | float | Best objective value (e.g., AUC) |
+| `best_params` | dict | Best hyperparameters found |
+| `best_trial_number` | int | Trial number of best result |
+| `n_trials` | int | Total trials completed |
+| `n_failed` | int | Number of failed trials |
+| `duration_seconds` | float | Total optimization time |
+| `all_trials` | list[TrialResult] | All trial results |
+
+### Testing with Fake Optuna
+
+For tests, use the hook system instead of real Optuna:
+
+```python
+from covenant_ml.optimizer import set_optuna_module_hook
+
+# Create a fake Optuna module for testing
+class FakeStudy:
+    def optimize(self, func, n_trials, **kwargs):
+        # Minimal implementation for tests
+        pass
+
+class FakeOptuna:
+    def create_study(self, **kwargs):
+        return FakeStudy()
+
+# Set hook before running tests
+set_optuna_module_hook(lambda: FakeOptuna())
+```
