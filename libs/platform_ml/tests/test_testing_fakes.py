@@ -173,6 +173,27 @@ class TestFakeTensor:
         assert result.shape == (2, 3)
         assert result.device.type == tensor.device.type
 
+    def test_requires_grad_(self) -> None:
+        """Test requires_grad_ returns self."""
+        tensor = FakeTensor(shape=(2, 3))
+        result = tensor.requires_grad_(requires_grad=True)
+        assert result is tensor
+
+    def test_select(self) -> None:
+        """Test select removes selected dimension from shape."""
+        tensor = FakeTensor(shape=(2, 3, 4))
+        result = tensor.select(dim=1, index=0)
+        # Selecting dim=1 removes that dimension: (2, 3, 4) -> (2, 4)
+        assert result.shape == (2, 4)
+        assert result.device.type == tensor.device.type
+
+    def test_sum(self) -> None:
+        """Test sum returns scalar tensor (empty shape)."""
+        tensor = FakeTensor(shape=(2, 3))
+        result = tensor.sum()
+        assert result.shape == ()
+        assert result.device.type == tensor.device.type
+
 
 class TestFakeNoGradContext:
     """Tests for FakeNoGradContext."""

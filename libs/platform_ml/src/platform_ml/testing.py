@@ -327,6 +327,17 @@ class FakeTensor:
     def argmax(self, dim: int | None = None) -> FakeTensor:
         return FakeTensor(shape=self._shape, device_type=self._device.type)
 
+    def requires_grad_(self, requires_grad: bool = True) -> FakeTensor:
+        return self
+
+    def select(self, dim: int, index: int) -> FakeTensor:
+        # Remove the selected dimension from shape
+        new_shape = tuple(s for i, s in enumerate(self._shape) if i != dim)
+        return FakeTensor(shape=new_shape, device_type=self._device.type)
+
+    def sum(self) -> FakeTensor:
+        return FakeTensor(shape=(), device_type=self._device.type)
+
     def __add__(self, other: TensorProtocol | float | int) -> FakeTensor:
         return self
 
