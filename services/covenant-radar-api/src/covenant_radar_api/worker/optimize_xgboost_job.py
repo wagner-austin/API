@@ -405,14 +405,14 @@ def run_optimization(
     )
 
 
-def process_optimize_job(config_json: str) -> dict[str, JSONValue]:
-    """RQ job entry point for hyperparameter optimization.
+def process_xgboost_optimize_job(config_json: str) -> dict[str, JSONValue]:
+    """RQ job entry point for XGBoost hyperparameter optimization.
 
     Args:
-        config_json: JSON config with dataset and optimization parameters
+        config_json: JSON config with dataset and optimization parameters.
 
     Returns:
-        Optimization result with best hyperparameters
+        Optimization result with best hyperparameters.
     """
     from covenant_radar_api.core.config import settings_from_env
 
@@ -469,6 +469,6 @@ __all__ = [
     "OptimizationResult",
     "TrialProgressCallbackProtocol",
     "TrialProgressInfo",
-    "process_optimize_job",
+    "process_xgboost_optimize_job",
     "run_optimization",
 ]
