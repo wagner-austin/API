@@ -1,6 +1,6 @@
-"""Tests for BaseTabularTrainer unified training interface.
+"""Tests for BaseTabularTrainer with XGBoost backend.
 
-Tests the orchestration layer using XGBoost backend (no torch dependency).
+Tests the orchestration layer delegates correctly to XGBoost.
 """
 
 from __future__ import annotations
@@ -82,8 +82,8 @@ def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
     assert outcome["total_rounds"] >= 1
 
 
-def test_base_trainer_with_progress_callback(tmp_path: Path) -> None:
-    """BaseTabularTrainer passes progress callback to backend."""
+def test_base_trainer_xgboost_with_progress_callback(tmp_path: Path) -> None:
+    """BaseTabularTrainer passes progress callback to XGBoost backend."""
     registry = default_registry()
     trainer = BaseTabularTrainer(registry)
 
