@@ -79,7 +79,7 @@ class ServiceContainer:
         _redis_rq: Redis client for RQ operations.
         _model: Cached model (lazy loaded, backend-aware).
         _model_info: Information about current model.
-        _ml_backend: ML backend type for inference (xgboost or mlp).
+        _ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
     """
 
     settings: Settings
@@ -116,7 +116,7 @@ class ServiceContainer:
             model_output_dir: Directory for new model output.
             sector_encoder: Sector to int encoding.
             region_encoder: Region to int encoding.
-            ml_backend: ML backend type for inference (xgboost or mlp).
+            ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
         """
         self.settings = settings
         self.redis = redis
@@ -239,7 +239,7 @@ class ServiceContainer:
         return model
 
     def _load_mlp_model(self: ServiceContainer, model_path: str) -> PredictorProtocol:
-        """Load MLP model from file.
+        """Load MLP model from file with architecture metadata.
 
         Args:
             model_path: Path to the PyTorch .pt model file.
@@ -248,17 +248,48 @@ class ServiceContainer:
             Loaded MLP model as PredictorProtocol.
 
         Raises:
-            RuntimeError: MLP inference requires model metadata.
+            FileNotFoundError: If model or metadata file is missing.
         """
-        # MLP loading requires model architecture metadata (hidden_sizes, n_features)
-        # which must be saved alongside the .pt file during training.
-        # For now, raise a clear error explaining this requirement.
-        raise RuntimeError(
-            f"MLP model inference not yet supported. "
-            f"Model path: {model_path}. "
-            f"MLP models are currently only supported for training/benchmarking. "
-            f"Set APP__ML_BACKEND=xgboost to use XGBoost inference."
-        )
+        from covenant_radar_api.worker import _test_hooks as worker_hooks
+
+        model_p = Path(model_path)
+        meta_p = model_p.parent / "active_mlp_meta.json"
+        return worker_hooks.mlp_loader(model_p, meta_p)
+
+    def _load_lstm_model(self: ServiceContainer, model_path: str) -> PredictorProtocol:
+        """Load LSTM model from file with architecture metadata.
+
+        Args:
+            model_path: Path to the PyTorch .pt model file.
+
+        Returns:
+            Loaded LSTM model as PredictorProtocol.
+
+        Raises:
+            FileNotFoundError: If model or metadata file is missing.
+        """
+        from covenant_radar_api.worker import _test_hooks as worker_hooks
+
+        model_p = Path(model_path)
+        meta_p = model_p.parent / "active_lstm_meta.json"
+        return worker_hooks.lstm_loader(model_p, meta_p)
+
+    def _load_lightgbm_model(self: ServiceContainer, model_path: str) -> PredictorProtocol:
+        """Load LightGBM model from file.
+
+        Args:
+            model_path: Path to the LightGBM .txt model file.
+
+        Returns:
+            Loaded LightGBM model as PredictorProtocol.
+
+        Raises:
+            FileNotFoundError: If model file is missing.
+        """
+        from covenant_radar_api.worker import _test_hooks as worker_hooks
+
+        model_p = Path(model_path)
+        return worker_hooks.lightgbm_loader(model_p)
 
     def load_model_now(self: ServiceContainer) -> bool:
         """Eagerly load the ML model into memory.
@@ -287,8 +318,12 @@ class ServiceContainer:
         # Load model based on configured backend
         if self._ml_backend == "xgboost":
             self._model = self._load_xgboost_model(str(model_path))
-        else:
+        elif self._ml_backend == "mlp":
             self._model = self._load_mlp_model(str(model_path))
+        elif self._ml_backend == "lstm":
+            self._model = self._load_lstm_model(str(model_path))
+        else:  # lightgbm
+            self._model = self._load_lightgbm_model(str(model_path))
 
         self._model_info = ModelInfo(
             model_id=self._model_info["model_id"],
@@ -309,13 +344,17 @@ class ServiceContainer:
 
         Raises:
             FileNotFoundError: If model file doesn't exist.
-            RuntimeError: If MLP backend is configured (not yet supported).
+            RuntimeError: If mlp, lstm, or lightgbm backend is configured (not yet supported).
         """
         if self._model is None:
             if self._ml_backend == "xgboost":
                 self._model = self._load_xgboost_model(self._model_info["model_path"])
-            else:
+            elif self._ml_backend == "mlp":
                 self._model = self._load_mlp_model(self._model_info["model_path"])
+            elif self._ml_backend == "lstm":
+                self._model = self._load_lstm_model(self._model_info["model_path"])
+            else:  # lightgbm
+                self._model = self._load_lightgbm_model(self._model_info["model_path"])
             self._model_info = ModelInfo(
                 model_id=self._model_info["model_id"],
                 model_path=self._model_info["model_path"],
