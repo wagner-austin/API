@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+# =============================================================================
+# Parameter Specification Types
+# =============================================================================
 
-# Parameter specification types
+
 class FloatRangeSpec(TypedDict, total=True):
     """Continuous float parameter range for sampling."""
 
@@ -42,15 +45,48 @@ class CategoricalIntSpec(TypedDict, total=True):
     choices: tuple[int, ...]
 
 
-# Union of all parameter specification types
-ParamSpec = FloatRangeSpec | IntRangeSpec | CategoricalFloatSpec | CategoricalIntSpec
+# =============================================================================
+# Sampled Parameter Value Types
+# =============================================================================
+
+
+class SampledIntParams(TypedDict, total=False):
+    """Sampled integer parameter values.
+
+    All fields optional - only present params are included.
+    """
+
+    max_depth: int
+    n_estimators: int
+    n_layers: int
+    hidden_size: int
+    num_layers: int
+    batch_size: int
+    num_leaves: int
+    min_child_samples: int
+
+
+class SampledFloatParams(TypedDict, total=False):
+    """Sampled float parameter values.
+
+    All fields optional - only present params are included.
+    """
+
+    learning_rate: float
+    reg_alpha: float
+    reg_lambda: float
+    subsample: float
+    colsample_bytree: float
+    dropout: float
+
+
+# =============================================================================
+# Search Space Types
+# =============================================================================
 
 
 class XGBoostSearchSpace(TypedDict, total=True):
-    """Search space for XGBoost hyperparameters.
-
-    Each field maps to a ParamSpec defining the sampling range.
-    """
+    """Search space for XGBoost hyperparameters."""
 
     max_depth: IntRangeSpec | CategoricalIntSpec
     n_estimators: IntRangeSpec | CategoricalIntSpec
@@ -71,7 +107,37 @@ class MLPSearchSpace(TypedDict, total=True):
     batch_size: IntRangeSpec | CategoricalIntSpec
 
 
-# Trial state enumeration
+class LSTMSearchSpace(TypedDict, total=True):
+    """Search space for LSTM hyperparameters."""
+
+    hidden_size: IntRangeSpec | CategoricalIntSpec
+    num_layers: IntRangeSpec | CategoricalIntSpec
+    dropout: FloatRangeSpec | CategoricalFloatSpec
+    learning_rate: FloatRangeSpec | CategoricalFloatSpec
+    batch_size: IntRangeSpec | CategoricalIntSpec
+
+
+class LightGBMSearchSpace(TypedDict, total=True):
+    """Search space for LightGBM hyperparameters."""
+
+    max_depth: IntRangeSpec | CategoricalIntSpec
+    n_estimators: IntRangeSpec | CategoricalIntSpec
+    num_leaves: IntRangeSpec | CategoricalIntSpec
+    learning_rate: FloatRangeSpec | CategoricalFloatSpec
+    subsample: FloatRangeSpec | CategoricalFloatSpec
+    colsample_bytree: FloatRangeSpec | CategoricalFloatSpec
+    reg_alpha: FloatRangeSpec | CategoricalFloatSpec
+    reg_lambda: FloatRangeSpec | CategoricalFloatSpec
+
+
+# Union of all backend-specific search spaces for generic optimizer interfaces
+SearchSpace = XGBoostSearchSpace | MLPSearchSpace | LSTMSearchSpace | LightGBMSearchSpace
+
+
+# =============================================================================
+# Trial State and Results
+# =============================================================================
+
 TrialState = Literal["complete", "pruned", "failed", "running"]
 
 
@@ -79,13 +145,8 @@ class TrialResult(TypedDict, total=True):
     """Result of a single optimization trial."""
 
     trial_number: int
-    params_max_depth: int
-    params_n_estimators: int
-    params_learning_rate: float
-    params_reg_alpha: float
-    params_reg_lambda: float
-    params_subsample: float
-    params_colsample_bytree: float
+    int_params: SampledIntParams
+    float_params: SampledFloatParams
     value: float  # The objective value (validation AUC to maximize)
     state: TrialState
     duration_seconds: float
@@ -96,18 +157,18 @@ class OptimizationSummary(TypedDict, total=True):
 
     best_trial_number: int
     best_value: float
-    best_max_depth: int
-    best_n_estimators: int
-    best_learning_rate: float
-    best_reg_alpha: float
-    best_reg_lambda: float
-    best_subsample: float
-    best_colsample_bytree: float
+    best_int_params: SampledIntParams
+    best_float_params: SampledFloatParams
     n_trials_total: int
     n_trials_complete: int
     n_trials_pruned: int
     n_trials_failed: int
     total_duration_seconds: float
+
+
+# =============================================================================
+# Optimization Configuration
+# =============================================================================
 
 
 class OptimizationConfig(TypedDict, total=True):
@@ -129,10 +190,14 @@ __all__ = [
     "CategoricalIntSpec",
     "FloatRangeSpec",
     "IntRangeSpec",
+    "LSTMSearchSpace",
+    "LightGBMSearchSpace",
     "MLPSearchSpace",
     "OptimizationConfig",
     "OptimizationSummary",
-    "ParamSpec",
+    "SampledFloatParams",
+    "SampledIntParams",
+    "SearchSpace",
     "TrialResult",
     "TrialState",
     "XGBoostSearchSpace",
