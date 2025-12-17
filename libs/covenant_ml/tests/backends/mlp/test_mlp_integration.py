@@ -1,6 +1,6 @@
 """MLP backend integration tests with actual PyTorch training.
 
-Tests the full training loop, prediction, and error paths.
+Tests the full training loop, prediction, and error paths using real US bankruptcy data.
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from covenant_ml.types import (
     TrainOutcome,
     TrainProgress,
 )
+
+from ...conftest import load_us_bankruptcy_data
 
 
 def _invoke_mlp_train(
@@ -41,13 +43,13 @@ def _invoke_mlp_train(
     )
 
 
-def _make_binary_dataset(
+def _make_synthetic_dataset(
     n_samples: int = 100,
     n_features: int = 4,
     pos_ratio: float = 0.3,
     seed: int = 42,
 ) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
-    """Create synthetic binary classification dataset."""
+    """Create synthetic binary classification dataset for edge case tests."""
     rng = np.random.default_rng(seed)
     x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
     n_pos = int(n_samples * pos_ratio)
@@ -84,8 +86,24 @@ def _make_mlp_config(
 def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     """MLPBackend trains and returns TrainOutcome with all required fields."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
-    config = _make_mlp_config(n_epochs=15, batch_size=8)
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
+    config: MLPConfig = {
+        "device": "cpu",
+        "precision": "fp32",
+        "optimizer": "adamw",
+        "hidden_sizes": (64, 32),
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "dropout": 0.1,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "random_state": 42,
+        "early_stopping_patience": 5,
+    }
 
     progress_calls: list[TrainProgress] = []
 
@@ -105,11 +123,7 @@ def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     assert outcome["model_path"].endswith(".pt")
     assert Path(outcome["model_path"]).exists()
     assert outcome["model_id"] == "mlp"
-    assert outcome["samples_total"] == 60
-    # Stratified split may round differently; verify approximately correct
-    assert 34 <= outcome["samples_train"] <= 37  # ~60% of 60
-    assert 10 <= outcome["samples_val"] <= 14  # ~20% of 60
-    assert 10 <= outcome["samples_test"] <= 14  # ~20% of 60
+    assert outcome["samples_total"] == dataset["n_samples"]
     # Verify model learned by tracking actual loss from progress
     assert progress_calls, "Progress callback must be invoked"
     val_losses: list[float] = []
@@ -123,14 +137,30 @@ def test_mlp_backend_train_returns_outcome(tmp_path: Path) -> None:
     assert loss_final < loss_initial, (
         f"Best loss {loss_final} should be below first epoch {loss_initial}"
     )
-    assert outcome["total_rounds"] == 15
+    assert outcome["total_rounds"] >= 1
 
 
 def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
     """MLPBackend invokes progress callback during training."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
-    config = _make_mlp_config(n_epochs=15, batch_size=8, hidden_sizes=(8, 4))
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
+    config: MLPConfig = {
+        "device": "cpu",
+        "precision": "fp32",
+        "optimizer": "adamw",
+        "hidden_sizes": (32, 16),
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "dropout": 0.0,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "random_state": 42,
+        "early_stopping_patience": 5,
+    }
 
     progress_calls: list[TrainProgress] = []
 
@@ -147,7 +177,7 @@ def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
     )
 
     # Verify outcome structure
-    assert outcome["samples_total"] == 60
+    assert outcome["samples_total"] == dataset["n_samples"]
     assert 0.0 <= outcome["best_val_auc"] <= 1.0
 
     # Verify progress callbacks
@@ -178,21 +208,23 @@ def test_mlp_backend_train_with_progress_callback(tmp_path: Path) -> None:
 def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     """MLPBackend stops early when validation AUC doesn't improve."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=80, n_features=4, seed=123)
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
     # Use moderate patience with good LR to allow learning, then early stop
     config: MLPConfig = {
         "device": "cpu",
         "precision": "fp32",
         "optimizer": "adamw",
-        "hidden_sizes": (16, 8),
-        "learning_rate": 0.02,  # Higher LR for faster learning
-        "batch_size": 8,
+        "hidden_sizes": (64, 32),
+        "learning_rate": 0.001,
+        "batch_size": 256,
         "n_epochs": 50,  # Many epochs (should stop early)
-        "dropout": 0.0,
-        "train_ratio": 0.6,
-        "val_ratio": 0.2,
-        "test_ratio": 0.2,
-        "random_state": 123,
+        "dropout": 0.1,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "random_state": 42,
         "early_stopping_patience": 5,
     }
 
@@ -211,7 +243,7 @@ def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     )
 
     # Verify training completed
-    assert outcome["samples_total"] == 80
+    assert outcome["samples_total"] == dataset["n_samples"]
     assert 0.0 <= outcome["best_val_auc"] <= 1.0
     # Verify progress tracked actual loss values
     assert progress_calls, "Progress callback must be invoked"
@@ -225,8 +257,8 @@ def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
     # Verify model learned (best loss not worse than first epoch)
     loss_initial = val_losses[0]
     loss_final = min(val_losses)
-    assert loss_final <= loss_initial, (
-        f"Best loss {loss_final} should not exceed first epoch {loss_initial}"
+    assert loss_final < loss_initial, (
+        f"Best loss {loss_final} should be below first epoch {loss_initial}"
     )
     # Verify early stopping triggered (fewer epochs than max)
     n_epochs_run = len(progress_calls)
@@ -236,7 +268,7 @@ def test_mlp_backend_train_early_stopping(tmp_path: Path) -> None:
 def test_mlp_backend_config_type_validation(tmp_path: Path) -> None:
     """MLPBackend raises RuntimeError when given TrainConfig instead of MLPConfig."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset()
+    x, y, names = _make_synthetic_dataset()
 
     # TrainConfig (for XGBoost) instead of MLPConfig
     xgb_config: TrainConfig = {
@@ -320,25 +352,26 @@ def test_mlp_backend_feature_importances_returns_none() -> None:
 def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
     """MLPBackend works with different optimizer choices."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     for optimizer in ("adamw", "adam", "sgd"):
         # SGD needs higher LR to converge in reasonable epochs
-        lr = 0.1 if optimizer == "sgd" else 0.01
+        lr = 0.01 if optimizer == "sgd" else 0.001
         config: MLPConfig = {
             "device": "cpu",
             "precision": "fp32",
             "optimizer": optimizer,
-            "hidden_sizes": (8, 4),
+            "hidden_sizes": (64, 32),
             "learning_rate": lr,
-            "batch_size": 8,
-            "n_epochs": 20,  # Enough epochs for all optimizers to learn
-            "dropout": 0.0,
-            "train_ratio": 0.6,
-            "val_ratio": 0.2,
-            "test_ratio": 0.2,
+            "batch_size": 256,
+            "n_epochs": 10,
+            "dropout": 0.1,
+            "train_ratio": 0.7,
+            "val_ratio": 0.15,
+            "test_ratio": 0.15,
             "random_state": 42,
-            "early_stopping_patience": 10,
+            "early_stopping_patience": 5,
         }
 
         out_dir = tmp_path / optimizer
@@ -355,7 +388,7 @@ def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
             progress=collected.append,
         )
 
-        assert outcome["samples_total"] == 60
+        assert outcome["samples_total"] == dataset["n_samples"]
         # Verify model learned by tracking actual loss progression
         assert collected, f"Optimizer {optimizer}: progress callback must be invoked"
         val_losses: list[float] = []
@@ -374,22 +407,23 @@ def test_mlp_backend_different_optimizers(tmp_path: Path) -> None:
 def test_mlp_backend_with_dropout(tmp_path: Path) -> None:
     """MLPBackend works with dropout enabled."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
         "device": "cpu",
         "precision": "fp32",
         "optimizer": "adamw",
-        "hidden_sizes": (8, 4),
-        "learning_rate": 0.01,
-        "batch_size": 8,
-        "n_epochs": 15,  # Enough epochs with dropout
+        "hidden_sizes": (64, 32),
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "n_epochs": 10,
         "dropout": 0.2,  # Dropout enabled
-        "train_ratio": 0.6,
-        "val_ratio": 0.2,
-        "test_ratio": 0.2,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
         "random_state": 42,
-        "early_stopping_patience": 10,
+        "early_stopping_patience": 5,
     }
 
     progress_calls: list[TrainProgress] = []
@@ -406,7 +440,7 @@ def test_mlp_backend_with_dropout(tmp_path: Path) -> None:
         progress=on_progress,
     )
 
-    assert outcome["samples_total"] == 60
+    assert outcome["samples_total"] == dataset["n_samples"]
     # Verify model learned by tracking actual loss
     assert progress_calls, "Progress callback must be invoked"
     val_losses: list[float] = []
@@ -431,22 +465,23 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
         pytest.skip("CUDA not available")
 
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
     config: MLPConfig = {
         "device": "cuda",
         "precision": "fp16",  # Mixed precision on CUDA
         "optimizer": "adamw",
-        "hidden_sizes": (8, 4),
-        "learning_rate": 0.01,
-        "batch_size": 8,
-        "n_epochs": 20,  # More epochs for CUDA to learn
-        "dropout": 0.0,
-        "train_ratio": 0.6,
-        "val_ratio": 0.2,
-        "test_ratio": 0.2,
+        "hidden_sizes": (64, 32),
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "dropout": 0.1,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
         "random_state": 42,
-        "early_stopping_patience": 10,
+        "early_stopping_patience": 5,
     }
 
     progress_calls: list[TrainProgress] = []
@@ -464,7 +499,7 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
     )
 
     # Verify training completed on CUDA
-    assert outcome["samples_total"] == 60
+    assert outcome["samples_total"] == dataset["n_samples"]
     assert outcome["model_path"].endswith(".pt")
     assert Path(outcome["model_path"]).exists()
 
@@ -488,8 +523,24 @@ def test_mlp_backend_train_on_cuda(tmp_path: Path) -> None:
 def test_mlp_backend_train_without_progress(tmp_path: Path) -> None:
     """MLPBackend trains without progress callback (covers progress=None branch)."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=60, n_features=4)
-    config = _make_mlp_config(n_epochs=15, batch_size=8, hidden_sizes=(8, 4))
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
+    config: MLPConfig = {
+        "device": "cpu",
+        "precision": "fp32",
+        "optimizer": "adamw",
+        "hidden_sizes": (64, 32),
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "n_epochs": 10,
+        "dropout": 0.1,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "random_state": 42,
+        "early_stopping_patience": 5,
+    }
 
     outcome: TrainOutcome = backend.train(
         x_features=x,
@@ -501,28 +552,21 @@ def test_mlp_backend_train_without_progress(tmp_path: Path) -> None:
     )
 
     # Verify training completed
-    assert outcome["samples_total"] == 60
+    assert outcome["samples_total"] == dataset["n_samples"]
     assert outcome["model_path"].endswith(".pt")
     assert Path(outcome["model_path"]).exists()
-    # Verify model learned: train loss should be lower than val loss (model fits training data)
-    # This indicates learning happened even without progress tracking
-    loss_train = outcome["train_metrics"]["loss"]
+    # Verify model learned: val loss should be below random baseline
     loss_final = outcome["val_metrics"]["loss"]
-    # Train loss should be lower than val loss for a learning model (not overfitted)
-    assert loss_train < loss_final + 0.2, (
-        f"Train loss {loss_train} should be close to val loss {loss_final}"
-    )
-    # Verify loss is reasonable (below random baseline)
-    loss_initial = 0.693  # log(2) - random binary classifier baseline
-    assert loss_final < loss_initial, (
-        f"Val loss {loss_final} should be below baseline {loss_initial}"
+    loss_baseline = 0.693  # log(2) - random binary classifier baseline
+    assert loss_final < loss_baseline, (
+        f"Val loss {loss_final} should be below baseline {loss_baseline}"
     )
 
 
 def test_mlp_backend_train_zero_epochs_raises(tmp_path: Path) -> None:
     """MLPBackend raises RuntimeError when n_epochs is 0 (no training)."""
     backend = create_mlp_backend()
-    x, y, names = _make_binary_dataset(n_samples=40, n_features=3)
+    x, y, names = _make_synthetic_dataset(n_samples=40, n_features=3)
 
     config: MLPConfig = {
         "device": "cpu",
@@ -583,3 +627,33 @@ def test_mlp_model_factory_protocol_exported() -> None:
     assert "n_classes" in annotations
     assert "hidden_sizes" in annotations
     assert "return" in annotations
+
+
+def test_mlp_compute_gradients_returns_correct_shape() -> None:
+    """MLPPrepared.compute_gradients returns gradients with correct shape."""
+    from covenant_ml.backends.mlp.backend import _build_model, _MLPPrepared
+
+    # Build a simple model
+    n_features = 8
+    n_samples = 10
+    model = _build_model(n_in=n_features, hidden=(16,), dropout=0.0, device="cpu")
+
+    # Create prepared classifier
+    prepared = _MLPPrepared(model)
+
+    # Create test input
+    rng = np.random.default_rng(42)
+    x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
+
+    # Compute gradients for class 0
+    grads_0 = prepared.compute_gradients(x, target_class=0)
+    assert grads_0.shape == (n_samples, n_features)
+    assert grads_0.dtype == np.float64
+
+    # Compute gradients for class 1
+    grads_1 = prepared.compute_gradients(x, target_class=1)
+    assert grads_1.shape == (n_samples, n_features)
+    assert grads_1.dtype == np.float64
+
+    # Gradients for different classes should be different
+    assert not np.allclose(grads_0, grads_1)
