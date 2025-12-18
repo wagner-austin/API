@@ -74,9 +74,12 @@ Thumbs.db
 !services/covenant-radar-api/data/
 !services/covenant-radar-api/data/external/
 !services/covenant-radar-api/data/external/**
-# Exclude large Kaggle datasets
+# Exclude large Kaggle datasets (>100MB, use kaggle CLI to download)
 services/covenant-radar-api/data/external/kaggle_amex_default/
 services/covenant-radar-api/data/external/kaggle_lending_club/
+services/covenant-radar-api/data/external/kaggle_home_credit/
+services/covenant-radar-api/data/external/kaggle_credit_card_fraud/
+services/covenant-radar-api/data/external/kaggle_sba_loans/
 **/datasets/
 **/outputs/
 **/checkpoints/
