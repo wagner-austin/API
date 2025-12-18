@@ -1256,7 +1256,7 @@ Run Bayesian hyperparameter optimization using Optuna's Tree-structured Parzen E
 | `sequence_length` | lstm | int | `5` | LSTM sequence length |
 | `bidirectional` | lstm | bool | `false` | Use bidirectional LSTM |
 
-**XGBoost Request Example:**
+**XGBoost Full Config:**
 ```json
 {
   "dataset": "taiwan",
@@ -1270,37 +1270,83 @@ Run Bayesian hyperparameter optimization using Optuna's Tree-structured Parzen E
 }
 ```
 
-**MLP Request Example:**
+| Field | Type | Required | Default | Options |
+|-------|------|----------|---------|---------|
+| `dataset` | string | Yes | - | `taiwan`, `us`, `polish` |
+| `backend` | string | No | `xgboost` | `xgboost` |
+| `n_trials` | int | Yes | - | Any positive integer |
+| `timeout_seconds` | int | No | `null` | Seconds or `null` |
+| `device` | string | No | `auto` | `cpu`, `cuda`, `auto` |
+| `space_profile` | string | No | `default` | `default`, `categorical` |
+| `feature_preset` | string | No | `none` | `none`, `log_only`, `ratios_only`, `full` |
+| `random_state` | int | No | `42` | Any integer |
+
+**MLP Full Config:**
 ```json
 {
   "dataset": "taiwan",
   "backend": "mlp",
   "n_trials": 50,
+  "timeout_seconds": 3600,
+  "device": "cuda",
+  "feature_preset": "full",
+  "random_state": 42,
   "precision": "fp16",
   "optimizer": "adamw",
   "n_epochs": 100,
-  "early_stopping_patience": 15,
-  "device": "cuda"
+  "early_stopping_patience": 15
 }
 ```
 
-**LightGBM Request Example:**
+| Field | Type | Required | Default | Options |
+|-------|------|----------|---------|---------|
+| `dataset` | string | Yes | - | `taiwan`, `us`, `polish` |
+| `backend` | string | Yes | - | `mlp` |
+| `n_trials` | int | Yes | - | Any positive integer |
+| `timeout_seconds` | int | No | `null` | Seconds or `null` |
+| `device` | string | No | `auto` | `cpu`, `cuda`, `auto` |
+| `feature_preset` | string | No | `none` | `none`, `log_only`, `ratios_only`, `full` |
+| `random_state` | int | No | `42` | Any integer |
+| `precision` | string | No | `fp32` | `fp32`, `fp16`, `bf16`, `auto` |
+| `optimizer` | string | No | `adamw` | `adamw`, `adam`, `sgd` |
+| `n_epochs` | int | No | `50` | Any positive integer |
+| `early_stopping_patience` | int | No | `10` | Any positive integer |
+
+**LightGBM Full Config:**
 ```json
 {
   "dataset": "polish",
   "backend": "lightgbm",
   "n_trials": 30,
-  "early_stopping_rounds": 20,
-  "feature_preset": "log_only"
+  "timeout_seconds": 1800,
+  "device": "auto",
+  "feature_preset": "log_only",
+  "random_state": 42,
+  "early_stopping_rounds": 20
 }
 ```
 
-**LSTM Request Example:**
+| Field | Type | Required | Default | Options |
+|-------|------|----------|---------|---------|
+| `dataset` | string | Yes | - | `taiwan`, `us`, `polish` |
+| `backend` | string | Yes | - | `lightgbm` |
+| `n_trials` | int | Yes | - | Any positive integer |
+| `timeout_seconds` | int | No | `null` | Seconds or `null` |
+| `device` | string | No | `auto` | `cpu`, `cuda`, `auto` |
+| `feature_preset` | string | No | `none` | `none`, `log_only`, `ratios_only`, `full` |
+| `random_state` | int | No | `42` | Any integer |
+| `early_stopping_rounds` | int | No | `10` | Any positive integer |
+
+**LSTM Full Config:**
 ```json
 {
   "dataset": "us",
   "backend": "lstm",
   "n_trials": 25,
+  "timeout_seconds": 7200,
+  "device": "cuda",
+  "feature_preset": "ratios_only",
+  "random_state": 42,
   "precision": "bf16",
   "n_epochs": 75,
   "early_stopping_patience": 8,
@@ -1308,6 +1354,21 @@ Run Bayesian hyperparameter optimization using Optuna's Tree-structured Parzen E
   "bidirectional": true
 }
 ```
+
+| Field | Type | Required | Default | Options |
+|-------|------|----------|---------|---------|
+| `dataset` | string | Yes | - | `taiwan`, `us`, `polish` |
+| `backend` | string | Yes | - | `lstm` |
+| `n_trials` | int | Yes | - | Any positive integer |
+| `timeout_seconds` | int | No | `null` | Seconds or `null` |
+| `device` | string | No | `auto` | `cpu`, `cuda`, `auto` |
+| `feature_preset` | string | No | `none` | `none`, `log_only`, `ratios_only`, `full` |
+| `random_state` | int | No | `42` | Any integer |
+| `precision` | string | No | `fp32` | `fp32`, `fp16`, `bf16`, `auto` |
+| `n_epochs` | int | No | `50` | Any positive integer |
+| `early_stopping_patience` | int | No | `10` | Any positive integer |
+| `sequence_length` | int | No | `5` | Any positive integer |
+| `bidirectional` | bool | No | `false` | `true`, `false` |
 
 **Response (202):**
 ```json
