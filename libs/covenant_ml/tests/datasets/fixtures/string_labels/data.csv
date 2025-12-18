@@ -1,0 +1,6 @@
+id,feature_1,feature_2,status
+A001,1.5,2.5,healthy
+A002,3.5,?,bankrupt
+A003,NA,6.5,healthy
+A004,7.5,8.5,bankrupt
+A005,9.5,10.5,healthy

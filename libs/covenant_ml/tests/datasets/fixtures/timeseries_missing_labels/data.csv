@@ -1,0 +1,5 @@
+entity_id,timestamp,feature_1,feature_2
+A,1,10.0,20.0
+A,2,11.0,21.0
+B,1,30.0,40.0
+C,1,50.0,60.0

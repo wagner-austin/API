@@ -1,0 +1,12 @@
+% ARFF with malformed @attribute lines
+@relation malformed_test
+
+@attribute Attr1 numeric
+@attribute
+@attribute Attr2 numeric
+@attribute class {0,1}
+
+@data
+1.0,2.0,0
+3.0,4.0,1
+5.0,6.0,0

@@ -83,6 +83,9 @@ services/covenant-radar-api/data/external/kaggle_sba_loans/
 services/covenant-radar-api/data/external/kaggle_risk_analytics/
 services/covenant-radar-api/data/external/kaggle_prosper_loans/
 **/datasets/
+# But allow source code directories named "datasets"
+!**/src/**/datasets/
+!**/tests/**/datasets/
 **/outputs/
 **/checkpoints/
 **/corpus_cache/

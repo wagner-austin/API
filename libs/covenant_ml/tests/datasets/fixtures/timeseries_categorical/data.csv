@@ -1,0 +1,8 @@
+entity_id,timestamp,feature_num,feature_cat
+A,1,10.0,LOW
+A,2,11.0,HIGH
+A,3,12.0,MEDIUM
+B,1,30.0,HIGH
+B,2,31.0,HIGH
+C,1,50.0,LOW
+C,2,51.0,LOW

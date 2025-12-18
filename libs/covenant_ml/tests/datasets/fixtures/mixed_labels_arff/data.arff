@@ -1,0 +1,13 @@
+% ARFF with mixed int/string labels
+@relation mixed_label_test
+
+@attribute Attr1 numeric
+@attribute Attr2 numeric
+@attribute class {0,1,YES,NO}
+
+@data
+1.0,2.0,0
+3.0,4.0,YES
+5.0,6.0,NO
+7.0,8.0,1
+9.0,10.0,NO

@@ -1,0 +1,13 @@
+% ARFF with string labels
+@relation string_label_test
+
+@attribute Attr1 numeric
+@attribute Attr2 numeric
+@attribute status {healthy,bankrupt}
+
+@data
+1.0,2.0,healthy
+3.0,4.0,bankrupt
+5.0,6.0,healthy
+7.0,8.0,bankrupt
+9.0,10.0,healthy

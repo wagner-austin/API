@@ -1,0 +1,6 @@
+feature_num,feature_cat,feature_cat2,target
+1.0,LOW,A,0
+2.0,MEDIUM,B,1
+3.0,HIGH,A,0
+4.0,LOW,C,1
+5.0,MEDIUM,B,0

@@ -1,0 +1,14 @@
+% Small test ARFF file
+@relation test_bankruptcy
+
+@attribute Attr1 numeric
+@attribute Attr2 numeric
+@attribute Attr3 numeric
+@attribute class {0,1}
+
+@data
+1.0,2.0,3.0,0
+4.0,5.0,6.0,1
+?,8.0,9.0,0
+10.0,11.0,12.0,1
+13.0,14.0,15.0,0

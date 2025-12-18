@@ -1,0 +1,8 @@
+% Empty ARFF file (no data rows)
+@relation empty_test
+
+@attribute Attr1 numeric
+@attribute Attr2 numeric
+@attribute class {0,1}
+
+@data
