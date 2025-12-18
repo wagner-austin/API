@@ -1,0 +1,72 @@
+﻿# procart-api
+
+Strict, typed FastAPI service orchestrating procart rendering.
+
+## Installation
+
+```bash
+cd services/procart-api
+poetry install --with dev
+```
+
+## Run
+
+```bash
+# Development
+poetry run hypercorn procart_api.main:app --bind 0.0.0.0:8000 --reload
+
+# Production
+poetry run hypercorn procart_api.main:app --bind [::]:${PORT:-8000}
+```
+
+## Endpoints
+
+- GET /health — liveness
+- GET /registries/modules — list available visual modules
+- GET /registries/camera-paths — list camera path types
+- GET /registries/tone-mappers — list tone mapping types
+- POST /render/preview — render a single frame preview
+- POST /render/frames — render all frames to disk
+- POST /render/video — encode frames to video via ffmpeg
+
+See docs/api.md for request/response schemas.
+
+## Development
+
+```bash
+make lint   # guards + ruff + mypy
+make test   # pytest with --cov-branch
+make check  # lint + test (fail_under=100)
+```
+
+## Project Structure
+
+```
+src/procart_api/
+  app.py         # FastAPI factory with platform_core exception handlers
+  _test_hooks.py # injectable hooks (ffmpeg runner)
+  main.py        # production entrypoint; sets real hooks
+  routes/
+    health.py    # /health via add_api_route
+scripts/guard.py  # monorepo guard harness
+tests/            # ASGI tests via httpx.ASGITransport
+docs/PLAN.md      # service integration plan
+```
+
+## Hooks
+
+- FFMPEG_RUNNER Protocol provided by libs/procart; production sets the real runner in main.py and tests set fakes.
+- No conditionals in core paths; call the hook directly.
+
+## Standards
+
+- Hypercorn ASGI server in dependencies; no Uvicorn in code
+- Guards, mypy --strict, Ruff over src/tests/scripts; --cov-branch with fail_under=100
+- No Any, cast, type: ignore, .pyi, or dataclasses in src; no try/except in core
+
+
+
+## API Schema
+
+See docs/api.md for request/response examples and typed schema notes.
+
