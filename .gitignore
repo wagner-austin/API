@@ -80,6 +80,7 @@ services/covenant-radar-api/data/external/kaggle_lending_club/
 services/covenant-radar-api/data/external/kaggle_home_credit/
 services/covenant-radar-api/data/external/kaggle_credit_card_fraud/
 services/covenant-radar-api/data/external/kaggle_sba_loans/
+services/covenant-radar-api/data/external/kaggle_risk_analytics/
 **/datasets/
 **/outputs/
 **/checkpoints/
