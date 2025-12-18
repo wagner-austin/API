@@ -74,6 +74,8 @@ Thumbs.db
 !services/covenant-radar-api/data/
 !services/covenant-radar-api/data/external/
 !services/covenant-radar-api/data/external/**
+# Exclude large Kaggle datasets
+services/covenant-radar-api/data/external/kaggle_amex_default/
 **/datasets/
 **/outputs/
 **/checkpoints/
