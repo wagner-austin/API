@@ -198,6 +198,8 @@ def run_xgboost(
     device: str,
     timeout: int | None,
     progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
+    phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
+    loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
 ) -> XGBoostOptimizationResult:
     """Run XGBoost hyperparameter optimization.
 
@@ -209,6 +211,10 @@ def run_xgboost(
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         progress_callback (XGBoostProgressCallbackProtocol | None): Optional
             callback invoked after each trial with progress info.
+        phase_callback (XGBoostPhaseCallbackProtocol | None): Optional callback
+            invoked when entering a new optimization phase.
+        loading_progress_callback (XGBoostLoadingProgressCallbackProtocol | None):
+            Optional callback for granular loading progress updates.
 
     Returns:
         XGBoostOptimizationResult: Optimization result with best hyperparameters
@@ -220,7 +226,14 @@ def run_xgboost(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     config_json = _build_xgboost_config(dataset, n_trials, feature_preset, device, timeout)
-    return _hooks.xgboost_runner(config_json, external_dir, output_dir, progress_callback)
+    return _hooks.xgboost_runner(
+        config_json,
+        external_dir,
+        output_dir,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
 
 
 def run_mlp(
@@ -230,6 +243,8 @@ def run_mlp(
     device: str,
     timeout: int | None,
     progress_callback: _hooks.MLPTrialProgressCallbackProtocol | None = None,
+    phase_callback: _hooks.MLPPhaseCallbackProtocol | None = None,
+    loading_progress_callback: _hooks.MLPLoadingProgressCallbackProtocol | None = None,
 ) -> MLPOptimizationResult:
     """Run MLP hyperparameter optimization.
 
@@ -241,6 +256,10 @@ def run_mlp(
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         progress_callback (MLPTrialProgressCallbackProtocol | None): Optional
             callback invoked after each trial with progress info.
+        phase_callback (MLPPhaseCallbackProtocol | None): Optional callback
+            invoked when entering a new optimization phase.
+        loading_progress_callback (MLPLoadingProgressCallbackProtocol | None):
+            Optional callback for granular loading progress updates.
 
     Returns:
         MLPOptimizationResult: Optimization result with best hyperparameters
@@ -252,7 +271,14 @@ def run_mlp(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     config_json = _build_mlp_config(dataset, n_trials, feature_preset, device, timeout)
-    return _hooks.mlp_runner(config_json, external_dir, output_dir, progress_callback)
+    return _hooks.mlp_runner(
+        config_json,
+        external_dir,
+        output_dir,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
 
 
 def run_lightgbm(
@@ -262,6 +288,8 @@ def run_lightgbm(
     device: str,
     timeout: int | None,
     progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
+    phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
+    loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
 ) -> LightGBMOptimizationResult:
     """Run LightGBM hyperparameter optimization.
 
@@ -273,6 +301,10 @@ def run_lightgbm(
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         progress_callback (LightGBMTrialProgressCallbackProtocol | None): Optional
             callback invoked after each trial with progress info.
+        phase_callback (LightGBMPhaseCallbackProtocol | None): Optional callback
+            invoked when entering a new optimization phase.
+        loading_progress_callback (LightGBMLoadingProgressCallbackProtocol | None):
+            Optional callback for granular loading progress updates.
 
     Returns:
         LightGBMOptimizationResult: Optimization result with best hyperparameters
@@ -284,7 +316,14 @@ def run_lightgbm(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     config_json = _build_lightgbm_config(dataset, n_trials, feature_preset, device, timeout)
-    return _hooks.lightgbm_runner(config_json, external_dir, output_dir, progress_callback)
+    return _hooks.lightgbm_runner(
+        config_json,
+        external_dir,
+        output_dir,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
 
 
 def run_lstm(
@@ -294,6 +333,8 @@ def run_lstm(
     device: str,
     timeout: int | None,
     progress_callback: _hooks.LSTMTrialProgressCallbackProtocol | None = None,
+    phase_callback: _hooks.LSTMPhaseCallbackProtocol | None = None,
+    loading_progress_callback: _hooks.LSTMLoadingProgressCallbackProtocol | None = None,
 ) -> LSTMOptimizationResult:
     """Run LSTM hyperparameter optimization.
 
@@ -305,6 +346,10 @@ def run_lstm(
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         progress_callback (LSTMTrialProgressCallbackProtocol | None): Optional
             callback invoked after each trial with progress info.
+        phase_callback (LSTMPhaseCallbackProtocol | None): Optional callback
+            invoked when entering a new optimization phase.
+        loading_progress_callback (LSTMLoadingProgressCallbackProtocol | None):
+            Optional callback for granular loading progress updates.
 
     Returns:
         LSTMOptimizationResult: Optimization result with best hyperparameters
@@ -316,7 +361,14 @@ def run_lstm(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     config_json = _build_lstm_config(dataset, n_trials, feature_preset, device, timeout)
-    return _hooks.lstm_runner(config_json, external_dir, output_dir, progress_callback)
+    return _hooks.lstm_runner(
+        config_json,
+        external_dir,
+        output_dir,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
 
 
 __all__ = [

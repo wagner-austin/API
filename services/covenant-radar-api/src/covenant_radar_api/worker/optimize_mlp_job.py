@@ -10,6 +10,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol, TypedDict
 
+from covenant_ml.backends.protocol import ProgressCallback
+from covenant_ml.datasets.types import LoadPhase, LoadProgress
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import (
     MLPSearchSpace,
@@ -18,11 +20,10 @@ from covenant_ml.optimizer import (
     create_mlp_objective,
     create_mlp_optimizer,
 )
-from covenant_ml.types import MLPConfig, MLPOptimizer, MLPPrecision
+from covenant_ml.types import MLPConfig, MLPOptimizer, MLPPrecision, TrainProgress
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
-    dump_json_str,
     load_json_str,
     require_int,
     require_str,
@@ -31,10 +32,11 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
-    load_dataset,
+    load_any_dataset,
     optional_int,
     parse_device,
     parse_feature_preset,
+    save_optimization_results,
 )
 
 _log = get_logger(__name__)
@@ -301,11 +303,123 @@ class MLPTrialProgressCallbackProtocol(Protocol):
         ...
 
 
+class MLPPhaseInfo(TypedDict):
+    """Information about optimization phase for CLI display."""
+
+    phase: Literal["loading_data", "feature_engineering", "optimizing", "saving"]
+    dataset: str
+    n_samples: int
+    n_features: int
+
+
+class MLPPhaseCallbackProtocol(Protocol):
+    """Protocol for MLP phase progress callback."""
+
+    def __call__(self, info: MLPPhaseInfo) -> None:
+        """Called when entering a new optimization phase."""
+        ...
+
+
+class MLPLoadingProgressInfo(TypedDict):
+    """Progress information during dataset loading.
+
+    Provides granular progress updates during the loading_data phase.
+    """
+
+    dataset: str
+    phase: LoadPhase
+    percent_complete: float
+    rows_processed: int
+    rows_total: int
+    message: str
+
+
+class MLPLoadingProgressCallbackProtocol(Protocol):
+    """Protocol for loading progress callback during dataset loading."""
+
+    def __call__(self, info: MLPLoadingProgressInfo) -> None:
+        """Called with progress updates during dataset loading."""
+        ...
+
+
+class MLPEpochProgressInfo(TypedDict):
+    """Progress information during epoch training within a trial.
+
+    Provides per-epoch updates during MLP training to show
+    training progress within each trial.
+    """
+
+    trial_number: int
+    epoch: int
+    total_epochs: int
+    train_loss: float
+    train_auc: float
+    val_loss: float | None
+    val_auc: float | None
+
+
+class MLPEpochProgressCallbackProtocol(Protocol):
+    """Protocol for epoch progress callback during MLP training."""
+
+    def __call__(self, info: MLPEpochProgressInfo) -> None:
+        """Called with progress updates during epoch training."""
+        ...
+
+
+def _default_mlp_epoch_callback(info: MLPEpochProgressInfo) -> None:
+    """Default epoch callback that logs progress.
+
+    Args:
+        info: Epoch progress information.
+    """
+    val_auc_str = f"{info['val_auc']:.4f}" if info["val_auc"] is not None else "N/A"
+    _log.debug(
+        "MLP epoch progress",
+        extra={
+            "trial": info["trial_number"],
+            "epoch": info["epoch"],
+            "total_epochs": info["total_epochs"],
+            "train_auc": f"{info['train_auc']:.4f}",
+            "val_auc": val_auc_str,
+        },
+    )
+
+
+def _report_mlp_phase(
+    callback: MLPPhaseCallbackProtocol | None,
+    phase: Literal["loading_data", "feature_engineering", "optimizing", "saving"],
+    dataset: str,
+    n_samples: int,
+    n_features: int,
+) -> None:
+    """Report phase transition if callback is provided.
+
+    Args:
+        callback: Optional phase callback.
+        phase: Phase name (loading_data, feature_engineering, optimizing).
+        dataset: Dataset name.
+        n_samples: Number of samples (0 during loading).
+        n_features: Number of features (0 during loading).
+    """
+    if callback is not None:
+        callback(
+            MLPPhaseInfo(
+                phase=phase,
+                dataset=dataset,
+                n_samples=n_samples,
+                n_features=n_features,
+            )
+        )
+
+
 def run_mlp_optimization(
     config_json: str,
     external_dir: Path,
     output_dir: Path,
     progress_callback: MLPTrialProgressCallbackProtocol | None = None,
+    phase_callback: MLPPhaseCallbackProtocol | None = None,
+    loading_progress_callback: MLPLoadingProgressCallbackProtocol | None = None,
+    epoch_callback: MLPEpochProgressCallbackProtocol | None = None,
 ) -> MLPOptimizationResult:
     """Run MLP hyperparameter optimization on external dataset.
 
@@ -314,6 +428,9 @@ def run_mlp_optimization(
         external_dir: Path to data/external directory with datasets.
         output_dir: Directory to save optimization results.
         progress_callback: Optional callback for trial progress updates.
+        phase_callback: Optional callback for phase transitions (loading, optimizing, etc).
+        loading_progress_callback: Optional callback for granular loading progress.
+        epoch_callback: Optional callback for per-epoch training progress within trials.
 
     Returns:
         MLPOptimizationResult with best hyperparameters and recommended config.
@@ -321,8 +438,37 @@ def run_mlp_optimization(
     parse_result = _parse_optimize_config(config_json)
     dataset_name = parse_result["dataset"]
 
-    # Load raw dataset
-    dataset = load_dataset(dataset_name, external_dir)
+    # Report loading phase
+    _report_mlp_phase(phase_callback, "loading_data", dataset_name, 0, 0)
+
+    # Create loading progress adapter - only used when loading_progress_callback is not None
+    def _loading_progress_adapter(progress: LoadProgress) -> None:
+        # Assertion to satisfy type narrowing - adapter only called when callback exists
+        assert loading_progress_callback is not None
+        loading_progress_callback(
+            MLPLoadingProgressInfo(
+                dataset=dataset_name,
+                phase=progress["phase"],
+                percent_complete=progress["percent_complete"],
+                rows_processed=progress["rows_processed"],
+                rows_total=progress["rows_total"],
+                message=progress["message"],
+            )
+        )
+
+    # Load raw dataset with progress reporting
+    dataset = load_any_dataset(
+        dataset_name, external_dir, _loading_progress_adapter if loading_progress_callback else None
+    )
+
+    # Report feature engineering phase
+    _report_mlp_phase(
+        phase_callback,
+        "feature_engineering",
+        dataset_name,
+        dataset["meta"]["n_samples"],
+        dataset["meta"]["n_features"],
+    )
 
     _log.info(
         "Starting MLP hyperparameter optimization",
@@ -346,6 +492,32 @@ def run_mlp_optimization(
     )
     search_space = _get_search_space(parse_result["space_profile"])
 
+    # Track current trial for epoch callback
+    current_trial_number = 0
+
+    # Create epoch callback adapter - uses default logging if none provided
+    def _make_epoch_adapter() -> ProgressCallback:
+        effective_callback = (
+            epoch_callback if epoch_callback is not None else _default_mlp_epoch_callback
+        )
+
+        def _epoch_adapter(progress: TrainProgress) -> None:
+            effective_callback(
+                MLPEpochProgressInfo(
+                    trial_number=current_trial_number,
+                    epoch=progress["round"],
+                    total_epochs=progress["total_rounds"],
+                    train_loss=progress["train_loss"],
+                    train_auc=progress["train_auc"],
+                    val_loss=progress["val_loss"],
+                    val_auc=progress["val_auc"],
+                )
+            )
+
+        return _epoch_adapter
+
+    epoch_adapter = _make_epoch_adapter()
+
     # Create objective function (applies feature engineering if preset != "none")
     objective = create_mlp_objective(
         dataset["x"],
@@ -357,6 +529,16 @@ def run_mlp_optimization(
         parse_result["n_epochs"],
         parse_result["early_stopping_patience"],
         optimizer_name=parse_result["optimizer"],
+        epoch_callback=epoch_adapter,
+    )
+
+    # Report optimizing phase
+    _report_mlp_phase(
+        phase_callback,
+        "optimizing",
+        dataset_name,
+        dataset["meta"]["n_samples"],
+        objective.n_features,
     )
 
     # Track progress
@@ -377,7 +559,10 @@ def run_mlp_optimization(
         nonlocal best_n_layers
         nonlocal best_hidden_size
         nonlocal best_dropout
+        nonlocal current_trial_number
         trials_seen += 1
+        # Update trial number for next trial's epoch callbacks
+        current_trial_number = result["trial_number"] + 1
         auc = result["value"]
         is_best = auc > best_auc
         if is_best:
@@ -450,12 +635,7 @@ def run_mlp_optimization(
         parse_result["early_stopping_patience"],
     )
 
-    # Save results to output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
-    result_path = output_dir / f"{dataset_name}_mlp_optuna_result.json"
-    config_path = output_dir / f"{dataset_name}_mlp_optimal_config.json"
-
-    # Build serializable result
+    # Build serializable result and config
     best_int_params = summary["best_int_params"]
     best_float_params = summary["best_float_params"]
 
@@ -473,10 +653,6 @@ def run_mlp_optimization(
         "n_trials_complete": summary["n_trials_complete"],
         "duration_seconds": summary["total_duration_seconds"],
     }
-
-    # Write results
-    with open(result_path, "w") as f:
-        f.write(dump_json_str(result_dict))
 
     # Convert hidden_sizes tuple to list for JSON serialization
     hidden_sizes_json: list[JSONValue] = [int(s) for s in recommended_config["hidden_sizes"]]
@@ -497,8 +673,10 @@ def run_mlp_optimization(
         "early_stopping_patience": recommended_config["early_stopping_patience"],
     }
 
-    with open(config_path, "w") as f:
-        f.write(dump_json_str(config_dict))
+    # Save results to output directory
+    result_path, config_path = save_optimization_results(
+        output_dir, dataset_name, "mlp", result_dict, config_dict
+    )
 
     _log.info(
         "Saved MLP optimization results",
@@ -593,7 +771,13 @@ def process_mlp_optimize_job(config_json: str) -> dict[str, JSONValue]:
 
 
 __all__ = [
+    "MLPEpochProgressCallbackProtocol",
+    "MLPEpochProgressInfo",
+    "MLPLoadingProgressCallbackProtocol",
+    "MLPLoadingProgressInfo",
     "MLPOptimizationResult",
+    "MLPPhaseCallbackProtocol",
+    "MLPPhaseInfo",
     "MLPTrialProgressCallbackProtocol",
     "MLPTrialProgressInfo",
     "process_mlp_optimize_job",

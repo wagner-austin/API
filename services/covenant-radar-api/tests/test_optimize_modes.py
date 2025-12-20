@@ -8,7 +8,11 @@ from platform_core.logging import setup_rich_logging
 from scripts._test_hooks import XGBoostOptimizationResult
 from scripts.optimize.cli import DatasetName, FeaturePreset
 from scripts.optimize.history import XGBoostHistoryEntry
-from scripts.optimize.modes import _print_multi_dataset_summary, _print_preset_comparison_summary
+from scripts.optimize.modes import (
+    _format_loading_progress,
+    _print_multi_dataset_summary,
+    _print_preset_comparison_summary,
+)
 from scripts.optimize.runner import RunResult
 
 
@@ -243,3 +247,99 @@ class TestPrintPresetComparisonSummary:
 
         # Should execute without error
         _print_preset_comparison_summary(results)
+
+
+class TestFormatLoadingProgress:
+    """Tests for _format_loading_progress function."""
+
+    def test_format_with_rows_total_positive(self) -> None:
+        """Test formatting when rows_total is positive (shows rows processed)."""
+        result = _format_loading_progress(
+            dataset="taiwan",
+            phase="reading",
+            percent_complete=50.0,
+            rows_processed=500,
+            rows_total=1000,
+            elapsed=5.0,
+        )
+
+        # Verify key components are in the output
+        assert "taiwan" in result
+        assert "reading" in result
+        assert "500" in result
+        assert "1,000" in result
+        assert "50.0%" in result
+
+    def test_format_with_rows_total_zero(self) -> None:
+        """Test formatting when rows_total is zero (no rows display)."""
+        result = _format_loading_progress(
+            dataset="us",
+            phase="parsing",
+            percent_complete=75.0,
+            rows_processed=0,
+            rows_total=0,
+            elapsed=10.0,
+        )
+
+        # Verify key components are in the output
+        assert "us" in result
+        assert "parsing" in result
+        assert "75.0%" in result
+        # Rows should not appear when total is 0
+        assert "/[dim]" not in result
+
+    def test_format_with_encoding_phase(self) -> None:
+        """Test formatting with encoding phase (uses green color)."""
+        result = _format_loading_progress(
+            dataset="polish",
+            phase="encoding",
+            percent_complete=100.0,
+            rows_processed=5000,
+            rows_total=5000,
+            elapsed=15.0,
+        )
+
+        # Verify key components are in the output
+        assert "polish" in result
+        assert "encoding" in result
+        assert "100.0%" in result
+
+    def test_format_with_unknown_phase(self) -> None:
+        """Test formatting with unknown phase (falls back to white color)."""
+        result = _format_loading_progress(
+            dataset="taiwan",
+            phase="unknown_phase",
+            percent_complete=25.0,
+            rows_processed=100,
+            rows_total=400,
+            elapsed=2.0,
+        )
+
+        # Verify key components are in the output
+        assert "taiwan" in result
+        assert "unknown_phase" in result
+        assert "25.0%" in result
+
+    def test_format_elapsed_time_formatting(self) -> None:
+        """Test that elapsed time is formatted correctly."""
+        # Test with seconds only
+        result_seconds = _format_loading_progress(
+            dataset="taiwan",
+            phase="reading",
+            percent_complete=10.0,
+            rows_processed=100,
+            rows_total=1000,
+            elapsed=45.0,
+        )
+        assert "45s" in result_seconds
+
+        # Test with minutes and seconds
+        result_minutes = _format_loading_progress(
+            dataset="taiwan",
+            phase="reading",
+            percent_complete=90.0,
+            rows_processed=900,
+            rows_total=1000,
+            elapsed=125.0,  # 2m 05s
+        )
+        assert "2m" in result_minutes

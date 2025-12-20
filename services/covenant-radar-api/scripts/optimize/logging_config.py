@@ -35,6 +35,16 @@ def suppress_verbose_logging() -> None:
         stdlib_logging.WARNING
     )
 
+    # Suppress training progress logs from backends
+    for name in (
+        "covenant_ml.trainer",
+        "covenant_ml.backends.mlp.backend",
+        "covenant_ml.backends.lstm.backend",
+        "covenant_ml.optimizer.objectives.lightgbm_objective",
+        "covenant_ml.backends.lightgbm.backend",
+    ):
+        stdlib_logging.getLogger(name).setLevel(stdlib_logging.WARNING)
+
     # Suppress covenant_ml optuna backend logging (Trial complete messages)
     stdlib_logging.getLogger("covenant_ml.optimizer.optuna_backend").setLevel(
         stdlib_logging.WARNING

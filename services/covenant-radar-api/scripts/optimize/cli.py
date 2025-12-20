@@ -3,6 +3,9 @@
 Provides argument parsing for multi-backend hyperparameter optimization.
 Supports XGBoost, MLP, LightGBM, and LSTM backends.
 
+Supports both standard datasets (taiwan, us, polish) and time-series datasets
+(amex, and future stock-related datasets).
+
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
 
@@ -14,9 +17,37 @@ from typing import Literal
 from covenant_ml.types import BackendName
 from platform_core.logging import get_rich_console
 
-# Type aliases
+# Type aliases for standard datasets
 FeaturePreset = Literal["none", "log_only", "ratios_only", "full"]
-DatasetName = Literal["taiwan", "us", "polish"]
+StandardDatasetName = Literal["taiwan", "us", "polish", "kaggle_give_me_credit"]
+
+# Time-series dataset names (AMEX default prediction, future stock datasets)
+TimeSeriesDatasetName = Literal["kaggle_amex_default"]
+
+# Combined dataset name type - all supported datasets
+DatasetName = StandardDatasetName | TimeSeriesDatasetName
+
+# All known dataset names for validation
+ALL_STANDARD_DATASETS: tuple[StandardDatasetName, ...] = (
+    "taiwan",
+    "us",
+    "polish",
+    "kaggle_give_me_credit",
+)
+ALL_TIMESERIES_DATASETS: tuple[TimeSeriesDatasetName, ...] = ("kaggle_amex_default",)
+
+
+def is_timeseries_dataset(dataset: DatasetName) -> bool:
+    """Check if a dataset is a time-series dataset.
+
+    Args:
+        dataset: Dataset name to check.
+
+    Returns:
+        True if time-series dataset, False if standard dataset.
+    """
+    return dataset in ALL_TIMESERIES_DATASETS
+
 
 # Feature preset descriptions
 PRESET_DESCRIPTIONS: dict[str, str] = {
@@ -84,13 +115,13 @@ def print_help() -> None:
 
 [bold]Options:[/bold]
   -b, --backend         Backend: xgboost, mlp, lightgbm, lstm (default: xgboost)
-  -d, --dataset         Dataset: taiwan, us, polish (default: taiwan)
+  -d, --dataset         Dataset name (default: taiwan)
   -n, --n-trials        Number of trials (default: 300)
   -f, --feature-preset  Preset: none, log_only, ratios_only, full (default: full)
   --device              Device: auto, cpu, cuda (default: cuda)
   -t, --timeout         Timeout in seconds (optional)
   -c, --compare-presets Run all presets on one dataset and compare
-  -a, --all-datasets    Run on all three datasets
+  -a, --all-datasets    Run on all standard datasets
   -s, --save-model      Train and save the best model after optimization (default: on)
   --no-save-model       Skip training and saving the best model
   -v, --verbose         Show Optuna trial logs (default: quiet)
@@ -101,6 +132,14 @@ def print_help() -> None:
   mlp       Multi-layer perceptron (PyTorch)
   lightgbm  Gradient boosted trees (LightGBM)
   lstm      Long short-term memory network (PyTorch)
+
+[bold]Standard Datasets:[/bold]
+  taiwan    Taiwan Bankruptcy (6.8K samples, 95 features)
+  us        US Bankruptcy (78K samples, 18 features)
+  polish    Polish Bankruptcy (7K samples, 64 features)
+
+[bold]Time-Series Datasets:[/bold]
+  kaggle_amex_default  AMEX Default Prediction (458K entities, 188 features, ~13 time steps)
 """
     console.print(help_text)
 
@@ -133,6 +172,8 @@ def _parse_backend(val: str) -> BackendName:
 def _parse_dataset(val: str) -> DatasetName:
     """Parse dataset value.
 
+    Validates against both standard and time-series dataset names.
+
     Args:
         val (str): Dataset name string from CLI.
 
@@ -143,13 +184,24 @@ def _parse_dataset(val: str) -> DatasetName:
         SystemExit: If dataset name is invalid.
     """
     console = get_rich_console()
+
+    # Standard datasets
     if val == "taiwan":
         return "taiwan"
     if val == "us":
         return "us"
     if val == "polish":
         return "polish"
-    console.print(f"[red]Invalid dataset: {val}. Must be taiwan, us, or polish.[/red]")
+    if val == "kaggle_give_me_credit":
+        return "kaggle_give_me_credit"
+
+    # Time-series datasets
+    if val == "kaggle_amex_default":
+        return "kaggle_amex_default"
+
+    # Invalid - show all valid options
+    all_datasets = ", ".join(ALL_STANDARD_DATASETS + ALL_TIMESERIES_DATASETS)
+    console.print(f"[red]Invalid dataset: {val}. Must be one of: {all_datasets}[/red]")
     raise SystemExit(1)
 
 

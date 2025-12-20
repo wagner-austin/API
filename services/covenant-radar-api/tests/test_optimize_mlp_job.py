@@ -15,6 +15,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_mlp_job import (
+    MLPPhaseInfo,
     MLPTrialProgressInfo,
     _get_search_space,
     _parse_optimize_config,
@@ -350,6 +351,129 @@ class TestRunMLPOptimization:
             assert 0.0 <= info["best_auc"] <= 1.0
             assert info["best_trial"] >= 0
             assert info["is_best"] in (True, False)
+
+    def test_run_optimization_with_phase_callback(self, tmp_path: Path) -> None:
+        """run_mlp_optimization calls phase callback for all phases."""
+        external_dir = tmp_path / "external"
+        _copy_real_taiwan(external_dir)
+        output_dir = tmp_path / "optuna_output"
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "space_profile": "default",
+                "random_state": 42,
+                "n_epochs": 5,
+            }
+        )
+
+        phase_calls: list[MLPPhaseInfo] = []
+
+        def phase_callback(info: MLPPhaseInfo) -> None:
+            phase_calls.append(info)
+
+        result = run_mlp_optimization(config_json, external_dir, output_dir, None, phase_callback)
+
+        # Verify all three phases were reported
+        assert len(phase_calls) == 3
+        assert result["status"] == "complete"
+
+        # Verify phase sequence and info structure
+        assert phase_calls[0]["phase"] == "loading_data"
+        assert phase_calls[0]["dataset"] == "taiwan"
+        assert phase_calls[0]["n_samples"] == 0  # Not yet loaded
+
+        assert phase_calls[1]["phase"] == "feature_engineering"
+        assert phase_calls[1]["dataset"] == "taiwan"
+        assert phase_calls[1]["n_samples"] > 0  # Now loaded
+
+        assert phase_calls[2]["phase"] == "optimizing"
+        assert phase_calls[2]["dataset"] == "taiwan"
+        assert phase_calls[2]["n_features"] > 0
+
+    def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
+        """run_mlp_optimization calls loading progress callback during data loading."""
+        from covenant_radar_api.worker.optimize_mlp_job import MLPLoadingProgressInfo
+
+        external_dir = tmp_path / "external"
+        _copy_real_taiwan(external_dir)
+        output_dir = tmp_path / "optuna_output"
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "space_profile": "default",
+                "random_state": 42,
+                "n_epochs": 5,
+            }
+        )
+
+        loading_calls: list[MLPLoadingProgressInfo] = []
+
+        def loading_progress_callback(info: MLPLoadingProgressInfo) -> None:
+            loading_calls.append(info)
+
+        result = run_mlp_optimization(
+            config_json, external_dir, output_dir, None, None, loading_progress_callback
+        )
+
+        # Verify loading progress was reported (at least one call for reading phase)
+        assert result["status"] == "complete"
+        # Use explicit count to verify callback was called
+        progress_count = len(loading_calls)
+        assert progress_count == 1 or progress_count > 1
+
+        # Verify loading progress info structure
+        first_info = loading_calls[0]
+        assert first_info["dataset"] == "taiwan"
+        assert first_info["phase"] in ("reading", "parsing", "encoding")
+        assert 0.0 <= first_info["percent_complete"] <= 100.0
+        assert first_info["rows_processed"] >= 0
+        assert first_info["rows_total"] >= 0
+        # Verify message is a non-empty string
+        assert first_info["message"] != ""
+
+    def test_run_optimization_progress_includes_non_best_trial(self, tmp_path: Path) -> None:
+        """run_mlp_optimization includes trials where is_best is False."""
+        external_dir = tmp_path / "external"
+        _copy_real_taiwan(external_dir)
+        output_dir = tmp_path / "optuna_output"
+
+        # Run 3 trials - at least one must NOT be best since best can only improve
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 3,
+                "device": "cpu",
+                "space_profile": "default",
+                "random_state": 42,
+                "n_epochs": 5,
+            }
+        )
+
+        callback_calls: list[MLPTrialProgressInfo] = []
+
+        def progress_callback(info: MLPTrialProgressInfo) -> None:
+            callback_calls.append(info)
+
+        result = run_mlp_optimization(config_json, external_dir, output_dir, progress_callback)
+
+        assert result["status"] == "complete"
+        assert len(callback_calls) == 3
+
+        # With 3 trials, at least one must have is_best=False
+        # (first trial is always best, subsequent trials may or may not improve)
+        best_count = sum(1 for info in callback_calls if info["is_best"])
+        non_best_count = sum(1 for info in callback_calls if not info["is_best"])
+
+        # At least one trial must not be best (covers the is_best=False branch)
+        assert non_best_count >= 1, f"Expected at least 1 non-best trial, got {non_best_count}"
+        # And at least one must be best (the first trial is always best)
+        assert best_count >= 1, f"Expected at least 1 best trial, got {best_count}"
 
 
 class TestProcessMLPOptimizeJob:

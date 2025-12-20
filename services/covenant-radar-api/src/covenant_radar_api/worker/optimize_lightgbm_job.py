@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol, TypedDict
 
+from covenant_ml.datasets.types import LoadPhase, LoadProgress
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import (
     LightGBMSearchSpace,
@@ -31,7 +32,7 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
-    load_dataset,
+    load_any_dataset,
     optional_int,
     parse_device,
     parse_feature_preset,
@@ -148,7 +149,11 @@ def _get_search_space(profile: SpaceProfile) -> LightGBMSearchSpace:
 
 
 class LightGBMOptimizationResult(TypedDict, total=True):
-    """Result of a LightGBM hyperparameter optimization run."""
+    """Result of a LightGBM hyperparameter optimization run.
+
+    Note: best_max_depth is always -1 (unlimited). LightGBM optimization uses
+    num_leaves as the primary complexity control to avoid constraint conflicts.
+    """
 
     backend: Literal["lightgbm"]
     status: Literal["complete"]
@@ -161,7 +166,7 @@ class LightGBMOptimizationResult(TypedDict, total=True):
     n_trials_failed: int
     best_trial_number: int
     best_val_auc: float
-    best_max_depth: int
+    best_max_depth: Literal[-1]  # Fixed: unlimited depth, num_leaves controls complexity
     best_n_estimators: int
     best_num_leaves: int
     best_learning_rate: float
@@ -194,10 +199,11 @@ def _generate_lightgbm_config(
     num_leaves = best_int.get("num_leaves", 31)
     min_child_samples = best_int.get("min_child_samples", 20)
 
+    # max_depth is fixed at -1 (unlimited) - num_leaves controls tree complexity
     return LightGBMConfig(
         device=device,
         learning_rate=best_float["learning_rate"],
-        max_depth=best_int["max_depth"],
+        max_depth=-1,
         n_estimators=best_int["n_estimators"],
         num_leaves=num_leaves,
         min_child_samples=min_child_samples,
@@ -214,7 +220,10 @@ def _generate_lightgbm_config(
 
 
 class LightGBMTrialProgressInfo(TypedDict):
-    """Information about LightGBM trial progress for CLI display."""
+    """Information about LightGBM trial progress for CLI display.
+
+    Note: max_depth is not tracked since it's fixed at -1 (unlimited).
+    """
 
     trial_number: int
     n_trials_total: int
@@ -223,7 +232,6 @@ class LightGBMTrialProgressInfo(TypedDict):
     best_trial: int
     is_best: bool
     best_learning_rate: float
-    best_max_depth: int
     best_n_estimators: int
     best_num_leaves: int
 
@@ -236,11 +244,52 @@ class LightGBMTrialProgressCallbackProtocol(Protocol):
         ...
 
 
+class LightGBMPhaseInfo(TypedDict):
+    """Information about optimization phase for CLI display."""
+
+    phase: Literal["loading_data", "feature_engineering", "optimizing", "saving"]
+    dataset: str
+    n_samples: int
+    n_features: int
+
+
+class LightGBMPhaseCallbackProtocol(Protocol):
+    """Protocol for LightGBM phase progress callback."""
+
+    def __call__(self, info: LightGBMPhaseInfo) -> None:
+        """Called when entering a new optimization phase."""
+        ...
+
+
+class LightGBMLoadingProgressInfo(TypedDict):
+    """Progress information during dataset loading.
+
+    Provides granular progress updates during the loading_data phase.
+    """
+
+    dataset: str
+    phase: LoadPhase
+    percent_complete: float
+    rows_processed: int
+    rows_total: int
+    message: str
+
+
+class LightGBMLoadingProgressCallbackProtocol(Protocol):
+    """Protocol for loading progress callback during dataset loading."""
+
+    def __call__(self, info: LightGBMLoadingProgressInfo) -> None:
+        """Called with progress updates during dataset loading."""
+        ...
+
+
 def run_lightgbm_optimization(
     config_json: str,
     external_dir: Path,
     output_dir: Path,
     progress_callback: LightGBMTrialProgressCallbackProtocol | None = None,
+    phase_callback: LightGBMPhaseCallbackProtocol | None = None,
+    loading_progress_callback: LightGBMLoadingProgressCallbackProtocol | None = None,
 ) -> LightGBMOptimizationResult:
     """Run LightGBM hyperparameter optimization on external dataset.
 
@@ -249,6 +298,8 @@ def run_lightgbm_optimization(
         external_dir: Path to data/external directory with datasets.
         output_dir: Directory to save optimization results.
         progress_callback: Optional callback for trial progress updates.
+        phase_callback: Optional callback for phase transitions (loading, optimizing, etc).
+        loading_progress_callback: Optional callback for granular loading progress.
 
     Returns:
         LightGBMOptimizationResult with best hyperparameters and recommended config.
@@ -256,8 +307,47 @@ def run_lightgbm_optimization(
     parse_result = _parse_optimize_config(config_json)
     dataset_name = parse_result["dataset"]
 
-    # Load raw dataset
-    dataset = load_dataset(dataset_name, external_dir)
+    # Report loading phase
+    if phase_callback is not None:
+        phase_callback(
+            LightGBMPhaseInfo(
+                phase="loading_data",
+                dataset=dataset_name,
+                n_samples=0,
+                n_features=0,
+            )
+        )
+
+    # Create loading progress adapter - only used when loading_progress_callback is not None
+    def _loading_progress_adapter(progress: LoadProgress) -> None:
+        # Assertion to satisfy type narrowing - adapter only called when callback exists
+        assert loading_progress_callback is not None
+        loading_progress_callback(
+            LightGBMLoadingProgressInfo(
+                dataset=dataset_name,
+                phase=progress["phase"],
+                percent_complete=progress["percent_complete"],
+                rows_processed=progress["rows_processed"],
+                rows_total=progress["rows_total"],
+                message=progress["message"],
+            )
+        )
+
+    # Load raw dataset with progress reporting
+    dataset = load_any_dataset(
+        dataset_name, external_dir, _loading_progress_adapter if loading_progress_callback else None
+    )
+
+    # Report feature engineering phase
+    if phase_callback is not None:
+        phase_callback(
+            LightGBMPhaseInfo(
+                phase="feature_engineering",
+                dataset=dataset_name,
+                n_samples=dataset["meta"]["n_samples"],
+                n_features=dataset["meta"]["n_features"],
+            )
+        )
 
     _log.info(
         "Starting LightGBM hyperparameter optimization",
@@ -290,11 +380,22 @@ def run_lightgbm_optimization(
         early_stopping_rounds=parse_result["early_stopping_rounds"],
     )
 
+    # Report optimizing phase
+    if phase_callback is not None:
+        phase_callback(
+            LightGBMPhaseInfo(
+                phase="optimizing",
+                dataset=dataset_name,
+                n_samples=dataset["meta"]["n_samples"],
+                n_features=objective.n_features,
+            )
+        )
+
     # Track progress
+    # Note: max_depth is not tracked since it's fixed at -1 (unlimited)
     best_auc = 0.0
     best_trial_num = 0
     best_learning_rate = 0.0
-    best_max_depth = 0
     best_n_estimators = 0
     best_num_leaves = 0
     trials_seen = 0
@@ -305,7 +406,6 @@ def run_lightgbm_optimization(
         nonlocal best_trial_num
         nonlocal trials_seen
         nonlocal best_learning_rate
-        nonlocal best_max_depth
         nonlocal best_n_estimators
         nonlocal best_num_leaves
         trials_seen += 1
@@ -317,7 +417,6 @@ def run_lightgbm_optimization(
             trial_int_params = result["int_params"]
             trial_float_params = result["float_params"]
             best_learning_rate = trial_float_params["learning_rate"]
-            best_max_depth = trial_int_params["max_depth"]
             best_n_estimators = trial_int_params["n_estimators"]
             best_num_leaves = trial_int_params.get("num_leaves", 31)
             _log.info(
@@ -325,7 +424,6 @@ def run_lightgbm_optimization(
                 extra={
                     "trial": result["trial_number"],
                     "auc": f"{auc:.4f}",
-                    "max_depth": trial_int_params["max_depth"],
                     "num_leaves": best_num_leaves,
                     "learning_rate": f"{trial_float_params['learning_rate']:.4f}",
                     "n_estimators": trial_int_params["n_estimators"],
@@ -342,7 +440,6 @@ def run_lightgbm_optimization(
                 "best_trial": best_trial_num,
                 "is_best": is_best,
                 "best_learning_rate": best_learning_rate,
-                "best_max_depth": best_max_depth,
                 "best_n_estimators": best_n_estimators,
                 "best_num_leaves": best_num_leaves,
             }
@@ -385,13 +482,14 @@ def run_lightgbm_optimization(
     best_int_params = summary["best_int_params"]
     best_float_params = summary["best_float_params"]
 
+    # max_depth is fixed at -1 (unlimited) - num_leaves controls tree complexity
     result_dict: dict[str, JSONValue] = {
         "dataset": dataset_name,
         "n_samples": dataset["meta"]["n_samples"],
         "n_features": objective.n_features,
         "best_trial": summary["best_trial_number"],
         "best_val_auc": summary["best_value"],
-        "best_max_depth": best_int_params["max_depth"],
+        "best_max_depth": -1,
         "best_n_estimators": best_int_params["n_estimators"],
         "best_num_leaves": best_int_params.get("num_leaves", 31),
         "best_learning_rate": best_float_params["learning_rate"],
@@ -448,7 +546,7 @@ def run_lightgbm_optimization(
         n_trials_failed=summary["n_trials_failed"],
         best_trial_number=summary["best_trial_number"],
         best_val_auc=summary["best_value"],
-        best_max_depth=best_int_params["max_depth"],
+        best_max_depth=-1,  # Fixed: unlimited depth, num_leaves controls complexity
         best_n_estimators=best_int_params["n_estimators"],
         best_num_leaves=best_int_params.get("num_leaves", 31),
         best_learning_rate=best_float_params["learning_rate"],
@@ -525,7 +623,11 @@ def process_lightgbm_optimize_job(config_json: str) -> dict[str, JSONValue]:
 
 
 __all__ = [
+    "LightGBMLoadingProgressCallbackProtocol",
+    "LightGBMLoadingProgressInfo",
     "LightGBMOptimizationResult",
+    "LightGBMPhaseCallbackProtocol",
+    "LightGBMPhaseInfo",
     "LightGBMTrialProgressCallbackProtocol",
     "LightGBMTrialProgressInfo",
     "process_lightgbm_optimize_job",

@@ -345,6 +345,7 @@ def _make_fake_loaded_dataset(n_samples: int = 100, n_features: int = 10) -> Loa
         "n_negative": n_samples - n_positive,
         "positive_ratio": n_positive / n_samples,
         "feature_names": tuple(f"feature_{i}" for i in range(n_features)),
+        "categorical_encodings": (),
     }
 
     return {

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from covenant_ml.types import BackendName
 from platform_core.logging import (
+    RichProgressProtocol,
     create_rich_panel,
     create_rich_progress,
     create_rich_table,
@@ -46,38 +47,59 @@ from scripts.optimize.runner import (
 # =============================================================================
 
 
-def _format_xgboost_progress(info: _hooks.XGBoostProgressInfo) -> str:
+def _format_elapsed(seconds: float) -> str:
+    """Format elapsed time for display.
+
+    Args:
+        seconds: Elapsed time in seconds.
+
+    Returns:
+        Formatted time string (e.g., "1m 23s" or "45s").
+    """
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}m {secs:02d}s"
+
+
+def _format_xgboost_progress(info: _hooks.XGBoostProgressInfo, elapsed: float = 0.0) -> str:
     """Format XGBoost trial progress for display.
 
     Args:
         info (XGBoostProgressInfo): XGBoost trial progress information dict.
+        elapsed: Elapsed time in seconds.
 
     Returns:
         str: Rich-formatted progress string with trial number, AUC, and hyperparameters.
     """
     best_marker = "[yellow]*[/yellow]" if info["is_best"] else ""
+    elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim] "
     return (
-        f"[cyan]Trial {info['trial_number']}/{info['n_trials_total']}[/cyan] "
+        f"{elapsed_str}"
+        f"[cyan]Trial {info['trial_number'] + 1}/{info['n_trials_total']}[/cyan] "
         f"Best: [bold green]{info['best_auc']:.4f}[/bold green] "
         f"(#{info['best_trial']}) {best_marker} "
         f"LR: [yellow]{info['best_learning_rate']:.4f}[/yellow] "
-        f"Depth: [magenta]{info['best_max_depth']}[/magenta] "
         f"Est: [blue]{info['best_n_estimators']}[/blue]"
     )
 
 
-def _format_mlp_progress(info: _hooks.MLPTrialProgressInfo) -> str:
+def _format_mlp_progress(info: _hooks.MLPTrialProgressInfo, elapsed: float = 0.0) -> str:
     """Format MLP trial progress for display.
 
     Args:
         info (MLPTrialProgressInfo): MLP trial progress information dict.
+        elapsed: Elapsed time in seconds.
 
     Returns:
         str: Rich-formatted progress string with trial number, AUC, and hyperparameters.
     """
     best_marker = "[yellow]*[/yellow]" if info["is_best"] else ""
+    elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim] "
     return (
-        f"[cyan]Trial {info['trial_number']}/{info['n_trials_total']}[/cyan] "
+        f"{elapsed_str}"
+        f"[cyan]Trial {info['trial_number'] + 1}/{info['n_trials_total']}[/cyan] "
         f"Best: [bold green]{info['best_auc']:.4f}[/bold green] "
         f"(#{info['best_trial']}) {best_marker} "
         f"LR: [yellow]{info['best_learning_rate']:.4f}[/yellow] "
@@ -86,43 +108,92 @@ def _format_mlp_progress(info: _hooks.MLPTrialProgressInfo) -> str:
     )
 
 
-def _format_lightgbm_progress(info: _hooks.LightGBMTrialProgressInfo) -> str:
+def _format_lightgbm_progress(info: _hooks.LightGBMTrialProgressInfo, elapsed: float = 0.0) -> str:
     """Format LightGBM trial progress for display.
 
     Args:
         info (LightGBMTrialProgressInfo): LightGBM trial progress information dict.
+        elapsed: Elapsed time in seconds.
 
     Returns:
         str: Rich-formatted progress string with trial number, AUC, and hyperparameters.
     """
     best_marker = "[yellow]*[/yellow]" if info["is_best"] else ""
+    elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim] "
     return (
-        f"[cyan]Trial {info['trial_number']}/{info['n_trials_total']}[/cyan] "
+        f"{elapsed_str}"
+        f"[cyan]Trial {info['trial_number'] + 1}/{info['n_trials_total']}[/cyan] "
         f"Best: [bold green]{info['best_auc']:.4f}[/bold green] "
         f"(#{info['best_trial']}) {best_marker} "
         f"LR: [yellow]{info['best_learning_rate']:.4f}[/yellow] "
-        f"Depth: [magenta]{info['best_max_depth']}[/magenta] "
-        f"Leaves: [blue]{info['best_num_leaves']}[/blue]"
+        f"Leaves: [magenta]{info['best_num_leaves']}[/magenta] "
+        f"Est: [blue]{info['best_n_estimators']}[/blue]"
     )
 
 
-def _format_lstm_progress(info: _hooks.LSTMTrialProgressInfo) -> str:
+def _format_lstm_progress(info: _hooks.LSTMTrialProgressInfo, elapsed: float = 0.0) -> str:
     """Format LSTM trial progress for display.
 
     Args:
         info (LSTMTrialProgressInfo): LSTM trial progress information dict.
+        elapsed: Elapsed time in seconds.
 
     Returns:
         str: Rich-formatted progress string with trial number, AUC, and hyperparameters.
     """
     best_marker = "[yellow]*[/yellow]" if info["is_best"] else ""
+    elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim] "
     return (
-        f"[cyan]Trial {info['trial_number']}/{info['n_trials_total']}[/cyan] "
+        f"{elapsed_str}"
+        f"[cyan]Trial {info['trial_number'] + 1}/{info['n_trials_total']}[/cyan] "
         f"Best: [bold green]{info['best_auc']:.4f}[/bold green] "
         f"(#{info['best_trial']}) {best_marker} "
         f"LR: [yellow]{info['best_learning_rate']:.4f}[/yellow] "
         f"Layers: [magenta]{info['best_num_layers']}[/magenta] "
         f"Hidden: [blue]{info['best_hidden_size']}[/blue]"
+    )
+
+
+# =============================================================================
+# Loading Progress Formatters
+# =============================================================================
+
+
+def _format_loading_progress(
+    dataset: str,
+    phase: str,
+    percent_complete: float,
+    rows_processed: int,
+    rows_total: int,
+    elapsed: float = 0.0,
+) -> str:
+    """Format loading progress for display.
+
+    Args:
+        dataset: Dataset name being loaded.
+        phase: Current loading phase (reading, parsing, encoding).
+        percent_complete: Percent complete (0-100).
+        rows_processed: Number of rows processed so far.
+        rows_total: Total rows to process.
+        elapsed: Elapsed time in seconds.
+
+    Returns:
+        Rich-formatted progress string with loading details.
+    """
+    elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim]"
+    phase_color = {"reading": "cyan", "parsing": "yellow", "encoding": "green"}.get(phase, "white")
+
+    if rows_total > 0:
+        return (
+            f"{elapsed_str} [{phase_color}]Loading {dataset}[/{phase_color}] "
+            f"[dim]({phase})[/dim] "
+            f"[bold cyan]{rows_processed:,}[/bold cyan]/[dim]{rows_total:,}[/dim] rows "
+            f"[magenta]{percent_complete:.1f}%[/magenta]"
+        )
+    return (
+        f"{elapsed_str} [{phase_color}]Loading {dataset}[/{phase_color}] "
+        f"[dim]({phase})[/dim] "
+        f"[magenta]{percent_complete:.1f}%[/magenta]"
     )
 
 
@@ -138,6 +209,7 @@ def _run_xgboost_with_progress(
     device: str,
     timeout: int | None,
     history: OptimizationHistory,
+    progress: RichProgressProtocol | None = None,
 ) -> tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]:
     """Run XGBoost optimization with progress bar.
 
@@ -148,26 +220,83 @@ def _run_xgboost_with_progress(
         device (str): Device for training (cuda/cpu/auto).
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         history (OptimizationHistory): History manager for saving results.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
 
     Returns:
         tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]: Tuple of
             (optimization result, elapsed time in seconds, history entry).
     """
     console = get_rich_console()
+    start = time.perf_counter()
 
-    with create_rich_progress(console) as progress:
-        task_id = progress.add_task(
-            f"[cyan]Trial 0/{n_trials}[/cyan] Best: [green]0.0000[/green]",
-            total=float(n_trials),
-        )
+    if progress is None:
+        with create_rich_progress(console) as new_progress:
+            return _run_xgboost_with_progress(
+                dataset,
+                n_trials,
+                feature_preset,
+                device,
+                timeout,
+                history,
+                new_progress,
+            )
 
-        def progress_callback(info: _hooks.XGBoostProgressInfo) -> None:
-            progress.update(task_id, description=_format_xgboost_progress(info))
-            progress.advance(task_id)
+    task_id = progress.add_task(
+        f"[dim]0s[/dim] [yellow]Loading {dataset} dataset...[/yellow]",
+        total=float(n_trials),
+    )
 
-        start = time.perf_counter()
-        result = run_xgboost(dataset, n_trials, feature_preset, device, timeout, progress_callback)
+    def phase_callback(info: _hooks.XGBoostPhaseInfo) -> None:
         elapsed = time.perf_counter() - start
+        elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim]"
+        phase = info["phase"]
+        if phase == "loading_data":
+            desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
+        elif phase == "feature_engineering":
+            n_samples = info["n_samples"]
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
+                f"{n_features} features. Applying feature engineering...[/yellow]"
+            )
+        elif phase == "optimizing":
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [green]Ready ({n_features} features). "
+                f"Starting optimization...[/green]"
+            )
+        else:
+            desc = f"{elapsed_str} [cyan]Saving results...[/cyan]"
+        progress.update(task_id, description=desc)
+
+    def progress_callback(info: _hooks.XGBoostProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        progress.update(task_id, description=_format_xgboost_progress(info, elapsed))
+        progress.advance(task_id)
+
+    def loading_progress_callback(info: _hooks.XGBoostLoadingProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        desc = _format_loading_progress(
+            info["dataset"],
+            info["phase"],
+            info["percent_complete"],
+            info["rows_processed"],
+            info["rows_total"],
+            elapsed,
+        )
+        progress.update(task_id, description=desc)
+
+    result = run_xgboost(
+        dataset,
+        n_trials,
+        feature_preset,
+        device,
+        timeout,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+    elapsed = time.perf_counter() - start
 
     entry = xgboost_result_to_entry(result, elapsed)
     history.append(entry)
@@ -181,6 +310,7 @@ def _run_mlp_with_progress(
     device: str,
     timeout: int | None,
     history: OptimizationHistory,
+    progress: RichProgressProtocol | None = None,
 ) -> tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]:
     """Run MLP optimization with progress bar.
 
@@ -191,26 +321,83 @@ def _run_mlp_with_progress(
         device (str): Device for training (cuda/cpu/auto).
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         history (OptimizationHistory): History manager for saving results.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
 
     Returns:
         tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]: Tuple of
             (optimization result, elapsed time in seconds, history entry).
     """
     console = get_rich_console()
+    start = time.perf_counter()
 
-    with create_rich_progress(console) as progress:
-        task_id = progress.add_task(
-            f"[cyan]Trial 0/{n_trials}[/cyan] Best: [green]0.0000[/green]",
-            total=float(n_trials),
-        )
+    if progress is None:
+        with create_rich_progress(console) as new_progress:
+            return _run_mlp_with_progress(
+                dataset,
+                n_trials,
+                feature_preset,
+                device,
+                timeout,
+                history,
+                new_progress,
+            )
 
-        def progress_callback(info: _hooks.MLPTrialProgressInfo) -> None:
-            progress.update(task_id, description=_format_mlp_progress(info))
-            progress.advance(task_id)
+    task_id = progress.add_task(
+        f"[dim]0s[/dim] [yellow]Loading {dataset} dataset...[/yellow]",
+        total=float(n_trials),
+    )
 
-        start = time.perf_counter()
-        result = run_mlp(dataset, n_trials, feature_preset, device, timeout, progress_callback)
+    def phase_callback(info: _hooks.MLPPhaseInfo) -> None:
         elapsed = time.perf_counter() - start
+        elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim]"
+        phase = info["phase"]
+        if phase == "loading_data":
+            desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
+        elif phase == "feature_engineering":
+            n_samples = info["n_samples"]
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
+                f"{n_features} features. Applying feature engineering...[/yellow]"
+            )
+        elif phase == "optimizing":
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [green]Ready ({n_features} features). "
+                f"Starting optimization...[/green]"
+            )
+        else:
+            desc = f"{elapsed_str} [cyan]Saving results...[/cyan]"
+        progress.update(task_id, description=desc)
+
+    def progress_callback(info: _hooks.MLPTrialProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        progress.update(task_id, description=_format_mlp_progress(info, elapsed))
+        progress.advance(task_id)
+
+    def loading_progress_callback(info: _hooks.MLPLoadingProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        desc = _format_loading_progress(
+            info["dataset"],
+            info["phase"],
+            info["percent_complete"],
+            info["rows_processed"],
+            info["rows_total"],
+            elapsed,
+        )
+        progress.update(task_id, description=desc)
+
+    result = run_mlp(
+        dataset,
+        n_trials,
+        feature_preset,
+        device,
+        timeout,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+    elapsed = time.perf_counter() - start
 
     entry = mlp_result_to_entry(result, elapsed)
     history.append(entry)
@@ -224,6 +411,7 @@ def _run_lightgbm_with_progress(
     device: str,
     timeout: int | None,
     history: OptimizationHistory,
+    progress: RichProgressProtocol | None = None,
 ) -> tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]:
     """Run LightGBM optimization with progress bar.
 
@@ -234,26 +422,83 @@ def _run_lightgbm_with_progress(
         device (str): Device for training (cuda/cpu/auto).
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         history (OptimizationHistory): History manager for saving results.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
 
     Returns:
         tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]: Tuple of
             (optimization result, elapsed time in seconds, history entry).
     """
     console = get_rich_console()
+    start = time.perf_counter()
 
-    with create_rich_progress(console) as progress:
-        task_id = progress.add_task(
-            f"[cyan]Trial 0/{n_trials}[/cyan] Best: [green]0.0000[/green]",
-            total=float(n_trials),
-        )
+    if progress is None:
+        with create_rich_progress(console) as new_progress:
+            return _run_lightgbm_with_progress(
+                dataset,
+                n_trials,
+                feature_preset,
+                device,
+                timeout,
+                history,
+                new_progress,
+            )
 
-        def progress_callback(info: _hooks.LightGBMTrialProgressInfo) -> None:
-            progress.update(task_id, description=_format_lightgbm_progress(info))
-            progress.advance(task_id)
+    task_id = progress.add_task(
+        f"[dim]0s[/dim] [yellow]Loading {dataset} dataset...[/yellow]",
+        total=float(n_trials),
+    )
 
-        start = time.perf_counter()
-        result = run_lightgbm(dataset, n_trials, feature_preset, device, timeout, progress_callback)
+    def phase_callback(info: _hooks.LightGBMPhaseInfo) -> None:
         elapsed = time.perf_counter() - start
+        elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim]"
+        phase = info["phase"]
+        if phase == "loading_data":
+            desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
+        elif phase == "feature_engineering":
+            n_samples = info["n_samples"]
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
+                f"{n_features} features. Applying feature engineering...[/yellow]"
+            )
+        elif phase == "optimizing":
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [green]Ready ({n_features} features). "
+                f"Starting optimization...[/green]"
+            )
+        else:
+            desc = f"{elapsed_str} [cyan]Saving results...[/cyan]"
+        progress.update(task_id, description=desc)
+
+    def progress_callback(info: _hooks.LightGBMTrialProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        progress.update(task_id, description=_format_lightgbm_progress(info, elapsed))
+        progress.advance(task_id)
+
+    def loading_progress_callback(info: _hooks.LightGBMLoadingProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        desc = _format_loading_progress(
+            info["dataset"],
+            info["phase"],
+            info["percent_complete"],
+            info["rows_processed"],
+            info["rows_total"],
+            elapsed,
+        )
+        progress.update(task_id, description=desc)
+
+    result = run_lightgbm(
+        dataset,
+        n_trials,
+        feature_preset,
+        device,
+        timeout,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+    elapsed = time.perf_counter() - start
 
     entry = lightgbm_result_to_entry(result, elapsed)
     history.append(entry)
@@ -267,6 +512,7 @@ def _run_lstm_with_progress(
     device: str,
     timeout: int | None,
     history: OptimizationHistory,
+    progress: RichProgressProtocol | None = None,
 ) -> tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]:
     """Run LSTM optimization with progress bar.
 
@@ -277,26 +523,83 @@ def _run_lstm_with_progress(
         device (str): Device for training (cuda/cpu/auto).
         timeout (int | None): Optional timeout in seconds, or None for no limit.
         history (OptimizationHistory): History manager for saving results.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
 
     Returns:
         tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]: Tuple of
             (optimization result, elapsed time in seconds, history entry).
     """
     console = get_rich_console()
+    start = time.perf_counter()
 
-    with create_rich_progress(console) as progress:
-        task_id = progress.add_task(
-            f"[cyan]Trial 0/{n_trials}[/cyan] Best: [green]0.0000[/green]",
-            total=float(n_trials),
-        )
+    if progress is None:
+        with create_rich_progress(console) as new_progress:
+            return _run_lstm_with_progress(
+                dataset,
+                n_trials,
+                feature_preset,
+                device,
+                timeout,
+                history,
+                new_progress,
+            )
 
-        def progress_callback(info: _hooks.LSTMTrialProgressInfo) -> None:
-            progress.update(task_id, description=_format_lstm_progress(info))
-            progress.advance(task_id)
+    task_id = progress.add_task(
+        f"[dim]0s[/dim] [yellow]Loading {dataset} dataset...[/yellow]",
+        total=float(n_trials),
+    )
 
-        start = time.perf_counter()
-        result = run_lstm(dataset, n_trials, feature_preset, device, timeout, progress_callback)
+    def phase_callback(info: _hooks.LSTMPhaseInfo) -> None:
         elapsed = time.perf_counter() - start
+        elapsed_str = f"[dim]{_format_elapsed(elapsed)}[/dim]"
+        phase = info["phase"]
+        if phase == "loading_data":
+            desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
+        elif phase == "feature_engineering":
+            n_samples = info["n_samples"]
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
+                f"{n_features} features. Applying feature engineering...[/yellow]"
+            )
+        elif phase == "optimizing":
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [green]Ready ({n_features} features). "
+                f"Starting optimization...[/green]"
+            )
+        else:
+            desc = f"{elapsed_str} [cyan]Saving results...[/cyan]"
+        progress.update(task_id, description=desc)
+
+    def progress_callback(info: _hooks.LSTMTrialProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        progress.update(task_id, description=_format_lstm_progress(info, elapsed))
+        progress.advance(task_id)
+
+    def loading_progress_callback(info: _hooks.LSTMLoadingProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        desc = _format_loading_progress(
+            info["dataset"],
+            info["phase"],
+            info["percent_complete"],
+            info["rows_processed"],
+            info["rows_total"],
+            elapsed,
+        )
+        progress.update(task_id, description=desc)
+
+    result = run_lstm(
+        dataset,
+        n_trials,
+        feature_preset,
+        device,
+        timeout,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+    elapsed = time.perf_counter() - start
 
     entry = lstm_result_to_entry(result, elapsed)
     history.append(entry)
@@ -312,6 +615,7 @@ def run_single_with_progress(
     timeout: int | None,
     save_model: bool = True,
     project_root: Path | None = None,
+    progress: RichProgressProtocol | None = None,
 ) -> RunResult:
     """Run single optimization with progress bar and history tracking.
 
@@ -325,6 +629,7 @@ def run_single_with_progress(
         save_model (bool): If True, train and save the best model after optimization.
             Only saves if the new model is better than any existing saved model.
         project_root (Path | None): Project root directory. If None, uses default.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
 
     Returns:
         RunResult: Result dict with optimization result, timing, and history context.
@@ -342,20 +647,20 @@ def run_single_with_progress(
     # Run backend-specific optimization
     if backend == "xgboost":
         result, elapsed, _ = _run_xgboost_with_progress(
-            dataset, n_trials, feature_preset, device, timeout, history
+            dataset, n_trials, feature_preset, device, timeout, history, progress
         )
     elif backend == "mlp":
         result, elapsed, _ = _run_mlp_with_progress(
-            dataset, n_trials, feature_preset, device, timeout, history
+            dataset, n_trials, feature_preset, device, timeout, history, progress
         )
     elif backend == "lightgbm":
         result, elapsed, _ = _run_lightgbm_with_progress(
-            dataset, n_trials, feature_preset, device, timeout, history
+            dataset, n_trials, feature_preset, device, timeout, history, progress
         )
     else:
         # backend must be "lstm" here - mypy validates exhaustiveness
         result, elapsed, _ = _run_lstm_with_progress(
-            dataset, n_trials, feature_preset, device, timeout, history
+            dataset, n_trials, feature_preset, device, timeout, history, progress
         )
 
     # Determine if new best
@@ -439,20 +744,20 @@ def compare_presets(
 
             if backend == "xgboost":
                 result, elapsed, _ = _run_xgboost_with_progress(
-                    dataset, n_trials, preset, device, timeout, history
+                    dataset, n_trials, preset, device, timeout, history, progress
                 )
             elif backend == "mlp":
                 result, elapsed, _ = _run_mlp_with_progress(
-                    dataset, n_trials, preset, device, timeout, history
+                    dataset, n_trials, preset, device, timeout, history, progress
                 )
             elif backend == "lightgbm":
                 result, elapsed, _ = _run_lightgbm_with_progress(
-                    dataset, n_trials, preset, device, timeout, history
+                    dataset, n_trials, preset, device, timeout, history, progress
                 )
             else:
                 # backend must be "lstm" here - mypy validates exhaustiveness
                 result, elapsed, _ = _run_lstm_with_progress(
-                    dataset, n_trials, preset, device, timeout, history
+                    dataset, n_trials, preset, device, timeout, history, progress
                 )
 
             # Save best model for this preset if requested
@@ -700,6 +1005,7 @@ def _print_multi_dataset_summary(
 
 
 __all__ = [
+    "_format_elapsed",
     "compare_presets",
     "run_all_datasets",
     "run_single_with_progress",

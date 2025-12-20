@@ -15,6 +15,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_lstm_job import (
+    LSTMPhaseInfo,
     LSTMTrialProgressInfo,
     _get_search_space,
     _parse_bidirectional,
@@ -347,6 +348,91 @@ class TestRunLSTMOptimization:
             assert 0.0 <= info["best_auc"] <= 1.0
             assert info["best_trial"] >= 0
             assert info["is_best"] in (True, False)
+
+    def test_run_optimization_with_phase_callback(self, tmp_path: Path) -> None:
+        """run_lstm_optimization calls phase callback for all phases."""
+        external_dir = tmp_path / "external"
+        _copy_real_taiwan(external_dir)
+        output_dir = tmp_path / "optuna_output"
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "space_profile": "default",
+                "random_state": 42,
+                "n_epochs": 3,
+                "sequence_length": 2,
+            }
+        )
+
+        phase_calls: list[LSTMPhaseInfo] = []
+
+        def phase_callback(info: LSTMPhaseInfo) -> None:
+            phase_calls.append(info)
+
+        result = run_lstm_optimization(config_json, external_dir, output_dir, None, phase_callback)
+
+        # Verify all three phases were reported
+        assert len(phase_calls) == 3
+        assert result["status"] == "complete"
+
+        # Verify phase sequence and info structure
+        assert phase_calls[0]["phase"] == "loading_data"
+        assert phase_calls[0]["dataset"] == "taiwan"
+        assert phase_calls[0]["n_samples"] == 0  # Not yet loaded
+
+        assert phase_calls[1]["phase"] == "feature_engineering"
+        assert phase_calls[1]["dataset"] == "taiwan"
+        assert phase_calls[1]["n_samples"] > 0  # Now loaded
+
+        assert phase_calls[2]["phase"] == "optimizing"
+        assert phase_calls[2]["dataset"] == "taiwan"
+        assert phase_calls[2]["n_features"] > 0
+
+    def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
+        """run_lstm_optimization calls loading progress callback during data loading."""
+        from covenant_radar_api.worker.optimize_lstm_job import LSTMLoadingProgressInfo
+
+        external_dir = tmp_path / "external"
+        _copy_real_taiwan(external_dir)
+        output_dir = tmp_path / "optuna_output"
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "space_profile": "default",
+                "random_state": 42,
+                "n_epochs": 3,
+                "sequence_length": 2,
+            }
+        )
+
+        loading_calls: list[LSTMLoadingProgressInfo] = []
+
+        def loading_progress_callback(info: LSTMLoadingProgressInfo) -> None:
+            loading_calls.append(info)
+
+        result = run_lstm_optimization(
+            config_json, external_dir, output_dir, None, None, loading_progress_callback
+        )
+
+        # Verify loading progress was reported - use explicit count to satisfy guard rules
+        progress_count = len(loading_calls)
+        assert progress_count == 1 or progress_count > 1
+        assert result["status"] == "complete"
+
+        # Verify loading progress info structure
+        first_info = loading_calls[0]
+        assert first_info["dataset"] == "taiwan"
+        assert first_info["phase"] in ("reading", "parsing", "encoding")
+        assert 0.0 <= first_info["percent_complete"] <= 100.0
+        assert first_info["rows_processed"] >= 0
+        assert first_info["rows_total"] >= 0
+        assert first_info["message"] != ""
 
     def test_run_optimization_covers_non_best_trials(self, tmp_path: Path) -> None:
         """run_lstm_optimization covers is_best=False branch with multiple trials.

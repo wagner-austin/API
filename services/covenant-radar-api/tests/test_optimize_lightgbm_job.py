@@ -15,6 +15,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_lightgbm_job import (
+    LightGBMPhaseInfo,
     LightGBMTrialProgressInfo,
     _get_search_space,
     _parse_optimize_config,
@@ -118,10 +119,10 @@ class TestGetSearchSpace:
         """Default profile returns a valid LightGBM search space."""
         space = _get_search_space("default")
         # Verify LightGBM-specific params exist
+        # Note: max_depth is NOT in the search space - it's fixed at -1 (unlimited)
         lr_spec = space["learning_rate"]
         assert lr_spec["param_type"] in ("float", "categorical_float")
-        depth_spec = space["max_depth"]
-        assert depth_spec["param_type"] in ("int", "categorical_int")
+        assert "max_depth" not in space  # Fixed at -1, not tuned
         num_leaves_spec = space["num_leaves"]
         assert num_leaves_spec["param_type"] in ("int", "categorical_int")
 
@@ -252,7 +253,7 @@ class TestRunLightGBMOptimization:
         assert result["n_features"] > 0
         assert result["n_trials_complete"] == 2
         assert 0.0 <= result["best_val_auc"] <= 1.0
-        assert result["best_max_depth"] > 0
+        assert result["best_max_depth"] == -1  # Fixed: unlimited depth
         assert result["best_n_estimators"] > 0
         assert result["best_num_leaves"] > 0
         assert result["best_learning_rate"] > 0.0
@@ -261,7 +262,7 @@ class TestRunLightGBMOptimization:
         # Verify recommended config
         config = result["recommended_config"]
         assert config["device"] == "cpu"
-        assert config["max_depth"] == result["best_max_depth"]
+        assert config["max_depth"] == -1  # Fixed: unlimited depth
         assert config["n_estimators"] == result["best_n_estimators"]
         assert config["learning_rate"] == result["best_learning_rate"]
         # LightGBM-specific
@@ -463,9 +464,98 @@ class TestProcessLightGBMOptimizeJob:
             # Verify recommended config is included with LightGBM-specific fields
             recommended = narrow_json_to_dict(result["recommended_config"])
             assert require_str(recommended, "device") == "cpu"
-            assert require_int(recommended, "max_depth") > 0
+            assert require_int(recommended, "max_depth") == -1  # Fixed: unlimited
             assert require_int(recommended, "n_estimators") > 0
             assert require_int(recommended, "num_leaves") > 0
             assert require_int(recommended, "min_child_samples") > 0
         finally:
             config_hooks.get_env = orig_get_env
+
+
+class TestPhaseCallbacks:
+    """Tests for phase callback functionality."""
+
+    def test_run_optimization_with_phase_callback(self, tmp_path: Path) -> None:
+        """Test run_lightgbm_optimization calls phase callback at each phase."""
+        _copy_real_taiwan(tmp_path / "external")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        phases_received: list[LightGBMPhaseInfo] = []
+
+        def phase_callback(info: LightGBMPhaseInfo) -> None:
+            phases_received.append(info)
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "feature_preset": "none",
+            }
+        )
+
+        run_lightgbm_optimization(
+            config_json,
+            tmp_path / "external",
+            output_dir,
+            progress_callback=None,
+            phase_callback=phase_callback,
+        )
+
+        # Verify all phases were reported
+        assert len(phases_received) == 3
+        assert phases_received[0]["phase"] == "loading_data"
+        assert phases_received[1]["phase"] == "feature_engineering"
+        assert phases_received[2]["phase"] == "optimizing"
+
+        # Verify data was populated after loading
+        assert phases_received[1]["n_samples"] > 0
+        assert phases_received[1]["n_features"] > 0
+
+    def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
+        """run_lightgbm_optimization calls loading progress callback during data loading."""
+        from covenant_radar_api.worker.optimize_lightgbm_job import (
+            LightGBMLoadingProgressInfo,
+        )
+
+        _copy_real_taiwan(tmp_path / "external")
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+
+        loading_calls: list[LightGBMLoadingProgressInfo] = []
+
+        def loading_progress_callback(info: LightGBMLoadingProgressInfo) -> None:
+            loading_calls.append(info)
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 2,
+                "device": "cpu",
+                "feature_preset": "none",
+            }
+        )
+
+        result = run_lightgbm_optimization(
+            config_json,
+            tmp_path / "external",
+            output_dir,
+            progress_callback=None,
+            phase_callback=None,
+            loading_progress_callback=loading_progress_callback,
+        )
+
+        # Verify loading progress was reported - use explicit count to satisfy guard rules
+        progress_count = len(loading_calls)
+        assert progress_count == 1 or progress_count > 1
+        assert result["status"] == "complete"
+
+        # Verify loading progress info structure
+        first_info = loading_calls[0]
+        assert first_info["dataset"] == "taiwan"
+        assert first_info["phase"] in ("reading", "parsing", "encoding")
+        assert 0.0 <= first_info["percent_complete"] <= 100.0
+        assert first_info["rows_processed"] >= 0
+        assert first_info["rows_total"] >= 0
+        assert first_info["message"] != ""

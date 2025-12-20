@@ -89,7 +89,12 @@ class MLPHistoryEntry(TypedDict):
 
 
 class LightGBMHistoryEntry(TypedDict):
-    """LightGBM optimization run history entry."""
+    """LightGBM optimization run history entry.
+
+    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
+    where num_leaves is the primary complexity control. Using max_depth=-1
+    (unlimited) avoids constraint conflicts when num_leaves > 2^max_depth.
+    """
 
     timestamp: str
     backend: BackendName
@@ -101,8 +106,7 @@ class LightGBMHistoryEntry(TypedDict):
     best_val_auc: float
     best_trial_number: int
     duration_seconds: float
-    # LightGBM-specific hyperparameters
-    best_max_depth: int
+    # LightGBM-specific hyperparameters (max_depth fixed at -1, not tuned)
     best_n_estimators: int
     best_num_leaves: int
     best_learning_rate: float
@@ -246,7 +250,6 @@ def _decode_lightgbm_entry(obj: JSONObject) -> LightGBMHistoryEntry:
         best_val_auc=require_float(obj, "best_val_auc"),
         best_trial_number=require_int(obj, "best_trial_number"),
         duration_seconds=require_float(obj, "duration_seconds"),
-        best_max_depth=require_int(obj, "best_max_depth"),
         best_n_estimators=require_int(obj, "best_n_estimators"),
         best_num_leaves=require_int(obj, "best_num_leaves"),
         best_learning_rate=require_float(obj, "best_learning_rate"),
@@ -395,7 +398,6 @@ def lightgbm_result_to_entry(
         best_val_auc=result["best_val_auc"],
         best_trial_number=result["best_trial_number"],
         duration_seconds=elapsed,
-        best_max_depth=result["best_max_depth"],
         best_n_estimators=result["best_n_estimators"],
         best_num_leaves=result["best_num_leaves"],
         best_learning_rate=result["best_learning_rate"],

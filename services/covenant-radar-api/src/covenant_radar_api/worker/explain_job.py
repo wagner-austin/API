@@ -34,7 +34,7 @@ from covenant_radar_api.worker._explain_loaders import (
     load_model_for_backend,
 )
 from covenant_radar_api.worker._optimize_common import (
-    load_dataset,
+    load_any_dataset,
     optional_int,
     parse_backend_name,
     parse_dataset_name,
@@ -426,7 +426,7 @@ def run_explanation(
 
     # Load and sample data
     _report_progress("loading_data")
-    dataset = load_dataset(dataset_name, external_dir)
+    dataset = load_any_dataset(dataset_name, external_dir)
     x_full: NDArray[np.float64] = dataset["x"]
     x_sampled = _sample_data(x_full, n_samples, random_state)
     n_samples_used = int(x_sampled.shape[0])

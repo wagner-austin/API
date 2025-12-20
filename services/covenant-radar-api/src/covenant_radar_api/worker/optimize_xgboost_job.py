@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol, TypedDict
 
+from covenant_ml.datasets.types import LoadPhase, LoadProgress
 from covenant_ml.features import FeaturePreset
 from covenant_ml.optimizer import (
     OptimizationSummary,
@@ -31,7 +32,7 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
-    load_dataset,
+    load_any_dataset,
     optional_int,
     parse_device,
     parse_feature_preset,
@@ -192,28 +193,110 @@ class TrialProgressCallbackProtocol(Protocol):
         ...
 
 
+class XGBoostPhaseInfo(TypedDict):
+    """Information about optimization phase for CLI display."""
+
+    phase: Literal["loading_data", "feature_engineering", "optimizing", "saving"]
+    dataset: str
+    n_samples: int
+    n_features: int
+
+
+class XGBoostPhaseCallbackProtocol(Protocol):
+    """Protocol for XGBoost phase progress callback."""
+
+    def __call__(self, info: XGBoostPhaseInfo) -> None:
+        """Called when entering a new optimization phase."""
+        ...
+
+
+class XGBoostLoadingProgressInfo(TypedDict):
+    """Progress information during dataset loading.
+
+    Provides granular progress updates during the loading_data phase.
+    """
+
+    dataset: str
+    phase: LoadPhase
+    percent_complete: float
+    rows_processed: int
+    rows_total: int
+    message: str
+
+
+class XGBoostLoadingProgressCallbackProtocol(Protocol):
+    """Protocol for loading progress callback during dataset loading."""
+
+    def __call__(self, info: XGBoostLoadingProgressInfo) -> None:
+        """Called with progress updates during dataset loading."""
+        ...
+
+
 def run_optimization(
     config_json: str,
     external_dir: Path,
     output_dir: Path,
     progress_callback: TrialProgressCallbackProtocol | None = None,
+    phase_callback: XGBoostPhaseCallbackProtocol | None = None,
+    loading_progress_callback: XGBoostLoadingProgressCallbackProtocol | None = None,
 ) -> OptimizationResult:
     """Run hyperparameter optimization on external dataset.
 
     Args:
-        config_json: JSON config with dataset and optimization parameters
-        external_dir: Path to data/external directory with datasets
-        output_dir: Directory to save optimization results
-        progress_callback: Optional callback for trial progress updates
+        config_json: JSON config with dataset and optimization parameters.
+        external_dir: Path to data/external directory with datasets.
+        output_dir: Directory to save optimization results.
+        progress_callback: Optional callback for trial progress updates.
+        phase_callback: Optional callback for phase transitions (loading, optimizing, etc).
+        loading_progress_callback: Optional callback for granular loading progress.
 
     Returns:
-        OptimizationResult with best hyperparameters and recommended config
+        OptimizationResult with best hyperparameters and recommended config.
     """
     parse_result = _parse_optimize_config(config_json)
     dataset_name = parse_result["dataset"]
 
-    # Load raw dataset
-    dataset = load_dataset(dataset_name, external_dir)
+    # Report loading phase
+    if phase_callback is not None:
+        phase_callback(
+            XGBoostPhaseInfo(
+                phase="loading_data",
+                dataset=dataset_name,
+                n_samples=0,
+                n_features=0,
+            )
+        )
+
+    # Create loading progress adapter - only used when loading_progress_callback is not None
+    def _loading_progress_adapter(progress: LoadProgress) -> None:
+        # Assertion to satisfy type narrowing - adapter only called when callback exists
+        assert loading_progress_callback is not None
+        loading_progress_callback(
+            XGBoostLoadingProgressInfo(
+                dataset=dataset_name,
+                phase=progress["phase"],
+                percent_complete=progress["percent_complete"],
+                rows_processed=progress["rows_processed"],
+                rows_total=progress["rows_total"],
+                message=progress["message"],
+            )
+        )
+
+    # Load raw dataset with progress reporting
+    dataset = load_any_dataset(
+        dataset_name, external_dir, _loading_progress_adapter if loading_progress_callback else None
+    )
+
+    # Report feature engineering phase
+    if phase_callback is not None:
+        phase_callback(
+            XGBoostPhaseInfo(
+                phase="feature_engineering",
+                dataset=dataset_name,
+                n_samples=dataset["meta"]["n_samples"],
+                n_features=dataset["meta"]["n_features"],
+            )
+        )
 
     _log.info(
         "Starting hyperparameter optimization",
@@ -244,6 +327,17 @@ def run_optimization(
         parse_result["device"],
         parse_result["feature_preset"],
     )
+
+    # Report optimizing phase
+    if phase_callback is not None:
+        phase_callback(
+            XGBoostPhaseInfo(
+                phase="optimizing",
+                dataset=dataset_name,
+                n_samples=dataset["meta"]["n_samples"],
+                n_features=objective.n_features,
+            )
+        )
 
     # Track progress
     best_auc = 0.0
@@ -469,6 +563,10 @@ __all__ = [
     "OptimizationResult",
     "TrialProgressCallbackProtocol",
     "TrialProgressInfo",
+    "XGBoostLoadingProgressCallbackProtocol",
+    "XGBoostLoadingProgressInfo",
+    "XGBoostPhaseCallbackProtocol",
+    "XGBoostPhaseInfo",
     "process_xgboost_optimize_job",
     "run_optimization",
 ]

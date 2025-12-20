@@ -16,9 +16,14 @@ from covenant_ml.datasets import (
     DatasetConfig,
     DatasetRegistry,
     LoadedDataset,
+    TimeSeriesDatasetConfig,
+    TimeSeriesDatasetRegistry,
     create_dataset_loader,
+    create_timeseries_csv_loader,
     make_default_registry,
+    make_default_timeseries_registry,
 )
+from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.explainers.registry import ExplainerRegistry, default_explainer_registry
 from covenant_ml.types import PredictorProtocol
 from platform_workers.rq_harness import WorkerConfig
@@ -89,18 +94,21 @@ class DatasetLoaderCallable(Protocol):
     """Protocol for callable dataset loader function.
 
     Defines the signature of a callable function for loading datasets.
+    Supports optional progress callback for granular loading progress.
     """
 
     def __call__(
         self,
         config: DatasetConfig,
         external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
         """Load a dataset from disk.
 
         Args:
             config: Dataset configuration from registry.
             external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for loading progress updates.
 
         Returns:
             LoadedDataset with features, labels, and metadata.
@@ -112,12 +120,17 @@ class DatasetLoaderCallable(Protocol):
         ...
 
 
-def _real_dataset_loader(config: DatasetConfig, external_dir: Path) -> LoadedDataset:
+def _real_dataset_loader(
+    config: DatasetConfig,
+    external_dir: Path,
+    progress_callback: ProgressCallbackProtocol | None = None,
+) -> LoadedDataset:
     """Real implementation using covenant_ml.datasets loader.
 
     Args:
         config: Dataset configuration from registry.
         external_dir: Root directory containing dataset folders.
+        progress_callback: Optional callback for loading progress updates.
 
     Returns:
         LoadedDataset with features, labels, and metadata.
@@ -127,10 +140,100 @@ def _real_dataset_loader(config: DatasetConfig, external_dir: Path) -> LoadedDat
         ValueError: If data doesn't match expected format.
     """
     loader = create_dataset_loader()
-    return loader.load(config, external_dir)
+    return loader.load(config, external_dir, progress_callback)
 
 
 dataset_loader: DatasetLoaderCallable = _real_dataset_loader
+
+
+# =============================================================================
+# Time-Series Dataset Registry Hook
+# =============================================================================
+
+
+class TimeSeriesRegistryFactoryProtocol(Protocol):
+    """Protocol for time-series dataset registry factory function."""
+
+    def __call__(self) -> TimeSeriesDatasetRegistry:
+        """Create a TimeSeriesDatasetRegistry with dataset configurations.
+
+        Returns:
+            TimeSeriesDatasetRegistry instance.
+        """
+        ...
+
+
+def _real_timeseries_registry() -> TimeSeriesDatasetRegistry:
+    """Real implementation returning production time-series dataset registry.
+
+    Returns:
+        TimeSeriesDatasetRegistry with all verified time-series dataset configurations.
+    """
+    return make_default_timeseries_registry()
+
+
+timeseries_registry_factory: TimeSeriesRegistryFactoryProtocol = _real_timeseries_registry
+
+
+# =============================================================================
+# Time-Series Dataset Loader Hook
+# =============================================================================
+
+
+class TimeSeriesLoaderCallable(Protocol):
+    """Protocol for callable time-series dataset loader function.
+
+    Defines the signature of a callable function for loading time-series datasets.
+    Supports optional progress callback for granular loading progress.
+    """
+
+    def __call__(
+        self,
+        config: TimeSeriesDatasetConfig,
+        external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
+    ) -> LoadedDataset:
+        """Load a time-series dataset from disk.
+
+        Args:
+            config: Time-series dataset configuration from registry.
+            external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for loading progress updates.
+
+        Returns:
+            LoadedDataset with aggregated features, labels, and metadata.
+
+        Raises:
+            FileNotFoundError: If dataset file doesn't exist.
+            ValueError: If data doesn't match expected format.
+        """
+        ...
+
+
+def _real_timeseries_loader(
+    config: TimeSeriesDatasetConfig,
+    external_dir: Path,
+    progress_callback: ProgressCallbackProtocol | None = None,
+) -> LoadedDataset:
+    """Real implementation using covenant_ml.datasets time-series loader.
+
+    Args:
+        config: Time-series dataset configuration from registry.
+        external_dir: Root directory containing dataset folders.
+        progress_callback: Optional callback for loading progress updates.
+
+    Returns:
+        LoadedDataset with aggregated features, labels, and metadata.
+
+    Raises:
+        FileNotFoundError: If dataset file doesn't exist.
+        ValueError: If data doesn't match expected format.
+    """
+    loader = create_timeseries_csv_loader()
+    return loader.load(config, external_dir, progress_callback)
+
+
+timeseries_loader: TimeSeriesLoaderCallable = _real_timeseries_loader
 
 
 # =============================================================================
@@ -301,7 +404,12 @@ __all__ = [
     "LoadedDataset",
     "MLPLoaderProtocol",
     "PredictorProtocol",
+    "ProgressCallbackProtocol",
     "RegistryFactory",
+    "TimeSeriesDatasetConfig",
+    "TimeSeriesDatasetRegistry",
+    "TimeSeriesLoaderCallable",
+    "TimeSeriesRegistryFactoryProtocol",
     "WorkerRunnerProtocol",
     "dataset_loader",
     "dataset_registry_factory",
@@ -311,4 +419,6 @@ __all__ = [
     "mlp_loader",
     "registry_factory",
     "test_runner",
+    "timeseries_loader",
+    "timeseries_registry_factory",
 ]

@@ -1696,6 +1696,110 @@ The `request_id` appears in:
 
 ---
 
+## CLI Tools
+
+### Submit CLI
+
+Backend-agnostic CLI for Kaggle competition submission pipelines. Trains models on time-series data and generates prediction CSV files.
+
+**Usage:**
+
+```bash
+# Run as module
+poetry run python -m scripts.submit [options]
+
+# Default (LightGBM backend)
+poetry run python -m scripts.submit --train-dir data/train --test-dir data/test -o submission.csv
+poetry run python -m scripts.submit -n 100 -l 0.05 --num-leaves 31
+
+# Other backends
+poetry run python -m scripts.submit -b xgboost -n 100 -l 0.1
+poetry run python -m scripts.submit -b mlp -n 50 -l 0.001
+poetry run python -m scripts.submit -b lstm -n 50 -l 0.001
+
+# Feature engineering options
+poetry run python -m scripts.submit --no-rank-features --no-diff-features
+poetry run python -m scripts.submit -a statistics  # Aggregation: last, first, mean, statistics
+```
+
+**CLI Options:**
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--backend` | `-b` | `lightgbm` | Backend: `lightgbm`, `xgboost`, `mlp`, `lstm` |
+| `--n-estimators` | `-n` | `1000` | Boosting rounds (tree) or epochs (neural) |
+| `--learning-rate` | `-l` | `0.05` | Learning rate |
+| `--num-leaves` | | `31` | Max leaves per tree (LightGBM only) |
+| `--max-depth` | | `-1` | Max tree depth (-1 = unlimited) |
+| `--aggregation` | `-a` | `statistics` | Time-series aggregation: `last`, `first`, `mean`, `statistics` |
+| `--no-rank-features` | | False | Disable per-entity rank features |
+| `--no-diff-features` | | False | Disable row-to-row diff features |
+| `--train-dir` | | `data/external/amex_train` | Training data directory |
+| `--test-dir` | | `data/external/amex_test` | Test data directory |
+| `--output` | `-o` | `data/submissions/submission.csv` | Output CSV path |
+
+**Backend Configurations:**
+
+| Backend | Format | Best For | Default Config |
+|---------|--------|----------|----------------|
+| `lightgbm` | `.txt` | Fast training, large datasets | 1000 trees, lr=0.05, leaves=31 |
+| `xgboost` | `.ubj` | Tabular data, interpretability | 1000 trees, lr=0.05 |
+| `mlp` | `.pt` | Non-linear patterns | 256-128-64, lr=0.001, epochs=100 |
+| `lstm` | `.pt` | Temporal sequences | hidden=128, layers=2, bidirectional |
+
+**Time-Series Aggregation:**
+
+| Strategy | Description |
+|----------|-------------|
+| `last` | Use only the most recent observation per entity |
+| `first` | Use only the first observation per entity |
+| `mean` | Average all observations per entity |
+| `statistics` | Compute mean, std, min, max, last for each feature |
+
+**Data Format:**
+
+Training and test directories should contain:
+- `data.csv` - Time-series features (entity_id, timestamp, features...)
+- `labels.csv` - Labels per entity (entity_id, target)
+
+**Output Format:**
+
+```csv
+customer_ID,prediction
+entity_0,0.234567
+entity_1,0.891234
+...
+```
+
+For complete documentation, see [scripts/submit/README.md](../scripts/submit/README.md).
+
+---
+
+### Optimize CLI
+
+For local development and benchmarking, use the optimization CLI directly:
+
+```bash
+# Default (taiwan, 300 trials, full features, cuda)
+poetry run python -m scripts.optimize
+
+# Quick test
+poetry run python -m scripts.optimize -n 10 -d taiwan -f full --device cpu
+
+# Compare feature presets
+poetry run python -m scripts.optimize -c -n 50 -d us
+
+# All standard datasets
+poetry run python -m scripts.optimize -a -n 100
+
+# Time-series dataset
+poetry run python -m scripts.optimize -d kaggle_amex_default -n 50 -b xgboost
+```
+
+For complete documentation, see [scripts/optimize/README.md](../scripts/optimize/README.md).
+
+---
+
 ## Scaled Integer Convention
 
 All monetary and ratio values use scaled integers to avoid floating-point precision issues:

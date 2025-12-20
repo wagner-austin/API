@@ -172,6 +172,7 @@ def _make_fake_dataset() -> LoadedDataset:
         "n_negative": 200 - n_positive,
         "positive_ratio": float(n_positive) / 200.0,
         "feature_names": tuple(f"feature_{i}" for i in range(10)),
+        "categorical_encodings": (),
     }
     return {"x": x, "y": y, "meta": meta}
 

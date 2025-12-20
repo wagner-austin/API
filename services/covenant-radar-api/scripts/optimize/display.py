@@ -172,6 +172,9 @@ def _create_lightgbm_hyperparams_table(
 ) -> RichTableProtocol:
     """Create hyperparameters table for LightGBM results.
 
+    Note: max_depth is fixed at -1 (unlimited) and not displayed. LightGBM uses
+    leaf-wise growth where num_leaves is the primary complexity control.
+
     Args:
         result (LightGBMOptimizationResult): LightGBM optimization result.
 
@@ -185,10 +188,9 @@ def _create_lightgbm_hyperparams_table(
     table.add_column("Parameter", style="bold cyan")
     table.add_column("Value", style="bold yellow", justify="right")
 
-    # Tree structure params
-    table.add_row("[green]max_depth[/green]", f"[bold]{result['best_max_depth']}[/bold]")
-    table.add_row("[green]n_estimators[/green]", f"[bold]{result['best_n_estimators']}[/bold]")
+    # Tree structure params (max_depth fixed at -1, num_leaves controls complexity)
     table.add_row("[green]num_leaves[/green]", f"[bold]{result['best_num_leaves']}[/bold]")
+    table.add_row("[green]n_estimators[/green]", f"[bold]{result['best_n_estimators']}[/bold]")
 
     # Learning params
     table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.6f}")
@@ -497,6 +499,7 @@ def print_result(
 
 __all__ = [
     "BACKEND_DISPLAY_NAMES",
+    "_format_delta",
     "create_history_comparison_table",
     "create_hyperparams_table",
     "create_result_table",

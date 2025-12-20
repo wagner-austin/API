@@ -471,6 +471,19 @@ All backends handle imbalanced classes (few bankruptcies vs many healthy compani
 - MLP/LSTM: Weighted BCE loss based on class distribution
 - LightGBM: Auto-computed class weights
 
+### Automatic Preprocessing
+
+All backends apply automatic preprocessing to improve model quality. The preprocessing pipeline fits on training data only to prevent data leakage.
+
+| Step | Description |
+|------|-------------|
+| Special Code Detection | Replaces sentinel values (96, 98, 999, -1, -9, -999) with NaN |
+| Outlier Capping | Caps extreme values at 1st/99th percentile bounds |
+| Missing Imputation | Fills NaN with per-feature median from training data |
+| Z-Score Normalization | Standardizes features to mean=0, std=1 |
+
+This happens transparently - no configuration needed. The preprocessing state is computed from training data and applied consistently to validation and test sets.
+
 ### Train on Internal Data
 
 Train an XGBoost model on seeded deal/measurement data:
@@ -673,10 +686,13 @@ curl http://localhost:8007/ml/jobs/{job_id}
 # }
 ```
 
-**Available Datasets:**
+**Standard Datasets:**
 - `taiwan` - Taiwan bankruptcy data (6,819 samples, 95 features)
 - `us` - US bankruptcy data (78,682 samples, 18 features)
 - `polish` - Polish bankruptcy data (7,027 samples, 64 features)
+
+**Time-Series Datasets:**
+- `kaggle_amex_default` - AMEX Default Prediction (458,913 entities, 188 features, ~13 time steps)
 
 ### Hyperparameter Optimization with Optuna
 
@@ -753,6 +769,45 @@ curl http://localhost:8007/ml/jobs/{job_id}
 
 The `recommended_config` in the result can be used directly with `/ml/train-external`.
 
+### Submit CLI (Kaggle Submissions)
+
+Backend-agnostic CLI for training models on time-series data and generating Kaggle submission files:
+
+```bash
+# Default (LightGBM backend)
+poetry run python -m scripts.submit --train-dir data/train --test-dir data/test -o submission.csv
+
+# With specific settings
+poetry run python -m scripts.submit -b lightgbm -n 1000 -l 0.05 --num-leaves 31
+
+# Other backends
+poetry run python -m scripts.submit -b xgboost -n 100 -l 0.1
+poetry run python -m scripts.submit -b mlp -n 50 -l 0.001
+poetry run python -m scripts.submit -b lstm -n 50 -l 0.001
+
+# Feature engineering options
+poetry run python -m scripts.submit --no-rank-features --no-diff-features
+poetry run python -m scripts.submit -a statistics  # Aggregation: last, first, mean, statistics
+```
+
+**CLI Options:**
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--backend` | `-b` | `lightgbm` | Backend: `lightgbm`, `xgboost`, `mlp`, `lstm` |
+| `--n-estimators` | `-n` | `1000` | Boosting rounds (tree) or epochs (neural) |
+| `--learning-rate` | `-l` | `0.05` | Learning rate |
+| `--num-leaves` | | `31` | Max leaves per tree (LightGBM only) |
+| `--max-depth` | | `-1` | Max tree depth (-1 = unlimited) |
+| `--aggregation` | `-a` | `statistics` | Aggregation: `last`, `first`, `mean`, `statistics` |
+| `--no-rank-features` | | False | Disable per-entity rank features |
+| `--no-diff-features` | | False | Disable row-to-row diff features |
+| `--train-dir` | | `data/external/amex_train` | Training data directory |
+| `--test-dir` | | `data/external/amex_test` | Test data directory |
+| `--output` | `-o` | `data/submissions/submission.csv` | Output CSV path |
+
+For complete documentation, see [scripts/submit/README.md](./scripts/submit/README.md).
+
 ### Optimization CLI
 
 For local development and benchmarking, use the CLI directly instead of the API:
@@ -767,8 +822,11 @@ poetry run python -m scripts.optimize -n 10 -d taiwan -f full --device cpu
 # Compare all feature presets on a dataset
 poetry run python -m scripts.optimize -c -n 50 -d us
 
-# Run on all datasets (taiwan, us, polish)
+# Run on all standard datasets (taiwan, us, polish)
 poetry run python -m scripts.optimize -a -n 100
+
+# Run on time-series dataset (AMEX)
+poetry run python -m scripts.optimize -d kaggle_amex_default -n 50 -b xgboost
 
 # With timeout (seconds)
 poetry run python -m scripts.optimize -n 300 -t 3600
@@ -781,14 +839,18 @@ poetry run python -m scripts.optimize -v -n 50
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--dataset` | `-d` | `taiwan` | Dataset: `taiwan`, `us`, `polish` |
+| `--backend` | `-b` | `xgboost` | Backend: `xgboost`, `mlp`, `lightgbm`, `lstm` |
+| `--dataset` | `-d` | `taiwan` | Dataset name (standard or time-series) |
 | `--n-trials` | `-n` | `300` | Number of Optuna trials |
 | `--feature-preset` | `-f` | `full` | Features: `none`, `log_only`, `ratios_only`, `full` |
 | `--device` | | `cuda` | Device: `cpu`, `cuda`, `auto` |
 | `--timeout` | `-t` | None | Timeout in seconds |
 | `--compare-presets` | `-c` | False | Compare all 4 feature presets |
-| `--all-datasets` | `-a` | False | Run on all 3 datasets |
+| `--all-datasets` | `-a` | False | Run on all standard datasets |
 | `--verbose` | `-v` | False | Enable verbose logging |
+
+**Standard Datasets:** `taiwan`, `us`, `polish`
+**Time-Series Datasets:** `kaggle_amex_default`
 
 **Feature Presets:**
 
@@ -857,11 +919,61 @@ curl -X POST http://localhost:8007/ml/predict \
 
 ## Quality Standards
 
-- **Type Safety**: mypy strict mode, no `Any`, no `cast`
-- **Coverage**: 100% statements and branches
-- **Guard Rules**: Enforced via `scripts/guard.py`
+### Type Safety
+
+- **mypy strict mode**: All code passes `--strict` type checking
+- **No `Any`**: Zero use of `Any` type anywhere in codebase
+- **No `cast`**: No type casting workarounds
+- **No `type: ignore`**: No suppression comments
+- **No `.pyi` stubs**: All types inline in source files
+- **TypedDict over dataclass**: Immutable typed dictionaries for structured data
+- **Protocol-based DI**: Dependency injection via Protocol types
+
+### Test Coverage
+
+- **100% statements and branches**: Full coverage across all modules
+- **No mocks**: Tests use real fake implementations via dependency injection
+- **Strong assertions**: Tests verify exact behavior, not just "no errors"
+- **Callback testing**: Nested callbacks exercised via fake runners
+
+### Test Architecture
+
+Tests use the `_test_hooks.py` pattern for dependency injection:
+
+```python
+# Production: Hooks set to real implementations at startup
+_hooks.xgboost_runner = run_xgboost_optimization
+
+# Tests: Hooks set to fakes for isolated testing
+def fake_runner(...) -> XGBoostOptimizationResult:
+    # Invoke callbacks to exercise nested functions
+    if loading_progress_callback is not None:
+        loading_progress_callback(progress_info)
+    return _make_fake_result()
+
+_hooks.xgboost_runner = fake_runner
+```
+
+This pattern enables:
+- Full coverage of nested callback functions
+- Isolation without mock objects
+- Type-safe test doubles
+
+### Guard Rules
+
+Enforced via `scripts/guard.py`:
+- `typing`: No `Any`, `cast`, `type: ignore`
+- `imports`: Proper module structure
+- `tests`: No mocks, strong assertions
+- `exceptions`: Explicit error handling
+- `patterns`: Consistent code patterns
+
+### Other Standards
+
 - **Logging**: Structured JSON via platform_core
 - **Errors**: Consistent `{code, message, request_id}` format
+- **No try/except recovery**: Errors propagate, no best-effort handling
+- **No backwards compatibility**: Clean breaks, no shims
 
 ---
 

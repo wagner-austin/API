@@ -146,7 +146,11 @@ class TestDecodeHistoryEntry:
         assert entry["best_val_auc"] == 0.85
 
     def test_decodes_lightgbm_json_object(self) -> None:
-        """Test decoding a valid LightGBM JSON object."""
+        """Test decoding a valid LightGBM JSON object.
+
+        Note: LightGBM history entries do not include best_max_depth because
+        max_depth is fixed at -1 (unlimited) - num_leaves controls complexity.
+        """
         obj: JSONObject = {
             "timestamp": "2024-01-01T00:00:00Z",
             "backend": "lightgbm",
@@ -157,7 +161,6 @@ class TestDecodeHistoryEntry:
             "n_features": 100,
             "best_val_auc": 0.85,
             "best_trial_number": 25,
-            "best_max_depth": 6,
             "best_n_estimators": 100,
             "best_num_leaves": 31,
             "best_learning_rate": 0.1,
@@ -301,7 +304,11 @@ class TestResultToEntry:
         assert "T" in entry["timestamp"]
 
     def test_converts_lightgbm_result(self) -> None:
-        """Test converting LightGBMOptimizationResult to LightGBMHistoryEntry."""
+        """Test converting LightGBMOptimizationResult to LightGBMHistoryEntry.
+
+        Note: best_max_depth is always -1 (unlimited) in LightGBM results
+        because num_leaves controls tree complexity, not max_depth.
+        """
         result: LightGBMOptimizationResult = {
             "backend": "lightgbm",
             "status": "complete",
@@ -314,7 +321,7 @@ class TestResultToEntry:
             "n_trials_failed": 0,
             "best_trial_number": 25,
             "best_val_auc": 0.89,
-            "best_max_depth": 6,
+            "best_max_depth": -1,  # Fixed: unlimited depth, num_leaves controls complexity
             "best_n_estimators": 100,
             "best_num_leaves": 31,
             "best_learning_rate": 0.1,
@@ -325,7 +332,7 @@ class TestResultToEntry:
             "duration_seconds": 60.0,
             "recommended_config": LightGBMConfig(
                 device="cpu",
-                max_depth=6,
+                max_depth=-1,  # Fixed: unlimited depth, num_leaves controls complexity
                 n_estimators=100,
                 num_leaves=31,
                 min_child_samples=20,
