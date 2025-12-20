@@ -11,7 +11,7 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 
-from .types import EvalMetrics
+from .types import AMEXMetricResult, EvalMetrics
 
 
 def compute_log_loss(
@@ -87,6 +87,131 @@ def compute_auc(
     dx: NDArray[np.float64] = np.diff(fpr_with_origin)
     avg_y: NDArray[np.float64] = (tpr_with_origin[:-1] + tpr_with_origin[1:]) / 2.0
     return float(np.sum(dx * avg_y))
+
+
+def compute_amex_metric(
+    y_true: NDArray[np.int64],
+    y_pred: NDArray[np.float64],
+) -> AMEXMetricResult:
+    """Compute AMEX competition metric: 0.5 * (normalized_gini + D@4%).
+
+    The AMEX Default Prediction competition uses a custom metric that combines:
+    1. Normalized Gini coefficient (measures ranking quality)
+    2. Default rate captured at top 4% (measures precision at high confidence)
+
+    Both components apply 20x weight to negative samples to account for
+    the 5% subsampling of the negative class in the competition data.
+
+    Args:
+        y_true: Ground truth binary labels (0 or 1), shape (n_samples,).
+        y_pred: Predicted probabilities for default (positive class), shape (n_samples,).
+
+    Returns:
+        AMEXMetricResult with score, normalized_gini, and default_rate_at_4_percent.
+
+    Raises:
+        ValueError: If arrays have different lengths or no positive samples exist.
+    """
+    if len(y_true) != len(y_pred):
+        raise ValueError(
+            f"Array length mismatch: y_true has {len(y_true)}, y_pred has {len(y_pred)}"
+        )
+
+    n_samples = len(y_true)
+    if n_samples == 0:
+        raise ValueError("Cannot compute metric on empty arrays")
+
+    n_pos = int(np.sum(y_true))
+    if n_pos == 0:
+        raise ValueError("Cannot compute metric with no positive samples")
+
+    # Convert to float64 for calculations
+    y_true_float: NDArray[np.float64] = y_true.astype(np.float64)
+
+    # Compute default rate at top 4% (D@4%)
+    # Sort by prediction descending
+    desc_indices: NDArray[np.intp] = np.argsort(y_pred)[::-1]
+    y_true_sorted: NDArray[np.float64] = y_true_float[desc_indices]
+
+    # Apply 20x weight to negatives (accounts for 5% subsampling)
+    # Use explicit array construction to avoid np.where typing issues
+    weights: NDArray[np.float64] = np.ones(len(y_true_sorted), dtype=np.float64)
+    neg_mask: NDArray[np.bool_] = y_true_sorted == 0
+    weights[neg_mask] = 20.0
+    total_weight = float(np.sum(weights))
+    weight_cutoff = int(0.04 * total_weight)
+
+    # Find samples in top 4% by cumulative weight
+    cum_weights: NDArray[np.float64] = np.cumsum(weights)
+    top_4_mask: NDArray[np.bool_] = cum_weights <= weight_cutoff
+    top_4_positives = float(np.sum(y_true_sorted[top_4_mask]))
+    total_positives = float(np.sum(y_true_sorted))
+    default_rate_at_4: float = top_4_positives / total_positives if total_positives > 0 else 0.0
+
+    # Compute Gini coefficients
+    # gini_pred: Gini when sorted by predictions (actual model performance)
+    # gini_true: Gini when sorted by truth (perfect model - for normalization)
+    gini_pred = _compute_weighted_gini(y_true_float, y_pred, sort_by_pred=True)
+    gini_true = _compute_weighted_gini(y_true_float, y_pred, sort_by_pred=False)
+
+    # Normalized Gini = gini_pred / gini_true
+    normalized_gini: float = gini_pred / gini_true if gini_true != 0 else 0.0
+
+    # Final score: average of normalized Gini and D@4%
+    score: float = 0.5 * (normalized_gini + default_rate_at_4)
+
+    return AMEXMetricResult(
+        score=score,
+        normalized_gini=normalized_gini,
+        default_rate_at_4_percent=default_rate_at_4,
+    )
+
+
+def _compute_weighted_gini(
+    y_true: NDArray[np.float64],
+    y_pred: NDArray[np.float64],
+    sort_by_pred: bool,
+) -> float:
+    """Compute weighted Gini coefficient for AMEX metric.
+
+    Args:
+        y_true: Ground truth labels as float64.
+        y_pred: Predicted probabilities.
+        sort_by_pred: If True, sort by predictions; if False, sort by truth.
+
+    Returns:
+        Weighted Gini coefficient (unnormalized).
+    """
+    # Sort by predictions or truth
+    if sort_by_pred:
+        sort_indices: NDArray[np.intp] = np.argsort(y_pred)[::-1]
+    else:
+        sort_indices = np.argsort(y_true)[::-1]
+
+    y_true_sorted: NDArray[np.float64] = y_true[sort_indices]
+
+    # Apply 20x weight to negatives
+    weights: NDArray[np.float64] = np.ones(len(y_true_sorted), dtype=np.float64)
+    neg_mask: NDArray[np.bool_] = y_true_sorted == 0
+    weights[neg_mask] = 20.0
+    total_weight = float(np.sum(weights))
+
+    # Cumulative weight (normalized to [0, 1])
+    weight_random: NDArray[np.float64] = np.cumsum(weights) / total_weight
+
+    # Weighted cumulative positives (Lorentz curve)
+    weighted_positives: NDArray[np.float64] = y_true_sorted * weights
+    total_weighted_pos = float(np.sum(weighted_positives))
+
+    if total_weighted_pos == 0:
+        return 0.0
+
+    cum_pos: NDArray[np.float64] = np.cumsum(weighted_positives)
+    lorentz: NDArray[np.float64] = cum_pos / total_weighted_pos
+
+    # Gini = sum of (lorentz - random) weighted by sample weights
+    gini_values: NDArray[np.float64] = (lorentz - weight_random) * weights
+    return float(np.sum(gini_values))
 
 
 def compute_accuracy(
@@ -239,6 +364,7 @@ def format_metrics_str(metrics: EvalMetrics) -> str:
 __all__ = [
     "compute_accuracy",
     "compute_all_metrics",
+    "compute_amex_metric",
     "compute_auc",
     "compute_f1_score",
     "compute_log_loss",

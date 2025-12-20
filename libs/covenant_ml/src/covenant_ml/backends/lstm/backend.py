@@ -36,7 +36,7 @@ from platform_ml.torch_types import (
 )
 
 from ...metrics import compute_all_metrics
-from ...trainer import normalize_data_splits, stratified_split
+from ...trainer import preprocess_data_splits, stratified_split
 from ...types import (
     BackendName,
     ClassifierTrainConfig,
@@ -857,8 +857,8 @@ class LSTMBackend(ClassifierBackend):
             random_state=cfg["random_state"],
         )
 
-        # Normalize features
-        splits = normalize_data_splits(raw_splits)
+        # Preprocess features (outlier capping, imputation, normalization)
+        splits = preprocess_data_splits(raw_splits)
         n_features = int(splits.x_train.shape[1])
         sequence_length = int(cfg["sequence_length"])
 

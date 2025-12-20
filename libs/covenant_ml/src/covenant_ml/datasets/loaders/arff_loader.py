@@ -89,9 +89,7 @@ class ARFFLoader:
 
             # Extract and encode label
             target_value = row[target_idx] if target_idx < len(row) else ""
-            y_array[row_idx] = encode_label(
-                target_value, target_spec, row_idx, file_path
-            )
+            y_array[row_idx] = encode_label(target_value, target_spec, row_idx, file_path)
 
         # Replace any remaining NaN/inf with 0.0
         x_array = np.nan_to_num(x_array, nan=0.0, posinf=0.0, neginf=0.0)

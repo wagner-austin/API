@@ -545,8 +545,8 @@ def test_lightgbm_optimizer_protocol_implementation() -> None:
     y = np.zeros(10, dtype=np.int64)
     names = ["f0", "f1", "f2", "f3"]
 
+    # Note: max_depth is intentionally excluded - num_leaves controls complexity
     space: LightGBMSearchSpace = {
-        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
         "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
         "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
         "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},

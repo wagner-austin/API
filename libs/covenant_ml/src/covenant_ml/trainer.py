@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from .metrics import compute_all_metrics, format_metrics_str
+from .preprocessing import AutoPreprocessor, PreprocessingState
 from .types import (
     DMatrixFactory,
     DMatrixProtocol,
@@ -171,11 +172,15 @@ class DataSplits:
         return self.n_train + self.n_val + self.n_test
 
 
-class NormalizedDataSplits:
-    """Container for normalized train/val/test data splits.
+class PreprocessedDataSplits:
+    """Container for preprocessed train/val/test data splits.
 
-    Feature normalization is applied using statistics computed from
-    training data only (to avoid data leakage).
+    Full preprocessing is applied using statistics computed from
+    training data only (to avoid data leakage). Includes:
+    - Outlier capping (percentile-based)
+    - Special code replacement (96, 98, 999 → NaN)
+    - Missing value imputation (median)
+    - Z-score normalization
     """
 
     def __init__(
@@ -186,7 +191,7 @@ class NormalizedDataSplits:
         y_val: NDArray[np.int64],
         x_test: NDArray[np.float64],
         y_test: NDArray[np.int64],
-        scaler: FeatureScaler,
+        state: PreprocessingState,
     ) -> None:
         self.x_train = x_train
         self.y_train = y_train
@@ -194,7 +199,7 @@ class NormalizedDataSplits:
         self.y_val = y_val
         self.x_test = x_test
         self.y_test = y_test
-        self.scaler = scaler
+        self.state = state
 
     @property
     def n_train(self) -> int:
@@ -213,38 +218,47 @@ class NormalizedDataSplits:
         return self.n_train + self.n_val + self.n_test
 
 
-def normalize_data_splits(splits: DataSplits) -> NormalizedDataSplits:
-    """Normalize data splits using statistics from training data only.
+def preprocess_data_splits(splits: DataSplits) -> PreprocessedDataSplits:
+    """Preprocess data splits using statistics from training data only.
 
-    Computes mean/std from x_train, then applies standardization to
-    all splits. This prevents data leakage from val/test into training.
+    Applies full preprocessing pipeline:
+    1. Outlier capping (1st/99th percentile bounds)
+    2. Special code replacement (96, 98, 999, etc. → NaN)
+    3. Missing value imputation (median)
+    4. Z-score normalization (mean=0, std=1)
+
+    All statistics are computed from training data only to prevent leakage.
 
     Args:
-        splits: Unnormalized data splits
+        splits: Raw data splits.
 
     Returns:
-        NormalizedDataSplits with standardized features (mean=0, std=1)
+        PreprocessedDataSplits with cleaned and normalized features.
     """
-    scaler = compute_feature_scaler(splits.x_train)
+    preprocessor = AutoPreprocessor()
+    state = preprocessor.fit(splits.x_train, splits.y_train)
 
     _log.info(
-        "Normalizing data splits",
+        "Preprocessing data splits",
         extra={
-            "n_features": scaler.n_features,
+            "n_features": state["n_features"],
+            "n_outlier_bounds": len(state["outlier_bounds"]),
+            "n_special_codes": len(state["special_codes"]),
+            "n_imputation_values": len(state["imputation_values"]),
             "n_train": splits.n_train,
             "n_val": splits.n_val,
             "n_test": splits.n_test,
         },
     )
 
-    return NormalizedDataSplits(
-        x_train=scaler.transform(splits.x_train),
+    return PreprocessedDataSplits(
+        x_train=preprocessor.transform(splits.x_train, state),
         y_train=splits.y_train,
-        x_val=scaler.transform(splits.x_val),
+        x_val=preprocessor.transform(splits.x_val, state),
         y_val=splits.y_val,
-        x_test=scaler.transform(splits.x_test),
+        x_test=preprocessor.transform(splits.x_test, state),
         y_test=splits.y_test,
-        scaler=scaler,
+        state=state,
     )
 
 
@@ -687,9 +701,9 @@ def train_model_with_validation(
         else:
             rounds_no_improve += 1
 
-        # Log progress every 10 rounds or on improvement
-        if current_round % 10 == 0 or rounds_no_improve == 0:
-            _log.info(
+        # Log progress every 50 rounds (quiet by default)
+        if current_round % 50 == 0:
+            _log.debug(
                 "Training progress",
                 extra={
                     "round": current_round,
@@ -854,11 +868,11 @@ def save_model(model: XGBModelProtocol, path: str) -> None:
 __all__ = [
     "DataSplits",
     "FeatureScaler",
-    "NormalizedDataSplits",
+    "PreprocessedDataSplits",
     "ProgressCallback",
     "compute_feature_scaler",
     "extract_feature_importances",
-    "normalize_data_splits",
+    "preprocess_data_splits",
     "save_model",
     "stratified_split",
     "train_model",

@@ -28,7 +28,7 @@ from platform_ml.torch_types import (
 )
 
 from ...metrics import compute_all_metrics
-from ...trainer import normalize_data_splits, stratified_split
+from ...trainer import preprocess_data_splits, stratified_split
 from ...types import (
     BackendName,
     ClassifierTrainConfig,
@@ -44,7 +44,7 @@ _log = get_logger(__name__)
 
 
 class _SplitsProtocol(Protocol):
-    """Protocol for data splits (DataSplits or NormalizedDataSplits)."""
+    """Protocol for data splits (DataSplits or PreprocessedDataSplits)."""
 
     x_train: NDArray[np.float64]
     y_train: NDArray[np.int64]
@@ -672,9 +672,9 @@ class MLPBackend(ClassifierBackend):
             random_state=cfg["random_state"],
         )
 
-        # Normalize features using training data statistics only (prevents data leakage)
-        # This is critical for MLP performance - neural networks require normalized inputs
-        splits = normalize_data_splits(raw_splits)
+        # Preprocess features (outlier capping, imputation, normalization)
+        # This is critical for MLP performance - neural networks require clean, normalized inputs
+        splits = preprocess_data_splits(raw_splits)
 
         components = _prepare_components(
             n_features=int(splits.x_train.shape[1]),

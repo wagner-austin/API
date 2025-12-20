@@ -69,6 +69,18 @@ class EvalMetrics(TypedDict, total=True):
     f1_score: float  # F1 score
 
 
+class AMEXMetricResult(TypedDict, total=True):
+    """Result of AMEX competition metric calculation.
+
+    The AMEX metric is: 0.5 * (normalized_gini + default_rate_at_4_percent).
+    Accounts for 5% negative class subsampling with 20x weight on negatives.
+    """
+
+    score: float  # Final competition metric (0 to 1, higher is better)
+    normalized_gini: float  # Gini coefficient normalized by perfect prediction
+    default_rate_at_4_percent: float  # Recall at top 4% weighted predictions
+
+
 class TrainOutcome(TypedDict, total=True):
     """Complete training outcome with metrics from all splits."""
 
@@ -382,6 +394,7 @@ class DMatrixFactory(Protocol):
 
 
 __all__ = [
+    "AMEXMetricResult",
     "BackendName",
     "ClassifierTrainConfig",
     "DMatrixFactory",

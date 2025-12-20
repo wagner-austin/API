@@ -855,8 +855,9 @@ class OptunaLightGBMOptimizer:
         def optuna_objective(trial: OptunaTrialProtocol) -> float:
             trial_start = time.perf_counter()
 
+            # Note: max_depth is not sampled for LightGBM. The objective uses
+            # max_depth=-1 (unlimited) to let num_leaves control tree complexity.
             int_params: SampledIntParams = {
-                "max_depth": _sample_param_int(trial, "max_depth", search_space["max_depth"]),
                 "n_estimators": _sample_param_int(
                     trial, "n_estimators", search_space["n_estimators"]
                 ),
@@ -907,7 +908,6 @@ class OptunaLightGBMOptimizer:
                 extra={
                     "trial": trial.number,
                     "val_auc": val_auc,
-                    "max_depth": int_params.get("max_depth"),
                     "num_leaves": int_params.get("num_leaves"),
                     "learning_rate": float_params.get("learning_rate"),
                     "duration_sec": trial_duration,
@@ -930,7 +930,6 @@ class OptunaLightGBMOptimizer:
 
         best_params = study.best_params
         best_int_params: SampledIntParams = {
-            "max_depth": int(best_params["max_depth"]),
             "n_estimators": int(best_params["n_estimators"]),
             "num_leaves": int(best_params["num_leaves"]),
         }
@@ -958,7 +957,6 @@ class OptunaLightGBMOptimizer:
             "Optimization complete",
             extra={
                 "best_value": summary["best_value"],
-                "best_max_depth": best_int_params.get("max_depth"),
                 "best_num_leaves": best_int_params.get("num_leaves"),
                 "best_learning_rate": best_float_params.get("learning_rate"),
                 "n_trials_complete": summary["n_trials_complete"],

@@ -12,6 +12,7 @@ import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.backends.lightgbm import LIGHTGBM_CAPABILITIES, create_lightgbm_backend
+from covenant_ml.backends.lightgbm.backend import _resolve_device
 from covenant_ml.backends.protocol import ClassifierBackend
 from covenant_ml.types import (
     ClassifierTrainConfig,
@@ -450,3 +451,44 @@ def test_lightgbm_backend_different_depths(tmp_path: Path) -> None:
         config = _make_lightgbm_config(n_estimators=10, max_depth=max_depth)
         outcome = _invoke_lightgbm_train(backend, x, y, names, config, tmp_path)
         assert outcome["best_val_auc"] > 0.5, f"Failed for max_depth={max_depth}"
+
+
+# =============================================================================
+# Device Resolution Tests
+# =============================================================================
+
+
+def test_resolve_device_auto_returns_cpu() -> None:
+    """_resolve_device returns 'cpu' for 'auto' device."""
+    result = _resolve_device("auto")
+    assert result == "cpu"
+
+
+def test_resolve_device_cpu_returns_cpu() -> None:
+    """_resolve_device returns 'cpu' for 'cpu' device."""
+    result = _resolve_device("cpu")
+    assert result == "cpu"
+
+
+def test_resolve_device_cuda_on_windows_returns_gpu() -> None:
+    """_resolve_device returns 'gpu' for 'cuda' on Windows platform."""
+    result = _resolve_device("cuda", platform="win32")
+    assert result == "gpu"
+
+
+def test_resolve_device_cuda_on_linux_returns_cuda() -> None:
+    """_resolve_device returns 'cuda' for 'cuda' on Linux platform."""
+    result = _resolve_device("cuda", platform="linux")
+    assert result == "cuda"
+
+
+def test_resolve_device_cuda_on_darwin_returns_cuda() -> None:
+    """_resolve_device returns 'cuda' for 'cuda' on macOS platform."""
+    result = _resolve_device("cuda", platform="darwin")
+    assert result == "cuda"
+
+
+def test_resolve_device_unknown_returns_cpu() -> None:
+    """_resolve_device returns 'cpu' for unknown device string."""
+    result = _resolve_device("unknown")
+    assert result == "cpu"

@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from covenant_ml.optimizer.objectives.lightgbm_objective import (
     LightGBMObjective,
     _get_lgb_dataset_and_train,
+    _resolve_lightgbm_device,
     create_lightgbm_objective,
 )
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
@@ -45,9 +46,12 @@ def _make_positive_data(x: NDArray[np.float64], offset: float) -> NDArray[np.flo
 
 
 def _make_default_int_params() -> SampledIntParams:
-    """Create default integer parameters for testing."""
+    """Create default integer parameters for testing.
+
+    Note: max_depth is not included because LightGBM optimization uses
+    fixed max_depth=-1 (unlimited) to let num_leaves control tree complexity.
+    """
     return SampledIntParams(
-        max_depth=3,
         n_estimators=10,
         num_leaves=8,
         min_child_samples=5,
@@ -235,15 +239,16 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
     x, y, names = _make_test_data(n_samples=100, n_features=5)
     objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
 
-    int_params_shallow = SampledIntParams(max_depth=2, n_estimators=5, num_leaves=4)
-    int_params_deep = SampledIntParams(max_depth=8, n_estimators=50, num_leaves=64)
+    # Test with few leaves (simpler model) vs many leaves (more complex model)
+    int_params_simple = SampledIntParams(n_estimators=5, num_leaves=4)
+    int_params_complex = SampledIntParams(n_estimators=50, num_leaves=64)
     float_params = _make_default_float_params()
 
-    auc_shallow = objective(
+    auc_simple = objective(
         x_features=x,
         y_labels=y,
         feature_names=names,
-        int_params=int_params_shallow,
+        int_params=int_params_simple,
         float_params=float_params,
         train_ratio=0.7,
         val_ratio=0.15,
@@ -251,11 +256,11 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
         random_state=42,
     )
 
-    auc_deep = objective(
+    auc_complex = objective(
         x_features=x,
         y_labels=y,
         feature_names=names,
-        int_params=int_params_deep,
+        int_params=int_params_complex,
         float_params=float_params,
         train_ratio=0.7,
         val_ratio=0.15,
@@ -264,8 +269,8 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
     )
 
     # Both should be valid AUCs
-    assert 0.0 <= auc_shallow <= 1.0
-    assert 0.0 <= auc_deep <= 1.0
+    assert 0.0 <= auc_simple <= 1.0
+    assert 0.0 <= auc_complex <= 1.0
 
 
 def test_lightgbm_objective_multiple_calls_deterministic() -> None:
@@ -393,3 +398,50 @@ def test_n_features_property_reflects_engineering() -> None:
     objective = LightGBMObjective(x_positive, y, names, device="cpu", feature_preset="log_only")
     # log_only typically doubles features (original + log)
     assert objective.n_features > 4
+
+
+# =============================================================================
+# Tests: Device Resolution
+# =============================================================================
+
+
+def test_resolve_lightgbm_device_auto_returns_cpu() -> None:
+    """_resolve_lightgbm_device returns 'cpu' for 'auto' device."""
+    result = _resolve_lightgbm_device("auto")
+    assert result == "cpu"
+
+
+def test_resolve_lightgbm_device_cpu_returns_cpu() -> None:
+    """_resolve_lightgbm_device returns 'cpu' for 'cpu' device."""
+    result = _resolve_lightgbm_device("cpu")
+    assert result == "cpu"
+
+
+def test_resolve_lightgbm_device_cuda_on_windows_returns_gpu() -> None:
+    """_resolve_lightgbm_device returns 'gpu' for 'cuda' on Windows platform."""
+    result = _resolve_lightgbm_device("cuda", platform="win32")
+    assert result == "gpu"
+
+
+def test_resolve_lightgbm_device_cuda_on_linux_returns_cuda() -> None:
+    """_resolve_lightgbm_device returns 'cuda' for 'cuda' on Linux platform."""
+    result = _resolve_lightgbm_device("cuda", platform="linux")
+    assert result == "cuda"
+
+
+def test_resolve_lightgbm_device_cuda_on_darwin_returns_cuda() -> None:
+    """_resolve_lightgbm_device returns 'cuda' for 'cuda' on macOS platform."""
+    result = _resolve_lightgbm_device("cuda", platform="darwin")
+    assert result == "cuda"
+
+
+def test_resolve_lightgbm_device_returns_valid_type_for_all_inputs() -> None:
+    """_resolve_lightgbm_device returns valid LightGBMDevice for all inputs."""
+    from covenant_ml.optimizer.types import DeviceRequest
+
+    inputs: tuple[DeviceRequest, ...] = ("cpu", "cuda", "auto")
+    valid_outputs = {"cpu", "gpu", "cuda"}
+
+    for device_input in inputs:
+        result = _resolve_lightgbm_device(device_input)
+        assert result in valid_outputs

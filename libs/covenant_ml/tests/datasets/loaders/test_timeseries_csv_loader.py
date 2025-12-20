@@ -16,6 +16,7 @@ from covenant_ml.datasets.types import (
     FileEncoding,
     LabelType,
     LoadedDataset,
+    LoadProgress,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -25,6 +26,30 @@ from covenant_ml.datasets.types import (
 def _get_fixtures_dir() -> Path:
     """Get path to test fixtures directory."""
     return Path(__file__).parent.parent / "fixtures"
+
+
+def _copy_fixture_to_temp(tmp_path: Path, folder: str) -> Path:
+    """Copy fixture folder to temp directory for isolated testing.
+
+    Args:
+        tmp_path: Pytest temp directory fixture.
+        folder: Fixture folder name to copy.
+
+    Returns:
+        Path to temp directory containing fixtures.
+    """
+    import shutil
+
+    fixtures_dir = _get_fixtures_dir()
+    src_folder = fixtures_dir / folder
+    dst_folder = tmp_path / folder
+    dst_folder.mkdir(parents=True)
+
+    for item in src_folder.iterdir():
+        if item.is_file():
+            shutil.copy(item, dst_folder / item.name)
+
+    return tmp_path
 
 
 def _make_timeseries_config(
@@ -44,6 +69,8 @@ def _make_timeseries_config(
     aggregation: AggregationStrategy = "last",
     labels_file: str = "labels.csv",
     labels_entity_column: str = "entity_id",
+    include_rank_features: bool = False,
+    include_diff_features: bool = False,
 ) -> TimeSeriesDatasetConfig:
     """Create a test time-series dataset config."""
     return TimeSeriesDatasetConfig(
@@ -69,6 +96,8 @@ def _make_timeseries_config(
             aggregation=aggregation,
             labels_file=labels_file,
             labels_entity_column=labels_entity_column,
+            include_rank_features=include_rank_features,
+            include_diff_features=include_diff_features,
         ),
     )
 
@@ -76,11 +105,15 @@ def _make_timeseries_config(
 class TestTimeSeriesCSVLoader:
     """Tests for TimeSeriesCSVLoader class."""
 
-    def test_load_aggregation_last(self) -> None:
-        """Load with 'last' aggregation takes most recent observation."""
+    def test_load_aggregation_last(self, tmp_path: Path) -> None:
+        """Load with 'last' aggregation takes most recent observation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(aggregation="last")
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
 
@@ -98,11 +131,15 @@ class TestTimeSeriesCSVLoader:
         actual_features = {tuple(row) for row in x_list}
         assert actual_features == expected_features
 
-    def test_load_aggregation_first(self) -> None:
-        """Load with 'first' aggregation takes oldest observation."""
+    def test_load_aggregation_first(self, tmp_path: Path) -> None:
+        """Load with 'first' aggregation takes oldest observation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(aggregation="first")
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
 
@@ -116,11 +153,15 @@ class TestTimeSeriesCSVLoader:
         actual_features = {tuple(row) for row in x_list}
         assert actual_features == expected_features
 
-    def test_load_aggregation_mean(self) -> None:
-        """Load with 'mean' aggregation computes mean of features."""
+    def test_load_aggregation_mean(self, tmp_path: Path) -> None:
+        """Load with 'mean' aggregation computes mean of features.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(aggregation="mean")
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
 
@@ -134,11 +175,15 @@ class TestTimeSeriesCSVLoader:
         actual_features = {tuple(row) for row in x_list}
         assert actual_features == expected_features
 
-    def test_load_aggregation_statistics(self) -> None:
-        """Load with 'statistics' aggregation creates mean/std/min/max features."""
+    def test_load_aggregation_statistics(self, tmp_path: Path) -> None:
+        """Load with 'statistics' aggregation creates mean/std/min/max features.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(aggregation="statistics")
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
 
@@ -213,14 +258,18 @@ class TestTimeSeriesCSVLoader:
         with pytest.raises(ValueError, match="Column 'nonexistent_column' not found"):
             loader.load(config, fixtures_dir)
 
-    def test_load_with_categorical_columns(self) -> None:
-        """Load handles categorical columns correctly."""
+    def test_load_with_categorical_columns(self, tmp_path: Path) -> None:
+        """Load handles categorical columns correctly.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
             aggregation="last",
         )
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
         result = loader.load(config, fixtures_dir)
 
@@ -244,15 +293,65 @@ class TestTimeSeriesCSVLoader:
         expected_ratio = 2 / 3
         assert result["meta"]["positive_ratio"] == pytest.approx(expected_ratio, abs=0.01)
 
+    def test_load_with_progress_callback(self, tmp_path: Path) -> None:
+        """Load reports progress via callback including aggregation phase.
+
+        Uses tmp_path to avoid cache race conditions with parallel tests.
+
+        Args:
+            tmp_path: Pytest fixture providing isolated temp directory.
+        """
+        import shutil
+
+        # Copy fixture files to temp directory to avoid cache conflicts
+        fixtures_dir = _get_fixtures_dir()
+        src_folder = fixtures_dir / "timeseries_simple"
+        dst_folder = tmp_path / "timeseries_simple"
+        dst_folder.mkdir(parents=True)
+
+        for file_name in ["data.csv", "labels.csv"]:
+            shutil.copy(src_folder / file_name, dst_folder / file_name)
+
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config()
+
+        progress_updates: list[LoadProgress] = []
+
+        def capture(progress: LoadProgress) -> None:
+            progress_updates.append(progress)
+
+        result: LoadedDataset = loader.load(config, tmp_path, progress_callback=capture)
+
+        # Should have progress updates
+        assert len(progress_updates) >= 4
+
+        # Check for aggregating phase (start and complete)
+        aggregating_updates = [p for p in progress_updates if p["phase"] == "aggregating"]
+        assert len(aggregating_updates) == 2
+        # First should be start (0%)
+        assert aggregating_updates[0]["percent_complete"] == 0.0
+        assert "Aggregating" in aggregating_updates[0]["message"]
+        # Second should be complete (100%)
+        assert aggregating_updates[1]["percent_complete"] == 100.0
+        assert "Aggregated" in aggregating_updates[1]["message"]
+
+        # Result should still be correct
+        assert result["meta"]["n_samples"] == 3
+        assert result["meta"]["n_features"] == 2
+
 
 class TestTimeSeriesCSVLoaderAggregationDetails:
     """Detailed tests for aggregation behavior."""
 
-    def test_statistics_aggregation_values(self) -> None:
-        """Verify statistics aggregation computes correct values."""
+    def test_statistics_aggregation_values(self, tmp_path: Path) -> None:
+        """Verify statistics aggregation computes correct values.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(aggregation="statistics")
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
         x_list: list[list[float]] = result["x"].tolist()
@@ -283,6 +382,17 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         config = _make_timeseries_config(
             folder="empty_csv",
             file_name="data.csv",
+        )
+        fixtures_dir = _get_fixtures_dir()
+
+        with pytest.raises(ValueError, match="No data rows found"):
+            loader.load(config, fixtures_dir)
+
+    def test_load_empty_labels_file_raises(self) -> None:
+        """Load raises ValueError for labels file with no data rows."""
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config(
+            folder="timeseries_empty_labels",
         )
         fixtures_dir = _get_fixtures_dir()
 
@@ -339,14 +449,83 @@ class TestTimeSeriesCSVLoaderEdgeCases:
 
         assert result["meta"]["n_samples"] == 2
 
-    def test_load_categorical_mean_aggregation(self) -> None:
-        """Load handles categorical columns with mean aggregation."""
+    def test_load_categorical_with_missing_values(self, tmp_path: Path) -> None:
+        """Load handles categorical columns with missing values.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config(
+            folder="timeseries_categorical_missing",
+            aggregation="last",
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical_missing")
+
+        result = loader.load(config, fixtures_dir)
+
+        assert result["meta"]["n_samples"] == 3
+        assert result["meta"]["n_features"] == 2
+
+        # Check categorical encoding has missing category
+        encodings = result["meta"]["categorical_encodings"]
+        assert len(encodings) == 1
+        cat_enc = encodings[0]
+        mapping_dict = dict(cat_enc["mapping"])
+        # Should have _MISSING_ as first category
+        assert "_MISSING_" in mapping_dict
+        assert mapping_dict["_MISSING_"] == 0
+
+    def test_load_large_file_triggers_sampling(self, tmp_path: Path) -> None:
+        """Load with >1000 rows triggers sampling for categorical detection.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        # Create large data file with 1100 rows
+        folder = tmp_path / "large_data"
+        folder.mkdir()
+
+        # Write data file with >1000 rows
+        with open(folder / "data.csv", "w") as f:
+            f.write("entity_id,timestamp,feature_1,feature_cat\n")
+            for i in range(1100):
+                entity = chr(65 + (i % 10))  # A-J
+                cat_val = ["LOW", "HIGH", "MEDIUM"][i % 3]
+                f.write(f"{entity},{i},{i * 1.5},{cat_val}\n")
+
+        # Write labels file
+        with open(folder / "labels.csv", "w") as f:
+            f.write("entity_id,target\n")
+            for c in "ABCDEFGHIJ":
+                f.write(f"{c},{1 if c in 'ACEGI' else 0}\n")
+
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config(
+            folder="large_data",
+            aggregation="last",
+        )
+
+        result = loader.load(config, tmp_path)
+
+        # Should load successfully with sampling
+        assert result["meta"]["n_samples"] == 10
+        assert result["meta"]["n_features"] == 2
+        # Check categorical was detected
+        assert len(result["meta"]["categorical_encodings"]) == 1
+
+    def test_load_categorical_mean_aggregation(self, tmp_path: Path) -> None:
+        """Load handles categorical columns with mean aggregation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
             aggregation="mean",
         )
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
         result = loader.load(config, fixtures_dir)
 
@@ -354,14 +533,18 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         # Categorical column should be included in mean (encoded values averaged)
         assert result["meta"]["n_features"] == 2
 
-    def test_load_categorical_statistics_aggregation(self) -> None:
-        """Load handles categorical columns with statistics aggregation."""
+    def test_load_categorical_statistics_aggregation(self, tmp_path: Path) -> None:
+        """Load handles categorical columns with statistics aggregation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_categorical",
             aggregation="statistics",
         )
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_categorical")
 
         result = loader.load(config, fixtures_dir)
 
@@ -369,28 +552,36 @@ class TestTimeSeriesCSVLoaderEdgeCases:
         # 2 features * 4 stats = 8 output features
         assert result["meta"]["n_features"] == 8
 
-    def test_load_all_missing_feature_values_mean(self) -> None:
-        """Load handles feature columns with all missing values in mean aggregation."""
+    def test_load_all_missing_feature_values_mean(self, tmp_path: Path) -> None:
+        """Load handles feature columns with all missing values in mean aggregation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_all_missing",
             aggregation="mean",
         )
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_all_missing")
 
         result = loader.load(config, fixtures_dir)
 
         # Should handle gracefully (zeros for missing)
         assert result["meta"]["n_samples"] == 2
 
-    def test_load_all_missing_feature_values_statistics(self) -> None:
-        """Load handles feature columns with all missing values in statistics aggregation."""
+    def test_load_all_missing_feature_values_statistics(self, tmp_path: Path) -> None:
+        """Load handles feature columns with all missing values in statistics aggregation.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = TimeSeriesCSVLoader()
         config = _make_timeseries_config(
             folder="timeseries_all_missing",
             aggregation="statistics",
         )
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_all_missing")
 
         result = loader.load(config, fixtures_dir)
 
@@ -405,16 +596,151 @@ class TestTimeSeriesCSVLoaderEdgeCases:
                 assert val == 0.0
 
 
+class TestTimeSeriesCSVLoaderAMEXSample:
+    """Tests for loading AMEX-style data."""
+
+    def test_load_amex_sample(self, tmp_path: Path) -> None:
+        """Load AMEX sample data with real column structure.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config(
+            name="amex_sample",
+            folder="timeseries_amex_sample",
+            entity_column="customer_ID",
+            time_column="S_2",
+            aggregation="last",
+            labels_file="labels.csv",
+            labels_entity_column="customer_ID",
+            n_samples_expected=4,
+            n_features_expected=188,
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_amex_sample")
+
+        result = loader.load(config, fixtures_dir)
+
+        assert result["meta"]["n_samples"] == 4
+        assert result["meta"]["n_features"] == 188
+        # All 4 customers in sample have target=0
+        assert result["meta"]["n_positive"] == 0
+        assert result["meta"]["n_negative"] == 4
+
+
 class TestCreateTimeseriesCSVLoader:
     """Tests for create_timeseries_csv_loader factory."""
 
-    def test_factory_creates_working_loader(self) -> None:
-        """Factory creates loader that can successfully load data."""
+    def test_factory_creates_working_loader(self, tmp_path: Path) -> None:
+        """Factory creates loader that can successfully load data.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
         loader = create_timeseries_csv_loader()
         config = _make_timeseries_config()
-        fixtures_dir = _get_fixtures_dir()
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
 
         result = loader.load(config, fixtures_dir)
 
         assert result["meta"]["n_samples"] == 3
         assert result["meta"]["n_features"] == 2
+
+
+class TestTimeSeriesRankDiffFeatures:
+    """Tests for rank and diff feature computation in loader."""
+
+    def test_load_with_rank_features(self, tmp_path: Path) -> None:
+        """Load adds rank features when enabled.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        loader = TimeSeriesCSVLoader()
+        # Base: 2 features, rank adds 2 features (one per base feature)
+        config = _make_timeseries_config(
+            n_features_expected=4,
+            include_rank_features=True,
+            include_diff_features=False,
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
+
+        result = loader.load(config, fixtures_dir)
+
+        assert result["meta"]["n_samples"] == 3
+        assert result["meta"]["n_features"] == 4
+        # Check feature names include rank suffix
+        feature_names = result["meta"]["feature_names"]
+        assert "feature_1_rank" in feature_names
+        assert "feature_2_rank" in feature_names
+
+    def test_load_with_diff_features(self, tmp_path: Path) -> None:
+        """Load adds diff features when enabled.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        loader = TimeSeriesCSVLoader()
+        # Base: 2 features, diff adds 10 features (5 aggs per base feature)
+        config = _make_timeseries_config(
+            n_features_expected=12,
+            include_rank_features=False,
+            include_diff_features=True,
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
+
+        result = loader.load(config, fixtures_dir)
+
+        assert result["meta"]["n_samples"] == 3
+        assert result["meta"]["n_features"] == 12
+        # Check feature names include diff suffixes
+        feature_names = result["meta"]["feature_names"]
+        assert "feature_1_diff_mean" in feature_names
+        assert "feature_2_diff_last" in feature_names
+
+    def test_load_with_both_rank_and_diff_features(self, tmp_path: Path) -> None:
+        """Load adds both rank and diff features when both enabled.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        loader = TimeSeriesCSVLoader()
+        # Base: 2 features, rank adds 2, diff adds 10 -> total 14
+        config = _make_timeseries_config(
+            n_features_expected=14,
+            include_rank_features=True,
+            include_diff_features=True,
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
+
+        result = loader.load(config, fixtures_dir)
+
+        assert result["meta"]["n_samples"] == 3
+        assert result["meta"]["n_features"] == 14
+        feature_names = result["meta"]["feature_names"]
+        # Both rank and diff features present
+        assert "feature_1_rank" in feature_names
+        assert "feature_1_diff_mean" in feature_names
+
+    def test_rank_features_values_in_range(self, tmp_path: Path) -> None:
+        """Rank features are in [0, 1] range.
+
+        Args:
+            tmp_path: Pytest temp directory for isolated testing.
+        """
+        import numpy as np
+
+        loader = TimeSeriesCSVLoader()
+        config = _make_timeseries_config(
+            include_rank_features=True,
+            include_diff_features=False,
+        )
+        fixtures_dir = _copy_fixture_to_temp(tmp_path, "timeseries_simple")
+
+        result = loader.load(config, fixtures_dir)
+
+        # Rank features are columns 2 and 3 (after base features 0 and 1)
+        x_array = result["x"]
+        rank_cols = x_array[:, 2:]
+        assert np.all(rank_cols >= 0.0)
+        assert np.all(rank_cols <= 1.0)

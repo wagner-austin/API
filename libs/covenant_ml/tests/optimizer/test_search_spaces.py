@@ -442,10 +442,16 @@ def test_make_lstm_focused_space_hidden_size_fallback() -> None:
 
 
 def test_make_lightgbm_default_space_returns_complete_space() -> None:
-    """make_lightgbm_default_space returns space with all required parameters."""
+    """make_lightgbm_default_space returns space with all required parameters.
+
+    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
+    where num_leaves is the primary complexity control. The optimizer uses
+    max_depth=-1 (unlimited) to avoid constraint conflicts.
+    """
     space = make_lightgbm_default_space()
 
-    assert "max_depth" in space
+    # max_depth is NOT in the search space - it's fixed at -1
+    assert "max_depth" not in space
     assert "n_estimators" in space
     assert "num_leaves" in space
     assert "learning_rate" in space
@@ -459,7 +465,6 @@ def test_make_lightgbm_default_space_param_types() -> None:
     """make_lightgbm_default_space uses correct param types."""
     space = make_lightgbm_default_space()
 
-    assert space["max_depth"]["param_type"] == "int"
     assert space["n_estimators"]["param_type"] == "int"
     assert space["num_leaves"]["param_type"] == "int"
     assert space["learning_rate"]["param_type"] == "float"
@@ -472,11 +477,6 @@ def test_make_lightgbm_default_space_param_types() -> None:
 def test_make_lightgbm_default_space_ranges() -> None:
     """make_lightgbm_default_space has sensible default ranges."""
     space = make_lightgbm_default_space()
-
-    max_depth = space["max_depth"]
-    if max_depth["param_type"] == "int":
-        assert max_depth["low"] == 3
-        assert max_depth["high"] == 12
 
     n_estimators = space["n_estimators"]
     if n_estimators["param_type"] == "int":
@@ -506,14 +506,7 @@ def test_make_lightgbm_default_space_reg_alpha_allows_zero() -> None:
 
 def test_make_lightgbm_focused_space_narrows_around_best() -> None:
     """make_lightgbm_focused_space creates narrower ranges around best values."""
-    space = make_lightgbm_focused_space(
-        best_max_depth=6, best_num_leaves=50, best_learning_rate=0.1
-    )
-
-    max_depth = space["max_depth"]
-    if max_depth["param_type"] == "int":
-        assert max_depth["low"] == 4  # max(2, 6-2)
-        assert max_depth["high"] == 8  # min(15, 6+2)
+    space = make_lightgbm_focused_space(best_num_leaves=50, best_learning_rate=0.1)
 
     num_leaves = space["num_leaves"]
     if num_leaves["param_type"] == "int":
@@ -526,35 +519,14 @@ def test_make_lightgbm_focused_space_narrows_around_best() -> None:
         assert lr["high"] == 0.2  # min(0.5, 0.1*2.0)
 
 
-def test_make_lightgbm_focused_space_clamps_depth() -> None:
-    """make_lightgbm_focused_space clamps depth to valid range."""
-    space_low = make_lightgbm_focused_space(
-        best_max_depth=2, best_num_leaves=50, best_learning_rate=0.1
-    )
-    depth_low = space_low["max_depth"]
-    if depth_low["param_type"] == "int":
-        assert depth_low["low"] == 2  # max(2, 2-2) = 2
-
-    space_high = make_lightgbm_focused_space(
-        best_max_depth=14, best_num_leaves=50, best_learning_rate=0.1
-    )
-    depth_high = space_high["max_depth"]
-    if depth_high["param_type"] == "int":
-        assert depth_high["high"] == 15  # min(15, 14+2) = 15
-
-
 def test_make_lightgbm_focused_space_clamps_num_leaves() -> None:
     """make_lightgbm_focused_space clamps num_leaves to valid range."""
-    space_low = make_lightgbm_focused_space(
-        best_max_depth=6, best_num_leaves=15, best_learning_rate=0.1
-    )
+    space_low = make_lightgbm_focused_space(best_num_leaves=15, best_learning_rate=0.1)
     leaves_low = space_low["num_leaves"]
     if leaves_low["param_type"] == "int":
         assert leaves_low["low"] == 10  # max(10, 15-20) = 10
 
-    space_high = make_lightgbm_focused_space(
-        best_max_depth=6, best_num_leaves=145, best_learning_rate=0.1
-    )
+    space_high = make_lightgbm_focused_space(best_num_leaves=145, best_learning_rate=0.1)
     leaves_high = space_high["num_leaves"]
     if leaves_high["param_type"] == "int":
         assert leaves_high["high"] == 150  # min(150, 145+20) = 150
@@ -562,16 +534,12 @@ def test_make_lightgbm_focused_space_clamps_num_leaves() -> None:
 
 def test_make_lightgbm_focused_space_clamps_learning_rate() -> None:
     """make_lightgbm_focused_space clamps learning rate to valid range."""
-    space_low = make_lightgbm_focused_space(
-        best_max_depth=6, best_num_leaves=50, best_learning_rate=0.001
-    )
+    space_low = make_lightgbm_focused_space(best_num_leaves=50, best_learning_rate=0.001)
     lr_low = space_low["learning_rate"]
     if lr_low["param_type"] == "float":
         assert lr_low["low"] == 0.001  # max(0.001, 0.001*0.5) = 0.001
 
-    space_high = make_lightgbm_focused_space(
-        best_max_depth=6, best_num_leaves=50, best_learning_rate=0.4
-    )
+    space_high = make_lightgbm_focused_space(best_num_leaves=50, best_learning_rate=0.4)
     lr_high = space_high["learning_rate"]
     if lr_high["param_type"] == "float":
         assert lr_high["high"] == 0.5  # min(0.5, 0.4*2.0) = 0.5

@@ -213,6 +213,8 @@ def _make_test_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
             aggregation="last",
             labels_file="labels.csv",
             labels_entity_column="entity_id",
+            include_rank_features=False,
+            include_diff_features=False,
         ),
     )
 
@@ -311,10 +313,15 @@ class TestTimeSeriesDatasetRegistry:
 class TestMakeDefaultTimeseriesRegistry:
     """Tests for make_default_timeseries_registry factory."""
 
-    def test_default_timeseries_registry_empty(self) -> None:
-        """Default time-series registry starts empty (configs added as verified)."""
+    def test_default_timeseries_registry_has_amex(self) -> None:
+        """Default time-series registry includes AMEX dataset."""
         registry = make_default_timeseries_registry()
 
-        # Initially empty until we verify time-series datasets
-        assert len(registry) == 0
-        assert registry.list_names() == ()
+        assert "kaggle_amex_default" in registry
+
+        config = registry.get("kaggle_amex_default")
+        assert config["name"] == "kaggle_amex_default"
+        assert config["display_name"] == "AMEX Default Prediction"
+        assert config["time_series"]["entity_column"] == "customer_ID"
+        assert config["time_series"]["time_column"] == "S_2"
+        assert config["time_series"]["aggregation"] == "last"

@@ -435,6 +435,81 @@ splits: DataSplits = stratified_split(
 print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 ```
 
+## Preprocessing
+
+Automatic preprocessing pipeline applied to all backends. Fits on training data only to prevent data leakage.
+
+```python
+from covenant_ml.trainer import preprocess_data_splits, stratified_split
+
+# Split data
+splits = stratified_split(X, y, 0.7, 0.15, 0.15, random_state=42)
+
+# Preprocess (fits on train, transforms all splits)
+preprocessed = preprocess_data_splits(splits)
+
+# Access preprocessed data
+print(f"Train shape: {preprocessed.x_train.shape}")
+print(f"Preprocessing state: {preprocessed.state}")
+```
+
+### Preprocessing Pipeline
+
+The `AutoPreprocessor` applies these transforms in order:
+
+| Step | Description | Details |
+|------|-------------|---------|
+| 1. Special Code Detection | Replace sentinel values with NaN | 96, 98, 99, 999, -1, -9, -999 |
+| 2. Outlier Capping | Cap extreme values | 1st/99th percentile bounds |
+| 3. Missing Imputation | Fill NaN with median | Per-feature median from training data |
+| 4. Z-Score Normalization | Standardize features | Mean=0, std=1 using training stats |
+
+### Using AutoPreprocessor Directly
+
+```python
+from covenant_ml.preprocessing import AutoPreprocessor, PreprocessingState
+
+# Create preprocessor
+preprocessor = AutoPreprocessor()
+
+# Fit on training data only
+state: PreprocessingState = preprocessor.fit(x_train, y_train)
+
+# Transform any split using fitted state
+x_train_processed = preprocessor.transform(x_train, state)
+x_val_processed = preprocessor.transform(x_val, state)
+x_test_processed = preprocessor.transform(x_test, state)
+```
+
+### PreprocessingState Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `n_features` | int | Number of features |
+| `outlier_bounds` | tuple[OutlierBounds, ...] | Per-feature lower/upper bounds |
+| `special_codes` | tuple[SpecialCodeSpec, ...] | Per-feature detected special codes |
+| `imputation_values` | tuple[ImputationSpec, ...] | Per-feature imputation values |
+| `feature_means` | NDArray[np.float64] | Per-feature means for z-score |
+| `feature_stds` | NDArray[np.float64] | Per-feature stds for z-score |
+
+### PreprocessedDataSplits
+
+Container returned by `preprocess_data_splits()`:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `x_train` | NDArray[np.float64] | Preprocessed training features |
+| `y_train` | NDArray[np.int64] | Training labels |
+| `x_val` | NDArray[np.float64] | Preprocessed validation features |
+| `y_val` | NDArray[np.int64] | Validation labels |
+| `x_test` | NDArray[np.float64] | Preprocessed test features |
+| `y_test` | NDArray[np.int64] | Test labels |
+| `state` | PreprocessingState | Fitted preprocessing state |
+| `n_train` | int | Number of training samples |
+| `n_val` | int | Number of validation samples |
+| `n_test` | int | Number of test samples |
+| `n_total` | int | Total samples across all splits |
+
 ## API Reference
 
 ### Training Functions
@@ -445,6 +520,7 @@ print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 | `train_model` | Train without validation (simpler API) |
 | `save_model` | Save trained model to file |
 | `stratified_split` | Split data with stratification |
+| `preprocess_data_splits` | Apply full preprocessing pipeline to splits |
 
 ### Inference Functions
 
@@ -480,8 +556,19 @@ print(f"Train: {splits.n_train}, Val: {splits.n_val}, Test: {splits.n_test}")
 | `EvalMetrics` | Evaluation metrics for a split |
 | `FeatureImportance` | Feature importance entry (name, importance, rank) |
 | `DataSplits` | Train/val/test data splits |
+| `PreprocessedDataSplits` | Preprocessed train/val/test splits with state |
 | `ProgressCallback` | Callback type for progress updates |
 | `BackendName` | Literal type: `"xgboost" | "mlp" | "lstm" | "lightgbm"` |
+
+### Preprocessing Types (covenant_ml.preprocessing)
+
+| Type | Description |
+|------|-------------|
+| `AutoPreprocessor` | Preprocessor with fit/transform interface |
+| `PreprocessingState` | Fitted state (outlier bounds, imputation values, z-score stats) |
+| `OutlierBounds` | Per-feature outlier lower/upper bounds |
+| `SpecialCodeSpec` | Per-feature special code definitions |
+| `ImputationSpec` | Per-feature imputation values |
 
 ### Manifest Types
 
@@ -528,8 +615,9 @@ TypedDicts for model manifest serialization:
 | Type | Description |
 |------|-------------|
 | `DatasetConfig` | TypedDict for dataset configuration |
-| `LoadedDataset` | TypedDict with loaded features, labels, names |
-| `DatasetMeta` | TypedDict with dataset metadata |
+| `LoadedDataset` | TypedDict with loaded features, labels, metadata |
+| `DatasetMeta` | TypedDict with dataset metadata (samples, features, encodings) |
+| `CategoricalEncoding` | TypedDict for categorical column label encoding |
 | `TargetColumnSpec` | TypedDict for target column configuration |
 | `FileFormat` | Literal type: `"csv" \| "arff"` |
 | `FileEncoding` | Literal type: `"utf-8" \| "latin-1" \| ...` |
@@ -538,6 +626,13 @@ TypedDicts for model manifest serialization:
 | `DatasetLoaderProtocol` | Protocol for dataset loaders |
 | `make_default_registry()` | Create registry with pre-configured datasets |
 | `create_dataset_loader()` | Create default dataset loader |
+| `TimeSeriesDatasetConfig` | TypedDict for time-series dataset configuration |
+| `TimeSeriesSpec` | TypedDict for time-series specification |
+| `AggregationStrategy` | Literal type: `"last" \| "first" \| "mean" \| "statistics"` |
+| `TimeSeriesDatasetRegistry` | Registry for time-series dataset configurations |
+| `TimeSeriesCSVLoader` | Loader for time-series CSV datasets |
+| `make_default_timeseries_registry()` | Create registry with pre-configured time-series datasets |
+| `create_timeseries_csv_loader()` | Create time-series CSV loader |
 
 ### Explainers (covenant_ml.explainers)
 
@@ -708,7 +803,7 @@ dataset: LoadedDataset = loader.load(config, Path("data/external"))
 
 print(f"Features: {dataset['x'].shape}")  # (n_samples, n_features)
 print(f"Labels: {dataset['y'].shape}")    # (n_samples,)
-print(f"Feature names: {dataset['feature_names']}")
+print(f"Feature names: {dataset['meta']['feature_names']}")
 ```
 
 ### Supported Formats
@@ -733,10 +828,144 @@ print(f"Feature names: {dataset['feature_names']}")
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `meta` | DatasetMeta | Dataset metadata with statistics |
 | `x` | NDArray[np.float64] | Feature matrix (n_samples, n_features) |
 | `y` | NDArray[np.int64] | Labels (n_samples,) - 0=healthy, 1=breach |
-| `feature_names` | list[str] | Feature column names |
-| `meta` | DatasetMeta | Dataset metadata (samples, features, positive ratio) |
+
+### DatasetMeta Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | str | Dataset identifier |
+| `n_samples` | int | Total number of samples |
+| `n_features` | int | Number of feature columns |
+| `n_positive` | int | Number of positive class samples |
+| `n_negative` | int | Number of negative class samples |
+| `positive_ratio` | float | Fraction of positive samples |
+| `feature_names` | tuple[str, ...] | Ordered tuple of feature column names |
+| `categorical_encodings` | tuple[CategoricalEncoding, ...] | Encodings for categorical columns (empty if none) |
+
+### CategoricalEncoding Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `column_name` | str | Name of the encoded column |
+| `mapping` | tuple[tuple[str, int], ...] | (value, code) pairs sorted alphabetically by value |
+| `n_categories` | int | Number of unique categories including missing |
+
+## Time-Series Dataset Loading
+
+Load time-series datasets where each entity has multiple observations over time:
+
+```python
+from pathlib import Path
+from covenant_ml.datasets import (
+    make_default_timeseries_registry,
+    DatasetLoader,
+    create_dataset_loader,
+)
+from covenant_ml.datasets.loaders import TimeSeriesCSVLoader
+
+# Get registry with pre-configured time-series datasets
+registry = make_default_timeseries_registry()
+
+# List available time-series datasets
+print(registry.list_names())  # ("kaggle_amex_default",)
+
+# Get config for AMEX dataset
+config = registry.get("kaggle_amex_default")
+print(f"Entity column: {config['time_series']['entity_column']}")  # "customer_ID"
+print(f"Time column: {config['time_series']['time_column']}")      # "S_2"
+print(f"Aggregation: {config['time_series']['aggregation']}")      # "last"
+
+# Load time-series dataset
+loader = TimeSeriesCSVLoader()
+dataset = loader.load(config, Path("data/external"))
+
+print(f"Entities: {dataset['meta']['n_samples']}")
+print(f"Features: {dataset['meta']['n_features']}")
+```
+
+### Aggregation Strategies
+
+Time-series data is aggregated per entity into a single feature vector:
+
+| Strategy | Description | Output Features |
+|----------|-------------|-----------------|
+| `"last"` | Take most recent observation | Same as input |
+| `"first"` | Take oldest observation | Same as input |
+| `"mean"` | Average all observations | Same as input |
+| `"statistics"` | Compute mean, std, min, max | 4x input features |
+
+```python
+from covenant_ml.datasets.types import TimeSeriesDatasetConfig, TimeSeriesSpec
+
+# Configure time-series dataset with statistics aggregation
+config = TimeSeriesDatasetConfig(
+    name="my_timeseries",
+    display_name="My Time Series Dataset",
+    folder="my_data",
+    file_name="features.csv",
+    file_format="csv",
+    encoding="utf-8",
+    target=TargetColumnSpec(
+        column_name="target",
+        label_type="binary_int",
+        positive_values=(1,),
+        negative_values=(0,),
+    ),
+    exclude_columns=(),
+    n_samples_expected=1000,
+    n_features_expected=50,
+    positive_class_ratio_expected=0.05,
+    time_series=TimeSeriesSpec(
+        entity_column="customer_id",
+        time_column="date",
+        aggregation="statistics",  # Creates 200 features (50 * 4 stats)
+        labels_file="labels.csv",
+        labels_entity_column="customer_id",
+        include_rank_features=True,  # Add percentile rank features
+        include_diff_features=True,  # Add row-to-row diff features
+    ),
+)
+```
+
+### TimeSeriesSpec Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `entity_column` | str | Column identifying unique entities |
+| `time_column` | str | Column for temporal ordering |
+| `aggregation` | AggregationStrategy | `"last"`, `"first"`, `"mean"`, or `"statistics"` |
+| `labels_file` | str | Separate CSV file containing entity labels |
+| `labels_entity_column` | str | Entity column name in labels file |
+| `include_rank_features` | bool | Add per-entity percentile rank features |
+| `include_diff_features` | bool | Add row-to-row difference features |
+
+### Memory-Efficient Implementation
+
+The time-series loader uses Polars-native groupby operations for memory efficiency on large datasets (16GB+):
+
+```
+CSV file → Polars DataFrame → Polars groupby → NumPy arrays
+```
+
+This avoids Python list conversions that would multiply memory usage 3-4x. Key optimizations:
+
+- **Polars-native aggregation**: All groupby operations (last, first, mean, statistics) run in Polars without Python intermediaries
+- **Categorical encoding**: Uses Polars when/then/otherwise instead of Python loops
+- **Parquet caching**: Repeat loads are 10-100x faster via `.cache/<hash>/` directories
+- **Progress callbacks**: Real-time progress reporting during loading phases
+
+### Time-Series Types
+
+| Type | Description |
+|------|-------------|
+| `TimeSeriesDatasetConfig` | TypedDict extending DatasetConfig with time_series field |
+| `TimeSeriesSpec` | TypedDict for time-series configuration |
+| `AggregationStrategy` | Literal type: `"last" \| "first" \| "mean" \| "statistics"` |
+| `TimeSeriesDatasetRegistry` | Registry for time-series dataset configurations |
+| `TimeSeriesCSVLoader` | Loader for time-series CSV datasets |
 
 ## Feature Importance Explainers
 

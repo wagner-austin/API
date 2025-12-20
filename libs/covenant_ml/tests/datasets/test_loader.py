@@ -8,6 +8,11 @@ import numpy as np
 import pytest
 
 from covenant_ml.datasets.loader import DatasetLoader, create_dataset_loader
+from covenant_ml.datasets.loaders.parquet_cache import (
+    _compute_config_hash,
+    get_cache_dir,
+    invalidate_cache,
+)
 from covenant_ml.datasets.types import (
     DatasetConfig,
     LoadedDataset,
@@ -20,6 +25,26 @@ from covenant_ml.datasets.types import (
 def _get_fixtures_dir() -> Path:
     """Get path to test fixtures directory."""
     return Path(__file__).parent / "fixtures"
+
+
+def _clear_csv_cache(config: DatasetConfig, fixtures_dir: Path) -> None:
+    """Clear parquet cache for a CSV dataset config.
+
+    Args:
+        config: Dataset configuration.
+        fixtures_dir: Path to fixtures directory.
+    """
+    config_parts = [
+        config["name"],
+        config["file_name"],
+        config["encoding"],
+        str(config["target"]),
+        str(config["exclude_columns"]),
+    ]
+    config_str = "|".join(config_parts)
+    config_hash = _compute_config_hash(config_str)
+    cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+    invalidate_cache(cache_dir)
 
 
 def _make_csv_config(
@@ -214,6 +239,8 @@ def _make_timeseries_config(
             aggregation="last",
             labels_file="labels.csv",
             labels_entity_column="entity_id",
+            include_rank_features=False,
+            include_diff_features=False,
         ),
     )
 
@@ -244,6 +271,9 @@ class TestCreateDatasetLoader:
         loader = create_dataset_loader()
         config = _make_csv_config()
         fixtures_dir = _get_fixtures_dir()
+
+        # Clear cache to ensure clean test
+        _clear_csv_cache(config, fixtures_dir)
 
         result = loader.load(config, fixtures_dir)
 

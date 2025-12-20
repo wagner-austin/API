@@ -20,6 +20,7 @@ from pathlib import Path
 from covenant_ml.datasets.loaders.arff_loader import ARFFLoader
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader
 from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoader
+from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
     DatasetConfig,
     LoadedDataset,
@@ -51,6 +52,7 @@ class DatasetLoader:
         self,
         config: DatasetConfig,
         external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
         """Load standard dataset based on format specified in config.
 
@@ -59,6 +61,7 @@ class DatasetLoader:
         Args:
             config: Dataset configuration specifying format and location.
             external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for loading progress updates.
 
         Returns:
             LoadedDataset with features, labels, and metadata.
@@ -70,18 +73,17 @@ class DatasetLoader:
         file_format = config["file_format"]
 
         if file_format == "csv":
-            return self._csv_loader.load(config, external_dir)
+            return self._csv_loader.load(config, external_dir, progress_callback)
         if file_format == "arff":
             return self._arff_loader.load(config, external_dir)
         # Excel format not yet implemented
-        raise ValueError(
-            f"Excel format not yet implemented for dataset '{config['name']}'"
-        )
+        raise ValueError(f"Excel format not yet implemented for dataset '{config['name']}'")
 
     def load_timeseries(
         self,
         config: TimeSeriesDatasetConfig,
         external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
         """Load time-series dataset with temporal aggregation.
 
@@ -91,6 +93,7 @@ class DatasetLoader:
         Args:
             config: Time-series dataset configuration with aggregation spec.
             external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for loading progress updates.
 
         Returns:
             LoadedDataset with aggregated features ready for ML.
@@ -99,7 +102,7 @@ class DatasetLoader:
             FileNotFoundError: If dataset file doesn't exist.
             ValueError: If data invalid or parsing fails.
         """
-        return self._timeseries_csv_loader.load(config, external_dir)
+        return self._timeseries_csv_loader.load(config, external_dir, progress_callback)
 
 
 def create_dataset_loader() -> DatasetLoader:

@@ -1,13 +1,9 @@
-"""Time-series CSV dataset loader.
+"""Time-series CSV dataset loader using Polars-native operations.
 
-Loads time-series CSV datasets into LoadedDataset format.
-Handles datasets with multiple observations per entity over time,
-aggregating them into single feature vectors for ML.
-
-Example use cases:
-- Credit card transaction history (AMEX default)
-- Stock price time series
-- Customer behavior over time
+Loads time-series CSV datasets into LoadedDataset format using Polars
+for memory-efficient processing. Uses Polars groupby aggregations to avoid
+materializing all rows in Python, enabling large dataset loading.
+Integrates parquet caching for fast repeated loads.
 """
 
 from __future__ import annotations
@@ -18,149 +14,287 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-from covenant_ml.datasets.loaders._parsing import (
-    MISSING_VALUES,
-    build_categorical_encodings,
-    build_encoding_lookup,
-    detect_categorical_columns,
-    encode_categorical_value,
-    encode_label,
-    find_column_index,
-    parse_numeric_value,
+from covenant_ml.datasets.loaders._parsing import encode_label, find_column_index
+from covenant_ml.datasets.loaders._polars_aggregation import (
+    aggregate_timeseries,
+    build_statistics_feature_names,
 )
+from covenant_ml.datasets.loaders._polars_encoding import (
+    apply_encodings,
+    build_categorical_encodings,
+    convert_to_numeric,
+    detect_categorical_columns,
+)
+from covenant_ml.datasets.loaders._polars_ranking import (
+    compute_diff_features,
+    compute_entity_rank_features,
+)
+from covenant_ml.datasets.loaders._polars_utils import (
+    PolarsDataFrameProtocol,
+    PolarsReadCSVProtocol,
+    convert_encoding,
+    report_progress,
+    sanitize_array_inplace,
+)
+from covenant_ml.datasets.loaders.parquet_cache import (
+    _CacheLock,
+    _compute_config_hash,
+    check_cache,
+    get_cache_dir,
+    load_from_cache,
+    save_to_cache,
+)
+from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
-    AggregationStrategy,
     DatasetMeta,
+    FileEncoding,
     LoadedDataset,
+    LoadProgress,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
 )
 
 
 class TimeSeriesCSVLoader:
-    """Loads time-series CSV datasets into LoadedDataset format.
+    """Loads time-series CSV datasets using Polars-native operations.
+
+    Uses Polars groupby aggregations to process data without materializing
+    all rows in Python memory. Enables loading of large datasets (millions
+    of rows) that would otherwise cause memory exhaustion.
 
     Handles:
     - Multiple observations per entity over time
-    - Time-based ordering within each entity
     - Aggregation strategies (last, first, mean, statistics)
     - Separate labels files (common in Kaggle competitions)
-    - Categorical encoding with consistent mapping across entities
+    - Categorical encoding with consistent mapping
     - Missing value handling
-
-    The loader aggregates multiple time observations per entity into
-    a single feature vector suitable for ML models. Different aggregation
-    strategies allow flexibility in how temporal information is compressed.
+    - Parquet caching for fast repeated loads
     """
 
     def load(
         self,
         config: TimeSeriesDatasetConfig,
         external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
-        """Load time-series CSV dataset.
+        """Load time-series CSV dataset with optional progress reporting.
+
+        First checks for valid parquet cache. If found, loads from cache.
+        Otherwise, loads from CSV using Polars-native operations and
+        saves to cache for future loads.
 
         Args:
-            config: Time-series dataset configuration including aggregation strategy.
+            config: Time-series dataset configuration.
             external_dir: Root directory for datasets.
+            progress_callback: Optional callback for progress updates.
 
         Returns:
             LoadedDataset with aggregated features ready for ML.
 
         Raises:
-            FileNotFoundError: If dataset file doesn't exist.
+            FileNotFoundError: If dataset file or labels file doesn't exist.
             ValueError: If columns missing, data invalid, or parsing fails.
         """
+        ts_spec = config["time_series"]
+
+        if not ts_spec["labels_file"]:
+            raise ValueError(
+                "Time-series datasets must have labels_file specified in time_series spec"
+            )
+
         file_path = external_dir / config["folder"] / config["file_name"]
+
+        # Check cache
+        config_hash = _compute_config_hash(self._build_config_string(config))
+        cache_dir = get_cache_dir(external_dir, config["folder"], config_hash)
+
+        with _CacheLock(cache_dir):
+            cache_info = check_cache(file_path, cache_dir)
+            if cache_info["is_valid"]:
+                return load_from_cache(cache_dir, progress_callback)
+
+        # Load from CSV
+        dataset = self._load_from_csv(config, external_dir, progress_callback)
+
+        # Save to cache
+        save_to_cache(dataset, cache_dir, progress_callback)
+
+        return dataset
+
+    def _build_config_string(self, config: TimeSeriesDatasetConfig) -> str:
+        """Build config string for cache hash.
+
+        Args:
+            config: Dataset configuration.
+
+        Returns:
+            String representation for hashing.
+        """
+        ts_spec = config["time_series"]
+        parts = [
+            config["name"],
+            config["file_name"],
+            config["encoding"],
+            str(config["target"]),
+            str(config["exclude_columns"]),
+            ts_spec["entity_column"],
+            ts_spec["time_column"],
+            ts_spec["aggregation"],
+            ts_spec["labels_file"],
+            str(ts_spec["include_rank_features"]),
+            str(ts_spec["include_diff_features"]),
+        ]
+        return "|".join(parts)
+
+    def _load_from_csv(
+        self,
+        config: TimeSeriesDatasetConfig,
+        external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None,
+    ) -> LoadedDataset:
+        """Load dataset from CSV using Polars-native operations.
+
+        Args:
+            config: Time-series dataset configuration.
+            external_dir: Root directory for datasets.
+            progress_callback: Optional callback for progress updates.
+
+        Returns:
+            LoadedDataset with aggregated features.
+
+        Raises:
+            FileNotFoundError: If files don't exist.
+            ValueError: If data is invalid.
+        """
+        file_path = external_dir / config["folder"] / config["file_name"]
+        encoding: FileEncoding = config["encoding"]
+        ts_spec = config["time_series"]
+
         if not file_path.exists():
             raise FileNotFoundError(f"Dataset file not found: {file_path}")
 
-        ts_spec = config["time_series"]
+        # Read CSV
+        df = self._read_csv(file_path, encoding, progress_callback)
 
-        # Read features data
-        headers, rows = self._read_csv(file_path, config["encoding"])
+        # Validate columns
+        headers = [h.strip() for h in df.columns]
+        entity_col = ts_spec["entity_column"]
+        time_col = ts_spec["time_column"]
+        find_column_index(headers, entity_col)
+        find_column_index(headers, time_col)
 
-        # Find entity and time column indices
-        entity_idx = find_column_index(headers, ts_spec["entity_column"])
-        time_idx = find_column_index(headers, ts_spec["time_column"])
+        # Build feature column list
+        feature_columns = self._get_feature_columns(headers, config)
 
-        # Build feature column indices (exclude entity, time, target, and exclude_columns)
-        target_spec = config["target"]
-        exclude_set = set(config["exclude_columns"])
-        exclude_set.add(ts_spec["entity_column"])
-        exclude_set.add(ts_spec["time_column"])
-        exclude_set.add(target_spec["column_name"])
-
-        feature_indices: list[int] = []
-        feature_names: list[str] = []
-        for i, header in enumerate(headers):
-            if header not in exclude_set:
-                feature_indices.append(i)
-                feature_names.append(header)
-
-        # Detect categorical columns and build encodings from all data
-        categorical_columns = detect_categorical_columns(rows, feature_indices)
-        encodings = build_categorical_encodings(
-            rows, feature_indices, feature_names, categorical_columns
-        )
-        encoding_lookup = build_encoding_lookup(encodings, feature_names)
-
-        # Group rows by entity
-        entity_rows: dict[str, list[list[str]]] = {}
-        for row in rows:
-            entity_id = row[entity_idx] if entity_idx < len(row) else ""
-            if entity_id not in entity_rows:
-                entity_rows[entity_id] = []
-            entity_rows[entity_id].append(row)
-
-        # Sort each entity's rows by time
-        for entity_id in entity_rows:
-            entity_rows[entity_id] = self._sort_by_time(
-                entity_rows[entity_id], time_idx
-            )
-
-        # Load labels (from separate file or main file)
-        entity_labels = self._load_labels(
-            config, external_dir, ts_spec, list(entity_rows.keys())
+        # Encode and convert
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="encoding",
+                bytes_read=0,
+                bytes_total=0,
+                rows_processed=0,
+                rows_total=df.height,
+                percent_complete=0.0,
+                message="Detecting categorical columns...",
+            ),
         )
 
-        # Compute output dimensions
-        n_entities = len(entity_rows)
-        n_base_features = len(feature_indices)
+        categorical_columns = detect_categorical_columns(df, feature_columns)
+        encodings = build_categorical_encodings(df, feature_columns, categorical_columns)
+
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="encoding",
+                bytes_read=0,
+                bytes_total=0,
+                rows_processed=df.height,
+                rows_total=df.height,
+                percent_complete=100.0,
+                message=f"Found {len(categorical_columns)} categorical columns",
+            ),
+        )
+
+        df_encoded = apply_encodings(df, feature_columns, encodings, categorical_columns)
+        df_numeric = convert_to_numeric(df_encoded, feature_columns, categorical_columns)
+
+        # Load labels
+        entity_labels = self._load_labels(config, external_dir, ts_spec)
+
+        # Aggregate
         aggregation = ts_spec["aggregation"]
+        n_base_features = len(feature_columns)
 
         if aggregation == "statistics":
-            # 4 stats per feature: mean, std, min, max
             n_output_features = n_base_features * 4
-            output_feature_names = self._build_statistics_feature_names(feature_names)
+            output_feature_names = build_statistics_feature_names(feature_columns)
         else:
             n_output_features = n_base_features
-            output_feature_names = feature_names
+            output_feature_names = feature_columns
 
-        # Aggregate features for each entity
-        x_array = np.zeros((n_entities, n_output_features), dtype=np.float64)
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="aggregating",
+                bytes_read=0,
+                bytes_total=0,
+                rows_processed=0,
+                rows_total=0,
+                percent_complete=0.0,
+                message="Aggregating entities...",
+            ),
+        )
+
+        x_array, entity_ids = aggregate_timeseries(
+            df_numeric, entity_col, time_col, feature_columns, aggregation
+        )
+
+        n_entities = len(entity_ids)
+
+        # Compute optional rank features
+        if ts_spec["include_rank_features"]:
+            rank_result = compute_entity_rank_features(df_numeric, entity_col, feature_columns)
+            rank_array: NDArray[np.float64] = rank_result["features"]
+            rank_names = rank_result["feature_names"]
+            combined: NDArray[np.float64] = np.hstack((x_array, rank_array))
+            x_array = combined
+            output_feature_names = output_feature_names + rank_names
+            n_output_features += len(rank_names)
+
+        # Compute optional diff features
+        if ts_spec["include_diff_features"]:
+            diff_result = compute_diff_features(df_numeric, entity_col, time_col, feature_columns)
+            diff_array: NDArray[np.float64] = diff_result["features"]
+            diff_names = diff_result["feature_names"]
+            combined_diff: NDArray[np.float64] = np.hstack((x_array, diff_array))
+            x_array = combined_diff
+            output_feature_names = output_feature_names + diff_names
+            n_output_features += len(diff_names)
+
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="aggregating",
+                bytes_read=0,
+                bytes_total=0,
+                rows_processed=n_entities,
+                rows_total=n_entities,
+                percent_complete=100.0,
+                message=f"Aggregated {n_entities:,} entities with {n_output_features} features",
+            ),
+        )
+
+        # Build labels array
         y_array = np.zeros(n_entities, dtype=np.int64)
+        for idx, entity_id in enumerate(entity_ids):
+            if entity_id not in entity_labels:
+                raise ValueError(f"Missing labels for 1 entities. First few: ['{entity_id}']")
+            y_array[idx] = entity_labels[entity_id]
 
-        entity_ids = list(entity_rows.keys())
-        for entity_num, entity_id in enumerate(entity_ids):
-            entity_data = entity_rows[entity_id]
+        sanitize_array_inplace(x_array)
 
-            # Aggregate features based on strategy
-            x_array[entity_num] = self._aggregate_entity(
-                entity_data,
-                feature_indices,
-                encoding_lookup,
-                categorical_columns,
-                aggregation,
-            )
-
-            # Get label for this entity
-            y_array[entity_num] = entity_labels[entity_id]
-
-        # Replace any remaining NaN/inf with 0.0
-        x_array = np.nan_to_num(x_array, nan=0.0, posinf=0.0, neginf=0.0)
-
-        # Compute metadata
+        # Build metadata
         n_positive = int(np.sum(y_array))
         n_negative = n_entities - n_positive
         positive_ratio = n_positive / n_entities if n_entities > 0 else 0.0
@@ -181,271 +315,139 @@ class TimeSeriesCSVLoader:
     def _read_csv(
         self,
         file_path: Path,
-        encoding: str,
-    ) -> tuple[list[str], list[list[str]]]:
-        """Read CSV file and return headers and rows.
+        encoding: FileEncoding,
+        progress_callback: ProgressCallbackProtocol | None,
+    ) -> PolarsDataFrameProtocol:
+        """Read CSV file using Polars.
 
         Args:
             file_path: Path to CSV file.
-            encoding: File encoding to use.
+            encoding: File encoding.
+            progress_callback: Optional progress callback.
 
         Returns:
-            Tuple of (headers, rows).
+            Polars DataFrame.
 
         Raises:
             ValueError: If no data rows found.
         """
-        rows: list[list[str]] = []
-        headers: list[str] = []
+        file_size = file_path.stat().st_size
+        polars_encoding = convert_encoding(encoding)
 
-        with open(file_path, encoding=encoding, newline="") as f:
-            reader = csv.reader(f)
-            for line_values in reader:
-                if not headers:
-                    headers = [h.strip() for h in line_values]
-                    continue
-                rows.append(line_values)
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="reading",
+                bytes_read=0,
+                bytes_total=file_size,
+                rows_processed=0,
+                rows_total=0,
+                percent_complete=0.0,
+                message=f"Reading {file_path.name}...",
+            ),
+        )
 
-        if not rows:
+        polars_mod = __import__("polars")
+        read_csv_fn: PolarsReadCSVProtocol = polars_mod.read_csv
+        df: PolarsDataFrameProtocol = read_csv_fn(
+            file_path,
+            encoding=polars_encoding,
+            infer_schema_length=0,
+        )
+
+        if df.height == 0:
             raise ValueError(f"No data rows found in {file_path}")
 
-        return headers, rows
+        report_progress(
+            progress_callback,
+            LoadProgress(
+                phase="reading",
+                bytes_read=file_size,
+                bytes_total=file_size,
+                rows_processed=df.height,
+                rows_total=df.height,
+                percent_complete=100.0,
+                message=f"Read {df.height:,} rows from {file_path.name}",
+            ),
+        )
 
-    def _sort_by_time(
+        return df
+
+    def _get_feature_columns(
         self,
-        rows: list[list[str]],
-        time_idx: int,
-    ) -> list[list[str]]:
-        """Sort rows by time column value.
-
-        Handles both numeric and string time values.
-        Numeric values are sorted numerically, strings lexicographically.
+        headers: list[str],
+        config: TimeSeriesDatasetConfig,
+    ) -> list[str]:
+        """Get list of feature column names.
 
         Args:
-            rows: List of data rows.
-            time_idx: Index of time column.
+            headers: All column headers.
+            config: Dataset configuration.
 
         Returns:
-            Rows sorted by time in ascending order.
+            List of feature column names.
         """
+        ts_spec = config["time_series"]
+        target_spec = config["target"]
 
-        def sort_key(row: list[str]) -> tuple[int, float, str]:
-            """Generate sort key: (is_numeric, numeric_val, string_val)."""
-            value = row[time_idx] if time_idx < len(row) else ""
-            stripped = value.strip()
+        exclude_set = set(config["exclude_columns"])
+        exclude_set.add(ts_spec["entity_column"])
+        exclude_set.add(ts_spec["time_column"])
+        exclude_set.add(target_spec["column_name"])
 
-            # Check if numeric
-            if stripped in MISSING_VALUES:
-                return (0, 0.0, "")
-
-            cleaned = stripped.replace(",", "")
-            if cleaned.lstrip("-").replace(".", "").replace("e", "").isdigit():
-                return (0, float(cleaned), "")
-            return (1, 0.0, stripped)
-
-        return sorted(rows, key=sort_key)
+        return [h for h in headers if h not in exclude_set]
 
     def _load_labels(
         self,
         config: TimeSeriesDatasetConfig,
         external_dir: Path,
         ts_spec: TimeSeriesSpec,
-        entity_ids: list[str],
     ) -> dict[str, int]:
-        """Load labels for each entity.
-
-        Labels may be in a separate file or in the main data file.
+        """Load labels from separate labels file.
 
         Args:
             config: Dataset configuration.
             external_dir: Root directory for datasets.
             ts_spec: Time-series specification.
-            entity_ids: List of unique entity IDs.
 
         Returns:
             Dictionary mapping entity ID to label (0 or 1).
 
         Raises:
             FileNotFoundError: If labels file doesn't exist.
-            ValueError: If entity missing label.
+            ValueError: If label parsing fails or no data rows.
         """
         target_spec = config["target"]
+        labels_path = external_dir / config["folder"] / ts_spec["labels_file"]
 
-        if ts_spec["labels_file"]:
-            # Load from separate labels file
-            labels_path = external_dir / config["folder"] / ts_spec["labels_file"]
-            if not labels_path.exists():
-                raise FileNotFoundError(f"Labels file not found: {labels_path}")
+        if not labels_path.exists():
+            raise FileNotFoundError(f"Labels file not found: {labels_path}")
 
-            headers, rows = self._read_csv(labels_path, config["encoding"])
-            entity_col_idx = find_column_index(
-                headers, ts_spec["labels_entity_column"]
-            )
-            target_idx = find_column_index(headers, target_spec["column_name"])
+        labels: dict[str, int] = {}
 
-            labels: dict[str, int] = {}
-            for row_idx, row in enumerate(rows):
-                entity_id = row[entity_col_idx] if entity_col_idx < len(row) else ""
-                target_value = row[target_idx] if target_idx < len(row) else ""
+        with open(labels_path, encoding=config["encoding"], newline="") as f:
+            reader = csv.reader(f)
+            headers: list[str] = []
+
+            for line_values in reader:
+                if not headers:
+                    headers = [h.strip() for h in line_values]
+                    continue
+
+                entity_col_idx = find_column_index(headers, ts_spec["labels_entity_column"])
+                target_idx = find_column_index(headers, target_spec["column_name"])
+
+                entity_id = line_values[entity_col_idx] if entity_col_idx < len(line_values) else ""
+                target_value = line_values[target_idx] if target_idx < len(line_values) else ""
+
                 labels[entity_id] = encode_label(
-                    target_value, target_spec, row_idx, labels_path
+                    target_value, target_spec, len(labels), labels_path
                 )
 
-            # Verify all entities have labels
-            missing = set(entity_ids) - set(labels.keys())
-            if missing:
-                raise ValueError(
-                    f"Missing labels for {len(missing)} entities. "
-                    f"First few: {list(missing)[:5]}"
-                )
+        if not labels:
+            raise ValueError(f"No data rows found in {labels_path}")
 
-            return labels
-
-        # Labels in main file - take label from first (or only) row per entity
-        # This assumes all rows for an entity have the same label
-        raise ValueError(
-            "Time-series datasets must have labels_file specified in time_series spec"
-        )
-
-    def _aggregate_entity(
-        self,
-        rows: list[list[str]],
-        feature_indices: list[int],
-        encoding_lookup: dict[int, dict[str, int]],
-        categorical_columns: set[int],
-        aggregation: AggregationStrategy,
-    ) -> NDArray[np.float64]:
-        """Aggregate multiple rows for a single entity into one feature vector.
-
-        Args:
-            rows: All rows for this entity (sorted by time).
-            feature_indices: Indices of feature columns in raw data.
-            encoding_lookup: Categorical encoding mappings.
-            categorical_columns: Set of categorical feature indices.
-            aggregation: Aggregation strategy to use.
-
-        Returns:
-            Aggregated feature vector.
-        """
-        n_features = len(feature_indices)
-
-        if aggregation == "last":
-            # Take the last (most recent) observation
-            row = rows[-1]
-            return self._extract_features(
-                row, feature_indices, encoding_lookup, categorical_columns
-            )
-
-        if aggregation == "first":
-            # Take the first (oldest) observation
-            row = rows[0]
-            return self._extract_features(
-                row, feature_indices, encoding_lookup, categorical_columns
-            )
-
-        # For mean and statistics, we need to collect all values
-        feature_values: list[list[float]] = [[] for _ in range(n_features)]
-
-        for row in rows:
-            for feat_idx, col_idx in enumerate(feature_indices):
-                value = row[col_idx] if col_idx < len(row) else ""
-                stripped = value.strip()
-
-                if feat_idx in encoding_lookup:
-                    # Categorical - encode
-                    parsed = encode_categorical_value(value, encoding_lookup[feat_idx])
-                elif stripped not in MISSING_VALUES:
-                    # Numeric - parse (skip missing for aggregation)
-                    parsed = parse_numeric_value(value)
-                    feature_values[feat_idx].append(parsed)
-                    continue
-                else:
-                    continue
-
-                feature_values[feat_idx].append(parsed)
-
-        if aggregation == "mean":
-            result = np.zeros(n_features, dtype=np.float64)
-            for feat_idx in range(n_features):
-                vals = feature_values[feat_idx]
-                if vals:
-                    vals_arr: NDArray[np.float64] = np.array(vals, dtype=np.float64)
-                    mean_val: np.float64 = vals_arr.mean()
-                    result[feat_idx] = float(mean_val)
-            return result
-
-        # aggregation == "statistics"
-        # 4 stats per feature: mean, std, min, max
-        result = np.zeros(n_features * 4, dtype=np.float64)
-        for feat_idx in range(n_features):
-            vals = feature_values[feat_idx]
-            offset = feat_idx * 4
-            if vals:
-                arr: NDArray[np.float64] = np.array(vals, dtype=np.float64)
-                mean_stat: np.float64 = arr.mean()
-                std_stat: np.float64 = arr.std()
-                min_stat: np.float64 = arr.min()
-                max_stat: np.float64 = arr.max()
-                result[offset] = float(mean_stat)
-                result[offset + 1] = float(std_stat)
-                result[offset + 2] = float(min_stat)
-                result[offset + 3] = float(max_stat)
-        return result
-
-    def _extract_features(
-        self,
-        row: list[str],
-        feature_indices: list[int],
-        encoding_lookup: dict[int, dict[str, int]],
-        categorical_columns: set[int],
-    ) -> NDArray[np.float64]:
-        """Extract features from a single row.
-
-        Args:
-            row: Single data row.
-            feature_indices: Indices of feature columns.
-            encoding_lookup: Categorical encoding mappings.
-            categorical_columns: Set of categorical feature indices.
-
-        Returns:
-            Feature vector for this row.
-        """
-        n_features = len(feature_indices)
-        result = np.zeros(n_features, dtype=np.float64)
-
-        for feat_idx, col_idx in enumerate(feature_indices):
-            value = row[col_idx] if col_idx < len(row) else ""
-
-            if feat_idx in encoding_lookup:
-                result[feat_idx] = encode_categorical_value(
-                    value, encoding_lookup[feat_idx]
-                )
-            else:
-                result[feat_idx] = parse_numeric_value(value)
-
-        return result
-
-    def _build_statistics_feature_names(
-        self,
-        base_names: list[str],
-    ) -> list[str]:
-        """Build feature names for statistics aggregation.
-
-        Creates 4 names per base feature: _mean, _std, _min, _max.
-
-        Args:
-            base_names: Original feature names.
-
-        Returns:
-            Expanded feature names with statistical suffixes.
-        """
-        result: list[str] = []
-        for name in base_names:
-            result.append(f"{name}_mean")
-            result.append(f"{name}_std")
-            result.append(f"{name}_min")
-            result.append(f"{name}_max")
-        return result
+        return labels
 
 
 def create_timeseries_csv_loader() -> TimeSeriesCSVLoader:

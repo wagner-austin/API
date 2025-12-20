@@ -5,11 +5,14 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pytest
 from numpy.typing import NDArray
 
 from covenant_ml.metrics import (
+    _compute_weighted_gini,
     compute_accuracy,
     compute_all_metrics,
+    compute_amex_metric,
     compute_auc,
     compute_f1_score,
     compute_log_loss,
@@ -353,3 +356,113 @@ def test_format_metrics_str_format() -> None:
 
     parts = result.split("=")
     assert len(parts) > 1
+
+
+# =============================================================================
+# AMEX Competition Metric Tests
+# =============================================================================
+
+
+def test_compute_amex_metric_perfect_predictions() -> None:
+    """AMEX metric is 1.0 for perfect predictions."""
+    # Perfect ranking: all positives ranked higher than negatives
+    y_true = _make_int_array([1, 1, 1, 0, 0, 0, 0, 0])
+    y_pred = _make_float_array([0.9, 0.8, 0.7, 0.3, 0.2, 0.15, 0.1, 0.05])
+
+    result = compute_amex_metric(y_true, y_pred)
+
+    assert result["score"] == 1.0
+    assert result["normalized_gini"] == 1.0
+    assert result["default_rate_at_4_percent"] == 1.0
+
+
+def test_compute_amex_metric_returns_all_components() -> None:
+    """AMEX metric result contains all required fields."""
+    y_true = _make_int_array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    y_pred = _make_float_array([0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0.08, 0.05])
+
+    result = compute_amex_metric(y_true, y_pred)
+
+    assert "score" in result
+    assert "normalized_gini" in result
+    assert "default_rate_at_4_percent" in result
+    assert 0.0 <= result["score"] <= 1.0
+    assert 0.0 <= result["normalized_gini"] <= 1.0
+    assert 0.0 <= result["default_rate_at_4_percent"] <= 1.0
+
+
+def test_compute_amex_metric_score_is_average() -> None:
+    """AMEX score is average of Gini and D@4%."""
+    y_true = _make_int_array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    y_pred = _make_float_array([0.9, 0.8, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0.08, 0.05])
+
+    result = compute_amex_metric(y_true, y_pred)
+
+    expected_score = 0.5 * (result["normalized_gini"] + result["default_rate_at_4_percent"])
+    assert abs(result["score"] - expected_score) < 1e-10
+
+
+def test_compute_amex_metric_raises_on_length_mismatch() -> None:
+    """AMEX metric raises ValueError on array length mismatch."""
+    y_true = _make_int_array([1, 0, 0])
+    y_pred = _make_float_array([0.8, 0.2])
+
+    with pytest.raises(ValueError, match="Array length mismatch"):
+        compute_amex_metric(y_true, y_pred)
+
+
+def test_compute_amex_metric_raises_on_empty_arrays() -> None:
+    """AMEX metric raises ValueError on empty arrays."""
+    y_true: NDArray[np.int64] = np.zeros(0, dtype=np.int64)
+    y_pred: NDArray[np.float64] = np.zeros(0, dtype=np.float64)
+
+    with pytest.raises(ValueError, match="Cannot compute metric on empty arrays"):
+        compute_amex_metric(y_true, y_pred)
+
+
+def test_compute_amex_metric_raises_on_no_positives() -> None:
+    """AMEX metric raises ValueError when no positive samples exist."""
+    y_true = _make_int_array([0, 0, 0, 0])
+    y_pred = _make_float_array([0.8, 0.6, 0.4, 0.2])
+
+    with pytest.raises(ValueError, match="Cannot compute metric with no positive samples"):
+        compute_amex_metric(y_true, y_pred)
+
+
+def test_compute_amex_metric_weighted_negatives() -> None:
+    """AMEX metric applies 20x weight to negative samples."""
+    # With 20x weight on negatives, the effective ratio changes
+    # 2 positives + 8 negatives * 20 = 2 + 160 = 162 effective samples
+    # Top 4% of 162 = ~6.5 samples
+    y_true = _make_int_array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    y_pred = _make_float_array([0.95, 0.90, 0.85, 0.80, 0.70, 0.60, 0.50, 0.40, 0.30, 0.20])
+
+    result = compute_amex_metric(y_true, y_pred)
+
+    # With good predictions, positives should be captured in top 4%
+    assert result["default_rate_at_4_percent"] > 0.0
+    assert result["score"] > 0.5
+
+
+def test_compute_amex_metric_poor_predictions() -> None:
+    """AMEX metric is low for poor predictions."""
+    # Positives ranked lower than negatives
+    y_true = _make_int_array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    y_pred = _make_float_array([0.1, 0.2, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3])
+
+    result = compute_amex_metric(y_true, y_pred)
+
+    # Poor predictions should give low Gini
+    assert result["normalized_gini"] < 0.5
+    assert result["score"] < 0.5
+
+
+def test_compute_weighted_gini_all_zeros_returns_zero() -> None:
+    """Weighted Gini returns 0.0 when all labels are zero."""
+    # This tests the edge case in _compute_weighted_gini when total_weighted_pos == 0
+    y_true: NDArray[np.float64] = np.zeros(5, dtype=np.float64)
+    y_pred: NDArray[np.float64] = _make_float_array([0.9, 0.7, 0.5, 0.3, 0.1])
+
+    result = _compute_weighted_gini(y_true, y_pred, sort_by_pred=True)
+
+    assert result == 0.0

@@ -22,7 +22,7 @@ from covenant_ml.features import (
 )
 from covenant_ml.metrics import compute_auc
 from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
-from covenant_ml.trainer import stratified_split
+from covenant_ml.trainer import preprocess_data_splits, stratified_split
 
 _log = get_logger(__name__)
 
@@ -143,8 +143,8 @@ class XGBoostObjective:
         # Store actual feature count (after engineering)
         self._n_features = int(x_engineered.shape[1])
 
-        # Pre-split data once (stratified)
-        self._splits = stratified_split(
+        # Pre-split and preprocess data once
+        raw_splits = stratified_split(
             x_engineered,
             y_labels,
             train_ratio=0.7,
@@ -152,6 +152,8 @@ class XGBoostObjective:
             test_ratio=0.15,
             random_state=42,
         )
+        self._splits = preprocess_data_splits(raw_splits)
+
         # Resolve device once
         self._device = ("cuda" if _cuda_available() else "cpu") if device == "auto" else device
 
@@ -160,7 +162,7 @@ class XGBoostObjective:
         n_neg = len(self._splits.y_train) - n_pos
         self._scale_pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
 
-        # Pre-create DMatrix objects (device is set in params, not DMatrix)
+        # Pre-create DMatrix objects with preprocessed data
         dmatrix_cls, train_fn = _get_xgb_dmatrix_and_train()
         self._train_dmatrix = dmatrix_cls(
             self._splits.x_train,

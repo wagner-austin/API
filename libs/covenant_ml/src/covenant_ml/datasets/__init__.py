@@ -15,19 +15,26 @@ from covenant_ml.datasets.loader import (
     DatasetLoader,
     create_dataset_loader,
 )
+from covenant_ml.datasets.loaders.timeseries_csv_loader import (
+    TimeSeriesCSVLoader,
+    create_timeseries_csv_loader,
+)
 from covenant_ml.datasets.protocol import (
     DatasetLoaderProtocol,
     DatasetValidatorProtocol,
 )
 from covenant_ml.datasets.registry import (
     DatasetRegistry,
+    TimeSeriesDatasetRegistry,
     make_default_registry,
+    make_default_timeseries_registry,
 )
 from covenant_ml.datasets.testing import (
     FakeDatasetLoader,
     create_fake_dataset_loader,
 )
 from covenant_ml.datasets.types import (
+    AggregationStrategy,
     DatasetConfig,
     DatasetMeta,
     DatasetValidationResult,
@@ -36,28 +43,32 @@ from covenant_ml.datasets.types import (
     LabelType,
     LoadedDataset,
     TargetColumnSpec,
+    TimeSeriesDatasetConfig,
+    TimeSeriesSpec,
 )
 
 __all__ = [
-    # Types
+    "AggregationStrategy",
     "DatasetConfig",
+    "DatasetLoader",
+    "DatasetLoaderProtocol",
     "DatasetMeta",
+    "DatasetRegistry",
     "DatasetValidationResult",
+    "DatasetValidatorProtocol",
+    "FakeDatasetLoader",
     "FileEncoding",
     "FileFormat",
     "LabelType",
     "LoadedDataset",
     "TargetColumnSpec",
-    # Protocols
-    "DatasetLoaderProtocol",
-    "DatasetValidatorProtocol",
-    # Registry
-    "DatasetRegistry",
-    "make_default_registry",
-    # Loader
-    "DatasetLoader",
+    "TimeSeriesCSVLoader",
+    "TimeSeriesDatasetConfig",
+    "TimeSeriesDatasetRegistry",
+    "TimeSeriesSpec",
     "create_dataset_loader",
-    # Testing utilities
-    "FakeDatasetLoader",
     "create_fake_dataset_loader",
+    "create_timeseries_csv_loader",
+    "make_default_registry",
+    "make_default_timeseries_registry",
 ]

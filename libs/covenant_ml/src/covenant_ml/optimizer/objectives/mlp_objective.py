@@ -18,6 +18,7 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.backends.mlp import create_mlp_backend
+from covenant_ml.backends.protocol import ProgressCallback
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -47,6 +48,7 @@ class MLPObjective:
         n_epochs: int,
         early_stopping_patience: int,
         optimizer_name: MLPOptimizer = "adamw",
+        epoch_callback: ProgressCallback | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
 
@@ -60,6 +62,7 @@ class MLPObjective:
             n_epochs: Maximum training epochs per trial.
             early_stopping_patience: Early stopping patience.
             optimizer_name: Optimizer to use (adamw, adam, sgd).
+            epoch_callback: Optional callback for epoch-level progress updates.
         """
         # Apply feature engineering BEFORE storing
         if feature_preset != "none":
@@ -94,6 +97,7 @@ class MLPObjective:
         self._n_epochs = n_epochs
         self._early_stopping_patience = early_stopping_patience
         self._optimizer_name = optimizer_name
+        self._epoch_callback = epoch_callback
 
     @property
     def n_features(self) -> int:
@@ -167,7 +171,7 @@ class MLPObjective:
                 feature_names=self._feature_names,
                 config=config,
                 output_dir=Path(tmpdir),
-                progress=None,
+                progress=self._epoch_callback,
             )
 
         return outcome["best_val_auc"]
@@ -183,6 +187,7 @@ def create_mlp_objective(
     n_epochs: int,
     early_stopping_patience: int,
     optimizer_name: MLPOptimizer = "adamw",
+    epoch_callback: ProgressCallback | None = None,
 ) -> MLPObjective:
     """Create an objective function for MLP optimization.
 
@@ -200,6 +205,7 @@ def create_mlp_objective(
         n_epochs: Maximum training epochs per trial.
         early_stopping_patience: Early stopping patience.
         optimizer_name: Optimizer to use (adamw, adam, sgd).
+        epoch_callback: Optional callback for epoch-level progress updates.
 
     Returns:
         Objective callable with n_features property for engineered feature count.
@@ -214,6 +220,7 @@ def create_mlp_objective(
         n_epochs,
         early_stopping_patience,
         optimizer_name,
+        epoch_callback,
     )
 
 

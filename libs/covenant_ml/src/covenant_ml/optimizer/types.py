@@ -9,6 +9,17 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 # =============================================================================
+# Device Types
+# =============================================================================
+
+# User-facing device request (common across all backends)
+DeviceRequest = Literal["cpu", "cuda", "auto"]
+
+# LightGBM-specific device parameter
+# Note: "cuda" is Linux-only; "gpu" uses OpenCL and works on all platforms
+LightGBMDevice = Literal["cpu", "gpu", "cuda"]
+
+# =============================================================================
 # Parameter Specification Types
 # =============================================================================
 
@@ -118,9 +129,14 @@ class LSTMSearchSpace(TypedDict, total=True):
 
 
 class LightGBMSearchSpace(TypedDict, total=True):
-    """Search space for LightGBM hyperparameters."""
+    """Search space for LightGBM hyperparameters.
 
-    max_depth: IntRangeSpec | CategoricalIntSpec
+    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
+    where num_leaves is the primary complexity control. Using max_depth=-1
+    (unlimited) with num_leaves avoids constraint conflicts that can cause
+    training failures when num_leaves > 2^max_depth.
+    """
+
     n_estimators: IntRangeSpec | CategoricalIntSpec
     num_leaves: IntRangeSpec | CategoricalIntSpec
     learning_rate: FloatRangeSpec | CategoricalFloatSpec
@@ -188,9 +204,11 @@ class OptimizationConfig(TypedDict, total=True):
 __all__ = [
     "CategoricalFloatSpec",
     "CategoricalIntSpec",
+    "DeviceRequest",
     "FloatRangeSpec",
     "IntRangeSpec",
     "LSTMSearchSpace",
+    "LightGBMDevice",
     "LightGBMSearchSpace",
     "MLPSearchSpace",
     "OptimizationConfig",

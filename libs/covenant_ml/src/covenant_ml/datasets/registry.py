@@ -14,6 +14,7 @@ from covenant_ml.datasets.types import (
     DatasetConfig,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
+    TimeSeriesSpec,
 )
 
 
@@ -124,9 +125,7 @@ class TimeSeriesDatasetRegistry:
         """
         if name not in self._configs:
             available = ", ".join(sorted(self._configs.keys()))
-            raise KeyError(
-                f"Time-series dataset '{name}' not found. Available: {available}"
-            )
+            raise KeyError(f"Time-series dataset '{name}' not found. Available: {available}")
         return self._configs[name]
 
     def list_names(self) -> tuple[str, ...]:
@@ -167,35 +166,36 @@ def make_default_timeseries_registry() -> TimeSeriesDatasetRegistry:
 
 
 # Verified time-series dataset configurations
-# Add configs here as datasets are validated
 _VERIFIED_TIMESERIES_CONFIGS: tuple[TimeSeriesDatasetConfig, ...] = (
-    # Add time-series datasets here as they are verified
-    # Example structure (commented out until verified):
-    # TimeSeriesDatasetConfig(
-    #     name="kaggle_amex_default",
-    #     display_name="AMEX Default Prediction",
-    #     folder="kaggle_amex_default",
-    #     file_name="train_data.csv",
-    #     file_format="csv",
-    #     encoding="utf-8",
-    #     target=TargetColumnSpec(
-    #         column_name="target",
-    #         label_type="binary_int",
-    #         positive_values=(1,),
-    #         negative_values=(0,),
-    #     ),
-    #     exclude_columns=(),
-    #     n_samples_expected=458913,
-    #     n_features_expected=188,
-    #     positive_class_ratio_expected=0.26,
-    #     time_series=TimeSeriesSpec(
-    #         entity_column="customer_ID",
-    #         time_column="S_2",
-    #         aggregation="last",
-    #         labels_file="train_labels.csv",
-    #         labels_entity_column="customer_ID",
-    #     ),
-    # ),
+    # AMEX Default Prediction (Kaggle competition)
+    # ~458K customers, 188 features, ~13 time steps per customer
+    TimeSeriesDatasetConfig(
+        name="kaggle_amex_default",
+        display_name="AMEX Default Prediction",
+        folder="kaggle_amex_default",
+        file_name="train_data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=TargetColumnSpec(
+            column_name="target",
+            label_type="binary_int",
+            positive_values=(1,),
+            negative_values=(0,),
+        ),
+        exclude_columns=(),
+        n_samples_expected=458913,
+        n_features_expected=188,
+        positive_class_ratio_expected=0.26,
+        time_series=TimeSeriesSpec(
+            entity_column="customer_ID",
+            time_column="S_2",
+            aggregation="last",
+            labels_file="train_labels.csv",
+            labels_entity_column="customer_ID",
+            include_rank_features=False,
+            include_diff_features=False,
+        ),
+    ),
 )
 
 

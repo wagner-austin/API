@@ -18,6 +18,7 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from covenant_ml.backends.lstm import create_lstm_backend
+from covenant_ml.backends.protocol import ProgressCallback
 from covenant_ml.features import (
     FeaturePreset,
     engineer_features,
@@ -51,6 +52,7 @@ class LSTMObjective:
         early_stopping_patience: int,
         sequence_length: int,
         bidirectional: bool = False,
+        epoch_callback: ProgressCallback | None = None,
     ) -> None:
         """Initialize with data and fixed training configuration.
 
@@ -65,6 +67,7 @@ class LSTMObjective:
             early_stopping_patience: Early stopping patience.
             sequence_length: Number of timesteps in each sequence.
             bidirectional: Whether to use bidirectional LSTM.
+            epoch_callback: Optional callback for epoch-level progress updates.
         """
         # Apply feature engineering BEFORE storing
         if feature_preset != "none":
@@ -100,6 +103,7 @@ class LSTMObjective:
         self._early_stopping_patience = early_stopping_patience
         self._sequence_length = sequence_length
         self._bidirectional = bidirectional
+        self._epoch_callback = epoch_callback
 
     @property
     def n_features(self) -> int:
@@ -172,7 +176,7 @@ class LSTMObjective:
                 feature_names=self._feature_names,
                 config=config,
                 output_dir=Path(tmpdir),
-                progress=None,
+                progress=self._epoch_callback,
             )
 
         return outcome["best_val_auc"]
@@ -189,6 +193,7 @@ def create_lstm_objective(
     early_stopping_patience: int,
     sequence_length: int,
     bidirectional: bool = False,
+    epoch_callback: ProgressCallback | None = None,
 ) -> LSTMObjective:
     """Create an objective function for LSTM optimization.
 
@@ -207,6 +212,7 @@ def create_lstm_objective(
         early_stopping_patience: Early stopping patience.
         sequence_length: Number of timesteps in each sequence.
         bidirectional: Whether to use bidirectional LSTM.
+        epoch_callback: Optional callback for epoch-level progress updates.
 
     Returns:
         Objective callable with n_features property for engineered feature count.
@@ -222,6 +228,7 @@ def create_lstm_objective(
         early_stopping_patience,
         sequence_length,
         bidirectional,
+        epoch_callback,
     )
 
 

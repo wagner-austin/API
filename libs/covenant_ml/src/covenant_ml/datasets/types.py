@@ -11,9 +11,44 @@ from typing import Literal, TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
-
 # File format literals
 FileFormat = Literal["csv", "arff", "excel"]
+
+# Loading phase literals for progress reporting
+LoadPhase = Literal[
+    "reading",  # Reading raw data from file
+    "parsing",  # Parsing and converting data types
+    "encoding",  # Building categorical encodings
+    "aggregating",  # Aggregating time-series data
+    "caching",  # Writing to parquet cache
+    "loading_cache",  # Loading from parquet cache
+]
+
+
+class LoadProgress(TypedDict, total=True):
+    """Progress state during dataset loading.
+
+    Reports current phase, completion percentage, and contextual information.
+    Immutable snapshot of loading progress at a point in time.
+
+    Attributes:
+        phase: Current loading phase.
+        bytes_read: Number of bytes read from source file.
+        bytes_total: Total bytes in source file.
+        rows_processed: Number of rows processed so far.
+        rows_total: Total rows (0 if unknown during streaming).
+        percent_complete: Completion percentage (0.0 to 100.0).
+        message: Human-readable status message.
+    """
+
+    phase: LoadPhase
+    bytes_read: int
+    bytes_total: int
+    rows_processed: int
+    rows_total: int
+    percent_complete: float
+    message: str
+
 
 # Encoding literals
 FileEncoding = Literal["utf-8", "utf-8-sig", "latin-1", "cp1252"]
@@ -110,6 +145,8 @@ class TimeSeriesSpec(TypedDict, total=True):
         aggregation: Strategy for aggregating features per entity.
         labels_file: Separate labels file name, or empty string if labels in main file.
         labels_entity_column: Entity column name in labels file (for joining).
+        include_rank_features: Whether to compute per-entity percentile rank features.
+        include_diff_features: Whether to compute row-to-row diff features.
     """
 
     entity_column: str
@@ -117,6 +154,8 @@ class TimeSeriesSpec(TypedDict, total=True):
     aggregation: AggregationStrategy
     labels_file: str
     labels_entity_column: str
+    include_rank_features: bool
+    include_diff_features: bool
 
 
 class TimeSeriesDatasetConfig(DatasetConfig, total=True):
@@ -199,6 +238,8 @@ __all__ = [
     "FileEncoding",
     "FileFormat",
     "LabelType",
+    "LoadPhase",
+    "LoadProgress",
     "LoadedDataset",
     "TargetColumnSpec",
     "TimeSeriesDatasetConfig",

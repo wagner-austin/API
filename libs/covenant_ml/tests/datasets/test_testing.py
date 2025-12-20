@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from covenant_ml.datasets.testing import (
     FakeDatasetLoader,

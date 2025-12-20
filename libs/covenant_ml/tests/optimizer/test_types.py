@@ -131,9 +131,13 @@ def test_lstm_search_space_construction() -> None:
 
 
 def test_lightgbm_search_space_construction() -> None:
-    """LightGBMSearchSpace can be constructed with all required fields."""
+    """LightGBMSearchSpace can be constructed with all required fields.
+
+    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
+    where num_leaves is the primary complexity control. Using max_depth=-1
+    (unlimited) avoids constraint conflicts when num_leaves > 2^max_depth.
+    """
     space: LightGBMSearchSpace = {
-        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
         "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
         "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
         "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
@@ -142,8 +146,8 @@ def test_lightgbm_search_space_construction() -> None:
         "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
         "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
     }
-    assert space["max_depth"]["param_type"] == "int"
     assert space["num_leaves"]["param_type"] == "int"
+    assert space["n_estimators"]["param_type"] == "int"
 
 
 def test_sampled_int_params_construction() -> None:
@@ -359,9 +363,11 @@ def test_search_space_union_accepts_lstm() -> None:
 
 
 def test_search_space_union_accepts_lightgbm() -> None:
-    """SearchSpace union accepts LightGBMSearchSpace."""
+    """SearchSpace union accepts LightGBMSearchSpace.
+
+    Note: max_depth is intentionally excluded from LightGBM search space.
+    """
     lgbm_space: LightGBMSearchSpace = {
-        "max_depth": {"param_type": "int", "low": 3, "high": 12, "log_scale": False},
         "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
         "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
         "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
@@ -372,4 +378,4 @@ def test_search_space_union_accepts_lightgbm() -> None:
     }
     space: SearchSpace = lgbm_space
     assert "num_leaves" in space
-    assert "max_depth" in space
+    assert "n_estimators" in space

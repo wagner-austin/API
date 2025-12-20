@@ -9,7 +9,7 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -21,8 +21,13 @@ from covenant_ml.features import (
     get_feature_config_for_preset,
 )
 from covenant_ml.metrics import compute_auc
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
-from covenant_ml.trainer import stratified_split
+from covenant_ml.optimizer.types import (
+    DeviceRequest,
+    LightGBMDevice,
+    SampledFloatParams,
+    SampledIntParams,
+)
+from covenant_ml.trainer import preprocess_data_splits, stratified_split
 
 _log = get_logger(__name__)
 
@@ -98,6 +103,45 @@ def _get_lgb_dataset_and_train() -> tuple[
     return dataset_cls, train_fn, early_stopping
 
 
+def _resolve_lightgbm_device(
+    device: DeviceRequest,
+    *,
+    platform: str | None = None,
+) -> LightGBMDevice:
+    """Resolve user device request to LightGBM-compatible device parameter.
+
+    LightGBM has three device modes:
+    - "cpu": CPU-only training
+    - "gpu": OpenCL-based GPU training (works on Windows, Linux, macOS)
+    - "cuda": CUDA Tree Learner (Linux-only, requires CUDA build)
+
+    Since CUDA is not supported on Windows, this function maps "cuda" to "gpu"
+    (OpenCL) on Windows to provide transparent GPU acceleration.
+
+    Args:
+        device: User-requested device ("cpu", "cuda", or "auto").
+        platform: Override for sys.platform (for testing). If None, uses sys.platform.
+
+    Returns:
+        LightGBM device parameter ("cpu", "gpu", or "cuda").
+    """
+    import sys
+
+    actual_platform = platform if platform is not None else sys.platform
+
+    if device == "auto":
+        return "cpu"
+    if device == "cuda" and actual_platform == "win32":
+        _log.info(
+            "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
+            extra={"requested_device": device, "resolved_device": "gpu"},
+        )
+        return "gpu"
+    if device == "cuda":
+        return "cuda"
+    return "cpu"
+
+
 # =============================================================================
 # LightGBM Objective
 # =============================================================================
@@ -115,19 +159,19 @@ class LightGBMObjective:
         x_features: NDArray[np.float64],
         y_labels: NDArray[np.int64],
         feature_names: list[str],
-        device: Literal["cpu", "cuda", "auto"],
+        device: DeviceRequest,
         feature_preset: FeaturePreset,
         early_stopping_rounds: int = 10,
     ) -> None:
         """Initialize with data and configuration.
 
         Args:
-            x_features: Feature matrix
-            y_labels: Binary labels
-            feature_names: Original feature names
-            device: Device to use for training (cpu/cuda/auto)
-            feature_preset: Feature engineering preset to apply
-            early_stopping_rounds: Stop if no improvement for this many rounds
+            x_features: Feature matrix.
+            y_labels: Binary labels.
+            feature_names: Original feature names.
+            device: Device to use for training (cpu/cuda/auto).
+            feature_preset: Feature engineering preset to apply.
+            early_stopping_rounds: Stop if no improvement for this many rounds.
         """
         # Apply feature engineering BEFORE splitting
         if feature_preset != "none":
@@ -156,8 +200,8 @@ class LightGBMObjective:
         self._n_features = int(x_engineered.shape[1])
         self._early_stopping_rounds = early_stopping_rounds
 
-        # Pre-split data once (stratified)
-        self._splits = stratified_split(
+        # Pre-split and preprocess data once
+        raw_splits = stratified_split(
             x_engineered,
             y_labels,
             train_ratio=0.7,
@@ -165,16 +209,17 @@ class LightGBMObjective:
             test_ratio=0.15,
             random_state=42,
         )
+        self._splits = preprocess_data_splits(raw_splits)
 
-        # Resolve device once (LightGBM uses "cpu" or "gpu")
-        self._device = "cpu" if device == "auto" else device
+        # Resolve device to LightGBM-compatible value
+        self._device: LightGBMDevice = _resolve_lightgbm_device(device)
 
         # Calculate scale_pos_weight from training data (once)
         n_pos = int(np.sum(self._splits.y_train))
         n_neg = len(self._splits.y_train) - n_pos
         self._scale_pos_weight = float(n_neg) / float(n_pos) if n_pos > 0 else 1.0
 
-        # Pre-create Dataset objects
+        # Pre-create Dataset objects with preprocessed data
         dataset_cls, train_fn, early_stopping = _get_lgb_dataset_and_train()
         self._train_dataset = dataset_cls(
             self._splits.x_train,
@@ -229,7 +274,9 @@ class LightGBMObjective:
         _ = train_ratio, val_ratio, test_ratio
 
         # Extract hyperparameters from typed dicts
-        max_depth = int_params["max_depth"]
+        # Note: max_depth is fixed at -1 (unlimited) to let num_leaves control
+        # tree complexity. This avoids constraint conflicts when
+        # num_leaves > 2^max_depth, which can cause training failures.
         n_estimators = int_params["n_estimators"]
         num_leaves = int_params.get("num_leaves", 31)
         min_child_samples = int_params.get("min_child_samples", 20)
@@ -245,7 +292,7 @@ class LightGBMObjective:
             "objective": "binary",
             "metric": "auc",
             "num_leaves": num_leaves,
-            "max_depth": max_depth,
+            "max_depth": -1,  # Unlimited depth - num_leaves controls complexity
             "learning_rate": learning_rate,
             "reg_alpha": reg_alpha,
             "reg_lambda": reg_lambda,
@@ -289,7 +336,7 @@ def create_lightgbm_objective(
     x_features: NDArray[np.float64],
     y_labels: NDArray[np.int64],
     feature_names: list[str],
-    device: Literal["cpu", "cuda", "auto"],
+    device: DeviceRequest,
     feature_preset: FeaturePreset,
     early_stopping_rounds: int = 10,
 ) -> LightGBMObjective:
@@ -300,15 +347,15 @@ def create_lightgbm_objective(
     via its n_features property.
 
     Args:
-        x_features: Feature matrix
-        y_labels: Binary labels
-        feature_names: Original feature names
-        device: Device to use for training
-        feature_preset: Feature engineering preset to apply
-        early_stopping_rounds: Stop if no improvement for this many rounds
+        x_features: Feature matrix.
+        y_labels: Binary labels.
+        feature_names: Original feature names.
+        device: Device to use for training (cpu/cuda/auto).
+        feature_preset: Feature engineering preset to apply.
+        early_stopping_rounds: Stop if no improvement for this many rounds.
 
     Returns:
-        Objective callable with n_features property for engineered feature count
+        Objective callable with n_features property for engineered feature count.
     """
     return LightGBMObjective(
         x_features,

@@ -161,20 +161,39 @@ def _get_lightgbm_imports() -> tuple[_LGBMClassifierCtor, _EarlyStoppingCallback
     return classifier_ctor, early_stopping
 
 
-def _resolve_device(requested: str) -> str:
+def _resolve_device(requested: str, *, platform: str | None = None) -> str:
     """Resolve device preference for LightGBM.
+
+    LightGBM has three device modes:
+    - "cpu": CPU-only training
+    - "gpu": OpenCL-based GPU training (works on Windows, Linux, macOS)
+    - "cuda": CUDA Tree Learner (Linux-only, requires CUDA build)
+
+    Since CUDA is not supported on Windows, this function maps "cuda" to "gpu"
+    (OpenCL) on Windows to provide transparent GPU acceleration.
 
     Args:
         requested: Device preference ("cpu", "cuda", or "auto").
+        platform: Override for sys.platform (for testing). If None, uses sys.platform.
 
     Returns:
-        Resolved device string for LightGBM.
+        Resolved device string for LightGBM ("cpu", "gpu", or "cuda").
     """
+    import sys
+
+    actual_platform = platform if platform is not None else sys.platform
+
     if requested == "auto":
-        # LightGBM uses device_type parameter for GPU
-        # Default to CPU for safety unless explicitly requested
         return "cpu"
-    return requested
+    if requested == "cuda" and actual_platform == "win32":
+        _log.info(
+            "LightGBM CUDA not supported on Windows, using OpenCL GPU instead",
+            extra={"requested_device": requested, "resolved_device": "gpu"},
+        )
+        return "gpu"
+    if requested == "cuda":
+        return "cuda"
+    return "cpu"
 
 
 def _compute_class_weight(y_train: NDArray[np.int64]) -> float:

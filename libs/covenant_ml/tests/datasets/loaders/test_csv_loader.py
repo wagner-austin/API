@@ -8,12 +8,17 @@ import numpy as np
 import pytest
 
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader, create_csv_loader
+from covenant_ml.datasets.loaders.parquet_cache import (
+    _compute_config_hash,
+    get_cache_dir,
+    invalidate_cache,
+)
 from covenant_ml.datasets.types import (
-    CategoricalEncoding,
     DatasetConfig,
     FileEncoding,
     LabelType,
     LoadedDataset,
+    LoadProgress,
     TargetColumnSpec,
 )
 
@@ -21,6 +26,26 @@ from covenant_ml.datasets.types import (
 def _get_fixtures_dir() -> Path:
     """Get path to test fixtures directory."""
     return Path(__file__).parent.parent / "fixtures"
+
+
+def _clear_cache_for_config(config: DatasetConfig, fixtures_dir: Path) -> None:
+    """Clear parquet cache for a dataset config.
+
+    Args:
+        config: Dataset configuration.
+        fixtures_dir: Path to fixtures directory.
+    """
+    config_parts = [
+        config["name"],
+        config["file_name"],
+        config["encoding"],
+        str(config["target"]),
+        str(config["exclude_columns"]),
+    ]
+    config_str = "|".join(config_parts)
+    config_hash = _compute_config_hash(config_str)
+    cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+    invalidate_cache(cache_dir)
 
 
 def _make_config(
@@ -318,6 +343,9 @@ class TestCSVLoader:
         )
         fixtures_dir = _get_fixtures_dir()
 
+        # Clear cache to ensure CSV loading path is tested
+        _clear_cache_for_config(config, fixtures_dir)
+
         result: LoadedDataset = loader.load(config, fixtures_dir)
 
         # Check metadata has categorical encodings
@@ -415,6 +443,83 @@ class TestCSVLoader:
         # Row 2: -1.5e3, 4e-2
         assert x_list[1][0] == pytest.approx(-1500.0, rel=1e-6)
         assert x_list[1][1] == pytest.approx(0.04, rel=1e-6)
+
+    def test_load_with_progress_callback(self) -> None:
+        """Load reports progress via callback when loading from CSV (no cache)."""
+        loader = CSVLoader()
+        config = _make_config()
+        fixtures_dir = _get_fixtures_dir()
+
+        # Clear cache to ensure we test CSV loading progress
+        config_parts = [
+            config["name"],
+            config["file_name"],
+            config["encoding"],
+            str(config["target"]),
+            str(config["exclude_columns"]),
+        ]
+        config_str = "|".join(config_parts)
+        config_hash = _compute_config_hash(config_str)
+        cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+        invalidate_cache(cache_dir)
+
+        progress_updates: list[LoadProgress] = []
+
+        def capture(progress: LoadProgress) -> None:
+            progress_updates.append(progress)
+
+        result: LoadedDataset = loader.load(config, fixtures_dir, progress_callback=capture)
+
+        # Should have progress updates from reading and encoding phases
+        # At least: parse start, parse end, encode start, encode end
+        assert len(progress_updates) >= 3
+        # Check we have encoding phase updates (our new code)
+        encoding_updates = [p for p in progress_updates if p["phase"] == "encoding"]
+        assert len(encoding_updates) == 2  # Start and complete
+        # Last encoding update should be 100%
+        assert encoding_updates[-1]["percent_complete"] == 100.0
+        # Result should still be valid
+        assert result["meta"]["n_samples"] == 5
+
+    def test_load_from_cache_with_progress_callback(self) -> None:
+        """Load reports progress via callback when loading from cache."""
+        loader = CSVLoader()
+        config = _make_config()
+        fixtures_dir = _get_fixtures_dir()
+
+        # Clear cache first, then load to populate it
+        config_parts = [
+            config["name"],
+            config["file_name"],
+            config["encoding"],
+            str(config["target"]),
+            str(config["exclude_columns"]),
+        ]
+        config_str = "|".join(config_parts)
+        config_hash = _compute_config_hash(config_str)
+        cache_dir = get_cache_dir(fixtures_dir, config["folder"], config_hash)
+        invalidate_cache(cache_dir)
+
+        # First load populates cache
+        loader.load(config, fixtures_dir)
+
+        # Second load should hit cache
+        progress_updates: list[LoadProgress] = []
+
+        def capture(progress: LoadProgress) -> None:
+            progress_updates.append(progress)
+
+        result: LoadedDataset = loader.load(config, fixtures_dir, progress_callback=capture)
+
+        # Should have exactly 4 progress updates from loading_cache phase
+        # (start, metadata loaded, features loaded, labels loaded)
+        cache_updates = [p for p in progress_updates if p["phase"] == "loading_cache"]
+        assert len(cache_updates) == 4
+        # Last cache update should be 100%
+        assert cache_updates[-1]["percent_complete"] == 100.0
+        assert cache_updates[-1]["message"] == "Loaded 5 samples from cache"
+        # Result should still be valid
+        assert result["meta"]["n_samples"] == 5
 
 
 class TestCSVLoaderNumericDetection:

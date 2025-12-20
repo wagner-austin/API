@@ -473,21 +473,19 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
     """Create default LightGBM search space for bankruptcy prediction.
 
     Based on empirical testing:
-    - max_depth 3-12 (LightGBM uses leaf-wise growth)
     - n_estimators 50-500 (more trees for larger datasets)
-    - num_leaves 20-100 (key LightGBM parameter)
+    - num_leaves 20-100 (primary tree complexity control)
     - learning_rate 0.01-0.3 in log scale
     - Regularization helps prevent overfitting
 
+    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
+    where num_leaves is the primary complexity control. The optimizer uses
+    max_depth=-1 (unlimited) to avoid constraint conflicts when
+    num_leaves > 2^max_depth, which can cause training failures.
+
     Returns:
-        LightGBMSearchSpace with sensible default ranges
+        LightGBMSearchSpace with sensible default ranges.
     """
-    max_depth_spec: IntRangeSpec = {
-        "param_type": "int",
-        "low": 3,
-        "high": 12,
-        "log_scale": False,
-    }
     n_estimators_spec: IntRangeSpec = {
         "param_type": "int",
         "low": 50,
@@ -532,7 +530,6 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
     }
 
     space: LightGBMSearchSpace = {
-        "max_depth": max_depth_spec,
         "n_estimators": n_estimators_spec,
         "num_leaves": num_leaves_spec,
         "learning_rate": learning_rate_spec,
@@ -546,29 +543,18 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
 
 def make_lightgbm_focused_space(
     *,
-    best_max_depth: int,
     best_num_leaves: int,
     best_learning_rate: float,
 ) -> LightGBMSearchSpace:
     """Create focused LightGBM search space around known good values.
 
     Args:
-        best_max_depth: Best max_depth from initial search
-        best_num_leaves: Best num_leaves from initial search
-        best_learning_rate: Best learning_rate from initial search
+        best_num_leaves: Best num_leaves from initial search.
+        best_learning_rate: Best learning_rate from initial search.
 
     Returns:
-        LightGBMSearchSpace with narrowed ranges around best values
+        LightGBMSearchSpace with narrowed ranges around best values.
     """
-    depth_low = max(2, best_max_depth - 2)
-    depth_high = min(15, best_max_depth + 2)
-
-    max_depth_spec: IntRangeSpec = {
-        "param_type": "int",
-        "low": depth_low,
-        "high": depth_high,
-        "log_scale": False,
-    }
     n_estimators_spec: IntRangeSpec = {
         "param_type": "int",
         "low": 100,
@@ -621,7 +607,6 @@ def make_lightgbm_focused_space(
     }
 
     space: LightGBMSearchSpace = {
-        "max_depth": max_depth_spec,
         "n_estimators": n_estimators_spec,
         "num_leaves": num_leaves_spec,
         "learning_rate": learning_rate_spec,

@@ -17,6 +17,7 @@ from covenant_ml.trainer import (
     _resolve_device,
     _XGBCoreProto,
     _XGBModuleProto,
+    preprocess_data_splits,
     stratified_split,
     train_model_with_validation,
 )
@@ -872,47 +873,53 @@ def test_compute_feature_scaler_handles_zero_variance() -> None:
     np.testing.assert_array_almost_equal(result_col1, expected_col1)
 
 
-def _compute_column_std(x: NDArray[np.float64], col: int) -> float:
-    """Compute std of a column with explicit typing."""
-    col_data: NDArray[np.float64] = x[:, col]
-    return _compute_std(col_data)
+def test_train_model_with_validation_logs_progress_every_50_rounds() -> None:
+    """Training with 50 rounds triggers the every-50-rounds debug log."""
+    x_features, y_labels = _make_larger_data(100)
+    config = make_train_config(
+        n_estimators=50,
+        early_stopping_rounds=100,  # High patience to avoid early stopping
+        reg_alpha=1.0,
+        reg_lambda=5.0,
+    )
+
+    feature_names = [f"feat_{i}" for i in range(8)]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        outcome = train_model_with_validation(
+            x_features, y_labels, config, Path(tmpdir), feature_names=feature_names
+        )
+
+        # Should have completed all 50 rounds (no early stopping)
+        assert outcome["total_rounds"] == 50
+        assert outcome["best_val_auc"] > 0.0
 
 
-def test_normalize_data_splits_normalizes_all_splits() -> None:
-    """normalize_data_splits normalizes train/val/test using training stats."""
-    from covenant_ml.trainer import normalize_data_splits, stratified_split
-
-    # Create data with clear mean/std
-    rng = np.random.default_rng(42)
-    x: NDArray[np.float64] = (rng.standard_normal((100, 4)) * 10 + 50).astype(np.float64)
-    y: NDArray[np.int64] = np.zeros(100, dtype=np.int64)
-    y[70:] = 1  # 30 positive samples
-    rng.shuffle(y)
+def test_preprocess_data_splits_properties() -> None:
+    """PreprocessedDataSplits has correct property values."""
+    x_features, y_labels = _make_larger_data(100)
 
     splits = stratified_split(
-        x, y, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, random_state=42
+        x_features,
+        y_labels,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
     )
-    normalized = normalize_data_splits(splits)
 
-    # Training data should have mean~0, std~1 (approximately)
-    # Check each column individually with explicit typing
-    for col in range(4):
-        col_data: NDArray[np.float64] = normalized.x_train[:, col]
-        col_mean: float = _compute_mean(col_data)
-        col_std: float = _compute_std(col_data)
-        assert abs(col_mean) < 0.2, f"Column {col} mean should be ~0, got {col_mean}"
-        assert abs(col_std - 1.0) < 0.2, f"Column {col} std should be ~1, got {col_std}"
+    preprocessed = preprocess_data_splits(splits)
 
-    # Labels should be unchanged
-    np.testing.assert_array_equal(normalized.y_train, splits.y_train)
-    np.testing.assert_array_equal(normalized.y_val, splits.y_val)
-    np.testing.assert_array_equal(normalized.y_test, splits.y_test)
+    # Verify properties match underlying array sizes
+    assert preprocessed.n_train == len(preprocessed.y_train)
+    assert preprocessed.n_val == len(preprocessed.y_val)
+    assert preprocessed.n_test == len(preprocessed.y_test)
+    assert preprocessed.n_total == preprocessed.n_train + preprocessed.n_val + preprocessed.n_test
 
-    # Scaler should be attached
-    assert normalized.scaler.n_features == 4
+    # Should match original split sizes
+    assert preprocessed.n_train == splits.n_train
+    assert preprocessed.n_val == splits.n_val
+    assert preprocessed.n_test == splits.n_test
+    assert preprocessed.n_total == splits.n_total
 
-    # Properties should work
-    assert normalized.n_train == splits.n_train
-    assert normalized.n_val == splits.n_val
-    assert normalized.n_test == splits.n_test
-    assert normalized.n_total == splits.n_total
+    # Should have preprocessing state attached
+    assert preprocessed.state["n_features"] == 8

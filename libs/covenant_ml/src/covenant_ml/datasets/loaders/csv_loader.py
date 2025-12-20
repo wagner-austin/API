@@ -2,18 +2,17 @@
 
 Loads CSV datasets into LoadedDataset format with strict parsing.
 Handles multiple encodings, categorical encoding, and target column encoding.
+Uses Polars-based chunked reading with progress reporting for large files.
+Integrates parquet caching for fast repeated loads.
 """
 
 from __future__ import annotations
 
-import csv
 from pathlib import Path
 
 import numpy as np
-from numpy.typing import NDArray
 
 from covenant_ml.datasets.loaders._parsing import (
-    MISSING_VALUES,
     build_categorical_encodings,
     build_encoding_lookup,
     detect_categorical_columns,
@@ -24,10 +23,22 @@ from covenant_ml.datasets.loaders._parsing import (
     is_simple_numeric,
     parse_numeric_value,
 )
+from covenant_ml.datasets.loaders.chunked_csv_reader import read_csv_with_progress
+from covenant_ml.datasets.loaders.parquet_cache import (
+    _CacheLock,
+    _compute_config_hash,
+    check_cache,
+    get_cache_dir,
+    load_from_cache,
+    save_to_cache,
+)
+from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
     DatasetConfig,
     DatasetMeta,
+    FileEncoding,
     LoadedDataset,
+    LoadProgress,
 )
 
 
@@ -35,24 +46,33 @@ class CSVLoader:
     """Loads CSV datasets into LoadedDataset format.
 
     Handles:
+    - Parquet caching for fast repeated loads
     - Multiple encodings (utf-8, utf-8-sig, latin-1, cp1252)
     - Target column detection and label encoding
     - Column exclusion
     - Automatic categorical column detection and label encoding
     - Missing value handling (replaced with 0.0 for numeric, special code for categorical)
     - Numeric conversion with NaN/inf handling
+
+    Cache is stored in .cache/<config_hash>/ under the dataset folder.
+    Cache is invalidated when source file is modified.
     """
 
     def load(
         self,
         config: DatasetConfig,
         external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
     ) -> LoadedDataset:
-        """Load CSV dataset.
+        """Load CSV dataset with caching and optional progress reporting.
+
+        First checks for valid parquet cache. If found, loads from cache.
+        Otherwise, loads from CSV and saves to cache for future loads.
 
         Args:
             config: Dataset configuration.
             external_dir: Root directory for datasets.
+            progress_callback: Optional callback for progress updates.
 
         Returns:
             LoadedDataset ready for ML.
@@ -62,11 +82,29 @@ class CSVLoader:
             ValueError: If columns missing, data invalid, or parsing fails.
         """
         file_path = external_dir / config["folder"] / config["file_name"]
-        if not file_path.exists():
-            raise FileNotFoundError(f"Dataset file not found: {file_path}")
+        encoding: FileEncoding = config["encoding"]
 
-        # Read raw data
-        headers, rows = self._read_csv(file_path, config["encoding"])
+        # Compute config hash for cache key
+        config_parts = [
+            config["name"],
+            config["file_name"],
+            config["encoding"],
+            str(config["target"]),
+            str(config["exclude_columns"]),
+        ]
+        config_str = "|".join(config_parts)
+        config_hash = _compute_config_hash(config_str)
+        cache_dir = get_cache_dir(external_dir, config["folder"], config_hash)
+
+        # Check if valid cache exists under a cache lock to prevent races
+        # with concurrent invalidation/removal in other workers.
+        with _CacheLock(cache_dir):
+            cache_info = check_cache(file_path, cache_dir)
+            if cache_info["is_valid"]:
+                return load_from_cache(cache_dir, progress_callback)
+
+        # No valid cache - load from CSV
+        headers, rows = read_csv_with_progress(file_path, encoding, progress_callback)
 
         # Find target column index
         target_spec = config["target"]
@@ -97,6 +135,20 @@ class CSVLoader:
         n_samples = len(rows)
         n_features = len(feature_indices)
 
+        # Report encoding phase start
+        if progress_callback is not None:
+            progress_callback(
+                LoadProgress(
+                    phase="encoding",
+                    bytes_read=0,
+                    bytes_total=0,
+                    rows_processed=0,
+                    rows_total=n_samples,
+                    percent_complete=0.0,
+                    message=f"Encoding {n_samples:,} rows...",
+                )
+            )
+
         x_array = np.zeros((n_samples, n_features), dtype=np.float64)
         y_array = np.zeros(n_samples, dtype=np.int64)
 
@@ -116,8 +168,20 @@ class CSVLoader:
 
             # Extract and encode label
             target_value = row[target_idx] if target_idx < len(row) else ""
-            y_array[row_idx] = encode_label(
-                target_value, target_spec, row_idx, file_path
+            y_array[row_idx] = encode_label(target_value, target_spec, row_idx, file_path)
+
+        # Report encoding phase complete
+        if progress_callback is not None:
+            progress_callback(
+                LoadProgress(
+                    phase="encoding",
+                    bytes_read=0,
+                    bytes_total=0,
+                    rows_processed=n_samples,
+                    rows_total=n_samples,
+                    percent_complete=100.0,
+                    message=f"Encoded {n_samples:,} rows with {n_features} features",
+                )
             )
 
         # Replace any remaining NaN/inf with 0.0
@@ -139,40 +203,12 @@ class CSVLoader:
             categorical_encodings=tuple(encodings),
         )
 
-        return LoadedDataset(meta=meta, x=x_array, y=y_array)
+        dataset = LoadedDataset(meta=meta, x=x_array, y=y_array)
 
-    def _read_csv(
-        self,
-        file_path: Path,
-        encoding: str,
-    ) -> tuple[list[str], list[list[str]]]:
-        """Read CSV file and return headers and rows.
+        # Save to cache for future loads
+        save_to_cache(dataset, cache_dir, progress_callback)
 
-        Args:
-            file_path: Path to CSV file.
-            encoding: File encoding to use.
-
-        Returns:
-            Tuple of (headers, rows).
-
-        Raises:
-            ValueError: If no data rows found.
-        """
-        rows: list[list[str]] = []
-        headers: list[str] = []
-
-        with open(file_path, encoding=encoding, newline="") as f:
-            reader = csv.reader(f)
-            for line_values in reader:
-                if not headers:
-                    headers = [h.strip() for h in line_values]
-                    continue
-                rows.append(line_values)
-
-        if not rows:
-            raise ValueError(f"No data rows found in {file_path}")
-
-        return headers, rows
+        return dataset
 
     # Expose shared utilities as instance methods for backward compatibility with tests
     def _is_numeric_value(self, value: str) -> bool:

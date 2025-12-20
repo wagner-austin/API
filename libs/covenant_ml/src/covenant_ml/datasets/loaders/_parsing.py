@@ -17,22 +17,23 @@ from covenant_ml.datasets.types import (
     TargetColumnSpec,
 )
 
-
 # Known missing value patterns (case-sensitive)
 # Unified set covering CSV, ARFF, and common data formats
-MISSING_VALUES: frozenset[str] = frozenset({
-    "",
-    "?",
-    "NA",
-    "NaN",
-    "nan",
-    "None",
-    "N/A",
-    "n/a",
-    "null",
-    "NULL",
-    ".",
-})
+MISSING_VALUES: frozenset[str] = frozenset(
+    {
+        "",
+        "?",
+        "NA",
+        "NaN",
+        "nan",
+        "None",
+        "N/A",
+        "n/a",
+        "null",
+        "NULL",
+        ".",
+    }
+)
 
 # Sentinel value for missing categorical values
 CATEGORICAL_MISSING: str = "_MISSING_"
@@ -126,9 +127,7 @@ def is_numeric_value(value: str) -> bool:
             return False
         # Validate exponent (integer with optional sign)
         exp_str = exponent.lstrip("-").lstrip("+")
-        if not exp_str or not exp_str.isdigit():
-            return False
-        return True
+        return bool(exp_str and exp_str.isdigit())
 
     return is_simple_numeric(test_str)
 
@@ -157,6 +156,26 @@ def is_simple_numeric(value: str) -> bool:
     return any(part.isdigit() for part in parts if part)
 
 
+def _is_parseable_int(value: str) -> bool:
+    """Check if string value can be parsed as an integer."""
+    return value.lstrip("-").replace(".", "").isdigit()
+
+
+def _matches_label_value(stripped: str, label_val: str | int) -> bool:
+    """Check if stripped value matches a label value.
+
+    Args:
+        stripped: Stripped string value from data.
+        label_val: Expected label value (int or string).
+
+    Returns:
+        True if values match.
+    """
+    if isinstance(label_val, int):
+        return _is_parseable_int(stripped) and int(float(stripped)) == label_val
+    return stripped.lower() == str(label_val).lower()
+
+
 def encode_label(
     value: str,
     spec: TargetColumnSpec,
@@ -179,23 +198,12 @@ def encode_label(
     """
     stripped = value.strip()
 
-    # Check positive values
     for pos_val in spec["positive_values"]:
-        if isinstance(pos_val, int):
-            # Numeric comparison - check if value parses to this int
-            if stripped.lstrip("-").replace(".", "").isdigit():
-                if int(float(stripped)) == pos_val:
-                    return 1
-        elif stripped.lower() == str(pos_val).lower():
+        if _matches_label_value(stripped, pos_val):
             return 1
 
-    # Check negative values
     for neg_val in spec["negative_values"]:
-        if isinstance(neg_val, int):
-            if stripped.lstrip("-").replace(".", "").isdigit():
-                if int(float(stripped)) == neg_val:
-                    return 0
-        elif stripped.lower() == str(neg_val).lower():
+        if _matches_label_value(stripped, neg_val):
             return 0
 
     raise ValueError(
