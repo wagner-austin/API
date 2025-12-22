@@ -7,11 +7,11 @@ Shared Python libraries for the monorepo. Each library is a standalone Poetry pa
 | Library | Description | Dependencies |
 |---------|-------------|--------------|
 | [covenant-domain](./covenant_domain) | Pure business logic for covenant monitoring | None |
-| [covenant-ml](./covenant_ml) | Pluggable ML backends (XGBoost, LightGBM, MLP, LSTM) for breach prediction | covenant-domain, platform-ml, xgboost, lightgbm, torch |
+| [covenant-ml](./covenant_ml) | Pluggable ML backends, Optuna optimizers, DART boosting, feature explainers | covenant-domain, platform-ml, xgboost, lightgbm, torch, optuna |
 | [covenant-persistence](./covenant_persistence) | PostgreSQL repository layer for covenants | covenant-domain, psycopg |
 | [instrument-io](./instrument_io) | Readers/writers for analytical chemistry formats | rainbow-api, pyteomics, openpyxl |
 | [monorepo-guards](./monorepo_guards) | Code quality enforcement rules | None |
-| [platform-core](./platform_core) | Shared utilities: errors, validation, logging | FastAPI, httpx |
+| [platform-core](./platform_core) | Shared utilities: errors, validation, logging, service config | FastAPI, httpx |
 | [platform-discord](./platform_discord) | Discord bot helpers and embed utilities | discord.py, platform-workers |
 | [platform-ml](./platform_ml) | ML artifacts, manifests, device selection, explainers (SHAP, permutation, gradient) | platform-core, shap, torch |
 | [platform-music](./platform_music) | Music analytics for Music Wrapped | None |
