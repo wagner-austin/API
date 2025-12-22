@@ -16,7 +16,12 @@ from platform_core.logging import get_logger, setup_rich_logging
 from scripts.optimize.cli import parse_args
 from scripts.optimize.display import print_config, print_result
 from scripts.optimize.logging_config import set_verbose_mode, suppress_verbose_logging
-from scripts.optimize.modes import compare_presets, run_all_datasets, run_single_with_progress
+from scripts.optimize.modes import (
+    compare_presets,
+    run_all_datasets,
+    run_multiple_backends,
+    run_single_with_progress,
+)
 from scripts.optimize.state import managed_execution
 
 logger = get_logger(__name__)
@@ -39,9 +44,12 @@ def run(argv: Sequence[str]) -> int:
 
     suppress_verbose_logging()
 
+    # For all_datasets and compare_presets modes, use first backend only
+    first_backend = args.backends[0]
+
     if args.all_datasets:
         run_all_datasets(
-            args.backend,
+            first_backend,
             args.n_trials,
             args.feature_preset,
             args.device,
@@ -50,16 +58,28 @@ def run(argv: Sequence[str]) -> int:
         )
     elif args.compare_presets:
         compare_presets(
-            args.backend,
+            first_backend,
             args.dataset,
             args.n_trials,
             args.device,
             args.timeout,
             args.save_model,
         )
+    elif len(args.backends) > 1:
+        # Multiple backends specified - run each sequentially
+        run_multiple_backends(
+            args.backends,
+            args.dataset,
+            args.n_trials,
+            args.feature_preset,
+            args.device,
+            args.timeout,
+            args.save_model,
+        )
     else:
+        # Single backend
         print_config(
-            args.backend,
+            first_backend,
             args.dataset,
             args.n_trials,
             args.feature_preset,
@@ -67,7 +87,7 @@ def run(argv: Sequence[str]) -> int:
         )
 
         run_result = run_single_with_progress(
-            args.backend,
+            first_backend,
             args.dataset,
             args.n_trials,
             args.feature_preset,
