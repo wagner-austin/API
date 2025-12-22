@@ -12,10 +12,13 @@ from types import ModuleType
 
 import pytest
 import scripts._test_hooks as _hooks
-from scripts._test_hooks import XGBoostOptimizationResult
+from scripts._test_hooks import (
+    LightGBMOptimizationResult,
+    XGBoostOptimizationResult,
+)
 from scripts.optimize import main
 
-from .conftest import make_fake_result
+from .conftest import make_fake_lightgbm_result, make_fake_result
 
 
 class TestMain:
@@ -267,6 +270,46 @@ class TestModuleEntry:
         # The module should have the name "scripts.optimize.__main__", not "__main__"
         assert module.__name__ == mod_name
         # If we got here without SystemExit, the if __name__ == "__main__" was False
+
+    def test_main_with_multiple_backends(self) -> None:
+        """Test main with multiple backends runs multi-backend mode."""
+        backends_called: list[str] = []
+
+        def fake_xgboost_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
+        ) -> XGBoostOptimizationResult:
+            backends_called.append("xgboost")
+            return make_fake_result(dataset="taiwan", best_val_auc=0.85)
+
+        def fake_lightgbm_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
+        ) -> LightGBMOptimizationResult:
+            backends_called.append("lightgbm")
+            return make_fake_lightgbm_result(dataset="taiwan", best_val_auc=0.90)
+
+        original_xgb = _hooks.xgboost_runner
+        original_lgb = _hooks.lightgbm_runner
+        _hooks.xgboost_runner = fake_xgboost_runner
+        _hooks.lightgbm_runner = fake_lightgbm_runner
+        try:
+            exit_code = main(["-b", "xgboost,lightgbm", "-n", "5", "--no-save-model"])
+            assert exit_code == 0
+            assert len(backends_called) == 2
+            assert "xgboost" in backends_called
+            assert "lightgbm" in backends_called
+        finally:
+            _hooks.xgboost_runner = original_xgb
+            _hooks.lightgbm_runner = original_lgb
 
 
 class TestKeyboardInterrupt:
