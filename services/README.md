@@ -68,16 +68,19 @@ This monorepo contains a suite of interconnected API services for language proce
 ### Service Details
 
 #### covenant-radar-api
-Loan covenant monitoring and breach prediction API. Features deterministic rule evaluation, XGBoost-based breach risk prediction, and PostgreSQL persistence.
+Loan covenant monitoring and breach prediction API. Features deterministic rule evaluation, pluggable ML backends (XGBoost, LightGBM, MLP, LSTM), Optuna hyperparameter optimization, PostgreSQL persistence, and Datadog observability.
 
 **Key Features:**
 - Deal and covenant CRUD operations
 - Financial measurement ingestion
 - Deterministic covenant compliance checking (OK/NEAR_BREACH/BREACH)
-- XGBoost classifier for breach risk prediction (LOW/MEDIUM/HIGH)
+- Pluggable ML backends for breach risk prediction (LOW/MEDIUM/HIGH)
+- Pluggable optimizers (Optuna TPE) with DART boosting support
+- Feature importance explainers (XGBoost gain, LightGBM split)
 - Background training via Redis + RQ
+- Datadog APM tracing and custom metrics
 
-**Integrations:** PostgreSQL (persistence), Redis (job queue)
+**Integrations:** PostgreSQL (persistence), Redis (job queue), Datadog (observability), Optuna (optimization)
 
 ---
 
