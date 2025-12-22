@@ -10,6 +10,7 @@ from platform_core.request_context import install_request_id_middleware
 
 from ..core.config import Settings, settings_from_env
 from ..core.container import ServiceContainer
+from ..integrations.datadog.tracing import setup_datadog_tracing
 from .routes import covenants as routes_covenants
 from .routes import deals as routes_deals
 from .routes import evaluate as routes_evaluate
@@ -32,7 +33,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         Configured FastAPI application instance.
     """
     cfg = settings or settings_from_env()
-    # Setup logging first so model loading logs appear in JSON format
+
+    # Setup Datadog tracing BEFORE anything else (per ddtrace requirements)
+    # This must happen before other imports to ensure auto-instrumentation works
+    datadog_cfg = cfg["datadog"]
+    if datadog_cfg["enabled"] and datadog_cfg["trace_enabled"]:
+        setup_datadog_tracing(
+            service=datadog_cfg["service"],
+            env=datadog_cfg["env"],
+            version=datadog_cfg["version"],
+        )
+
+    # Setup logging so model loading logs appear in JSON format
+    # When Datadog is enabled, trace IDs are automatically correlated with logs
     setup_logging(
         level="INFO",
         format_mode="json",
@@ -40,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         instance_id=None,
         extra_fields=["request_id", "model_path"],
     )
+
     # Create container with eager model loading for fast first predictions
     container = ServiceContainer.from_settings(cfg, eager_load_model=True)
     app = FastAPI(title="covenant-radar-api", version="0.1.0")
