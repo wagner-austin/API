@@ -568,18 +568,18 @@ class CovenantRadarAppConfig(TypedDict, total=False):
 
 ## 11) Implementation Order
 
-### Phase 1: Foundation (2-3 days)
-1. Add `covenant_metrics_events.py` to platform_core
-2. Add config TypedDicts for Confluent, Datadog, Gemini
-3. Add dependencies to pyproject.toml
-4. Run `make check` to verify no regressions
+### Phase 1: Foundation ✅ COMPLETE
+1. Add `covenant_metrics_events.py` to platform_core ✅
+2. Add config TypedDicts for Confluent, Datadog, Gemini ✅ (Datadog done)
+3. Add dependencies to pyproject.toml ✅
+4. Run `make check` to verify no regressions ✅
 
-### Phase 2: Datadog Integration (1-2 days)
-1. Implement `integrations/datadog/tracing.py`
-2. Implement `integrations/datadog/metrics.py`
-3. Wire into `api/main.py`
-4. Add tests
-5. Run `make check`
+### Phase 2: Datadog Integration ✅ COMPLETE
+1. Implement `integrations/datadog/tracing.py` ✅
+2. Implement `integrations/datadog/metrics.py` ✅
+3. Wire into `api/main.py` ✅ (tracing wired, metrics for Phase 4)
+4. Add tests ✅ (100% coverage)
+5. Run `make check` ✅
 
 ### Phase 3: Kafka Infrastructure (2-3 days)
 1. Implement `streaming/config.py`
