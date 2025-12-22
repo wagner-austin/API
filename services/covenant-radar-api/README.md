@@ -767,6 +767,24 @@ curl http://localhost:8007/ml/jobs/{job_id}
 | `lightgbm` | `early_stopping_rounds` |
 | `lstm` | `precision`, `n_epochs`, `early_stopping_patience`, `sequence_length`, `bidirectional` |
 
+**DART Boosting Support:**
+
+XGBoost and LightGBM optimization automatically includes DART (Dropouts meet Multiple Additive Regression Trees) in the search space. DART applies dropout regularization during boosting to reduce overfitting.
+
+| Backend | DART Parameter | Values | Description |
+|---------|----------------|--------|-------------|
+| XGBoost | `booster` | `gbtree`, `dart` | Enables DART when set to "dart" |
+| XGBoost | `rate_drop` | 0.0-0.5 | Tree dropout rate (DART only) |
+| XGBoost | `skip_drop` | 0.0-0.5 | Probability of skipping dropout (DART only) |
+| LightGBM | `boosting_type` | `gbdt`, `dart` | Enables DART when set to "dart" |
+| LightGBM | `drop_rate` | 0.0-0.5 | Tree dropout rate (DART only) |
+| LightGBM | `skip_drop` | 0.0-0.5 | Probability of skipping dropout (DART only) |
+| LightGBM | `feature_fraction` | 0.02-0.1 | Aggressive feature subsampling (DART only) |
+
+Optuna conditionally samples DART parameters only when DART boosting is selected, allowing exploration of both standard and DART configurations.
+
+**Note:** Early stopping is automatically disabled for LightGBM DART mode, as DART's random tree dropout makes early stopping unreliable.
+
 The `recommended_config` in the result can be used directly with `/ml/train-external`.
 
 ### Submit CLI (Kaggle Submissions)
@@ -807,6 +825,52 @@ poetry run python -m scripts.submit -a statistics  # Aggregation: last, first, m
 | `--output` | `-o` | `data/submissions/submission.csv` | Output CSV path |
 
 For complete documentation, see [scripts/submit/README.md](./scripts/submit/README.md).
+
+### AMEX Competition Pipeline
+
+Ensemble pipeline for Kaggle AMEX Default Prediction competition with multi-backend support and weight optimization:
+
+```bash
+# Full pipeline with defaults
+poetry run python -m scripts.amex
+
+# Custom configuration
+poetry run python -m scripts.amex \
+    --backends lightgbm,xgboost \
+    --n-folds 5 \
+    --n-estimators 1000 \
+    --learning-rate 0.05 \
+    --aggregation statistics \
+    --window-sizes 3,6 \
+    --output submission.csv
+
+# Minimal test run
+poetry run python -m scripts.amex -b lightgbm -k 2 -n 10
+```
+
+**CLI Options:**
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--backends` | `-b` | `lightgbm,xgboost` | Comma-separated backends |
+| `--n-folds` | `-k` | `5` | Number of CV folds |
+| `--n-estimators` | `-n` | `1000` | Boosting rounds |
+| `--learning-rate` | `-l` | `0.05` | Learning rate |
+| `--aggregation` | `-a` | `statistics` | Aggregation strategy |
+| `--window-sizes` | `-w` | `3,6` | Comma-separated window sizes |
+| `--no-rank-features` | | False | Disable rank features |
+| `--no-diff-features` | | False | Disable diff features |
+| `--no-window-features` | | False | Disable window features |
+| `--output` | `-o` | `data/submissions/amex_submission.csv` | Output CSV path |
+
+**Pipeline Steps:**
+1. Load training data with competition features (rank, diff, window)
+2. Train each backend with GroupKFold CV (no customer leakage)
+3. Optimize ensemble weights to maximize AMEX metric
+4. Generate weighted predictions on test data
+5. Write Kaggle submission.csv
+
+For complete documentation, see [scripts/amex/README.md](./scripts/amex/README.md).
 
 ### Optimization CLI
 
