@@ -1,6 +1,6 @@
 # Covenant Radar API
 
-Loan covenant monitoring and breach prediction API service. Features deterministic rule evaluation, pluggable ML backends (XGBoost + MLP neural networks), and PostgreSQL persistence.
+Loan covenant monitoring and breach prediction API service. Features deterministic rule evaluation, pluggable ML backends (XGBoost, LightGBM, MLP, LSTM), Optuna hyperparameter optimization, feature importance explainers, and PostgreSQL persistence.
 
 ## Features
 
@@ -13,7 +13,15 @@ Loan covenant monitoring and breach prediction API service. Features determinist
   - MLP: Neural network with configurable architecture (hidden layers, dropout, precision)
   - LSTM: Recurrent network for temporal bankruptcy sequences (bidirectional support)
   - LightGBM: Fast gradient boosting for large-scale datasets
+- **Hyperparameter Optimization**: Pluggable optimizers via Optuna TPE
+  - DART boosting support for XGBoost and LightGBM (dropout regularization)
+  - Categorical and continuous parameter spaces
+  - Early stopping with validation AUC tracking
+- **Model Explainability**: Feature importance extraction
+  - XGBoost: Gain-based importance ranking
+  - LightGBM: Split-based importance ranking
 - **Background Training**: Redis + RQ worker for model training jobs
+- **Observability**: Datadog APM tracing and custom metrics integration
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
 
@@ -262,6 +270,13 @@ curl http://localhost:8007/ml/models/active
 | `APP__LOGS_ROOT` | string | `/data/logs` | Logs directory |
 | `APP__ACTIVE_MODEL_PATH` | string | `/data/models/active.ubj` | Active model path |
 | `LOGGING__LEVEL` | string | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+| `DATADOG__ENABLED` | bool | `false` | Enable Datadog integration |
+| `DATADOG__SERVICE` | string | `covenant-radar-api` | Service name for traces |
+| `DATADOG__ENV` | string | `dev` | Environment (`dev`, `staging`, `production`) |
+| `DATADOG__VERSION` | string | `0.0.0` | Service version |
+| `DATADOG__AGENT_HOST` | string | `localhost` | Datadog agent host |
+| `DATADOG__DOGSTATSD_PORT` | int | `8125` | DogStatsD UDP port |
+| `DATADOG__TRACE_ENABLED` | bool | `true` | Enable APM tracing |
 
 ### Example .env
 
@@ -272,6 +287,11 @@ REDIS_URL=redis://redis:6379/0
 RQ__QUEUE_NAME=covenant
 APP__ACTIVE_MODEL_PATH=/data/models/active.ubj
 LOGGING__LEVEL=INFO
+
+# Datadog (optional, disabled by default)
+DATADOG__ENABLED=false
+DATADOG__SERVICE=covenant-radar-api
+DATADOG__ENV=dev
 ```
 
 ---
@@ -300,6 +320,11 @@ covenant_radar_api/
 │   ├── evaluate_job.py    # Batch evaluation
 │   ├── train_job.py       # Model training (internal data)
 │   └── train_external_job.py # Model training (external datasets)
+├── integrations/
+│   └── datadog/           # Datadog APM and metrics
+│       ├── metrics.py     # DogStatsD client
+│       ├── tracing.py     # APM tracing setup
+│       └── _test_hooks.py # Dependency injection
 └── seeding/               # Database seeding
 ```
 
@@ -419,6 +444,51 @@ docker compose down
 
 - **API**: `/healthz` (liveness) and `/readyz` (readiness)
 - **Worker**: Monitored via RQ heartbeats
+
+---
+
+## Observability
+
+### Datadog Integration
+
+The service integrates with Datadog for APM tracing and custom metrics.
+
+**Enable in Production:**
+
+```bash
+export DATADOG__ENABLED=true
+export DATADOG__SERVICE=covenant-radar-api
+export DATADOG__ENV=production
+export DATADOG__VERSION=1.0.0
+export DATADOG__AGENT_HOST=datadog-agent
+```
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| APM Tracing | Distributed tracing via ddtrace auto-instrumentation |
+| Custom Metrics | Application metrics via DogStatsD |
+| Log Correlation | Automatic trace ID injection into structured logs |
+
+**Auto-Instrumented Libraries:**
+
+- FastAPI request lifecycle
+- httpx outbound HTTP calls
+- Redis operations
+- Logging (trace ID injection)
+
+**Custom Metrics:**
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `covenant.measurement.received` | counter | Measurement ingestion count |
+| `covenant.evaluation.latency_ms` | histogram | Covenant evaluation time |
+| `covenant.prediction.latency_ms` | histogram | ML prediction time |
+| `covenant.prediction.risk_probability` | gauge | Current risk level per deal |
+| `covenant.alert.triggered` | counter | Alert volume |
+
+For complete documentation, see [docs/integrations/datadog.md](./docs/integrations/datadog.md).
 
 ---
 
