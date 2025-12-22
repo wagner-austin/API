@@ -29,6 +29,11 @@ def test_make_xgboost_default_space_returns_complete_space() -> None:
     assert "subsample" in space
     assert "colsample_bytree" in space
 
+    # Verify DART params are included
+    assert "booster" in space
+    assert "rate_drop" in space
+    assert "skip_drop" in space
+
 
 def test_make_xgboost_default_space_param_types() -> None:
     """make_xgboost_default_space uses correct param types."""
@@ -44,6 +49,11 @@ def test_make_xgboost_default_space_param_types() -> None:
     assert space["reg_lambda"]["param_type"] == "float"
     assert space["subsample"]["param_type"] == "float"
     assert space["colsample_bytree"]["param_type"] == "float"
+
+    # DART parameters
+    assert space["booster"]["param_type"] == "categorical_str"
+    assert space["rate_drop"]["param_type"] == "float"
+    assert space["skip_drop"]["param_type"] == "float"
 
 
 def test_make_xgboost_default_space_ranges() -> None:
@@ -81,6 +91,38 @@ def test_make_xgboost_default_space_reg_alpha_allows_zero() -> None:
     assert reg_alpha["param_type"] == "float"
     if reg_alpha["param_type"] == "float":
         assert reg_alpha["low"] == 0.0
+
+
+def test_make_xgboost_default_space_dart_params() -> None:
+    """make_xgboost_default_space includes DART booster with correct ranges.
+
+    DART (Dropouts meet Multiple Additive Regression Trees) applies dropout
+    regularization during boosting. The booster param allows Optuna to explore
+    both gbtree and dart configurations.
+    """
+    space = make_xgboost_default_space()
+
+    # Booster choices
+    booster = space["booster"]
+    assert booster["param_type"] == "categorical_str"
+    if booster["param_type"] == "categorical_str":
+        assert booster["choices"] == ("gbtree", "dart")
+
+    # rate_drop range (0.0-0.5)
+    rate_drop = space["rate_drop"]
+    assert rate_drop["param_type"] == "float"
+    if rate_drop["param_type"] == "float":
+        assert rate_drop["low"] == 0.0
+        assert rate_drop["high"] == 0.5
+        assert rate_drop["log_scale"] is False
+
+    # skip_drop range (0.0-0.5)
+    skip_drop = space["skip_drop"]
+    assert skip_drop["param_type"] == "float"
+    if skip_drop["param_type"] == "float":
+        assert skip_drop["low"] == 0.0
+        assert skip_drop["high"] == 0.5
+        assert skip_drop["log_scale"] is False
 
 
 def test_make_xgboost_focused_space_narrows_around_best() -> None:
@@ -460,6 +502,12 @@ def test_make_lightgbm_default_space_returns_complete_space() -> None:
     assert "reg_alpha" in space
     assert "reg_lambda" in space
 
+    # Verify DART params are included
+    assert "boosting_type" in space
+    assert "drop_rate" in space
+    assert "skip_drop" in space
+    assert "feature_fraction" in space
+
 
 def test_make_lightgbm_default_space_param_types() -> None:
     """make_lightgbm_default_space uses correct param types."""
@@ -472,6 +520,12 @@ def test_make_lightgbm_default_space_param_types() -> None:
     assert space["colsample_bytree"]["param_type"] == "float"
     assert space["reg_alpha"]["param_type"] == "float"
     assert space["reg_lambda"]["param_type"] == "float"
+
+    # DART parameters
+    assert space["boosting_type"]["param_type"] == "categorical_str"
+    assert space["drop_rate"]["param_type"] == "float"
+    assert space["skip_drop"]["param_type"] == "float"
+    assert space["feature_fraction"]["param_type"] == "float"
 
 
 def test_make_lightgbm_default_space_ranges() -> None:
@@ -502,6 +556,59 @@ def test_make_lightgbm_default_space_reg_alpha_allows_zero() -> None:
     reg_alpha = space["reg_alpha"]
     if reg_alpha["param_type"] == "float":
         assert reg_alpha["low"] == 0.0
+
+
+def test_make_lightgbm_default_space_dart_params() -> None:
+    """make_lightgbm_default_space includes DART boosting with correct ranges.
+
+    DART (Dropouts meet Multiple Additive Regression Trees) applies dropout
+    regularization during boosting. The boosting_type param allows Optuna to
+    explore both gbdt and dart configurations.
+    """
+    space = make_lightgbm_default_space()
+
+    # Boosting type choices
+    boosting_type = space["boosting_type"]
+    assert boosting_type["param_type"] == "categorical_str"
+    if boosting_type["param_type"] == "categorical_str":
+        assert boosting_type["choices"] == ("gbdt", "dart")
+
+    # drop_rate range (0.0-0.5)
+    drop_rate = space["drop_rate"]
+    assert drop_rate["param_type"] == "float"
+    if drop_rate["param_type"] == "float":
+        assert drop_rate["low"] == 0.0
+        assert drop_rate["high"] == 0.5
+        assert drop_rate["log_scale"] is False
+
+    # skip_drop range (0.0-0.5)
+    skip_drop = space["skip_drop"]
+    assert skip_drop["param_type"] == "float"
+    if skip_drop["param_type"] == "float":
+        assert skip_drop["low"] == 0.0
+        assert skip_drop["high"] == 0.5
+        assert skip_drop["log_scale"] is False
+
+    # feature_fraction range (0.02-0.1) - Phase 6 DART-specific
+    feature_fraction = space["feature_fraction"]
+    assert feature_fraction["param_type"] == "float"
+    if feature_fraction["param_type"] == "float":
+        assert feature_fraction["low"] == 0.02
+        assert feature_fraction["high"] == 0.1
+        assert feature_fraction["log_scale"] is False
+
+
+def test_make_lightgbm_default_space_reg_lambda_range() -> None:
+    """make_lightgbm_default_space has higher reg_lambda range for DART regularization."""
+    space = make_lightgbm_default_space()
+
+    # reg_lambda range extended to 50.0 for Phase 6 DART regularization
+    reg_lambda = space["reg_lambda"]
+    assert reg_lambda["param_type"] == "float"
+    if reg_lambda["param_type"] == "float":
+        assert reg_lambda["low"] == 0.1
+        assert reg_lambda["high"] == 50.0  # Extended from 10.0 for DART
+        assert reg_lambda["log_scale"] is True
 
 
 def test_make_lightgbm_focused_space_narrows_around_best() -> None:

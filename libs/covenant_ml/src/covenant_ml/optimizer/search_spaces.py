@@ -9,6 +9,7 @@ from __future__ import annotations
 from .types import (
     CategoricalFloatSpec,
     CategoricalIntSpec,
+    CategoricalStringSpec,
     FloatRangeSpec,
     IntRangeSpec,
     LightGBMSearchSpace,
@@ -31,9 +32,15 @@ def make_xgboost_default_space() -> XGBoostSearchSpace:
     - n_estimators 50-300 balances training time and performance
     - learning_rate 0.01-0.3 in log scale (most important hyperparameter)
     - Regularization helps prevent overfitting on tabular data
+    - DART booster included for dropout regularization exploration
+
+    DART (Dropouts meet Multiple Additive Regression Trees) applies dropout
+    regularization during boosting to reduce overfitting. When booster="dart"
+    is selected by Optuna, rate_drop and skip_drop parameters control the
+    dropout behavior.
 
     Returns:
-        XGBoostSearchSpace with sensible default ranges
+        XGBoostSearchSpace with sensible default ranges including DART support.
     """
     max_depth_spec: IntRangeSpec = {
         "param_type": "int",
@@ -78,6 +85,26 @@ def make_xgboost_default_space() -> XGBoostSearchSpace:
         "log_scale": False,
     }
 
+    # DART booster support: allows Optuna to explore both gbtree and dart
+    booster_spec: CategoricalStringSpec = {
+        "param_type": "categorical_str",
+        "choices": ("gbtree", "dart"),
+    }
+    # DART-specific: fraction of trees to drop during dropout
+    rate_drop_spec: FloatRangeSpec = {
+        "param_type": "float",
+        "low": 0.0,
+        "high": 0.5,
+        "log_scale": False,
+    }
+    # DART-specific: probability of skipping dropout during a boosting iteration
+    skip_drop_spec: FloatRangeSpec = {
+        "param_type": "float",
+        "low": 0.0,
+        "high": 0.5,
+        "log_scale": False,
+    }
+
     space: XGBoostSearchSpace = {
         "max_depth": max_depth_spec,
         "n_estimators": n_estimators_spec,
@@ -86,6 +113,9 @@ def make_xgboost_default_space() -> XGBoostSearchSpace:
         "reg_lambda": reg_lambda_spec,
         "subsample": subsample_spec,
         "colsample_bytree": colsample_spec,
+        "booster": booster_spec,
+        "rate_drop": rate_drop_spec,
+        "skip_drop": skip_drop_spec,
     }
     return space
 
@@ -477,6 +507,12 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
     - num_leaves 20-100 (primary tree complexity control)
     - learning_rate 0.01-0.3 in log scale
     - Regularization helps prevent overfitting
+    - DART boosting included for dropout regularization exploration
+
+    DART (Dropouts meet Multiple Additive Regression Trees) applies dropout
+    regularization during boosting to reduce overfitting. When boosting_type="dart"
+    is selected by Optuna, drop_rate and skip_drop parameters control the
+    dropout behavior.
 
     Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
     where num_leaves is the primary complexity control. The optimizer uses
@@ -484,7 +520,7 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
     num_leaves > 2^max_depth, which can cause training failures.
 
     Returns:
-        LightGBMSearchSpace with sensible default ranges.
+        LightGBMSearchSpace with sensible default ranges including DART support.
     """
     n_estimators_spec: IntRangeSpec = {
         "param_type": "int",
@@ -525,8 +561,36 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
     reg_lambda_spec: FloatRangeSpec = {
         "param_type": "float",
         "low": 0.1,
-        "high": 10.0,
+        "high": 50.0,  # Higher range for DART regularization (Phase 6: 10-50)
         "log_scale": True,
+    }
+
+    # DART boosting support: allows Optuna to explore both gbdt and dart
+    boosting_type_spec: CategoricalStringSpec = {
+        "param_type": "categorical_str",
+        "choices": ("gbdt", "dart"),
+    }
+    # DART-specific: fraction of trees to drop during dropout
+    drop_rate_spec: FloatRangeSpec = {
+        "param_type": "float",
+        "low": 0.0,
+        "high": 0.5,
+        "log_scale": False,
+    }
+    # DART-specific: probability of skipping dropout during a boosting iteration
+    skip_drop_spec: FloatRangeSpec = {
+        "param_type": "float",
+        "low": 0.0,
+        "high": 0.5,
+        "log_scale": False,
+    }
+    # DART-specific: very low feature fraction for strong regularization (Phase 6)
+    # Combined with DART dropout, this provides aggressive regularization
+    feature_fraction_spec: FloatRangeSpec = {
+        "param_type": "float",
+        "low": 0.02,
+        "high": 0.1,
+        "log_scale": False,
     }
 
     space: LightGBMSearchSpace = {
@@ -537,6 +601,10 @@ def make_lightgbm_default_space() -> LightGBMSearchSpace:
         "colsample_bytree": colsample_spec,
         "reg_alpha": reg_alpha_spec,
         "reg_lambda": reg_lambda_spec,
+        "boosting_type": boosting_type_spec,
+        "drop_rate": drop_rate_spec,
+        "skip_drop": skip_drop_spec,
+        "feature_fraction": feature_fraction_spec,
     }
     return space
 

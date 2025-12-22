@@ -24,7 +24,7 @@ from covenant_ml.features import (
     engineer_features,
     get_feature_config_for_preset,
 )
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.types import MLPConfig, MLPOptimizer, MLPPrecision
 
 _log = get_logger(__name__)
@@ -111,6 +111,7 @@ class MLPObjective:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
@@ -124,6 +125,7 @@ class MLPObjective:
             feature_names: Ignored (uses pre-stored names).
             int_params: Sampled integer hyperparameters.
             float_params: Sampled float hyperparameters.
+            string_params: String hyperparameters (unused for MLP).
             train_ratio: Train split ratio.
             val_ratio: Validation split ratio.
             test_ratio: Test split ratio.
@@ -133,7 +135,7 @@ class MLPObjective:
             Validation AUC score.
         """
         # Ignore passed data - use pre-stored engineered features
-        _ = x_features, y_labels, feature_names
+        _ = x_features, y_labels, feature_names, string_params
 
         # Extract hyperparameters from typed dicts
         n_layers = int_params["n_layers"]

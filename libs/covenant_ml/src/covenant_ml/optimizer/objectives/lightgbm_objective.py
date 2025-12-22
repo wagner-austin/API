@@ -26,6 +26,7 @@ from covenant_ml.optimizer.types import (
     LightGBMDevice,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
 )
 from covenant_ml.trainer import preprocess_data_splits, stratified_split
 
@@ -248,6 +249,7 @@ class LightGBMObjective:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
@@ -261,6 +263,7 @@ class LightGBMObjective:
             feature_names: Ignored (uses pre-split data)
             int_params: Integer hyperparameters from sampler
             float_params: Float hyperparameters from sampler
+            string_params: String hyperparameters (boosting_type for DART)
             train_ratio: Ignored (uses pre-split data)
             val_ratio: Ignored (uses pre-split data)
             test_ratio: Ignored (uses pre-split data)
@@ -286,9 +289,12 @@ class LightGBMObjective:
         subsample = float_params["subsample"]
         colsample_bytree = float_params["colsample_bytree"]
 
+        # Get boosting_type from string_params (defaults to "gbdt" if not present)
+        boosting_type = string_params.get("boosting_type", "gbdt")
+
         # LightGBM parameters
         params: dict[str, str | int | float] = {
-            "boosting_type": "gbdt",
+            "boosting_type": boosting_type,
             "objective": "binary",
             "metric": "auc",
             "num_leaves": num_leaves,
@@ -306,21 +312,42 @@ class LightGBMObjective:
             "n_jobs": -1,
         }
 
-        # Early stopping callback
-        early_stop_cb = self._early_stopping(
-            stopping_rounds=self._early_stopping_rounds,
-            verbose=False,
-        )
+        # Add DART-specific params when using DART boosting
+        if boosting_type == "dart":
+            if "drop_rate" in float_params:
+                params["drop_rate"] = float_params["drop_rate"]
+            if "skip_drop" in float_params:
+                params["skip_drop"] = float_params["skip_drop"]
+            # feature_fraction provides aggressive feature subsampling for DART
+            # Combined with DART dropout, this is key to 1st place solution
+            if "feature_fraction" in float_params:
+                params["feature_fraction"] = float_params["feature_fraction"]
 
-        # Train with early stopping on validation AUC
-        booster = self._lgb_train(
-            params,
-            self._train_dataset,
-            num_boost_round=n_estimators,
-            valid_sets=[self._val_dataset],
-            valid_names=["valid"],
-            callbacks=[early_stop_cb],
-        )
+        # Early stopping is NOT supported in DART mode - LightGBM raises a warning
+        # and ignores it. Only use early stopping for non-DART boosting types.
+        if boosting_type == "dart":
+            # Train without early stopping for DART
+            booster = self._lgb_train(
+                params,
+                self._train_dataset,
+                num_boost_round=n_estimators,
+                valid_sets=[self._val_dataset],
+                valid_names=["valid"],
+            )
+        else:
+            # Train with early stopping for gbdt
+            early_stop_cb = self._early_stopping(
+                stopping_rounds=self._early_stopping_rounds,
+                verbose=False,
+            )
+            booster = self._lgb_train(
+                params,
+                self._train_dataset,
+                num_boost_round=n_estimators,
+                valid_sets=[self._val_dataset],
+                valid_names=["valid"],
+                callbacks=[early_stop_cb],
+            )
 
         # Predict on validation set
         y_pred_proba: NDArray[np.float64] = np.asarray(

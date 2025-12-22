@@ -14,6 +14,7 @@ from covenant_ml.optimizer.types import (
     OptimizationSummary,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
     SearchSpace,
     TrialResult,
     XGBoostSearchSpace,
@@ -185,10 +186,12 @@ def test_trial_result_construction() -> None:
         "subsample": 0.8,
         "colsample_bytree": 0.9,
     }
+    string_params: SampledStringParams = {}
     result: TrialResult = {
         "trial_number": 0,
         "int_params": int_params,
         "float_params": float_params,
+        "string_params": string_params,
         "value": 0.85,
         "state": "complete",
         "duration_seconds": 1.5,
@@ -205,6 +208,7 @@ def test_trial_result_complete_state() -> None:
         "trial_number": 0,
         "int_params": {"max_depth": 3},
         "float_params": {"learning_rate": 0.1},
+        "string_params": {},
         "value": 0.5,
         "state": "complete",
         "duration_seconds": 1.0,
@@ -218,6 +222,7 @@ def test_trial_result_pruned_state() -> None:
         "trial_number": 1,
         "int_params": {"max_depth": 3},
         "float_params": {"learning_rate": 0.1},
+        "string_params": {},
         "value": 0.4,
         "state": "pruned",
         "duration_seconds": 0.5,
@@ -231,6 +236,7 @@ def test_trial_result_failed_state() -> None:
         "trial_number": 2,
         "int_params": {"max_depth": 3},
         "float_params": {"learning_rate": 0.1},
+        "string_params": {},
         "value": 0.0,
         "state": "failed",
         "duration_seconds": 0.1,
@@ -244,6 +250,7 @@ def test_trial_result_running_state() -> None:
         "trial_number": 3,
         "int_params": {"max_depth": 3},
         "float_params": {"learning_rate": 0.1},
+        "string_params": {},
         "value": 0.0,
         "state": "running",
         "duration_seconds": 0.0,
@@ -264,11 +271,13 @@ def test_optimization_summary_construction() -> None:
         "subsample": 0.85,
         "colsample_bytree": 0.9,
     }
+    best_string_params: SampledStringParams = {}
     summary: OptimizationSummary = {
         "best_trial_number": 5,
         "best_value": 0.92,
         "best_int_params": best_int_params,
         "best_float_params": best_float_params,
+        "best_string_params": best_string_params,
         "n_trials_total": 50,
         "n_trials_complete": 48,
         "n_trials_pruned": 2,

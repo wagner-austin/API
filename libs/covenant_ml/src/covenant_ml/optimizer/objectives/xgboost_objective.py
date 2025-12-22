@@ -21,7 +21,7 @@ from covenant_ml.features import (
     get_feature_config_for_preset,
 )
 from covenant_ml.metrics import compute_auc
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from covenant_ml.trainer import preprocess_data_splits, stratified_split
 
 _log = get_logger(__name__)
@@ -187,12 +187,29 @@ class XGBoostObjective:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
         random_state: int,
     ) -> float:
-        """Train XGBoost using DMatrix directly and return validation AUC."""
+        """Train XGBoost using DMatrix directly and return validation AUC.
+
+        Args:
+            x_features: Ignored (uses pre-split data)
+            y_labels: Ignored (uses pre-split data)
+            feature_names: Ignored (uses pre-split data)
+            int_params: Integer hyperparameters from sampler
+            float_params: Float hyperparameters from sampler
+            string_params: String hyperparameters (booster for DART)
+            train_ratio: Ignored (uses pre-split data)
+            val_ratio: Ignored (uses pre-split data)
+            test_ratio: Ignored (uses pre-split data)
+            random_state: Random seed for reproducibility
+
+        Returns:
+            Validation AUC score
+        """
         # Ignore passed data - use pre-computed DMatrix
         _ = x_features, y_labels, feature_names
         _ = train_ratio, val_ratio, test_ratio
@@ -206,8 +223,12 @@ class XGBoostObjective:
         subsample = float_params["subsample"]
         colsample_bytree = float_params["colsample_bytree"]
 
+        # Get booster type from string_params (defaults to "gbtree" if not present)
+        booster_type = string_params.get("booster", "gbtree")
+
         # XGBoost parameters for direct training
         params: dict[str, str | int | float] = {
+            "booster": booster_type,
             "max_depth": max_depth,
             "learning_rate": learning_rate,
             "reg_alpha": reg_alpha,
@@ -222,8 +243,15 @@ class XGBoostObjective:
             "seed": random_state,
         }
 
+        # Add DART-specific params when using DART booster
+        if booster_type == "dart":
+            if "rate_drop" in float_params:
+                params["rate_drop"] = float_params["rate_drop"]
+            if "skip_drop" in float_params:
+                params["skip_drop"] = float_params["skip_drop"]
+
         # Train using xgb.train directly (full GPU pipeline)
-        booster = self._xgb_train(
+        trained_model = self._xgb_train(
             params,
             self._train_dmatrix,
             num_boost_round=n_estimators,
@@ -231,7 +259,7 @@ class XGBoostObjective:
         )
 
         # Predict on validation set (already on GPU)
-        y_pred_proba: NDArray[np.float64] = booster.predict(self._val_dmatrix)
+        y_pred_proba: NDArray[np.float64] = trained_model.predict(self._val_dmatrix)
         # Use our typed compute_auc instead of sklearn
         return compute_auc(self._y_val, y_pred_proba)
 

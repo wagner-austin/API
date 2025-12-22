@@ -14,7 +14,7 @@ from covenant_ml.optimizer.objectives.xgboost_objective import (
     _get_xgb_dmatrix_and_train,
     create_xgboost_objective,
 )
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 
 # =============================================================================
 # Test Data Helpers
@@ -62,6 +62,11 @@ def _make_default_float_params() -> SampledFloatParams:
         subsample=0.8,
         colsample_bytree=0.8,
     )
+
+
+def _make_default_string_params() -> SampledStringParams:
+    """Create default string parameters for testing (empty for XGBoost)."""
+    return SampledStringParams()
 
 
 # =============================================================================
@@ -166,6 +171,7 @@ def test_xgboost_objective_call_returns_auc() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc = objective(
         x_features=x,
@@ -173,6 +179,7 @@ def test_xgboost_objective_call_returns_auc() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -196,6 +203,7 @@ def test_xgboost_objective_call_ignores_passed_data() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     # Should not raise even though passed data has different shape
     auc = objective(
@@ -204,6 +212,7 @@ def test_xgboost_objective_call_ignores_passed_data() -> None:
         feature_names=names_other,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -221,6 +230,7 @@ def test_xgboost_objective_call_with_different_hyperparams() -> None:
     int_params_shallow = SampledIntParams(max_depth=2, n_estimators=5)
     int_params_deep = SampledIntParams(max_depth=8, n_estimators=50)
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc_shallow = objective(
         x_features=x,
@@ -228,6 +238,7 @@ def test_xgboost_objective_call_with_different_hyperparams() -> None:
         feature_names=names,
         int_params=int_params_shallow,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -240,6 +251,7 @@ def test_xgboost_objective_call_with_different_hyperparams() -> None:
         feature_names=names,
         int_params=int_params_deep,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -259,12 +271,15 @@ def test_xgboost_objective_multiple_calls_deterministic() -> None:
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
 
+    string_params = _make_default_string_params()
+
     auc1 = objective(
         x_features=x,
         y_labels=y,
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -277,6 +292,7 @@ def test_xgboost_objective_multiple_calls_deterministic() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -316,6 +332,7 @@ def test_create_xgboost_objective_callable() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc = objective(
         x_features=x,
@@ -323,6 +340,7 @@ def test_create_xgboost_objective_callable() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -351,3 +369,108 @@ def test_n_features_property_reflects_engineering() -> None:
     objective = XGBoostObjective(x_positive, y, names, device="cpu", feature_preset="log_only")
     # log_only typically doubles features (original + log)
     assert objective.n_features > 4
+
+
+# =============================================================================
+# Tests: DART Boosting
+# =============================================================================
+
+
+def test_xgboost_objective_with_dart_booster() -> None:
+    """XGBoostObjective uses DART params when booster is 'dart'."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = XGBoostObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        rate_drop=0.1,  # DART param
+        skip_drop=0.5,  # DART param
+    )
+    string_params = SampledStringParams(booster="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_xgboost_objective_with_dart_partial_params() -> None:
+    """XGBoostObjective handles partial DART params (only rate_drop, no skip_drop)."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = XGBoostObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        rate_drop=0.1,  # Only rate_drop, no skip_drop
+    )
+    string_params = SampledStringParams(booster="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_xgboost_objective_with_dart_skip_drop_only() -> None:
+    """XGBoostObjective handles DART with only skip_drop (no rate_drop)."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = XGBoostObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        skip_drop=0.5,  # Only skip_drop, no rate_drop
+    )
+    string_params = SampledStringParams(booster="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0

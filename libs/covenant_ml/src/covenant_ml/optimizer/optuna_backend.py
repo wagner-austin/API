@@ -19,6 +19,7 @@ from .protocol import ObjectiveProtocol, TrialCallbackProtocol
 from .types import (
     CategoricalFloatSpec,
     CategoricalIntSpec,
+    CategoricalStringSpec,
     FloatRangeSpec,
     IntRangeSpec,
     LightGBMSearchSpace,
@@ -28,6 +29,7 @@ from .types import (
     OptimizationSummary,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
     TrialResult,
     XGBoostSearchSpace,
 )
@@ -73,8 +75,8 @@ class OptunaTrialProtocol(Protocol):
     def suggest_categorical(
         self,
         name: str,
-        choices: tuple[float, ...] | tuple[int, ...],
-    ) -> float | int: ...
+        choices: tuple[float, ...] | tuple[int, ...] | tuple[str, ...],
+    ) -> float | int | str: ...
 
     def report(self, value: float, step: int) -> None: ...
 
@@ -91,7 +93,7 @@ class OptunaStudyProtocol(Protocol):
     def best_value(self) -> float: ...
 
     @property
-    def best_params(self) -> dict[str, float | int]: ...
+    def best_params(self) -> dict[str, float | int | str]: ...
 
     def optimize(
         self,
@@ -293,6 +295,155 @@ def _sample_param_float(
     return float(result)
 
 
+def _sample_param_str(
+    trial: OptunaTrialProtocol,
+    name: str,
+    spec: CategoricalStringSpec,
+) -> str:
+    """Sample string parameter from trial.
+
+    Args:
+        trial: Optuna trial object.
+        name: Parameter name.
+        spec: Categorical string specification with choices.
+
+    Returns:
+        Sampled string value from the choices.
+    """
+    result = trial.suggest_categorical(name, spec["choices"])
+    return str(result)
+
+
+def _sample_xgboost_dart_params(
+    trial: OptunaTrialProtocol,
+    search_space: XGBoostSearchSpace,
+    float_params: SampledFloatParams,
+    string_params: SampledStringParams,
+) -> None:
+    """Sample DART params for XGBoost if present in search space.
+
+    Modifies float_params and string_params in place.
+
+    Args:
+        trial: Optuna trial object.
+        search_space: XGBoost search space configuration.
+        float_params: Float params dict to update with DART params.
+        string_params: String params dict to update with booster type.
+    """
+    if "booster" not in search_space:
+        return
+
+    booster = _sample_param_str(trial, "booster", search_space["booster"])
+    string_params["booster"] = booster
+
+    # DART-specific params only when booster is "dart"
+    if booster == "dart":
+        if "rate_drop" in search_space:
+            float_params["rate_drop"] = _sample_param_float(
+                trial, "rate_drop", search_space["rate_drop"]
+            )
+        if "skip_drop" in search_space:
+            float_params["skip_drop"] = _sample_param_float(
+                trial, "skip_drop", search_space["skip_drop"]
+            )
+
+
+def _sample_lightgbm_dart_params(
+    trial: OptunaTrialProtocol,
+    search_space: LightGBMSearchSpace,
+    float_params: SampledFloatParams,
+    string_params: SampledStringParams,
+) -> None:
+    """Sample DART params for LightGBM if present in search space.
+
+    Modifies float_params and string_params in place.
+
+    Args:
+        trial: Optuna trial object.
+        search_space: LightGBM search space configuration.
+        float_params: Float params dict to update with DART params.
+        string_params: String params dict to update with boosting type.
+    """
+    if "boosting_type" not in search_space:
+        return
+
+    boosting_type = _sample_param_str(trial, "boosting_type", search_space["boosting_type"])
+    string_params["boosting_type"] = boosting_type
+
+    # DART-specific params only when boosting_type is "dart"
+    if boosting_type == "dart":
+        if "drop_rate" in search_space:
+            float_params["drop_rate"] = _sample_param_float(
+                trial, "drop_rate", search_space["drop_rate"]
+            )
+        if "skip_drop" in search_space:
+            float_params["skip_drop"] = _sample_param_float(
+                trial, "skip_drop", search_space["skip_drop"]
+            )
+        if "feature_fraction" in search_space:
+            float_params["feature_fraction"] = _sample_param_float(
+                trial, "feature_fraction", search_space["feature_fraction"]
+            )
+
+
+def _extract_xgboost_dart_best_params(
+    search_space: XGBoostSearchSpace,
+    best_params: dict[str, float | int | str],
+    best_float_params: SampledFloatParams,
+    best_string_params: SampledStringParams,
+) -> None:
+    """Extract best DART params for XGBoost from study results.
+
+    Modifies best_float_params and best_string_params in place.
+
+    Args:
+        search_space: XGBoost search space configuration.
+        best_params: Best params from Optuna study.
+        best_float_params: Float params dict to update with DART params.
+        best_string_params: String params dict to update with booster type.
+    """
+    if "booster" not in search_space:
+        return
+
+    best_booster = str(best_params["booster"])
+    best_string_params["booster"] = best_booster
+    if best_booster == "dart":
+        if "rate_drop" in search_space:
+            best_float_params["rate_drop"] = float(best_params["rate_drop"])
+        if "skip_drop" in search_space:
+            best_float_params["skip_drop"] = float(best_params["skip_drop"])
+
+
+def _extract_lightgbm_dart_best_params(
+    search_space: LightGBMSearchSpace,
+    best_params: dict[str, float | int | str],
+    best_float_params: SampledFloatParams,
+    best_string_params: SampledStringParams,
+) -> None:
+    """Extract best DART params for LightGBM from study results.
+
+    Modifies best_float_params and best_string_params in place.
+
+    Args:
+        search_space: LightGBM search space configuration.
+        best_params: Best params from Optuna study.
+        best_float_params: Float params dict to update with DART params.
+        best_string_params: String params dict to update with boosting type.
+    """
+    if "boosting_type" not in search_space:
+        return
+
+    best_boosting_type = str(best_params["boosting_type"])
+    best_string_params["boosting_type"] = best_boosting_type
+    if best_boosting_type == "dart":
+        if "drop_rate" in search_space:
+            best_float_params["drop_rate"] = float(best_params["drop_rate"])
+        if "skip_drop" in search_space:
+            best_float_params["skip_drop"] = float(best_params["skip_drop"])
+        if "feature_fraction" in search_space:
+            best_float_params["feature_fraction"] = float(best_params["feature_fraction"])
+
+
 # =============================================================================
 # XGBoost Optimizer
 # =============================================================================
@@ -373,12 +524,17 @@ class OptunaXGBoostOptimizer:
                 ),
             }
 
+            # Sample optional DART params if present in search space
+            string_params: SampledStringParams = {}
+            _sample_xgboost_dart_params(trial, search_space, float_params, string_params)
+
             val_auc = objective(
                 x_features,
                 y_labels,
                 feature_names,
                 int_params,
                 float_params,
+                string_params,
                 config["train_ratio"],
                 config["val_ratio"],
                 config["test_ratio"],
@@ -392,6 +548,7 @@ class OptunaXGBoostOptimizer:
                 "trial_number": trial.number,
                 "int_params": int_params,
                 "float_params": float_params,
+                "string_params": string_params,
                 "value": val_auc,
                 "state": "complete",
                 "duration_seconds": trial_duration,
@@ -407,6 +564,7 @@ class OptunaXGBoostOptimizer:
                     "val_auc": val_auc,
                     "max_depth": int_params.get("max_depth"),
                     "learning_rate": float_params.get("learning_rate"),
+                    "booster": string_params.get("booster"),
                     "duration_sec": trial_duration,
                 },
             )
@@ -438,11 +596,18 @@ class OptunaXGBoostOptimizer:
             "colsample_bytree": float(best_params["colsample_bytree"]),
         }
 
+        # Extract best string params and conditional DART float params
+        best_string_params: SampledStringParams = {}
+        _extract_xgboost_dart_best_params(
+            search_space, best_params, best_float_params, best_string_params
+        )
+
         summary: OptimizationSummary = {
             "best_trial_number": study.best_trial.number,
             "best_value": study.best_value,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": config["n_trials"],
             "n_trials_complete": self._trials_complete,
             "n_trials_pruned": self._trials_pruned,
@@ -456,6 +621,7 @@ class OptunaXGBoostOptimizer:
                 "best_value": summary["best_value"],
                 "best_max_depth": best_int_params.get("max_depth"),
                 "best_learning_rate": best_float_params.get("learning_rate"),
+                "best_booster": best_string_params.get("booster"),
                 "n_trials_complete": summary["n_trials_complete"],
                 "total_duration_sec": summary["total_duration_seconds"],
             },
@@ -538,12 +704,16 @@ class OptunaMLPOptimizer:
                 "dropout": _sample_param_float(trial, "dropout", search_space["dropout"]),
             }
 
+            # MLP has no string params
+            string_params: SampledStringParams = {}
+
             val_auc = objective(
                 x_features,
                 y_labels,
                 feature_names,
                 int_params,
                 float_params,
+                string_params,
                 config["train_ratio"],
                 config["val_ratio"],
                 config["test_ratio"],
@@ -557,6 +727,7 @@ class OptunaMLPOptimizer:
                 "trial_number": trial.number,
                 "int_params": int_params,
                 "float_params": float_params,
+                "string_params": string_params,
                 "value": val_auc,
                 "state": "complete",
                 "duration_seconds": trial_duration,
@@ -602,11 +773,15 @@ class OptunaMLPOptimizer:
             "dropout": float(best_params["dropout"]),
         }
 
+        # MLP has no string params
+        best_string_params: SampledStringParams = {}
+
         summary: OptimizationSummary = {
             "best_trial_number": study.best_trial.number,
             "best_value": study.best_value,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": config["n_trials"],
             "n_trials_complete": self._trials_complete,
             "n_trials_pruned": self._trials_pruned,
@@ -703,12 +878,16 @@ class OptunaLSTMOptimizer:
                 "dropout": _sample_param_float(trial, "dropout", search_space["dropout"]),
             }
 
+            # LSTM has no string params
+            string_params: SampledStringParams = {}
+
             val_auc = objective(
                 x_features,
                 y_labels,
                 feature_names,
                 int_params,
                 float_params,
+                string_params,
                 config["train_ratio"],
                 config["val_ratio"],
                 config["test_ratio"],
@@ -722,6 +901,7 @@ class OptunaLSTMOptimizer:
                 "trial_number": trial.number,
                 "int_params": int_params,
                 "float_params": float_params,
+                "string_params": string_params,
                 "value": val_auc,
                 "state": "complete",
                 "duration_seconds": trial_duration,
@@ -767,11 +947,15 @@ class OptunaLSTMOptimizer:
             "dropout": float(best_params["dropout"]),
         }
 
+        # LSTM has no string params
+        best_string_params: SampledStringParams = {}
+
         summary: OptimizationSummary = {
             "best_trial_number": study.best_trial.number,
             "best_value": study.best_value,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": config["n_trials"],
             "n_trials_complete": self._trials_complete,
             "n_trials_pruned": self._trials_pruned,
@@ -876,12 +1060,17 @@ class OptunaLightGBMOptimizer:
                 "reg_lambda": _sample_param_float(trial, "reg_lambda", search_space["reg_lambda"]),
             }
 
+            # Sample optional DART params if present in search space
+            string_params: SampledStringParams = {}
+            _sample_lightgbm_dart_params(trial, search_space, float_params, string_params)
+
             val_auc = objective(
                 x_features,
                 y_labels,
                 feature_names,
                 int_params,
                 float_params,
+                string_params,
                 config["train_ratio"],
                 config["val_ratio"],
                 config["test_ratio"],
@@ -895,6 +1084,7 @@ class OptunaLightGBMOptimizer:
                 "trial_number": trial.number,
                 "int_params": int_params,
                 "float_params": float_params,
+                "string_params": string_params,
                 "value": val_auc,
                 "state": "complete",
                 "duration_seconds": trial_duration,
@@ -910,6 +1100,7 @@ class OptunaLightGBMOptimizer:
                     "val_auc": val_auc,
                     "num_leaves": int_params.get("num_leaves"),
                     "learning_rate": float_params.get("learning_rate"),
+                    "boosting_type": string_params.get("boosting_type"),
                     "duration_sec": trial_duration,
                 },
             )
@@ -941,11 +1132,18 @@ class OptunaLightGBMOptimizer:
             "reg_lambda": float(best_params["reg_lambda"]),
         }
 
+        # Extract best string params and conditional DART float params
+        best_string_params: SampledStringParams = {}
+        _extract_lightgbm_dart_best_params(
+            search_space, best_params, best_float_params, best_string_params
+        )
+
         summary: OptimizationSummary = {
             "best_trial_number": study.best_trial.number,
             "best_value": study.best_value,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": config["n_trials"],
             "n_trials_complete": self._trials_complete,
             "n_trials_pruned": self._trials_pruned,
@@ -959,6 +1157,7 @@ class OptunaLightGBMOptimizer:
                 "best_value": summary["best_value"],
                 "best_num_leaves": best_int_params.get("num_leaves"),
                 "best_learning_rate": best_float_params.get("learning_rate"),
+                "best_boosting_type": best_string_params.get("boosting_type"),
                 "n_trials_complete": summary["n_trials_complete"],
                 "total_duration_sec": summary["total_duration_seconds"],
             },

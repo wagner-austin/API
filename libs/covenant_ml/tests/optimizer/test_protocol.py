@@ -21,6 +21,7 @@ from covenant_ml.optimizer.types import (
     OptimizationSummary,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
     TrialResult,
     XGBoostSearchSpace,
 )
@@ -53,10 +54,12 @@ def test_trial_callback_protocol_implementation() -> None:
         "subsample": 0.8,
         "colsample_bytree": 0.8,
     }
+    string_params: SampledStringParams = {}
     result: TrialResult = {
         "trial_number": 0,
         "int_params": int_params,
         "float_params": float_params,
+        "string_params": string_params,
         "value": 0.85,
         "state": "complete",
         "duration_seconds": 1.5,
@@ -83,6 +86,7 @@ class _ConcreteObjective:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
@@ -94,6 +98,7 @@ class _ConcreteObjective:
             feature_names,
             int_params,
             float_params,
+            string_params,
             train_ratio,
             val_ratio,
             test_ratio,
@@ -120,6 +125,7 @@ def test_objective_protocol_implementation() -> None:
         "subsample": 0.8,
         "colsample_bytree": 0.9,
     }
+    string_params: SampledStringParams = {}
 
     result = objective(
         x_features=x,
@@ -127,6 +133,7 @@ def test_objective_protocol_implementation() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -172,11 +179,13 @@ class _ConcreteXGBoostOptimizer:
             "subsample": 0.8,
             "colsample_bytree": 0.9,
         }
+        best_string_params: SampledStringParams = {}
         summary: OptimizationSummary = {
             "best_trial_number": 0,
             "best_value": 0.9,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": 1,
             "n_trials_complete": 1,
             "n_trials_pruned": 0,
@@ -321,11 +330,13 @@ class _ConcreteMLPOptimizer:
             "learning_rate": 0.001,
             "dropout": 0.2,
         }
+        best_string_params: SampledStringParams = {}
         summary: OptimizationSummary = {
             "best_trial_number": 0,
             "best_value": 0.88,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": 1,
             "n_trials_complete": 1,
             "n_trials_pruned": 0,
@@ -420,11 +431,13 @@ class _ConcreteLSTMOptimizer:
             "learning_rate": 0.001,
             "dropout": 0.3,
         }
+        best_string_params: SampledStringParams = {}
         summary: OptimizationSummary = {
             "best_trial_number": 0,
             "best_value": 0.91,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": 1,
             "n_trials_complete": 1,
             "n_trials_pruned": 0,
@@ -522,11 +535,13 @@ class _ConcreteLightGBMOptimizer:
             "subsample": 0.9,
             "colsample_bytree": 0.85,
         }
+        best_string_params: SampledStringParams = {}
         summary: OptimizationSummary = {
             "best_trial_number": 0,
             "best_value": 0.93,
             "best_int_params": best_int_params,
             "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
             "n_trials_total": 1,
             "n_trials_complete": 1,
             "n_trials_pruned": 0,
@@ -594,6 +609,7 @@ def _standalone_objective(
     feature_names: list[str],
     int_params: SampledIntParams,
     float_params: SampledFloatParams,
+    string_params: SampledStringParams,
     train_ratio: float,
     val_ratio: float,
     test_ratio: float,
@@ -606,6 +622,7 @@ def _standalone_objective(
         feature_names,
         int_params,
         float_params,
+        string_params,
         train_ratio,
         val_ratio,
         test_ratio,
@@ -624,6 +641,7 @@ def test_standalone_function_matches_objective_protocol() -> None:
 
     int_params: SampledIntParams = {"max_depth": 5}
     float_params: SampledFloatParams = {"learning_rate": 0.1}
+    string_params: SampledStringParams = {}
 
     result = objective(
         x_features=x,
@@ -631,6 +649,7 @@ def test_standalone_function_matches_objective_protocol() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,

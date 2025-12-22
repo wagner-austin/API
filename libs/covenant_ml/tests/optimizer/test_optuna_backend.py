@@ -19,8 +19,13 @@ from covenant_ml.optimizer.optuna_backend import (
     OptunaStudyProtocol,
     OptunaTPESamplerProtocol,
     OptunaTrialProtocol,
+    _extract_lightgbm_dart_best_params,
+    _extract_xgboost_dart_best_params,
+    _sample_lightgbm_dart_params,
     _sample_param_float,
     _sample_param_int,
+    _sample_param_str,
+    _sample_xgboost_dart_params,
     create_lightgbm_optimizer,
     create_lstm_optimizer,
     create_mlp_optimizer,
@@ -38,12 +43,16 @@ from covenant_ml.optimizer.search_spaces import (
 from covenant_ml.optimizer.types import (
     CategoricalFloatSpec,
     CategoricalIntSpec,
+    CategoricalStringSpec,
     FloatRangeSpec,
     IntRangeSpec,
+    LightGBMSearchSpace,
     OptimizationConfig,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
     TrialResult,
+    XGBoostSearchSpace,
 )
 
 # =============================================================================
@@ -56,7 +65,7 @@ class _FakeTrial:
 
     def __init__(self, trial_number: int) -> None:
         self._number = trial_number
-        self._suggestions: dict[str, float | int] = {}
+        self._suggestions: dict[str, float | int | str] = {}
 
     @property
     def number(self) -> int:
@@ -76,8 +85,8 @@ class _FakeTrial:
         return value
 
     def suggest_categorical(
-        self, name: str, choices: tuple[float, ...] | tuple[int, ...]
-    ) -> float | int:
+        self, name: str, choices: tuple[float, ...] | tuple[int, ...] | tuple[str, ...]
+    ) -> float | int | str:
         index = self._number % len(choices)
         value = choices[index]
         self._suggestions[name] = value
@@ -128,7 +137,7 @@ class _FakeStudy:
         return self._values[self._best_idx]
 
     @property
-    def best_params(self) -> dict[str, float | int]:
+    def best_params(self) -> dict[str, float | int | str]:
         return self._trials[self._best_idx]._suggestions
 
     def optimize(
@@ -227,12 +236,14 @@ class _FakeObjective:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
         random_state: int,
     ) -> float:
-        _ = x_features, y_labels, feature_names, train_ratio, val_ratio, test_ratio, random_state
+        _ = x_features, y_labels, feature_names, string_params
+        _ = train_ratio, val_ratio, test_ratio, random_state
         self.call_count += 1
         lr = float_params.get("learning_rate", 0.1)
         return max(0.5, min(1.0, self._base_auc - abs(lr - 0.1) * 0.5))
@@ -290,6 +301,446 @@ def test_sample_param_float_varies_by_trial() -> None:
 
 
 # =============================================================================
+# Tests: String Parameter Sampling
+# =============================================================================
+
+
+def test_sample_param_str_returns_string() -> None:
+    """_sample_param_str returns string value from choices."""
+    spec: CategoricalStringSpec = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    trial = _FakeTrial(0)
+    result = _sample_param_str(trial, "boosting_type", spec)
+    assert result in ("gbdt", "dart")
+
+
+def test_sample_param_str_varies_by_trial() -> None:
+    """_sample_param_str returns different values for different trials."""
+    spec: CategoricalStringSpec = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    trial0 = _FakeTrial(0)
+    trial1 = _FakeTrial(1)
+    result0 = _sample_param_str(trial0, "boosting_type", spec)
+    result1 = _sample_param_str(trial1, "boosting_type", spec)
+    # trial 0 selects index 0 (gbdt), trial 1 selects index 1 (dart)
+    assert result0 == "gbdt"
+    assert result1 == "dart"
+
+
+# =============================================================================
+# Tests: XGBoost DART Parameter Sampling
+# =============================================================================
+
+
+def _make_xgboost_space_with_dart() -> XGBoostSearchSpace:
+    """Create XGBoost search space with DART params.
+
+    Note: The default space now includes DART, so this uses the default.
+    """
+    return make_xgboost_default_space()
+
+
+def _make_xgboost_space_without_dart() -> XGBoostSearchSpace:
+    """Create XGBoost search space WITHOUT DART params.
+
+    Used for testing edge cases where DART is not in the search space.
+    """
+    space: XGBoostSearchSpace = {
+        "max_depth": {"param_type": "int", "low": 3, "high": 10, "log_scale": False},
+        "n_estimators": {"param_type": "int", "low": 50, "high": 300, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+    }
+    return space
+
+
+def _make_lightgbm_space_with_dart() -> LightGBMSearchSpace:
+    """Create LightGBM search space with DART params.
+
+    Note: The default space now includes DART with feature_fraction, so this uses the default.
+    """
+    return make_lightgbm_default_space()
+
+
+def _make_lightgbm_space_without_dart() -> LightGBMSearchSpace:
+    """Create LightGBM search space WITHOUT DART params.
+
+    Used for testing edge cases where DART is not in the search space.
+    """
+    space: LightGBMSearchSpace = {
+        "n_estimators": {"param_type": "int", "low": 50, "high": 500, "log_scale": False},
+        "num_leaves": {"param_type": "int", "low": 20, "high": 100, "log_scale": False},
+        "learning_rate": {"param_type": "float", "low": 0.01, "high": 0.3, "log_scale": True},
+        "subsample": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "colsample_bytree": {"param_type": "float", "low": 0.6, "high": 1.0, "log_scale": False},
+        "reg_alpha": {"param_type": "float", "low": 0.0, "high": 10.0, "log_scale": False},
+        "reg_lambda": {"param_type": "float", "low": 0.1, "high": 10.0, "log_scale": True},
+    }
+    return space
+
+
+def test_sample_xgboost_dart_params_no_booster_in_space() -> None:
+    """_sample_xgboost_dart_params does nothing when booster not in space."""
+    trial = _FakeTrial(0)
+    space = _make_xgboost_space_without_dart()  # No booster key
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_xgboost_dart_params(trial, space, float_params, string_params)
+    # Nothing added since booster not in space
+    assert "booster" not in string_params
+    assert "rate_drop" not in float_params
+
+
+def test_sample_xgboost_dart_params_with_dart() -> None:
+    """_sample_xgboost_dart_params adds DART params when booster is dart."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    space = _make_xgboost_space_with_dart()
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_xgboost_dart_params(trial, space, float_params, string_params)
+    # DART params added
+    assert string_params["booster"] == "dart"
+    assert "rate_drop" in float_params
+    assert "skip_drop" in float_params
+
+
+def test_sample_xgboost_dart_params_with_dart_partial() -> None:
+    """_sample_xgboost_dart_params handles partial DART params in search space."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    # Only rate_drop, no skip_drop - start from space without DART
+    space = _make_xgboost_space_without_dart()
+    space["booster"] = {"param_type": "categorical_str", "choices": ("gbtree", "dart")}
+    space["rate_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_xgboost_dart_params(trial, space, float_params, string_params)
+    assert string_params["booster"] == "dart"
+    assert "rate_drop" in float_params
+    assert "skip_drop" not in float_params
+
+
+def test_sample_xgboost_dart_params_with_dart_skip_drop_only() -> None:
+    """_sample_xgboost_dart_params handles skip_drop only (no rate_drop) in search space."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    # Only skip_drop, no rate_drop - start from space without DART
+    space = _make_xgboost_space_without_dart()
+    space["booster"] = {"param_type": "categorical_str", "choices": ("gbtree", "dart")}
+    space["skip_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_xgboost_dart_params(trial, space, float_params, string_params)
+    assert string_params["booster"] == "dart"
+    assert "rate_drop" not in float_params
+    assert "skip_drop" in float_params
+
+
+def test_sample_xgboost_dart_params_with_gbtree() -> None:
+    """_sample_xgboost_dart_params does not add DART params when booster is gbtree."""
+    trial = _FakeTrial(0)  # Trial 0 selects gbtree (index 0)
+    space = _make_xgboost_space_with_dart()
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_xgboost_dart_params(trial, space, float_params, string_params)
+    # Booster set but no DART params
+    assert string_params["booster"] == "gbtree"
+    assert "rate_drop" not in float_params
+    assert "skip_drop" not in float_params
+
+
+# =============================================================================
+# Tests: LightGBM DART Parameter Sampling
+# =============================================================================
+
+
+def test_sample_lightgbm_dart_params_no_boosting_type_in_space() -> None:
+    """_sample_lightgbm_dart_params does nothing when boosting_type not in space."""
+    trial = _FakeTrial(0)
+    space = _make_lightgbm_space_without_dart()  # No boosting_type key
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    # Nothing added since boosting_type not in space
+    assert "boosting_type" not in string_params
+    assert "drop_rate" not in float_params
+
+
+def test_sample_lightgbm_dart_params_with_dart() -> None:
+    """_sample_lightgbm_dart_params adds DART params when boosting_type is dart."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    space = _make_lightgbm_space_with_dart()
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    # DART params added including feature_fraction (Phase 6)
+    assert string_params["boosting_type"] == "dart"
+    assert "drop_rate" in float_params
+    assert "skip_drop" in float_params
+    assert "feature_fraction" in float_params
+
+
+def test_sample_lightgbm_dart_params_with_dart_partial() -> None:
+    """_sample_lightgbm_dart_params handles partial DART params in search space."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    # Only drop_rate, no skip_drop - start from space without DART
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    space["drop_rate"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    assert string_params["boosting_type"] == "dart"
+    assert "drop_rate" in float_params
+    assert "skip_drop" not in float_params
+
+
+def test_sample_lightgbm_dart_params_with_dart_skip_drop_only() -> None:
+    """_sample_lightgbm_dart_params handles skip_drop only (no drop_rate) in search space."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    # Only skip_drop, no drop_rate - start from space without DART
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    space["skip_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    assert string_params["boosting_type"] == "dart"
+    assert "drop_rate" not in float_params
+    assert "skip_drop" in float_params
+
+
+def test_sample_lightgbm_dart_params_with_dart_feature_fraction_only() -> None:
+    """_sample_lightgbm_dart_params handles feature_fraction only in search space."""
+    trial = _FakeTrial(1)  # Trial 1 selects dart (index 1)
+    # Only feature_fraction, no drop_rate or skip_drop - start from space without DART
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    ff_spec: FloatRangeSpec = {"param_type": "float", "low": 0.02, "high": 0.1, "log_scale": False}
+    space["feature_fraction"] = ff_spec
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    assert string_params["boosting_type"] == "dart"
+    assert "drop_rate" not in float_params
+    assert "skip_drop" not in float_params
+    assert "feature_fraction" in float_params
+
+
+def test_sample_lightgbm_dart_params_with_gbdt() -> None:
+    """_sample_lightgbm_dart_params does not add DART params when boosting_type is gbdt."""
+    trial = _FakeTrial(0)  # Trial 0 selects gbdt (index 0)
+    space = _make_lightgbm_space_with_dart()
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {}
+    _sample_lightgbm_dart_params(trial, space, float_params, string_params)
+    # Boosting type set but no DART params
+    assert string_params["boosting_type"] == "gbdt"
+    assert "drop_rate" not in float_params
+    assert "skip_drop" not in float_params
+    assert "feature_fraction" not in float_params
+
+
+# =============================================================================
+# Tests: XGBoost DART Best Params Extraction
+# =============================================================================
+
+
+def test_extract_xgboost_dart_best_params_no_booster_in_space() -> None:
+    """_extract_xgboost_dart_best_params does nothing when booster not in space."""
+    space = _make_xgboost_space_without_dart()  # No booster key
+    best_params: dict[str, float | int | str] = {"max_depth": 5}
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_xgboost_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # Nothing added since booster not in space
+    assert "booster" not in best_string_params
+
+
+def test_extract_xgboost_dart_best_params_with_dart() -> None:
+    """_extract_xgboost_dart_best_params extracts DART params when booster is dart."""
+    space = _make_xgboost_space_with_dart()
+    best_params: dict[str, float | int | str] = {
+        "max_depth": 5,
+        "booster": "dart",
+        "rate_drop": 0.15,
+        "skip_drop": 0.5,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_xgboost_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # DART params extracted
+    assert best_string_params["booster"] == "dart"
+    assert best_float_params["rate_drop"] == 0.15
+    assert best_float_params["skip_drop"] == 0.5
+
+
+def test_extract_xgboost_dart_best_params_with_dart_partial() -> None:
+    """_extract_xgboost_dart_best_params handles partial DART params in search space."""
+    # Only rate_drop in space, no skip_drop - start from space without DART
+    space = _make_xgboost_space_without_dart()
+    space["booster"] = {"param_type": "categorical_str", "choices": ("gbtree", "dart")}
+    space["rate_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    best_params: dict[str, float | int | str] = {
+        "max_depth": 5,
+        "booster": "dart",
+        "rate_drop": 0.15,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_xgboost_dart_best_params(space, best_params, best_float_params, best_string_params)
+    assert best_string_params["booster"] == "dart"
+    assert best_float_params["rate_drop"] == 0.15
+    assert "skip_drop" not in best_float_params
+
+
+def test_extract_xgboost_dart_best_params_with_dart_skip_drop_only() -> None:
+    """_extract_xgboost_dart_best_params handles skip_drop only (no rate_drop) in search space."""
+    # Only skip_drop in space, no rate_drop - start from space without DART
+    space = _make_xgboost_space_without_dart()
+    space["booster"] = {"param_type": "categorical_str", "choices": ("gbtree", "dart")}
+    space["skip_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    best_params: dict[str, float | int | str] = {
+        "max_depth": 5,
+        "booster": "dart",
+        "skip_drop": 0.5,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_xgboost_dart_best_params(space, best_params, best_float_params, best_string_params)
+    assert best_string_params["booster"] == "dart"
+    assert "rate_drop" not in best_float_params
+    assert best_float_params["skip_drop"] == 0.5
+
+
+def test_extract_xgboost_dart_best_params_with_gbtree() -> None:
+    """_extract_xgboost_dart_best_params skips DART params when booster is gbtree."""
+    space = _make_xgboost_space_with_dart()
+    best_params: dict[str, float | int | str] = {
+        "max_depth": 5,
+        "booster": "gbtree",
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_xgboost_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # Booster extracted but no DART params
+    assert best_string_params["booster"] == "gbtree"
+    assert "rate_drop" not in best_float_params
+    assert "skip_drop" not in best_float_params
+
+
+# =============================================================================
+# Tests: LightGBM DART Best Params Extraction
+# =============================================================================
+
+
+def test_extract_lightgbm_dart_best_params_no_boosting_type_in_space() -> None:
+    """_extract_lightgbm_dart_best_params does nothing when boosting_type not in space."""
+    space = _make_lightgbm_space_without_dart()  # No boosting_type key
+    best_params: dict[str, float | int | str] = {"num_leaves": 50}
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # Nothing added since boosting_type not in space
+    assert "boosting_type" not in best_string_params
+
+
+def test_extract_lightgbm_dart_best_params_with_dart() -> None:
+    """_extract_lightgbm_dart_best_params extracts DART params when boosting_type is dart."""
+    space = _make_lightgbm_space_with_dart()
+    best_params: dict[str, float | int | str] = {
+        "num_leaves": 50,
+        "boosting_type": "dart",
+        "drop_rate": 0.1,
+        "skip_drop": 0.6,
+        "feature_fraction": 0.05,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # DART params extracted
+    assert best_string_params["boosting_type"] == "dart"
+    assert best_float_params["drop_rate"] == 0.1
+    assert best_float_params["skip_drop"] == 0.6
+    assert best_float_params["feature_fraction"] == 0.05
+
+
+def test_extract_lightgbm_dart_best_params_with_dart_partial() -> None:
+    """_extract_lightgbm_dart_best_params handles partial DART params in search space."""
+    # Only drop_rate in space, no skip_drop - start from space without DART
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    space["drop_rate"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    best_params: dict[str, float | int | str] = {
+        "num_leaves": 50,
+        "boosting_type": "dart",
+        "drop_rate": 0.1,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    assert best_string_params["boosting_type"] == "dart"
+    assert best_float_params["drop_rate"] == 0.1
+    assert "skip_drop" not in best_float_params
+
+
+def test_extract_lightgbm_dart_best_params_with_dart_skip_drop_only() -> None:
+    """_extract_lightgbm_dart_best_params handles skip_drop only (no drop_rate) in space."""
+    # Only skip_drop in space, no drop_rate - start from space without DART
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    space["skip_drop"] = {"param_type": "float", "low": 0.0, "high": 1.0, "log_scale": False}
+    best_params: dict[str, float | int | str] = {
+        "num_leaves": 50,
+        "boosting_type": "dart",
+        "skip_drop": 0.6,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    assert best_string_params["boosting_type"] == "dart"
+    assert "drop_rate" not in best_float_params
+    assert best_float_params["skip_drop"] == 0.6
+
+
+def test_extract_lightgbm_dart_best_params_with_dart_feature_fraction_only() -> None:
+    """_extract_lightgbm_dart_best_params handles feature_fraction only in search space."""
+    # Only feature_fraction in space, no drop_rate or skip_drop
+    space = _make_lightgbm_space_without_dart()
+    space["boosting_type"] = {"param_type": "categorical_str", "choices": ("gbdt", "dart")}
+    ff_spec: FloatRangeSpec = {"param_type": "float", "low": 0.02, "high": 0.1, "log_scale": False}
+    space["feature_fraction"] = ff_spec
+    best_params: dict[str, float | int | str] = {
+        "num_leaves": 50,
+        "boosting_type": "dart",
+        "feature_fraction": 0.05,
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    assert best_string_params["boosting_type"] == "dart"
+    assert "drop_rate" not in best_float_params
+    assert "skip_drop" not in best_float_params
+    assert best_float_params["feature_fraction"] == 0.05
+
+
+def test_extract_lightgbm_dart_best_params_with_gbdt() -> None:
+    """_extract_lightgbm_dart_best_params skips DART params when boosting_type is gbdt."""
+    space = _make_lightgbm_space_with_dart()
+    best_params: dict[str, float | int | str] = {
+        "num_leaves": 50,
+        "boosting_type": "gbdt",
+    }
+    best_float_params: SampledFloatParams = {}
+    best_string_params: SampledStringParams = {}
+    _extract_lightgbm_dart_best_params(space, best_params, best_float_params, best_string_params)
+    # Boosting type extracted but no DART params
+    assert best_string_params["boosting_type"] == "gbdt"
+    assert "drop_rate" not in best_float_params
+    assert "skip_drop" not in best_float_params
+    assert "feature_fraction" not in best_float_params
+
+
+# =============================================================================
 # Tests: Hook Management
 # =============================================================================
 
@@ -338,12 +789,13 @@ def test_use_real_optuna_sets_hook() -> None:
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
         random_state: int,
     ) -> float:
-        _ = x_features, y_labels, feature_names, int_params, float_params
+        _ = x_features, y_labels, feature_names, int_params, float_params, string_params
         _ = train_ratio, val_ratio, test_ratio, random_state
         return 0.75
 

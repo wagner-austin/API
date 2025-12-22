@@ -14,7 +14,7 @@ from covenant_ml.optimizer.objectives.lightgbm_objective import (
     _resolve_lightgbm_device,
     create_lightgbm_objective,
 )
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 
 # =============================================================================
 # Test Data Helpers
@@ -67,6 +67,11 @@ def _make_default_float_params() -> SampledFloatParams:
         subsample=0.8,
         colsample_bytree=0.8,
     )
+
+
+def _make_default_string_params() -> SampledStringParams:
+    """Create default string parameters for testing (empty for LightGBM)."""
+    return SampledStringParams()
 
 
 # =============================================================================
@@ -187,6 +192,7 @@ def test_lightgbm_objective_call_returns_auc() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc = objective(
         x_features=x,
@@ -194,6 +200,7 @@ def test_lightgbm_objective_call_returns_auc() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -217,6 +224,7 @@ def test_lightgbm_objective_call_ignores_passed_data() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     # Should not raise even though passed data has different shape
     auc = objective(
@@ -225,6 +233,7 @@ def test_lightgbm_objective_call_ignores_passed_data() -> None:
         feature_names=names_other,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -243,6 +252,7 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
     int_params_simple = SampledIntParams(n_estimators=5, num_leaves=4)
     int_params_complex = SampledIntParams(n_estimators=50, num_leaves=64)
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc_simple = objective(
         x_features=x,
@@ -250,6 +260,7 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
         feature_names=names,
         int_params=int_params_simple,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -262,6 +273,7 @@ def test_lightgbm_objective_call_with_different_hyperparams() -> None:
         feature_names=names,
         int_params=int_params_complex,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -280,6 +292,7 @@ def test_lightgbm_objective_multiple_calls_deterministic() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc1 = objective(
         x_features=x,
@@ -287,6 +300,7 @@ def test_lightgbm_objective_multiple_calls_deterministic() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -299,6 +313,7 @@ def test_lightgbm_objective_multiple_calls_deterministic() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -338,6 +353,7 @@ def test_create_lightgbm_objective_callable() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc = objective(
         x_features=x,
@@ -345,6 +361,7 @@ def test_create_lightgbm_objective_callable() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -363,6 +380,7 @@ def test_create_lightgbm_objective_with_early_stopping_rounds() -> None:
 
     int_params = _make_default_int_params()
     float_params = _make_default_float_params()
+    string_params = _make_default_string_params()
 
     auc = objective(
         x_features=x,
@@ -370,6 +388,7 @@ def test_create_lightgbm_objective_with_early_stopping_rounds() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -445,3 +464,176 @@ def test_resolve_lightgbm_device_returns_valid_type_for_all_inputs() -> None:
     for device_input in inputs:
         result = _resolve_lightgbm_device(device_input)
         assert result in valid_outputs
+
+
+# =============================================================================
+# Tests: DART Boosting
+# =============================================================================
+
+
+def test_lightgbm_objective_with_dart_boosting() -> None:
+    """LightGBMObjective uses DART params when boosting_type is 'dart'."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        drop_rate=0.1,  # DART param
+        skip_drop=0.5,  # DART param
+    )
+    string_params = SampledStringParams(boosting_type="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_lightgbm_objective_with_dart_partial_params() -> None:
+    """LightGBMObjective handles partial DART params (only drop_rate, no skip_drop)."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        drop_rate=0.1,  # Only drop_rate, no skip_drop
+    )
+    string_params = SampledStringParams(boosting_type="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_lightgbm_objective_with_dart_skip_drop_only() -> None:
+    """LightGBMObjective handles DART with only skip_drop (no drop_rate)."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        skip_drop=0.5,  # Only skip_drop, no drop_rate
+    )
+    string_params = SampledStringParams(boosting_type="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_lightgbm_objective_with_dart_feature_fraction() -> None:
+    """LightGBMObjective uses feature_fraction when boosting_type is 'dart' (Phase 6)."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        drop_rate=0.1,
+        skip_drop=0.5,
+        feature_fraction=0.05,  # Phase 6: aggressive feature subsampling for DART
+    )
+    string_params = SampledStringParams(boosting_type="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0
+
+
+def test_lightgbm_objective_with_dart_feature_fraction_only() -> None:
+    """LightGBMObjective uses feature_fraction without other DART params."""
+    x, y, names = _make_test_data(n_samples=100, n_features=5)
+    objective = LightGBMObjective(x, y, names, device="cpu", feature_preset="none")
+
+    int_params = _make_default_int_params()
+    float_params = SampledFloatParams(
+        learning_rate=0.1,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        feature_fraction=0.05,  # Only feature_fraction, no drop_rate/skip_drop
+    )
+    string_params = SampledStringParams(boosting_type="dart")
+
+    auc = objective(
+        x_features=x,
+        y_labels=y,
+        feature_names=names,
+        int_params=int_params,
+        float_params=float_params,
+        string_params=string_params,
+        train_ratio=0.7,
+        val_ratio=0.15,
+        test_ratio=0.15,
+        random_state=42,
+    )
+
+    # AUC must be between 0 and 1
+    assert 0.0 <= auc <= 1.0

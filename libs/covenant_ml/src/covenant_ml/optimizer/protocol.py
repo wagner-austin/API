@@ -19,6 +19,7 @@ from .types import (
     OptimizationSummary,
     SampledFloatParams,
     SampledIntParams,
+    SampledStringParams,
     TrialResult,
     XGBoostSearchSpace,
 )
@@ -59,6 +60,7 @@ class ObjectiveProtocol(Protocol):
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
+        string_params: SampledStringParams,
         train_ratio: float,
         val_ratio: float,
         test_ratio: float,
@@ -72,6 +74,7 @@ class ObjectiveProtocol(Protocol):
             feature_names: Names for each feature column
             int_params: Integer hyperparameters
             float_params: Float hyperparameters
+            string_params: String hyperparameters (boosting_type, booster)
             train_ratio: Fraction of data for training
             val_ratio: Fraction of data for validation
             test_ratio: Fraction of data for test (unused during optimization)

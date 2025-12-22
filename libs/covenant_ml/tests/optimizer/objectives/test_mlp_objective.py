@@ -6,7 +6,7 @@ Tests the MLP hyperparameter optimization objective using real US bankruptcy dat
 from __future__ import annotations
 
 from covenant_ml.optimizer.objectives import MLPObjective, create_mlp_objective
-from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 
 from ...conftest import load_us_bankruptcy_data
 
@@ -43,6 +43,9 @@ def test_mlp_objective_returns_validation_auc() -> None:
         "dropout": 0.1,
     }
 
+    # MLP has no string params
+    string_params: SampledStringParams = {}
+
     # Run objective
     val_auc = objective(
         x_features=x,  # Ignored - uses pre-stored
@@ -50,6 +53,7 @@ def test_mlp_objective_returns_validation_auc() -> None:
         feature_names=names,  # Ignored - uses pre-stored
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -94,6 +98,9 @@ def test_mlp_objective_with_feature_engineering() -> None:
         "dropout": 0.0,
     }
 
+    # MLP has no string params
+    string_params: SampledStringParams = {}
+
     # Run objective
     val_auc = objective(
         x_features=x,
@@ -101,6 +108,7 @@ def test_mlp_objective_with_feature_engineering() -> None:
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,
@@ -144,12 +152,16 @@ def test_mlp_objective_class_direct_instantiation() -> None:
         "dropout": 0.0,
     }
 
+    # MLP has no string params
+    string_params: SampledStringParams = {}
+
     val_auc = objective(
         x_features=x,
         y_labels=y,
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
+        string_params=string_params,
         train_ratio=0.7,
         val_ratio=0.15,
         test_ratio=0.15,

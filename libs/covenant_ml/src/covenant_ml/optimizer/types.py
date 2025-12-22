@@ -56,6 +56,16 @@ class CategoricalIntSpec(TypedDict, total=True):
     choices: tuple[int, ...]
 
 
+class CategoricalStringSpec(TypedDict, total=True):
+    """Categorical parameter with fixed string choices.
+
+    Used for parameters like boosting_type that take string values.
+    """
+
+    param_type: Literal["categorical_str"]
+    choices: tuple[str, ...]
+
+
 # =============================================================================
 # Sampled Parameter Value Types
 # =============================================================================
@@ -89,6 +99,25 @@ class SampledFloatParams(TypedDict, total=False):
     subsample: float
     colsample_bytree: float
     dropout: float
+    # DART-specific params (LightGBM and XGBoost)
+    drop_rate: float
+    skip_drop: float
+    # XGBoost DART-specific
+    rate_drop: float
+    # LightGBM DART-specific: very low feature fraction for strong regularization
+    feature_fraction: float
+
+
+class SampledStringParams(TypedDict, total=False):
+    """Sampled string parameter values.
+
+    All fields optional - only present params are included.
+    """
+
+    # LightGBM boosting type: "gbdt" or "dart"
+    boosting_type: str
+    # XGBoost booster: "gbtree" or "dart"
+    booster: str
 
 
 # =============================================================================
@@ -96,8 +125,8 @@ class SampledFloatParams(TypedDict, total=False):
 # =============================================================================
 
 
-class XGBoostSearchSpace(TypedDict, total=True):
-    """Search space for XGBoost hyperparameters."""
+class _XGBoostSearchSpaceRequired(TypedDict, total=True):
+    """Required XGBoost search space parameters."""
 
     max_depth: IntRangeSpec | CategoricalIntSpec
     n_estimators: IntRangeSpec | CategoricalIntSpec
@@ -106,6 +135,20 @@ class XGBoostSearchSpace(TypedDict, total=True):
     reg_lambda: FloatRangeSpec | CategoricalFloatSpec
     subsample: FloatRangeSpec | CategoricalFloatSpec
     colsample_bytree: FloatRangeSpec | CategoricalFloatSpec
+
+
+class XGBoostSearchSpace(_XGBoostSearchSpaceRequired, total=False):
+    """Search space for XGBoost hyperparameters with optional DART support.
+
+    Required params are inherited from _XGBoostSearchSpaceRequired.
+    DART params are optional and only used when booster includes "dart".
+    """
+
+    # Optional: booster type ("gbtree" or "dart")
+    booster: CategoricalStringSpec
+    # DART-specific params (only used when booster is "dart")
+    rate_drop: FloatRangeSpec | CategoricalFloatSpec
+    skip_drop: FloatRangeSpec | CategoricalFloatSpec
 
 
 class MLPSearchSpace(TypedDict, total=True):
@@ -128,8 +171,8 @@ class LSTMSearchSpace(TypedDict, total=True):
     batch_size: IntRangeSpec | CategoricalIntSpec
 
 
-class LightGBMSearchSpace(TypedDict, total=True):
-    """Search space for LightGBM hyperparameters.
+class _LightGBMSearchSpaceRequired(TypedDict, total=True):
+    """Required LightGBM search space parameters.
 
     Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
     where num_leaves is the primary complexity control. Using max_depth=-1
@@ -144,6 +187,22 @@ class LightGBMSearchSpace(TypedDict, total=True):
     colsample_bytree: FloatRangeSpec | CategoricalFloatSpec
     reg_alpha: FloatRangeSpec | CategoricalFloatSpec
     reg_lambda: FloatRangeSpec | CategoricalFloatSpec
+
+
+class LightGBMSearchSpace(_LightGBMSearchSpaceRequired, total=False):
+    """Search space for LightGBM hyperparameters with optional DART support.
+
+    Required params are inherited from _LightGBMSearchSpaceRequired.
+    DART params are optional and only used when boosting_type includes "dart".
+    """
+
+    # Optional: boosting algorithm choice ("gbdt" or "dart")
+    boosting_type: CategoricalStringSpec
+    # DART-specific params (only used when boosting_type is "dart")
+    drop_rate: FloatRangeSpec | CategoricalFloatSpec
+    skip_drop: FloatRangeSpec | CategoricalFloatSpec
+    # DART-specific: very low feature fraction (0.02-0.1) for strong regularization
+    feature_fraction: FloatRangeSpec | CategoricalFloatSpec
 
 
 # Union of all backend-specific search spaces for generic optimizer interfaces
@@ -163,6 +222,7 @@ class TrialResult(TypedDict, total=True):
     trial_number: int
     int_params: SampledIntParams
     float_params: SampledFloatParams
+    string_params: SampledStringParams
     value: float  # The objective value (validation AUC to maximize)
     state: TrialState
     duration_seconds: float
@@ -175,6 +235,7 @@ class OptimizationSummary(TypedDict, total=True):
     best_value: float
     best_int_params: SampledIntParams
     best_float_params: SampledFloatParams
+    best_string_params: SampledStringParams
     n_trials_total: int
     n_trials_complete: int
     n_trials_pruned: int
@@ -204,6 +265,7 @@ class OptimizationConfig(TypedDict, total=True):
 __all__ = [
     "CategoricalFloatSpec",
     "CategoricalIntSpec",
+    "CategoricalStringSpec",
     "DeviceRequest",
     "FloatRangeSpec",
     "IntRangeSpec",
@@ -215,6 +277,7 @@ __all__ = [
     "OptimizationSummary",
     "SampledFloatParams",
     "SampledIntParams",
+    "SampledStringParams",
     "SearchSpace",
     "TrialResult",
     "TrialState",
