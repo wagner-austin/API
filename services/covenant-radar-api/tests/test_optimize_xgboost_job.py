@@ -449,6 +449,7 @@ class TestGenerateTrainConfig:
                 "subsample": 0.8,
                 "colsample_bytree": 0.8,
             },
+            "best_string_params": {},
             "total_duration_seconds": 120.5,
         }
 
