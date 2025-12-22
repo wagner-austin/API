@@ -31,37 +31,62 @@ poetry run python -m scripts.optimize -b lightgbm -n 100 -d kaggle_amex_default
 poetry run python -m scripts.optimize -b mlp -n 50 -d taiwan
 poetry run python -m scripts.optimize -b lightgbm -n 50 -d us
 poetry run python -m scripts.optimize -b lstm -n 50 -d polish
+
+# Examples - Multi-Backend Comparison
+poetry run python -m scripts.optimize -b lightgbm,xgboost -n 50  # Compare two backends
+poetry run python -m scripts.optimize -b all -n 50               # Compare all four backends
 ```
 
 ## Package Structure
 
 ```
 scripts/optimize/
-├── __init__.py      # Package exports
-├── __main__.py      # Module entry point
-├── cli.py           # Argument parsing and types
-├── display.py       # Rich console output formatting
-├── history.py       # Run history tracking (JSONL)
-├── logging_config.py# Logging setup and suppression
-├── main.py          # Main entry point with lifecycle
-├── modes.py         # Run modes (single, compare, all-datasets)
-├── runner.py        # Core optimization execution
-├── state.py         # Lifecycle state management
-└── README.md        # This file
+├── __init__.py       # Package exports
+├── __main__.py       # Module entry point
+├── _formatters.py    # Progress display formatters
+├── _runners.py       # Backend-specific runners with progress
+├── cli.py            # Argument parsing and types
+├── display.py        # Rich console output formatting
+├── history.py        # Run history tracking (JSONL)
+├── logging_config.py # Logging setup and suppression
+├── main.py           # Main entry point with lifecycle
+├── model_saver.py    # Best model saving after optimization
+├── modes.py          # Run modes (compare, all-datasets, multi-backend)
+├── runner.py         # Core optimization execution
+├── state.py          # Lifecycle state management
+└── README.md         # This file
 ```
 
 ## Module Responsibilities
 
+### _formatters.py
+Progress display formatters for optimization output:
+- `format_elapsed()` - Format elapsed time (e.g., "1m 23s")
+- `format_xgboost_progress()` - XGBoost trial progress display
+- `format_mlp_progress()` - MLP trial progress display
+- `format_lightgbm_progress()` - LightGBM trial progress display
+- `format_lstm_progress()` - LSTM trial progress display
+- `format_loading_progress()` - Dataset loading progress display
+
+### _runners.py
+Backend-specific runners with Rich progress bar integration:
+- `run_single_with_progress()` - Main entry point for single optimization run
+- `_run_xgboost_with_progress()` - XGBoost optimization with callbacks
+- `_run_mlp_with_progress()` - MLP neural network optimization with callbacks
+- `_run_lightgbm_with_progress()` - LightGBM optimization with callbacks
+- `_run_lstm_with_progress()` - LSTM optimization with callbacks
+
 ### cli.py
 Argument parsing with strict types. Defines:
 - `BackendName` - Literal type for ML backends (`xgboost`, `mlp`, `lightgbm`, `lstm`)
+- `ALL_BACKENDS` - Tuple of all backend names for iteration
 - `StandardDatasetName` - Literal type for standard datasets (`taiwan`, `us`, `polish`)
 - `TimeSeriesDatasetName` - Literal type for time-series datasets (`kaggle_amex_default`)
 - `DatasetName` - Union of standard and time-series dataset names
 - `FeaturePreset` - Literal type for feature presets
 - `is_timeseries_dataset()` - Check if dataset is time-series type
-- `OptimizeArgs` - Parsed argument container
-- `parse_args()` - Main parser function
+- `OptimizeArgs` - Parsed argument container with `backends` tuple
+- `parse_args()` - Main parser function with multi-backend support
 
 ### display.py
 Rich console output formatting:
@@ -93,16 +118,19 @@ Main entry point with proper lifecycle:
 - Handles KeyboardInterrupt gracefully
 
 ### modes.py
-Three run modes with backend-specific execution:
-- `run_single_with_progress()` - Single optimization with Rich progress bar (all backends)
-- `compare_presets()` - Run all 4 presets, rank by AUC (per backend)
-- `run_all_datasets()` - Run on taiwan, us, polish datasets (per backend)
+Run modes for different optimization scenarios:
+- `compare_presets()` - Run all 4 feature presets, rank by AUC
+- `run_all_datasets()` - Run on taiwan, us, polish datasets
+- `run_multiple_backends()` - Compare multiple backends on same dataset
 
-Backend-specific run functions:
-- `_run_xgboost_with_progress()` - XGBoost optimization
-- `_run_mlp_with_progress()` - MLP neural network optimization
-- `_run_lightgbm_with_progress()` - LightGBM optimization
-- `_run_lstm_with_progress()` - LSTM optimization
+Summary display helpers:
+- `_print_preset_comparison_summary()` - Display preset comparison table
+- `_print_multi_dataset_summary()` - Display multi-dataset results table
+- `_print_multi_backend_summary()` - Display multi-backend comparison table
+
+### model_saver.py
+Best model persistence after optimization:
+- `save_best_model()` - Save trained model to disk with metadata
 
 ### runner.py
 Core optimization execution with backend-specific runners:
@@ -231,7 +259,8 @@ tests/optimize/
 ├── conftest.py          # Shared fixtures and fake factories
 ├── test_cli.py          # CLI argument parsing tests
 ├── test_display.py      # Output formatting tests
-├── test_runner.py       # Backend runner tests
+├── test_runner.py       # Low-level runner tests
+├── test_runners.py      # Backend runners with progress tests
 ├── test_modes.py        # Optimization mode tests
 ├── test_integration.py  # Main entry point tests
 └── test_datasets.py     # Dataset and callback tests
@@ -289,10 +318,11 @@ def test_xgboost_loading_progress_callback_is_invoked(self) -> None:
 
 | Module | Coverage |
 |--------|----------|
-| `test_cli.py` | CLI argument parsing (OptimizeArgs, parse_args, flags) |
+| `test_cli.py` | CLI argument parsing (OptimizeArgs, parse_args, multi-backend) |
 | `test_display.py` | Output formatting (tables, result display, delta formatting) |
-| `test_runner.py` | Backend runners (XGBoost, MLP, LightGBM, LSTM) |
-| `test_modes.py` | Run modes (single, compare presets, all datasets) |
+| `test_runner.py` | Low-level runner functions (run_xgboost, run_mlp, etc.) |
+| `test_runners.py` | Backend runners with progress (run_single_with_progress) |
+| `test_modes.py` | Run modes (compare presets, all datasets, multi-backend) |
 | `test_integration.py` | Main entry point, module entry, keyboard interrupt |
 | `test_datasets.py` | Dataset hooks, loading progress callbacks |
 
@@ -351,6 +381,58 @@ All backends apply automatic preprocessing before training. The pipeline fits on
 | Z-Score Normalization | Standardizes features to mean=0, std=1 |
 
 This is handled by `covenant_ml.preprocessing.AutoPreprocessor` and requires no configuration.
+
+## DART Boosting Support
+
+XGBoost and LightGBM optimizers include DART (Dropouts meet Multiple Additive Regression Trees) in their search spaces. DART applies dropout regularization during boosting to reduce overfitting.
+
+### XGBoost DART Parameters
+
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `booster` | categorical | `gbtree`, `dart` | Boosting algorithm |
+| `rate_drop` | float | 0.0-0.5 | Tree dropout rate (DART only) |
+| `skip_drop` | float | 0.0-0.5 | Probability of skipping dropout (DART only) |
+
+### LightGBM DART Parameters
+
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `boosting_type` | categorical | `gbdt`, `dart` | Boosting type |
+| `drop_rate` | float | 0.0-0.5 | Tree dropout rate (DART only) |
+| `skip_drop` | float | 0.0-0.5 | Probability of skipping dropout (DART only) |
+| `feature_fraction` | float | 0.02-0.1 | Aggressive feature subsampling for DART regularization (DART only) |
+
+DART parameters are conditionally sampled only when the DART booster/boosting_type is selected by Optuna. This allows exploration of both standard gradient boosting and DART configurations to find the optimal approach.
+
+**Note:** Early stopping is automatically disabled for LightGBM DART mode, as DART's random tree dropout makes early stopping unreliable. When DART is selected, training runs for the full `n_estimators` rounds.
+
+### DART History Entry Fields
+
+When DART is selected, the history entry includes additional fields:
+
+**XGBoost DART Entry:**
+```json
+{
+  "backend": "xgboost",
+  "best_booster": "dart",
+  "best_rate_drop": 0.15,
+  "best_skip_drop": 0.3,
+  ...
+}
+```
+
+**LightGBM DART Entry:**
+```json
+{
+  "backend": "lightgbm",
+  "best_boosting_type": "dart",
+  "best_drop_rate": 0.1,
+  "best_skip_drop": 0.25,
+  "best_feature_fraction": 0.05,
+  ...
+}
+```
 
 ## Type Safety
 
