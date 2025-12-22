@@ -105,20 +105,24 @@ def make_fake_result(
     }
 
 
-def make_fake_mlp_result() -> MLPOptimizationResult:
+def make_fake_mlp_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_val_auc: float = 0.85,
+) -> MLPOptimizationResult:
     """Create a fake MLP optimization result for testing."""
     return {
         "backend": "mlp",
         "status": "complete",
-        "dataset": "taiwan",
+        "dataset": dataset,
         "n_samples": 1000,
         "n_features": 100,
-        "feature_preset": "full",
+        "feature_preset": feature_preset,
         "n_trials_complete": 10,
         "n_trials_pruned": 2,
         "n_trials_failed": 0,
         "best_trial_number": 5,
-        "best_val_auc": 0.85,
+        "best_val_auc": best_val_auc,
         "best_n_layers": 3,
         "best_hidden_size": 128,
         "best_learning_rate": 0.001,
@@ -143,7 +147,11 @@ def make_fake_mlp_result() -> MLPOptimizationResult:
     }
 
 
-def make_fake_lightgbm_result() -> LightGBMOptimizationResult:
+def make_fake_lightgbm_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_val_auc: float = 0.85,
+) -> LightGBMOptimizationResult:
     """Create a fake LightGBM optimization result for testing.
 
     Note: best_max_depth is always -1 (unlimited) because LightGBM uses
@@ -152,15 +160,15 @@ def make_fake_lightgbm_result() -> LightGBMOptimizationResult:
     return {
         "backend": "lightgbm",
         "status": "complete",
-        "dataset": "taiwan",
+        "dataset": dataset,
         "n_samples": 1000,
         "n_features": 100,
-        "feature_preset": "full",
+        "feature_preset": feature_preset,
         "n_trials_complete": 10,
         "n_trials_pruned": 2,
         "n_trials_failed": 0,
         "best_trial_number": 5,
-        "best_val_auc": 0.85,
+        "best_val_auc": best_val_auc,
         "best_max_depth": -1,  # Fixed: unlimited depth, num_leaves controls complexity
         "best_n_estimators": 100,
         "best_num_leaves": 31,
@@ -190,20 +198,24 @@ def make_fake_lightgbm_result() -> LightGBMOptimizationResult:
     }
 
 
-def make_fake_lstm_result() -> LSTMOptimizationResult:
+def make_fake_lstm_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_val_auc: float = 0.85,
+) -> LSTMOptimizationResult:
     """Create a fake LSTM optimization result for testing."""
     return {
         "backend": "lstm",
         "status": "complete",
-        "dataset": "taiwan",
+        "dataset": dataset,
         "n_samples": 1000,
         "n_features": 100,
-        "feature_preset": "full",
+        "feature_preset": feature_preset,
         "n_trials_complete": 10,
         "n_trials_pruned": 2,
         "n_trials_failed": 0,
         "best_trial_number": 5,
-        "best_val_auc": 0.85,
+        "best_val_auc": best_val_auc,
         "best_hidden_size": 64,
         "best_num_layers": 2,
         "best_learning_rate": 0.001,
