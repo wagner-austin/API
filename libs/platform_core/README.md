@@ -242,6 +242,65 @@ from platform_core.data_bank_events import (
 )
 ```
 
+## Service Configuration
+
+Typed configuration loaders for service-specific settings.
+
+### Covenant Radar Settings
+
+```python
+from platform_core import (
+    CovenantRadarSettings,
+    CovenantRadarDatadogConfig,
+    load_covenant_radar_settings,
+)
+
+# Load settings from environment
+settings = load_covenant_radar_settings()
+
+# Access typed configuration
+print(settings["redis"]["url"])
+print(settings["database_url"])
+print(settings["datadog"]["enabled"])
+print(settings["app"]["ml_backend"])
+```
+
+**Environment Variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `""` | PostgreSQL connection URL |
+| `REDIS_URL` or `REDIS__URL` | `redis://redis:6379/0` | Redis connection URL |
+| `APP_ENV` | `dev` | Environment (`dev` or `prod`) |
+| `LOGGING__LEVEL` | `INFO` | Log level |
+| `APP__ML_BACKEND` | `xgboost` | ML backend (`xgboost`, `mlp`, `lstm`, `lightgbm`) |
+| `APP__DATA_ROOT` | `/data` | Data root directory |
+| `APP__MODELS_ROOT` | `/data/models` | Models directory |
+| `APP__LOGS_ROOT` | `/data/logs` | Logs directory |
+
+**Datadog Configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATADOG__ENABLED` | `false` | Enable Datadog integration |
+| `DATADOG__SERVICE` | `covenant-radar-api` | Service name for traces |
+| `DATADOG__ENV` | `dev` | Environment (`dev`, `staging`, `production`) |
+| `DATADOG__VERSION` | `0.0.0` | Service version |
+| `DATADOG__AGENT_HOST` | `localhost` | Datadog agent host |
+| `DATADOG__DOGSTATSD_PORT` | `8125` | DogStatsD UDP port |
+| `DATADOG__TRACE_ENABLED` | `true` | Enable APM tracing |
+
+### Configuration Types
+
+| Type | Description |
+|------|-------------|
+| `CovenantRadarSettings` | Root settings TypedDict |
+| `CovenantRadarRedisConfig` | Redis connection config |
+| `CovenantRadarAppConfig` | Application paths and ML backend |
+| `CovenantRadarLoggingConfig` | Logging level config |
+| `CovenantRadarRQConfig` | RQ queue settings |
+| `CovenantRadarDatadogConfig` | Datadog APM and metrics config |
+
 ## Torch Types
 
 Protocol types for PyTorch compatibility without importing torch:
