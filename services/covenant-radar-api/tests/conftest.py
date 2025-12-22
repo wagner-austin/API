@@ -18,6 +18,8 @@ from covenant_radar_api import _test_hooks as worker_test_hooks
 from covenant_radar_api.core import _test_hooks
 from covenant_radar_api.core.config import Settings
 from covenant_radar_api.core.container import ServiceContainer
+from covenant_radar_api.integrations.datadog import _test_hooks as datadog_test_hooks
+from covenant_radar_api.integrations.datadog.tracing import reset_tracing_state
 from covenant_radar_api.seeding import _test_hooks as seeding_test_hooks
 from scripts import guard as guard_mod
 
@@ -65,17 +67,17 @@ def _make_fake_queue() -> FakeQueue:
 
 
 def _make_test_settings() -> Settings:
-    return Settings(
-        app_env="dev",
-        logging={"level": "INFO"},
-        redis={"enabled": True, "url": "redis://test:6379/0"},
-        rq={
+    return {
+        "app_env": "dev",
+        "logging": {"level": "INFO"},
+        "redis": {"enabled": True, "url": "redis://test:6379/0"},
+        "rq": {
             "queue_name": "covenant",
             "job_timeout_sec": 3600,
             "result_ttl_sec": 86400,
             "failure_ttl_sec": 604800,
         },
-        app={
+        "app": {
             "data_root": "/data",
             "models_root": "/data/models",
             "logs_root": "/data/logs",
@@ -84,8 +86,17 @@ def _make_test_settings() -> Settings:
             "active_model_path_xgb": "/data/models/active_xgb.ubj",
             "active_model_path_mlp": "/data/models/active_mlp.pt",
         },
-        database_url="postgresql://test:test@localhost/test",
-    )
+        "datadog": {
+            "enabled": False,
+            "service": "covenant-radar-api",
+            "env": "dev",
+            "version": "0.0.0",
+            "agent_host": "localhost",
+            "dogstatsd_port": 8125,
+            "trace_enabled": False,
+        },
+        "database_url": "postgresql://test:test@localhost/test",
+    }
 
 
 def _make_container_with_store(
@@ -196,6 +207,16 @@ def _disable_cuda_impl() -> Generator[None, None, None]:
     set_cuda_hook(None)
 
 
+def _reset_datadog_hooks_impl() -> Generator[None, None, None]:
+    """Reset Datadog integration hooks after each test."""
+    orig_metrics_factory = datadog_test_hooks.metrics_sink_factory
+    orig_tracing_setup = datadog_test_hooks.tracing_setup
+    yield
+    datadog_test_hooks.metrics_sink_factory = orig_metrics_factory
+    datadog_test_hooks.tracing_setup = orig_tracing_setup
+    reset_tracing_state()
+
+
 # =============================================================================
 # Pytest Fixtures
 # =============================================================================
@@ -212,3 +233,4 @@ _reset_worker_hooks = pytest.fixture(autouse=True)(_reset_worker_hooks_impl)
 _reset_guard_hooks = pytest.fixture(autouse=True)(_reset_guard_hooks_impl)
 _reset_seeding_hooks = pytest.fixture(autouse=True)(_reset_seeding_hooks_impl)
 _disable_cuda = pytest.fixture(autouse=True)(_disable_cuda_impl)
+_reset_datadog_hooks = pytest.fixture(autouse=True)(_reset_datadog_hooks_impl)
