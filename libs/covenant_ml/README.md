@@ -890,17 +890,27 @@ print(f"Features: {dataset['meta']['n_features']}")
 
 Time-series data is aggregated per entity into a single feature vector:
 
-| Strategy | Description | Output Features |
-|----------|-------------|-----------------|
-| `"last"` | Take most recent observation | Same as input |
-| `"first"` | Take oldest observation | Same as input |
-| `"mean"` | Average all observations | Same as input |
-| `"statistics"` | Compute mean, std, min, max | 4x input features |
+| Strategy | Description | Output per Feature |
+|----------|-------------|-------------------|
+| `"last"` | Take most recent observation | 1 |
+| `"first"` | Take oldest observation | 1 |
+| `"mean"` | Average all observations | 1 |
+| `"statistics"` | Compute mean, std, min, max | 4 |
+
+### Competition Feature Engineering
+
+Additional features for Kaggle-style competitions:
+
+| Feature Type | Description | Output per Feature |
+|--------------|-------------|-------------------|
+| **Rank** | Per-entity percentile (0.0-1.0) of final value | 1 |
+| **Diff** | Row-to-row differences: mean, std, min, max, last | 5 |
+| **Window** | Stats over last N observations: mean, std, min, max | 4 per window size |
 
 ```python
-from covenant_ml.datasets.types import TimeSeriesDatasetConfig, TimeSeriesSpec
+from covenant_ml.datasets.types import TimeSeriesDatasetConfig, TimeSeriesSpec, TargetColumnSpec
 
-# Configure time-series dataset with statistics aggregation
+# Configure time-series dataset with all competition features
 config = TimeSeriesDatasetConfig(
     name="my_timeseries",
     display_name="My Time Series Dataset",
@@ -921,14 +931,25 @@ config = TimeSeriesDatasetConfig(
     time_series=TimeSeriesSpec(
         entity_column="customer_id",
         time_column="date",
-        aggregation="statistics",  # Creates 200 features (50 * 4 stats)
+        aggregation="statistics",         # 50 * 4 = 200 features
         labels_file="labels.csv",
         labels_entity_column="customer_id",
-        include_rank_features=True,  # Add percentile rank features
-        include_diff_features=True,  # Add row-to-row diff features
+        include_rank_features=True,       # + 50 = 250 features
+        include_diff_features=True,       # + 50 * 5 = 500 features
+        include_window_features=True,     # Enable window aggregations
+        window_sizes=(3, 6),              # + 50 * 4 * 2 = 900 features
     ),
 )
+# Total: 900 features from 50 base columns
 ```
+
+### Feature Count Formula
+
+For N base features:
+- Base aggregation (`"statistics"`): N * 4
+- With `include_rank_features=True`: + N
+- With `include_diff_features=True`: + N * 5
+- With `include_window_features=True, window_sizes=(3, 6)`: + N * 4 * len(window_sizes)
 
 ### TimeSeriesSpec Fields
 
@@ -941,6 +962,8 @@ config = TimeSeriesDatasetConfig(
 | `labels_entity_column` | str | Entity column name in labels file |
 | `include_rank_features` | bool | Add per-entity percentile rank features |
 | `include_diff_features` | bool | Add row-to-row difference features |
+| `include_window_features` | bool | Add window aggregation features |
+| `window_sizes` | tuple[int, ...] | Window sizes for window features (e.g., `(3, 6)`) |
 
 ### Memory-Efficient Implementation
 
@@ -966,6 +989,80 @@ This avoids Python list conversions that would multiply memory usage 3-4x. Key o
 | `AggregationStrategy` | Literal type: `"last" \| "first" \| "mean" \| "statistics"` |
 | `TimeSeriesDatasetRegistry` | Registry for time-series dataset configurations |
 | `TimeSeriesCSVLoader` | Loader for time-series CSV datasets |
+
+## Cross-Validation
+
+Stratified k-fold cross-validation with optional group constraints:
+
+```python
+from covenant_ml.validation import (
+    stratified_kfold_split,
+    group_stratified_kfold_split,
+    run_cross_validation,
+    run_group_cross_validation,
+    compute_oof_metrics,
+)
+
+# Standard stratified k-fold (maintains class proportions)
+splits = stratified_kfold_split(y=labels, n_folds=5, random_state=42)
+
+# Group-stratified k-fold (ensures no entity appears in both train and val)
+# Critical for time-series data to prevent data leakage
+splits = group_stratified_kfold_split(
+    y=labels,
+    groups=customer_ids,  # NDArray[np.int64] mapping samples to entities
+    n_folds=5,
+    random_state=42,
+)
+
+# Run full CV pipeline with trainer function
+cv_result = run_group_cross_validation(
+    x=features,
+    y=labels,
+    groups=customer_ids,
+    n_folds=5,
+    random_state=42,
+    trainer=my_trainer_fn,
+)
+
+# Compute OOF metrics
+oof_metrics = compute_oof_metrics(labels, cv_result)
+print(f"OOF AUC: {oof_metrics['oof_auc']:.4f}")
+```
+
+### GroupKFold for Time-Series
+
+When training on time-series data (e.g., AMEX competition), standard k-fold causes data leakage because:
+- The same customer appears in both train and validation
+- Model learns customer-specific patterns rather than generalizable features
+- CV scores are inflated (~0.95) vs realistic test scores (~0.80)
+
+`group_stratified_kfold_split` ensures:
+- All samples from a customer stay in the same fold
+- Groups are stratified by label (positive if any sample is positive)
+- No customer appears in both train and validation
+
+### Cross-Validation Types
+
+| Type | Description |
+|------|-------------|
+| `CVSplit` | Single fold with train/val indices |
+| `CVSplitInfo` | All folds with metadata |
+| `CVResult` | Complete CV results with OOF predictions |
+| `FoldResult` | Single fold training result |
+| `FoldTrainer` | Protocol for fold training function |
+| `OOFMetrics` | Out-of-fold evaluation metrics |
+
+### Cross-Validation Functions
+
+| Function | Description |
+|----------|-------------|
+| `stratified_kfold_split` | Create stratified train/val splits |
+| `group_stratified_kfold_split` | Create group-aware splits (no entity leakage) |
+| `run_cross_validation` | Execute k-fold CV with trainer |
+| `run_group_cross_validation` | Execute group-aware CV |
+| `compute_oof_metrics` | Compute metrics from OOF predictions |
+| `get_fold_data` | Extract train/val data for a fold |
 
 ## Feature Importance Explainers
 
@@ -1078,12 +1175,37 @@ print(f"Trials: {summary['n_trials']}")
 
 | Function | Description |
 |----------|-------------|
-| `make_xgboost_default_space()` | Default XGBoost search space |
+| `make_xgboost_default_space()` | Default XGBoost search space (includes DART booster) |
 | `make_xgboost_focused_space()` | Narrower space for fine-tuning |
-| `make_lightgbm_default_space()` | Default LightGBM search space |
+| `make_lightgbm_default_space()` | Default LightGBM search space (includes DART boosting) |
 | `make_mlp_default_space()` | Default MLP search space |
 | `make_lstm_default_space()` | Default LSTM search space |
 | `make_default_optimization_config(n_trials)` | Default optimization config |
+
+### DART Boosting Support
+
+Both XGBoost and LightGBM search spaces include DART (Dropouts meet Multiple Additive Regression Trees) as an optional boosting method. DART applies dropout regularization during boosting to reduce overfitting.
+
+**XGBoost DART Parameters:**
+
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `booster` | categorical | `"gbtree"`, `"dart"` | Boosting algorithm (DART enables dropout) |
+| `rate_drop` | float | 0.0-0.5 | Dropout rate for trees (only when booster="dart") |
+| `skip_drop` | float | 0.0-0.5 | Probability of skipping dropout (only when booster="dart") |
+
+**LightGBM DART Parameters:**
+
+| Parameter | Type | Range | Description |
+|-----------|------|-------|-------------|
+| `boosting_type` | categorical | `"gbdt"`, `"dart"` | Boosting type (DART enables dropout) |
+| `drop_rate` | float | 0.0-0.5 | Dropout rate for trees (only when boosting_type="dart") |
+| `skip_drop` | float | 0.0-0.5 | Probability of skipping dropout (only when boosting_type="dart") |
+| `feature_fraction` | float | 0.02-0.1 | Aggressive feature subsampling for DART regularization (only when boosting_type="dart") |
+
+DART parameters are conditionally sampled only when the DART booster/boosting_type is selected by Optuna during optimization. This allows Optuna to explore both standard gradient boosting and DART configurations to find the optimal approach for your dataset.
+
+**Note:** Early stopping is automatically disabled for LightGBM DART mode. DART's random tree dropout causes validation metrics to fluctuate, making early stopping unreliable. When DART is selected, training runs for the full `n_estimators` rounds.
 
 ### OptimizationConfig Fields
 
