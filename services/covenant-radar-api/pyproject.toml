@@ -27,6 +27,10 @@ numpy = "^2.3"
 scikit-learn = "^1.7"
 rich = "^14.2"
 
+# Datadog APM and metrics
+ddtrace = {version = "^4.1", python = "^3.11,<3.15"}
+datadog = "^0.52"
+
 # Monorepo libs
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
