@@ -33,6 +33,8 @@ platform-workers = { path = "../../libs/platform_workers", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
 covenant-ml = { path = "../../libs/covenant_ml", develop = true }
 covenant-persistence = { path = "../../libs/covenant_persistence", develop = true }
+openpyxl = "^3.1.0"
+xlrd = "^2.0.2"
 
 [[tool.poetry.source]]
 name = "pytorch-cu124"
@@ -41,6 +43,7 @@ priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
+xlwt = "^1.3.0"
 pytest-asyncio = "^1.3.0"
 pytest-timeout = "^2.3.1"
 mypy = "^1.13.0"
