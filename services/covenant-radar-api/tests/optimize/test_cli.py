@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import pytest
 from scripts.optimize.cli import (
+    ALL_BACKENDS,
     ALL_STANDARD_DATASETS,
     ALL_TIMESERIES_DATASETS,
     PRESET_DESCRIPTIONS,
     FeaturePreset,
     OptimizeArgs,
     _handle_flag,
-    _parse_backend,
+    _parse_backends,
     _parse_dataset,
     _parse_preset,
+    _parse_single_backend,
     is_timeseries_dataset,
     parse_args,
 )
@@ -28,6 +30,7 @@ class TestOptimizeArgs:
     def test_default_values(self) -> None:
         """Test OptimizeArgs has correct defaults."""
         args = OptimizeArgs()
+        assert args.backends == ("xgboost",)
         assert args.dataset == "taiwan"
         assert args.n_trials == 300
         assert args.feature_preset == "full"
@@ -51,33 +54,80 @@ class TestPresetDescriptions:
             assert "features" in description.lower() or "original" in description.lower()
 
 
-class TestParseBackend:
-    """Tests for _parse_backend function."""
+class TestParseSingleBackend:
+    """Tests for _parse_single_backend function."""
 
     def test_parse_xgboost(self) -> None:
         """Test parsing xgboost backend."""
-        result: str = _parse_backend("xgboost")
+        result: str = _parse_single_backend("xgboost")
         assert result == "xgboost"
 
     def test_parse_mlp(self) -> None:
         """Test parsing mlp backend."""
-        result: str = _parse_backend("mlp")
+        result: str = _parse_single_backend("mlp")
         assert result == "mlp"
 
     def test_parse_lightgbm(self) -> None:
         """Test parsing lightgbm backend."""
-        result: str = _parse_backend("lightgbm")
+        result: str = _parse_single_backend("lightgbm")
         assert result == "lightgbm"
 
     def test_parse_lstm(self) -> None:
         """Test parsing lstm backend."""
-        result: str = _parse_backend("lstm")
+        result: str = _parse_single_backend("lstm")
         assert result == "lstm"
 
     def test_parse_invalid_raises_system_exit(self) -> None:
         """Test parsing invalid backend raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:
-            _parse_backend("invalid")
+            _parse_single_backend("invalid")
+        assert exc_info.value.code == 1
+
+
+class TestParseBackends:
+    """Tests for _parse_backends function (multi-backend support)."""
+
+    def test_parse_single_backend(self) -> None:
+        """Test parsing a single backend returns tuple with one element."""
+        result = _parse_backends("xgboost")
+        assert result == ("xgboost",)
+
+    def test_parse_comma_separated_backends(self) -> None:
+        """Test parsing comma-separated backends."""
+        result = _parse_backends("lightgbm,xgboost")
+        assert result == ("lightgbm", "xgboost")
+
+    def test_parse_all_keyword(self) -> None:
+        """Test parsing 'all' returns all backends."""
+        result = _parse_backends("all")
+        assert result == ALL_BACKENDS
+
+    def test_parse_all_keyword_case_insensitive(self) -> None:
+        """Test 'ALL' keyword is case-insensitive."""
+        result = _parse_backends("ALL")
+        assert result == ALL_BACKENDS
+
+    def test_parse_multiple_backends_with_spaces(self) -> None:
+        """Test parsing handles spaces around commas."""
+        result = _parse_backends("lightgbm, xgboost, mlp")
+        assert result == ("lightgbm", "xgboost", "mlp")
+
+    def test_parse_invalid_in_list_raises_system_exit(self) -> None:
+        """Test invalid backend in list raises SystemExit."""
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_backends("lightgbm,invalid,xgboost")
+        assert exc_info.value.code == 1
+
+    def test_parse_empty_string_raises_system_exit(self) -> None:
+        """Test empty string raises SystemExit."""
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_backends("")
+        assert exc_info.value.code == 1
+
+    def test_parse_only_commas_raises_system_exit(self) -> None:
+        """Test only commas raises SystemExit."""
+        with pytest.raises(SystemExit) as exc_info:
+            _parse_backends(",,,")
         assert exc_info.value.code == 1
 
 
@@ -245,14 +295,24 @@ class TestParseArgs:
         assert args.feature_preset == "full"
 
     def test_backend_short(self) -> None:
-        """Test -b sets backend."""
+        """Test -b sets backends."""
         args: OptimizeArgs = parse_args(["-b", "lightgbm"])
-        assert args.backend == "lightgbm"
+        assert args.backends == ("lightgbm",)
 
     def test_backend_long(self) -> None:
-        """Test --backend sets backend."""
+        """Test --backend sets backends."""
         args: OptimizeArgs = parse_args(["--backend", "lstm"])
-        assert args.backend == "lstm"
+        assert args.backends == ("lstm",)
+
+    def test_multiple_backends(self) -> None:
+        """Test -b with comma-separated backends."""
+        args: OptimizeArgs = parse_args(["-b", "lightgbm,xgboost"])
+        assert args.backends == ("lightgbm", "xgboost")
+
+    def test_all_backends(self) -> None:
+        """Test -b all sets all backends."""
+        args: OptimizeArgs = parse_args(["-b", "all"])
+        assert args.backends == ALL_BACKENDS
 
     def test_dataset_short(self) -> None:
         """Test -d sets dataset."""
