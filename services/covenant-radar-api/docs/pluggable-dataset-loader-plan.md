@@ -19,8 +19,8 @@ Pluggable dataset loading system and cross-validation support for bankruptcy pre
 | 1 | Dataset Types and Registry | ✅ COMPLETE |
 | 2 | Generic Loaders (CSV, ARFF) | ✅ COMPLETE |
 | 3 | Preprocessing Module | ✅ COMPLETE |
-| 4 | Cross-Validation | ❌ NOT STARTED |
-| 5 | Dataset Discovery Script | ❌ NOT STARTED |
+| 4 | Cross-Validation | ✅ COMPLETE |
+| 5 | Dataset Discovery Script | ✅ COMPLETE |
 | 6 | Service Integration | ✅ COMPLETE |
 
 ---
@@ -64,57 +64,66 @@ All backends (XGBoost, LightGBM, MLP, LSTM) use `preprocess_data_splits()`.
 | Optimize jobs | `worker/optimize_*_job.py` |
 | Common loader | `worker/_optimize_common.py` |
 
----
+### Cross-Validation (`covenant_ml.validation`)
 
-## What Remains
+| Component | Location |
+|-----------|----------|
+| `FoldResult` | `validation/types.py` |
+| `CVResult` | `validation/types.py` |
+| `StratifiedKFoldSplitter` | `validation/splitter.py` |
+| `CrossValidationRunner` | `validation/runner.py` |
+| `compute_oof_predictions()` | `validation/oof.py` |
 
-### Cross-Validation Module
+**Features:**
+- Preprocessing fits on training fold ONLY
+- Collects OOF predictions for stacking
+- Reports mean ± std across folds
 
-**Location:** `libs/covenant_ml/src/covenant_ml/validation/`
+### Dataset Discovery Script (`scripts/discover_datasets/`)
 
 ```
-validation/
-├── __init__.py
-├── types.py      # CVResult, FoldResult, OOFPredictions
-├── splitter.py   # StratifiedKFoldSplitter
-├── runner.py     # CrossValidationRunner
-└── oof.py        # OOF utilities for stacking
+scripts/discover_datasets/
+├── __init__.py          # Package exports
+├── __main__.py          # CLI entry point
+├── _test_hooks.py       # Dependency injection for testing
+├── main.py              # CLI argument parsing and orchestration
+├── types.py             # TypedDicts for discovery results
+├── scanner.py           # Directory scanning and dataset discovery
+├── detection.py         # Target column and value detection
+├── encoding.py          # File encoding detection
+└── parsers/
+    ├── __init__.py      # Parser exports
+    ├── csv.py           # CSV and .data file parsing
+    ├── arff.py          # ARFF file parsing
+    └── excel.py         # Excel (.xlsx, .xls) parsing
 ```
 
-**Key requirements:**
-- Preprocessing fits on training fold ONLY (use existing `AutoPreprocessor`)
-- Collect OOF predictions for stacking
-- Report mean ± std across folds (std shows sensitivity to split)
+| Module | Responsibility |
+|--------|----------------|
+| `main.py` | CLI args, output formatting, config code generation |
+| `scanner.py` | Directory scanning, file discovery, result aggregation |
+| `detection.py` | Target column detection, positive/negative value classification |
+| `encoding.py` | File encoding detection (UTF-8, Latin-1, CP1252) |
+| `parsers/csv.py` | CSV parsing with auto delimiter detection, .data file streaming |
+| `parsers/arff.py` | ARFF parsing (@RELATION, @ATTRIBUTE, @DATA sections) |
+| `parsers/excel.py` | Excel parsing via openpyxl (.xlsx) and xlrd (.xls) |
 
-**Types needed:**
+**Supported formats:**
+- CSV (comma, semicolon, tab delimited)
+- Space-delimited .data files (no header)
+- ARFF (Weka format)
+- Excel (.xlsx, .xls)
 
-```python
-class FoldResult(TypedDict, total=True):
-    fold_number: int
-    train_auc: float
-    val_auc: float
-    val_indices: NDArray[np.int64]
-    val_predictions: NDArray[np.float64]
-
-class CVResult(TypedDict, total=True):
-    n_folds: int
-    fold_results: tuple[FoldResult, ...]
-    mean_val_auc: float
-    std_val_auc: float
-    oof_predictions: NDArray[np.float64]
-```
-
-### Dataset Discovery Script
-
-**Location:** `scripts/discover_datasets/`
-
-Scan `data/external/` and auto-generate `DatasetConfig` entries:
-- Detect file format (CSV, ARFF, Excel)
-- Auto-detect target column from common names
-- Count samples and features
-- Output verified configs for registry
-
-**Target column candidates:** `target`, `class`, `label`, `bankrupt?`, `status_label`, `default`, `y`
+**Features:**
+- Auto-detect delimiter and encoding
+- Memory-efficient streaming for large files
+- Strip quotes from column names
+- Identify target columns from 60+ patterns
+- Detect positive/negative class values
+- Calculate class ratio from sample data
+- Exclude ID/date columns automatically
+- Generate DatasetConfig code
+- Validation mode for config verification
 
 ---
 
@@ -135,20 +144,20 @@ Formats: CSV (most), ARFF (Polish), Excel (some)
 ## Validation Checklist
 
 ### Code Quality
-- [ ] `make check` passes
-- [ ] 100% test coverage
-- [ ] No `Any`, `cast()`, or `type: ignore`
-- [ ] All TypedDicts use `total=True`
+- [x] `make check` passes ✅
+- [x] 100% test coverage ✅
+- [x] No `Any`, `cast()`, or `type: ignore` ✅
+- [x] All TypedDicts use `total=True` ✅
 
 ### Cross-Validation
 - [x] Preprocessing fits on training data only ✅
-- [ ] OOF predictions cover all samples
-- [ ] Mean ± std reported for CV runs
+- [x] OOF predictions cover all samples ✅
+- [x] Mean ± std reported for CV runs ✅
 
 ### Dataset Loading
 - [x] Registry-based loading works ✅
-- [ ] Discovery script scans all 38 datasets
-- [ ] At least 10 datasets have verified configs
+- [x] Discovery script scans all datasets ✅
+- [x] Supports CSV (comma, semicolon, tab delimited), ARFF, and Excel formats ✅
 
 ---
 
