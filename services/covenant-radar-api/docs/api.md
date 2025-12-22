@@ -18,6 +18,12 @@ Complete API documentation for the covenant-radar-api service.
 | [ML Endpoints](api/ml.md) | Model training, optimization, prediction, and explanation |
 | [CLI Tools](api/cli.md) | Command-line tools for local development |
 
+## Integrations
+
+| Section | Description |
+|---------|-------------|
+| [Datadog](integrations/datadog.md) | APM tracing and custom metrics |
+
 ---
 
 ## Quick Reference
@@ -129,6 +135,8 @@ All requests are assigned a unique `request_id` for tracing:
 The `request_id` appears in:
 - All error responses
 - Structured logs
+
+When [Datadog integration](integrations/datadog.md) is enabled, logs also include `dd.trace_id` and `dd.span_id` for correlation with APM traces.
 
 ---
 
