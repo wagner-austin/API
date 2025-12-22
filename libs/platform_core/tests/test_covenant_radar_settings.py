@@ -144,6 +144,7 @@ def test_covenant_radar_settings_is_typed_dict() -> None:
     assert "logging" in annotations
     assert "rq" in annotations
     assert "app_env" in annotations
+    assert "datadog" in annotations
 
 
 def test_load_covenant_radar_settings_mlp_backend() -> None:
@@ -200,4 +201,62 @@ def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
     env.set("APP__ML_BACKEND", "invalid_backend")
 
     with pytest.raises(ValueError, match="must be 'xgboost', 'mlp', 'lstm', or 'lightgbm'"):
+        load_covenant_radar_settings()
+
+
+def test_load_covenant_radar_settings_datadog_defaults() -> None:
+    """Test load_covenant_radar_settings uses Datadog defaults."""
+    _env = make_fake_env()
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["datadog"]["enabled"] is False
+    assert settings["datadog"]["service"] == "covenant-radar-api"
+    assert settings["datadog"]["env"] == "dev"
+    assert settings["datadog"]["version"] == "0.0.0"
+    assert settings["datadog"]["agent_host"] == "localhost"
+    assert settings["datadog"]["dogstatsd_port"] == 8125
+    assert settings["datadog"]["trace_enabled"] is True
+
+
+def test_load_covenant_radar_settings_datadog_custom() -> None:
+    """Test load_covenant_radar_settings uses custom Datadog config."""
+    env = make_fake_env()
+    env.set("DATADOG__ENABLED", "true")
+    env.set("DATADOG__SERVICE", "my-service")
+    env.set("DATADOG__ENV", "production")
+    env.set("DATADOG__VERSION", "2.0.0")
+    env.set("DATADOG__AGENT_HOST", "datadog-agent")
+    env.set("DATADOG__DOGSTATSD_PORT", "9125")
+    env.set("DATADOG__TRACE_ENABLED", "false")
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["datadog"]["enabled"] is True
+    assert settings["datadog"]["service"] == "my-service"
+    assert settings["datadog"]["env"] == "production"
+    assert settings["datadog"]["version"] == "2.0.0"
+    assert settings["datadog"]["agent_host"] == "datadog-agent"
+    assert settings["datadog"]["dogstatsd_port"] == 9125
+    assert settings["datadog"]["trace_enabled"] is False
+
+
+def test_load_covenant_radar_settings_datadog_staging_env() -> None:
+    """Test load_covenant_radar_settings parses staging env."""
+    env = make_fake_env()
+    env.set("DATADOG__ENV", "staging")
+
+    settings = load_covenant_radar_settings()
+
+    assert settings["datadog"]["env"] == "staging"
+
+
+def test_load_covenant_radar_settings_datadog_invalid_env_raises() -> None:
+    """Test load_covenant_radar_settings raises for invalid Datadog env."""
+    import pytest
+
+    env = make_fake_env()
+    env.set("DATADOG__ENV", "invalid_env")
+
+    with pytest.raises(ValueError, match="must be 'dev', 'staging', or 'production'"):
         load_covenant_radar_settings()

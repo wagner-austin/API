@@ -32,6 +32,28 @@ class CovenantRadarRQConfig(TypedDict, total=True):
     failure_ttl_sec: int
 
 
+class CovenantRadarDatadogConfig(TypedDict, total=True):
+    """Datadog APM and metrics configuration.
+
+    Fields:
+        enabled: Whether Datadog integration is enabled.
+        service: Service name for traces and metrics.
+        env: Environment name (dev, staging, production).
+        version: Service version for trace filtering.
+        agent_host: Datadog agent host for DogStatsD.
+        dogstatsd_port: DogStatsD UDP port.
+        trace_enabled: Whether APM tracing is enabled.
+    """
+
+    enabled: bool
+    service: str
+    env: Literal["dev", "staging", "production"]
+    version: str
+    agent_host: str
+    dogstatsd_port: int
+    trace_enabled: bool
+
+
 class CovenantRadarAppConfig(TypedDict, total=True):
     """Application configuration."""
 
@@ -52,6 +74,7 @@ class CovenantRadarSettings(TypedDict, total=True):
     redis: CovenantRadarRedisConfig
     rq: CovenantRadarRQConfig
     app: CovenantRadarAppConfig
+    datadog: CovenantRadarDatadogConfig
     database_url: str
 
 
@@ -67,6 +90,21 @@ def _parse_ml_backend(env_var: str, default: MLBackend) -> MLBackend:
     if value == "lightgbm":
         return "lightgbm"
     raise ValueError(f"{env_var} must be 'xgboost', 'mlp', 'lstm', or 'lightgbm', got '{value}'")
+
+
+DatadogEnv = Literal["dev", "staging", "production"]
+
+
+def _parse_datadog_env(env_var: str, default: DatadogEnv) -> DatadogEnv:
+    """Parse Datadog environment from environment variable."""
+    value = _parse_str(env_var, default)
+    if value == "dev":
+        return "dev"
+    if value == "staging":
+        return "staging"
+    if value == "production":
+        return "production"
+    raise ValueError(f"{env_var} must be 'dev', 'staging', or 'production', got '{value}'")
 
 
 def load_covenant_radar_settings() -> CovenantRadarSettings:
@@ -87,6 +125,13 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         APP__ML_BACKEND: ML backend for inference (xgboost/mlp/lstm/lightgbm, default: xgboost)
         APP__ACTIVE_MODEL_PATH_XGB: Active XGBoost model path (default: /data/models/active_xgb.ubj)
         APP__ACTIVE_MODEL_PATH_MLP: Active MLP model path (default: /data/models/active_mlp.pt)
+        DATADOG__ENABLED: Enable Datadog integration (default: false)
+        DATADOG__SERVICE: Service name for traces (default: covenant-radar-api)
+        DATADOG__ENV: Environment name (dev/staging/production, default: dev)
+        DATADOG__VERSION: Service version (default: 0.0.0)
+        DATADOG__AGENT_HOST: Datadog agent host (default: localhost)
+        DATADOG__DOGSTATSD_PORT: DogStatsD port (default: 8125)
+        DATADOG__TRACE_ENABLED: Enable APM tracing (default: true)
         DATABASE_URL: PostgreSQL connection URL (required)
     """
     level_str = _parse_str("LOGGING__LEVEL", "INFO")
@@ -139,6 +184,16 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "active_model_path_mlp": active_model_path_mlp,
     }
 
+    datadog_cfg: CovenantRadarDatadogConfig = {
+        "enabled": _parse_bool("DATADOG__ENABLED", False),
+        "service": _parse_str("DATADOG__SERVICE", "covenant-radar-api"),
+        "env": _parse_datadog_env("DATADOG__ENV", "dev"),
+        "version": _parse_str("DATADOG__VERSION", "0.0.0"),
+        "agent_host": _parse_str("DATADOG__AGENT_HOST", "localhost"),
+        "dogstatsd_port": _parse_int("DATADOG__DOGSTATSD_PORT", 8125),
+        "trace_enabled": _parse_bool("DATADOG__TRACE_ENABLED", True),
+    }
+
     app_env_str = _parse_str("APP_ENV", "dev")
     app_env: Literal["dev", "prod"] = "prod" if app_env_str == "prod" else "dev"
 
@@ -148,12 +203,14 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "redis": redis_cfg,
         "rq": rq_cfg,
         "app": app_cfg,
+        "datadog": datadog_cfg,
         "database_url": _parse_str("DATABASE_URL", ""),
     }
 
 
 __all__ = [
     "CovenantRadarAppConfig",
+    "CovenantRadarDatadogConfig",
     "CovenantRadarLoggingConfig",
     "CovenantRadarRQConfig",
     "CovenantRadarRedisConfig",

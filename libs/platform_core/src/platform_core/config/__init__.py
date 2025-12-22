@@ -16,6 +16,7 @@ from ._utils import (
 )
 from .covenant_radar import (
     CovenantRadarAppConfig,
+    CovenantRadarDatadogConfig,
     CovenantRadarLoggingConfig,
     CovenantRadarRedisConfig,
     CovenantRadarRQConfig,
@@ -63,6 +64,7 @@ from .turkic_api import TurkicApiSettings, load_turkic_api_settings
 
 __all__ = [
     "CovenantRadarAppConfig",
+    "CovenantRadarDatadogConfig",
     "CovenantRadarLoggingConfig",
     "CovenantRadarRQConfig",
     "CovenantRadarRedisConfig",
