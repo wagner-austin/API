@@ -36,6 +36,9 @@ ALL_STANDARD_DATASETS: tuple[StandardDatasetName, ...] = (
 )
 ALL_TIMESERIES_DATASETS: tuple[TimeSeriesDatasetName, ...] = ("kaggle_amex_default",)
 
+# All backend names for "all" option
+ALL_BACKENDS: tuple[BackendName, ...] = ("xgboost", "lightgbm", "mlp", "lstm")
+
 
 def is_timeseries_dataset(dataset: DatasetName) -> bool:
     """Check if a dataset is a time-series dataset.
@@ -70,7 +73,7 @@ class OptimizeArgs:
     """Parsed command line arguments.
 
     Attributes:
-        backend: ML backend to use for optimization.
+        backends: ML backends to use for optimization (one or more).
         dataset: Dataset name to optimize on.
         n_trials: Number of Optuna trials to run.
         feature_preset: Feature engineering preset.
@@ -82,7 +85,7 @@ class OptimizeArgs:
         save_model: Train and save the best model after optimization.
     """
 
-    backend: BackendName
+    backends: tuple[BackendName, ...]
     dataset: DatasetName
     n_trials: int
     feature_preset: FeaturePreset
@@ -95,7 +98,7 @@ class OptimizeArgs:
 
     def __init__(self) -> None:
         """Initialize with defaults."""
-        self.backend = "xgboost"
+        self.backends = ("xgboost",)
         self.dataset = "taiwan"
         self.n_trials = 300
         self.feature_preset = "full"
@@ -114,12 +117,14 @@ def print_help() -> None:
 [bold]Usage:[/bold] python -m scripts.optimize [OPTIONS]
 
 [bold]Options:[/bold]
-  -b, --backend         Backend: xgboost, mlp, lightgbm, lstm (default: xgboost)
+  -b, --backend         Backend(s): xgboost, mlp, lightgbm, lstm, or "all"
+                        Comma-separated for multiple: -b lightgbm,xgboost
+                        (default: xgboost)
   -d, --dataset         Dataset name (default: taiwan)
-  -n, --n-trials        Number of trials (default: 300)
+  -n, --n-trials        Number of trials per backend (default: 300)
   -f, --feature-preset  Preset: none, log_only, ratios_only, full (default: full)
   --device              Device: auto, cpu, cuda (default: cuda)
-  -t, --timeout         Timeout in seconds (optional)
+  -t, --timeout         Timeout in seconds per backend (optional)
   -c, --compare-presets Run all presets on one dataset and compare
   -a, --all-datasets    Run on all standard datasets
   -s, --save-model      Train and save the best model after optimization (default: on)
@@ -132,6 +137,11 @@ def print_help() -> None:
   mlp       Multi-layer perceptron (PyTorch)
   lightgbm  Gradient boosted trees (LightGBM)
   lstm      Long short-term memory network (PyTorch)
+  all       Run all backends sequentially
+
+[bold]Examples:[/bold]
+  python -m scripts.optimize -b lightgbm,xgboost -n 100 -d kaggle_amex_default
+  python -m scripts.optimize -b all -n 50 -d taiwan
 
 [bold]Standard Datasets:[/bold]
   taiwan    Taiwan Bankruptcy (6.8K samples, 95 features)
@@ -144,14 +154,14 @@ def print_help() -> None:
     console.print(help_text)
 
 
-def _parse_backend(val: str) -> BackendName:
-    """Parse backend value.
+def _parse_single_backend(val: str) -> BackendName:
+    """Parse a single backend value.
 
     Args:
-        val (str): Backend name string from CLI.
+        val: Backend name string.
 
     Returns:
-        BackendName: Validated backend name literal.
+        Validated backend name literal.
 
     Raises:
         SystemExit: If backend name is invalid.
@@ -165,8 +175,45 @@ def _parse_backend(val: str) -> BackendName:
         return "lightgbm"
     if val == "lstm":
         return "lstm"
-    console.print(f"[red]Invalid backend: {val}. Must be xgboost, mlp, lightgbm, or lstm.[/red]")
+    console.print(f"[red]Invalid backend: {val}.[/red]")
+    console.print("[red]Must be xgboost, mlp, lightgbm, lstm, or all.[/red]")
     raise SystemExit(1)
+
+
+def _parse_backends(val: str) -> tuple[BackendName, ...]:
+    """Parse backend value(s).
+
+    Supports:
+    - Single backend: "xgboost"
+    - Multiple backends: "lightgbm,xgboost"
+    - All backends: "all"
+
+    Args:
+        val: Backend name(s) string from CLI.
+
+    Returns:
+        Tuple of validated backend names.
+
+    Raises:
+        SystemExit: If any backend name is invalid.
+    """
+    # Handle "all" keyword
+    if val.lower() == "all":
+        return ALL_BACKENDS
+
+    # Handle comma-separated list
+    parts = [p.strip() for p in val.split(",")]
+    backends: list[BackendName] = []
+    for part in parts:
+        if part:  # Skip empty strings
+            backends.append(_parse_single_backend(part))
+
+    if not backends:
+        console = get_rich_console()
+        console.print("[red]No valid backends specified.[/red]")
+        raise SystemExit(1)
+
+    return tuple(backends)
 
 
 def _parse_dataset(val: str) -> DatasetName:
@@ -268,10 +315,10 @@ def parse_args(argv: Sequence[str]) -> OptimizeArgs:
     """Parse command line arguments.
 
     Args:
-        argv (Sequence[str]): Command line argument sequence.
+        argv: Command line argument sequence.
 
     Returns:
-        OptimizeArgs: Parsed arguments with all settings.
+        Parsed arguments with all settings.
     """
     args = list(argv)
     result = OptimizeArgs()
@@ -282,7 +329,7 @@ def parse_args(argv: Sequence[str]) -> OptimizeArgs:
         if _handle_flag(result, arg):
             i += 1
         elif arg in ("--backend", "-b") and i + 1 < len(args):
-            result.backend = _parse_backend(args[i + 1])
+            result.backends = _parse_backends(args[i + 1])
             i += 2
         elif arg in ("--dataset", "-d") and i + 1 < len(args):
             result.dataset = _parse_dataset(args[i + 1])
