@@ -137,6 +137,8 @@ def build_dataset_config(
             "labels_entity_column": "entity_id",
             "include_rank_features": include_rank_features,
             "include_diff_features": include_diff_features,
+            "include_window_features": False,
+            "window_sizes": (),
         },
     )
 
