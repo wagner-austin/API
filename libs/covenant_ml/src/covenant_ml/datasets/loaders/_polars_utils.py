@@ -147,6 +147,17 @@ class PolarsGroupByProtocol(Protocol):
         """Get last row per group."""
         ...
 
+    def tail(self, n: int) -> PolarsDataFrameProtocol:
+        """Get last n rows per group.
+
+        Args:
+            n: Number of rows to return per group.
+
+        Returns:
+            DataFrame with last n rows from each group.
+        """
+        ...
+
     def agg(self, exprs: list[PolarsExprProtocol]) -> PolarsDataFrameProtocol:
         """Aggregate groups."""
         ...

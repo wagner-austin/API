@@ -36,6 +36,9 @@ from covenant_ml.datasets.loaders._polars_utils import (
     report_progress,
     sanitize_array_inplace,
 )
+from covenant_ml.datasets.loaders._polars_window import (
+    compute_multi_window_features,
+)
 from covenant_ml.datasets.loaders.parquet_cache import (
     _CacheLock,
     _compute_config_hash,
@@ -143,6 +146,8 @@ class TimeSeriesCSVLoader:
             ts_spec["labels_file"],
             str(ts_spec["include_rank_features"]),
             str(ts_spec["include_diff_features"]),
+            str(ts_spec["include_window_features"]),
+            str(ts_spec["window_sizes"]),
         ]
         return "|".join(parts)
 
@@ -271,6 +276,18 @@ class TimeSeriesCSVLoader:
             x_array = combined_diff
             output_feature_names = output_feature_names + diff_names
             n_output_features += len(diff_names)
+
+        # Compute optional window features (last N observations)
+        if ts_spec["include_window_features"] and ts_spec["window_sizes"]:
+            window_result = compute_multi_window_features(
+                df_numeric, entity_col, time_col, feature_columns, ts_spec["window_sizes"]
+            )
+            window_array: NDArray[np.float64] = window_result["features"]
+            window_names = window_result["feature_names"]
+            combined_window: NDArray[np.float64] = np.hstack((x_array, window_array))
+            x_array = combined_window
+            output_feature_names = output_feature_names + window_names
+            n_output_features += len(window_names)
 
         report_progress(
             progress_callback,

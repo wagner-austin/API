@@ -147,6 +147,8 @@ class TimeSeriesSpec(TypedDict, total=True):
         labels_entity_column: Entity column name in labels file (for joining).
         include_rank_features: Whether to compute per-entity percentile rank features.
         include_diff_features: Whether to compute row-to-row diff features.
+        include_window_features: Whether to compute window aggregations (last N obs).
+        window_sizes: Tuple of window sizes for window features (e.g., (3, 6)).
     """
 
     entity_column: str
@@ -156,6 +158,8 @@ class TimeSeriesSpec(TypedDict, total=True):
     labels_entity_column: str
     include_rank_features: bool
     include_diff_features: bool
+    include_window_features: bool
+    window_sizes: tuple[int, ...]
 
 
 class TimeSeriesDatasetConfig(DatasetConfig, total=True):

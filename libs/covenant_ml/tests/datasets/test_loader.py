@@ -241,6 +241,8 @@ def _make_timeseries_config(
             labels_entity_column="entity_id",
             include_rank_features=False,
             include_diff_features=False,
+            include_window_features=False,
+            window_sizes=(),
         ),
     )
 

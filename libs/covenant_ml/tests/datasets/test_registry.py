@@ -215,6 +215,8 @@ def _make_test_timeseries_config(name: str) -> TimeSeriesDatasetConfig:
             labels_entity_column="entity_id",
             include_rank_features=False,
             include_diff_features=False,
+            include_window_features=False,
+            window_sizes=(),
         ),
     )
 

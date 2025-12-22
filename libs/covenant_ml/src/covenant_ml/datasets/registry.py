@@ -194,6 +194,8 @@ _VERIFIED_TIMESERIES_CONFIGS: tuple[TimeSeriesDatasetConfig, ...] = (
             labels_entity_column="customer_ID",
             include_rank_features=False,
             include_diff_features=False,
+            include_window_features=False,
+            window_sizes=(),
         ),
     ),
 )
