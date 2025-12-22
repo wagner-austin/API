@@ -6,10 +6,10 @@ import pytest
 from covenant_ml.types import TrainConfig
 from platform_core.logging import setup_rich_logging
 from scripts._test_hooks import XGBoostOptimizationResult
+from scripts.optimize._formatters import format_loading_progress
 from scripts.optimize.cli import DatasetName, FeaturePreset
 from scripts.optimize.history import XGBoostHistoryEntry
 from scripts.optimize.modes import (
-    _format_loading_progress,
     _print_multi_dataset_summary,
     _print_preset_comparison_summary,
 )
@@ -250,11 +250,11 @@ class TestPrintPresetComparisonSummary:
 
 
 class TestFormatLoadingProgress:
-    """Tests for _format_loading_progress function."""
+    """Tests for format_loading_progress function."""
 
     def test_format_with_rows_total_positive(self) -> None:
         """Test formatting when rows_total is positive (shows rows processed)."""
-        result = _format_loading_progress(
+        result = format_loading_progress(
             dataset="taiwan",
             phase="reading",
             percent_complete=50.0,
@@ -272,7 +272,7 @@ class TestFormatLoadingProgress:
 
     def test_format_with_rows_total_zero(self) -> None:
         """Test formatting when rows_total is zero (no rows display)."""
-        result = _format_loading_progress(
+        result = format_loading_progress(
             dataset="us",
             phase="parsing",
             percent_complete=75.0,
@@ -290,7 +290,7 @@ class TestFormatLoadingProgress:
 
     def test_format_with_encoding_phase(self) -> None:
         """Test formatting with encoding phase (uses green color)."""
-        result = _format_loading_progress(
+        result = format_loading_progress(
             dataset="polish",
             phase="encoding",
             percent_complete=100.0,
@@ -306,7 +306,7 @@ class TestFormatLoadingProgress:
 
     def test_format_with_unknown_phase(self) -> None:
         """Test formatting with unknown phase (falls back to white color)."""
-        result = _format_loading_progress(
+        result = format_loading_progress(
             dataset="taiwan",
             phase="unknown_phase",
             percent_complete=25.0,
@@ -323,7 +323,7 @@ class TestFormatLoadingProgress:
     def test_format_elapsed_time_formatting(self) -> None:
         """Test that elapsed time is formatted correctly."""
         # Test with seconds only
-        result_seconds = _format_loading_progress(
+        result_seconds = format_loading_progress(
             dataset="taiwan",
             phase="reading",
             percent_complete=10.0,
@@ -334,7 +334,7 @@ class TestFormatLoadingProgress:
         assert "45s" in result_seconds
 
         # Test with minutes and seconds
-        result_minutes = _format_loading_progress(
+        result_minutes = format_loading_progress(
             dataset="taiwan",
             phase="reading",
             percent_complete=90.0,
