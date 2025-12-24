@@ -7,6 +7,7 @@ from typing import Literal, Protocol, TypedDict
 from covenant_domain import DealId
 from covenant_domain.features import (
     LoanFeatures,
+    RiskTier,
     classify_risk_tier,
     extract_features,
 )
@@ -268,7 +269,7 @@ def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> No
         probabilities = predict_probabilities(model, features_list)
         probability = probabilities[0]
 
-        risk_tier: Literal["LOW", "MEDIUM", "HIGH"] = classify_risk_tier(probability)
+        risk_tier: RiskTier = classify_risk_tier(probability)
 
         response = PredictResponse(
             deal_id=req["deal_id"],
@@ -291,7 +292,7 @@ def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> No
         summary="Predict breach risk",
         description=(
             "Predict covenant breach probability for a deal based on financial metrics. "
-            "Returns probability score (0.0-1.0) and risk tier (LOW/MEDIUM/HIGH)."
+            "Returns probability score (0.0-1.0) and risk tier (LOW/MEDIUM/HIGH/CRITICAL)."
         ),
         response_description="Prediction with probability and risk tier",
         responses=_PREDICT_RESPONSES,

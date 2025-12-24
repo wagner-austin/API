@@ -23,6 +23,7 @@ Complete API documentation for the covenant-radar-api service.
 | Section | Description |
 |---------|-------------|
 | [Datadog](integrations/datadog.md) | APM tracing and custom metrics |
+| [Streaming](integrations/streaming.md) | Kafka streaming for real-time inference |
 
 ---
 

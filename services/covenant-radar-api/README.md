@@ -8,7 +8,7 @@ Loan covenant monitoring and breach prediction API service. Features determinist
 - **Covenant Definitions**: Configurable rules with formulas, thresholds, and frequencies
 - **Financial Measurements**: Time-series metric ingestion for covenant calculations
 - **Rule Evaluation**: Deterministic covenant compliance checking with OK/NEAR_BREACH/BREACH status
-- **Breach Prediction**: Pluggable ML backends for risk tier prediction (LOW/MEDIUM/HIGH)
+- **Breach Prediction**: Pluggable ML backends for risk tier prediction (LOW/MEDIUM/HIGH/CRITICAL)
   - XGBoost: Gradient boosting with feature importance ranking
   - MLP: Neural network with configurable architecture (hidden layers, dropout, precision)
   - LSTM: Recurrent network for temporal bankruptcy sequences (bidirectional support)
@@ -21,6 +21,11 @@ Loan covenant monitoring and breach prediction API service. Features determinist
   - XGBoost: Gain-based importance ranking
   - LightGBM: Split-based importance ranking
 - **Background Training**: Redis + RQ worker for model training jobs
+- **Kafka Streaming**: Confluent Cloud integration for real-time inference pipeline
+  - Measurement event consumption from `covenant.measurements.v1`
+  - Prediction event publishing to `covenant.predictions.v1`
+  - Alert event publishing to `covenant.alerts.v1`
+  - TypedDict schemas with encode/decode/TypeGuard functions
 - **Observability**: Datadog APM tracing and custom metrics integration
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
@@ -277,6 +282,27 @@ curl http://localhost:8007/ml/models/active
 | `DATADOG__AGENT_HOST` | string | `localhost` | Datadog agent host |
 | `DATADOG__DOGSTATSD_PORT` | int | `8125` | DogStatsD UDP port |
 | `DATADOG__TRACE_ENABLED` | bool | `true` | Enable APM tracing |
+| `STREAMING__ENABLED` | bool | `false` | Enable Kafka streaming |
+| `CONFLUENT__BOOTSTRAP_SERVERS` | string | - | Confluent Cloud bootstrap servers |
+| `CONFLUENT__API_KEY` | string | - | Confluent Cloud API key |
+| `CONFLUENT__API_SECRET` | string | - | Confluent Cloud API secret |
+| `CONFLUENT__SCHEMA_REGISTRY_URL` | string | - | Schema Registry URL (optional) |
+| `CONFLUENT__SCHEMA_REGISTRY_API_KEY` | string | - | Schema Registry API key |
+| `CONFLUENT__SCHEMA_REGISTRY_API_SECRET` | string | - | Schema Registry API secret |
+| `KAFKA__TOPIC_MEASUREMENTS` | string | `covenant.measurements.v1` | Input topic |
+| `KAFKA__TOPIC_PREDICTIONS` | string | `covenant.predictions.v1` | Predictions output topic |
+| `KAFKA__TOPIC_ALERTS` | string | `covenant.alerts.v1` | Alerts output topic |
+| `KAFKA__CONSUMER_GROUP_ID` | string | `covenant-radar-api` | Consumer group ID |
+| `KAFKA__AUTO_OFFSET_RESET` | string | `earliest` | Offset reset policy |
+| `KAFKA__ENABLE_AUTO_COMMIT` | bool | `false` | Auto-commit offsets |
+| `KAFKA__FETCH_MIN_BYTES` | int | `1` | Minimum fetch bytes |
+| `KAFKA__SESSION_TIMEOUT_MS` | int | `45000` | Session timeout |
+| `KAFKA__HEARTBEAT_INTERVAL_MS` | int | `15000` | Heartbeat interval |
+| `KAFKA__PRODUCER_ACKS` | string | `all` | Producer acknowledgment |
+| `KAFKA__PRODUCER_RETRIES` | int | `3` | Producer retries |
+| `KAFKA__PRODUCER_LINGER_MS` | int | `5` | Producer linger time |
+| `KAFKA__PRODUCER_BATCH_SIZE` | int | `16384` | Producer batch size |
+| `KAFKA__COMPRESSION_TYPE` | string | `gzip` | Compression type |
 
 ### Example .env
 
@@ -292,6 +318,12 @@ LOGGING__LEVEL=INFO
 DATADOG__ENABLED=false
 DATADOG__SERVICE=covenant-radar-api
 DATADOG__ENV=dev
+
+# Kafka Streaming (optional, disabled by default)
+STREAMING__ENABLED=false
+CONFLUENT__BOOTSTRAP_SERVERS=pkc-xxxxx.us-east-1.aws.confluent.cloud:9092
+CONFLUENT__API_KEY=your-api-key
+CONFLUENT__API_SECRET=your-api-secret
 ```
 
 ---
@@ -325,6 +357,12 @@ covenant_radar_api/
 │       ├── metrics.py     # DogStatsD client
 │       ├── tracing.py     # APM tracing setup
 │       └── _test_hooks.py # Dependency injection
+├── streaming/             # Kafka streaming infrastructure
+│   ├── config.py          # TypedDicts for Confluent/Kafka config
+│   ├── schemas.py         # Event TypedDicts with encode/decode
+│   ├── producer.py        # StreamingProducer wrapper
+│   ├── consumer.py        # StreamingConsumer wrapper
+│   └── _test_hooks.py     # Protocol-based DI (Real/Fake)
 └── seeding/               # Database seeding
 ```
 
@@ -1008,13 +1046,14 @@ The CLI tracks all optimization runs in `models/optimization_history.jsonl` and 
 curl -X POST http://localhost:8007/ml/predict \
   -H "Content-Type: application/json" \
   -d '{"deal_id": "your-deal-uuid"}'
-# {"deal_id": "...", "probability": 0.82, "risk_tier": "HIGH"}
+# {"deal_id": "...", "probability": 0.82, "risk_tier": "CRITICAL"}
 ```
 
 **Risk Tiers:**
-- `LOW`: probability < 0.3
-- `MEDIUM`: 0.3 <= probability < 0.7
-- `HIGH`: probability >= 0.7
+- `LOW`: probability < 0.25
+- `MEDIUM`: 0.25 <= probability < 0.50
+- `HIGH`: 0.50 <= probability < 0.80
+- `CRITICAL`: probability >= 0.80
 
 ---
 

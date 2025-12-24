@@ -36,15 +36,16 @@ Predict breach risk for a deal.
 |-------|------|-------------|
 | `deal_id` | string | Deal UUID |
 | `probability` | float | Breach probability (0.0-1.0) |
-| `risk_tier` | string | `LOW`, `MEDIUM`, or `HIGH` |
+| `risk_tier` | string | `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL` |
 
 **Risk Tier Thresholds:**
 
-| Tier | Probability Range |
-|------|-------------------|
-| `LOW` | 0.0 - 0.3 |
-| `MEDIUM` | 0.3 - 0.7 |
-| `HIGH` | 0.7 - 1.0 |
+| Tier | Probability Range | Description |
+|------|-------------------|-------------|
+| `LOW` | < 0.25 | Normal risk, no action needed |
+| `MEDIUM` | 0.25 - 0.50 | Elevated risk, monitor |
+| `HIGH` | 0.50 - 0.80 | High risk, review required |
+| `CRITICAL` | >= 0.80 | Critical risk, immediate action |
 
 ---
 

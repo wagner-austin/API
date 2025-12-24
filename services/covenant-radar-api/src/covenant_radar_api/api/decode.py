@@ -119,7 +119,7 @@ class PredictResponse(TypedDict, total=True):
 
     deal_id: str
     probability: float
-    risk_tier: Literal["LOW", "MEDIUM", "HIGH"]
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 
 class TrainResponse(TypedDict, total=True):
