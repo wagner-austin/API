@@ -1,6 +1,6 @@
 # covenant-ml
 
-Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports four backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), and LightGBM (large-scale datasets).
+Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports five backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), LightGBM (large-scale datasets), and ClearGBM (interpretable pure-Python gradient boosting).
 
 ## Installation
 
@@ -283,6 +283,70 @@ print(f"Top feature: {outcome['feature_importances'][0]['name']}")
 | `random_state` | int | Random seed |
 | `early_stopping_rounds` | int | Rounds without improvement before stopping |
 
+## ClearGBM Backend
+
+Train a ClearGBM classifier for interpretable gradient boosting with pure Python:
+
+```python
+from pathlib import Path
+from covenant_ml.types import ClearGBMConfig
+from covenant_ml.backends.cleargbm import create_cleargbm_backend
+
+# Configure ClearGBM training
+config: ClearGBMConfig = {
+    "n_estimators": 100,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    "min_samples_split": 10,
+    "min_samples_leaf": 5,
+    "max_bins": 64,
+    "subsample": 1.0,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "early_stopping_rounds": 10,
+}
+
+# Create backend and train
+backend = create_cleargbm_backend()
+outcome = backend.train(
+    x_features=X,
+    y_labels=y,
+    feature_names=feature_names,
+    config=config,
+    output_dir=Path("/models"),
+    progress=on_progress,
+)
+
+print(f"Test AUC: {outcome['test_metrics']['auc']}")
+print(f"Top feature: {outcome['feature_importances'][0]['name']}")
+```
+
+### ClearGBMConfig Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `n_estimators` | int | Number of boosting rounds |
+| `max_depth` | int | Maximum tree depth |
+| `learning_rate` | float | Shrinkage factor for updates |
+| `min_samples_split` | int | Minimum samples to split a node |
+| `min_samples_leaf` | int | Minimum samples in a leaf |
+| `max_bins` | int | Histogram bins for O(K) split finding (default: 64) |
+| `subsample` | float | Row subsampling ratio (1.0 = no subsampling) |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `early_stopping_rounds` | int | Rounds without improvement before stopping |
+
+### ClearGBM Features
+
+- **Pure Python**: No C++ dependencies, runs anywhere Python runs
+- **Interpretable**: Built-in rule extraction and feature contributions
+- **Histogram-based**: LightGBM-style O(K) split finding for efficient training
+- **Strict typing**: 100% typed with TypedDicts and Protocols
+
 ### TrainConfig Fields (XGBoost)
 
 | Field | Type | Description |
@@ -550,6 +614,7 @@ Container returned by `preprocess_data_splits()`:
 | `MLPConfig` | MLP neural network configuration |
 | `LSTMConfig` | LSTM sequence model configuration |
 | `LightGBMConfig` | LightGBM gradient boosting configuration |
+| `ClearGBMConfig` | ClearGBM pure-Python gradient boosting configuration |
 | `ClassifierTrainConfig` | Union of all backend config types |
 | `TrainOutcome` | Complete training result |
 | `TrainProgress` | Progress update during training |
@@ -558,7 +623,7 @@ Container returned by `preprocess_data_splits()`:
 | `DataSplits` | Train/val/test data splits |
 | `PreprocessedDataSplits` | Preprocessed train/val/test splits with state |
 | `ProgressCallback` | Callback type for progress updates |
-| `BackendName` | Literal type: `"xgboost" | "mlp" | "lstm" | "lightgbm"` |
+| `BackendName` | Literal type: `"xgboost" | "mlp" | "lstm" | "lightgbm" | "cleargbm"` |
 
 ### Preprocessing Types (covenant_ml.preprocessing)
 
@@ -702,16 +767,17 @@ make check  # lint + test
 
 ## Backend Comparison
 
-| Aspect | XGBoost | MLP | LSTM | LightGBM |
-|--------|---------|-----|------|----------|
-| Model format | `.ubj` | `.pt` | `.pt` | `.txt` |
-| Feature importances | Yes | No | No | Yes |
-| GPU support | CUDA | CUDA (fp16/bf16) | CUDA (fp16/bf16) | CUDA |
-| Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets |
-| Training speed | Fast | Moderate | Slow | Very fast |
-| Interpretability | High | Low | Low | High |
-| Early stopping | Yes | Yes | Yes | Yes |
-| Bidirectional | N/A | N/A | Yes | N/A |
+| Aspect | XGBoost | MLP | LSTM | LightGBM | ClearGBM |
+|--------|---------|-----|------|----------|----------|
+| Model format | `.ubj` | `.pt` | `.pt` | `.txt` | `.json` |
+| Feature importances | Yes | No | No | Yes | Yes |
+| GPU support | CUDA | CUDA (fp16/bf16) | CUDA (fp16/bf16) | CUDA | CPU only |
+| Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets | Interpretability |
+| Training speed | Fast | Moderate | Slow | Very fast | Moderate |
+| Interpretability | High | Low | Low | High | Very high |
+| Early stopping | Yes | Yes | Yes | Yes | Yes |
+| Rule extraction | Post-hoc | No | No | Post-hoc | Built-in |
+| Dependencies | C++ lib | PyTorch | PyTorch | C++ lib | Python stdlib |
 
 ## Feature Engineering
 
