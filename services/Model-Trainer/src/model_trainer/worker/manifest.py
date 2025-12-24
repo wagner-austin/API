@@ -23,7 +23,7 @@ from model_trainer.infra.persistence.models import (
 )
 
 
-def as_model_family(s: str) -> Literal["gpt2", "llama", "qwen", "char_lstm"]:
+def as_model_family(s: str) -> Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]:
     """Convert string to model family literal type."""
     if s == "gpt2":
         return "gpt2"
@@ -33,6 +33,8 @@ def as_model_family(s: str) -> Literal["gpt2", "llama", "qwen", "char_lstm"]:
         return "qwen"
     if s == "char_lstm":
         return "char_lstm"
+    if s == "hf_lm":
+        return "hf_lm"
     raise JSONTypeError(f"Invalid model_family: {s}")
 
 
@@ -120,7 +122,7 @@ class _ManifestFields:
     loss: float
     learning_rate: float
     holdout_fraction: float
-    tokenizer_id: str
+    tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
     optimizer: str
     freeze_embed: bool
@@ -151,7 +153,7 @@ class _ManifestFields:
         loss: float,
         learning_rate: float,
         holdout_fraction: float,
-        tokenizer_id: str,
+        tokenizer_id: str | None,
         corpus_path: str,
         optimizer: str,
         freeze_embed: bool,
@@ -203,7 +205,7 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
         run_id=require_str(obj, "run_id"),
         model_family=require_str(obj, "model_family"),
         model_size=require_str(obj, "model_size"),
-        tokenizer_id=require_str(obj, "tokenizer_id"),
+        tokenizer_id=_optional_str(obj, "tokenizer_id"),
         corpus_path=require_str(obj, "corpus_path"),
         optimizer=require_str(obj, "optimizer"),
         device=require_str(obj, "device"),
