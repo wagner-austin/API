@@ -4,14 +4,17 @@ Strictly typed, modular system for training and evaluating small language models
 
 ## Features
 
-- **Pluggable Backends**: Protocol-based tokenizers (BPE, SentencePiece) and models (GPT-2, Char-LSTM)
+- **Pluggable Backends**: Protocol-based tokenizers (BPE, SentencePiece, Char) and models (GPT-2, Char-LSTM, HF LM)
+- **HuggingFace LM Backend**: Support for any HuggingFace causal language model with pluggable fine-tuning strategies
+- **Fine-Tuning Strategies**: LoRA, QLoRA, Unsloth optimization, and full fine-tuning support
+- **Backend Factory**: Registry-based backend system with capability discovery
 - **GPU Acceleration**: CUDA support with automatic device selection
 - **Mixed-Precision Training**: FP16/BF16 with automatic loss scaling for faster training
 - **Durable Jobs**: Redis + RQ with heartbeats, cancellation, retry logic
 - **Artifact Management**: Deterministic manifests, model weights, evaluation metrics
 - **Weights & Biases Integration**: Optional experiment tracking with full metrics logging
 - **Discord Integration**: Training notifications via Redis pub/sub
-- **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
+- **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI via `_test_hooks.py` pattern
 - **100% Test Coverage**: Statements and branches
 
 ## Quick Start
@@ -392,11 +395,27 @@ model_trainer/
 │   └── routes/            # Endpoint handlers
 ├── core/
 │   ├── contracts/         # Protocol interfaces
+│   │   ├── model.py       # Model contracts (PreparedLMModel, etc.)
+│   │   ├── finetuning.py  # LoRA/Unsloth config types
+│   │   └── tokenizer.py   # Tokenizer contracts
 │   ├── services/
 │   │   ├── container.py   # DI container
-│   │   ├── tokenizer/     # BPE, SentencePiece backends
-│   │   ├── model/         # GPT-2 backend
-│   │   └── dataset/       # Dataset builders
+│   │   ├── tokenizer/     # BPE, SentencePiece, Char backends
+│   │   ├── model/
+│   │   │   ├── backend_factory.py  # Pluggable backend registry
+│   │   │   └── backends/
+│   │   │       ├── gpt2/           # GPT-2 backend
+│   │   │       ├── char_lstm/      # Character LSTM backend
+│   │   │       └── hf_lm/          # HuggingFace LM backend
+│   │   │           ├── _test_hooks.py  # DI hooks for testing
+│   │   │           ├── prepare.py
+│   │   │           ├── train.py
+│   │   │           ├── evaluate.py
+│   │   │           ├── generate.py
+│   │   │           ├── score.py
+│   │   │           └── io.py
+│   │   ├── finetuning/    # Fine-tuning strategies (LoRA, Unsloth)
+│   │   └── training/      # BaseTrainer, dataset builders
 │   └── config/            # Settings
 ├── orchestrators/         # Job orchestration
 ├── worker/                # RQ worker entry
@@ -419,7 +438,38 @@ class ModelBackend(Protocol):
     def save(self, model: PreparedModel, path: str) -> ModelArtifact: ...
 ```
 
-See [DESIGN.md](./DESIGN.md) for detailed architecture documentation.
+### Test Hooks Pattern (`_test_hooks.py`)
+
+Each backend uses dependency injection via a `_test_hooks.py` module for testability without mocks:
+
+```python
+# In _test_hooks.py
+class Hooks:
+    """Production code sets to real implementations; tests set to fakes."""
+    load_hf_model: Callable[[str], LMModelProto] | None = None
+    load_hf_tokenizer: Callable[[str], TokenizerProto] | None = None
+    create_trainer: TrainerCreator | None = None
+
+def reset_hooks() -> None:
+    """Reset all hooks to None (for test cleanup)."""
+    Hooks.load_hf_model = None
+    # ...
+
+# In production code
+def prepare_hf_lm(cfg: ModelTrainConfig) -> PreparedLMModel:
+    if Hooks.load_hf_model is None:
+        raise RuntimeError("Hooks.load_hf_model not initialized")
+    model = Hooks.load_hf_model(cfg["hub_model_id"])
+    # ...
+```
+
+Tests install fake implementations; production initializes real implementations at startup.
+
+### Design Documentation
+
+- [ERNIE + LoRA Integration](./docs/ERNIE_LORA_INTEGRATION.md) - ERNIE model family with LoRA/Unsloth fine-tuning
+- [Pluggable Systems Refactor](./docs/PLUGGABLE_SYSTEMS_REFACTOR.md) - Optimizer, Scheduler, CV, Warm-Start strategies
+- [API Reference](./docs/api.md) - Complete API documentation
 
 ---
 
@@ -476,23 +526,35 @@ Model-Trainer/
 │   │   │   └── tokenizers.py
 │   │   └── schemas/            # Request/response models
 │   ├── core/
-│   │   ├── contracts/          # Protocols
+│   │   ├── contracts/          # Protocols and TypedDicts
+│   │   │   ├── model.py        # PreparedLMModel, ModelTrainConfig
+│   │   │   ├── finetuning.py   # LoraConfig, UnslothConfig
+│   │   │   └── tokenizer.py    # TokenizerHandle, TokenizerConfig
 │   │   ├── services/
 │   │   │   ├── container.py    # DI container
-│   │   │   ├── tokenizer/      # Tokenizer backends
-│   │   │   ├── model/          # Model backends
-│   │   │   └── dataset/        # Dataset builders
+│   │   │   ├── tokenizer/      # BPE, SentencePiece, Char backends
+│   │   │   ├── model/
+│   │   │   │   ├── backend_factory.py
+│   │   │   │   └── backends/
+│   │   │   │       ├── gpt2/
+│   │   │   │       ├── char_lstm/
+│   │   │   │       └── hf_lm/  # HuggingFace LM backend
+│   │   │   ├── finetuning/     # Fine-tuning strategies
+│   │   │   └── training/       # BaseTrainer, dataset builders
 │   │   └── config/             # Settings
 │   ├── orchestrators/          # Job orchestration
 │   ├── worker/                 # RQ workers
 │   └── infra/                  # Storage helpers
 ├── tests/
+│   └── core/services/model/backends/hf_lm/  # HF LM backend tests
+├── docs/
+│   ├── api.md
+│   ├── ERNIE_LORA_INTEGRATION.md
+│   └── PLUGGABLE_SYSTEMS_REFACTOR.md
 ├── scripts/
+│   ├── guard.py                # Code quality enforcement
 │   ├── cleanup_tokenizers.py
 │   └── cleanup_corpus_cache.py
-├── config/
-│   └── app.toml
-├── corpus/                     # Training data (mounted)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml
