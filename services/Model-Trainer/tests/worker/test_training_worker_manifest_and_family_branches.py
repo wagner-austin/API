@@ -11,6 +11,7 @@ def test_as_model_family_variants_and_invalid() -> None:
     assert manifest.as_model_family("llama") == "llama"
     assert manifest.as_model_family("qwen") == "qwen"
     assert manifest.as_model_family("char_lstm") == "char_lstm"
+    assert manifest.as_model_family("hf_lm") == "hf_lm"
     with pytest.raises(JSONTypeError):
         _ = manifest.as_model_family("bert")
 
@@ -225,4 +226,26 @@ def test_load_manifest_float_or_none_error_case() -> None:
         "test_loss": "not-a-number",  # should be float or null
     }
     with pytest.raises(JSONTypeError, match="test_loss"):
+        _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+
+
+def test_load_manifest_tokenizer_id_null_for_hf_lm() -> None:
+    """Cover manifest.py tokenizer_id None case (for hf_lm models)."""
+    hf_lm_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "model_family": "hf_lm",
+        "tokenizer_id": None,  # hf_lm models don't need tokenizer_id
+    }
+    result = manifest.load_manifest_from_text(dump_json_str(hf_lm_manifest))
+    assert result["tokenizer_id"] is None
+    assert result["model_family"] == "hf_lm"
+
+
+def test_load_manifest_tokenizer_id_non_string_error() -> None:
+    """Cover manifest.py tokenizer_id type error case."""
+    bad_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "tokenizer_id": 123,  # should be str or null, not int
+    }
+    with pytest.raises(JSONTypeError, match="tokenizer_id"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))

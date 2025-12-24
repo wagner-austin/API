@@ -68,7 +68,7 @@ class _Backend(ModelBackend):
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         raise NotImplementedError
 
@@ -77,7 +77,7 @@ class _Backend(ModelBackend):
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         raise NotImplementedError
 

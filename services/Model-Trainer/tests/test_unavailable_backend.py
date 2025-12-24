@@ -128,6 +128,11 @@ def test_unavailable_backend_all_methods_raise() -> None:
         "early_stopping_patience": 0,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     s = load_settings()
 

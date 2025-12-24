@@ -213,7 +213,7 @@ class _FakeBackendWithTopk:
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared()
 
@@ -225,7 +225,7 @@ class _FakeBackendWithTopk:
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared()
 
@@ -309,7 +309,7 @@ class _FakeBackendNoTopk:
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared()
 
@@ -321,7 +321,7 @@ class _FakeBackendNoTopk:
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared()
 

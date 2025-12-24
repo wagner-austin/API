@@ -134,6 +134,11 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
         "early_stopping_patience": 2,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "hub_model_id": None,
+        "finetuning_strategy": "full",
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     cfg = build_cfg(req, corpus_path="/tmp/corpus")
     assert cfg["device"] == "cuda"
@@ -172,6 +177,11 @@ def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
         "early_stopping_patience": 2,
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
+        "hub_model_id": None,
+        "finetuning_strategy": "full",
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     cfg = build_cfg(req, corpus_path="/tmp/corpus")
     assert cfg["device"] == "cpu"

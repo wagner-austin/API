@@ -163,7 +163,7 @@ class _Backend(ModelBackend):
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared("fake-tok")
 
@@ -172,7 +172,7 @@ class _Backend(ModelBackend):
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return _make_fake_prepared("loaded-tok")
 
@@ -351,6 +351,11 @@ def test_process_train_job_cancelled_block(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     }
 

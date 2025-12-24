@@ -162,7 +162,7 @@ class _StubBackend(ModelBackend):
         return UNAVAILABLE_CAPABILITIES
 
     def prepare(
-        self, cfg: ModelTrainConfig, settings: Settings, *, tokenizer: TokenizerHandle
+        self, cfg: ModelTrainConfig, settings: Settings, *, tokenizer: TokenizerHandle | None
     ) -> PreparedLMModel:
         raise NotImplementedError
 
@@ -170,7 +170,7 @@ class _StubBackend(ModelBackend):
         raise NotImplementedError
 
     def load(
-        self, artifact_path: str, settings: Settings, *, tokenizer: TokenizerHandle
+        self, artifact_path: str, settings: Settings, *, tokenizer: TokenizerHandle | None
     ) -> PreparedLMModel:
         raise NotImplementedError
 

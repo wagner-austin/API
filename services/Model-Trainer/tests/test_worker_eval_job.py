@@ -134,6 +134,11 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     tok_handle = BPEBackend().load(str(tok_dir / "tokenizer.json"))
     prepared = prepare_gpt2_with_handle(tok_handle, cfg)

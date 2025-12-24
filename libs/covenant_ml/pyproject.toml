@@ -25,6 +25,7 @@ platform-ml = { path = "../platform_ml", develop = true }
 torch = {version = "^2.5", source = "pytorch-cu124"}
 optuna = "^4.6.0"
 polars = "^1.36"
+cleargbm = { path = "../cleargbm", develop = true }
 
 [[tool.poetry.source]]
 name = "pytorch-cu124"
