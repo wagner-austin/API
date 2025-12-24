@@ -56,28 +56,35 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
     orch = TrainingOrchestrator(
         settings=s, redis_client=r, enqueuer=_enqueuer(), model_registry=None
     )
-    req = TrainRequest(
-        model_family="gpt2",
-        model_size="s",
-        max_seq_len=16,
-        num_epochs=1,
-        batch_size=1,
-        learning_rate=5e-4,
-        corpus_file_id=" ",
-        tokenizer_id="tok",
-        user_id=0,
-        holdout_fraction=0.01,
-        seed=42,
-        pretrained_run_id=None,
-        freeze_embed=False,
-        gradient_clipping=1.0,
-        optimizer="adamw",
-        device="cpu",
-        early_stopping_patience=5,
-        test_split_ratio=0.15,
-        finetune_lr_cap=5e-5,
-        precision="auto",
-    )
+    req: TrainRequest = {
+        "model_family": "gpt2",
+        "model_size": "s",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 5e-4,
+        "corpus_file_id": " ",
+        "tokenizer_id": "tok",
+        "user_id": 0,
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "auto",
+        "data_num_workers": None,
+        "data_pin_memory": None,
+        "hub_model_id": None,
+        "finetuning_strategy": "full",
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
     with pytest.raises(AppError) as ei2:
         _ = orch.enqueue_training(req)
     exc2: AppError[ModelTrainerErrorCode] = ei2.value

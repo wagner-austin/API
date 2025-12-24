@@ -53,28 +53,35 @@ def test_orchestrator_threads_user_id() -> None:
     )
 
     orch = TrainingOrchestrator(settings=s, redis_client=r, enqueuer=enq, model_registry=None)
-    req = TrainRequest(
-        model_family="gpt2",
-        model_size="small",
-        max_seq_len=128,
-        num_epochs=1,
-        batch_size=2,
-        learning_rate=5e-4,
-        corpus_file_id="deadbeef",
-        tokenizer_id="tok1",
-        user_id=42,
-        holdout_fraction=0.01,
-        seed=42,
-        pretrained_run_id=None,
-        freeze_embed=False,
-        gradient_clipping=1.0,
-        optimizer="adamw",
-        device="cpu",
-        early_stopping_patience=5,
-        test_split_ratio=0.15,
-        finetune_lr_cap=5e-5,
-        precision="auto",
-    )
+    req: TrainRequest = {
+        "model_family": "gpt2",
+        "model_size": "small",
+        "max_seq_len": 128,
+        "num_epochs": 1,
+        "batch_size": 2,
+        "learning_rate": 5e-4,
+        "corpus_file_id": "deadbeef",
+        "tokenizer_id": "tok1",
+        "user_id": 42,
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "auto",
+        "data_num_workers": None,
+        "data_pin_memory": None,
+        "hub_model_id": None,
+        "finetuning_strategy": "full",
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
     out = orch.enqueue_training(req)
     assert out["run_id"]
 
