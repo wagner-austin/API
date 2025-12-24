@@ -104,6 +104,11 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "early_stopping_patience": manifest["early_stopping_patience"],
             "test_split_ratio": manifest["test_split_ratio"],
             "finetune_lr_cap": manifest["finetune_lr_cap"],
+            "finetuning_strategy": "full",
+            "hub_model_id": None,
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         }
 
         container = _test_hooks.service_container_from_settings(settings)
