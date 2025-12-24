@@ -4,18 +4,38 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
+from model_trainer.core.contracts.model import (
+    LoraConfig,
+    QuantizationConfig,
+    UnslothConfig,
+)
+
 
 class TrainRequestPayload(TypedDict):
-    """Payload for training job request."""
+    """Payload for training job request.
 
-    model_family: Literal["gpt2", "llama", "qwen", "char_lstm"]
+    This TypedDict is serialized to JSON for the job queue. It contains all
+    fields needed to configure a training run, including optional HuggingFace
+    LM backend configuration for LoRA/Unsloth fine-tuning.
+
+    Attributes:
+        model_family: Model architecture. 'hf_lm' for HuggingFace models.
+        tokenizer_id: Tokenizer ID. None for hf_lm (uses HF tokenizer).
+        hub_model_id: HuggingFace model ID (required for hf_lm).
+        finetuning_strategy: Fine-tuning strategy (full, lora, qlora, unsloth).
+        lora: LoRA configuration (for lora/qlora/unsloth strategies).
+        quantization: Quantization config (for qlora strategy).
+        unsloth: Unsloth configuration (for unsloth strategy).
+    """
+
+    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
     model_size: str
     max_seq_len: int
     num_epochs: int
     batch_size: int
     learning_rate: float
     corpus_file_id: str
-    tokenizer_id: str
+    tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     holdout_fraction: float
     seed: int
     pretrained_run_id: str | None
@@ -29,6 +49,12 @@ class TrainRequestPayload(TypedDict):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    # HuggingFace LM backend fields
+    hub_model_id: str | None
+    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    lora: LoraConfig | None
+    quantization: QuantizationConfig | None
+    unsloth: UnslothConfig | None
 
 
 class TrainJobPayload(TypedDict):
