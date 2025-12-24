@@ -17,7 +17,7 @@ from platform_ml import recommended_batch_size as recommended_batch_size
 from platform_ml import resolve_device as resolve_device
 from platform_ml import resolve_precision as resolve_precision
 
-ModelFamily = Literal["gpt2", "llama", "qwen", "char_lstm"]
+ModelFamily = Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
 
 _CUDA: Final[ResolvedDevice] = "cuda"
 _CPU: Final[ResolvedDevice] = "cpu"

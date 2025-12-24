@@ -842,7 +842,9 @@ tokenizer_enqueue_hook: TokenizerEnqueueHookProto | None = None
 class LoadPreparedGpt2FromHandleProto(Protocol):
     """Protocol for load_prepared_gpt2_from_handle hook."""
 
-    def __call__(self, artifact_path: str, tokenizer: TokenizerHandle) -> PreparedLMModel: ...
+    def __call__(
+        self, artifact_path: str, tokenizer: TokenizerHandle | None
+    ) -> PreparedLMModel: ...
 
 
 class PreparedLMModelProto(Protocol):
@@ -861,7 +863,7 @@ class PreparedLMModelProto(Protocol):
 
 
 def _default_load_prepared_gpt2_from_handle(
-    artifact_path: str, tokenizer: TokenizerHandle
+    artifact_path: str, tokenizer: TokenizerHandle | None
 ) -> PreparedLMModel:
     """Production load_prepared_gpt2_from_handle - used as default hook."""
     from model_trainer.core.services.model.backends.gpt2.io import (
