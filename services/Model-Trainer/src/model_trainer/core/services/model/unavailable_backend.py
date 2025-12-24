@@ -46,7 +46,7 @@ class UnavailableBackend(ModelBackend):
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         raise AppError(
             ModelTrainerErrorCode.UNSUPPORTED_BACKEND,
@@ -66,7 +66,7 @@ class UnavailableBackend(ModelBackend):
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         raise AppError(
             ModelTrainerErrorCode.UNSUPPORTED_BACKEND,
