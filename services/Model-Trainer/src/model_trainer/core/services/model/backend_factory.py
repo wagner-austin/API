@@ -41,7 +41,9 @@ class EvalResultProto(Protocol):
 class PrepareFn(Protocol):
     """Protocol for backend prepare functions."""
 
-    def __call__(self, tokenizer: TokenizerHandle, cfg: ModelTrainConfig) -> PreparedLMModel: ...
+    def __call__(
+        self, tokenizer: TokenizerHandle | None, cfg: ModelTrainConfig
+    ) -> PreparedLMModel: ...
 
 
 class SaveFn(Protocol):
@@ -53,7 +55,9 @@ class SaveFn(Protocol):
 class LoadFn(Protocol):
     """Protocol for backend load functions."""
 
-    def __call__(self, artifact_path: str, tokenizer: TokenizerHandle) -> PreparedLMModel: ...
+    def __call__(
+        self, artifact_path: str, tokenizer: TokenizerHandle | None
+    ) -> PreparedLMModel: ...
 
 
 class TrainFn(Protocol):
@@ -154,7 +158,7 @@ class _FactoryBackend:
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return self._funcs["prepare"](tokenizer, cfg)
 
@@ -167,7 +171,7 @@ class _FactoryBackend:
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         return self._funcs["load"](artifact_path, tokenizer)
 
@@ -325,3 +329,44 @@ def create_gpt2_backend(dataset_builder: DatasetBuilder) -> ModelBackend:
 def create_char_lstm_backend(dataset_builder: DatasetBuilder) -> ModelBackend:
     """Create a CharLSTM ModelBackend."""
     return create_backend(char_lstm_backend_funcs(), dataset_builder, CHAR_LSTM_CAPABILITIES)
+
+
+# HuggingFace LM backend capabilities - supports any HF causal LM model
+HF_LM_CAPABILITIES: BackendCapabilities = {
+    "supports_train": True,
+    "supports_evaluate": True,
+    "supports_score": True,
+    "supports_generate": True,
+    "supports_distributed": False,
+    "supported_sizes": (),  # Size determined by hub_model_id
+}
+
+
+def hf_lm_backend_funcs() -> BackendFuncs:
+    """Get function references for HuggingFace LM backend.
+
+    This backend loads pretrained models from HuggingFace Hub via hub_model_id
+    and applies finetuning strategies (full, lora, qlora, unsloth).
+    """
+    from .backends.hf_lm.evaluate import evaluate_hf_lm
+    from .backends.hf_lm.generate import generate_hf_lm
+    from .backends.hf_lm.io import load_prepared_hf_lm_from_handle, save_prepared_hf_lm
+    from .backends.hf_lm.prepare import prepare_hf_lm_with_handle
+    from .backends.hf_lm.score import score_hf_lm
+    from .backends.hf_lm.train import train_prepared_hf_lm
+
+    return BackendFuncs(
+        name="hf_lm",
+        prepare=prepare_hf_lm_with_handle,
+        save=save_prepared_hf_lm,
+        load=load_prepared_hf_lm_from_handle,
+        train=train_prepared_hf_lm,
+        evaluate=evaluate_hf_lm,
+        score=score_hf_lm,
+        generate=generate_hf_lm,
+    )
+
+
+def create_hf_lm_backend(dataset_builder: DatasetBuilder) -> ModelBackend:
+    """Create a HuggingFace LM ModelBackend."""
+    return create_backend(hf_lm_backend_funcs(), dataset_builder, HF_LM_CAPABILITIES)
