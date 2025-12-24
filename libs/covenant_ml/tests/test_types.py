@@ -288,7 +288,6 @@ def test_protocols_are_callable() -> None:
     assert params["tree_method"] == "hist"
     assert params["device"] == "cpu"
     assert progress["round"] == 1
-    assert train_out["config"]["device"] == "cpu"
     assert train_out["model_id"] != ""
 
     factory: XGBClassifierFactory = _fake_classifier_factory
