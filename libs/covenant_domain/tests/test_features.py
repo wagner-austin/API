@@ -30,20 +30,38 @@ class TestFeatureOrder:
 
 
 class TestClassifyRiskTier:
+    """Tests for classify_risk_tier with 4-tier system.
+
+    Thresholds:
+    - LOW: probability < 0.25
+    - MEDIUM: 0.25 <= probability < 0.50
+    - HIGH: 0.50 <= probability < 0.80
+    - CRITICAL: probability >= 0.80
+    """
+
     def test_low_risk(self) -> None:
+        """LOW tier for probability < 0.25."""
         assert classify_risk_tier(0.0) == "LOW"
         assert classify_risk_tier(0.1) == "LOW"
-        assert classify_risk_tier(0.29) == "LOW"
+        assert classify_risk_tier(0.24) == "LOW"
 
     def test_medium_risk(self) -> None:
-        assert classify_risk_tier(0.3) == "MEDIUM"
-        assert classify_risk_tier(0.5) == "MEDIUM"
-        assert classify_risk_tier(0.69) == "MEDIUM"
+        """MEDIUM tier for 0.25 <= probability < 0.50."""
+        assert classify_risk_tier(0.25) == "MEDIUM"
+        assert classify_risk_tier(0.35) == "MEDIUM"
+        assert classify_risk_tier(0.49) == "MEDIUM"
 
     def test_high_risk(self) -> None:
-        assert classify_risk_tier(0.7) == "HIGH"
-        assert classify_risk_tier(0.9) == "HIGH"
-        assert classify_risk_tier(1.0) == "HIGH"
+        """HIGH tier for 0.50 <= probability < 0.80."""
+        assert classify_risk_tier(0.50) == "HIGH"
+        assert classify_risk_tier(0.65) == "HIGH"
+        assert classify_risk_tier(0.79) == "HIGH"
+
+    def test_critical_risk(self) -> None:
+        """CRITICAL tier for probability >= 0.80."""
+        assert classify_risk_tier(0.80) == "CRITICAL"
+        assert classify_risk_tier(0.90) == "CRITICAL"
+        assert classify_risk_tier(1.0) == "CRITICAL"
 
 
 class TestCountNearBreaches:

@@ -151,6 +151,7 @@ from covenant_domain import (
     classify_risk_tier,
     LoanFeatures,
     RiskPrediction,
+    RiskTier,
     FEATURE_ORDER,
 )
 
@@ -171,7 +172,9 @@ features: LoanFeatures = extract_features(
 # - near_breach_count_4p
 
 # Classify risk tier from probability
+# Thresholds: LOW (<0.25), MEDIUM (0.25-0.50), HIGH (0.50-0.80), CRITICAL (>=0.80)
 risk_tier = classify_risk_tier(0.75)  # Returns "HIGH"
+risk_tier = classify_risk_tier(0.85)  # Returns "CRITICAL"
 
 # Feature column order for numpy array conversion
 print(FEATURE_ORDER)  # ("debt_to_ebitda", "interest_cover", ...)
@@ -182,9 +185,18 @@ print(FEATURE_ORDER)  # ("debt_to_ebitda", "interest_cover", ...)
 ```python
 prediction: RiskPrediction = {
     "probability": 0.75,
-    "risk_tier": "HIGH",  # Literal["LOW", "MEDIUM", "HIGH"]
+    "risk_tier": "HIGH",  # Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 }
 ```
+
+### Risk Tier Thresholds
+
+| Tier | Probability Range | Description |
+|------|-------------------|-------------|
+| `LOW` | < 0.25 | Normal risk |
+| `MEDIUM` | 0.25 - 0.50 | Elevated risk, monitor |
+| `HIGH` | 0.50 - 0.80 | High risk, review required |
+| `CRITICAL` | >= 0.80 | Critical risk, immediate action |
 
 ## JSON Encoding/Decoding
 
@@ -222,6 +234,7 @@ json_dict = encode_deal(deal)
 | `CovenantResult` | Evaluation result with status |
 | `LoanFeatures` | ML feature vector |
 | `RiskPrediction` | ML prediction output |
+| `RiskTier` | Risk tier literal (LOW/MEDIUM/HIGH/CRITICAL) |
 
 ### Functions
 
@@ -232,7 +245,7 @@ json_dict = encode_deal(deal)
 | `evaluate_all_covenants_for_period` | Evaluate all covenants for a period |
 | `classify_status` | Map value to OK/NEAR_BREACH/BREACH |
 | `extract_features` | Extract ML features from domain data |
-| `classify_risk_tier` | Map probability to LOW/MEDIUM/HIGH |
+| `classify_risk_tier` | Map probability to LOW/MEDIUM/HIGH/CRITICAL |
 
 ### Constants
 

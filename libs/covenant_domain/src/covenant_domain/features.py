@@ -5,6 +5,49 @@ from typing import Literal, TypedDict
 
 from .models import CovenantResult, Deal
 
+# =============================================================================
+# Risk Tier Type and Classification
+# =============================================================================
+
+RiskTier = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+"""Risk tier classification for ML predictions.
+
+Thresholds:
+- LOW: probability < 0.25
+- MEDIUM: 0.25 <= probability < 0.50
+- HIGH: 0.50 <= probability < 0.80
+- CRITICAL: probability >= 0.80
+"""
+
+
+def classify_risk_tier(probability: float) -> RiskTier:
+    """Classify probability into risk tier.
+
+    Uses standard thresholds:
+    - LOW: probability < 0.25
+    - MEDIUM: 0.25 <= probability < 0.50
+    - HIGH: 0.50 <= probability < 0.80
+    - CRITICAL: probability >= 0.80
+
+    Args:
+        probability: Risk probability between 0.0 and 1.0.
+
+    Returns:
+        Categorized RiskTier.
+    """
+    if probability < 0.25:
+        return "LOW"
+    if probability < 0.50:
+        return "MEDIUM"
+    if probability < 0.80:
+        return "HIGH"
+    return "CRITICAL"
+
+
+# =============================================================================
+# Feature Types
+# =============================================================================
+
 
 class LoanFeatures(TypedDict, total=True):
     """Feature vector for ML risk prediction. All values are floats."""
@@ -23,7 +66,7 @@ class RiskPrediction(TypedDict, total=True):
     """ML model prediction output."""
 
     probability: float
-    risk_tier: Literal["LOW", "MEDIUM", "HIGH"]
+    risk_tier: RiskTier
 
 
 # Feature column order for numpy array conversion
@@ -37,15 +80,6 @@ FEATURE_ORDER: tuple[str, ...] = (
     "region_encoded",
     "near_breach_count_4p",
 )
-
-
-def classify_risk_tier(probability: float) -> Literal["LOW", "MEDIUM", "HIGH"]:
-    """Map probability to risk tier. Pure function."""
-    if probability < 0.3:
-        return "LOW"
-    if probability < 0.7:
-        return "MEDIUM"
-    return "HIGH"
 
 
 def _count_near_breaches(results: Sequence[CovenantResult], periods: int) -> int:
@@ -128,6 +162,7 @@ __all__ = [
     "FEATURE_ORDER",
     "LoanFeatures",
     "RiskPrediction",
+    "RiskTier",
     "classify_risk_tier",
     "extract_features",
 ]

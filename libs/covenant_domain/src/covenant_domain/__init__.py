@@ -20,6 +20,7 @@ from .features import (
     FEATURE_ORDER,
     LoanFeatures,
     RiskPrediction,
+    RiskTier,
     classify_risk_tier,
     extract_features,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "LoanFeatures",
     "Measurement",
     "RiskPrediction",
+    "RiskTier",
     "classify_risk_tier",
     "classify_status",
     "decode_covenant",
