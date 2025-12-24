@@ -20,6 +20,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, TrainOutcome
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import model_dir
 from model_trainer.worker.job_utils import (
     build_cfg,
@@ -280,7 +281,17 @@ def _execute_training(
 
     container = _test_hooks.service_container_from_settings(settings)
     backend = container.model_registry.get(cfg["model_family"])
-    tok_handle = load_tokenizer_for_training(settings, cfg["tokenizer_id"])
+
+    # Load tokenizer handle if tokenizer_id is provided.
+    # For hf_lm models, tokenizer_id may be None - the backend uses the HF
+    # tokenizer from hub_model_id instead.
+    tokenizer_id = cfg["tokenizer_id"]
+    tok_handle: TokenizerHandle | None
+    if tokenizer_id is not None:
+        tok_handle = load_tokenizer_for_training(settings, tokenizer_id)
+    else:
+        tok_handle = None
+
     pretrained_run_id = cfg["pretrained_run_id"]
     if pretrained_run_id is not None:
         pretrained_dir = str(model_dir(settings, pretrained_run_id))
