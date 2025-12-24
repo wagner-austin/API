@@ -62,12 +62,13 @@ def default_registry() -> ClassifierRegistry:
     - mlp: torch-based MLP backend
     - lstm: torch-based LSTM backend for temporal sequences
     - lightgbm: LightGBM gradient boosting backend
+    - cleargbm: pure Python gradient boosting with built-in interpretability
     """
     reg = ClassifierRegistry()
 
     # XGBoost backend
     xgb_mod = __import__(
-        "covenant_ml.backends.xgboost_backend",
+        "covenant_ml.backends.xgboost",
         fromlist=["create_xgboost_backend"],
     )
     create_xgboost_backend: BackendFactory = xgb_mod.create_xgboost_backend
@@ -96,6 +97,14 @@ def default_registry() -> ClassifierRegistry:
     )
     create_lightgbm_backend: BackendFactory = lgbm_pkg.create_lightgbm_backend
     reg.register("lightgbm", BackendRegistration(create_lightgbm_backend))
+
+    # ClearGBM backend
+    cgbm_pkg = __import__(
+        "covenant_ml.backends.cleargbm",
+        fromlist=["create_cleargbm_backend"],
+    )
+    create_cleargbm_backend: BackendFactory = cgbm_pkg.create_cleargbm_backend
+    reg.register("cleargbm", BackendRegistration(create_cleargbm_backend))
 
     return reg
 
