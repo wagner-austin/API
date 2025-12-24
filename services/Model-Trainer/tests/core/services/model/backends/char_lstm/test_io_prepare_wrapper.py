@@ -75,6 +75,11 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "fp32",
+            "finetuning_strategy": "full",
+            "hub_model_id": None,
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     )
     prep_med = prepare_char_lstm_with_handle(
@@ -101,6 +106,11 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "fp32",
+            "finetuning_strategy": "full",
+            "hub_model_id": None,
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     )
     # Save one and load via wrapper to cover wrapper.from_pretrained and .config

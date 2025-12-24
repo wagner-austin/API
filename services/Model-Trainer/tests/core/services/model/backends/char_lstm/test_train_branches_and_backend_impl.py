@@ -129,6 +129,11 @@ def _make_cfg() -> ModelTrainConfig:
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
 
@@ -349,6 +354,11 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
     train_prepared_char_lstm(
@@ -426,6 +436,11 @@ def test_train_prepared_skips_save_when_cancelled(
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
     train_prepared_char_lstm(
