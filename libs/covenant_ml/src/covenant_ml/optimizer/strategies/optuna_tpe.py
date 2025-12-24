@@ -1,0 +1,721 @@
+"""Optuna TPE optimizer strategy.
+
+Strict typing only: no Any, no casts, no type: ignore, no stubs.
+Wraps Optuna's TPE (Tree-structured Parzen Estimator) for Bayesian optimization.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from typing import Protocol
+
+import numpy as np
+from numpy.typing import NDArray
+from platform_core.logging import get_logger
+
+from ..protocol import ObjectiveProtocol, TrialCallbackProtocol
+from ..strategy_protocol import OptimizerStrategyCapabilities, OptimizerStrategyName
+from ..type_guards import (
+    is_lightgbm_search_space,
+    is_lstm_search_space,
+    is_mlp_search_space,
+    is_xgboost_search_space,
+)
+from ..types import (
+    CategoricalFloatSpec,
+    CategoricalIntSpec,
+    CategoricalStringSpec,
+    FloatRangeSpec,
+    IntRangeSpec,
+    LightGBMSearchSpace,
+    LSTMSearchSpace,
+    MLPSearchSpace,
+    OptimizationConfig,
+    OptimizationSummary,
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+    SearchSpace,
+    TrialResult,
+    XGBoostSearchSpace,
+)
+
+_log = get_logger(__name__)
+
+
+# =============================================================================
+# Optuna Protocol Definitions (minimal for module hook)
+# =============================================================================
+
+
+class OptunaSamplerProtocol(Protocol):
+    """Protocol for Optuna sampler."""
+
+    ...
+
+
+class OptunaTrialProtocol(Protocol):
+    """Protocol for Optuna trial object."""
+
+    @property
+    def number(self) -> int: ...
+
+    def suggest_int(
+        self,
+        name: str,
+        low: int,
+        high: int,
+        *,
+        log: bool = False,
+    ) -> int: ...
+
+    def suggest_float(
+        self,
+        name: str,
+        low: float,
+        high: float,
+        *,
+        log: bool = False,
+    ) -> float: ...
+
+    def suggest_categorical(
+        self,
+        name: str,
+        choices: tuple[float, ...] | tuple[int, ...] | tuple[str, ...],
+    ) -> float | int | str: ...
+
+
+class OptunaPrunerProtocol(Protocol):
+    """Protocol for Optuna pruner."""
+
+    ...
+
+
+class OptunaStudyProtocol(Protocol):
+    """Protocol for Optuna study object."""
+
+    @property
+    def best_trial(self) -> OptunaTrialProtocol: ...
+
+    @property
+    def best_value(self) -> float: ...
+
+    @property
+    def best_params(self) -> dict[str, float | int | str]: ...
+
+    def optimize(
+        self,
+        func: Callable[[OptunaTrialProtocol], float],
+        n_trials: int,
+        timeout: float | None = None,
+        callbacks: list[Callable[[OptunaStudyProtocol, OptunaTrialProtocol], None]] | None = None,
+    ) -> None: ...
+
+
+class OptunaCreateStudyProtocol(Protocol):
+    """Protocol for optuna.create_study function."""
+
+    def __call__(
+        self,
+        *,
+        direction: str,
+        sampler: OptunaSamplerProtocol,
+        pruner: OptunaPrunerProtocol | None = None,
+    ) -> OptunaStudyProtocol: ...
+
+
+class OptunaTPESamplerProtocol(Protocol):
+    """Protocol for TPESampler constructor."""
+
+    def __call__(
+        self,
+        *,
+        seed: int,
+        n_startup_trials: int,
+    ) -> OptunaSamplerProtocol: ...
+
+
+class OptunaMedianPrunerProtocol(Protocol):
+    """Protocol for MedianPruner constructor."""
+
+    def __call__(
+        self,
+        *,
+        n_startup_trials: int,
+        n_warmup_steps: int,
+    ) -> OptunaPrunerProtocol: ...
+
+
+# =============================================================================
+# Module Hook for Optuna
+# =============================================================================
+
+_optuna_hook: (
+    Callable[
+        [],
+        tuple[
+            OptunaCreateStudyProtocol,
+            OptunaTPESamplerProtocol,
+            OptunaMedianPrunerProtocol,
+        ],
+    ]
+    | None
+) = None
+
+
+def set_optuna_tpe_hook(
+    hook: Callable[
+        [],
+        tuple[
+            OptunaCreateStudyProtocol,
+            OptunaTPESamplerProtocol,
+            OptunaMedianPrunerProtocol,
+        ],
+    ]
+    | None,
+) -> None:
+    """Set hook for Optuna module access.
+
+    Production code sets this to real Optuna at startup.
+    Tests can set a fake implementation.
+
+    Args:
+        hook: Callable returning (create_study, TPESampler, MedianPruner).
+    """
+    global _optuna_hook
+    _optuna_hook = hook
+
+
+def _get_optuna_factories() -> tuple[
+    OptunaCreateStudyProtocol,
+    OptunaTPESamplerProtocol,
+    OptunaMedianPrunerProtocol,
+]:
+    """Get Optuna factories via hook.
+
+    Returns:
+        Tuple of (create_study, TPESampler, MedianPruner) factories.
+
+    Raises:
+        RuntimeError: If hook is not set.
+    """
+    if _optuna_hook is None:
+        raise RuntimeError(
+            "Optuna TPE hook not set. "
+            "Call set_optuna_tpe_hook() or use_real_optuna_tpe() before optimization."
+        )
+    return _optuna_hook()
+
+
+def _real_optuna_factories() -> tuple[
+    OptunaCreateStudyProtocol,
+    OptunaTPESamplerProtocol,
+    OptunaMedianPrunerProtocol,
+]:
+    """Get real Optuna factories via dynamic import.
+
+    Returns:
+        Tuple of (create_study, TPESampler, MedianPruner) factories.
+    """
+    optuna_mod = __import__("optuna")
+    create_study: OptunaCreateStudyProtocol = optuna_mod.create_study
+
+    samplers_submod = __import__("optuna.samplers", fromlist=["TPESampler"])
+    tpe_sampler: OptunaTPESamplerProtocol = samplers_submod.TPESampler
+
+    pruners_submod = __import__("optuna.pruners", fromlist=["MedianPruner"])
+    median_pruner: OptunaMedianPrunerProtocol = pruners_submod.MedianPruner
+
+    return create_study, tpe_sampler, median_pruner
+
+
+def use_real_optuna_tpe() -> None:
+    """Set the hook to use real Optuna.
+
+    Call this at application startup before running optimization.
+    """
+    set_optuna_tpe_hook(_real_optuna_factories)
+
+
+# =============================================================================
+# Parameter Sampling
+# =============================================================================
+
+
+def _sample_int(
+    trial: OptunaTrialProtocol,
+    name: str,
+    spec: IntRangeSpec | CategoricalIntSpec,
+) -> int:
+    """Sample integer parameter from trial."""
+    if spec["param_type"] == "int":
+        int_spec: IntRangeSpec = spec
+        return trial.suggest_int(
+            name,
+            int_spec["low"],
+            int_spec["high"],
+            log=int_spec["log_scale"],
+        )
+    cat_spec: CategoricalIntSpec = spec
+    result = trial.suggest_categorical(name, cat_spec["choices"])
+    return int(result)
+
+
+def _sample_float(
+    trial: OptunaTrialProtocol,
+    name: str,
+    spec: FloatRangeSpec | CategoricalFloatSpec,
+) -> float:
+    """Sample float parameter from trial."""
+    if spec["param_type"] == "float":
+        float_spec: FloatRangeSpec = spec
+        return trial.suggest_float(
+            name,
+            float_spec["low"],
+            float_spec["high"],
+            log=float_spec["log_scale"],
+        )
+    cat_spec: CategoricalFloatSpec = spec
+    result = trial.suggest_categorical(name, cat_spec["choices"])
+    return float(result)
+
+
+def _sample_string(
+    trial: OptunaTrialProtocol,
+    name: str,
+    spec: CategoricalStringSpec,
+) -> str:
+    """Sample string parameter from trial."""
+    result = trial.suggest_categorical(name, spec["choices"])
+    return str(result)
+
+
+def _sample_xgboost_params(
+    trial: OptunaTrialProtocol,
+    space: XGBoostSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample XGBoost hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "max_depth": _sample_int(trial, "max_depth", space["max_depth"]),
+        "n_estimators": _sample_int(trial, "n_estimators", space["n_estimators"]),
+    }
+
+    float_params: SampledFloatParams = {
+        "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
+        "reg_alpha": _sample_float(trial, "reg_alpha", space["reg_alpha"]),
+        "reg_lambda": _sample_float(trial, "reg_lambda", space["reg_lambda"]),
+        "subsample": _sample_float(trial, "subsample", space["subsample"]),
+        "colsample_bytree": _sample_float(trial, "colsample_bytree", space["colsample_bytree"]),
+    }
+
+    string_params: SampledStringParams = {}
+
+    # Optional DART params
+    if "booster" in space:
+        booster = _sample_string(trial, "booster", space["booster"])
+        string_params["booster"] = booster
+        if booster == "dart":
+            if "rate_drop" in space:
+                float_params["rate_drop"] = _sample_float(trial, "rate_drop", space["rate_drop"])
+            if "skip_drop" in space:
+                float_params["skip_drop"] = _sample_float(trial, "skip_drop", space["skip_drop"])
+
+    return int_params, float_params, string_params
+
+
+def _sample_mlp_params(
+    trial: OptunaTrialProtocol,
+    space: MLPSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample MLP hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "n_layers": _sample_int(trial, "n_layers", space["n_layers"]),
+        "hidden_size": _sample_int(trial, "hidden_size", space["hidden_size"]),
+        "batch_size": _sample_int(trial, "batch_size", space["batch_size"]),
+    }
+
+    float_params: SampledFloatParams = {
+        "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
+        "dropout": _sample_float(trial, "dropout", space["dropout"]),
+    }
+
+    return int_params, float_params, {}
+
+
+def _sample_lstm_params(
+    trial: OptunaTrialProtocol,
+    space: LSTMSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample LSTM hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "hidden_size": _sample_int(trial, "hidden_size", space["hidden_size"]),
+        "num_layers": _sample_int(trial, "num_layers", space["num_layers"]),
+        "batch_size": _sample_int(trial, "batch_size", space["batch_size"]),
+    }
+
+    float_params: SampledFloatParams = {
+        "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
+        "dropout": _sample_float(trial, "dropout", space["dropout"]),
+    }
+
+    return int_params, float_params, {}
+
+
+def _sample_lightgbm_params(
+    trial: OptunaTrialProtocol,
+    space: LightGBMSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample LightGBM hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "n_estimators": _sample_int(trial, "n_estimators", space["n_estimators"]),
+        "num_leaves": _sample_int(trial, "num_leaves", space["num_leaves"]),
+    }
+
+    float_params: SampledFloatParams = {
+        "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
+        "subsample": _sample_float(trial, "subsample", space["subsample"]),
+        "colsample_bytree": _sample_float(trial, "colsample_bytree", space["colsample_bytree"]),
+        "reg_alpha": _sample_float(trial, "reg_alpha", space["reg_alpha"]),
+        "reg_lambda": _sample_float(trial, "reg_lambda", space["reg_lambda"]),
+    }
+
+    string_params: SampledStringParams = {}
+
+    # Optional DART params
+    if "boosting_type" in space:
+        boosting_type = _sample_string(trial, "boosting_type", space["boosting_type"])
+        string_params["boosting_type"] = boosting_type
+        if boosting_type == "dart":
+            if "drop_rate" in space:
+                float_params["drop_rate"] = _sample_float(trial, "drop_rate", space["drop_rate"])
+            if "skip_drop" in space:
+                float_params["skip_drop"] = _sample_float(trial, "skip_drop", space["skip_drop"])
+            if "feature_fraction" in space:
+                float_params["feature_fraction"] = _sample_float(
+                    trial, "feature_fraction", space["feature_fraction"]
+                )
+
+    return int_params, float_params, string_params
+
+
+def _sample_params(
+    trial: OptunaTrialProtocol,
+    search_space: SearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample parameters based on search space type."""
+    if is_xgboost_search_space(search_space):
+        return _sample_xgboost_params(trial, search_space)
+    if is_mlp_search_space(search_space):
+        return _sample_mlp_params(trial, search_space)
+    if is_lstm_search_space(search_space):
+        return _sample_lstm_params(trial, search_space)
+    # LightGBM is the remaining type after other guards
+    assert is_lightgbm_search_space(search_space)
+    return _sample_lightgbm_params(trial, search_space)
+
+
+def _extract_xgboost_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for XGBoost."""
+    int_params: SampledIntParams = {
+        "max_depth": int(best_params["max_depth"]),
+        "n_estimators": int(best_params["n_estimators"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": float(best_params["learning_rate"]),
+        "reg_alpha": float(best_params["reg_alpha"]),
+        "reg_lambda": float(best_params["reg_lambda"]),
+        "subsample": float(best_params["subsample"]),
+        "colsample_bytree": float(best_params["colsample_bytree"]),
+    }
+    string_params: SampledStringParams = {}
+
+    if "booster" in best_params:
+        string_params["booster"] = str(best_params["booster"])
+        if best_params.get("booster") == "dart":
+            if "rate_drop" in best_params:
+                float_params["rate_drop"] = float(best_params["rate_drop"])
+            if "skip_drop" in best_params:
+                float_params["skip_drop"] = float(best_params["skip_drop"])
+
+    return int_params, float_params, string_params
+
+
+def _extract_mlp_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for MLP."""
+    int_params: SampledIntParams = {
+        "n_layers": int(best_params["n_layers"]),
+        "hidden_size": int(best_params["hidden_size"]),
+        "batch_size": int(best_params["batch_size"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": float(best_params["learning_rate"]),
+        "dropout": float(best_params["dropout"]),
+    }
+    return int_params, float_params, {}
+
+
+def _extract_lstm_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for LSTM."""
+    int_params: SampledIntParams = {
+        "hidden_size": int(best_params["hidden_size"]),
+        "num_layers": int(best_params["num_layers"]),
+        "batch_size": int(best_params["batch_size"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": float(best_params["learning_rate"]),
+        "dropout": float(best_params["dropout"]),
+    }
+    return int_params, float_params, {}
+
+
+def _extract_lightgbm_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for LightGBM."""
+    int_params: SampledIntParams = {
+        "n_estimators": int(best_params["n_estimators"]),
+        "num_leaves": int(best_params["num_leaves"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": float(best_params["learning_rate"]),
+        "subsample": float(best_params["subsample"]),
+        "colsample_bytree": float(best_params["colsample_bytree"]),
+        "reg_alpha": float(best_params["reg_alpha"]),
+        "reg_lambda": float(best_params["reg_lambda"]),
+    }
+    string_params: SampledStringParams = {}
+
+    if "boosting_type" in best_params:
+        string_params["boosting_type"] = str(best_params["boosting_type"])
+        if best_params.get("boosting_type") == "dart":
+            if "drop_rate" in best_params:
+                float_params["drop_rate"] = float(best_params["drop_rate"])
+            if "skip_drop" in best_params:
+                float_params["skip_drop"] = float(best_params["skip_drop"])
+            if "feature_fraction" in best_params:
+                float_params["feature_fraction"] = float(best_params["feature_fraction"])
+
+    return int_params, float_params, string_params
+
+
+def _extract_best_params(
+    search_space: SearchSpace,
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters from study results based on search space type."""
+    if is_xgboost_search_space(search_space):
+        return _extract_xgboost_best_params(best_params)
+    if is_mlp_search_space(search_space):
+        return _extract_mlp_best_params(best_params)
+    if is_lstm_search_space(search_space):
+        return _extract_lstm_best_params(best_params)
+    # LightGBM is the remaining type after other guards
+    assert is_lightgbm_search_space(search_space)
+    return _extract_lightgbm_best_params(best_params)
+
+
+# =============================================================================
+# Optuna TPE Optimizer
+# =============================================================================
+
+
+class OptunaTpeOptimizer:
+    """Bayesian optimization using Optuna's TPE algorithm.
+
+    Tree-structured Parzen Estimator (TPE) is an efficient Bayesian
+    optimization algorithm that models p(x|y) instead of p(y|x).
+    It works well for hyperparameter optimization with up to ~1000 trials.
+    """
+
+    def __init__(self) -> None:
+        """Initialize optimizer with trial counters."""
+        self._trials_complete = 0
+        self._trials_pruned = 0
+        self._trials_failed = 0
+
+    def strategy_name(self) -> OptimizerStrategyName:
+        """Return the strategy name.
+
+        Returns:
+            The literal string 'optuna_tpe'.
+        """
+        return "optuna_tpe"
+
+    def capabilities(self) -> OptimizerStrategyCapabilities:
+        """Return the capabilities of this strategy.
+
+        Returns:
+            Capabilities indicating TPE supports pruning and parallelism.
+        """
+        return OptimizerStrategyCapabilities(
+            supports_pruning=True,
+            supports_parallel=True,
+            is_deterministic=False,
+            requires_bounds=True,
+        )
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: SearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        """Run hyperparameter optimization using Optuna TPE.
+
+        Args:
+            x_features: Feature matrix (n_samples, n_features).
+            y_labels: Binary labels (n_samples,).
+            feature_names: Names for each feature column.
+            search_space: Parameter ranges to search.
+            config: Optimization settings.
+            objective: Function to evaluate hyperparameters.
+            trial_callback: Optional callback after each trial.
+
+        Returns:
+            Summary with best hyperparameters and trial statistics.
+        """
+        create_study, tpe_sampler, median_pruner = _get_optuna_factories()
+
+        self._trials_complete = 0
+        self._trials_pruned = 0
+        self._trials_failed = 0
+
+        start_time = time.perf_counter()
+
+        _log.info(
+            "Starting Optuna TPE optimization",
+            extra={
+                "n_trials": config["n_trials"],
+                "n_startup_trials": config["n_startup_trials"],
+                "direction": config["direction"],
+                "pruning_enabled": config["pruning_enabled"],
+            },
+        )
+
+        sampler = tpe_sampler(
+            seed=config["random_state"],
+            n_startup_trials=config["n_startup_trials"],
+        )
+
+        pruner: OptunaPrunerProtocol | None = None
+        if config["pruning_enabled"]:
+            pruner = median_pruner(n_startup_trials=5, n_warmup_steps=10)
+
+        study = create_study(
+            direction=config["direction"],
+            sampler=sampler,
+            pruner=pruner,
+        )
+
+        def optuna_objective(trial: OptunaTrialProtocol) -> float:
+            trial_start = time.perf_counter()
+
+            int_params, float_params, string_params = _sample_params(trial, search_space)
+
+            val_auc = objective(
+                x_features,
+                y_labels,
+                feature_names,
+                int_params,
+                float_params,
+                string_params,
+                config["train_ratio"],
+                config["val_ratio"],
+                config["test_ratio"],
+                config["random_state"],
+            )
+
+            trial_duration = time.perf_counter() - trial_start
+            self._trials_complete += 1
+
+            result: TrialResult = {
+                "trial_number": trial.number,
+                "int_params": int_params,
+                "float_params": float_params,
+                "string_params": string_params,
+                "value": val_auc,
+                "state": "complete",
+                "duration_seconds": trial_duration,
+            }
+
+            if trial_callback is not None:
+                trial_callback(result)
+
+            _log.info(
+                "Trial complete",
+                extra={
+                    "trial": trial.number,
+                    "val_auc": val_auc,
+                    "duration_sec": trial_duration,
+                },
+            )
+
+            return val_auc
+
+        timeout_val: float | None = None
+        if config["timeout_seconds"] is not None:
+            timeout_val = float(config["timeout_seconds"])
+
+        study.optimize(
+            optuna_objective,
+            n_trials=config["n_trials"],
+            timeout=timeout_val,
+        )
+
+        total_duration = time.perf_counter() - start_time
+
+        best_int_params, best_float_params, best_string_params = _extract_best_params(
+            search_space, study.best_params
+        )
+
+        summary: OptimizationSummary = {
+            "best_trial_number": study.best_trial.number,
+            "best_value": study.best_value,
+            "best_int_params": best_int_params,
+            "best_float_params": best_float_params,
+            "best_string_params": best_string_params,
+            "n_trials_total": config["n_trials"],
+            "n_trials_complete": self._trials_complete,
+            "n_trials_pruned": self._trials_pruned,
+            "n_trials_failed": self._trials_failed,
+            "total_duration_seconds": total_duration,
+        }
+
+        _log.info(
+            "Optuna TPE optimization complete",
+            extra={
+                "best_value": summary["best_value"],
+                "n_trials_complete": summary["n_trials_complete"],
+                "total_duration_sec": summary["total_duration_seconds"],
+            },
+        )
+
+        return summary
+
+
+def create_optuna_tpe_optimizer() -> OptunaTpeOptimizer:
+    """Factory function to create an OptunaTpeOptimizer.
+
+    Returns:
+        A new OptunaTpeOptimizer instance.
+    """
+    return OptunaTpeOptimizer()
+
+
+__all__ = [
+    "OptunaTpeOptimizer",
+    "create_optuna_tpe_optimizer",
+    "set_optuna_tpe_hook",
+    "use_real_optuna_tpe",
+]
