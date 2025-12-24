@@ -252,7 +252,7 @@ class OptimizationConfig(TypedDict, total=True):
     """Configuration for an optimization run."""
 
     n_trials: int
-    timeout_seconds: int | None  # None = no timeout
+    timeout_seconds: float | None  # None = no timeout, float for fractional seconds
     n_startup_trials: int  # Random trials before TPE kicks in
     random_state: int
     direction: Literal["maximize", "minimize"]
