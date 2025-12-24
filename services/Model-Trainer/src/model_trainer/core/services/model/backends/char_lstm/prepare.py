@@ -30,8 +30,27 @@ def _encoder_for_dataset(tok: TokenizerHandle) -> Encoder:
 
 
 def prepare_char_lstm_with_handle(
-    tokenizer: TokenizerHandle, cfg: ModelTrainConfig
+    tokenizer: TokenizerHandle | None, cfg: ModelTrainConfig
 ) -> PreparedLMModel:
+    """Prepare a char-LSTM model for training using a tokenizer handle.
+
+    Args:
+        tokenizer: TokenizerHandle for encoding text. Required for char-LSTM.
+        cfg: Training configuration including model_size and max_seq_len.
+
+    Returns:
+        PreparedLMModel containing the model and tokenizer information.
+
+    Raises:
+        ValueError: If tokenizer is None or tokenizer_id is None.
+        AppError: If model_size is not valid.
+    """
+    if tokenizer is None:
+        raise ValueError("tokenizer is required for char_lstm backend")
+    tokenizer_id = cfg["tokenizer_id"]
+    if tokenizer_id is None:
+        raise ValueError("tokenizer_id is required for char_lstm backend")
+
     eos_id, pad_id, vocab_size = token_ids(tokenizer)
     embed_dim, hidden_dim, num_layers, dropout = _size_to_dims(cfg["model_size"])
     raw = CharLSTM(
@@ -44,7 +63,7 @@ def prepare_char_lstm_with_handle(
     )
     return PreparedLMModel(
         model=CharLSTMModel(raw),
-        tokenizer_id=cfg["tokenizer_id"],
+        tokenizer_id=tokenizer_id,
         eos_id=eos_id,
         pad_id=pad_id,
         max_seq_len=cfg["max_seq_len"],

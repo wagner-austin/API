@@ -62,10 +62,11 @@ def _load_tokenizer_for_dataset(tokenizer_path: str) -> TokenizerHandle:
 def evaluate_char_lstm(
     *, run_id: str, cfg: ModelTrainConfig, settings: Settings, dataset_builder: DatasetBuilder
 ) -> EvalResult:
+    tokenizer_id = cfg["tokenizer_id"]
+    if tokenizer_id is None:
+        raise ValueError("tokenizer_id is required for char_lstm backend")
     artifacts_root = settings["app"]["artifacts_root"]
-    tokenizer_path = str(
-        Path(artifacts_root) / "tokenizers" / cfg["tokenizer_id"] / "tokenizer.json"
-    )
+    tokenizer_path = str(Path(artifacts_root) / "tokenizers" / tokenizer_id / "tokenizer.json")
     handle = _load_tokenizer_for_dataset(tokenizer_path)
     eos_id, pad_id, _ = token_ids(handle)
 

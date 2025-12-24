@@ -41,8 +41,23 @@ def get_model_max_seq_len(model: CharLSTM) -> int:
 
 
 def load_prepared_char_lstm_from_handle(
-    artifact_path: str, tokenizer: TokenizerHandle
+    artifact_path: str, tokenizer: TokenizerHandle | None
 ) -> PreparedLMModel:
+    """Load a char-LSTM model from saved artifact.
+
+    Args:
+        artifact_path: Path to saved model directory.
+        tokenizer: TokenizerHandle for encoding. Required for char-LSTM.
+
+    Returns:
+        PreparedLMModel ready for inference or continued training.
+
+    Raises:
+        ValueError: If tokenizer is None.
+    """
+    if tokenizer is None:
+        raise ValueError("tokenizer is required for char_lstm backend")
+
     # Load raw model then wrap into LMModelProto implementation
     raw = CharLSTM.from_pretrained(artifact_path)
     eos_id, pad_id, _ = token_ids(tokenizer)
