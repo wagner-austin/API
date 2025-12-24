@@ -12,14 +12,28 @@ from platform_core.validators import (
     validate_str,
 )
 
-from ..schemas.runs import ChatRequest, EvaluateRequest, GenerateRequest, ScoreRequest, TrainRequest
+from ..schemas.runs import (
+    ChatRequest,
+    EvaluateRequest,
+    GenerateRequest,
+    LoraConfigRequest,
+    QuantizationConfigRequest,
+    ScoreRequest,
+    TrainRequest,
+    UnslothConfigRequest,
+)
 
-_MODEL_FAMILIES: frozenset[str] = frozenset({"gpt2", "llama", "qwen", "char_lstm"})
+_MODEL_FAMILIES: frozenset[str] = frozenset({"gpt2", "llama", "qwen", "char_lstm", "hf_lm"})
 _OPTIMIZERS: frozenset[str] = frozenset({"adamw", "adam", "sgd"})
 _DEVICES: frozenset[str] = frozenset({"cpu", "cuda", "auto"})
 _PRECISIONS: frozenset[str] = frozenset({"fp32", "fp16", "bf16", "auto"})
 _SPLITS: frozenset[str] = frozenset({"validation", "test"})
 _DETAIL_LEVELS: frozenset[str] = frozenset({"summary", "per_char"})
+_FINETUNING_STRATEGIES: frozenset[str] = frozenset({"full", "lora", "qlora", "unsloth"})
+_LORA_BIASES: frozenset[str] = frozenset({"none", "all", "lora_only"})
+_QUANT_COMPUTE_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16", "float32"})
+_QUANT_TYPES: frozenset[str] = frozenset({"nf4", "fp4"})
+_UNSLOTH_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16"})
 _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
     {
         "model_family",
@@ -44,6 +58,12 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "early_stopping_patience",
         "test_split_ratio",
         "finetune_lr_cap",
+        # HuggingFace LM backend fields
+        "hub_model_id",
+        "finetuning_strategy",
+        "lora",
+        "quantization",
+        "unsloth",
     }
 )
 
@@ -84,8 +104,15 @@ def _decode_optional_bool(d: dict[str, JSONValue], field: str) -> bool | None:
 
 def _narrow_model_family(
     raw: str | None,
-) -> Literal["gpt2", "llama", "qwen", "char_lstm"]:
-    """Narrow model family string to Literal type."""
+) -> Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]:
+    """Narrow model family string to Literal type.
+
+    Args:
+        raw: Raw model family string from request.
+
+    Returns:
+        Narrowed Literal type for model family.
+    """
     val = raw if raw is not None else "gpt2"
     if val == "gpt2":
         return "gpt2"
@@ -93,7 +120,94 @@ def _narrow_model_family(
         return "llama"
     if val == "qwen":
         return "qwen"
+    if val == "hf_lm":
+        return "hf_lm"
     return "char_lstm"
+
+
+def _narrow_finetuning_strategy(
+    raw: str | None,
+) -> Literal["full", "lora", "qlora", "unsloth"]:
+    """Narrow finetuning strategy string to Literal type.
+
+    Args:
+        raw: Raw finetuning strategy string from request.
+
+    Returns:
+        Narrowed Literal type for finetuning strategy.
+    """
+    val = raw if raw is not None else "full"
+    if val == "lora":
+        return "lora"
+    if val == "qlora":
+        return "qlora"
+    if val == "unsloth":
+        return "unsloth"
+    return "full"
+
+
+def _narrow_lora_bias(raw: str) -> Literal["none", "all", "lora_only"]:
+    """Narrow LoRA bias string to Literal type.
+
+    Args:
+        raw: Raw bias string from request.
+
+    Returns:
+        Narrowed Literal type for LoRA bias.
+    """
+    if raw == "all":
+        return "all"
+    if raw == "lora_only":
+        return "lora_only"
+    return "none"
+
+
+def _narrow_quant_compute_dtype(
+    raw: str,
+) -> Literal["float16", "bfloat16", "float32"]:
+    """Narrow quantization compute dtype to Literal type.
+
+    Args:
+        raw: Raw compute dtype string from request.
+
+    Returns:
+        Narrowed Literal type for compute dtype.
+    """
+    if raw == "bfloat16":
+        return "bfloat16"
+    if raw == "float32":
+        return "float32"
+    return "float16"
+
+
+def _narrow_quant_type(raw: str) -> Literal["nf4", "fp4"]:
+    """Narrow quantization type to Literal type.
+
+    Args:
+        raw: Raw quant type string from request.
+
+    Returns:
+        Narrowed Literal type for quantization type.
+    """
+    if raw == "fp4":
+        return "fp4"
+    return "nf4"
+
+
+def _narrow_unsloth_dtype(raw: str | None) -> Literal["float16", "bfloat16"] | None:
+    """Narrow Unsloth dtype to Literal type or None.
+
+    Args:
+        raw: Raw dtype string from request, or None for auto.
+
+    Returns:
+        Narrowed Literal type or None for auto-detect.
+    """
+    if raw is None:
+        return None
+    if raw == "bfloat16":
+        return "bfloat16"
+    return "float16"
 
 
 def _narrow_optimizer(raw: str | None) -> Literal["adamw", "adam", "sgd"]:
@@ -128,6 +242,324 @@ def _narrow_precision(raw: str | None) -> Literal["fp32", "fp16", "bf16", "auto"
     return "auto"
 
 
+def _decode_lora_config(d: dict[str, JSONValue]) -> LoraConfigRequest:
+    """Decode and validate LoRA configuration from JSON dict.
+
+    Args:
+        d: Raw dictionary with LoRA config fields.
+
+    Returns:
+        Validated LoraConfigRequest TypedDict.
+
+    Raises:
+        AppError: If required fields are missing or invalid.
+    """
+    enabled_raw = d.get("enabled")
+    if enabled_raw is None:
+        enabled = True
+    elif not isinstance(enabled_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="lora.enabled must be a boolean",
+            http_status=400,
+        )
+    else:
+        enabled = enabled_raw
+
+    r_val = validate_int_range(d.get("r"), "lora.r", ge=4, le=128, default=16)
+    lora_alpha = validate_int_range(
+        d.get("lora_alpha"), "lora.lora_alpha", ge=1, le=256, default=16
+    )
+    lora_dropout = validate_float_range(
+        d.get("lora_dropout"), "lora.lora_dropout", ge=0.0, le=0.5, default=0.1
+    )
+
+    target_modules_raw = d.get("target_modules")
+    if target_modules_raw is None:
+        target_modules: tuple[str, ...] = ("q_proj", "k_proj", "v_proj", "o_proj")
+    elif not isinstance(target_modules_raw, list):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="lora.target_modules must be a list of strings",
+            http_status=400,
+        )
+    else:
+        modules_list: list[str] = []
+        for i, m in enumerate(target_modules_raw):
+            if not isinstance(m, str):
+                raise AppError(
+                    code=ErrorCode.INVALID_INPUT,
+                    message=f"lora.target_modules[{i}] must be a string",
+                    http_status=400,
+                )
+            modules_list.append(m)
+        target_modules = tuple(modules_list)
+
+    bias_raw = validate_optional_literal(d.get("bias"), "lora.bias", _LORA_BIASES)
+    bias = _narrow_lora_bias(bias_raw if bias_raw is not None else "none")
+
+    return {
+        "enabled": enabled,
+        "r": r_val,
+        "lora_alpha": lora_alpha,
+        "lora_dropout": lora_dropout,
+        "target_modules": target_modules,
+        "bias": bias,
+    }
+
+
+def _decode_quantization_config(d: dict[str, JSONValue]) -> QuantizationConfigRequest:
+    """Decode and validate quantization configuration from JSON dict.
+
+    Args:
+        d: Raw dictionary with quantization config fields.
+
+    Returns:
+        Validated QuantizationConfigRequest TypedDict.
+
+    Raises:
+        AppError: If required fields are missing or invalid.
+    """
+    load_in_4bit_raw = d.get("load_in_4bit")
+    if load_in_4bit_raw is None:
+        load_in_4bit = True
+    elif not isinstance(load_in_4bit_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="quantization.load_in_4bit must be a boolean",
+            http_status=400,
+        )
+    else:
+        load_in_4bit = load_in_4bit_raw
+
+    load_in_8bit_raw = d.get("load_in_8bit")
+    if load_in_8bit_raw is None:
+        load_in_8bit = False
+    elif not isinstance(load_in_8bit_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="quantization.load_in_8bit must be a boolean",
+            http_status=400,
+        )
+    else:
+        load_in_8bit = load_in_8bit_raw
+
+    compute_dtype_raw = validate_optional_literal(
+        d.get("bnb_4bit_compute_dtype"),
+        "quantization.bnb_4bit_compute_dtype",
+        _QUANT_COMPUTE_DTYPES,
+    )
+    compute_dtype = _narrow_quant_compute_dtype(
+        compute_dtype_raw if compute_dtype_raw is not None else "float16"
+    )
+
+    quant_type_raw = validate_optional_literal(
+        d.get("bnb_4bit_quant_type"),
+        "quantization.bnb_4bit_quant_type",
+        _QUANT_TYPES,
+    )
+    quant_type = _narrow_quant_type(quant_type_raw if quant_type_raw is not None else "nf4")
+
+    return {
+        "load_in_4bit": load_in_4bit,
+        "load_in_8bit": load_in_8bit,
+        "bnb_4bit_compute_dtype": compute_dtype,
+        "bnb_4bit_quant_type": quant_type,
+    }
+
+
+def _decode_unsloth_config(d: dict[str, JSONValue]) -> UnslothConfigRequest:
+    """Decode and validate Unsloth configuration from JSON dict.
+
+    Args:
+        d: Raw dictionary with Unsloth config fields.
+
+    Returns:
+        Validated UnslothConfigRequest TypedDict.
+
+    Raises:
+        AppError: If required fields are missing or invalid.
+    """
+    enabled_raw = d.get("enabled")
+    if enabled_raw is None:
+        enabled = True
+    elif not isinstance(enabled_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="unsloth.enabled must be a boolean",
+            http_status=400,
+        )
+    else:
+        enabled = enabled_raw
+
+    max_seq_length = validate_int_range(
+        d.get("max_seq_length"), "unsloth.max_seq_length", ge=128, le=8192, default=2048
+    )
+
+    dtype_raw = d.get("dtype")
+    if dtype_raw is None:
+        dtype: Literal["float16", "bfloat16"] | None = _narrow_unsloth_dtype(None)
+    elif not isinstance(dtype_raw, str):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="unsloth.dtype must be a string or null",
+            http_status=400,
+        )
+    else:
+        _ = validate_optional_literal(dtype_raw, "unsloth.dtype", _UNSLOTH_DTYPES)
+        dtype = _narrow_unsloth_dtype(dtype_raw)
+
+    return {
+        "enabled": enabled,
+        "max_seq_length": max_seq_length,
+        "dtype": dtype,
+    }
+
+
+def _decode_optional_lora(d: dict[str, JSONValue]) -> LoraConfigRequest | None:
+    """Decode optional LoRA config from dict."""
+    lora_raw = d.get("lora")
+    if lora_raw is None:
+        return None
+    if not isinstance(lora_raw, dict):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="lora must be an object",
+            http_status=400,
+        )
+    return _decode_lora_config(lora_raw)
+
+
+def _decode_optional_quantization(d: dict[str, JSONValue]) -> QuantizationConfigRequest | None:
+    """Decode optional quantization config from dict."""
+    quantization_raw = d.get("quantization")
+    if quantization_raw is None:
+        return None
+    if not isinstance(quantization_raw, dict):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="quantization must be an object",
+            http_status=400,
+        )
+    return _decode_quantization_config(quantization_raw)
+
+
+def _decode_optional_unsloth(d: dict[str, JSONValue]) -> UnslothConfigRequest | None:
+    """Decode optional Unsloth config from dict."""
+    unsloth_raw = d.get("unsloth")
+    if unsloth_raw is None:
+        return None
+    if not isinstance(unsloth_raw, dict):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="unsloth must be an object",
+            http_status=400,
+        )
+    return _decode_unsloth_config(unsloth_raw)
+
+
+def _validate_hf_lm_cross_fields(
+    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
+    hub_model_id: str | None,
+    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"],
+    lora: LoraConfigRequest | None,
+    quantization: QuantizationConfigRequest | None,
+    unsloth: UnslothConfigRequest | None,
+) -> None:
+    """Validate cross-field requirements for HF LM backend."""
+    if model_family == "hf_lm" and hub_model_id is None:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="hub_model_id is required when model_family is 'hf_lm'",
+            http_status=400,
+        )
+    if finetuning_strategy in ("lora", "qlora", "unsloth") and lora is None:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message=f"lora config is required for finetuning_strategy '{finetuning_strategy}'",
+            http_status=400,
+        )
+    if finetuning_strategy == "qlora" and quantization is None:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="quantization config is required for finetuning_strategy 'qlora'",
+            http_status=400,
+        )
+    if finetuning_strategy == "unsloth" and unsloth is None:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="unsloth config is required for finetuning_strategy 'unsloth'",
+            http_status=400,
+        )
+
+
+class _HfLmFields:
+    """Container for decoded HF LM backend fields."""
+
+    hub_model_id: str | None
+    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    lora: LoraConfigRequest | None
+    quantization: QuantizationConfigRequest | None
+    unsloth: UnslothConfigRequest | None
+
+    def __init__(
+        self,
+        hub_model_id: str | None,
+        finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"],
+        lora: LoraConfigRequest | None,
+        quantization: QuantizationConfigRequest | None,
+        unsloth: UnslothConfigRequest | None,
+    ) -> None:
+        self.hub_model_id = hub_model_id
+        self.finetuning_strategy = finetuning_strategy
+        self.lora = lora
+        self.quantization = quantization
+        self.unsloth = unsloth
+
+
+def _decode_hf_lm_fields(
+    d: dict[str, JSONValue],
+    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
+) -> _HfLmFields:
+    """Decode and validate HuggingFace LM backend fields.
+
+    Args:
+        d: Raw request dictionary.
+        model_family: Validated model family.
+
+    Returns:
+        _HfLmFields container with decoded values.
+
+    Raises:
+        AppError: If validation fails.
+    """
+    hub_model_id_raw = d.get("hub_model_id")
+    hub_model_id: str | None = None
+    if hub_model_id_raw is not None:
+        hub_model_id = validate_str(hub_model_id_raw, "hub_model_id")
+
+    finetuning_strategy_raw = validate_optional_literal(
+        d.get("finetuning_strategy"), "finetuning_strategy", _FINETUNING_STRATEGIES
+    )
+    finetuning_strategy = _narrow_finetuning_strategy(finetuning_strategy_raw)
+
+    lora = _decode_optional_lora(d)
+    quantization = _decode_optional_quantization(d)
+    unsloth = _decode_optional_unsloth(d)
+
+    _validate_hf_lm_cross_fields(
+        model_family, hub_model_id, finetuning_strategy, lora, quantization, unsloth
+    )
+
+    return _HfLmFields(
+        hub_model_id=hub_model_id,
+        finetuning_strategy=finetuning_strategy,
+        lora=lora,
+        quantization=quantization,
+        unsloth=unsloth,
+    )
+
+
 def _decode_train_request(obj: JSONValue) -> TrainRequest:
     d = load_json_dict(obj)
 
@@ -153,7 +585,33 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         d.get("learning_rate"), "learning_rate", ge=0.0, default=5e-4
     )
     corpus_file_id = validate_str(d.get("corpus_file_id"), "corpus_file_id")
-    tokenizer_id = validate_str(d.get("tokenizer_id"), "tokenizer_id", default="")
+
+    # tokenizer_id validation depends on model_family:
+    # - hf_lm: optional (None) - uses HF tokenizer from hub_model_id
+    # - other models: required - must provide a trained tokenizer
+    tokenizer_id_raw = d.get("tokenizer_id")
+    tokenizer_id: str | None
+    if model_family == "hf_lm":
+        # For hf_lm, tokenizer_id is optional - accept None or empty string as None
+        if tokenizer_id_raw is None or tokenizer_id_raw == "":
+            tokenizer_id = None
+        elif isinstance(tokenizer_id_raw, str):
+            tokenizer_id = tokenizer_id_raw
+        else:
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message="tokenizer_id must be a string or null for hf_lm models",
+                http_status=400,
+            )
+    else:
+        # For non-hf_lm models, tokenizer_id is required
+        if tokenizer_id_raw is None or tokenizer_id_raw == "":
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"tokenizer_id is required for {model_family} models",
+                http_status=400,
+            )
+        tokenizer_id = validate_str(tokenizer_id_raw, "tokenizer_id")
     holdout_fraction = validate_float_range(
         d.get("holdout_fraction"), "holdout_fraction", ge=0.0, le=0.5, default=0.01
     )
@@ -201,6 +659,9 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
     data_num_workers = _decode_optional_int_ge(d, "data_num_workers", ge=0)
     data_pin_memory = _decode_optional_bool(d, "data_pin_memory")
 
+    # HuggingFace LM backend fields (delegated to reduce complexity)
+    hf_fields = _decode_hf_lm_fields(d, model_family)
+
     return {
         "model_family": model_family,
         "model_size": model_size,
@@ -224,6 +685,11 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "early_stopping_patience": early_stopping_patience,
         "test_split_ratio": test_split_ratio,
         "finetune_lr_cap": finetune_lr_cap,
+        "hub_model_id": hf_fields.hub_model_id,
+        "finetuning_strategy": hf_fields.finetuning_strategy,
+        "lora": hf_fields.lora,
+        "quantization": hf_fields.quantization,
+        "unsloth": hf_fields.unsloth,
     }
 
 

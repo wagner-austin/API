@@ -5,17 +5,86 @@ from typing import Literal, NotRequired
 from typing_extensions import TypedDict
 
 
-class TrainRequest(TypedDict, total=True):
-    """Request to start model training."""
+class LoraConfigRequest(TypedDict, total=True):
+    """API request schema for LoRA configuration.
 
-    model_family: Literal["gpt2", "llama", "qwen", "char_lstm"]
+    Maps to core LoraConfig TypedDict. All fields required at API level
+    with defaults applied in validators.
+
+    Attributes:
+        enabled: Whether LoRA is enabled.
+        r: LoRA rank (typically 8, 16, 32, 64).
+        lora_alpha: Scaling factor (often equal to r).
+        lora_dropout: Dropout probability for LoRA layers.
+        target_modules: Module names to apply LoRA.
+        bias: Bias handling mode.
+    """
+
+    enabled: bool
+    r: int
+    lora_alpha: int
+    lora_dropout: float
+    target_modules: tuple[str, ...]
+    bias: Literal["none", "all", "lora_only"]
+
+
+class QuantizationConfigRequest(TypedDict, total=True):
+    """API request schema for quantization configuration.
+
+    Maps to core QuantizationConfig TypedDict.
+
+    Attributes:
+        load_in_4bit: Whether to load model in 4-bit precision.
+        load_in_8bit: Whether to load model in 8-bit precision.
+        bnb_4bit_compute_dtype: Compute dtype for 4-bit operations.
+        bnb_4bit_quant_type: Quantization type (nf4 or fp4).
+    """
+
+    load_in_4bit: bool
+    load_in_8bit: bool
+    bnb_4bit_compute_dtype: Literal["float16", "bfloat16", "float32"]
+    bnb_4bit_quant_type: Literal["nf4", "fp4"]
+
+
+class UnslothConfigRequest(TypedDict, total=True):
+    """API request schema for Unsloth configuration.
+
+    Maps to core UnslothConfig TypedDict.
+
+    Attributes:
+        enabled: Whether Unsloth optimization is enabled.
+        max_seq_length: Maximum sequence length for Unsloth.
+        dtype: Data type for Unsloth (None for auto-detect).
+    """
+
+    enabled: bool
+    max_seq_length: int
+    dtype: Literal["float16", "bfloat16"] | None
+
+
+class TrainRequest(TypedDict, total=True):
+    """Request to start model training.
+
+    Supports both legacy backends (gpt2, char_lstm) and the new hf_lm backend
+    for HuggingFace models with optional LoRA/Unsloth fine-tuning.
+
+    Attributes:
+        model_family: Model architecture. Use 'hf_lm' for HuggingFace models.
+        hub_model_id: HuggingFace model ID (required when model_family='hf_lm').
+        finetuning_strategy: Strategy for fine-tuning (full, lora, qlora, unsloth).
+        lora: LoRA configuration (required for lora/qlora/unsloth strategies).
+        quantization: Quantization config (required for qlora strategy).
+        unsloth: Unsloth configuration (required for unsloth strategy).
+    """
+
+    model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"]
     model_size: str
     max_seq_len: int
     num_epochs: int
     batch_size: int
     learning_rate: float
     corpus_file_id: str
-    tokenizer_id: str
+    tokenizer_id: str | None  # Optional for hf_lm (uses HF tokenizer from hub_model_id)
     holdout_fraction: float
     seed: int
     pretrained_run_id: str | None
@@ -31,6 +100,12 @@ class TrainRequest(TypedDict, total=True):
     early_stopping_patience: int
     test_split_ratio: float
     finetune_lr_cap: float
+    # HuggingFace LM backend fields
+    hub_model_id: str | None
+    finetuning_strategy: Literal["full", "lora", "qlora", "unsloth"]
+    lora: LoraConfigRequest | None
+    quantization: QuantizationConfigRequest | None
+    unsloth: UnslothConfigRequest | None
 
 
 class TrainResponse(TypedDict, total=True):
