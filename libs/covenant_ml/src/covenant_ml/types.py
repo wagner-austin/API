@@ -14,7 +14,7 @@ RequestedDevice = Literal["cpu", "cuda", "auto"]
 ResolvedDevice = Literal["cpu", "cuda"]
 
 # Pluggable backend naming - all supported classifier backends
-BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm"]
+BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm"]
 
 
 class TrainConfigRequired(TypedDict, total=True):
@@ -98,7 +98,7 @@ class TrainOutcome(TypedDict, total=True):
     total_rounds: int
     early_stopped: bool
     # Union inlined to avoid forward ref
-    config: TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
+    config: TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig
     feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
     # Class weight used for training (auto-calculated if not provided in config)
     scale_pos_weight_computed: float
@@ -197,8 +197,43 @@ class LightGBMConfig(TypedDict, total=True):
     early_stopping_rounds: int
 
 
+class ClearGBMConfig(TypedDict, total=True):
+    """Configuration for ClearGBM backend training.
+
+    ClearGBM is a pure Python gradient boosting implementation with
+    built-in interpretability features (rule extraction, feature contributions).
+
+    Args:
+        n_estimators: Number of boosting rounds.
+        max_depth: Maximum tree depth.
+        learning_rate: Shrinkage factor for updates.
+        min_samples_split: Minimum samples required to split a node.
+        min_samples_leaf: Minimum samples required in a leaf.
+        max_bins: Histogram bins for O(K) split finding (default: 64).
+        subsample: Row subsampling ratio (1.0 = no subsampling).
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        random_state: Random seed for reproducibility.
+        early_stopping_rounds: Rounds without improvement to stop.
+    """
+
+    n_estimators: int
+    max_depth: int
+    learning_rate: float
+    min_samples_split: int
+    min_samples_leaf: int
+    max_bins: int
+    subsample: float
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    early_stopping_rounds: int
+
+
 # Union of backend-specific train configs
-ClassifierTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig
+ClassifierTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig
 
 
 # =============================================================================
@@ -397,6 +432,7 @@ __all__ = [
     "AMEXMetricResult",
     "BackendName",
     "ClassifierTrainConfig",
+    "ClearGBMConfig",
     "DMatrixFactory",
     "DMatrixProtocol",
     "EvalMetrics",
