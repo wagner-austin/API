@@ -235,3 +235,11 @@ def test_load_prepared_gpt2_from_handle_defaults_when_missing() -> None:
 
     prepared = load_prepared_gpt2_from_handle("/no/file", _TokHNoTokens())
     assert prepared.max_seq_len == 512
+
+
+def test_load_prepared_gpt2_from_handle_raises_when_tokenizer_none() -> None:
+    """Cover gpt2/io.py tokenizer None error branch."""
+    import pytest as _pytest  # Import needed for this test file
+
+    with _pytest.raises(ValueError, match="tokenizer is required for gpt2 backend"):
+        load_prepared_gpt2_from_handle("/some/path", None)

@@ -79,6 +79,11 @@ def test_gpt2_backend_impl_name_and_type_errors(
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_gpt2_backend(LocalTextDatasetBuilder())
     assert backend.name() == "gpt2"

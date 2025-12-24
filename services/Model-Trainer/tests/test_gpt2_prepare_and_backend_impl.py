@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
+import pytest
+
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
@@ -81,6 +83,11 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     prepared = prepare_gpt2_with_handle(tok_handle, cfg)
     assert prepared.max_seq_len == 16
@@ -134,6 +141,11 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
     builder = LocalTextDatasetBuilder()
@@ -179,3 +191,138 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
     # Evaluate path via backend adapter
     eval_res = backend.evaluate(run_id="run-backend", cfg=cfg, settings=settings)
     assert eval_res["loss"] >= 0.0
+
+
+class _FakeTokHandle:
+    """Fake tokenizer handle for testing tokenizer_id None case."""
+
+    def encode(self: _FakeTokHandle, text: str) -> list[int]:
+        return [ord(c) for c in text]
+
+    def decode(self: _FakeTokHandle, ids: list[int]) -> str:
+        return "".join(chr(i) for i in ids)
+
+    def token_to_id(self: _FakeTokHandle, token: str) -> int | None:
+        if token == "[EOS]":
+            return 0
+        if token == "[PAD]":
+            return 1
+        return None
+
+    def get_vocab_size(self: _FakeTokHandle) -> int:
+        return 256
+
+
+def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
+    """Cover gpt2/prepare.py tokenizer None error branch."""
+    cfg: ModelTrainConfig = {
+        "model_family": "gpt2",
+        "model_size": "small",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 5e-4,
+        "tokenizer_id": "some_tok",
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer is required for gpt2 backend"):
+        prepare_gpt2_with_handle(None, cfg)
+
+
+def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
+    """Cover gpt2/prepare.py tokenizer_id None error branch."""
+    cfg: ModelTrainConfig = {
+        "model_family": "gpt2",
+        "model_size": "small",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 5e-4,
+        "tokenizer_id": None,  # tokenizer_id is None, but tokenizer handle is provided
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):
+        prepare_gpt2_with_handle(_FakeTokHandle(), cfg)
+
+
+def test_gpt2_evaluate_raises_when_tokenizer_id_none(
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> None:
+    """Cover gpt2/evaluate.py tokenizer_id None error branch."""
+    from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
+    from model_trainer.core.services.model.backends.gpt2.evaluate import evaluate_gpt2
+
+    artifacts = tmp_path / "artifacts"
+    settings = settings_factory(artifacts_root=str(artifacts))
+
+    cfg: ModelTrainConfig = {
+        "model_family": "gpt2",
+        "model_size": "small",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 5e-4,
+        "tokenizer_id": None,  # tokenizer_id is None
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):
+        evaluate_gpt2(
+            run_id="test-run",
+            cfg=cfg,
+            settings=settings,
+            dataset_builder=LocalTextDatasetBuilder(),
+        )

@@ -93,8 +93,8 @@ def _make_fake_prepared() -> PreparedLMModel:
 def test_gpt2_backend_load_calls_helper() -> None:
     called: dict[str, str] = {}
 
-    def _fake_load(artifact_path: str, tokenizer: TokenizerHandle) -> PreparedLMModel:
-        _ = tokenizer
+    def _fake_load(artifact_path: str, tokenizer: TokenizerHandle | None) -> PreparedLMModel:
+        del tokenizer  # Explicitly mark as unused
         called["path"] = artifact_path
         called["tok"] = "called"
         return _make_fake_prepared()
