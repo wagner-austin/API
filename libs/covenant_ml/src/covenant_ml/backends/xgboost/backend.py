@@ -12,9 +12,9 @@ from typing import TypeGuard
 import numpy as np
 from numpy.typing import NDArray
 
-from ..metrics import compute_all_metrics
-from ..trainer import train_model_with_validation
-from ..types import (
+from ...metrics import compute_all_metrics
+from ...trainer import train_model_with_validation
+from ...types import (
     BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
@@ -22,7 +22,7 @@ from ..types import (
     TrainConfig,
     TrainOutcome,
 )
-from .protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
+from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
 
 
 class _XGBPrepared:
