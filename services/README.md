@@ -58,6 +58,7 @@ This monorepo contains a suite of interconnected API services for language proce
 |---------|---------|------|------|
 | [covenant-radar-api](./covenant-radar-api/) | Loan covenant monitoring and breach prediction | 8007 | [README](./covenant-radar-api/README.md) |
 | [data-bank-api](./data-bank-api/) | Central file storage for service-to-service data exchange | 8000 | [README](./data-bank-api/README.md) • [DESIGN](./data-bank-api/DESIGN.md) |
+| [grandma-api](./grandma-api/) | Vietnamese to English audio translation via OpenAI Whisper | 8080 | [README](./grandma-api/README.md) • [API](./grandma-api/docs/api.md) |
 | [handwriting-ai](./handwriting-ai/) | MNIST digit recognition with ResNet-18 inference | 8081 | [README](./handwriting-ai/README.md) |
 | [Model-Trainer](./Model-Trainer/) | LLM training and tokenizer service (GPT-2, BPE) | 8000 | [README](./Model-Trainer/README.md) • [DESIGN](./Model-Trainer/DESIGN.md) |
 | [music-wrapped-api](./music-wrapped-api/) | Music listening analytics and yearly Wrapped reports | 8006 | [README](./music-wrapped-api/README.md) |
@@ -94,6 +95,20 @@ Central file storage service for internal service-to-service exchange. Provides 
 - SHA256 checksums for integrity verification
 
 **Consumers:** turkic-api, Model-Trainer
+
+---
+
+#### grandma-api
+Vietnamese to English audio translation service using OpenAI Whisper. Designed for real-time voice translation with a simple, stateless API.
+
+**Key Features:**
+- Vietnamese audio to English text translation
+- OpenAI Whisper integration via platform_stt
+- Protocol-based dependency injection (ServiceContainer)
+- Multipart form upload for audio files
+- CORS enabled for browser clients
+
+**Integrations:** OpenAI Whisper API (via platform_stt)
 
 ---
 
@@ -181,6 +196,7 @@ Located in `../libs/`:
 | Library | Purpose | Used By |
 |---------|---------|---------|
 | [platform_core](../libs/platform_core/) | Centralized logging, error handling, config, health checks, JSON utilities | All services |
+| [platform_stt](../libs/platform_stt/) | OpenAI Whisper speech-to-text client | grandma-api, transcript-api |
 | [platform_workers](../libs/platform_workers/) | Redis/RQ job queue abstractions and worker harness | turkic-api, Model-Trainer, handwriting-ai |
 | [platform_discord](../libs/platform_discord/) | Discord integration helpers and embed builders | handwriting-ai |
 | [monorepo_guards](../libs/monorepo_guards/) | Code quality enforcement scripts | All services |
@@ -511,6 +527,7 @@ API/
 ├── services/                    # Microservices (this directory)
 │   ├── covenant-radar-api/
 │   ├── data-bank-api/
+│   ├── grandma-api/
 │   ├── handwriting-ai/
 │   ├── Model-Trainer/
 │   ├── music-wrapped-api/
