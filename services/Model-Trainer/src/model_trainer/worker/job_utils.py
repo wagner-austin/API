@@ -92,29 +92,35 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
     bs_in = int(req["batch_size"])  # explicit int conversion for safety
     bs_eff = recommended_batch_size_for(req["model_family"], bs_in, resolved_device)
 
-    return ModelTrainConfig(
-        model_family=req["model_family"],
-        model_size=req["model_size"],
-        max_seq_len=req["max_seq_len"],
-        num_epochs=req["num_epochs"],
-        batch_size=bs_eff,
-        learning_rate=req["learning_rate"],
-        tokenizer_id=req["tokenizer_id"],
-        corpus_path=corpus_path,
-        holdout_fraction=req["holdout_fraction"],
-        seed=req["seed"],
-        pretrained_run_id=req["pretrained_run_id"],
-        freeze_embed=req["freeze_embed"],
-        gradient_clipping=req["gradient_clipping"],
-        optimizer=req["optimizer"],
-        device=resolved_device,
-        precision=resolved_precision,
-        data_num_workers=data_num_workers,
-        data_pin_memory=data_pin_memory,
-        early_stopping_patience=req["early_stopping_patience"],
-        test_split_ratio=req["test_split_ratio"],
-        finetune_lr_cap=req["finetune_lr_cap"],
-    )
+    cfg: ModelTrainConfig = {
+        "model_family": req["model_family"],
+        "model_size": req["model_size"],
+        "max_seq_len": req["max_seq_len"],
+        "num_epochs": req["num_epochs"],
+        "batch_size": bs_eff,
+        "learning_rate": req["learning_rate"],
+        "tokenizer_id": req["tokenizer_id"],
+        "corpus_path": corpus_path,
+        "holdout_fraction": req["holdout_fraction"],
+        "seed": req["seed"],
+        "pretrained_run_id": req["pretrained_run_id"],
+        "freeze_embed": req["freeze_embed"],
+        "gradient_clipping": req["gradient_clipping"],
+        "optimizer": req["optimizer"],
+        "device": resolved_device,
+        "precision": resolved_precision,
+        "data_num_workers": data_num_workers,
+        "data_pin_memory": data_pin_memory,
+        "early_stopping_patience": req["early_stopping_patience"],
+        "test_split_ratio": req["test_split_ratio"],
+        "finetune_lr_cap": req["finetune_lr_cap"],
+        "finetuning_strategy": req["finetuning_strategy"],
+        "hub_model_id": req["hub_model_id"],
+        "lora": req["lora"],
+        "quantization": req["quantization"],
+        "unsloth": req["unsloth"],
+    }
+    return cfg
 
 
 def setup_job_logging(settings: Settings) -> None:
