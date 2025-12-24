@@ -148,12 +148,20 @@ class PredictionEventV1(TypedDict):
     covenants_evaluated: int
     breaches_count: int
     risk_probability: float
-    risk_tier: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    risk_tier: RiskTier  # Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] from covenant_domain
     model_version: str
     evaluation_latency_ms: int
     prediction_latency_ms: int
     processed_at: str
 ```
+
+**Risk Tier Thresholds** (defined in `covenant_domain.features`):
+| Tier | Probability | Description |
+|------|-------------|-------------|
+| LOW | < 0.25 | Normal risk |
+| MEDIUM | 0.25 - 0.50 | Elevated, monitor |
+| HIGH | 0.50 - 0.80 | Review required |
+| CRITICAL | >= 0.80 | Immediate action, triggers alert |
 
 **Output: AlertEventV1**
 ```python
@@ -440,15 +448,17 @@ libs/platform_core/tests/
 ```
 services/covenant-radar-api/src/covenant_radar_api/
 ├── streaming/
-│   ├── __init__.py                    # 20 lines (exports)
-│   ├── _test_hooks.py                 # 120 lines (DI for producer/consumer/gemini)
-│   ├── config.py                      # 100 lines (KafkaConfig, GeneratorConfig TypedDicts)
-│   ├── schemas.py                     # 350 lines (Kafka events + encode/decode/TypeGuards)
-│   ├── producer.py                    # 200 lines (KafkaProducer wrapper)
-│   ├── consumer.py                    # 250 lines (KafkaConsumer wrapper)
-│   ├── generator.py                   # 250 lines (synthetic measurement generator)
-│   ├── worker.py                      # 350 lines (main consume-predict-produce loop)
-│   └── retrain_monitor.py             # 200 lines (drift detection, trigger logic)
+│   ├── __init__.py                    # ~20 lines (exports)
+│   ├── _test_hooks.py                 # ~180 lines (DI for producer/consumer, Protocols, Real/Fake Kafka implementations)
+│   ├── _test_hooks_model.py           # ~30 lines (FakePredictor, FakeMetricsSink)
+│   ├── _test_hooks_repositories.py    # ~100 lines (FakeDealRepository, FakeCovenantRepository, etc.)
+│   ├── config.py                      # ~80 lines (KafkaConfig TypedDicts, env parsing)
+│   ├── schemas.py                     # ~160 lines (Kafka events + encode/decode/TypeGuards)
+│   ├── producer.py                    # ~35 lines (StreamingProducer wrapper)
+│   ├── consumer.py                    # ~60 lines (StreamingConsumer wrapper)
+│   ├── worker.py                      # ~245 lines (StreamingWorker consume-predict-produce loop)
+│   ├── generator.py                   # (Phase 6) synthetic measurement generator
+│   └── retrain_monitor.py             # (Phase 6) drift detection, trigger logic
 │
 ├── integrations/
 │   ├── __init__.py                    # 5 lines
@@ -476,13 +486,16 @@ scripts/
 services/covenant-radar-api/tests/
 ├── streaming/
 │   ├── __init__.py
-│   ├── conftest.py                    # 100 lines (shared fixtures)
-│   ├── test_schemas.py                # 200 lines
-│   ├── test_producer.py               # 180 lines
-│   ├── test_consumer.py               # 220 lines
-│   ├── test_generator.py              # 200 lines
-│   ├── test_worker.py                 # 350 lines
-│   └── test_retrain_monitor.py        # 200 lines
+│   ├── _test_worker_fixtures.py       # ~200 lines (shared fixtures: REQUIRED_METRICS, make_*, factories)
+│   ├── test_schemas.py                # ~160 lines (encode/decode, TypeGuards, make_* functions)
+│   ├── test_hooks.py                  # ~200 lines (Real/Fake Kafka implementations, hook switching)
+│   ├── test_producer.py               # ~50 lines (StreamingProducer with FakeKafkaProducer)
+│   ├── test_consumer.py               # ~100 lines (StreamingConsumer with FakeKafkaConsumer)
+│   ├── test_worker_helpers.py         # ~200 lines (helper function tests: buffer key, status, etc.)
+│   ├── test_worker_fakes.py           # ~250 lines (FakeDealRepository, FakePredictor, etc.)
+│   ├── test_worker_core.py            # ~500 lines (StreamingWorker init, buffer, processing, run, edge cases)
+│   ├── test_generator.py              # (Phase 6) synthetic measurement generator tests
+│   └── test_retrain_monitor.py        # (Phase 6) drift detection tests
 │
 ├── integrations/
 │   ├── datadog/
@@ -505,7 +518,7 @@ services/covenant-radar-api/tests/
 # Existing dependencies...
 
 # Confluent Cloud (Kafka)
-confluent-kafka = "^2.6"
+confluent-kafka = "^2.12"
 
 # Datadog
 ddtrace = "^2.14"
@@ -581,20 +594,66 @@ class CovenantRadarAppConfig(TypedDict, total=False):
 4. Add tests ✅ (100% coverage)
 5. Run `make check` ✅
 
-### Phase 3: Kafka Infrastructure (2-3 days)
-1. Implement `streaming/config.py`
-2. Implement `streaming/schemas.py` (Kafka events)
-3. Implement `streaming/producer.py`
-4. Implement `streaming/consumer.py`
-5. Add tests with fake producer/consumer
-6. Run `make check`
+### Phase 3: Kafka Infrastructure ✅ COMPLETE
+1. Implement `streaming/config.py` ✅
+   - ConfluentConfig, ConsumerConfig, ProducerConfig, KafkaTopicsConfig, StreamingConfig TypedDicts
+   - ConfluentSchemaRegistryConfig for optional schema registry
+   - load_streaming_config() with environment variable parsing
+   - Parsing functions for Literal types (_parse_auto_offset_reset, _parse_acks, _parse_compression_type)
+2. Implement `streaming/schemas.py` (Kafka events) ✅
+   - MeasurementEventV1, PredictionEventV1, AlertEventV1 TypedDicts with Literal type discriminators
+   - make_* factory functions for event creation
+   - encode_* functions for JSON serialization
+   - decode_* functions with require_* validation (from platform_core.json_utils)
+   - TypeGuard functions (is_measurement_event, is_prediction_event, is_alert_event)
+   - RiskTier and classify_risk_tier() imported from covenant_domain.features (single source of truth)
+3. Implement `streaming/_test_hooks.py` ✅
+   - Protocol definitions: KafkaProducerProtocol, KafkaConsumerProtocol, ConsumedMessageProtocol
+   - Raw Protocol definitions: RawKafkaProducerProtocol, RawKafkaConsumerProtocol, RawKafkaMessageProtocol
+   - RealKafkaProducer, RealKafkaConsumer, RealConsumedMessage (real implementations via confluent-kafka)
+   - FakeKafkaProducer, FakeKafkaConsumer, FakeConsumedMessage (test fakes)
+   - use_fake_kafka(), use_real_kafka() hook switching functions
+   - Dynamic import pattern with _get_confluent_kafka() helper to avoid mypy untyped module errors
+4. Implement `streaming/producer.py` ✅
+   - StreamingProducer class wrapping KafkaProducerProtocol
+   - produce_prediction(), produce_alert(), produce_event() methods
+   - create_streaming_producer(), create_producer_from_parts() factory functions
+5. Implement `streaming/consumer.py` ✅
+   - StreamingConsumer class wrapping KafkaConsumerProtocol
+   - ConsumedMeasurement TypedDict with event data and metadata (topic, partition, offset, key)
+   - subscribe(), poll(), poll_batch(), commit(), close() methods
+   - create_streaming_consumer(), create_consumer_from_parts() factory functions
+6. Add `streaming/__init__.py` with exports ✅
+7. Add tests with fake producer/consumer ✅
+   - tests/streaming/test_config.py (config parsing, defaults, custom values)
+   - tests/streaming/test_schemas.py (encode/decode, TypeGuards, make_* functions)
+   - tests/streaming/test_hooks.py (fake implementations, real implementations, hook switching)
+   - tests/streaming/test_producer.py (StreamingProducer with FakeKafkaProducer)
+   - tests/streaming/test_consumer.py (StreamingConsumer with FakeKafkaConsumer)
+8. Run `make check` ✅ (100% statement and branch coverage)
 
-### Phase 4: Stream Worker (2-3 days)
-1. Implement `streaming/worker.py`
-2. Wire existing evaluation + prediction code
-3. Implement metric emission (internal + Datadog)
-4. Add tests
-5. Run `make check`
+### Phase 4: Stream Worker ✅ COMPLETE
+1. Implement `streaming/worker.py` ✅
+   - StreamingWorker class with consume-evaluate-predict-produce loop
+   - WorkerConfig TypedDict for configuration
+   - Buffer management for aggregating measurements by period
+   - Integration with existing evaluation + ML prediction code
+   - Helper functions: _make_buffer_key, _determine_evaluation_status, _count_breaches, etc.
+2. Wire existing evaluation + prediction code ✅
+   - Uses covenant_domain.rules.evaluate_all_covenants_for_period
+   - Uses covenant_domain.features.extract_features
+   - PredictorProtocol for ML model (XGBoost/MLP/LSTM compatible)
+3. Implement metric emission (internal + Datadog) ✅
+   - MetricsClient integration for latency histograms and gauges
+   - Risk probability tracking
+4. Add modularized test infrastructure ✅
+   - `streaming/_test_hooks_repositories.py` - Fake repository implementations
+   - `streaming/_test_hooks_model.py` - FakePredictor and FakeMetricsSink
+   - `tests/streaming/_test_worker_fixtures.py` - Shared test fixtures and factories
+   - `tests/streaming/test_worker_helpers.py` - Helper function tests
+   - `tests/streaming/test_worker_fakes.py` - Fake implementation tests
+   - `tests/streaming/test_worker_core.py` - Core StreamingWorker tests
+5. Run `make check` ✅ (100% statement and branch coverage, 1639 tests passing)
 
 ### Phase 5: Gemini Integration (1 day)
 1. Implement `integrations/google_ai/client.py`
