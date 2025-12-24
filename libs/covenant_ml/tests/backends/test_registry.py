@@ -40,7 +40,7 @@ def test_registry_get_returns_backend_instance() -> None:
 def test_backend_registration_factory_returns_callable() -> None:
     """BackendRegistration.factory() returns the factory callable."""
     from covenant_ml.backends.registry import BackendRegistration
-    from covenant_ml.backends.xgboost_backend import create_xgboost_backend
+    from covenant_ml.backends.xgboost import create_xgboost_backend
 
     registration = BackendRegistration(create_xgboost_backend)
     factory = registration.factory()
@@ -52,7 +52,7 @@ def test_backend_registration_factory_returns_callable() -> None:
 def test_capabilities_caching() -> None:
     """Capabilities are cached after first access."""
     from covenant_ml.backends.registry import BackendRegistration
-    from covenant_ml.backends.xgboost_backend import create_xgboost_backend
+    from covenant_ml.backends.xgboost import create_xgboost_backend
 
     registration = BackendRegistration(create_xgboost_backend)
     # First access populates cache
