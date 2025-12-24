@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https: http://localhost:*; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
+  <title>Grandma Translator</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/ts-ebml@3.0.2/dist/EBML.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <section id="login-section" class="card">
+      <h1>Grandma Translator</h1>
+      <p class="subtitle">Vietnamese to English audio translation</p>
+      <form id="login-form" novalidate>
+        <input
+          type="password"
+          id="token-input"
+          placeholder="Enter password"
+          autocomplete="off"
+          required
+        >
+        <button type="submit" class="btn btn--primary">Enter</button>
+      </form>
+      <div id="login-error" class="error hidden"></div>
+    </section>
+
+    <!-- Main App (hidden until authenticated) -->
+    <section id="main-section" class="hidden">
+      <header class="header">
+        <h1>Grandma Translator</h1>
+        <button id="logout-btn" class="btn btn--ghost">Sign out</button>
+      </header>
+
+      <div class="recorder">
+        <button id="record-btn" class="btn btn--record" aria-label="Record audio">
+          <span id="record-icon">🎤</span>
+        </button>
+        <div id="status" class="status">Tap to record</div>
+        <div id="recording-feedback" class="recording-feedback hidden">
+          <div id="timer" class="timer">0:00</div>
+          <div class="audio-level-container">
+            <div id="audio-level" class="audio-level"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="transcript-container">
+        <h2>Translations</h2>
+        <div id="transcript" class="transcript">Translations will appear here...</div>
+        <button id="clear-btn" class="btn btn--secondary">Clear</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
