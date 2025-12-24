@@ -133,7 +133,10 @@ def _run_generation(
     manifest_text = manifest_path.read_text(encoding="utf-8")
     manifest = load_manifest_from_text(manifest_text)
 
-    tok_handle = load_tokenizer_for_training(settings, manifest["tokenizer_id"])
+    tokenizer_id = manifest["tokenizer_id"]
+    tok_handle = (
+        load_tokenizer_for_training(settings, tokenizer_id) if tokenizer_id is not None else None
+    )
     container = ServiceContainer.from_settings(settings)
     backend = container.model_registry.get(as_model_family(manifest["model_family"]))
 

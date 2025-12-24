@@ -72,7 +72,12 @@ def process_generate_job(payload: GenerateJobPayload) -> None:
         manifest_text = manifest_path.read_text(encoding="utf-8")
         manifest = load_manifest_from_text(manifest_text)
 
-        tok_handle = _test_hooks.load_tokenizer_for_training(settings, manifest["tokenizer_id"])
+        tokenizer_id = manifest["tokenizer_id"]
+        tok_handle = (
+            _test_hooks.load_tokenizer_for_training(settings, tokenizer_id)
+            if tokenizer_id is not None
+            else None
+        )
         container = _test_hooks.service_container_from_settings(settings)
         backend = container.model_registry.get(as_model_family(manifest["model_family"]))
 
