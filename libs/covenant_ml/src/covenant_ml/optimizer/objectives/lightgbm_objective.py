@@ -163,6 +163,7 @@ class LightGBMObjective:
         device: DeviceRequest,
         feature_preset: FeaturePreset,
         early_stopping_rounds: int = 10,
+        n_jobs: int = -1,
     ) -> None:
         """Initialize with data and configuration.
 
@@ -173,6 +174,7 @@ class LightGBMObjective:
             device: Device to use for training (cpu/cuda/auto).
             feature_preset: Feature engineering preset to apply.
             early_stopping_rounds: Stop if no improvement for this many rounds.
+            n_jobs: Number of parallel threads for LightGBM (-1 for all cores).
         """
         # Apply feature engineering BEFORE splitting
         if feature_preset != "none":
@@ -200,6 +202,7 @@ class LightGBMObjective:
         # Store actual feature count (after engineering)
         self._n_features = int(x_engineered.shape[1])
         self._early_stopping_rounds = early_stopping_rounds
+        self._n_jobs = n_jobs
 
         # Pre-split and preprocess data once
         raw_splits = stratified_split(
@@ -309,7 +312,7 @@ class LightGBMObjective:
             "device": self._device,
             "seed": random_state,
             "verbose": -1,
-            "n_jobs": -1,
+            "n_jobs": self._n_jobs,
         }
 
         # Add DART-specific params when using DART boosting
@@ -366,6 +369,7 @@ def create_lightgbm_objective(
     device: DeviceRequest,
     feature_preset: FeaturePreset,
     early_stopping_rounds: int = 10,
+    n_jobs: int = -1,
 ) -> LightGBMObjective:
     """Create an objective function for LightGBM optimization.
 
@@ -380,6 +384,7 @@ def create_lightgbm_objective(
         device: Device to use for training (cpu/cuda/auto).
         feature_preset: Feature engineering preset to apply.
         early_stopping_rounds: Stop if no improvement for this many rounds.
+        n_jobs: Number of parallel threads for LightGBM (-1 for all cores).
 
     Returns:
         Objective callable with n_features property for engineered feature count.
@@ -391,6 +396,7 @@ def create_lightgbm_objective(
         device,
         feature_preset,
         early_stopping_rounds,
+        n_jobs,
     )
 
 
