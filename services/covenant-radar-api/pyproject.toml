@@ -31,6 +31,9 @@ rich = "^14.2"
 ddtrace = {version = "^4.1", python = "^3.11,<3.15"}
 datadog = "^0.52"
 
+# Kafka streaming
+confluent-kafka = "^2.12"
+
 # Monorepo libs
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
@@ -112,6 +115,8 @@ branch = true
 precision = 2
 show_missing = true
 fail_under = 100
+# Exclude branches that exit via external thread signaling (not testable single-threaded)
+partial_branches = ["while self._running:"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
