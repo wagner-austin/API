@@ -16,8 +16,10 @@ from ..services.registries import BackendRegistration, ModelRegistry, TokenizerR
 from .model.backend_factory import (
     CHAR_LSTM_CAPABILITIES,
     GPT2_CAPABILITIES,
+    HF_LM_CAPABILITIES,
     create_char_lstm_backend,
     create_gpt2_backend,
+    create_hf_lm_backend,
 )
 from .model.unavailable_backend import UNAVAILABLE_CAPABILITIES, UnavailableBackend
 from .queue.rq_adapter import RQEnqueuer, RQSettings
@@ -92,6 +94,14 @@ class ServiceContainer:
 
 
 def _create_model_registry(dataset_builder: DatasetBuilder) -> ModelRegistry:
+    """Create model registry with all available backends.
+
+    Args:
+        dataset_builder: Dataset builder for evaluation operations.
+
+    Returns:
+        ModelRegistry with registered backends.
+    """
     registrations: dict[str, BackendRegistration] = {
         "gpt2": BackendRegistration(
             factory=create_gpt2_backend,
@@ -100,6 +110,10 @@ def _create_model_registry(dataset_builder: DatasetBuilder) -> ModelRegistry:
         "char_lstm": BackendRegistration(
             factory=create_char_lstm_backend,
             capabilities=CHAR_LSTM_CAPABILITIES,
+        ),
+        "hf_lm": BackendRegistration(
+            factory=create_hf_lm_backend,
+            capabilities=HF_LM_CAPABILITIES,
         ),
         "llama": BackendRegistration(
             factory=lambda _: UnavailableBackend("llama"),
