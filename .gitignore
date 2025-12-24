@@ -118,3 +118,7 @@ nul
 
 # Node (if any JS tooling)
 node_modules/
+
+# Web frontend build output
+services/grandma-api/web/assets/js/
+services/grandma-api/web/coverage/

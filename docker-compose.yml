@@ -22,6 +22,7 @@
 #   - 8005:  Model-Trainer
 #   - 8006:  music-wrapped-api
 #   - 8007:  covenant-radar-api
+#   - 8008:  grandma-api
 # =============================================================================
 
 services:
