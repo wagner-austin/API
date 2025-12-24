@@ -101,6 +101,11 @@ class TrainingOrchestrator:
             "early_stopping_patience": req["early_stopping_patience"],
             "test_split_ratio": req["test_split_ratio"],
             "finetune_lr_cap": req["finetune_lr_cap"],
+            "hub_model_id": req["hub_model_id"],
+            "finetuning_strategy": req["finetuning_strategy"],
+            "lora": req["lora"],
+            "quantization": req["quantization"],
+            "unsloth": req["unsloth"],
         }
         payload: TrainJobPayload = {
             "run_id": run_id,
