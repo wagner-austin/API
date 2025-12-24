@@ -69,10 +69,11 @@ def evaluate_gpt2(
     Raises:
         FileNotFoundError: If model or tokenizer files do not exist.
     """
+    tokenizer_id = cfg["tokenizer_id"]
+    if tokenizer_id is None:
+        raise ValueError("tokenizer_id is required for gpt2 backend")
     artifacts_root = settings["app"]["artifacts_root"]
-    tokenizer_path = str(
-        Path(artifacts_root) / "tokenizers" / cfg["tokenizer_id"] / "tokenizer.json"
-    )
+    tokenizer_path = str(Path(artifacts_root) / "tokenizers" / tokenizer_id / "tokenizer.json")
     tokenizer = load_tokenizer_for_dataset(tokenizer_path)
     eos_id, pad_id, _ = token_ids(tokenizer)
 

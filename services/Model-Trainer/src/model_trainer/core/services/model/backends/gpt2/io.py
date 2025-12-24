@@ -50,8 +50,23 @@ def get_model_max_seq_len(model: LMModelProto) -> int:
 
 
 def load_prepared_gpt2_from_handle(
-    artifact_path: str, tokenizer: TokenizerHandle
+    artifact_path: str, tokenizer: TokenizerHandle | None
 ) -> PreparedLMModel:
+    """Load a GPT-2 model from saved artifact.
+
+    Args:
+        artifact_path: Path to saved model directory.
+        tokenizer: TokenizerHandle for encoding. Required for GPT-2.
+
+    Returns:
+        PreparedLMModel ready for inference or continued training.
+
+    Raises:
+        ValueError: If tokenizer is None.
+    """
+    if tokenizer is None:
+        raise ValueError("tokenizer is required for gpt2 backend")
+
     from model_trainer.core import _test_hooks
 
     eos_id, pad_id, _ = token_ids(tokenizer)
