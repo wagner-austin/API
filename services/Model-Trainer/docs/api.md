@@ -69,14 +69,14 @@ Enqueue a model training job.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `model_family` | string | No | `"gpt2"` | Model architecture (`gpt2`, `llama`, `qwen`, `char_lstm`) |
+| `model_family` | string | No | `"gpt2"` | Model architecture (`gpt2`, `char_lstm`, `hf_lm`). Use `hf_lm` for HuggingFace models (LLaMA, Qwen, etc.) |
 | `model_size` | string | No | `"small"` | Model size variant |
 | `max_seq_len` | int | No | `512` | Maximum sequence length (>= 8) |
 | `num_epochs` | int | No | `1` | Number of training epochs (>= 1) |
 | `batch_size` | int | No | `4` | Training batch size (>= 1); see device defaults below |
 | `learning_rate` | float | No | `0.0005` | Learning rate (>= 0.0) |
 | `corpus_file_id` | string | Yes | - | File ID in data-bank for training corpus |
-| `tokenizer_id` | string | No | `""` | Tokenizer ID to use |
+| `tokenizer_id` | string\|null | Conditional | `null` | Tokenizer ID (required for non-`hf_lm` models; optional for `hf_lm` which uses HF tokenizer) |
 | `user_id` | int | No | `0` | User ID for event attribution |
 | `device` | string | No | `"auto"` | `"cpu"`, `"cuda"`, or `"auto"` (resolves to CUDA when available) |
 | `precision` | string | No | `"auto"` | `"fp32"`, `"fp16"`, `"bf16"`, or `"auto"` (resolves based on device) |
@@ -91,6 +91,39 @@ Enqueue a model training job.
 | `early_stopping_patience` | int | No | `5` | Epochs without improvement before stopping |
 | `test_split_ratio` | float | No | `0.15` | Fraction of data held out for testing (0.0-0.5) |
 | `finetune_lr_cap` | float | No | `0.00005` | Maximum learning rate for fine-tuning |
+| `hub_model_id` | string\|null | No | `null` | HuggingFace model ID (required for `hf_lm` family) |
+| `finetuning_strategy` | string | No | `"full"` | Fine-tuning strategy (`full`, `lora`, `qlora`, `unsloth`) |
+| `lora` | object\|null | No | `null` | LoRA configuration (required for `lora`/`qlora`/`unsloth` strategies, see below) |
+| `quantization` | object\|null | No | `null` | Quantization configuration (required for `qlora` strategy, see below) |
+| `unsloth` | object\|null | No | `null` | Unsloth configuration (required for `unsloth` strategy, see below) |
+
+**LoRA Configuration (`lora` field):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `true` | Enable LoRA |
+| `r` | int | `16` | LoRA rank (4-128) |
+| `lora_alpha` | int | `16` | Scaling factor (1-256) |
+| `lora_dropout` | float | `0.1` | Dropout probability (0.0-0.5) |
+| `target_modules` | string[] | `["q_proj", "k_proj", "v_proj", "o_proj"]` | Modules to apply LoRA |
+| `bias` | string | `"none"` | Bias handling (`none`, `all`, `lora_only`) |
+
+**Quantization Configuration (`quantization` field):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `load_in_4bit` | bool | `true` | Load model in 4-bit precision |
+| `load_in_8bit` | bool | `false` | Load model in 8-bit precision |
+| `bnb_4bit_compute_dtype` | string | `"float16"` | Compute dtype (`float16`, `bfloat16`, `float32`) |
+| `bnb_4bit_quant_type` | string | `"nf4"` | Quantization type (`nf4`, `fp4`) |
+
+**Unsloth Configuration (`unsloth` field):**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | bool | `true` | Enable Unsloth optimization |
+| `max_seq_length` | int | `2048` | Maximum sequence length (128-8192) |
+| `dtype` | string\|null | `null` | Data type (`float16`, `bfloat16`, or `null` for auto) |
 
 **Request Example:**
 ```json
