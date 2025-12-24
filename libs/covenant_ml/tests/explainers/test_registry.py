@@ -77,7 +77,7 @@ def _create_tree_predictor() -> XGBModelProtocol:
     from pathlib import Path
 
     from covenant_ml.backends.protocol import ClassifierBackend
-    from covenant_ml.backends.xgboost_backend import create_xgboost_backend
+    from covenant_ml.backends.xgboost import create_xgboost_backend
     from covenant_ml.predictor import load_model
     from covenant_ml.types import TrainConfig
 
