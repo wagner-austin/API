@@ -68,29 +68,34 @@ def test_emit_metrics_helpers_publish() -> None:
     # Use a FakeRedis to exercise publish path without failures
     r = FakeRedis()
     run_id = "r-1"
-    cfg = ModelTrainConfig(
-        model_family="gpt2",
-        model_size="small",
-        max_seq_len=16,
-        num_epochs=1,
-        batch_size=1,
-        learning_rate=5e-4,
-        tokenizer_id="tok",
-        corpus_path="/dev/null",
-        holdout_fraction=0.01,
-        seed=42,
-        pretrained_run_id=None,
-        freeze_embed=False,
-        gradient_clipping=1.0,
-        optimizer="adamw",
-        device="cpu",
-        data_num_workers=0,
-        data_pin_memory=False,
-        early_stopping_patience=5,
-        test_split_ratio=0.15,
-        finetune_lr_cap=5e-5,
-        precision="fp32",
-    )
+    cfg: ModelTrainConfig = {
+        "model_family": "gpt2",
+        "model_size": "small",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 5e-4,
+        "tokenizer_id": "tok",
+        "corpus_path": "/dev/null",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 5,
+        "test_split_ratio": 0.15,
+        "finetune_lr_cap": 5e-5,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
     # Does not raise - metrics events (no failed event - handled by job_events)
     job_utils.emit_config_event(r, run_id, 123, cfg, threads=2)
     job_utils.emit_progress_metrics(
@@ -141,6 +146,11 @@ def test_process_train_job_sets_status_message_on_exception(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     }
     corpus_root = tmp_path / "corpus"

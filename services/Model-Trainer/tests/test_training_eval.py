@@ -131,6 +131,11 @@ def test_training_and_eval_tiny(
         "test_split_ratio": 0.15,
         "finetune_lr_cap": 5e-5,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
     def _hb(_: float) -> None:

@@ -21,6 +21,7 @@ from model_trainer.core.contracts.model import (
     EvalOutcome,
     GenerateConfig,
     GenerateOutcome,
+    LoraConfig,
     ModelArtifact,
     ModelBackend,
     ModelTrainConfig,
@@ -133,7 +134,7 @@ class _FakeEncoder:
         return 256
 
 
-def _make_fake_prepared(tokenizer_id: str) -> PreparedLMModel:
+def _make_fake_prepared(tokenizer_id: str | None) -> PreparedLMModel:
     """Create a fake PreparedLMModel for testing."""
     return PreparedLMModel(
         model=_FakeLMModel(),
@@ -187,7 +188,7 @@ class _BackendWithLoad(ModelBackend):
         cfg: ModelTrainConfig,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         self.prepare_called = True
         raise NotImplementedError
@@ -197,7 +198,7 @@ class _BackendWithLoad(ModelBackend):
         artifact_path: str,
         settings: Settings,
         *,
-        tokenizer: TokenizerHandle,
+        tokenizer: TokenizerHandle | None,
     ) -> PreparedLMModel:
         self.load_called = True
         self.loaded_from = artifact_path
@@ -479,6 +480,11 @@ def test_training_worker_loads_pretrained_model(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     }
 
@@ -500,3 +506,216 @@ def test_training_worker_loads_pretrained_model(
     status = TrainerJobStore(fake).load("run-finetune")
     assert status is not None and status["status"] == "completed"
     fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
+
+
+# ============================================================================
+# Test for hf_lm with tokenizer_id=None (covers train_job.py:293)
+# ============================================================================
+
+
+class _HfLmBackend(ModelBackend):
+    """Fake hf_lm backend for testing tokenizer_id=None path."""
+
+    def __init__(self: _HfLmBackend, train_losses: list[float]) -> None:
+        self._train_losses = train_losses
+        self.prepare_called = False
+        self.prepare_tokenizer_was_none = False
+
+    def name(self: _HfLmBackend) -> str:
+        return "hf_lm"
+
+    def capabilities(self: _HfLmBackend) -> BackendCapabilities:
+        return UNAVAILABLE_CAPABILITIES
+
+    def prepare(
+        self: _HfLmBackend,
+        cfg: ModelTrainConfig,
+        settings: Settings,
+        *,
+        tokenizer: TokenizerHandle | None,
+    ) -> PreparedLMModel:
+        self.prepare_called = True
+        self.prepare_tokenizer_was_none = tokenizer is None
+        return _make_fake_prepared(None)  # tokenizer_id is None for hf_lm
+
+    def load(
+        self: _HfLmBackend,
+        artifact_path: str,
+        settings: Settings,
+        *,
+        tokenizer: TokenizerHandle | None,
+    ) -> PreparedLMModel:
+        raise NotImplementedError
+
+    def save(self: _HfLmBackend, prepared: PreparedLMModel, out_dir: str) -> ModelArtifact:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        (Path(out_dir) / "weights.bin").write_bytes(b"\x00hflm")
+        return ModelArtifact(out_dir=out_dir)
+
+    def train(
+        self: _HfLmBackend,
+        cfg: ModelTrainConfig,
+        settings: Settings,
+        *,
+        run_id: str,
+        heartbeat: Callable[[float], None],
+        cancelled: Callable[[], bool],
+        prepared: PreparedLMModel,
+        progress: (
+            Callable[[int, int, float, float, float, float, float | None, float | None], None]
+            | None
+        ) = None,
+        wandb_publisher: WandbPublisher | None = None,
+    ) -> TrainOutcome:
+        losses = [2.0, 1.5, 1.0, 0.5]
+        for step, loss_val in enumerate(losses):
+            self._train_losses.append(loss_val)
+            if progress:
+                progress(step, 0, loss_val, 7.4, 0.3, 10.0, None, None)
+        return TrainOutcome(
+            cancelled=False,
+            loss=0.5,
+            perplexity=1.2,
+            steps=4,
+            out_dir="",
+            test_loss=None,
+            test_perplexity=None,
+            best_val_loss=None,
+            early_stopped=False,
+        )
+
+    def evaluate(
+        self: _HfLmBackend, *, run_id: str, cfg: ModelTrainConfig, settings: Settings
+    ) -> EvalOutcome:
+        raise NotImplementedError
+
+    def score(
+        self: _HfLmBackend, *, prepared: PreparedLMModel, cfg: ScoreConfig, settings: Settings
+    ) -> ScoreOutcome:
+        raise NotImplementedError
+
+    def generate(
+        self: _HfLmBackend,
+        *,
+        prepared: PreparedLMModel,
+        cfg: GenerateConfig,
+        settings: Settings,
+    ) -> GenerateOutcome:
+        raise NotImplementedError
+
+
+def _create_hf_lm_service_container_factory(
+    fake_redis: FakeRedis,
+    backend_instance_holder: list[_HfLmBackend | None],
+    train_losses: list[float],
+) -> _test_hooks.ServiceContainerFactoryProto:
+    """Create a service container factory for hf_lm testing."""
+
+    def _from_settings(settings: Settings) -> ServiceContainerProto:
+        backend = _HfLmBackend(train_losses)
+        backend_instance_holder.append(backend)
+
+        model_registry = ModelRegistry(
+            registrations={
+                "hf_lm": BackendRegistration(
+                    factory=lambda _: backend, capabilities=UNAVAILABLE_CAPABILITIES
+                )
+            },
+            dataset_builder=LocalTextDatasetBuilder(),
+        )
+        return _FakeServiceContainer(settings, fake_redis, model_registry)
+
+    return _from_settings
+
+
+def test_training_worker_hf_lm_with_tokenizer_id_none(
+    tmp_path: Path, settings_factory: _SettingsFactory
+) -> None:
+    """Cover train_job.py line 293 - tokenizer_id=None branch for hf_lm models."""
+    backend_instance_holder: list[_HfLmBackend | None] = []
+    train_losses: list[float] = []
+
+    artifacts = tmp_path / "artifacts"
+    settings = settings_factory(
+        artifacts_root=str(artifacts),
+        runs_root=str(tmp_path / "runs"),
+        logs_root=str(tmp_path / "logs"),
+        data_root=str(tmp_path / "data"),
+        data_bank_api_url="http://data-bank-api.local",
+        data_bank_api_key="secret-key",
+    )
+
+    _test_hooks.load_settings = lambda: settings
+
+    # Create corpus (no tokenizer needed for hf_lm)
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "a.txt").write_text("hello world\nhf_lm training data\n", encoding="utf-8")
+
+    fake = FakeRedis()
+    _test_hooks.kv_store_factory = lambda url: fake
+
+    _test_hooks.service_container_from_settings = _create_hf_lm_service_container_factory(
+        fake, backend_instance_holder, train_losses
+    )
+    _test_hooks.corpus_fetcher_factory = _create_corpus_fetcher_factory(corpus)
+    _test_hooks.artifact_store_factory = _create_artifact_store_factory()
+
+    # Build payload with tokenizer_id=None (hf_lm uses HF tokenizer from hub_model_id)
+    payload: TrainJobPayload = {
+        "run_id": "run-hflm-no-tok",
+        "user_id": 1,
+        "request": {
+            "model_family": "hf_lm",
+            "model_size": "small",
+            "max_seq_len": 128,
+            "num_epochs": 1,
+            "batch_size": 2,
+            "learning_rate": 5e-5,
+            "tokenizer_id": None,  # None for hf_lm - uses HF tokenizer from hub_model_id
+            "corpus_file_id": "deadbeef",
+            "holdout_fraction": 0.1,
+            "seed": 42,
+            "pretrained_run_id": None,
+            "freeze_embed": False,
+            "gradient_clipping": 1.0,
+            "optimizer": "adamw",
+            "device": "cpu",
+            "data_num_workers": None,
+            "data_pin_memory": None,
+            "early_stopping_patience": 5,
+            "test_split_ratio": 0.15,
+            "finetune_lr_cap": 5e-5,
+            "precision": "fp32",
+            "hub_model_id": "nghuyong/ernie-2.0-base-en",
+            "finetuning_strategy": "lora",
+            "lora": LoraConfig(
+                enabled=True,
+                r=8,
+                lora_alpha=16,
+                lora_dropout=0.1,
+                target_modules=("query", "value"),
+                bias="none",
+            ),
+            "quantization": None,
+            "unsloth": None,
+        },
+    }
+
+    train_job.process_train_job(payload)
+
+    # Verify backend.prepare() was called with tokenizer=None
+    assert len(backend_instance_holder) == 1
+    backend_instance = backend_instance_holder[0]
+    assert backend_instance is not None and backend_instance.prepare_called is True
+    assert backend_instance.prepare_tokenizer_was_none is True
+
+    # Verify loss decreases during training
+    assert len(train_losses) >= 2, "Should have at least 2 loss values"
+    loss_before = train_losses[0]
+    loss_after = train_losses[-1]
+    assert loss_after < loss_before, f"Loss should decrease: {loss_before} -> {loss_after}"
+
+    # Verify status is completed
+    status = TrainerJobStore(fake).load("run-hflm-no-tok")
+    assert status is not None and status["status"] == "completed"

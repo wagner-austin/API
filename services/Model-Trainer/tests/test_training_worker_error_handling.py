@@ -95,6 +95,11 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     }
     corpus_root = tmp_path / "corpus"
@@ -180,6 +185,11 @@ def test_process_train_job_logs_redis_error_on_handle_error(
             "test_split_ratio": 0.15,
             "finetune_lr_cap": 5e-5,
             "precision": "auto",
+            "hub_model_id": None,
+            "finetuning_strategy": "full",
+            "lora": None,
+            "quantization": None,
+            "unsloth": None,
         },
     }
     corpus_root = tmp_path / "corpus"
