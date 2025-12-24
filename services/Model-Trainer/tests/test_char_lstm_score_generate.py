@@ -103,6 +103,11 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings["app"]["artifacts_root"]) / "tokenizers" / tok_id

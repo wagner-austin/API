@@ -77,6 +77,11 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
 
@@ -165,6 +170,11 @@ def test_char_lstm_invalid_size_raises(settings_with_paths: Settings, tmp_path: 
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -204,6 +214,11 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -316,6 +331,11 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -394,6 +414,11 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -486,6 +511,11 @@ def test_char_lstm_forward_pass_shapes(settings_with_paths: Settings, tmp_path: 
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -535,6 +565,11 @@ def test_char_lstm_gradient_flow(settings_with_paths: Settings, tmp_path: Path) 
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -598,6 +633,11 @@ def test_char_lstm_long_input_truncation(settings_with_paths: Settings, tmp_path
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -651,6 +691,11 @@ def test_char_lstm_generation_determinism(settings_with_paths: Settings, tmp_pat
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -753,6 +798,11 @@ def test_char_lstm_continued_training_reduces_loss(
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -815,6 +865,11 @@ def test_char_lstm_continued_training_reduces_loss(
         "test_split_ratio": 0.0,
         "finetune_lr_cap": 0.0,
         "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
     }
 
     continued_losses: list[float] = []
@@ -891,3 +946,147 @@ def test_char_tokenizer_roundtrip(settings_with_paths: Settings, tmp_path: Path)
 
         # Verify roundtrip
         assert decoded == text, f"Roundtrip failed: '{text}' -> {token_ids} -> '{decoded}'"
+
+
+class _FakeTokHandle:
+    """Fake tokenizer handle for testing tokenizer_id None case."""
+
+    def encode(self: _FakeTokHandle, text: str) -> list[int]:
+        return [ord(c) for c in text]
+
+    def decode(self: _FakeTokHandle, ids: list[int]) -> str:
+        return "".join(chr(i) for i in ids)
+
+    def token_to_id(self: _FakeTokHandle, token: str) -> int | None:
+        if token == "[EOS]":
+            return 0
+        if token == "[PAD]":
+            return 1
+        return None
+
+    def get_vocab_size(self: _FakeTokHandle) -> int:
+        return 256
+
+
+def test_char_lstm_prepare_raises_when_tokenizer_none(settings_with_paths: Settings) -> None:
+    """Cover char_lstm/prepare.py tokenizer None error branch."""
+    from model_trainer.core.services.model.backends.char_lstm import prepare_char_lstm_with_handle
+
+    cfg: ModelTrainConfig = {
+        "model_family": "char_lstm",
+        "model_size": "tiny",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 1e-3,
+        "tokenizer_id": "some_tok",
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 0,
+        "test_split_ratio": 0.0,
+        "finetune_lr_cap": 0.0,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer is required for char_lstm backend"):
+        prepare_char_lstm_with_handle(None, cfg)
+
+
+def test_char_lstm_prepare_raises_when_tokenizer_id_none(settings_with_paths: Settings) -> None:
+    """Cover char_lstm/prepare.py tokenizer_id None error branch."""
+    from model_trainer.core.services.model.backends.char_lstm import prepare_char_lstm_with_handle
+
+    cfg: ModelTrainConfig = {
+        "model_family": "char_lstm",
+        "model_size": "tiny",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 1e-3,
+        "tokenizer_id": None,  # tokenizer_id is None, but tokenizer handle is provided
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 0,
+        "test_split_ratio": 0.0,
+        "finetune_lr_cap": 0.0,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer_id is required for char_lstm backend"):
+        prepare_char_lstm_with_handle(_FakeTokHandle(), cfg)
+
+
+def test_char_lstm_io_load_raises_when_tokenizer_none(settings_with_paths: Settings) -> None:
+    """Cover char_lstm/io.py tokenizer None error branch."""
+    from model_trainer.core.services.model.backends.char_lstm.io import (
+        load_prepared_char_lstm_from_handle,
+    )
+
+    with pytest.raises(ValueError, match="tokenizer is required for char_lstm backend"):
+        load_prepared_char_lstm_from_handle("/some/path", None)
+
+
+def test_char_lstm_evaluate_raises_when_tokenizer_id_none(settings_with_paths: Settings) -> None:
+    """Cover char_lstm/evaluate.py tokenizer_id None error branch."""
+    from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
+    from model_trainer.core.services.model.backends.char_lstm.evaluate import evaluate_char_lstm
+
+    cfg: ModelTrainConfig = {
+        "model_family": "char_lstm",
+        "model_size": "tiny",
+        "max_seq_len": 16,
+        "num_epochs": 1,
+        "batch_size": 1,
+        "learning_rate": 1e-3,
+        "tokenizer_id": None,  # tokenizer_id is None
+        "corpus_path": "/tmp",
+        "holdout_fraction": 0.01,
+        "seed": 42,
+        "pretrained_run_id": None,
+        "freeze_embed": False,
+        "gradient_clipping": 1.0,
+        "optimizer": "adamw",
+        "device": "cpu",
+        "data_num_workers": 0,
+        "data_pin_memory": False,
+        "early_stopping_patience": 0,
+        "test_split_ratio": 0.0,
+        "finetune_lr_cap": 0.0,
+        "precision": "fp32",
+        "finetuning_strategy": "full",
+        "hub_model_id": None,
+        "lora": None,
+        "quantization": None,
+        "unsloth": None,
+    }
+    with pytest.raises(ValueError, match="tokenizer_id is required for char_lstm backend"):
+        evaluate_char_lstm(
+            run_id="test-run",
+            cfg=cfg,
+            settings=settings_with_paths,
+            dataset_builder=LocalTextDatasetBuilder(),
+        )
