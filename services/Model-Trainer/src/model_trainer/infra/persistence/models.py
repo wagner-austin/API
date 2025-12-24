@@ -28,7 +28,11 @@ class TrainingManifestSystem(TypedDict):
 
 
 class TrainingManifest(TypedDict):
-    """Training manifest with all configuration and results."""
+    """Training manifest with all configuration and results.
+
+    For hf_lm models, tokenizer_id may be None because the HF tokenizer
+    is loaded from hub_model_id.
+    """
 
     run_id: str
     model_family: str
@@ -39,7 +43,7 @@ class TrainingManifest(TypedDict):
     steps: int
     loss: float
     learning_rate: float
-    tokenizer_id: str
+    tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
     holdout_fraction: float
     optimizer: str
@@ -62,7 +66,11 @@ class TrainingManifest(TypedDict):
 
 
 class TrainingManifestConfig(TypedDict):
-    """Configuration section of training manifest."""
+    """Configuration section of training manifest.
+
+    For hf_lm models, tokenizer_id may be None because the HF tokenizer
+    is loaded from hub_model_id.
+    """
 
     model_family: str
     model_size: str
@@ -70,7 +78,7 @@ class TrainingManifestConfig(TypedDict):
     num_epochs: int
     batch_size: int
     learning_rate: float
-    tokenizer_id: str
+    tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
     holdout_fraction: float
     seed: int
@@ -86,7 +94,11 @@ class TrainingManifestConfig(TypedDict):
 
 
 class TrainingManifestFull(TypedDict):
-    """Full training manifest with embedded config block."""
+    """Full training manifest with embedded config block.
+
+    For hf_lm models, tokenizer_id may be None because the HF tokenizer
+    is loaded from hub_model_id.
+    """
 
     run_id: str
     model_family: str
@@ -97,7 +109,7 @@ class TrainingManifestFull(TypedDict):
     steps: int
     loss: float
     learning_rate: float
-    tokenizer_id: str
+    tokenizer_id: str | None  # None for hf_lm (uses HF tokenizer from hub_model_id)
     corpus_path: str
     holdout_fraction: float
     optimizer: str
