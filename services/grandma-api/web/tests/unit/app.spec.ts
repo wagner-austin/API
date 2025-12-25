@@ -1355,10 +1355,12 @@ describe("app", () => {
       delete globalThis.AudioContext;
 
       // This test covers the error handling in raw chunk translation
+      // When a chunk translation fails, the app falls back to translating the full blob on stop
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeResponse({ status: 500, ok: false }), // chunk 2 translation fails
+          createFakeResponse({ text: "Full recording translation" }), // fallback full blob translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1398,15 +1400,17 @@ describe("app", () => {
 
       // Transcript should be unchanged (error path)
       expect(appAny.transcripts[0]).toBe("First");
+      // chunkTranslationFailed should be set
+      expect(appAny.chunkTranslationFailed).toBe(true);
 
       // Status should indicate error
       expect(elements.get("status")?.textContent).toContain("translation error");
 
-      // Stop recording - chunk translations are kept, no final re-translation
+      // Stop recording - since chunk failed, falls back to full blob translation
       await app.handleRecordClick();
 
-      // Previous transcript from successful chunk is kept
-      expect(elements.get("transcript")?.textContent).toBe("First");
+      // Full blob translation replaces the partial transcript
+      expect(elements.get("transcript")?.textContent).toBe("Full recording translation");
 
       globalThis.AudioContext = savedAudioContext;
     });

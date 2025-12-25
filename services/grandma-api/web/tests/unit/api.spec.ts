@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { setHooks, resetHooks } from "../../src/_test_hooks.js";
 import { createFakeHooks, createFakeResponse, createFakeErrorResponse } from "../../src/testing.js";
 import { translateAudio } from "../../src/api.js";
@@ -64,6 +64,25 @@ describe("api", () => {
       );
     });
 
+    it("throws HTTP status when response body is not valid JSON", async () => {
+      // Create a response with text that can't be parsed as JSON
+      const { hooks } = createFakeHooks({
+        fetchResponses: [
+          {
+            ok: false,
+            status: 502,
+            json: () => Promise.reject(new SyntaxError("Unexpected token")),
+          } as Response,
+        ],
+      });
+      setHooks(hooks);
+
+      const blob = new Blob(["audio"], { type: "audio/webm" });
+      await expect(translateAudio("https://api.example.com", "token", blob)).rejects.toThrow(
+        "HTTP 502"
+      );
+    });
+
     it("throws on invalid response structure", async () => {
       const { hooks } = createFakeHooks({
         fetchResponses: [createFakeResponse({ invalid: true })],
@@ -86,6 +105,66 @@ describe("api", () => {
       await expect(translateAudio("https://api.example.com", "token", blob)).rejects.toThrow(
         "Network error"
       );
+    });
+
+    it("throws timeout error when request is aborted", async () => {
+      const abortError = new Error("The operation was aborted");
+      abortError.name = "AbortError";
+      const { hooks } = createFakeHooks({
+        fetchThrow: abortError,
+      });
+      setHooks(hooks);
+
+      const blob = new Blob(["audio"], { type: "audio/webm" });
+      await expect(translateAudio("https://api.example.com", "token", blob)).rejects.toThrow(
+        "Translation request timed out"
+      );
+    });
+
+    it("aborts request after 30 second timeout", async () => {
+      vi.useFakeTimers();
+
+      try {
+        // Create a fetch that never resolves, simulating a slow network
+        let abortSignal: AbortSignal | undefined;
+        const neverResolvingFetch = vi.fn(
+          (_url: string, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              abortSignal = init?.signal;
+              // When abort is called, reject with AbortError
+              if (abortSignal) {
+                abortSignal.addEventListener("abort", () => {
+                  const abortError = new Error("The operation was aborted");
+                  abortError.name = "AbortError";
+                  reject(abortError);
+                });
+              }
+            })
+        );
+        setHooks({ fetch: neverResolvingFetch });
+
+        const blob = new Blob(["audio"], { type: "audio/webm" });
+
+        // Start the translation and capture any error
+        let caughtError: Error | undefined;
+        const translatePromise = translateAudio("https://api.example.com", "token", blob).catch(
+          (err: Error) => {
+            caughtError = err;
+          }
+        );
+
+        // Advance past the 30 second timeout
+        await vi.advanceTimersByTimeAsync(31000);
+
+        // Wait for the promise to settle
+        await translatePromise;
+
+        // The request should have been aborted with our specific error message
+        expect(caughtError?.message).toBe("Translation request timed out");
+        expect(abortSignal?.aborted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

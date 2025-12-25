@@ -11,6 +11,9 @@ import { requireTranslateResponse, decodeErrorResponse } from "./types.js";
 
 const log = createLogger("api");
 
+/** Timeout for translation API requests (30 seconds). */
+const TRANSLATE_TIMEOUT_MS = 30000;
+
 /**
  * Send audio to the translation API.
  *
@@ -44,15 +47,26 @@ export async function translateAudio(
   log.info("Sending translation request to:", url);
   log.info("Audio blob size:", audioBlob.size, "bytes");
 
+  // Use AbortController for timeout on slow networks
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TRANSLATE_TIMEOUT_MS);
+
   let resp: Response;
   try {
     resp = await fetch(url, {
       method: "POST",
       body: formData,
+      signal: controller.signal,
     });
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      log.error("Translation request timed out after", TRANSLATE_TIMEOUT_MS, "ms");
+      throw new Error("Translation request timed out");
+    }
     log.error("Fetch failed:", err);
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   log.info("Response status:", resp.status);

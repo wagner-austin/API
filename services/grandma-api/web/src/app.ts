@@ -145,6 +145,7 @@ export class App {
   private webmHeader: ArrayBuffer | null = null; // WebM header from first chunk
   private stopPromise: Promise<Blob> | null = null;
   private pendingChunkTranslation: Promise<void> | null = null; // Track pending chunk translations
+  private chunkTranslationFailed: boolean = false; // Track if any chunk translation failed
   private timerInterval: number | null = null;
   private recordingStartTime: number | null = null;
   private autoStopTimeout: number | null = null;
@@ -335,16 +336,26 @@ export class App {
       this.stopPromise = null;
 
       // Chunks were already translated in real-time, so we keep those translations.
-      // Only translate if no chunks were processed (short recording < 15s).
-      if (this.currentSessionIndex === -1) {
-        log.info("No chunks translated yet, translating full blob");
+      // Only translate if no chunks were processed (short recording < 15s),
+      // OR if a chunk translation failed (e.g., timeout on slow mobile network).
+      if (this.currentSessionIndex === -1 || this.chunkTranslationFailed) {
+        log.info(
+          this.chunkTranslationFailed
+            ? "Chunk translation failed, falling back to full blob translation"
+            : "No chunks translated yet, translating full blob"
+        );
         const fixedBlob = await fixWebmBlob(blob);
         log.info("Fixed blob:", fixedBlob.size, "bytes");
 
         const text = await translateAudio(config.API_BASE_URL, token, fixedBlob);
         log.info("Translation complete:", text.length, "chars");
 
-        this.transcripts.push(text);
+        if (this.chunkTranslationFailed && this.currentSessionIndex !== -1) {
+          // Replace partial transcript with full translation
+          this.transcripts[this.currentSessionIndex] = text;
+        } else {
+          this.transcripts.push(text);
+        }
         this.updateTranscriptDisplay();
       } else {
         log.info("Keeping chunk translations, skipping final blob translation");
@@ -362,6 +373,7 @@ export class App {
       this.cumulativeChunks = [];
       this.currentSessionIndex = -1;
       this.webmHeader = null;
+      this.chunkTranslationFailed = false;
 
       try {
         const result = await startRecording(this.recorderState, {
@@ -485,6 +497,7 @@ export class App {
       }
     } catch (err) {
       log.error("Chunk translation failed:", err);
+      this.chunkTranslationFailed = true;
       if (this.recorderState.isRecording) {
         elements.status.textContent = "Recording... (translation error, retrying)";
       }
@@ -550,6 +563,7 @@ export class App {
       }
     } catch (err) {
       log.error("Raw chunk translation failed:", err);
+      this.chunkTranslationFailed = true;
       if (this.recorderState.isRecording) {
         elements.status.textContent = "Recording... (translation error, retrying)";
       }
