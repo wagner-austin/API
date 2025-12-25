@@ -147,7 +147,6 @@ class TestParseOptimizeConfig:
         assert result["space_profile"] == "default"
         assert result["random_state"] == 42
         assert result["early_stopping_rounds"] == 10
-        assert result["n_jobs"] == -1  # Default: all cores
 
     def test_parse_config_valid_us_with_all_options(self) -> None:
         """Parse valid config for US dataset with all options."""
@@ -171,22 +170,6 @@ class TestParseOptimizeConfig:
         assert result["space_profile"] == "default"
         assert result["random_state"] == 123
         assert result["early_stopping_rounds"] == 5
-        assert result["n_jobs"] == -1  # Default when not specified
-
-    def test_parse_config_with_n_jobs(self) -> None:
-        """Parse config with explicit n_jobs setting."""
-        config_json = dump_json_str(
-            {
-                "dataset": "taiwan",
-                "n_trials": 10,
-                "n_jobs": 4,
-            }
-        )
-        result = _parse_optimize_config(config_json)
-
-        assert result["dataset"] == "taiwan"
-        assert result["n_trials"] == 10
-        assert result["n_jobs"] == 4
 
     def test_parse_config_valid_polish(self) -> None:
         """Parse valid config for Polish dataset."""
@@ -258,7 +241,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",  # faster due to narrower range
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -304,7 +286,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -333,7 +314,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -364,7 +344,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -389,7 +368,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",  # continuous space
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -412,7 +390,6 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -475,7 +452,6 @@ class TestProcessLightGBMOptimizeJob:
                     "device": "cpu",
                     "space_profile": "default",
                     "random_state": 42,
-                    "n_jobs": 1,  # Single-threaded for parallel test safety
                 }
             )
 
@@ -516,7 +492,6 @@ class TestPhaseCallbacks:
                 "n_trials": 2,
                 "device": "cpu",
                 "feature_preset": "none",
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -559,7 +534,6 @@ class TestPhaseCallbacks:
                 "n_trials": 2,
                 "device": "cpu",
                 "feature_preset": "none",
-                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 

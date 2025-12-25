@@ -79,7 +79,6 @@ class LightGBMOptimizeParseResult(TypedDict, total=True):
     feature_preset: FeaturePreset
     random_state: int
     early_stopping_rounds: int
-    n_jobs: int
 
 
 def _parse_optimize_config(config_json: str) -> LightGBMOptimizeParseResult:
@@ -119,7 +118,6 @@ def _parse_optimize_config(config_json: str) -> LightGBMOptimizeParseResult:
     feature_preset = parse_feature_preset(raw.get("feature_preset"))
     random_state = optional_int(raw, "random_state", 42)
     early_stopping_rounds = optional_int(raw, "early_stopping_rounds", 10)
-    n_jobs = optional_int(raw, "n_jobs", -1)
 
     return LightGBMOptimizeParseResult(
         dataset=dataset_name,
@@ -130,7 +128,6 @@ def _parse_optimize_config(config_json: str) -> LightGBMOptimizeParseResult:
         feature_preset=feature_preset,
         random_state=random_state,
         early_stopping_rounds=early_stopping_rounds,
-        n_jobs=n_jobs,
     )
 
 
@@ -381,7 +378,6 @@ def run_lightgbm_optimization(
         parse_result["device"],
         parse_result["feature_preset"],
         early_stopping_rounds=parse_result["early_stopping_rounds"],
-        n_jobs=parse_result["n_jobs"],
     )
 
     # Report optimizing phase

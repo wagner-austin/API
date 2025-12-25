@@ -325,7 +325,7 @@ export class App {
       elements.status.textContent = "Translating...";
       emitEvent("app:recording-stop");
 
-      // Wait for recording to finish and translate the full audio
+      // Wait for recording to finish
       if (this.stopPromise === null) {
         throw new Error("Recording stopped but no stop promise available");
       }
@@ -334,20 +334,21 @@ export class App {
       log.info("Got final blob:", blob.size, "bytes");
       this.stopPromise = null;
 
-      // Fix the WebM blob to make it seekable, then translate
-      const fixedBlob = await fixWebmBlob(blob);
-      log.info("Fixed blob:", fixedBlob.size, "bytes");
+      // Chunks were already translated in real-time, so we keep those translations.
+      // Only translate if no chunks were processed (short recording < 15s).
+      if (this.currentSessionIndex === -1) {
+        log.info("No chunks translated yet, translating full blob");
+        const fixedBlob = await fixWebmBlob(blob);
+        log.info("Fixed blob:", fixedBlob.size, "bytes");
 
-      const text = await translateAudio(config.API_BASE_URL, token, fixedBlob);
-      log.info("Translation complete:", text.length, "chars");
+        const text = await translateAudio(config.API_BASE_URL, token, fixedBlob);
+        log.info("Translation complete:", text.length, "chars");
 
-      // Update the current session's transcript with final translation
-      if (this.currentSessionIndex >= 0 && this.currentSessionIndex < this.transcripts.length) {
-        this.transcripts[this.currentSessionIndex] = text;
-      } else {
         this.transcripts.push(text);
+        this.updateTranscriptDisplay();
+      } else {
+        log.info("Keeping chunk translations, skipping final blob translation");
       }
-      this.updateTranscriptDisplay();
       elements.status.textContent = "Tap to record";
 
       // Reset session tracking

@@ -272,12 +272,12 @@ describe("app", () => {
       await app.handleRecordClick();
     });
 
-    it("stops recording and translates on second click", async () => {
+    it("stops recording and keeps chunk translations", async () => {
+      // Chunk translations are kept when recording stops (no final re-translation)
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello partial" }), // chunk translation
-          createFakeResponse({ text: "Hello grandmother" }), // final translation
+          createFakeResponse({ text: "Hello grandmother" }), // chunk translation (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -301,7 +301,7 @@ describe("app", () => {
       // Wait for async chunk translation to complete
       await app.waitForPendingOperations();
 
-      // Stop recording - this also does final translation
+      // Stop recording - chunk translations are kept
       await app.handleRecordClick();
 
       const transcript = elements.get("transcript");
@@ -335,13 +335,13 @@ describe("app", () => {
     });
 
     it("accumulates multiple transcripts", async () => {
+      // Each recording session creates a separate transcript entry
+      // Chunk translations are kept (no final re-translation)
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "First partial" }), // session 1 chunk
-          createFakeResponse({ text: "First" }), // session 1 final
-          createFakeResponse({ text: "Second partial" }), // session 2 chunk
-          createFakeResponse({ text: "Second" }), // session 2 final
+          createFakeResponse({ text: "First" }), // session 1 chunk (kept)
+          createFakeResponse({ text: "Second" }), // session 2 chunk (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -379,13 +379,12 @@ describe("app", () => {
 
     it("appends text when multiple chunks arrive", async () => {
       // Each chunk is transcribed independently and APPENDED to the transcript
-      // This is more efficient than cumulative audio (only 15s per API call)
+      // Chunk translations are kept when recording stops (no final re-translation)
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeResponse({ text: "First chunk" }), // chunk 1 translation
           createFakeResponse({ text: "second chunk" }), // chunk 2 translation
-          createFakeResponse({ text: "Complete final transcript" }), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -422,23 +421,22 @@ describe("app", () => {
       let state = app.getState();
       expect(state.transcripts.length).toBe(1);
 
-      // Stop recording - final translation replaces with complete version
+      // Stop recording - chunk translations are kept (no final re-translation)
       await app.handleRecordClick();
 
       transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("Complete final transcript");
+      expect(transcript?.textContent).toBe("First chunk second chunk");
       state = app.getState();
       expect(state.transcripts.length).toBe(1);
     });
 
     it("waits for pending chunk translation when stopping", async () => {
       // This test verifies that stopping recording waits for any in-progress
-      // chunk translation to complete before doing the final translation
+      // chunk translation to complete before keeping those results
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Chunk result" }), // chunk translation
-          createFakeResponse({ text: "Final result" }), // final translation
+          createFakeResponse({ text: "Chunk result" }), // chunk translation (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -464,9 +462,9 @@ describe("app", () => {
       // This exercises the code path that awaits pendingChunkTranslation
       await app.handleRecordClick();
 
-      // Final result should be shown
+      // Chunk result should be kept (no final re-translation)
       const transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("Final result");
+      expect(transcript?.textContent).toBe("Chunk result");
     });
 
     it("updates timer display after 1 second", async () => {
@@ -762,6 +760,38 @@ describe("app", () => {
 
       // Auto-stop timeout should have been cleared
       expect(appAny.autoStopTimeout).toBeNull();
+
+      globalThis.AudioContext = savedAudioContext;
+    });
+
+    it("handles stop when autoStopTimeout is already null", async () => {
+      // Edge case: timeout was already cleared (e.g., by a race condition)
+      const savedAudioContext = globalThis.AudioContext;
+      // @ts-expect-error - intentionally removing for test
+      delete globalThis.AudioContext;
+
+      setupHooks({
+        fetchResponses: [
+          createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
+          createFakeResponse({ text: "Translation" }),
+        ],
+        initialStorage: new Map([["grandma_token", "token"]]),
+      });
+      const app = createApp();
+      await app.init();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const appAny = app as any;
+
+      // Start recording
+      await app.handleRecordClick();
+
+      // Simulate the timeout already being cleared (edge case)
+      appAny.autoStopTimeout = null;
+
+      // Stop recording - should not throw even with null timeout
+      await app.handleRecordClick();
+      expect(app.getState().isRecording).toBe(false);
 
       globalThis.AudioContext = savedAudioContext;
     });
@@ -1329,7 +1359,6 @@ describe("app", () => {
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeResponse({ status: 500, ok: false }), // chunk 2 translation fails
-          createFakeResponse({ text: "Final" }), // final translation works
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1348,10 +1377,11 @@ describe("app", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const appAny = app as any;
 
-      // Pre-set a header and transcript
+      // Pre-set a header and transcript (simulating a successful first chunk)
       appAny.webmHeader = new Uint8Array([0x18, 0x53, 0x80, 0x67]).buffer;
       appAny.currentSessionIndex = 0;
       appAny.transcripts = ["First"];
+      appAny.updateTranscriptDisplay();
 
       // Call handleChunkReceived with chunk index 2
       const fakeChunk = new Blob(["audio data"], { type: "audio/webm" });
@@ -1372,10 +1402,11 @@ describe("app", () => {
       // Status should indicate error
       expect(elements.get("status")?.textContent).toContain("translation error");
 
-      // Stop recording
+      // Stop recording - chunk translations are kept, no final re-translation
       await app.handleRecordClick();
 
-      expect(elements.get("transcript")?.textContent).toContain("Final");
+      // Previous transcript from successful chunk is kept
+      expect(elements.get("transcript")?.textContent).toBe("First");
 
       globalThis.AudioContext = savedAudioContext;
     });
