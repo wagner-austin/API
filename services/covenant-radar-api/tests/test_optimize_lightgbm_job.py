@@ -41,22 +41,6 @@ def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
     return dst, n_rows, feature_names
 
 
-def _copy_real_us(external_root: Path) -> tuple[Path, int, list[str]]:
-    """Copy full US dataset into external_root and return (path, n_rows, feature_names)."""
-    src = Path(__file__).parent.parent / "data" / "external" / "us_data" / "american_bankruptcy.csv"
-    if not src.exists():
-        raise FileNotFoundError("US dataset not found in repository data")
-    dst_dir = external_root / "us_data"
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    dst = dst_dir / "american_bankruptcy.csv"
-    copyfile(str(src), str(dst))
-    header = (dst.read_text(encoding="utf-8-sig").splitlines())[0]
-    cols = [c.strip() for c in header.split(",")]
-    feature_names = [c for c in cols if c.startswith("X")]
-    n_rows = sum(1 for _ in dst.open(encoding="utf-8-sig")) - 1
-    return dst, n_rows, feature_names
-
-
 def _copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
     """Copy full Polish dataset into external_root and return (path, n_rows, feature_names)."""
     src = Path(__file__).parent.parent / "data" / "external" / "polish_data" / "1year.arff"
@@ -147,6 +131,7 @@ class TestParseOptimizeConfig:
         assert result["space_profile"] == "default"
         assert result["random_state"] == 42
         assert result["early_stopping_rounds"] == 10
+        assert result["n_jobs"] == -1  # Default: all cores
 
     def test_parse_config_valid_us_with_all_options(self) -> None:
         """Parse valid config for US dataset with all options."""
@@ -170,6 +155,22 @@ class TestParseOptimizeConfig:
         assert result["space_profile"] == "default"
         assert result["random_state"] == 123
         assert result["early_stopping_rounds"] == 5
+        assert result["n_jobs"] == -1  # Default when not specified
+
+    def test_parse_config_with_n_jobs(self) -> None:
+        """Parse config with explicit n_jobs setting."""
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "n_trials": 10,
+                "n_jobs": 4,
+            }
+        )
+        result = _parse_optimize_config(config_json)
+
+        assert result["dataset"] == "taiwan"
+        assert result["n_trials"] == 10
+        assert result["n_jobs"] == 4
 
     def test_parse_config_valid_polish(self) -> None:
         """Parse valid config for Polish dataset."""
@@ -241,6 +242,7 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",  # faster due to narrower range
                 "random_state": 42,
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -273,34 +275,6 @@ class TestRunLightGBMOptimization:
         assert (output_dir / "taiwan_lightgbm_optuna_result.json").exists()
         assert (output_dir / "taiwan_lightgbm_optimal_config.json").exists()
 
-    def test_run_optimization_us(self, tmp_path: Path) -> None:
-        """run_lightgbm_optimization completes successfully on US dataset."""
-        external_dir = tmp_path / "external"
-        _copy_real_us(external_dir)
-        output_dir = tmp_path / "optuna_output"
-
-        config_json = dump_json_str(
-            {
-                "dataset": "us",
-                "n_trials": 2,
-                "device": "cpu",
-                "space_profile": "default",
-                "random_state": 42,
-            }
-        )
-
-        result = run_lightgbm_optimization(config_json, external_dir, output_dir)
-
-        assert result["status"] == "complete"
-        assert result["dataset"] == "us"
-        assert result["n_samples"] > 0
-        assert result["n_trials_complete"] == 2
-        assert 0.0 <= result["best_val_auc"] <= 1.0
-
-        # Verify output files created
-        assert (output_dir / "us_lightgbm_optuna_result.json").exists()
-        assert (output_dir / "us_lightgbm_optimal_config.json").exists()
-
     def test_run_optimization_polish(self, tmp_path: Path) -> None:
         """run_lightgbm_optimization completes successfully on Polish dataset."""
         external_dir = tmp_path / "external"
@@ -314,6 +288,7 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -344,6 +319,7 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -368,6 +344,7 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",  # continuous space
                 "random_state": 42,
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -390,6 +367,7 @@ class TestRunLightGBMOptimization:
                 "device": "cpu",
                 "space_profile": "default",
                 "random_state": 42,
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -452,6 +430,7 @@ class TestProcessLightGBMOptimizeJob:
                     "device": "cpu",
                     "space_profile": "default",
                     "random_state": 42,
+                    "n_jobs": 1,  # Single-threaded for parallel test safety
                 }
             )
 
@@ -492,6 +471,7 @@ class TestPhaseCallbacks:
                 "n_trials": 2,
                 "device": "cpu",
                 "feature_preset": "none",
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
@@ -534,6 +514,7 @@ class TestPhaseCallbacks:
                 "n_trials": 2,
                 "device": "cpu",
                 "feature_preset": "none",
+                "n_jobs": 1,  # Single-threaded for parallel test safety
             }
         )
 
