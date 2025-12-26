@@ -144,6 +144,114 @@ updated = client.update_event(
 client.delete_event(calendar_id="primary", event_id=event["id"])
 ```
 
+## Using in a FastAPI Service
+
+### 1. Add Dependency
+
+```toml
+# pyproject.toml
+[tool.poetry.dependencies]
+platform-calendar = { path = "../platform_calendar", develop = true }
+```
+
+### 2. Initialize at Startup
+
+```python
+# app/dependencies.py
+from platform_calendar import (
+    CalendarClientProtocol,
+    google_calendar_client,
+    load_or_authorize,
+)
+
+_client: CalendarClientProtocol | None = None
+
+def init_calendar() -> None:
+    global _client
+    tokens = load_or_authorize()
+    _client = google_calendar_client(tokens=tokens)
+
+def get_calendar_client() -> CalendarClientProtocol:
+    if _client is None:
+        raise RuntimeError("Calendar not initialized")
+    return _client
+```
+
+```python
+# app/main.py
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from app.dependencies import init_calendar
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_calendar()
+    yield
+
+app = FastAPI(lifespan=lifespan)
+```
+
+### 3. Use in Routes
+
+```python
+# app/routes/calendar.py
+from fastapi import APIRouter, Depends, HTTPException
+from platform_calendar import CalendarClientProtocol, EventDateTime
+from platform_core.errors import AppError
+from app.dependencies import get_calendar_client
+
+router = APIRouter(prefix="/calendar")
+
+@router.post("/events")
+def create_event(
+    summary: str,
+    start: str,
+    end: str,
+    client: CalendarClientProtocol = Depends(get_calendar_client),
+):
+    try:
+        event = client.create_event(
+            calendar_id="primary",
+            summary=summary,
+            description="",
+            start=EventDateTime(dateTime=start, timeZone="UTC"),
+            end=EventDateTime(dateTime=end, timeZone="UTC"),
+            reminders=(60,),
+        )
+        return dict(event)
+    except AppError as e:
+        raise HTTPException(status_code=e.http_status, detail=e.message)
+```
+
+### 4. Test with Fake Client
+
+```python
+# tests/test_routes.py
+import pytest
+from fastapi.testclient import TestClient
+from platform_calendar import FakeCalendarClient
+from app.main import app
+from app import dependencies
+
+@pytest.fixture
+def test_client():
+    fake = FakeCalendarClient()
+    fake.add_calendar(calendar_id="primary", summary="Test")
+    app.dependency_overrides[dependencies.get_calendar_client] = lambda: fake
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+def test_create_event(test_client):
+    response = test_client.post("/calendar/events", params={
+        "summary": "Test",
+        "start": "2025-12-26T14:00:00Z",
+        "end": "2025-12-26T15:00:00Z",
+    })
+    assert response.status_code == 200
+```
+
+See `docs/architecture-plan.md` for detailed patterns.
+
 ## Competition Storage
 
 Competitions are stored at `~/.competitions/tracked.json`:
