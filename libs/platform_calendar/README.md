@@ -4,6 +4,23 @@ Google Calendar API integration for tracking competition deadlines with automati
 
 ## Installation
 
+### Within this monorepo
+
+Add to your package's `pyproject.toml`:
+
+```toml
+[tool.poetry.dependencies]
+platform-calendar = { path = "../platform_calendar", develop = true }
+```
+
+Then install:
+
+```bash
+poetry install
+```
+
+### External (if published to PyPI)
+
 ```bash
 poetry add platform-calendar
 ```
