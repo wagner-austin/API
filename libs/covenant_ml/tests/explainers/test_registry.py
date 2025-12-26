@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from platform_ml.explainers import FeatureExplainer
 from platform_ml.explainers.protocol import PredictorProtocol
 
+from covenant_ml.backends.protocol import PreparedClassifier
 from covenant_ml.explainers.registry import (
     ExplainerFactory,
     ExplainerRegistration,
@@ -1037,6 +1038,144 @@ class TestShapTreeAdapterDirect:
 
         scores = adapter.compute_importance(
             model=predictor,
+            x_data=x,
+            feature_names=feature_names,
+            target_class=1,
+        )
+
+        assert len(scores) == 4
+        for score in scores:
+            assert score["name"] in feature_names
+            assert score["importance"] >= 0.0
+            assert 1 <= score["rank"] <= 4
+
+
+# =============================================================================
+# ClearGBM integration tests
+# =============================================================================
+
+
+def _create_cleargbm_prepared() -> PreparedClassifier:
+    """Create a ClearGBM prepared classifier for tests.
+
+    Uses the ClearGBM backend to create a real _ClearGBMPrepared instance
+    that will be recognized by try_extract_cleargbm_model.
+
+    Returns:
+        PreparedClassifier wrapping a ClearGBM model.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from cleargbm.ensemble import train_gradient_boosting
+    from cleargbm.types import GradientBoostingConfig, encode_gradient_boosting_model
+    from platform_core.json_utils import dump_json_str
+
+    from covenant_ml.backends.cleargbm import ClearGBMBackend
+
+    rng = np.random.default_rng(42)
+    x_train = rng.random((100, 4)).astype(np.float64)
+    y_train = rng.integers(0, 2, size=100).astype(np.int64)
+
+    # Convert to tuples for cleargbm (explicit loops to avoid Any from generators)
+    rows: list[tuple[float, ...]] = []
+    n_rows = int(x_train.shape[0])
+    for i in range(n_rows):
+        row_arr: NDArray[np.float64] = x_train[i, :]
+        row_list: list[float] = []
+        n_cols = int(row_arr.shape[0])
+        for j in range(n_cols):
+            val: float = float(row_arr.flat[j].item())
+            row_list.append(val)
+        rows.append(tuple(row_list))
+    x_tuple: tuple[tuple[float, ...], ...] = tuple(rows)
+
+    labels: list[int] = []
+    n_labels = int(y_train.shape[0])
+    for i in range(n_labels):
+        label_val: int = int(y_train.flat[i].item())
+        labels.append(label_val)
+    y_tuple: tuple[int, ...] = tuple(labels)
+
+    feature_names: tuple[str, ...] = ("f0", "f1", "f2", "f3")
+
+    config = GradientBoostingConfig(
+        n_estimators=5,
+        max_depth=3,
+        learning_rate=0.1,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        max_features=None,
+        max_bins=64,
+        subsample=1.0,
+        random_state=42,
+        track_contributions=False,
+        monotonic_constraints=None,
+        reg_alpha=0.0,
+        reg_lambda=1.0,
+        n_jobs=1,
+    )
+
+    gbm_model = train_gradient_boosting(
+        x_train=x_tuple,
+        y_train=y_tuple,
+        x_val=None,
+        y_val=None,
+        config=config,
+        feature_names=feature_names,
+        progress_callback=None,
+    )
+
+    # Use the backend to save/load - this creates a real _ClearGBMPrepared
+    backend = ClearGBMBackend()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_path = Path(tmpdir) / "model.json"
+
+        # Save model directly to JSON
+        encoded = encode_gradient_boosting_model(gbm_model)
+        json_str = dump_json_str(encoded, indent=2)
+        with open(model_path, "w", encoding="utf-8") as f:
+            f.write(json_str)
+
+        # Load via backend to get the real _ClearGBMPrepared type
+        return backend.load(path=str(model_path))
+
+
+class TestShapTreeAdapterWithClearGBM:
+    """Tests for _ShapTreeAdapter with ClearGBM models."""
+
+    def test_adapter_computes_importance_for_cleargbm(self) -> None:
+        """ShapTreeAdapter computes importance for ClearGBM model."""
+        adapter = _ShapTreeAdapter()
+        prepared = _create_cleargbm_prepared()
+
+        x: NDArray[np.float64] = np.random.randn(5, 4).astype(np.float64)
+        feature_names = ["f0", "f1", "f2", "f3"]
+
+        scores = adapter.compute_importance(
+            model=prepared,
+            x_data=x,
+            feature_names=feature_names,
+            target_class=1,
+        )
+
+        assert len(scores) == 4
+        for score in scores:
+            assert score["name"] in feature_names
+            assert score["importance"] >= 0.0
+            assert 1 <= score["rank"] <= 4
+
+    def test_registry_shap_tree_works_with_cleargbm(self) -> None:
+        """SHAP tree explainer from registry works with ClearGBM model."""
+        registry = default_explainer_registry()
+        explainer = registry.get("shap_tree")
+        prepared = _create_cleargbm_prepared()
+
+        x: NDArray[np.float64] = np.random.randn(3, 4).astype(np.float64)
+        feature_names = ["f0", "f1", "f2", "f3"]
+
+        scores = explainer.compute_importance(
+            model=prepared,
             x_data=x,
             feature_names=feature_names,
             target_class=1,
