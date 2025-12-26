@@ -36,6 +36,16 @@ from covenant_ml.explainers.registry import (
     default_explainer_registry,
 )
 
+from covenant_radar_api.worker.optimize_cleargbm_job import (
+    ClearGBMLoadingProgressCallbackProtocol,
+    ClearGBMLoadingProgressInfo,
+    ClearGBMOptimizationResult,
+    ClearGBMPhaseCallbackProtocol,
+    ClearGBMPhaseInfo,
+    ClearGBMTrialProgressCallbackProtocol,
+    ClearGBMTrialProgressInfo,
+    run_cleargbm_optimization,
+)
 from covenant_radar_api.worker.optimize_lightgbm_job import (
     LightGBMLoadingProgressCallbackProtocol,
     LightGBMLoadingProgressInfo,
@@ -227,6 +237,42 @@ class LSTMRunnerProtocol(Protocol):
 
 
 lstm_runner: LSTMRunnerProtocol = run_lstm_optimization
+
+
+# =============================================================================
+# ClearGBM Runner Protocol and Hook
+# =============================================================================
+
+
+class ClearGBMRunnerProtocol(Protocol):
+    """Protocol for ClearGBM optimization runner function."""
+
+    def __call__(
+        self,
+        config_json: str,
+        external_dir: Path,
+        output_dir: Path,
+        progress_callback: ClearGBMTrialProgressCallbackProtocol | None = None,
+        phase_callback: ClearGBMPhaseCallbackProtocol | None = None,
+        loading_progress_callback: ClearGBMLoadingProgressCallbackProtocol | None = None,
+    ) -> ClearGBMOptimizationResult:
+        """Run ClearGBM hyperparameter optimization.
+
+        Args:
+            config_json: JSON configuration string.
+            external_dir: Directory with external datasets.
+            output_dir: Directory for output files.
+            progress_callback: Optional callback for trial progress updates.
+            phase_callback: Optional callback for phase transitions.
+            loading_progress_callback: Optional callback for loading progress.
+
+        Returns:
+            Optimization result with best ClearGBM hyperparameters.
+        """
+        ...
+
+
+cleargbm_runner: ClearGBMRunnerProtocol = run_cleargbm_optimization
 
 
 # =============================================================================
@@ -430,6 +476,14 @@ backend_registry_factory: BackendRegistryFactoryProtocol = default_backend_regis
 __all__ = [
     "BackendRegistryFactoryProtocol",
     "ClassifierRegistry",
+    "ClearGBMLoadingProgressCallbackProtocol",
+    "ClearGBMLoadingProgressInfo",
+    "ClearGBMOptimizationResult",
+    "ClearGBMPhaseCallbackProtocol",
+    "ClearGBMPhaseInfo",
+    "ClearGBMRunnerProtocol",
+    "ClearGBMTrialProgressCallbackProtocol",
+    "ClearGBMTrialProgressInfo",
     "DatasetConfig",
     "DatasetLoaderCallable",
     "DatasetRegistry",
@@ -474,6 +528,7 @@ __all__ = [
     "XGBoostProgressInfo",
     "XGBoostRunnerProtocol",
     "backend_registry_factory",
+    "cleargbm_runner",
     "dataset_loader",
     "dataset_registry_factory",
     "explainer_registry_factory",

@@ -17,6 +17,7 @@ from platform_core.logging import (
 )
 
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -35,6 +36,7 @@ BACKEND_DISPLAY_NAMES: dict[BackendName, str] = {
     "mlp": "MLP",
     "lightgbm": "LightGBM",
     "lstm": "LSTM",
+    "cleargbm": "ClearGBM",
 }
 
 
@@ -206,6 +208,33 @@ def _create_lightgbm_hyperparams_table(
     return table
 
 
+def _create_cleargbm_hyperparams_table(result: ClearGBMOptimizationResult) -> RichTableProtocol:
+    """Create hyperparameters table for ClearGBM results.
+
+    Args:
+        result (ClearGBMOptimizationResult): ClearGBM optimization result.
+
+    Returns:
+        RichTableProtocol: Rich table with ClearGBM hyperparameters.
+    """
+    table = create_rich_table(
+        title="[bold blue]Best Hyperparameters (ClearGBM)[/bold blue]",
+        show_header=False,
+    )
+    table.add_column("Key", style="bold cyan")
+    table.add_column("Value", style="white")
+
+    table.add_row("[green]max_depth[/green]", str(result["best_max_depth"]))
+    table.add_row("[yellow]n_estimators[/yellow]", str(result["best_n_estimators"]))
+    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.4f}")
+    table.add_row("[blue]min_samples_split[/blue]", str(result["best_min_samples_split"]))
+    table.add_row("[blue]min_samples_leaf[/blue]", str(result["best_min_samples_leaf"]))
+    table.add_row("[cyan]max_bins[/cyan]", str(result["best_max_bins"]))
+    table.add_row("[blue]subsample[/blue]", f"{result['best_subsample']:.4f}")
+
+    return table
+
+
 def _create_lstm_hyperparams_table(result: LSTMOptimizationResult) -> RichTableProtocol:
     """Create hyperparameters table for LSTM results.
 
@@ -263,8 +292,10 @@ def create_hyperparams_table(
         return _create_mlp_hyperparams_table(result)
     if result["backend"] == "lightgbm":
         return _create_lightgbm_hyperparams_table(result)
-    # result["backend"] must be "lstm" here - mypy validates exhaustiveness via return type
-    return _create_lstm_hyperparams_table(result)
+    if result["backend"] == "lstm":
+        return _create_lstm_hyperparams_table(result)
+    # result["backend"] must be "cleargbm" here - mypy validates exhaustiveness via return type
+    return _create_cleargbm_hyperparams_table(result)
 
 
 # =============================================================================

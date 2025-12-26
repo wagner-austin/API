@@ -20,6 +20,7 @@ from platform_core.logging import (
 
 from scripts.optimize._formatters import format_elapsed
 from scripts.optimize._runners import (
+    _run_cleargbm_with_progress,
     _run_lightgbm_with_progress,
     _run_lstm_with_progress,
     _run_mlp_with_progress,
@@ -38,7 +39,7 @@ from scripts.optimize.runner import RunResult, get_project_root
 
 
 def compare_presets(
-    backend: BackendName,
+    backends: tuple[BackendName, ...],
     dataset: DatasetName,
     n_trials: int,
     device: str,
@@ -46,10 +47,10 @@ def compare_presets(
     save_model: bool = True,
     project_root: Path | None = None,
 ) -> None:
-    """Run all presets and compare AUC performance.
+    """Run all presets for all backends and compare AUC performance.
 
     Args:
-        backend (BackendName): Backend to use (xgboost, mlp, lightgbm, lstm).
+        backends: Tuple of backends to use (xgboost, mlp, lightgbm, lstm, cleargbm).
         dataset (DatasetName): Dataset to optimize on (taiwan, us, polish).
         n_trials (int): Number of Optuna trials per preset.
         device (str): Device for training (cuda/cpu/auto).
@@ -62,13 +63,15 @@ def compare_presets(
 
     console = get_rich_console()
     presets: list[FeaturePreset] = ["none", "log_only", "ratios_only", "full"]
-    results: list[tuple[FeaturePreset, float, int, float]] = []
+    # Results: list of (backend, preset, auc, n_features, elapsed)
+    results: list[tuple[BackendName, FeaturePreset, float, int, float]] = []
 
+    backends_str = ", ".join(b.upper() for b in backends)
     console.print()
     console.print(
         create_rich_panel(
             f"[bold magenta]Comparing Feature Presets[/bold magenta]\n"
-            f"[cyan]Backend:[/cyan] [green]{backend.upper()}[/green] | "
+            f"[cyan]Backends:[/cyan] [green]{backends_str}[/green] | "
             f"[cyan]Dataset:[/cyan] [yellow]{dataset.upper()}[/yellow] | "
             f"[cyan]Trials:[/cyan] [yellow]{n_trials}[/yellow] | "
             f"[cyan]Device:[/cyan] [yellow]{device.upper()}[/yellow]"
@@ -79,46 +82,56 @@ def compare_presets(
     history = OptimizationHistory.for_output_dir(output_dir)
     history.load()
 
+    total_runs = len(backends) * len(presets)
+
     with create_rich_progress(console) as progress:
         task = progress.add_task(
-            "[bold blue]Running presets...[/bold blue]",
-            total=float(len(presets)),
+            "[bold blue]Running...[/bold blue]",
+            total=float(total_runs),
         )
 
-        for preset in presets:
-            progress.update(task, description=f"Running [bold cyan]{preset}[/bold cyan]...")
-
-            if backend == "xgboost":
-                result, elapsed, _ = _run_xgboost_with_progress(
-                    dataset, n_trials, preset, device, timeout, history, progress
-                )
-            elif backend == "mlp":
-                result, elapsed, _ = _run_mlp_with_progress(
-                    dataset, n_trials, preset, device, timeout, history, progress
-                )
-            elif backend == "lightgbm":
-                result, elapsed, _ = _run_lightgbm_with_progress(
-                    dataset, n_trials, preset, device, timeout, history, progress
-                )
-            else:
-                # backend must be "lstm" here - mypy validates exhaustiveness
-                result, elapsed, _ = _run_lstm_with_progress(
-                    dataset, n_trials, preset, device, timeout, history, progress
+        for backend in backends:
+            for preset in presets:
+                progress.update(
+                    task,
+                    description=f"Running [bold cyan]{backend.upper()}[/bold cyan] / [yellow]{preset}[/yellow]...",
                 )
 
-            # Save best model for this preset if requested
-            if save_model:
-                _ = save_best_model(
-                    result=result,
-                    dataset=dataset,
-                    feature_preset=preset,
-                    project_root=project_root,
-                )
+                if backend == "xgboost":
+                    result, elapsed, _ = _run_xgboost_with_progress(
+                        dataset, n_trials, preset, device, timeout, history, progress
+                    )
+                elif backend == "mlp":
+                    result, elapsed, _ = _run_mlp_with_progress(
+                        dataset, n_trials, preset, device, timeout, history, progress
+                    )
+                elif backend == "lightgbm":
+                    result, elapsed, _ = _run_lightgbm_with_progress(
+                        dataset, n_trials, preset, device, timeout, history, progress
+                    )
+                elif backend == "lstm":
+                    result, elapsed, _ = _run_lstm_with_progress(
+                        dataset, n_trials, preset, device, timeout, history, progress
+                    )
+                else:
+                    # backend must be "cleargbm" here
+                    result, elapsed, _ = _run_cleargbm_with_progress(
+                        dataset, n_trials, preset, device, timeout, history, progress
+                    )
 
-            results.append((preset, result["best_val_auc"], result["n_features"], elapsed))
-            progress.advance(task)
+                # Save best model for this preset if requested
+                if save_model:
+                    _ = save_best_model(
+                        result=result,
+                        dataset=dataset,
+                        feature_preset=preset,
+                        project_root=project_root,
+                    )
 
-    _print_preset_comparison_summary(results)
+                results.append((backend, preset, result["best_val_auc"], result["n_features"], elapsed))
+                progress.advance(task)
+
+    _print_multi_backend_preset_comparison(results, dataset)
 
 
 def _print_preset_comparison_summary(
@@ -168,6 +181,68 @@ def _print_preset_comparison_summary(
     winner = sorted_results[0]
     console.print(
         f"[bold white on blue] Winner: {winner[0]} with AUC {winner[1]:.4f} [/bold white on blue]"
+    )
+    console.print()
+
+
+def _print_multi_backend_preset_comparison(
+    results: list[tuple[BackendName, FeaturePreset, float, int, float]],
+    dataset: DatasetName,
+) -> None:
+    """Print comparison table for multiple backends across all presets.
+
+    Args:
+        results: List of (backend, preset, auc, n_features, elapsed) tuples.
+        dataset: Dataset name used for optimization.
+    """
+    console = get_rich_console()
+
+    console.print()
+    table = create_rich_table(
+        title=f"[bold magenta]Backend × Preset Comparison - {dataset.upper()}[/bold magenta] [dim](sorted by AUC)[/dim]"
+    )
+    table.add_column("Rank", style="bold white", justify="center")
+    table.add_column("Backend", style="cyan")
+    table.add_column("Preset", style="blue")
+    table.add_column("Features", style="dim", justify="right")
+    table.add_column("AUC", justify="right")
+    table.add_column("Time", style="dim", justify="right")
+
+    def _get_auc(item: tuple[BackendName, FeaturePreset, float, int, float]) -> float:
+        return item[2]
+
+    sorted_results = sorted(results, key=_get_auc, reverse=True)
+
+    for i, (backend, preset, auc, n_features, elapsed) in enumerate(sorted_results):
+        if i == 0:
+            rank = "[bold yellow]1st[/bold yellow]"
+            auc_str = f"[bold green on black] {auc:.4f} [/bold green on black]"
+        elif i == 1:
+            rank = "[white]2nd[/white]"
+            auc_str = f"[green]{auc:.4f}[/green]"
+        elif i == 2:
+            rank = "[dim]3rd[/dim]"
+            auc_str = f"[yellow]{auc:.4f}[/yellow]"
+        else:
+            rank = f"[dim]{i + 1}th[/dim]"
+            auc_str = f"{auc:.4f}"
+
+        table.add_row(
+            rank,
+            f"[bold]{backend.upper()}[/bold]",
+            preset,
+            str(n_features),
+            auc_str,
+            f"{elapsed:.1f}s",
+        )
+
+    console.print(table)
+    console.print()
+
+    winner = sorted_results[0]
+    console.print(
+        f"[bold white on green] Winner: {winner[0].upper()} + {winner[1]} "
+        f"with AUC {winner[2]:.4f} [/bold white on green]"
     )
     console.print()
 

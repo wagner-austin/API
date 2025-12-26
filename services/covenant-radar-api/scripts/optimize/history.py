@@ -25,6 +25,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
+from covenant_radar_api.worker.optimize_cleargbm_job import ClearGBMOptimizationResult
 from covenant_radar_api.worker.optimize_lightgbm_job import LightGBMOptimizationResult
 from covenant_radar_api.worker.optimize_lstm_job import LSTMOptimizationResult
 from covenant_radar_api.worker.optimize_mlp_job import MLPOptimizationResult
@@ -137,9 +138,36 @@ class LSTMHistoryEntry(TypedDict):
     best_batch_size: int
 
 
+class ClearGBMHistoryEntry(TypedDict):
+    """ClearGBM optimization run history entry."""
+
+    timestamp: str
+    backend: BackendName
+    dataset: str
+    feature_preset: str
+    n_trials: int
+    n_samples: int
+    n_features: int
+    best_val_auc: float
+    best_trial_number: int
+    duration_seconds: float
+    # ClearGBM-specific hyperparameters
+    best_max_depth: int
+    best_n_estimators: int
+    best_learning_rate: float
+    best_min_samples_split: int
+    best_min_samples_leaf: int
+    best_max_bins: int
+    best_subsample: float
+
+
 # Union type for all history entries
 UnifiedHistoryEntry = (
-    XGBoostHistoryEntry | MLPHistoryEntry | LightGBMHistoryEntry | LSTMHistoryEntry
+    XGBoostHistoryEntry
+    | MLPHistoryEntry
+    | LightGBMHistoryEntry
+    | LSTMHistoryEntry
+    | ClearGBMHistoryEntry
 )
 
 
@@ -155,7 +183,7 @@ def _decode_backend(obj: JSONObject) -> BackendName:
         obj (JSONObject): JSON object with backend field.
 
     Returns:
-        BackendName: Validated backend name (xgboost, mlp, lightgbm, lstm).
+        BackendName: Validated backend name (xgboost, mlp, lightgbm, lstm, cleargbm).
 
     Raises:
         ValueError: If backend field contains invalid value.
@@ -169,6 +197,8 @@ def _decode_backend(obj: JSONObject) -> BackendName:
         return "lightgbm"
     if backend == "lstm":
         return "lstm"
+    if backend == "cleargbm":
+        return "cleargbm"
     raise ValueError(f"Invalid backend: {backend}")
 
 
@@ -288,6 +318,36 @@ def _decode_lstm_entry(obj: JSONObject) -> LSTMHistoryEntry:
     )
 
 
+def _decode_cleargbm_entry(obj: JSONObject) -> ClearGBMHistoryEntry:
+    """Decode ClearGBM history entry from JSON object.
+
+    Args:
+        obj (JSONObject): JSON object with ClearGBM history fields.
+
+    Returns:
+        ClearGBMHistoryEntry: Validated ClearGBM history entry TypedDict.
+    """
+    return ClearGBMHistoryEntry(
+        timestamp=require_str(obj, "timestamp"),
+        backend="cleargbm",
+        dataset=require_str(obj, "dataset"),
+        feature_preset=require_str(obj, "feature_preset"),
+        n_trials=require_int(obj, "n_trials"),
+        n_samples=require_int(obj, "n_samples"),
+        n_features=require_int(obj, "n_features"),
+        best_val_auc=require_float(obj, "best_val_auc"),
+        best_trial_number=require_int(obj, "best_trial_number"),
+        duration_seconds=require_float(obj, "duration_seconds"),
+        best_max_depth=require_int(obj, "best_max_depth"),
+        best_n_estimators=require_int(obj, "best_n_estimators"),
+        best_learning_rate=require_float(obj, "best_learning_rate"),
+        best_min_samples_split=require_int(obj, "best_min_samples_split"),
+        best_min_samples_leaf=require_int(obj, "best_min_samples_leaf"),
+        best_max_bins=require_int(obj, "best_max_bins"),
+        best_subsample=require_float(obj, "best_subsample"),
+    )
+
+
 def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
     """Decode history entry from JSON object based on backend type.
 
@@ -304,8 +364,10 @@ def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
         return _decode_mlp_entry(obj)
     if backend == "lightgbm":
         return _decode_lightgbm_entry(obj)
-    # backend must be "lstm" here - mypy validates exhaustiveness via return type
-    return _decode_lstm_entry(obj)
+    if backend == "lstm":
+        return _decode_lstm_entry(obj)
+    # backend must be "cleargbm" here - mypy validates exhaustiveness via return type
+    return _decode_cleargbm_entry(obj)
 
 
 # =============================================================================
@@ -434,6 +496,39 @@ def lstm_result_to_entry(result: LSTMOptimizationResult, elapsed: float) -> LSTM
         best_learning_rate=result["best_learning_rate"],
         best_dropout=result["best_dropout"],
         best_batch_size=result["best_batch_size"],
+    )
+
+
+def cleargbm_result_to_entry(
+    result: ClearGBMOptimizationResult, elapsed: float
+) -> ClearGBMHistoryEntry:
+    """Convert ClearGBM optimization result to history entry.
+
+    Args:
+        result (ClearGBMOptimizationResult): Typed ClearGBM optimization result.
+        elapsed (float): Elapsed time in seconds.
+
+    Returns:
+        ClearGBMHistoryEntry: History entry with current UTC timestamp.
+    """
+    return ClearGBMHistoryEntry(
+        timestamp=datetime.now(UTC).isoformat(),
+        backend="cleargbm",
+        dataset=result["dataset"],
+        feature_preset=result["feature_preset"],
+        n_trials=result["n_trials_complete"],
+        n_samples=result["n_samples"],
+        n_features=result["n_features"],
+        best_val_auc=result["best_val_auc"],
+        best_trial_number=result["best_trial_number"],
+        duration_seconds=elapsed,
+        best_max_depth=result["best_max_depth"],
+        best_n_estimators=result["best_n_estimators"],
+        best_learning_rate=result["best_learning_rate"],
+        best_min_samples_split=result["best_min_samples_split"],
+        best_min_samples_leaf=result["best_min_samples_leaf"],
+        best_max_bins=result["best_max_bins"],
+        best_subsample=result["best_subsample"],
     )
 
 
@@ -661,12 +756,14 @@ class OptimizationHistory:
 
 __all__ = [
     "HISTORY_FILENAME",
+    "ClearGBMHistoryEntry",
     "LSTMHistoryEntry",
     "LightGBMHistoryEntry",
     "MLPHistoryEntry",
     "OptimizationHistory",
     "UnifiedHistoryEntry",
     "XGBoostHistoryEntry",
+    "cleargbm_result_to_entry",
     "lightgbm_result_to_entry",
     "lstm_result_to_entry",
     "mlp_result_to_entry",

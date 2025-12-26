@@ -20,6 +20,7 @@ from platform_core.logging import (
 
 import scripts._test_hooks as _hooks
 from scripts.optimize._formatters import (
+    format_cleargbm_progress,
     format_elapsed,
     format_lightgbm_progress,
     format_loading_progress,
@@ -31,6 +32,7 @@ from scripts.optimize.cli import DatasetName, FeaturePreset
 from scripts.optimize.history import (
     OptimizationHistory,
     UnifiedHistoryEntry,
+    cleargbm_result_to_entry,
     lightgbm_result_to_entry,
     lstm_result_to_entry,
     mlp_result_to_entry,
@@ -41,6 +43,7 @@ from scripts.optimize.runner import (
     RunResult,
     UnifiedOptimizationResult,
     get_project_root,
+    run_cleargbm,
     run_lightgbm,
     run_lstm,
     run_mlp,
@@ -452,6 +455,107 @@ def _run_lstm_with_progress(
     return result, elapsed, entry
 
 
+def _run_cleargbm_with_progress(
+    dataset: DatasetName,
+    n_trials: int,
+    feature_preset: FeaturePreset,
+    device: str,
+    timeout: int | None,
+    history: OptimizationHistory,
+    progress: RichProgressProtocol | None = None,
+) -> tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]:
+    """Run ClearGBM optimization with progress bar.
+
+    Args:
+        dataset (DatasetName): Dataset to optimize on (taiwan, us, polish).
+        n_trials (int): Number of Optuna trials to run.
+        feature_preset (FeaturePreset): Feature engineering preset.
+        device (str): Ignored - ClearGBM is pure Python (CPU only).
+        timeout (int | None): Optional timeout in seconds, or None for no limit.
+        history (OptimizationHistory): History manager for saving results.
+        progress (RichProgressProtocol | None): Optional existing progress bar.
+
+    Returns:
+        tuple[UnifiedOptimizationResult, float, UnifiedHistoryEntry]: Tuple of
+            (optimization result, elapsed time in seconds, history entry).
+    """
+    console = get_rich_console()
+    start = time.perf_counter()
+
+    if progress is None:
+        with create_rich_progress(console) as new_progress:
+            return _run_cleargbm_with_progress(
+                dataset,
+                n_trials,
+                feature_preset,
+                device,
+                timeout,
+                history,
+                new_progress,
+            )
+
+    task_id = progress.add_task(
+        f"[dim]0s[/dim] [yellow]Loading {dataset} dataset...[/yellow]",
+        total=float(n_trials),
+    )
+
+    def phase_callback(info: _hooks.ClearGBMPhaseInfo) -> None:
+        elapsed = time.perf_counter() - start
+        elapsed_str = f"[dim]{format_elapsed(elapsed)}[/dim]"
+        phase = info["phase"]
+        if phase == "loading_data":
+            desc = f"{elapsed_str} [yellow]Loading {info['dataset']} dataset...[/yellow]"
+        elif phase == "feature_engineering":
+            n_samples = info["n_samples"]
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [yellow]Loaded {n_samples:,} samples, "
+                f"{n_features} features. Applying feature engineering...[/yellow]"
+            )
+        elif phase == "optimizing":
+            n_features = info["n_features"]
+            desc = (
+                f"{elapsed_str} [green]Ready ({n_features} features). "
+                f"Starting optimization...[/green]"
+            )
+        else:
+            desc = f"{elapsed_str} [cyan]Saving results...[/cyan]"
+        progress.update(task_id, description=desc)
+
+    def progress_callback(info: _hooks.ClearGBMTrialProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        progress.update(task_id, description=format_cleargbm_progress(info, elapsed))
+        progress.advance(task_id)
+
+    def loading_progress_callback(info: _hooks.ClearGBMLoadingProgressInfo) -> None:
+        elapsed = time.perf_counter() - start
+        desc = format_loading_progress(
+            info["dataset"],
+            info["phase"],
+            info["percent_complete"],
+            info["rows_processed"],
+            info["rows_total"],
+            elapsed,
+        )
+        progress.update(task_id, description=desc)
+
+    result = run_cleargbm(
+        dataset,
+        n_trials,
+        feature_preset,
+        device,
+        timeout,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+    elapsed = time.perf_counter() - start
+
+    entry = cleargbm_result_to_entry(result, elapsed)
+    history.append(entry)
+    return result, elapsed, entry
+
+
 def run_single_with_progress(
     backend: BackendName,
     dataset: DatasetName,
@@ -503,9 +607,13 @@ def run_single_with_progress(
         result, elapsed, _ = _run_lightgbm_with_progress(
             dataset, n_trials, feature_preset, device, timeout, history, progress
         )
-    else:
-        # backend must be "lstm" here - mypy validates exhaustiveness
+    elif backend == "lstm":
         result, elapsed, _ = _run_lstm_with_progress(
+            dataset, n_trials, feature_preset, device, timeout, history, progress
+        )
+    else:
+        # backend must be "cleargbm" here - mypy validates exhaustiveness
+        result, elapsed, _ = _run_cleargbm_with_progress(
             dataset, n_trials, feature_preset, device, timeout, history, progress
         )
 
@@ -533,6 +641,7 @@ def run_single_with_progress(
 
 
 __all__ = [
+    "_run_cleargbm_with_progress",
     "_run_lightgbm_with_progress",
     "_run_lstm_with_progress",
     "_run_mlp_with_progress",

@@ -37,7 +37,7 @@ ALL_STANDARD_DATASETS: tuple[StandardDatasetName, ...] = (
 ALL_TIMESERIES_DATASETS: tuple[TimeSeriesDatasetName, ...] = ("kaggle_amex_default",)
 
 # All backend names for "all" option
-ALL_BACKENDS: tuple[BackendName, ...] = ("xgboost", "lightgbm", "mlp", "lstm")
+ALL_BACKENDS: tuple[BackendName, ...] = ("xgboost", "lightgbm", "mlp", "lstm", "cleargbm")
 
 
 def is_timeseries_dataset(dataset: DatasetName) -> bool:
@@ -66,6 +66,7 @@ BACKEND_DESCRIPTIONS: dict[BackendName, str] = {
     "mlp": "Multi-layer perceptron (PyTorch)",
     "lightgbm": "Gradient boosted trees (LightGBM)",
     "lstm": "Long short-term memory network (PyTorch)",
+    "cleargbm": "Pure Python gradient boosting (ClearGBM, zero dependencies)",
 }
 
 
@@ -137,6 +138,7 @@ def print_help() -> None:
   mlp       Multi-layer perceptron (PyTorch)
   lightgbm  Gradient boosted trees (LightGBM)
   lstm      Long short-term memory network (PyTorch)
+  cleargbm  Pure Python gradient boosting (ClearGBM, zero dependencies)
   all       Run all backends sequentially
 
 [bold]Examples:[/bold]
@@ -175,8 +177,10 @@ def _parse_single_backend(val: str) -> BackendName:
         return "lightgbm"
     if val == "lstm":
         return "lstm"
+    if val == "cleargbm":
+        return "cleargbm"
     console.print(f"[red]Invalid backend: {val}.[/red]")
-    console.print("[red]Must be xgboost, mlp, lightgbm, lstm, or all.[/red]")
+    console.print("[red]Must be xgboost, mlp, lightgbm, lstm, cleargbm, or all.[/red]")
     raise SystemExit(1)
 
 

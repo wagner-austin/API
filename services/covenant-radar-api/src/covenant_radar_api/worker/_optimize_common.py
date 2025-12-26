@@ -190,7 +190,9 @@ def parse_backend_name(raw: JSONValue | None) -> BackendName:
         return "lstm"
     if raw == "lightgbm":
         return "lightgbm"
-    raise ValueError("backend must be one of: xgboost, mlp, lstm, lightgbm")
+    if raw == "cleargbm":
+        return "cleargbm"
+    raise ValueError("backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm")
 
 
 def load_dataset(

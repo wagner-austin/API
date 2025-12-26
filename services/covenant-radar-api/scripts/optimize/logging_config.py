@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 from platform_core.logging import stdlib_logging
 
 # Module-level verbose flag for optuna logging control
@@ -54,3 +56,7 @@ def suppress_verbose_logging() -> None:
     stdlib_logging.getLogger("covenant_radar_api.seeding.real_data").setLevel(
         stdlib_logging.WARNING
     )
+
+    # Suppress XGBoost/LightGBM GPU fallback warnings
+    warnings.filterwarnings("ignore", message=".*No visible GPU is found.*", category=UserWarning)
+    warnings.filterwarnings("ignore", message=".*Device is changed from GPU to CPU.*", category=UserWarning)

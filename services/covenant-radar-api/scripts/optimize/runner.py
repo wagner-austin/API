@@ -16,6 +16,7 @@ from platform_core.json_utils import dump_json_str
 
 import scripts._test_hooks as _hooks
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -30,6 +31,7 @@ UnifiedOptimizationResult = (
     | MLPOptimizationResult
     | LightGBMOptimizationResult
     | LSTMOptimizationResult
+    | ClearGBMOptimizationResult
 )
 
 
@@ -371,7 +373,87 @@ def run_lstm(
     )
 
 
+def _build_cleargbm_config(
+    dataset: DatasetName,
+    n_trials: int,
+    feature_preset: FeaturePreset,
+    timeout: int | None,
+) -> str:
+    """Build ClearGBM optimization config JSON.
+
+    Note: ClearGBM is pure Python and does not use device setting.
+
+    Args:
+        dataset (DatasetName): Dataset to optimize on (taiwan, us, polish).
+        n_trials (int): Number of Optuna trials to run.
+        feature_preset (FeaturePreset): Feature engineering preset.
+        timeout (int | None): Optional timeout in seconds, or None for no limit.
+
+    Returns:
+        str: JSON configuration string for the optimizer.
+    """
+    config_dict: dict[str, str | int | None] = {
+        "dataset": dataset,
+        "n_trials": n_trials,
+        "feature_preset": feature_preset,
+        "random_state": 42,
+        "early_stopping_rounds": 10,
+    }
+    if timeout is not None:
+        config_dict["timeout_seconds"] = timeout
+    return dump_json_str(config_dict)
+
+
+def run_cleargbm(
+    dataset: DatasetName,
+    n_trials: int,
+    feature_preset: FeaturePreset,
+    device: str,
+    timeout: int | None,
+    progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
+    phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
+    loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
+) -> ClearGBMOptimizationResult:
+    """Run ClearGBM hyperparameter optimization.
+
+    Note: ClearGBM is pure Python and does not use device setting.
+
+    Args:
+        dataset (DatasetName): Dataset to optimize on (taiwan, us, polish).
+        n_trials (int): Number of Optuna trials to run.
+        feature_preset (FeaturePreset): Feature engineering preset.
+        device (str): Ignored - ClearGBM is pure Python (CPU only).
+        timeout (int | None): Optional timeout in seconds, or None for no limit.
+        progress_callback (ClearGBMTrialProgressCallbackProtocol | None): Optional
+            callback invoked after each trial with progress info.
+        phase_callback (ClearGBMPhaseCallbackProtocol | None): Optional callback
+            invoked when entering a new optimization phase.
+        loading_progress_callback (ClearGBMLoadingProgressCallbackProtocol | None):
+            Optional callback for granular loading progress updates.
+
+    Returns:
+        ClearGBMOptimizationResult: Optimization result with best hyperparameters
+            and validation AUC.
+    """
+    _ = device  # ClearGBM is pure Python, no device selection
+    project_root = get_project_root()
+    external_dir = project_root / "data" / "external"
+    output_dir = project_root / "models" / "cleargbm"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    config_json = _build_cleargbm_config(dataset, n_trials, feature_preset, timeout)
+    return _hooks.cleargbm_runner(
+        config_json,
+        external_dir,
+        output_dir,
+        progress_callback,
+        phase_callback,
+        loading_progress_callback,
+    )
+
+
 __all__ = [
+    "ClearGBMOptimizationResult",
     "LSTMOptimizationResult",
     "LightGBMOptimizationResult",
     "MLPOptimizationResult",
@@ -379,6 +461,7 @@ __all__ = [
     "UnifiedOptimizationResult",
     "XGBoostOptimizationResult",
     "get_project_root",
+    "run_cleargbm",
     "run_lightgbm",
     "run_lstm",
     "run_mlp",

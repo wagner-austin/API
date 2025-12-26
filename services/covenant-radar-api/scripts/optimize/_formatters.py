@@ -118,6 +118,29 @@ def format_lstm_progress(info: _hooks.LSTMTrialProgressInfo, elapsed: float = 0.
     )
 
 
+def format_cleargbm_progress(info: _hooks.ClearGBMTrialProgressInfo, elapsed: float = 0.0) -> str:
+    """Format ClearGBM trial progress for display.
+
+    Args:
+        info (ClearGBMTrialProgressInfo): ClearGBM trial progress information dict.
+        elapsed: Elapsed time in seconds.
+
+    Returns:
+        str: Rich-formatted progress string with trial number, AUC, and hyperparameters.
+    """
+    best_marker = "[yellow]*[/yellow]" if info["is_best"] else ""
+    elapsed_str = f"[dim]{format_elapsed(elapsed)}[/dim] "
+    return (
+        f"{elapsed_str}"
+        f"[cyan]Trial {info['trial_number'] + 1}/{info['n_trials_total']}[/cyan] "
+        f"Best: [bold green]{info['best_auc']:.4f}[/bold green] "
+        f"(#{info['best_trial']}) {best_marker} "
+        f"LR: [yellow]{info['best_learning_rate']:.4f}[/yellow] "
+        f"Depth: [magenta]{info['best_max_depth']}[/magenta] "
+        f"Est: [blue]{info['best_n_estimators']}[/blue]"
+    )
+
+
 def format_loading_progress(
     dataset: str,
     phase: str,
@@ -157,6 +180,7 @@ def format_loading_progress(
 
 
 __all__ = [
+    "format_cleargbm_progress",
     "format_elapsed",
     "format_lightgbm_progress",
     "format_loading_progress",

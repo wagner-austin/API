@@ -44,7 +44,7 @@ def run(argv: Sequence[str]) -> int:
 
     suppress_verbose_logging()
 
-    # For all_datasets and compare_presets modes, use first backend only
+    # For all_datasets mode, use first backend only
     first_backend = args.backends[0]
 
     if args.all_datasets:
@@ -57,8 +57,9 @@ def run(argv: Sequence[str]) -> int:
             args.save_model,
         )
     elif args.compare_presets:
+        # Compare presets supports multiple backends
         compare_presets(
-            first_backend,
+            args.backends,
             args.dataset,
             args.n_trials,
             args.device,

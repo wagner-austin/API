@@ -20,6 +20,7 @@ from covenant_ml.features import (
 )
 from covenant_ml.types import (
     BackendName,
+    ClearGBMConfig,
     LightGBMConfig,
     LSTMConfig,
     MLPConfig,
@@ -36,6 +37,7 @@ from platform_core.logging import get_logger, get_rich_console
 
 import scripts._test_hooks as _hooks
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -51,10 +53,11 @@ UnifiedOptimizationResult = (
     | MLPOptimizationResult
     | LightGBMOptimizationResult
     | LSTMOptimizationResult
+    | ClearGBMOptimizationResult
 )
 
 # Union type for all training configs
-UnifiedTrainConfig = TrainConfig | MLPConfig | LightGBMConfig | LSTMConfig
+UnifiedTrainConfig = TrainConfig | MLPConfig | LightGBMConfig | LSTMConfig | ClearGBMConfig
 
 
 # =============================================================================
@@ -81,6 +84,7 @@ MODEL_EXTENSIONS: dict[BackendName, str] = {
     "mlp": "pt",
     "lightgbm": "txt",
     "lstm": "pt",
+    "cleargbm": "json",  # ClearGBM serializes as JSON
 }
 
 
@@ -234,7 +238,7 @@ def _save_metadata(
     # Build metadata dict based on backend type
     meta_dict: dict[
         str,
-        str | float | int | TrainConfig | MLPConfig | LightGBMConfig | LSTMConfig,
+        str | float | int | TrainConfig | MLPConfig | LightGBMConfig | LSTMConfig | ClearGBMConfig,
     ] = {
         "backend": backend,
         "dataset": dataset,
