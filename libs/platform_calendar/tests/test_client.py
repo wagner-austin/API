@@ -9,9 +9,12 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_calendar.client import _GoogleCalendarClient, google_calendar_client
 from platform_calendar.testing import (
     hooks,
+    make_fake_http_delete,
     make_fake_http_get,
     make_fake_http_post,
+    make_raising_http_delete,
     make_raising_http_get,
+    make_raising_http_patch,
     make_raising_http_post,
 )
 from platform_calendar.types import EventDateTime, OAuthTokens
@@ -369,6 +372,64 @@ class TestGetEvents:
             )
 
 
+class TestGetEvent:
+    def test_get_event_success(self) -> None:
+        response = dump_json_str(
+            {
+                "id": "event123",
+                "summary": "Test Event",
+                "description": "Test description",
+                "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                "status": "confirmed",
+                "reminders": {"useDefault": True, "overrides": []},
+                "location": "Meeting Room A",
+                "recurrence": ["RRULE:FREQ=WEEKLY;COUNT=10"],
+            }
+        )
+        hooks.http_get = make_fake_http_get(response)
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.get_event(calendar_id="primary", event_id="event123")
+
+        assert event["id"] == "event123"
+        assert event["summary"] == "Test Event"
+        assert event["location"] == "Meeting Room A"
+        assert event["recurrence"] == ("RRULE:FREQ=WEEKLY;COUNT=10",)
+
+    def test_get_event_normalizes_missing_fields(self) -> None:
+        response = dump_json_str(
+            {
+                "id": "event123",
+                "summary": "Test Event",
+                "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+            }
+        )
+        hooks.http_get = make_fake_http_get(response)
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.get_event(calendar_id="primary", event_id="event123")
+
+        assert event["description"] == ""
+        assert event["status"] == "confirmed"
+        assert event["location"] == ""
+        assert event["recurrence"] == ()
+
+    def test_get_event_connection_error(self) -> None:
+        hooks.http_get = make_raising_http_get(ConnectionError("Network failed"))
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.get_event(calendar_id="primary", event_id="event123")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+
+
 class TestCreateEvent:
     def test_create_event_success(self) -> None:
         response = dump_json_str(
@@ -469,24 +530,76 @@ class TestCreateEvent:
         error: AppError[CalendarErrorCode] = exc_info.value
         assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
 
+    def test_create_event_with_location(self) -> None:
+        response = dump_json_str(
+            {
+                "id": "new_event",
+                "summary": "Meeting",
+                "description": "",
+                "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                "status": "confirmed",
+                "reminders": {"useDefault": False, "overrides": []},
+                "location": "Conference Room B",
+                "recurrence": [],
+            }
+        )
+        hooks.http_post = make_fake_http_post(response)
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        start: EventDateTime = {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"}
+        end: EventDateTime = {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"}
+
+        event = client.create_event(
+            calendar_id="primary",
+            summary="Meeting",
+            description="",
+            start=start,
+            end=end,
+            reminders=(),
+            location="Conference Room B",
+        )
+
+        assert event["location"] == "Conference Room B"
+
+    def test_create_event_with_recurrence(self) -> None:
+        response = dump_json_str(
+            {
+                "id": "new_event",
+                "summary": "Weekly Standup",
+                "description": "",
+                "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                "status": "confirmed",
+                "reminders": {"useDefault": False, "overrides": []},
+                "location": "",
+                "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
+            }
+        )
+        hooks.http_post = make_fake_http_post(response)
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        start: EventDateTime = {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"}
+        end: EventDateTime = {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"}
+
+        event = client.create_event(
+            calendar_id="primary",
+            summary="Weekly Standup",
+            description="",
+            start=start,
+            end=end,
+            reminders=(),
+            recurrence=("RRULE:FREQ=WEEKLY;BYDAY=MO",),
+        )
+
+        assert event["recurrence"] == ("RRULE:FREQ=WEEKLY;BYDAY=MO",)
+
 
 class TestUpdateEvent:
     def test_update_event_summary(self) -> None:
-        # GET returns existing event, POST returns updated
-        def mock_get(url: str, headers: dict[str, str]) -> str:
-            return dump_json_str(
-                {
-                    "id": "event1",
-                    "summary": "Old Title",
-                    "description": "Description",
-                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
-                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
-                    "status": "confirmed",
-                    "reminders": {"useDefault": True, "overrides": []},
-                }
-            )
-
-        def mock_post(url: str, headers: dict[str, str], body: str) -> str:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
             return dump_json_str(
                 {
                     "id": "event1",
@@ -496,11 +609,12 @@ class TestUpdateEvent:
                     "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
                     "status": "confirmed",
                     "reminders": {"useDefault": True, "overrides": []},
+                    "location": "",
+                    "recurrence": [],
                 }
             )
 
-        hooks.http_get = mock_get
-        hooks.http_post = mock_post
+        hooks.http_patch = mock_patch
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -513,20 +627,7 @@ class TestUpdateEvent:
         assert event["summary"] == "New Title"
 
     def test_update_event_description(self) -> None:
-        def mock_get(url: str, headers: dict[str, str]) -> str:
-            return dump_json_str(
-                {
-                    "id": "event1",
-                    "summary": "Title",
-                    "description": "Old Desc",
-                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
-                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
-                    "status": "confirmed",
-                    "reminders": {"useDefault": True, "overrides": []},
-                }
-            )
-
-        def mock_post(url: str, headers: dict[str, str], body: str) -> str:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
             return dump_json_str(
                 {
                     "id": "event1",
@@ -536,11 +637,12 @@ class TestUpdateEvent:
                     "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
                     "status": "confirmed",
                     "reminders": {"useDefault": True, "overrides": []},
+                    "location": "",
+                    "recurrence": [],
                 }
             )
 
-        hooks.http_get = mock_get
-        hooks.http_post = mock_post
+        hooks.http_patch = mock_patch
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -553,7 +655,8 @@ class TestUpdateEvent:
         assert event["description"] == "New Desc"
 
     def test_update_event_adds_missing_fields(self) -> None:
-        def mock_get(url: str, headers: dict[str, str]) -> str:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            # Response without optional fields
             return dump_json_str(
                 {
                     "id": "event1",
@@ -563,19 +666,7 @@ class TestUpdateEvent:
                 }
             )
 
-        def mock_post(url: str, headers: dict[str, str], body: str) -> str:
-            # Response without description, status, reminders
-            return dump_json_str(
-                {
-                    "id": "event1",
-                    "summary": "Title",
-                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
-                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
-                }
-            )
-
-        hooks.http_get = mock_get
-        hooks.http_post = mock_post
+        hooks.http_patch = mock_patch
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
@@ -586,25 +677,247 @@ class TestUpdateEvent:
 
         assert event["description"] == ""
         assert event["status"] == "confirmed"
+        assert event["location"] == ""
+        assert event["recurrence"] == ()
+
+    def test_update_event_start_and_end(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            return dump_json_str(
+                {
+                    "id": "event1",
+                    "summary": "Meeting",
+                    "description": "",
+                    "start": {"dateTime": "2025-12-27T10:00:00Z", "timeZone": "UTC"},
+                    "end": {"dateTime": "2025-12-27T11:00:00Z", "timeZone": "UTC"},
+                    "status": "confirmed",
+                    "reminders": {"useDefault": True, "overrides": []},
+                    "location": "",
+                    "recurrence": [],
+                }
+            )
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.update_event(
+            calendar_id="primary",
+            event_id="event1",
+            start=EventDateTime(dateTime="2025-12-27T10:00:00Z", timeZone="UTC"),
+            end=EventDateTime(dateTime="2025-12-27T11:00:00Z", timeZone="UTC"),
+        )
+
+        assert event["start"]["dateTime"] == "2025-12-27T10:00:00Z"
+        assert event["end"]["dateTime"] == "2025-12-27T11:00:00Z"
+
+    def test_update_event_reminders(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            return dump_json_str(
+                {
+                    "id": "event1",
+                    "summary": "Meeting",
+                    "description": "",
+                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                    "status": "confirmed",
+                    "reminders": {
+                        "useDefault": False,
+                        "overrides": [{"method": "popup", "minutes": 30}],
+                    },
+                    "location": "",
+                    "recurrence": [],
+                }
+            )
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.update_event(
+            calendar_id="primary",
+            event_id="event1",
+            reminders=(30,),
+        )
+
+        assert event["reminders"]["useDefault"] is False
+        assert len(event["reminders"]["overrides"]) == 1
+        assert event["reminders"]["overrides"][0]["minutes"] == 30
+
+    def test_update_event_location(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            return dump_json_str(
+                {
+                    "id": "event1",
+                    "summary": "Meeting",
+                    "description": "",
+                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                    "status": "confirmed",
+                    "reminders": {"useDefault": True, "overrides": []},
+                    "location": "Conference Room A",
+                    "recurrence": [],
+                }
+            )
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.update_event(
+            calendar_id="primary",
+            event_id="event1",
+            location="Conference Room A",
+        )
+
+        assert event["location"] == "Conference Room A"
+
+    def test_update_event_recurrence(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            return dump_json_str(
+                {
+                    "id": "event1",
+                    "summary": "Weekly Meeting",
+                    "description": "",
+                    "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
+                    "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
+                    "status": "confirmed",
+                    "reminders": {"useDefault": True, "overrides": []},
+                    "location": "",
+                    "recurrence": ["RRULE:FREQ=WEEKLY;COUNT=10"],
+                }
+            )
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+        event = client.update_event(
+            calendar_id="primary",
+            event_id="event1",
+            recurrence=("RRULE:FREQ=WEEKLY;COUNT=10",),
+        )
+
+        assert event["recurrence"] == ("RRULE:FREQ=WEEKLY;COUNT=10",)
+
+    def test_update_event_connection_error(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            raise ConnectionError("Network failed")
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.update_event(calendar_id="primary", event_id="event1", summary="Test")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+        assert "Request failed" in error.message
+
+    def test_update_event_os_error(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            raise OSError("IO failed")
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.update_event(calendar_id="primary", event_id="event1", summary="Test")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+        assert "Request failed" in error.message
+
+    def test_update_event_invalid_json_response(self) -> None:
+        def mock_patch(url: str, headers: dict[str, str], body: str) -> str:
+            return "not valid json"
+
+        hooks.http_patch = mock_patch
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.update_event(calendar_id="primary", event_id="event1", summary="Test")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+        assert "Invalid response" in error.message
+
+    def test_update_event_http_error(self) -> None:
+        """Test update_event with HTTP error response (e.g., 404)."""
+
+        class FakeHTTPError(OSError):
+            code = 404
+
+            def read(self) -> bytes:
+                return b'{"error": {"message": "Event not found"}}'
+
+        hooks.http_patch = make_raising_http_patch(FakeHTTPError("Not found"))
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.update_event(calendar_id="primary", event_id="event1", summary="Test")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.EVENT_NOT_FOUND
 
 
 class TestDeleteEvent:
     def test_delete_event_success(self) -> None:
-        # Currently just does a GET
-        response = dump_json_str(
-            {
-                "id": "event1",
-                "summary": "Event",
-                "start": {"dateTime": "2025-12-26T10:00:00Z", "timeZone": "UTC"},
-                "end": {"dateTime": "2025-12-26T11:00:00Z", "timeZone": "UTC"},
-            }
-        )
-        hooks.http_get = make_fake_http_get(response)
+        """Test successful event deletion."""
+        hooks.http_delete = make_fake_http_delete()
 
         tokens = _test_tokens()
         client = google_calendar_client(tokens=tokens)
         # Should not raise
         client.delete_event(calendar_id="primary", event_id="event1")
+
+    def test_delete_event_connection_error(self) -> None:
+        """Test delete event with connection error."""
+        hooks.http_delete = make_raising_http_delete(ConnectionError("Network failed"))
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.delete_event(calendar_id="primary", event_id="event1")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+        assert "Delete request failed" in error.message
+
+    def test_delete_event_os_error(self) -> None:
+        """Test delete event with generic OS error."""
+        hooks.http_delete = make_raising_http_delete(OSError("IO failed"))
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.delete_event(calendar_id="primary", event_id="event1")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.CALENDAR_API_ERROR
+        assert "Delete request failed" in error.message
+
+    def test_delete_event_http_error_404(self) -> None:
+        """Test delete event with HTTP 404 error."""
+
+        class FakeHTTPError(OSError):
+            code = 404
+
+            def read(self) -> bytes:
+                return b'{"error": {"message": "Event not found"}}'
+
+        hooks.http_delete = make_raising_http_delete(FakeHTTPError("Not found"))
+
+        tokens = _test_tokens()
+        client = google_calendar_client(tokens=tokens)
+
+        with pytest.raises(AppError) as exc_info:
+            client.delete_event(calendar_id="primary", event_id="event1")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.EVENT_NOT_FOUND
 
 
 class TestAPIErrors:
@@ -673,12 +986,8 @@ class TestHTTPErrorHandling:
         assert error.code == CalendarErrorCode.CALENDAR_NOT_FOUND
 
     def test_event_not_found_error(self) -> None:
-        # For event not found, we need an endpoint without "calendar" in context
-        # The _handle_error checks if "calendar" is in the context (endpoint)
-        # The get_events endpoint is /calendars/{id}/events which contains "calendar"
-        # So 404 will trigger CALENDAR_NOT_FOUND, not EVENT_NOT_FOUND
-        # To test EVENT_NOT_FOUND, we'd need an endpoint like /events/{id}
-        # For now, test that calendar-based 404 works correctly
+        """Test 404 on event endpoint returns EVENT_NOT_FOUND."""
+
         class FakeHTTPError(OSError):
             code = 404
 
@@ -697,8 +1006,19 @@ class TestHTTPErrorHandling:
                 time_max="2025-12-31T23:59:59Z",
             )
         error: AppError[CalendarErrorCode] = exc_info.value
-        # The endpoint /calendars/{id}/events contains "calendar" -> CALENDAR_NOT_FOUND
-        assert error.code == CalendarErrorCode.CALENDAR_NOT_FOUND
+        # The endpoint /calendars/{id}/events contains "events" -> EVENT_NOT_FOUND
+        assert error.code == CalendarErrorCode.EVENT_NOT_FOUND
+
+    def test_404_fallback_without_calendar_or_events(self) -> None:
+        """Test 404 fallback when context has neither 'calendar' nor 'events'."""
+        client = _GoogleCalendarClient(access_token="test_token")
+
+        # Call _handle_error directly with a context that has neither keyword
+        with pytest.raises(AppError) as exc_info:
+            client._handle_error(404, "Not found", "/some/other/path")
+        error: AppError[CalendarErrorCode] = exc_info.value
+        assert error.code == CalendarErrorCode.EVENT_NOT_FOUND
+        assert "Not found" in error.message
 
     def test_other_api_error(self) -> None:
         class FakeHTTPError(OSError):
