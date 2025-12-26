@@ -193,19 +193,41 @@ def decode_event_reminders(data: JSONObject) -> EventReminders:
 
 
 class CalendarEvent(TypedDict):
-    """Google Calendar event."""
+    """Google Calendar event.
+
+    Attributes:
+        id: Unique event identifier.
+        summary: Event title.
+        description: Event description.
+        start: Event start time.
+        end: Event end time.
+        status: Event status (confirmed, tentative, cancelled).
+        reminders: Reminder configuration.
+        location: Location string (e.g., "123 Main St, City").
+        recurrence: Tuple of RRULE strings for recurring events.
+    """
 
     id: str
-    summary: str  # Title
+    summary: str
     description: str
     start: EventDateTime
     end: EventDateTime
     status: EventStatus
     reminders: EventReminders
+    location: str
+    recurrence: tuple[str, ...]
 
 
 def encode_calendar_event(e: CalendarEvent) -> JSONObject:
-    """Encode CalendarEvent to JSON-serializable dict."""
+    """Encode CalendarEvent to JSON-serializable dict.
+
+    Args:
+        e: CalendarEvent to encode.
+
+    Returns:
+        JSON-serializable dict representation.
+    """
+    recurrence_list: list[JSONValue] = list(e["recurrence"])
     result: JSONObject = {
         "id": e["id"],
         "summary": e["summary"],
@@ -214,15 +236,54 @@ def encode_calendar_event(e: CalendarEvent) -> JSONObject:
         "end": encode_event_datetime(e["end"]),
         "status": e["status"],
         "reminders": encode_event_reminders(e["reminders"]),
+        "location": e["location"],
+        "recurrence": recurrence_list,
     }
     return result
 
 
+def _require_recurrence(data: JSONObject, key: str) -> tuple[str, ...]:
+    """Extract and validate recurrence list from JSON object.
+
+    Args:
+        data: JSON object to extract from.
+        key: Key to extract.
+
+    Returns:
+        Tuple of RRULE strings.
+
+    Raises:
+        JSONTypeError: If value is not a list of strings.
+    """
+    raw_list = data.get(key, [])
+    if not isinstance(raw_list, list):
+        raise JSONTypeError(f"Field '{key}' must be a list, got {type(raw_list).__name__}")
+    result: list[str] = []
+    for i, item in enumerate(raw_list):
+        if not isinstance(item, str):
+            raise JSONTypeError(f"Field '{key}[{i}]' must be a string, got {type(item).__name__}")
+        result.append(item)
+    return tuple(result)
+
+
 def decode_calendar_event(data: JSONObject) -> CalendarEvent:
-    """Decode CalendarEvent from dict with validation."""
+    """Decode CalendarEvent from dict with validation.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated CalendarEvent.
+
+    Raises:
+        JSONTypeError: If required fields are missing or invalid.
+    """
     start_raw = data.get("start")
     end_raw = data.get("end")
     reminders_raw = data.get("reminders")
+    # Location defaults to empty string if not present
+    location_raw = data.get("location", "")
+    location = location_raw if isinstance(location_raw, str) else ""
     return CalendarEvent(
         id=require_str(data, "id"),
         summary=require_str(data, "summary"),
@@ -231,6 +292,8 @@ def decode_calendar_event(data: JSONObject) -> CalendarEvent:
         end=decode_event_datetime(_require_dict_value(end_raw, "end")),
         status=_require_event_status(data, "status"),
         reminders=decode_event_reminders(_require_dict_value(reminders_raw, "reminders")),
+        location=location,
+        recurrence=_require_recurrence(data, "recurrence"),
     )
 
 
