@@ -24,10 +24,37 @@ from platform_calendar.types import (
 
 @runtime_checkable
 class CalendarClientProtocol(Protocol):
-    """Protocol for Google Calendar client."""
+    """Protocol for Google Calendar client.
+
+    Defines the interface for interacting with Google Calendar API.
+    """
 
     def list_calendars(self) -> tuple[CalendarListItem, ...]:
-        """List all calendars for the authenticated user."""
+        """List all calendars for the authenticated user.
+
+        Returns:
+            Tuple of CalendarListItem for each accessible calendar.
+        """
+        ...
+
+    def get_event(
+        self,
+        *,
+        calendar_id: str,
+        event_id: str,
+    ) -> CalendarEvent:
+        """Get a single event by ID.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to retrieve.
+
+        Returns:
+            The CalendarEvent.
+
+        Raises:
+            AppError[CalendarErrorCode]: If event not found.
+        """
         ...
 
     def get_events(
@@ -37,7 +64,16 @@ class CalendarClientProtocol(Protocol):
         time_min: str,
         time_max: str,
     ) -> tuple[CalendarEvent, ...]:
-        """Get events in a time range."""
+        """Get events in a time range.
+
+        Args:
+            calendar_id: Calendar to query.
+            time_min: Start of time range (RFC 3339).
+            time_max: End of time range (RFC 3339).
+
+        Returns:
+            Tuple of CalendarEvent within the time range.
+        """
         ...
 
     def create_event(
@@ -49,8 +85,24 @@ class CalendarClientProtocol(Protocol):
         start: EventDateTime,
         end: EventDateTime,
         reminders: tuple[int, ...],
+        location: str = "",
+        recurrence: tuple[str, ...] = (),
     ) -> CalendarEvent:
-        """Create a new calendar event."""
+        """Create a new calendar event.
+
+        Args:
+            calendar_id: Calendar to create event in.
+            summary: Event title.
+            description: Event description.
+            start: Event start time.
+            end: Event end time.
+            reminders: Reminder times in minutes before event.
+            location: Event location string.
+            recurrence: RRULE strings for recurring events.
+
+        Returns:
+            The created CalendarEvent.
+        """
         ...
 
     def update_event(
@@ -60,8 +112,31 @@ class CalendarClientProtocol(Protocol):
         event_id: str,
         summary: str | None = None,
         description: str | None = None,
+        start: EventDateTime | None = None,
+        end: EventDateTime | None = None,
+        reminders: tuple[int, ...] | None = None,
+        location: str | None = None,
+        recurrence: tuple[str, ...] | None = None,
     ) -> CalendarEvent:
-        """Update an existing calendar event."""
+        """Update an existing calendar event.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to update.
+            summary: New event title (None to keep existing).
+            description: New description (None to keep existing).
+            start: New start time (None to keep existing).
+            end: New end time (None to keep existing).
+            reminders: New reminder times (None to keep existing).
+            location: New location (None to keep existing).
+            recurrence: New recurrence rules (None to keep existing).
+
+        Returns:
+            The updated CalendarEvent.
+
+        Raises:
+            AppError[CalendarErrorCode]: If event not found.
+        """
         ...
 
     def delete_event(
@@ -70,7 +145,15 @@ class CalendarClientProtocol(Protocol):
         calendar_id: str,
         event_id: str,
     ) -> None:
-        """Delete a calendar event."""
+        """Delete a calendar event.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to delete.
+
+        Raises:
+            AppError[CalendarErrorCode]: If event not found.
+        """
         ...
 
 
@@ -99,6 +182,8 @@ class HTTPErrorProtocol(Protocol):
 
 HttpGetHook = Callable[[str, dict[str, str]], str]
 HttpPostHook = Callable[[str, dict[str, str], str], str]
+HttpPatchHook = Callable[[str, dict[str, str], str], str]
+HttpDeleteHook = Callable[[str, dict[str, str]], None]
 LoadTokensHook = Callable[[], OAuthTokens | None]
 SaveTokensHook = Callable[[OAuthTokens], None]
 LoadCredentialsHook = Callable[[], OAuthCredentials]
@@ -121,6 +206,8 @@ class HooksContainer:
 
     http_get: HttpGetHook
     http_post: HttpPostHook
+    http_patch: HttpPatchHook
+    http_delete: HttpDeleteHook
     load_tokens: LoadTokensHook
     save_tokens: SaveTokensHook
     load_credentials: LoadCredentialsHook
@@ -175,10 +262,70 @@ def _prod_http_post(url: str, headers: dict[str, str], body: str) -> str:
         response.close()
 
 
+def _prod_http_patch(url: str, headers: dict[str, str], body: str) -> str:
+    """Production HTTP PATCH using urllib.
+
+    Args:
+        url: URL to send PATCH request to.
+        headers: HTTP headers to include.
+        body: Request body as string.
+
+    Returns:
+        Response body as string.
+    """
+    import urllib.request
+    from http.client import HTTPResponse
+
+    req = urllib.request.Request(url, data=body.encode("utf-8"), method="PATCH")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    response = urllib.request.urlopen(req, timeout=30)
+    assert isinstance(response, HTTPResponse)
+    try:
+        response_body = response.read()
+        return response_body.decode("utf-8")
+    finally:
+        response.close()
+
+
+def _prod_http_delete(url: str, headers: dict[str, str]) -> None:
+    """Production HTTP DELETE using urllib."""
+    import urllib.request
+    from http.client import HTTPResponse
+
+    req = urllib.request.Request(url, method="DELETE")
+    for key, value in headers.items():
+        req.add_header(key, value)
+    response = urllib.request.urlopen(req, timeout=30)
+    assert isinstance(response, HTTPResponse)
+    response.close()
+
+
 def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
-    """Production token loader - reads from ~/.google/calendar_tokens.json."""
+    """Production token loader.
+
+    Loads OAuth tokens from environment variables or file.
+
+    Environment variables (checked first):
+        GOOGLE_CALENDAR_ACCESS_TOKEN: OAuth access token
+        GOOGLE_CALENDAR_REFRESH_TOKEN: OAuth refresh token
+        GOOGLE_CALENDAR_TOKEN_EXPIRES_AT: Token expiry (Unix timestamp as string)
+
+    If any token env var is set, all must be set.
+    If no env vars are set, reads from file path.
+
+    Args:
+        path: Optional file path. Defaults to ~/.google/calendar_tokens.json
+
+    Returns:
+        OAuthTokens if found, None if no tokens configured.
+
+    Raises:
+        AppError[CalendarErrorCode]: If tokens are partially configured in environment.
+    """
     from pathlib import Path
 
+    from platform_core.config import config_test_hooks
     from platform_core.json_utils import (
         InvalidJsonError,
         JSONTypeError,
@@ -186,8 +333,37 @@ def _prod_load_tokens(path: str | None = None) -> OAuthTokens | None:
         narrow_json_to_dict,
     )
 
-    from platform_calendar.types import decode_oauth_tokens
+    from platform_calendar.types import OAuthTokens, decode_oauth_tokens
 
+    # Check environment variables first using centralized hook
+    env_access_token = config_test_hooks.get_env("GOOGLE_CALENDAR_ACCESS_TOKEN")
+    env_refresh_token = config_test_hooks.get_env("GOOGLE_CALENDAR_REFRESH_TOKEN")
+    env_expires_at = config_test_hooks.get_env("GOOGLE_CALENDAR_TOKEN_EXPIRES_AT")
+
+    # If any token env var is set, validate all are present
+    if env_access_token is not None or env_refresh_token is not None or env_expires_at is not None:
+        missing: list[str] = []
+        if env_access_token is None:
+            missing.append("GOOGLE_CALENDAR_ACCESS_TOKEN")
+        if env_refresh_token is None:
+            missing.append("GOOGLE_CALENDAR_REFRESH_TOKEN")
+        if env_expires_at is None:
+            missing.append("GOOGLE_CALENDAR_TOKEN_EXPIRES_AT")
+        if missing:
+            msg = f"Partial tokens in environment. Missing: {', '.join(missing)}"
+            raise AppError(CalendarErrorCode.AUTH_FAILED, msg, http_status=401)
+        # All env vars present - narrow types for mypy
+        assert env_access_token is not None
+        assert env_refresh_token is not None
+        assert env_expires_at is not None
+        return OAuthTokens(
+            access_token=env_access_token,
+            refresh_token=env_refresh_token,
+            expires_at=int(env_expires_at),
+            token_type="Bearer",
+        )
+
+    # No env vars set - read from file
     tokens_path = Path(path) if path else Path.home() / ".google" / "calendar_tokens.json"
     if not tokens_path.exists():
         return None
@@ -215,9 +391,30 @@ def _prod_save_tokens(tokens: OAuthTokens, path: str | None = None) -> None:
 
 
 def _prod_load_credentials(path: str | None = None) -> OAuthCredentials:
-    """Production credentials loader - reads from ~/.google/calendar_credentials.json."""
+    """Production credentials loader.
+
+    Loads OAuth credentials from environment variables or file.
+
+    Environment variables (checked first):
+        GOOGLE_CALENDAR_CLIENT_ID: OAuth client ID
+        GOOGLE_CALENDAR_CLIENT_SECRET: OAuth client secret
+        GOOGLE_CALENDAR_REDIRECT_URI: Redirect URI (defaults to "http://localhost")
+
+    If any credential env var is set, all required ones must be set.
+    If no env vars are set, reads from file path.
+
+    Args:
+        path: Optional file path. Defaults to ~/.google/calendar_credentials.json
+
+    Returns:
+        OAuthCredentials with client_id, client_secret, redirect_uri.
+
+    Raises:
+        AppError[CalendarErrorCode]: If credentials not found or partially configured.
+    """
     from pathlib import Path
 
+    from platform_core.config import config_test_hooks
     from platform_core.json_utils import (
         InvalidJsonError,
         JSONTypeError,
@@ -227,6 +424,31 @@ def _prod_load_credentials(path: str | None = None) -> OAuthCredentials:
 
     from platform_calendar.types import OAuthCredentials, decode_google_credentials_file
 
+    # Check environment variables first using centralized hook
+    env_client_id = config_test_hooks.get_env("GOOGLE_CALENDAR_CLIENT_ID")
+    env_client_secret = config_test_hooks.get_env("GOOGLE_CALENDAR_CLIENT_SECRET")
+    env_redirect_uri = config_test_hooks.get_env("GOOGLE_CALENDAR_REDIRECT_URI")
+
+    # If any credential env var is set, validate all required ones are present
+    if env_client_id is not None or env_client_secret is not None:
+        missing: list[str] = []
+        if env_client_id is None:
+            missing.append("GOOGLE_CALENDAR_CLIENT_ID")
+        if env_client_secret is None:
+            missing.append("GOOGLE_CALENDAR_CLIENT_SECRET")
+        if missing:
+            msg = f"Partial credentials in environment. Missing: {', '.join(missing)}"
+            raise AppError(CalendarErrorCode.CREDENTIALS_NOT_FOUND, msg, http_status=401)
+        # All required env vars present - narrow types for mypy
+        assert env_client_id is not None
+        assert env_client_secret is not None
+        return OAuthCredentials(
+            client_id=env_client_id,
+            client_secret=env_client_secret,
+            redirect_uri=env_redirect_uri if env_redirect_uri is not None else "http://localhost",
+        )
+
+    # No env vars set - read from file
     creds_path = Path(path) if path else Path.home() / ".google" / "calendar_credentials.json"
     if not creds_path.exists():
         msg = f"Credentials file not found at {creds_path}"
@@ -310,6 +532,8 @@ def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
     hooks.http_get = _prod_http_get
     hooks.http_post = _prod_http_post
+    hooks.http_patch = _prod_http_patch
+    hooks.http_delete = _prod_http_delete
     hooks.load_tokens = _prod_load_tokens
     hooks.save_tokens = _prod_save_tokens
     hooks.load_credentials = _prod_load_credentials
@@ -361,7 +585,15 @@ class FakeCalendarClient(CalendarClientProtocol):
         primary: bool = False,
         time_zone: str = "UTC",
     ) -> None:
-        """Add a fake calendar for testing."""
+        """Add a fake calendar for testing.
+
+        Args:
+            calendar_id: Unique calendar ID.
+            summary: Calendar name.
+            description: Calendar description.
+            primary: Whether this is the primary calendar.
+            time_zone: Calendar timezone.
+        """
         item = CalendarListItem(
             id=calendar_id,
             summary=summary,
@@ -374,21 +606,38 @@ class FakeCalendarClient(CalendarClientProtocol):
         self._events[calendar_id] = []
 
     def add_event(self, *, calendar_id: str, event: CalendarEvent) -> None:
-        """Add a fake event for testing."""
+        """Add a fake event for testing.
+
+        Args:
+            calendar_id: Calendar to add event to.
+            event: Event to add.
+        """
         if calendar_id not in self._events:
             self._events[calendar_id] = []
         self._events[calendar_id].append(event)
 
     def get_created_events(self) -> list[CalendarEvent]:
-        """Get all events created via create_event()."""
+        """Get all events created via create_event().
+
+        Returns:
+            List of created events.
+        """
         return list(self._created_events)
 
     def get_updated_events(self) -> list[CalendarEvent]:
-        """Get all events updated via update_event()."""
+        """Get all events updated via update_event().
+
+        Returns:
+            List of updated events.
+        """
         return list(self._updated_events)
 
     def get_deleted_events(self) -> list[tuple[str, str]]:
-        """Get all (calendar_id, event_id) pairs deleted via delete_event()."""
+        """Get all (calendar_id, event_id) pairs deleted via delete_event().
+
+        Returns:
+            List of (calendar_id, event_id) tuples.
+        """
         return list(self._deleted_events)
 
     # -------------------------------------------------------------------------
@@ -396,8 +645,37 @@ class FakeCalendarClient(CalendarClientProtocol):
     # -------------------------------------------------------------------------
 
     def list_calendars(self) -> tuple[CalendarListItem, ...]:
-        """List all calendars."""
+        """List all calendars.
+
+        Returns:
+            Tuple of all calendars.
+        """
         return tuple(self._calendars)
+
+    def get_event(
+        self,
+        *,
+        calendar_id: str,
+        event_id: str,
+    ) -> CalendarEvent:
+        """Get a single event by ID.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to retrieve.
+
+        Returns:
+            The CalendarEvent.
+
+        Raises:
+            AppError[CalendarErrorCode]: If event not found.
+        """
+        events = self._events.get(calendar_id, [])
+        for event in events:
+            if event["id"] == event_id:
+                return event
+        msg = f"Event '{event_id}' not found in calendar '{calendar_id}'"
+        raise AppError(CalendarErrorCode.EVENT_NOT_FOUND, msg, http_status=404)
 
     def get_events(
         self,
@@ -406,9 +684,17 @@ class FakeCalendarClient(CalendarClientProtocol):
         time_min: str,
         time_max: str,
     ) -> tuple[CalendarEvent, ...]:
-        """Get events in a time range."""
+        """Get events in a time range.
+
+        Args:
+            calendar_id: Calendar to query.
+            time_min: Start of time range.
+            time_max: End of time range.
+
+        Returns:
+            Tuple of events (simple filtering, no datetime comparison).
+        """
         events = self._events.get(calendar_id, [])
-        # Simple filtering - in real implementation would compare datetimes
         return tuple(events)
 
     def create_event(
@@ -420,8 +706,24 @@ class FakeCalendarClient(CalendarClientProtocol):
         start: EventDateTime,
         end: EventDateTime,
         reminders: tuple[int, ...],
+        location: str = "",
+        recurrence: tuple[str, ...] = (),
     ) -> CalendarEvent:
-        """Create a new calendar event."""
+        """Create a new calendar event.
+
+        Args:
+            calendar_id: Calendar to create event in.
+            summary: Event title.
+            description: Event description.
+            start: Event start time.
+            end: Event end time.
+            reminders: Reminder times in minutes.
+            location: Event location string.
+            recurrence: RRULE strings for recurring events.
+
+        Returns:
+            The created CalendarEvent.
+        """
         event_id = f"fake_event_{self._next_event_id}"
         self._next_event_id += 1
 
@@ -440,6 +742,8 @@ class FakeCalendarClient(CalendarClientProtocol):
                 useDefault=False,
                 overrides=tuple(overrides),
             ),
+            location=location,
+            recurrence=recurrence,
         )
 
         if calendar_id not in self._events:
@@ -456,36 +760,65 @@ class FakeCalendarClient(CalendarClientProtocol):
         event_id: str,
         summary: str | None = None,
         description: str | None = None,
+        start: EventDateTime | None = None,
+        end: EventDateTime | None = None,
+        reminders: tuple[int, ...] | None = None,
+        location: str | None = None,
+        recurrence: tuple[str, ...] | None = None,
     ) -> CalendarEvent:
-        """Update an existing calendar event."""
+        """Update an existing calendar event.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to update.
+            summary: New event title (None to keep existing).
+            description: New description (None to keep existing).
+            start: New start time (None to keep existing).
+            end: New end time (None to keep existing).
+            reminders: New reminder times (None to keep existing).
+            location: New location (None to keep existing).
+            recurrence: New recurrence rules (None to keep existing).
+
+        Returns:
+            The updated CalendarEvent.
+
+        Raises:
+            AppError[CalendarErrorCode]: If event not found.
+        """
         events = self._events.get(calendar_id, [])
         for i, event in enumerate(events):
             if event["id"] == event_id:
+                # Build new reminders if provided
+                new_reminders: EventReminders
+                if reminders is not None:
+                    overrides: list[ReminderOverride] = []
+                    for minutes in reminders:
+                        overrides.append(ReminderOverride(method="popup", minutes=minutes))
+                    new_reminders = EventReminders(
+                        useDefault=False,
+                        overrides=tuple(overrides),
+                    )
+                else:
+                    new_reminders = event["reminders"]
+
                 updated = CalendarEvent(
                     id=event["id"],
                     summary=summary if summary is not None else event["summary"],
                     description=description if description is not None else event["description"],
-                    start=event["start"],
-                    end=event["end"],
+                    start=start if start is not None else event["start"],
+                    end=end if end is not None else event["end"],
                     status=event["status"],
-                    reminders=event["reminders"],
+                    reminders=new_reminders,
+                    location=location if location is not None else event["location"],
+                    recurrence=recurrence if recurrence is not None else event["recurrence"],
                 )
                 self._events[calendar_id][i] = updated
                 self._updated_events.append(updated)
                 return updated
 
-        # Event not found - return a placeholder
-        placeholder = CalendarEvent(
-            id=event_id,
-            summary=summary if summary is not None else "",
-            description=description if description is not None else "",
-            start=EventDateTime(dateTime="", timeZone="UTC"),
-            end=EventDateTime(dateTime="", timeZone="UTC"),
-            status="confirmed",
-            reminders=EventReminders(useDefault=True, overrides=()),
-        )
-        self._updated_events.append(placeholder)
-        return placeholder
+        # Event not found - raise error
+        msg = f"Event '{event_id}' not found in calendar '{calendar_id}'"
+        raise AppError(CalendarErrorCode.EVENT_NOT_FOUND, msg, http_status=404)
 
     def delete_event(
         self,
@@ -493,7 +826,12 @@ class FakeCalendarClient(CalendarClientProtocol):
         calendar_id: str,
         event_id: str,
     ) -> None:
-        """Delete a calendar event."""
+        """Delete a calendar event.
+
+        Args:
+            calendar_id: Calendar containing the event.
+            event_id: ID of the event to delete.
+        """
         self._deleted_events.append((calendar_id, event_id))
         events = self._events.get(calendar_id, [])
         self._events[calendar_id] = [e for e in events if e["id"] != event_id]
@@ -533,6 +871,56 @@ def make_raising_http_get(exc: BaseException) -> HttpGetHook:
 
 def make_raising_http_post(exc: BaseException) -> HttpPostHook:
     """Create a hook that raises an exception."""
+
+    def _hook(url: str, headers: dict[str, str], body: str) -> str:
+        raise exc
+
+    return _hook
+
+
+def make_fake_http_delete() -> HttpDeleteHook:
+    """Create a hook that does nothing (successful delete)."""
+
+    def _hook(url: str, headers: dict[str, str]) -> None:
+        pass
+
+    return _hook
+
+
+def make_raising_http_delete(exc: BaseException) -> HttpDeleteHook:
+    """Create a hook that raises an exception."""
+
+    def _hook(url: str, headers: dict[str, str]) -> None:
+        raise exc
+
+    return _hook
+
+
+def make_fake_http_patch(response: str) -> HttpPatchHook:
+    """Create a hook that returns a fixed response.
+
+    Args:
+        response: Response body to return.
+
+    Returns:
+        HttpPatchHook that returns the fixed response.
+    """
+
+    def _hook(url: str, headers: dict[str, str], body: str) -> str:
+        return response
+
+    return _hook
+
+
+def make_raising_http_patch(exc: BaseException) -> HttpPatchHook:
+    """Create a hook that raises an exception.
+
+    Args:
+        exc: Exception to raise.
+
+    Returns:
+        HttpPatchHook that raises the exception.
+    """
 
     def _hook(url: str, headers: dict[str, str], body: str) -> str:
         raise exc
@@ -631,8 +1019,25 @@ def make_fake_event(
     end_datetime: str = "2025-12-26T15:00:00-08:00",
     time_zone: str = "America/Los_Angeles",
     status: str = "confirmed",
+    location: str = "",
+    recurrence: tuple[str, ...] = (),
 ) -> CalendarEvent:
-    """Create a fake CalendarEvent for testing."""
+    """Create a fake CalendarEvent for testing.
+
+    Args:
+        event_id: Event ID.
+        summary: Event title.
+        description: Event description.
+        start_datetime: Start time in RFC 3339 format.
+        end_datetime: End time in RFC 3339 format.
+        time_zone: Timezone for start/end.
+        status: Event status (confirmed, tentative, cancelled).
+        location: Event location string.
+        recurrence: RRULE strings for recurring events.
+
+    Returns:
+        CalendarEvent with the specified values.
+    """
     event_status: str = status
     return CalendarEvent(
         id=event_id,
@@ -646,6 +1051,8 @@ def make_fake_event(
             else ("tentative" if event_status == "tentative" else "cancelled")
         ),
         reminders=EventReminders(useDefault=True, overrides=()),
+        location=location,
+        recurrence=recurrence,
     )
 
 
@@ -677,7 +1084,9 @@ __all__ = [
     "FileExistsHook",
     "HTTPErrorProtocol",
     "HooksContainer",
+    "HttpDeleteHook",
     "HttpGetHook",
+    "HttpPatchHook",
     "HttpPostHook",
     "LoadCredentialsHook",
     "LoadTokensHook",
@@ -685,6 +1094,7 @@ __all__ = [
     "ReadFileHook",
     "SaveTokensHook",
     "WriteFileHook",
+    "_prod_http_patch",
     "hooks",
     "make_fake_calendar",
     "make_fake_console",
@@ -692,11 +1102,15 @@ __all__ = [
     "make_fake_current_time",
     "make_fake_event",
     "make_fake_file_system",
+    "make_fake_http_delete",
     "make_fake_http_get",
+    "make_fake_http_patch",
     "make_fake_http_post",
     "make_fake_no_tokens",
     "make_fake_tokens",
+    "make_raising_http_delete",
     "make_raising_http_get",
+    "make_raising_http_patch",
     "make_raising_http_post",
     "reset_hooks",
 ]
