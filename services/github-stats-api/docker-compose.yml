@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/github-stats-api/Dockerfile
+    container_name: github-stats-api
+    ports:
+      - "8009:8000"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-1800}
+      - PORT=8000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.github-stats.rule=PathPrefix(`/github-stats`)"
+      - "traefik.http.routers.github-stats.middlewares=github-stats-strip"
+      - "traefik.http.middlewares.github-stats-strip.stripprefix.prefixes=/github-stats"
+      - "traefik.http.services.github-stats.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true
