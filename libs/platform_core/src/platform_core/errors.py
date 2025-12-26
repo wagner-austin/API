@@ -133,6 +133,28 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     ARTIFACT_DOWNLOAD_FAILED = "ARTIFACT_DOWNLOAD_FAILED"
 
 
+class CalendarErrorCode(ErrorCodeBase):
+    """Domain-specific calendar service error codes.
+
+    Generic errors (unauthorized, timeout, etc.) use centralized ErrorCode.
+    """
+
+    # Authentication errors
+    CREDENTIALS_NOT_FOUND = "CREDENTIALS_NOT_FOUND"
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"
+    AUTH_FAILED = "AUTH_FAILED"
+
+    # API errors
+    CALENDAR_API_ERROR = "CALENDAR_API_ERROR"
+    EVENT_NOT_FOUND = "EVENT_NOT_FOUND"
+    CALENDAR_NOT_FOUND = "CALENDAR_NOT_FOUND"
+
+    # Competition tracking errors
+    COMPETITION_NOT_FOUND = "COMPETITION_NOT_FOUND"
+    COMPETITION_ALREADY_EXISTS = "COMPETITION_ALREADY_EXISTS"
+    COMPETITIONS_FILE_ERROR = "COMPETITIONS_FILE_ERROR"
+
+
 ErrorCodeType = TypeVar("ErrorCodeType", bound=ErrorCodeBase)
 
 
@@ -460,6 +482,7 @@ def model_trainer_status_for(code: ModelTrainerErrorCode) -> int:
 
 __all__ = [
     "AppError",
+    "CalendarErrorCode",
     "ErrorCode",
     "ErrorCodeBase",
     "HandwritingErrorCode",
