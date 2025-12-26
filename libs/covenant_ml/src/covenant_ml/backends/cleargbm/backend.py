@@ -210,6 +210,22 @@ class _ClearGBMPrepared:
         return self._model
 
 
+def try_extract_cleargbm_model(
+    prepared: PreparedClassifier,
+) -> GradientBoostingModel | None:
+    """Extract GradientBoostingModel from a prepared classifier if ClearGBM.
+
+    Args:
+        prepared: Prepared classifier from any backend.
+
+    Returns:
+        GradientBoostingModel if prepared is a ClearGBM classifier, None otherwise.
+    """
+    if not isinstance(prepared, _ClearGBMPrepared):
+        return None
+    return prepared.model
+
+
 class ClearGBMBackend(ClassifierBackend):
     """ClearGBM backend for tabular binary classification.
 
