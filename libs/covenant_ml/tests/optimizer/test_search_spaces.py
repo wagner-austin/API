@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from covenant_ml.optimizer.search_spaces import (
+    make_cleargbm_default_space,
+    make_cleargbm_focused_space,
     make_default_optimization_config,
     make_lightgbm_default_space,
     make_lightgbm_focused_space,
@@ -650,3 +652,179 @@ def test_make_lightgbm_focused_space_clamps_learning_rate() -> None:
     lr_high = space_high["learning_rate"]
     if lr_high["param_type"] == "float":
         assert lr_high["high"] == 0.5  # min(0.5, 0.4*2.0) = 0.5
+
+
+# =============================================================================
+# ClearGBM Search Space Tests
+# =============================================================================
+
+
+def test_make_cleargbm_default_space_returns_complete_space() -> None:
+    """make_cleargbm_default_space returns space with all required parameters."""
+    space = make_cleargbm_default_space()
+
+    # Verify all required keys exist
+    assert "n_estimators" in space
+    assert "max_depth" in space
+    assert "learning_rate" in space
+    assert "min_samples_split" in space
+    assert "min_samples_leaf" in space
+    assert "max_bins" in space
+    assert "subsample" in space
+
+
+def test_make_cleargbm_default_space_param_types() -> None:
+    """make_cleargbm_default_space uses correct param types."""
+    space = make_cleargbm_default_space()
+
+    # Integer parameters
+    assert space["n_estimators"]["param_type"] == "int"
+    assert space["max_depth"]["param_type"] == "int"
+    assert space["min_samples_split"]["param_type"] == "int"
+    assert space["min_samples_leaf"]["param_type"] == "int"
+
+    # Float parameters
+    assert space["learning_rate"]["param_type"] == "float"
+    assert space["subsample"]["param_type"] == "float"
+
+    # Categorical int
+    assert space["max_bins"]["param_type"] == "categorical_int"
+
+
+def test_make_cleargbm_default_space_ranges() -> None:
+    """make_cleargbm_default_space has sensible default ranges."""
+    space = make_cleargbm_default_space()
+
+    # Check n_estimators range
+    n_estimators = space["n_estimators"]
+    assert n_estimators["param_type"] == "int"
+    if n_estimators["param_type"] == "int":
+        assert n_estimators["low"] == 50
+        assert n_estimators["high"] == 300
+
+    # Check max_depth range
+    max_depth = space["max_depth"]
+    assert max_depth["param_type"] == "int"
+    if max_depth["param_type"] == "int":
+        assert max_depth["low"] == 3
+        assert max_depth["high"] == 10
+
+    # Check learning_rate uses log scale
+    lr = space["learning_rate"]
+    assert lr["param_type"] == "float"
+    if lr["param_type"] == "float":
+        assert lr["log_scale"] is True
+        assert lr["low"] == 0.01
+        assert lr["high"] == 0.3
+
+
+def test_make_cleargbm_default_space_min_samples_ranges() -> None:
+    """make_cleargbm_default_space has correct min_samples ranges."""
+    space = make_cleargbm_default_space()
+
+    min_samples_split = space["min_samples_split"]
+    if min_samples_split["param_type"] == "int":
+        assert min_samples_split["low"] == 5
+        assert min_samples_split["high"] == 50
+
+    min_samples_leaf = space["min_samples_leaf"]
+    if min_samples_leaf["param_type"] == "int":
+        assert min_samples_leaf["low"] == 2
+        assert min_samples_leaf["high"] == 20
+
+
+def test_make_cleargbm_default_space_max_bins_choices() -> None:
+    """make_cleargbm_default_space has correct max_bins choices."""
+    space = make_cleargbm_default_space()
+
+    max_bins = space["max_bins"]
+    assert max_bins["param_type"] == "categorical_int"
+    if max_bins["param_type"] == "categorical_int":
+        assert max_bins["choices"] == (32, 64, 128)
+
+
+def test_make_cleargbm_default_space_subsample_range() -> None:
+    """make_cleargbm_default_space has correct subsample range."""
+    space = make_cleargbm_default_space()
+
+    subsample = space["subsample"]
+    assert subsample["param_type"] == "float"
+    if subsample["param_type"] == "float":
+        assert subsample["low"] == 0.6
+        assert subsample["high"] == 1.0
+        assert subsample["log_scale"] is False
+
+
+def test_make_cleargbm_focused_space_narrows_around_best() -> None:
+    """make_cleargbm_focused_space creates narrower ranges around best values."""
+    space = make_cleargbm_focused_space(best_max_depth=5, best_learning_rate=0.1)
+
+    max_depth = space["max_depth"]
+    if max_depth["param_type"] == "int":
+        assert max_depth["low"] == 3  # max(2, 5-2)
+        assert max_depth["high"] == 7  # min(15, 5+2)
+
+    lr = space["learning_rate"]
+    if lr["param_type"] == "float":
+        assert lr["low"] == 0.05  # max(0.001, 0.1*0.5)
+        assert lr["high"] == 0.2  # min(0.5, 0.1*2.0)
+
+
+def test_make_cleargbm_focused_space_clamps_max_depth() -> None:
+    """make_cleargbm_focused_space clamps max_depth to valid range."""
+    space_low = make_cleargbm_focused_space(best_max_depth=2, best_learning_rate=0.1)
+    depth_low = space_low["max_depth"]
+    if depth_low["param_type"] == "int":
+        assert depth_low["low"] == 2  # max(2, 2-2) = 2
+
+    space_high = make_cleargbm_focused_space(best_max_depth=14, best_learning_rate=0.1)
+    depth_high = space_high["max_depth"]
+    if depth_high["param_type"] == "int":
+        assert depth_high["high"] == 15  # min(15, 14+2) = 15
+
+
+def test_make_cleargbm_focused_space_clamps_learning_rate() -> None:
+    """make_cleargbm_focused_space clamps learning rate to valid range."""
+    space_low = make_cleargbm_focused_space(best_max_depth=5, best_learning_rate=0.001)
+    lr_low = space_low["learning_rate"]
+    if lr_low["param_type"] == "float":
+        assert lr_low["low"] == 0.001  # max(0.001, 0.001*0.5) = 0.001
+
+    space_high = make_cleargbm_focused_space(best_max_depth=5, best_learning_rate=0.4)
+    lr_high = space_high["learning_rate"]
+    if lr_high["param_type"] == "float":
+        assert lr_high["high"] == 0.5  # min(0.5, 0.4*2.0) = 0.5
+
+
+def test_make_cleargbm_focused_space_narrower_ranges() -> None:
+    """make_cleargbm_focused_space has narrower secondary parameter ranges."""
+    space = make_cleargbm_focused_space(best_max_depth=5, best_learning_rate=0.1)
+
+    # n_estimators narrower (75-200 vs 50-300)
+    n_estimators = space["n_estimators"]
+    if n_estimators["param_type"] == "int":
+        assert n_estimators["low"] == 75
+        assert n_estimators["high"] == 200
+
+    # min_samples_split narrower (5-30 vs 5-50)
+    min_samples_split = space["min_samples_split"]
+    if min_samples_split["param_type"] == "int":
+        assert min_samples_split["low"] == 5
+        assert min_samples_split["high"] == 30
+
+    # min_samples_leaf narrower (2-15 vs 2-20)
+    min_samples_leaf = space["min_samples_leaf"]
+    if min_samples_leaf["param_type"] == "int":
+        assert min_samples_leaf["low"] == 2
+        assert min_samples_leaf["high"] == 15
+
+    # max_bins reduced choices (64,128 vs 32,64,128)
+    max_bins = space["max_bins"]
+    if max_bins["param_type"] == "categorical_int":
+        assert max_bins["choices"] == (64, 128)
+
+    # subsample narrower (0.7-1.0 vs 0.6-1.0)
+    subsample = space["subsample"]
+    if subsample["param_type"] == "float":
+        assert subsample["low"] == 0.7
+        assert subsample["high"] == 1.0

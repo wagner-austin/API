@@ -26,6 +26,7 @@ from covenant_ml.optimizer.optuna_backend import (
     _sample_param_int,
     _sample_param_str,
     _sample_xgboost_dart_params,
+    create_cleargbm_optimizer,
     create_lightgbm_optimizer,
     create_lstm_optimizer,
     create_mlp_optimizer,
@@ -34,6 +35,7 @@ from covenant_ml.optimizer.optuna_backend import (
     use_real_optuna,
 )
 from covenant_ml.optimizer.search_spaces import (
+    make_cleargbm_default_space,
     make_lightgbm_default_space,
     make_lstm_default_space,
     make_mlp_default_space,
@@ -1202,6 +1204,159 @@ def test_lightgbm_optimizer_with_timeout() -> None:
             y_labels=y,
             feature_names=names,
             search_space=make_lightgbm_default_space(),
+            config=_make_config(n_trials=3, timeout_seconds=60),
+            objective=_FakeObjective(),
+        )
+        assert summary["n_trials_complete"] == 3
+    finally:
+        set_optuna_module_hook(None)
+
+
+# =============================================================================
+# ClearGBM Optimizer Tests
+# =============================================================================
+
+
+def test_cleargbm_optimizer_completes_trials() -> None:
+    """ClearGBM optimizer completes configured number of trials."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3),
+            objective=_FakeObjective(),
+        )
+        assert summary["n_trials_complete"] == 3
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_returns_best_params() -> None:
+    """ClearGBM optimizer returns best parameters in summary."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3),
+            objective=_FakeObjective(),
+        )
+        # ClearGBM has 5 int params: n_estimators, max_depth, min_samples_split,
+        # min_samples_leaf, max_bins
+        assert len(summary["best_int_params"]) == 5
+        # ClearGBM has 2 float params: learning_rate, subsample
+        assert len(summary["best_float_params"]) == 2
+        # ClearGBM has no string params
+        assert len(summary["best_string_params"]) == 0
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_best_value_in_summary() -> None:
+    """ClearGBM optimizer returns best value in summary."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3),
+            objective=_FakeObjective(),
+        )
+        # _FakeObjective returns values in [0.5, 1.0] based on learning_rate
+        assert 0.5 <= summary["best_value"] <= 1.0
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_records_duration() -> None:
+    """ClearGBM optimizer records total duration."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3),
+            objective=_FakeObjective(),
+        )
+        assert summary["total_duration_seconds"] >= 0.0
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_without_pruning() -> None:
+    """ClearGBM optimizer works without pruning."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3, pruning_enabled=False),
+            objective=_FakeObjective(),
+        )
+        assert summary["n_trials_complete"] == 3
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_with_trial_callback() -> None:
+    """ClearGBM optimizer calls trial_callback for each trial."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        callbacks: list[TrialResult] = []
+
+        def on_trial(result: TrialResult) -> None:
+            callbacks.append(result)
+
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
+            config=_make_config(n_trials=3),
+            objective=_FakeObjective(),
+            trial_callback=on_trial,
+        )
+        assert len(callbacks) == 3
+        for result in callbacks:
+            assert result["state"] == "complete"
+    finally:
+        set_optuna_module_hook(None)
+
+
+def test_cleargbm_optimizer_with_timeout() -> None:
+    """ClearGBM optimizer accepts timeout_seconds."""
+    set_optuna_module_hook(_get_fake_optuna_factories)
+    try:
+        optimizer = create_cleargbm_optimizer()
+        x, y, names = _make_test_data()
+        summary = optimizer.optimize(
+            x_features=x,
+            y_labels=y,
+            feature_names=names,
+            search_space=make_cleargbm_default_space(),
             config=_make_config(n_trials=3, timeout_seconds=60),
             objective=_FakeObjective(),
         )
