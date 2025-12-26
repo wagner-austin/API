@@ -135,7 +135,7 @@ poetry run python -m scripts.autotune --samples 10000 --features 50
 | `subsample` | float | 1.0 | Row subsampling ratio |
 | `random_state` | int | - | Random seed for reproducibility |
 | `track_contributions` | bool | - | Store per-tree contributions |
-| `monotonic_constraints` | tuple \| None | None | +1=increasing, -1=decreasing, 0=none |
+| `monotonic_constraints` | tuple[int, ...] \| None | None | +1=increasing, -1=decreasing, 0=none per feature |
 | `reg_alpha` | float | 0.0 | L1 regularization (soft thresholding) |
 | `reg_lambda` | float | 0.0 | L2 regularization (leaf shrinkage) |
 | `n_jobs` | int | 1 | Parallel workers (-1 = all cores, 1 = sequential) |
