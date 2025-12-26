@@ -155,11 +155,15 @@ class TestCalendarEvent:
             end=EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC"),
             status="confirmed",
             reminders=EventReminders(useDefault=True, overrides=()),
+            location="123 Main St",
+            recurrence=("RRULE:FREQ=WEEKLY;COUNT=10",),
         )
         encoded = encode_calendar_event(event)
         assert encoded["id"] == "event123"
         assert encoded["summary"] == "Test Event"
         assert encoded["status"] == "confirmed"
+        assert encoded["location"] == "123 Main St"
+        assert encoded["recurrence"] == ["RRULE:FREQ=WEEKLY;COUNT=10"]
 
     def test_decode_calendar_event(self) -> None:
         data: JSONObject = {
@@ -170,10 +174,44 @@ class TestCalendarEvent:
             "end": {"dateTime": "2025-12-26T15:00:00Z", "timeZone": "UTC"},
             "status": "confirmed",
             "reminders": {"useDefault": True, "overrides": []},
+            "location": "Office",
+            "recurrence": [],
         }
         event = decode_calendar_event(data)
         assert event["id"] == "event123"
         assert event["status"] == "confirmed"
+        assert event["location"] == "Office"
+        assert event["recurrence"] == ()
+
+    def test_decode_calendar_event_with_recurrence(self) -> None:
+        data: JSONObject = {
+            "id": "event123",
+            "summary": "Weekly Meeting",
+            "description": "",
+            "start": {"dateTime": "2025-12-26T14:00:00Z", "timeZone": "UTC"},
+            "end": {"dateTime": "2025-12-26T15:00:00Z", "timeZone": "UTC"},
+            "status": "confirmed",
+            "reminders": {"useDefault": True, "overrides": []},
+            "location": "",
+            "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"],
+        }
+        event = decode_calendar_event(data)
+        assert event["recurrence"] == ("RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR",)
+
+    def test_decode_calendar_event_defaults_location(self) -> None:
+        """Test that missing location defaults to empty string."""
+        data: JSONObject = {
+            "id": "event123",
+            "summary": "Test",
+            "description": "",
+            "start": {"dateTime": "2025-12-26T14:00:00Z", "timeZone": "UTC"},
+            "end": {"dateTime": "2025-12-26T15:00:00Z", "timeZone": "UTC"},
+            "status": "confirmed",
+            "reminders": {"useDefault": True, "overrides": []},
+        }
+        event = decode_calendar_event(data)
+        assert event["location"] == ""
+        assert event["recurrence"] == ()
 
     def test_decode_calendar_event_tentative(self) -> None:
         data: JSONObject = {
@@ -226,6 +264,49 @@ class TestCalendarEvent:
         }
         with pytest.raises(JSONTypeError, match="must be an object"):
             decode_calendar_event(data)
+
+    def test_decode_calendar_event_invalid_recurrence(self) -> None:
+        data: JSONObject = {
+            "id": "event123",
+            "summary": "Test",
+            "description": "",
+            "start": {"dateTime": "2025-12-26T14:00:00Z", "timeZone": "UTC"},
+            "end": {"dateTime": "2025-12-26T15:00:00Z", "timeZone": "UTC"},
+            "status": "confirmed",
+            "reminders": {"useDefault": True, "overrides": []},
+            "recurrence": "not_a_list",
+        }
+        with pytest.raises(JSONTypeError, match="must be a list"):
+            decode_calendar_event(data)
+
+    def test_decode_calendar_event_invalid_recurrence_item(self) -> None:
+        data: JSONObject = {
+            "id": "event123",
+            "summary": "Test",
+            "description": "",
+            "start": {"dateTime": "2025-12-26T14:00:00Z", "timeZone": "UTC"},
+            "end": {"dateTime": "2025-12-26T15:00:00Z", "timeZone": "UTC"},
+            "status": "confirmed",
+            "reminders": {"useDefault": True, "overrides": []},
+            "recurrence": [123],
+        }
+        with pytest.raises(JSONTypeError, match="must be a string"):
+            decode_calendar_event(data)
+
+    def test_roundtrip_calendar_event(self) -> None:
+        original = CalendarEvent(
+            id="event123",
+            summary="Test Event",
+            description="Test description",
+            start=EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC"),
+            end=EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC"),
+            status="confirmed",
+            reminders=EventReminders(useDefault=True, overrides=()),
+            location="Meeting Room A",
+            recurrence=("RRULE:FREQ=DAILY;COUNT=5",),
+        )
+        decoded = decode_calendar_event(encode_calendar_event(original))
+        assert decoded == original
 
 
 class TestCalendarListItem:
