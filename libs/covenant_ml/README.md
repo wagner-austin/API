@@ -722,12 +722,14 @@ TypedDicts for model manifest serialization:
 | `TrialResult` | TypedDict for single trial result |
 | `XGBoostSearchSpace` | TypedDict for XGBoost hyperparameters |
 | `LightGBMSearchSpace` | TypedDict for LightGBM hyperparameters |
+| `ClearGBMSearchSpace` | TypedDict for ClearGBM hyperparameters |
 | `MLPSearchSpace` | TypedDict for MLP hyperparameters |
 | `LSTMSearchSpace` | TypedDict for LSTM hyperparameters |
 | `FloatRangeSpec` | Float parameter range specification |
 | `IntRangeSpec` | Integer parameter range specification |
 | `OptunaXGBoostOptimizer` | XGBoost hyperparameter optimizer |
 | `OptunaLightGBMOptimizer` | LightGBM hyperparameter optimizer |
+| `OptunaClearGBMOptimizer` | ClearGBM hyperparameter optimizer |
 | `OptunaMLPOptimizer` | MLP hyperparameter optimizer |
 | `OptunaLSTMOptimizer` | LSTM hyperparameter optimizer |
 
@@ -1174,10 +1176,10 @@ if registry.is_compatible("gradient", "mlp"):
 
 | Explainer | Compatible Backends | Requires Gradients | Speed |
 |-----------|--------------------|--------------------|-------|
-| `permutation` | All (xgboost, lightgbm, mlp, lstm) | No | Medium |
+| `permutation` | All (xgboost, lightgbm, cleargbm, mlp, lstm) | No | Medium |
 | `gradient` | Neural nets (mlp, lstm) | Yes | Fast |
 | `integrated_gradients` | Neural nets (mlp, lstm) | Yes | Slow |
-| `shap_tree` | Tree models (xgboost, lightgbm) | No | Medium |
+| `shap_tree` | Tree models (xgboost, lightgbm, cleargbm) | No | Medium |
 
 ### Explainer Types
 
@@ -1234,6 +1236,7 @@ print(f"Trials: {summary['n_trials']}")
 |----------|---------|-------------|
 | `create_xgboost_optimizer()` | XGBoost | Create XGBoost hyperparameter optimizer |
 | `create_lightgbm_optimizer()` | LightGBM | Create LightGBM hyperparameter optimizer |
+| `create_cleargbm_optimizer()` | ClearGBM | Create ClearGBM hyperparameter optimizer |
 | `create_mlp_optimizer()` | MLP | Create MLP hyperparameter optimizer |
 | `create_lstm_optimizer()` | LSTM | Create LSTM hyperparameter optimizer |
 
@@ -1244,6 +1247,9 @@ print(f"Trials: {summary['n_trials']}")
 | `make_xgboost_default_space()` | Default XGBoost search space (includes DART booster) |
 | `make_xgboost_focused_space()` | Narrower space for fine-tuning |
 | `make_lightgbm_default_space()` | Default LightGBM search space (includes DART boosting) |
+| `make_lightgbm_focused_space()` | Narrower LightGBM space for fine-tuning |
+| `make_cleargbm_default_space()` | Default ClearGBM search space |
+| `make_cleargbm_focused_space()` | Narrower ClearGBM space for fine-tuning |
 | `make_mlp_default_space()` | Default MLP search space |
 | `make_lstm_default_space()` | Default LSTM search space |
 | `make_default_optimization_config(n_trials)` | Default optimization config |
