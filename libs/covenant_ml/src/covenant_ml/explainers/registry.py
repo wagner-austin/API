@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Protocol, TypedDict
 
 import numpy as np
+from cleargbm.types import GradientBoostingModel
 from numpy.typing import NDArray
 from platform_ml.explainers import (
     FeatureExplainer,
@@ -26,8 +27,27 @@ from platform_ml.explainers.types import (
     FeatureImportanceScore,
 )
 
+from ..backends.cleargbm import try_extract_cleargbm_model
 from ..types import BackendName
+from .cleargbm_shap import ClearGBMShapWrapper
 from .types import SupportedExplainer
+
+
+class ClearGBMPreparedProtocol(Protocol):
+    """Protocol for ClearGBM prepared classifier with model access.
+
+    Used to detect ClearGBM models and extract the underlying
+    GradientBoostingModel for SHAP explanation.
+    """
+
+    @property
+    def model(self) -> GradientBoostingModel:
+        """Get the underlying ClearGBM model."""
+        ...
+
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Predict class probabilities."""
+        ...
 
 
 class ExplainerFactory(Protocol):
@@ -478,8 +498,14 @@ class _IntegratedGradientsAdapter:
 class _ShapTreeAdapter:
     """Adapter to make ShapTreeWrapper conform to FeatureExplainer protocol.
 
-    Wraps ShapTreeWrapper to provide compute_importance() method that returns
+    Wraps ShapTreeWrapper (for XGBoost/LightGBM) or ClearGBMShapWrapper
+    (for ClearGBM) to provide compute_importance() method that returns
     aggregated SHAP values as FeatureImportanceScore list.
+
+    Supports multiple tree-based backends:
+    - XGBoost: Uses ShapTreeWrapper with shap.TreeExplainer
+    - LightGBM: Uses ShapTreeWrapper with shap.TreeExplainer
+    - ClearGBM: Uses ClearGBMShapWrapper with converted tree format
     """
 
     def __init__(self) -> None:
@@ -509,6 +535,11 @@ class _ShapTreeAdapter:
     ) -> list[FeatureImportanceScore]:
         """Compute feature importance using SHAP TreeExplainer.
 
+        Automatically detects the model type and uses the appropriate
+        SHAP wrapper:
+        - ClearGBM models: ClearGBMShapWrapper
+        - XGBoost/LightGBM models: ShapTreeWrapper
+
         Args:
             model: Tree model implementing PredictorProtocol.
             x_data: Input data with shape (n_samples, n_features).
@@ -518,12 +549,35 @@ class _ShapTreeAdapter:
         Returns:
             List of FeatureImportanceScore sorted by importance.
         """
-        # Create wrapper for this model
-        wrapper = ShapTreeWrapper(model)
+        # Detect model type and create appropriate wrapper
+        raw_explanations: list[_LocalExplanation]
 
-        # Get local explanations for all samples
-        # ShapTreeWrapper returns list of dicts: values, feature_names, base_value
-        raw_explanations = wrapper.explain_local(x_data, feature_names)
+        gbm_model = try_extract_cleargbm_model(model)
+        if gbm_model is not None:
+            # Use ClearGBM-specific SHAP wrapper
+            wrapper = ClearGBMShapWrapper(gbm_model)
+            cgbm_explanations = wrapper.explain_local(x_data, feature_names)
+            # Convert to _LocalExplanation format
+            raw_explanations = [
+                _LocalExplanation(
+                    base_value=exp["base_value"],
+                    values=exp["values"],
+                    feature_names=exp["feature_names"],
+                )
+                for exp in cgbm_explanations
+            ]
+        else:
+            # Use standard ShapTreeWrapper for XGBoost/LightGBM
+            tree_wrapper = ShapTreeWrapper(model)
+            tree_explanations = tree_wrapper.explain_local(x_data, feature_names)
+            raw_explanations = [
+                _LocalExplanation(
+                    base_value=exp["base_value"],
+                    values=exp["values"],
+                    feature_names=exp["feature_names"],
+                )
+                for exp in tree_explanations
+            ]
 
         # Aggregate SHAP values across samples (mean absolute value)
         n_features = len(feature_names)
@@ -597,7 +651,9 @@ def _create_integrated_gradients_factory() -> ExplainerFactory:
 def _create_shap_tree_factory() -> ExplainerFactory:
     """Create factory for SHAP tree explainer.
 
-    Returns adapter that wraps ShapTreeWrapper to match FeatureExplainer protocol.
+    Returns adapter that wraps ShapTreeWrapper (for XGBoost/LightGBM) or
+    ClearGBMShapWrapper (for ClearGBM) to match FeatureExplainer protocol.
+    Model type is auto-detected at runtime.
     """
 
     def factory() -> FeatureExplainer:
@@ -645,12 +701,12 @@ def default_explainer_registry() -> ExplainerRegistry:
         ),
     )
 
-    # SHAP Tree: only tree-based backends
+    # SHAP Tree: tree-based backends (XGBoost, LightGBM, ClearGBM)
     reg.register(
         "shap_tree",
         ExplainerRegistration(
             factory=_create_shap_tree_factory(),
-            compatible_backends=frozenset(["xgboost", "lightgbm"]),
+            compatible_backends=frozenset(["xgboost", "lightgbm", "cleargbm"]),
             requires_gradients=False,
         ),
     )
@@ -659,6 +715,7 @@ def default_explainer_registry() -> ExplainerRegistry:
 
 
 __all__ = [
+    "ClearGBMPreparedProtocol",
     "ExplainerFactory",
     "ExplainerRegistration",
     "ExplainerRegistry",
@@ -672,4 +729,5 @@ __all__ = [
     "_get_importance_from_pair",
     "_rank_features",
     "default_explainer_registry",
+    "try_extract_cleargbm_model",
 ]
