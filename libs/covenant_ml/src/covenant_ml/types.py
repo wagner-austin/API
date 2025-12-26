@@ -209,12 +209,18 @@ class ClearGBMConfig(TypedDict, total=True):
         learning_rate: Shrinkage factor for updates.
         min_samples_split: Minimum samples required to split a node.
         min_samples_leaf: Minimum samples required in a leaf.
+        max_features: Max features per split (None = all, int = count, float = fraction).
         max_bins: Histogram bins for O(K) split finding (default: 64).
         subsample: Row subsampling ratio (1.0 = no subsampling).
+        random_state: Random seed for reproducibility.
+        track_contributions: Enable per-prediction feature contribution tracking.
+        monotonic_constraints: Dict mapping feature names to +1 (increasing) or -1 (decreasing).
+        reg_alpha: L1 regularization term on leaf weights.
+        reg_lambda: L2 regularization term on leaf weights.
+        n_jobs: Number of parallel workers (-1 = all cores, 1 = sequential).
         train_ratio: Fraction of data for training.
         val_ratio: Fraction of data for validation.
         test_ratio: Fraction of data for testing.
-        random_state: Random seed for reproducibility.
         early_stopping_rounds: Rounds without improvement to stop.
     """
 
@@ -223,12 +229,18 @@ class ClearGBMConfig(TypedDict, total=True):
     learning_rate: float
     min_samples_split: int
     min_samples_leaf: int
+    max_features: int | float | None
     max_bins: int
     subsample: float
+    random_state: int
+    track_contributions: bool
+    monotonic_constraints: dict[str, int] | None
+    reg_alpha: float
+    reg_lambda: float
+    n_jobs: int
     train_ratio: float
     val_ratio: float
     test_ratio: float
-    random_state: int
     early_stopping_rounds: int
 
 

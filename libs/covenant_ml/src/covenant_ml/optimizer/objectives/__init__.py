@@ -15,6 +15,8 @@ Usage:
         create_lstm_objective,
         LightGBMObjective,
         create_lightgbm_objective,
+        ClearGBMObjective,
+        create_cleargbm_objective,
     )
 
     # XGBoost objective
@@ -62,9 +64,22 @@ Usage:
         early_stopping_rounds=10,
     )
 
+    # ClearGBM objective
+    cgbm_objective = create_cleargbm_objective(
+        x_features=X,
+        y_labels=y,
+        feature_names=names,
+        feature_preset="none",
+        early_stopping_rounds=10,
+    )
+
     # Pass to optimizer.optimize()
 """
 
+from .cleargbm_objective import (
+    ClearGBMObjective,
+    create_cleargbm_objective,
+)
 from .lightgbm_objective import (
     LightGBMObjective,
     create_lightgbm_objective,
@@ -83,10 +98,12 @@ from .xgboost_objective import (
 )
 
 __all__ = [
+    "ClearGBMObjective",
     "LSTMObjective",
     "LightGBMObjective",
     "MLPObjective",
     "XGBoostObjective",
+    "create_cleargbm_objective",
     "create_lightgbm_objective",
     "create_lstm_objective",
     "create_mlp_objective",

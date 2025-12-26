@@ -85,6 +85,10 @@ class SampledIntParams(TypedDict, total=False):
     batch_size: int
     num_leaves: int
     min_child_samples: int
+    # ClearGBM-specific params
+    min_samples_split: int
+    min_samples_leaf: int
+    max_bins: int
 
 
 class SampledFloatParams(TypedDict, total=False):
@@ -205,8 +209,37 @@ class LightGBMSearchSpace(_LightGBMSearchSpaceRequired, total=False):
     feature_fraction: FloatRangeSpec | CategoricalFloatSpec
 
 
+class ClearGBMSearchSpace(TypedDict, total=True):
+    """Search space for ClearGBM hyperparameters.
+
+    ClearGBM is a pure Python from-scratch gradient boosting implementation
+    with built-in interpretability features. The search space includes:
+    - n_estimators: Number of boosting rounds
+    - max_depth: Maximum tree depth
+    - learning_rate: Shrinkage factor
+    - min_samples_split: Minimum samples to split a node
+    - min_samples_leaf: Minimum samples in a leaf
+    - max_bins: Histogram bins for split finding
+    - subsample: Row subsampling ratio
+    """
+
+    n_estimators: IntRangeSpec | CategoricalIntSpec
+    max_depth: IntRangeSpec | CategoricalIntSpec
+    learning_rate: FloatRangeSpec | CategoricalFloatSpec
+    min_samples_split: IntRangeSpec | CategoricalIntSpec
+    min_samples_leaf: IntRangeSpec | CategoricalIntSpec
+    max_bins: IntRangeSpec | CategoricalIntSpec
+    subsample: FloatRangeSpec | CategoricalFloatSpec
+
+
 # Union of all backend-specific search spaces for generic optimizer interfaces
-SearchSpace = XGBoostSearchSpace | MLPSearchSpace | LSTMSearchSpace | LightGBMSearchSpace
+SearchSpace = (
+    XGBoostSearchSpace
+    | MLPSearchSpace
+    | LSTMSearchSpace
+    | LightGBMSearchSpace
+    | ClearGBMSearchSpace
+)
 
 
 # =============================================================================
@@ -266,6 +299,7 @@ __all__ = [
     "CategoricalFloatSpec",
     "CategoricalIntSpec",
     "CategoricalStringSpec",
+    "ClearGBMSearchSpace",
     "DeviceRequest",
     "FloatRangeSpec",
     "IntRangeSpec",

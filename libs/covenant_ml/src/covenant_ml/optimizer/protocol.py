@@ -12,6 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .types import (
+    ClearGBMSearchSpace,
     LightGBMSearchSpace,
     LSTMSearchSpace,
     MLPSearchSpace,
@@ -172,7 +173,25 @@ class LightGBMOptimizerProtocol(Protocol):
         ...
 
 
+class ClearGBMOptimizerProtocol(Protocol):
+    """Protocol for ClearGBM hyperparameter optimizers."""
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: ClearGBMSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        """Run hyperparameter optimization for ClearGBM."""
+        ...
+
+
 __all__ = [
+    "ClearGBMOptimizerProtocol",
     "LSTMOptimizerProtocol",
     "LightGBMOptimizerProtocol",
     "MLPOptimizerProtocol",

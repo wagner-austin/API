@@ -43,20 +43,24 @@ Usage:
 """
 
 from .objectives import (
+    ClearGBMObjective,
     LightGBMObjective,
     LSTMObjective,
     MLPObjective,
     XGBoostObjective,
+    create_cleargbm_objective,
     create_lightgbm_objective,
     create_lstm_objective,
     create_mlp_objective,
     create_xgboost_objective,
 )
 from .optuna_backend import (
+    OptunaClearGBMOptimizer,
     OptunaLightGBMOptimizer,
     OptunaLSTMOptimizer,
     OptunaMLPOptimizer,
     OptunaXGBoostOptimizer,
+    create_cleargbm_optimizer,
     create_lightgbm_optimizer,
     create_lstm_optimizer,
     create_mlp_optimizer,
@@ -65,6 +69,7 @@ from .optuna_backend import (
     use_real_optuna,
 )
 from .protocol import (
+    ClearGBMOptimizerProtocol,
     LightGBMOptimizerProtocol,
     LSTMOptimizerProtocol,
     MLPOptimizerProtocol,
@@ -78,6 +83,8 @@ from .registry import (
     default_optimizer_registry,
 )
 from .search_spaces import (
+    make_cleargbm_default_space,
+    make_cleargbm_focused_space,
     make_default_optimization_config,
     make_lightgbm_default_space,
     make_lightgbm_focused_space,
@@ -106,6 +113,7 @@ from .strategy_protocol import (
 from .types import (
     CategoricalFloatSpec,
     CategoricalIntSpec,
+    ClearGBMSearchSpace,
     FloatRangeSpec,
     IntRangeSpec,
     LightGBMSearchSpace,
@@ -124,6 +132,9 @@ from .types import (
 __all__ = [
     "CategoricalFloatSpec",
     "CategoricalIntSpec",
+    "ClearGBMObjective",
+    "ClearGBMOptimizerProtocol",
+    "ClearGBMSearchSpace",
     "FloatRangeSpec",
     "GridSearchOptimizer",
     "HyperparameterOptimizerProtocol",
@@ -145,6 +156,7 @@ __all__ = [
     "OptimizerStrategyName",
     "OptimizerStrategyRegistration",
     "OptimizerStrategyRegistry",
+    "OptunaClearGBMOptimizer",
     "OptunaLSTMOptimizer",
     "OptunaLightGBMOptimizer",
     "OptunaMLPOptimizer",
@@ -160,6 +172,8 @@ __all__ = [
     "XGBoostObjective",
     "XGBoostOptimizerProtocol",
     "XGBoostSearchSpace",
+    "create_cleargbm_objective",
+    "create_cleargbm_optimizer",
     "create_grid_search_optimizer",
     "create_lightgbm_objective",
     "create_lightgbm_optimizer",
@@ -172,6 +186,8 @@ __all__ = [
     "create_xgboost_objective",
     "create_xgboost_optimizer",
     "default_optimizer_registry",
+    "make_cleargbm_default_space",
+    "make_cleargbm_focused_space",
     "make_default_optimization_config",
     "make_lightgbm_default_space",
     "make_lightgbm_focused_space",

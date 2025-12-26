@@ -620,7 +620,7 @@ def default_explainer_registry() -> ExplainerRegistry:
         "permutation",
         ExplainerRegistration(
             factory=_create_permutation_factory(),
-            compatible_backends=frozenset(["xgboost", "lightgbm", "mlp", "lstm"]),
+            compatible_backends=frozenset(["xgboost", "lightgbm", "mlp", "lstm", "cleargbm"]),
             requires_gradients=False,
         ),
     )
