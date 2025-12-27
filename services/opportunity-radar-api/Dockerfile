@@ -42,8 +42,6 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 
-# Create Kaggle config directory for API credentials
-RUN mkdir -p /home/app/.kaggle && chown -R app:app /home/app/.kaggle
 
 WORKDIR /workspace
 
@@ -62,5 +60,4 @@ WORKDIR /app
 USER app
 
 EXPOSE 8000
-# Write Kaggle API token to file if env var is set (Kaggle Python API expects token in file)
-CMD ["sh", "-c", "if [ -n \"$KAGGLE_API_TOKEN\" ]; then echo \"$KAGGLE_API_TOKEN\" > /home/app/.kaggle/access_token; fi && exec hypercorn 'opportunity_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
+CMD ["sh", "-c", "exec hypercorn 'opportunity_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]

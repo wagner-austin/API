@@ -18,13 +18,13 @@ FastAPI service for discovering Kaggle competitions and Devpost hackathons that 
 
 - Python 3.11+
 - Poetry 1.8+
-- Kaggle API credentials (`~/.kaggle/kaggle.json`)
+- Kaggle API token (`KAGGLE_API_TOKEN` environment variable)
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `KAGGLE_API_TOKEN` | No | Kaggle API token (or use `~/.kaggle/kaggle.json`) |
+| `KAGGLE_API_TOKEN` | Yes | Kaggle API token for API access |
 | `PORT` | No | Server port (default: 8010) |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 | `LOG_FORMAT` | No | Log format: `json` or `text` (default: json) |

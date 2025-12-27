@@ -413,7 +413,7 @@ docker build -f services/opportunity-radar-api/Dockerfile -t opportunity-radar-a
 
 # Run
 docker run -p 8000:8000 \
-  -v ~/.kaggle:/home/app/.kaggle:ro \
+  -e KAGGLE_API_TOKEN="$KAGGLE_API_TOKEN" \
   opportunity-radar-api
 ```
 
@@ -422,14 +422,11 @@ docker run -p 8000:8000 \
 | Variable | Description |
 |----------|-------------|
 | `PORT` | Server port (default: 8000) |
-| `KAGGLE_USERNAME` | Kaggle username (alternative to kaggle.json) |
-| `KAGGLE_KEY` | Kaggle API key (alternative to kaggle.json) |
+| `KAGGLE_API_TOKEN` | Kaggle API token (required) |
 
 ### Kaggle Credentials
 
-The Kaggle API requires credentials. Options:
-1. Mount `~/.kaggle/kaggle.json` into container
-2. Set `KAGGLE_USERNAME` and `KAGGLE_KEY` environment variables
+The Kaggle API requires the `KAGGLE_API_TOKEN` environment variable to be set.
 
 ## Future Enhancements
 
