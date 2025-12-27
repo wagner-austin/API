@@ -35,45 +35,6 @@ from covenant_ml.trainer import preprocess_data_splits, stratified_split
 _log = get_logger(__name__)
 
 
-def _ndarray_to_float_matrix(x: NDArray[np.float64]) -> tuple[tuple[float, ...], ...]:
-    """Convert numpy 2D array to tuple of tuples.
-
-    Args:
-        x: 2D numpy array of floats.
-
-    Returns:
-        Tuple of tuples of floats.
-    """
-    result: list[tuple[float, ...]] = []
-    n_rows = int(x.shape[0])
-    for i in range(n_rows):
-        row_arr: NDArray[np.float64] = x[i, :]
-        row_list: list[float] = []
-        n_cols = int(row_arr.shape[0])
-        for j in range(n_cols):
-            val: np.float64 = row_arr[j]
-            row_list.append(float(val))
-        result.append(tuple(row_list))
-    return tuple(result)
-
-
-def _ndarray_to_int_tuple(y: NDArray[np.int64]) -> tuple[int, ...]:
-    """Convert numpy 1D array to tuple of ints.
-
-    Args:
-        y: 1D numpy array of integers.
-
-    Returns:
-        Tuple of integers.
-    """
-    result: list[int] = []
-    n = int(y.shape[0])
-    for i in range(n):
-        val: np.int64 = y[i]
-        result.append(int(val))
-    return tuple(result)
-
-
 def _extract_positive_class_proba(
     proba: tuple[tuple[float, float], ...],
 ) -> NDArray[np.float64]:
@@ -159,12 +120,11 @@ class ClearGBMObjective:
         )
         self._splits = preprocess_data_splits(raw_splits)
 
-        # Convert to pure Python types (ClearGBM doesn't use numpy)
-        self._x_train = _ndarray_to_float_matrix(self._splits.x_train)
-        self._y_train = _ndarray_to_int_tuple(self._splits.y_train)
-        self._x_val = _ndarray_to_float_matrix(self._splits.x_val)
-        self._y_val = _ndarray_to_int_tuple(self._splits.y_val)
-        self._y_val_np = self._splits.y_val
+        # Store numpy arrays directly for ClearGBM
+        self._x_train: NDArray[np.float64] = self._splits.x_train
+        self._y_train: NDArray[np.int64] = self._splits.y_train
+        self._x_val: NDArray[np.float64] = self._splits.x_val
+        self._y_val: NDArray[np.int64] = self._splits.y_val
 
     @property
     def n_features(self) -> int:
@@ -216,7 +176,7 @@ class ClearGBMObjective:
         subsample = float_params.get("subsample", 1.0)
 
         # Build ClearGBM config
-        config = GradientBoostingConfig(
+        config: GradientBoostingConfig = GradientBoostingConfig(
             n_estimators=n_estimators,
             max_depth=max_depth,
             learning_rate=learning_rate,
@@ -231,6 +191,7 @@ class ClearGBMObjective:
             reg_alpha=0.0,
             reg_lambda=0.0,
             n_jobs=1,  # Sequential for stability
+            early_stopping_rounds=self._early_stopping_rounds,
         )
 
         # Train model (no progress callback for optimization)
@@ -249,7 +210,7 @@ class ClearGBMObjective:
         y_pred_proba = _extract_positive_class_proba(proba_tuple)
 
         # Use our typed compute_auc instead of sklearn
-        return compute_auc(self._y_val_np, y_pred_proba)
+        return compute_auc(self._y_val, y_pred_proba)
 
 
 def create_cleargbm_objective(

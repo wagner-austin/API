@@ -11,8 +11,6 @@ from numpy.typing import NDArray
 from covenant_ml.optimizer.objectives.cleargbm_objective import (
     ClearGBMObjective,
     _extract_positive_class_proba,
-    _ndarray_to_float_matrix,
-    _ndarray_to_int_tuple,
     create_cleargbm_objective,
 )
 from covenant_ml.optimizer.types import (
@@ -101,69 +99,8 @@ def _make_default_string_params() -> SampledStringParams:
 
 
 # =============================================================================
-# Tests: Conversion Helpers
+# Tests: Helper Functions
 # =============================================================================
-
-
-class TestNdarrayToFloatMatrix:
-    """Tests for _ndarray_to_float_matrix conversion function."""
-
-    def test_converts_2d_array_to_tuples(self) -> None:
-        """_ndarray_to_float_matrix converts 2D array to tuple of tuples."""
-        data: tuple[tuple[float, ...], ...] = ((1.0, 2.0), (3.0, 4.0))
-        x: NDArray[np.float64] = np.array(data, dtype=np.float64)
-        result = _ndarray_to_float_matrix(x)
-        assert result == ((1.0, 2.0), (3.0, 4.0))
-
-    def test_preserves_float_values(self) -> None:
-        """_ndarray_to_float_matrix preserves decimal values."""
-        data: tuple[tuple[float, ...], ...] = ((1.5, 2.25), (3.75, 4.125))
-        x: NDArray[np.float64] = np.array(data, dtype=np.float64)
-        result = _ndarray_to_float_matrix(x)
-        assert result[0][0] == 1.5
-        assert result[0][1] == 2.25
-        assert result[1][0] == 3.75
-        assert result[1][1] == 4.125
-
-    def test_handles_single_row(self) -> None:
-        """_ndarray_to_float_matrix handles single row array."""
-        data: tuple[tuple[float, ...], ...] = ((1.0, 2.0, 3.0),)
-        x: NDArray[np.float64] = np.array(data, dtype=np.float64)
-        result = _ndarray_to_float_matrix(x)
-        assert result == ((1.0, 2.0, 3.0),)
-
-    def test_handles_single_column(self) -> None:
-        """_ndarray_to_float_matrix handles single column array."""
-        data: tuple[tuple[float, ...], ...] = ((1.0,), (2.0,), (3.0,))
-        x: NDArray[np.float64] = np.array(data, dtype=np.float64)
-        result = _ndarray_to_float_matrix(x)
-        assert result == ((1.0,), (2.0,), (3.0,))
-
-
-class TestNdarrayToIntTuple:
-    """Tests for _ndarray_to_int_tuple conversion function."""
-
-    def test_converts_1d_array_to_tuple(self) -> None:
-        """_ndarray_to_int_tuple converts 1D array to tuple."""
-        data: tuple[int, ...] = (0, 1, 0, 1)
-        y: NDArray[np.int64] = np.array(data, dtype=np.int64)
-        result = _ndarray_to_int_tuple(y)
-        assert result == (0, 1, 0, 1)
-
-    def test_preserves_int_values(self) -> None:
-        """_ndarray_to_int_tuple preserves integer values."""
-        data: tuple[int, ...] = (0, 1, 1, 0, 1)
-        y: NDArray[np.int64] = np.array(data, dtype=np.int64)
-        result = _ndarray_to_int_tuple(y)
-        assert all(v in (0, 1) for v in result)
-        assert len(result) == 5
-
-    def test_handles_single_element(self) -> None:
-        """_ndarray_to_int_tuple handles single element array."""
-        data: tuple[int, ...] = (1,)
-        y: NDArray[np.int64] = np.array(data, dtype=np.int64)
-        result = _ndarray_to_int_tuple(y)
-        assert result == (1,)
 
 
 class TestExtractPositiveClassProba:

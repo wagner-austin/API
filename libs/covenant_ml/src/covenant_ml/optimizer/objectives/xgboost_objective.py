@@ -241,6 +241,7 @@ class XGBoostObjective:
             "tree_method": "hist",
             "device": self._device,
             "seed": random_state,
+            "nthread": 1,  # Sequential for stability during optimization
         }
 
         # Add DART-specific params when using DART booster

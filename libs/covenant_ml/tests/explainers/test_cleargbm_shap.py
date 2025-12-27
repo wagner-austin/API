@@ -74,7 +74,7 @@ def _make_x_1x3() -> NDArray[np.float64]:
 
 def _make_config() -> GradientBoostingConfig:
     """Create minimal GradientBoostingConfig for testing."""
-    return GradientBoostingConfig(
+    config: GradientBoostingConfig = GradientBoostingConfig(
         n_estimators=2,
         max_depth=2,
         learning_rate=0.1,
@@ -89,7 +89,9 @@ def _make_config() -> GradientBoostingConfig:
         reg_alpha=0.0,
         reg_lambda=1.0,
         n_jobs=1,
+        early_stopping_rounds=10,
     )
+    return config
 
 
 def _make_leaf_node(

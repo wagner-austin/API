@@ -105,45 +105,6 @@ def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]
     )
 
 
-def _ndarray_to_float_matrix(x: NDArray[np.float64]) -> tuple[tuple[float, ...], ...]:
-    """Convert numpy 2D array to tuple of tuples.
-
-    Args:
-        x: 2D numpy array of floats.
-
-    Returns:
-        Tuple of tuples of floats.
-    """
-    result: list[tuple[float, ...]] = []
-    n_rows = int(x.shape[0])
-    for i in range(n_rows):
-        row_arr: NDArray[np.float64] = x[i, :]
-        row_list: list[float] = []
-        n_cols = int(row_arr.shape[0])
-        for j in range(n_cols):
-            val: np.float64 = row_arr[j]
-            row_list.append(float(val))
-        result.append(tuple(row_list))
-    return tuple(result)
-
-
-def _ndarray_to_int_tuple(y: NDArray[np.int64]) -> tuple[int, ...]:
-    """Convert numpy 1D array to tuple of ints.
-
-    Args:
-        y: 1D numpy array of integers.
-
-    Returns:
-        Tuple of integers.
-    """
-    result: list[int] = []
-    n = int(y.shape[0])
-    for i in range(n):
-        val: np.int64 = y[i]
-        result.append(int(val))
-    return tuple(result)
-
-
 def _compute_class_weight(y_train: NDArray[np.int64]) -> float:
     """Compute scale_pos_weight from training labels.
 
@@ -200,8 +161,7 @@ class _ClearGBMPrepared:
         Returns:
             Probability matrix (n_samples, 2).
         """
-        x_tuple = _ndarray_to_float_matrix(x)
-        proba_tuple = cgbm_predict_proba(self._model, x_tuple)
+        proba_tuple = cgbm_predict_proba(self._model, x)
         return np.array(proba_tuple, dtype=np.float64)
 
     @property
@@ -318,12 +278,6 @@ class ClearGBMBackend(ClassifierBackend):
         else:
             resolved_names = tuple(feature_names)
 
-        # Convert to pure Python types
-        x_train_tuple = _ndarray_to_float_matrix(splits.x_train)
-        y_train_tuple = _ndarray_to_int_tuple(splits.y_train)
-        x_val_tuple = _ndarray_to_float_matrix(splits.x_val)
-        y_val_tuple = _ndarray_to_int_tuple(splits.y_val)
-
         # Build ClearGBM config
         gbm_config: GradientBoostingConfig = GradientBoostingConfig(
             n_estimators=cfg["n_estimators"],
@@ -340,6 +294,7 @@ class ClearGBMBackend(ClassifierBackend):
             reg_alpha=0.0,
             reg_lambda=0.0,
             n_jobs=1,
+            early_stopping_rounds=cfg["early_stopping_rounds"],
         )
 
         # Track best model for early stopping
@@ -373,10 +328,10 @@ class ClearGBMBackend(ClassifierBackend):
         )
 
         model = train_gradient_boosting(
-            x_train=x_train_tuple,
-            y_train=y_train_tuple,
-            x_val=x_val_tuple,
-            y_val=y_val_tuple,
+            x_train=splits.x_train,
+            y_train=splits.y_train,
+            x_val=splits.x_val,
+            y_val=splits.y_val,
             config=gbm_config,
             feature_names=resolved_names,
             progress_callback=progress_wrapper,

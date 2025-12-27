@@ -1074,32 +1074,12 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
     from covenant_ml.backends.cleargbm import ClearGBMBackend
 
     rng = np.random.default_rng(42)
-    x_train = rng.random((100, 4)).astype(np.float64)
-    y_train = rng.integers(0, 2, size=100).astype(np.int64)
-
-    # Convert to tuples for cleargbm (explicit loops to avoid Any from generators)
-    rows: list[tuple[float, ...]] = []
-    n_rows = int(x_train.shape[0])
-    for i in range(n_rows):
-        row_arr: NDArray[np.float64] = x_train[i, :]
-        row_list: list[float] = []
-        n_cols = int(row_arr.shape[0])
-        for j in range(n_cols):
-            val: float = float(row_arr.flat[j].item())
-            row_list.append(val)
-        rows.append(tuple(row_list))
-    x_tuple: tuple[tuple[float, ...], ...] = tuple(rows)
-
-    labels: list[int] = []
-    n_labels = int(y_train.shape[0])
-    for i in range(n_labels):
-        label_val: int = int(y_train.flat[i].item())
-        labels.append(label_val)
-    y_tuple: tuple[int, ...] = tuple(labels)
+    x_train: NDArray[np.float64] = rng.random((100, 4)).astype(np.float64)
+    y_train: NDArray[np.int64] = rng.integers(0, 2, size=100).astype(np.int64)
 
     feature_names: tuple[str, ...] = ("f0", "f1", "f2", "f3")
 
-    config = GradientBoostingConfig(
+    config: GradientBoostingConfig = GradientBoostingConfig(
         n_estimators=5,
         max_depth=3,
         learning_rate=0.1,
@@ -1114,11 +1094,12 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         reg_alpha=0.0,
         reg_lambda=1.0,
         n_jobs=1,
+        early_stopping_rounds=10,
     )
 
     gbm_model = train_gradient_boosting(
-        x_train=x_tuple,
-        y_train=y_tuple,
+        x_train=x_train,
+        y_train=y_train,
         x_val=None,
         y_val=None,
         config=config,

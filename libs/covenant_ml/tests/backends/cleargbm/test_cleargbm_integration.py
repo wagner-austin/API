@@ -20,8 +20,6 @@ from covenant_ml.backends.cleargbm.backend import (
     _compute_class_weight,
     _EarlyStoppingTracker,
     _is_cleargbm_config,
-    _ndarray_to_float_matrix,
-    _ndarray_to_int_tuple,
 )
 from covenant_ml.backends.protocol import ClassifierBackend, PreparedClassifier
 from covenant_ml.types import (
@@ -193,53 +191,6 @@ def test_is_cleargbm_config_returns_false_for_missing_key() -> None:
     }
     result = _is_cleargbm_config(xgb_config)
     assert result is False
-
-
-# =============================================================================
-# Array Conversion Tests
-# =============================================================================
-
-
-def test_ndarray_to_float_matrix_single_row() -> None:
-    """_ndarray_to_float_matrix converts single row array."""
-    x: NDArray[np.float64] = np.array(((1.0, 2.0, 3.0),), dtype=np.float64)
-    result = _ndarray_to_float_matrix(x)
-    assert result == ((1.0, 2.0, 3.0),)
-
-
-def test_ndarray_to_float_matrix_multiple_rows() -> None:
-    """_ndarray_to_float_matrix converts multiple rows."""
-    x: NDArray[np.float64] = np.array(((1.0, 2.0), (3.0, 4.0), (5.0, 6.0)), dtype=np.float64)
-    result = _ndarray_to_float_matrix(x)
-    assert result == ((1.0, 2.0), (3.0, 4.0), (5.0, 6.0))
-
-
-def test_ndarray_to_float_matrix_empty() -> None:
-    """_ndarray_to_float_matrix handles empty array."""
-    x: NDArray[np.float64] = np.zeros((0, 3), dtype=np.float64)
-    result = _ndarray_to_float_matrix(x)
-    assert result == ()
-
-
-def test_ndarray_to_int_tuple_simple() -> None:
-    """_ndarray_to_int_tuple converts array to tuple."""
-    y: NDArray[np.int64] = np.array((0, 1, 0, 1, 1), dtype=np.int64)
-    result = _ndarray_to_int_tuple(y)
-    assert result == (0, 1, 0, 1, 1)
-
-
-def test_ndarray_to_int_tuple_empty() -> None:
-    """_ndarray_to_int_tuple handles empty array."""
-    y: NDArray[np.int64] = np.zeros(0, dtype=np.int64)
-    result = _ndarray_to_int_tuple(y)
-    assert result == ()
-
-
-def test_ndarray_to_int_tuple_preserves_values() -> None:
-    """_ndarray_to_int_tuple preserves integer values."""
-    y: NDArray[np.int64] = np.array((5, 10, 15, 20), dtype=np.int64)
-    result = _ndarray_to_int_tuple(y)
-    assert result == (5, 10, 15, 20)
 
 
 # =============================================================================
