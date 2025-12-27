@@ -749,3 +749,636 @@ fasttext-wheel = "^0.9.2"
 
         cap_names = [c.name for c in profile.capabilities]
         assert "language_identification" in cap_names
+
+    def test_scan_codebase_with_ddtrace(self, tmp_path: Path) -> None:
+        """Test scanning codebase with Datadog ddtrace dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "api_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "api-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ddtrace = "^2.0.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "datadog_apm" in cap_names
+
+    def test_scan_codebase_with_prometheus(self, tmp_path: Path) -> None:
+        """Test scanning codebase with prometheus-client dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "metrics_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "metrics-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+prometheus-client = "^0.17.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "prometheus_metrics" in cap_names
+
+    def test_scan_codebase_with_opentelemetry(self, tmp_path: Path) -> None:
+        """Test scanning codebase with OpenTelemetry dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "otel_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "otel-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+opentelemetry-api = "^1.20.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "opentelemetry" in cap_names
+
+    def test_scan_codebase_with_confluent_kafka(self, tmp_path: Path) -> None:
+        """Test scanning codebase with confluent-kafka dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "streaming_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "streaming-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+confluent-kafka = "^2.3.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "confluent_kafka" in cap_names
+
+    def test_scan_codebase_with_kafka_python(self, tmp_path: Path) -> None:
+        """Test scanning codebase with kafka-python dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "kafka_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "kafka-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+kafka-python = "^2.0.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "kafka_python" in cap_names
+
+    def test_scan_codebase_with_redis(self, tmp_path: Path) -> None:
+        """Test scanning codebase with redis dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "cache_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "cache-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+redis = "^5.0.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "redis" in cap_names
+
+    def test_scan_codebase_with_pika(self, tmp_path: Path) -> None:
+        """Test scanning codebase with pika (RabbitMQ) dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "mq_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "mq-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pika = "^1.3.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "rabbitmq" in cap_names
+
+    def test_scan_codebase_with_google_generativeai(self, tmp_path: Path) -> None:
+        """Test scanning codebase with google-generativeai (Gemini) dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "llm_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "llm-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-generativeai = "^0.3.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "gemini_api" in cap_names
+
+    def test_scan_codebase_with_vertex_ai(self, tmp_path: Path) -> None:
+        """Test scanning codebase with google-cloud-aiplatform dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "vertex_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "vertex-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-cloud-aiplatform = "^1.38.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "vertex_ai" in cap_names
+
+    def test_scan_codebase_with_anthropic(self, tmp_path: Path) -> None:
+        """Test scanning codebase with anthropic dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "claude_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "claude-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+anthropic = "^0.18.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "anthropic_claude" in cap_names
+
+    def test_scan_codebase_with_langchain(self, tmp_path: Path) -> None:
+        """Test scanning codebase with langchain dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "rag_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "rag-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+langchain = "^0.1.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "langchain" in cap_names
+
+    def test_scan_codebase_with_gcs(self, tmp_path: Path) -> None:
+        """Test scanning codebase with google-cloud-storage dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "storage_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "storage-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-cloud-storage = "^2.14.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "google_cloud_storage" in cap_names
+
+    def test_scan_codebase_with_bigquery(self, tmp_path: Path) -> None:
+        """Test scanning codebase with google-cloud-bigquery dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "bq_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "bq-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+google-cloud-bigquery = "^3.14.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "bigquery" in cap_names
+
+    def test_scan_codebase_with_boto3(self, tmp_path: Path) -> None:
+        """Test scanning codebase with boto3 (AWS SDK) dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "aws_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "aws-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+boto3 = "^1.34.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "aws_sdk" in cap_names
+
+    def test_scan_codebase_with_azure(self, tmp_path: Path) -> None:
+        """Test scanning codebase with azure-core dependency."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "azure_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "azure-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+azure-core = "^1.29.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        assert "azure_sdk" in cap_names
+
+    def test_scan_codebase_with_fastapi(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects FastAPI framework."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "api_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "api-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        assert "fastapi" in profile.frameworks
+
+    def test_scan_codebase_with_flask(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects Flask framework."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "flask_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "flask-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "^3.0.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        assert "flask" in profile.frameworks
+
+    def test_scan_codebase_with_django(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects Django framework."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "django_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "django-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^5.0.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        assert "django" in profile.frameworks
+
+    def test_scan_codebase_with_starlette(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects Starlette framework."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "starlette_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "starlette-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+starlette = "^0.35.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        assert "starlette" in profile.frameworks
+
+    def test_scan_codebase_with_aiohttp(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects aiohttp framework."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "aiohttp_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "aiohttp-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiohttp = "^3.9.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        assert "aiohttp" in profile.frameworks
+
+    def test_scan_codebase_detects_python_technology(self, tmp_path: Path) -> None:
+        """Test scanning codebase detects Python as a technology."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        lib_dir = libs_dir / "any_lib"
+        lib_dir.mkdir()
+
+        pyproject = lib_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "any-lib"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+"""
+        )
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        profile = scan_codebase(tmp_path)
+
+        assert "python" in profile.technologies
+
+    def test_scan_codebase_with_openai_detects_llm_api(self, tmp_path: Path) -> None:
+        """Test scanning codebase with OpenAI also detects LLM API capability."""
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+
+        services_dir = tmp_path / "services"
+        services_dir.mkdir()
+
+        service_dir = services_dir / "gpt_service"
+        service_dir.mkdir()
+
+        pyproject = service_dir / "pyproject.toml"
+        pyproject.write_text(
+            """
+[tool.poetry]
+name = "gpt-service"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+openai = "^1.12.0"
+"""
+        )
+
+        profile = scan_codebase(tmp_path)
+
+        cap_names = [c.name for c in profile.capabilities]
+        # Should have both the NLP capability and the LLM API capability
+        assert "speech_to_text" in cap_names
+        assert "openai_api" in cap_names

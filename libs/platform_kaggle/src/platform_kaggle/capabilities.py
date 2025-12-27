@@ -283,6 +283,343 @@ def _detect_domain_capabilities(
     return tuple(capabilities)
 
 
+def _detect_observability_capabilities(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[CodebaseCapability, ...]:
+    """Detect observability and monitoring capabilities.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of detected observability capabilities.
+    """
+    capabilities: list[CodebaseCapability] = []
+    deps_tuple = collect_all_dependencies(libs, services)
+
+    # Datadog APM tracing
+    if has_dependency(deps_tuple, "ddtrace"):
+        capabilities.append(
+            CodebaseCapability(
+                name="datadog_apm",
+                strength="strong",
+                tags=(
+                    "observability",
+                    "monitoring",
+                    "apm",
+                    "tracing",
+                    "datadog",
+                ),
+                description="Datadog APM for distributed tracing and monitoring",
+            )
+        )
+
+    # Prometheus metrics
+    if has_dependency(deps_tuple, "prometheus-client"):
+        capabilities.append(
+            CodebaseCapability(
+                name="prometheus_metrics",
+                strength="moderate",
+                tags=("observability", "monitoring", "metrics", "prometheus"),
+                description="Prometheus client for metrics collection",
+            )
+        )
+
+    # OpenTelemetry
+    if has_dependency(deps_tuple, "opentelemetry-api"):
+        capabilities.append(
+            CodebaseCapability(
+                name="opentelemetry",
+                strength="moderate",
+                tags=("observability", "tracing", "opentelemetry", "otel"),
+                description="OpenTelemetry for observability instrumentation",
+            )
+        )
+
+    return tuple(capabilities)
+
+
+def _detect_streaming_capabilities(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[CodebaseCapability, ...]:
+    """Detect streaming and message queue capabilities.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of detected streaming capabilities.
+    """
+    capabilities: list[CodebaseCapability] = []
+    deps_tuple = collect_all_dependencies(libs, services)
+
+    # Confluent Kafka
+    if has_dependency(deps_tuple, "confluent-kafka"):
+        capabilities.append(
+            CodebaseCapability(
+                name="confluent_kafka",
+                strength="strong",
+                tags=(
+                    "streaming",
+                    "kafka",
+                    "confluent",
+                    "real-time",
+                    "event-driven",
+                    "message-queue",
+                ),
+                description="Confluent Kafka for real-time data streaming",
+            )
+        )
+
+    # kafka-python
+    if has_dependency(deps_tuple, "kafka-python"):
+        capabilities.append(
+            CodebaseCapability(
+                name="kafka_python",
+                strength="moderate",
+                tags=("streaming", "kafka", "real-time", "message-queue"),
+                description="Kafka Python client for message streaming",
+            )
+        )
+
+    # Redis (pub/sub, caching)
+    if has_dependency(deps_tuple, "redis"):
+        capabilities.append(
+            CodebaseCapability(
+                name="redis",
+                strength="moderate",
+                tags=("caching", "redis", "pub-sub", "message-queue"),
+                description="Redis for caching and pub/sub messaging",
+            )
+        )
+
+    # RabbitMQ
+    if has_dependency(deps_tuple, "pika"):
+        capabilities.append(
+            CodebaseCapability(
+                name="rabbitmq",
+                strength="moderate",
+                tags=("messaging", "rabbitmq", "amqp", "message-queue"),
+                description="RabbitMQ for message queuing",
+            )
+        )
+
+    return tuple(capabilities)
+
+
+def _detect_llm_api_capabilities(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[CodebaseCapability, ...]:
+    """Detect LLM API and generative AI capabilities.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of detected LLM API capabilities.
+    """
+    capabilities: list[CodebaseCapability] = []
+    deps_tuple = collect_all_dependencies(libs, services)
+
+    # Google Generative AI (Gemini)
+    if has_dependency(deps_tuple, "google-generativeai"):
+        capabilities.append(
+            CodebaseCapability(
+                name="gemini_api",
+                strength="strong",
+                tags=(
+                    "llm",
+                    "gemini",
+                    "google",
+                    "generative-ai",
+                    "text-generation",
+                    "vertex-ai",
+                ),
+                description="Google Gemini API for generative AI",
+            )
+        )
+
+    # Google Cloud AI Platform / Vertex AI
+    if has_dependency(deps_tuple, "google-cloud-aiplatform"):
+        capabilities.append(
+            CodebaseCapability(
+                name="vertex_ai",
+                strength="strong",
+                tags=(
+                    "llm",
+                    "vertex-ai",
+                    "google-cloud",
+                    "ml-platform",
+                    "gemini",
+                ),
+                description="Google Vertex AI for ML model deployment and LLMs",
+            )
+        )
+
+    # Anthropic Claude
+    if has_dependency(deps_tuple, "anthropic"):
+        capabilities.append(
+            CodebaseCapability(
+                name="anthropic_claude",
+                strength="strong",
+                tags=("llm", "claude", "anthropic", "generative-ai", "text-generation"),
+                description="Anthropic Claude API for generative AI",
+            )
+        )
+
+    # OpenAI API (enhanced from existing)
+    if has_dependency(deps_tuple, "openai"):
+        capabilities.append(
+            CodebaseCapability(
+                name="openai_api",
+                strength="strong",
+                tags=(
+                    "llm",
+                    "openai",
+                    "gpt",
+                    "generative-ai",
+                    "text-generation",
+                    "whisper",
+                ),
+                description="OpenAI API for GPT models and Whisper",
+            )
+        )
+
+    # LangChain
+    if has_dependency(deps_tuple, "langchain"):
+        capabilities.append(
+            CodebaseCapability(
+                name="langchain",
+                strength="moderate",
+                tags=("llm", "langchain", "orchestration", "agents", "rag"),
+                description="LangChain for LLM application orchestration",
+            )
+        )
+
+    return tuple(capabilities)
+
+
+def _detect_cloud_capabilities(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[CodebaseCapability, ...]:
+    """Detect cloud platform capabilities.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of detected cloud platform capabilities.
+    """
+    capabilities: list[CodebaseCapability] = []
+    deps_tuple = collect_all_dependencies(libs, services)
+
+    # Google Cloud Storage
+    if has_dependency(deps_tuple, "google-cloud-storage"):
+        capabilities.append(
+            CodebaseCapability(
+                name="google_cloud_storage",
+                strength="moderate",
+                tags=("cloud", "google-cloud", "storage", "gcs"),
+                description="Google Cloud Storage for object storage",
+            )
+        )
+
+    # Google Cloud BigQuery
+    if has_dependency(deps_tuple, "google-cloud-bigquery"):
+        capabilities.append(
+            CodebaseCapability(
+                name="bigquery",
+                strength="moderate",
+                tags=("cloud", "google-cloud", "bigquery", "data-warehouse", "sql"),
+                description="Google BigQuery for data warehousing",
+            )
+        )
+
+    # AWS SDK (boto3)
+    if has_dependency(deps_tuple, "boto3"):
+        capabilities.append(
+            CodebaseCapability(
+                name="aws_sdk",
+                strength="moderate",
+                tags=("cloud", "aws", "boto3", "s3"),
+                description="AWS SDK for cloud services",
+            )
+        )
+
+    # Azure SDK
+    if has_dependency(deps_tuple, "azure-core"):
+        capabilities.append(
+            CodebaseCapability(
+                name="azure_sdk",
+                strength="moderate",
+                tags=("cloud", "azure", "microsoft"),
+                description="Azure SDK for Microsoft cloud services",
+            )
+        )
+
+    return tuple(capabilities)
+
+
+def _detect_web_frameworks(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[str, ...]:
+    """Detect web frameworks in use.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of web framework names.
+    """
+    frameworks: set[str] = set()
+    deps_tuple = collect_all_dependencies(libs, services)
+
+    if has_dependency(deps_tuple, "fastapi"):
+        frameworks.add("fastapi")
+    if has_dependency(deps_tuple, "flask"):
+        frameworks.add("flask")
+    if has_dependency(deps_tuple, "django"):
+        frameworks.add("django")
+    if has_dependency(deps_tuple, "starlette"):
+        frameworks.add("starlette")
+    if has_dependency(deps_tuple, "aiohttp"):
+        frameworks.add("aiohttp")
+
+    return tuple(sorted(frameworks))
+
+
+def _detect_technologies(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[str, ...]:
+    """Detect programming languages and technologies.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of technology names.
+    """
+    technologies: set[str] = set()
+
+    # All our libs/services are Python
+    if libs or services:
+        technologies.add("python")
+
+    return tuple(sorted(technologies))
+
+
 def _detect_nlp_capabilities(
     libs: tuple[LibInfo, ...],
     services: tuple[ServiceInfo, ...],
@@ -490,11 +827,27 @@ def build_profile(
     transformers_caps = _detect_transformers_capabilities(libs, services)
     nlp_caps = _detect_nlp_capabilities(libs, services)
     domain_caps = _detect_domain_capabilities(libs, services)
+    observability_caps = _detect_observability_capabilities(libs, services)
+    streaming_caps = _detect_streaming_capabilities(libs, services)
+    llm_api_caps = _detect_llm_api_capabilities(libs, services)
+    cloud_caps = _detect_cloud_capabilities(libs, services)
 
-    all_caps = ml_caps + cv_caps + transformers_caps + nlp_caps + domain_caps
+    all_caps = (
+        ml_caps
+        + cv_caps
+        + transformers_caps
+        + nlp_caps
+        + domain_caps
+        + observability_caps
+        + streaming_caps
+        + llm_api_caps
+        + cloud_caps
+    )
 
     return CodebaseProfile(
         capabilities=all_caps,
+        technologies=_detect_technologies(libs, services),
+        frameworks=_detect_web_frameworks(libs, services),
         ml_backends=_detect_ml_backends(libs, services),
         data_formats=_detect_data_formats(libs, services),
         task_types=_detect_task_types(libs, services),
