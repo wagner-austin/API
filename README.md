@@ -14,6 +14,10 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [qr-api](services/qr-api) | 8002 | QR code generation |
 | [music-wrapped-api](services/music-wrapped-api) | 8006 | Music listening analytics (Spotify, Apple, Last.fm) |
 | [covenant-radar-api](services/covenant-radar-api) | 8007 | Loan covenant monitoring and breach prediction |
+| [grandma-api](services/grandma-api) | 8008 | Multi-language audio translation (Whisper STT) |
+| [github-stats-api](services/github-stats-api) | 8009 | GitHub stats SVG card generation |
+| [opportunity-radar-api](services/opportunity-radar-api) | 8010 | Hackathon and competition discovery |
+| [procart-api](services/procart-api) | - | Procedural art rendering orchestration |
 
 ## Clients
 
@@ -35,6 +39,13 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [covenant_domain](libs/covenant_domain) | Loan covenant domain models and rule engine |
 | [covenant_ml](libs/covenant_ml) | XGBoost training and prediction for covenants |
 | [covenant_persistence](libs/covenant_persistence) | PostgreSQL repositories for covenant data |
+| [cleargbm](libs/cleargbm) | From-scratch interpretable gradient boosting (pure stdlib) |
+| [platform_calendar](libs/platform_calendar) | Google Calendar API for competition deadlines |
+| [platform_codebase](libs/platform_codebase) | Codebase capability detection and profiling |
+| [platform_devpost](libs/platform_devpost) | Devpost hackathon discovery + capability matching |
+| [platform_kaggle](libs/platform_kaggle) | Kaggle competition discovery + capability matching |
+| [platform_stt](libs/platform_stt) | Speech-to-text with Whisper, chunking, language detection |
+| [procart](libs/procart) | Procedural art core (neon visuals, HDR pipeline) |
 
 ## Quick Start
 
@@ -43,9 +54,11 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 make infra
 
 # Start a specific service
-make up-trainer      # Model-Trainer (GPU)
-make up-databank     # data-bank-api
-make up-handwriting  # handwriting-ai
+make up-trainer       # Model-Trainer (GPU)
+make up-databank      # data-bank-api
+make up-handwriting   # handwriting-ai
+make up-github-stats  # github-stats-api
+make up-opportunity   # opportunity-radar-api
 
 # Start all services
 make up-all

@@ -23,6 +23,8 @@
 #   - 8006:  music-wrapped-api
 #   - 8007:  covenant-radar-api
 #   - 8008:  grandma-api
+#   - 8009:  github-stats-api
+#   - 8010:  opportunity-radar-api
 # =============================================================================
 
 services:

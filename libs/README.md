@@ -16,6 +16,13 @@ Shared Python libraries for the monorepo. Each library is a standalone Poetry pa
 | [platform-ml](./platform_ml) | ML artifacts, manifests, device selection, explainers (SHAP, permutation, gradient) | platform-core, shap, torch |
 | [platform-music](./platform_music) | Music analytics for Music Wrapped | None |
 | [platform-workers](./platform_workers) | Redis/RQ background job processing | platform-core, redis, rq |
+| [cleargbm](./cleargbm) | From-scratch interpretable gradient boosting (pure stdlib) | None |
+| [platform-calendar](./platform_calendar) | Google Calendar API for competition deadlines | platform-core |
+| [platform-codebase](./platform_codebase) | Codebase capability detection and profiling | platform-core |
+| [platform-devpost](./platform_devpost) | Devpost hackathon discovery + capability matching | platform-core, platform-codebase, httpx |
+| [platform-kaggle](./platform_kaggle) | Kaggle competition discovery + capability matching | platform-core, platform-codebase, kaggle |
+| [platform-stt](./platform_stt) | Speech-to-text with Whisper, chunking, language detection | platform-core, numpy, openai, fasttext-wheel |
+| [procart](./procart) | Procedural art core (neon visuals, HDR pipeline) | numpy, Pillow |
 
 ## Design Principles
 
