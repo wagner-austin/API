@@ -101,6 +101,15 @@ class FakeHttpxResponse:
             return self._json
         return load_json_str(self.text)
 
+    def raise_for_status(self) -> None:
+        """Raise for non-2xx status codes.
+
+        Raises:
+            RuntimeError: If status code is 4xx or 5xx.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class FakeHttpxAsyncClient:
     """Protocol-compliant fake for httpx.AsyncClient.
@@ -218,6 +227,22 @@ class FakeHttpxClient:
 
     def close(self) -> None:
         return None
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        params: Mapping[str, str | int] | None = None,
+    ) -> HttpxResponse:
+        self.seen_urls.append(url)
+        if headers is not None:
+            self.seen_headers.update(headers)
+        _ = params
+
+        if self._response is None:
+            raise RuntimeError("No response configured for FakeHttpxClient")
+        return self._response
 
     def post(
         self,

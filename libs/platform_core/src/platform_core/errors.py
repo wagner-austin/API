@@ -133,6 +133,29 @@ class ModelTrainerErrorCode(ErrorCodeBase):
     ARTIFACT_DOWNLOAD_FAILED = "ARTIFACT_DOWNLOAD_FAILED"
 
 
+class OAuthErrorCode(ErrorCodeBase):
+    """OAuth 2.0 error codes for authentication flows.
+
+    Used by platform_core.oauth for generic OAuth operations.
+    Services can catch AppError[OAuthErrorCode] and re-raise with
+    their own domain-specific error codes if needed.
+    """
+
+    # Authorization errors
+    AUTH_FAILED = "AUTH_FAILED"
+    INVALID_GRANT = "INVALID_GRANT"
+    INVALID_STATE = "INVALID_STATE"
+
+    # Token errors
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"
+    TOKEN_EXCHANGE_FAILED = "TOKEN_EXCHANGE_FAILED"
+    TOKEN_REFRESH_FAILED = "TOKEN_REFRESH_FAILED"
+    MISSING_REFRESH_TOKEN = "MISSING_REFRESH_TOKEN"
+
+    # Network errors
+    TOKEN_ENDPOINT_ERROR = "TOKEN_ENDPOINT_ERROR"
+
+
 class CalendarErrorCode(ErrorCodeBase):
     """Domain-specific calendar service error codes.
 
@@ -487,6 +510,7 @@ __all__ = [
     "ErrorCodeBase",
     "HandwritingErrorCode",
     "ModelTrainerErrorCode",
+    "OAuthErrorCode",
     "TranscriptErrorCode",
     "_ExceptionHandlerProto",
     "_JSONResponseProto",

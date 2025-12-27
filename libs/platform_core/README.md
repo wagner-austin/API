@@ -150,6 +150,148 @@ def protected(key: str = Depends(api_key_dep)):
     return {"status": "ok"}
 ```
 
+## OAuth 2.0
+
+Reusable OAuth 2.0 utilities for authorization flows with PKCE support.
+
+### Types
+
+```python
+from platform_core import (
+    OAuthCredentials,
+    OAuthTokens,
+    OAuthTokenResponse,
+    TokenType,
+    encode_oauth_credentials,
+    decode_oauth_credentials,
+    encode_oauth_tokens,
+    decode_oauth_tokens,
+    encode_oauth_token_response,
+    decode_oauth_token_response,
+)
+
+# Client credentials
+credentials = OAuthCredentials(
+    client_id="your-client-id",
+    client_secret="your-client-secret",
+    redirect_uri="http://localhost:8080/callback",
+)
+
+# Access and refresh tokens
+tokens = OAuthTokens(
+    access_token="access-token",
+    refresh_token="refresh-token",
+    expires_at=1735200000,
+    token_type="Bearer",
+)
+```
+
+### PKCE Functions
+
+```python
+from platform_core import (
+    generate_code_verifier,
+    generate_code_challenge,
+    generate_state,
+)
+
+# Generate PKCE values for authorization
+verifier = generate_code_verifier()
+challenge = generate_code_challenge(verifier)
+state = generate_state()
+```
+
+### Token Utilities
+
+```python
+from platform_core import is_token_expired, build_authorization_url
+
+# Check if token needs refresh
+current_time = int(time.time())
+if is_token_expired(tokens, current_time, buffer_seconds=60):
+    # Refresh the token
+    ...
+
+# Build authorization URL
+auth_url = build_authorization_url(
+    auth_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+    client_id=credentials["client_id"],
+    redirect_uri=credentials["redirect_uri"],
+    code_challenge=challenge,
+    state=state,
+    scopes=("openid", "email"),
+)
+```
+
+### Token Exchange
+
+```python
+from platform_core import exchange_authorization_code, refresh_access_token
+
+# Exchange authorization code for tokens
+tokens = exchange_authorization_code(
+    token_endpoint="https://oauth2.googleapis.com/token",
+    credentials=credentials,
+    code="auth-code-from-callback",
+    code_verifier=verifier,
+    http_post=your_http_post_function,
+    current_time=int(time.time()),
+)
+
+# Refresh expired access token
+new_tokens = refresh_access_token(
+    token_endpoint="https://oauth2.googleapis.com/token",
+    credentials=credentials,
+    refresh_token=tokens["refresh_token"],
+    http_post=your_http_post_function,
+    current_time=int(time.time()),
+)
+```
+
+### OAuth Testing Utilities
+
+```python
+from platform_core.oauth_testing import (
+    make_fake_http_post,
+    make_raising_http_post,
+    make_sequenced_http_post,
+    make_fake_current_time,
+    make_advancing_current_time,
+    make_token_response_json,
+    make_error_response_json,
+    make_test_credentials,
+    make_test_tokens,
+    make_test_token_response,
+)
+
+# Create fake HTTP POST that returns token response
+http_post = make_fake_http_post(make_token_response_json())
+
+# Create test credentials and tokens
+creds = make_test_credentials()
+tokens = make_test_tokens(expired=True, current_time=1735200000)
+```
+
+### OAuth Error Codes
+
+```python
+from platform_core import OAuthErrorCode, AppError
+
+# OAuth-specific errors
+raise AppError(OAuthErrorCode.TOKEN_EXPIRED, "Token has expired")
+```
+
+| Code | Description |
+|------|-------------|
+| `AUTH_FAILED` | Authorization failed |
+| `INVALID_GRANT` | Invalid authorization grant |
+| `INVALID_STATE` | State mismatch (CSRF) |
+| `TOKEN_EXPIRED` | Access token expired |
+| `TOKEN_EXCHANGE_FAILED` | Code exchange failed |
+| `TOKEN_REFRESH_FAILED` | Token refresh failed |
+| `MISSING_REFRESH_TOKEN` | No refresh token in response |
+| `TOKEN_ENDPOINT_ERROR` | Token endpoint returned error |
+
 ## Data Bank Client
 
 HTTP client for data-bank-api file storage:
@@ -337,6 +479,34 @@ print(f"Using {config['threads']} threads")
 | `ErrorCodeBase` | Base for custom error codes |
 | `HandwritingErrorCode` | Handwriting service errors |
 | `TranscriptErrorCode` | Transcript service errors |
+| `OAuthErrorCode` | OAuth 2.0 errors |
+
+### OAuth Types
+
+| Type | Description |
+|------|-------------|
+| `OAuthCredentials` | OAuth client credentials (client_id, client_secret, redirect_uri) |
+| `OAuthTokens` | Access and refresh tokens with expiry |
+| `OAuthTokenResponse` | Raw token endpoint response |
+| `TokenType` | Token type literal ("Bearer") |
+
+### OAuth Functions
+
+| Function | Description |
+|----------|-------------|
+| `generate_code_verifier` | Generate PKCE code verifier |
+| `generate_code_challenge` | Generate PKCE code challenge (S256) |
+| `generate_state` | Generate CSRF state parameter |
+| `is_token_expired` | Check if token needs refresh |
+| `build_authorization_url` | Build OAuth authorization URL |
+| `exchange_authorization_code` | Exchange code for tokens |
+| `refresh_access_token` | Refresh expired access token |
+| `encode_oauth_credentials` | Serialize credentials to JSON |
+| `decode_oauth_credentials` | Deserialize credentials from JSON |
+| `encode_oauth_tokens` | Serialize tokens to JSON |
+| `decode_oauth_tokens` | Deserialize tokens from JSON |
+| `encode_oauth_token_response` | Serialize token response to JSON |
+| `decode_oauth_token_response` | Deserialize token response from JSON |
 
 ### Validation Functions
 

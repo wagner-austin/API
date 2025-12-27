@@ -17,6 +17,8 @@ class HttpxResponse(Protocol):
 
     def json(self) -> JSONValue: ...
 
+    def raise_for_status(self) -> None: ...
+
 
 class Timeout(Protocol):
     def __repr__(self) -> str: ...
@@ -65,6 +67,14 @@ class _AsyncClientCtor(Protocol):
 
 class HttpxClient(Protocol):
     def close(self) -> None: ...
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        params: Mapping[str, str | int] | None = None,
+    ) -> HttpxResponse: ...
 
     def post(
         self,

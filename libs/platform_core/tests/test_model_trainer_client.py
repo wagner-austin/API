@@ -40,6 +40,10 @@ class _FakeResponse:
             raise ValueError("No JSON body")
         return self._json
 
+    def raise_for_status(self) -> None:
+        """No-op for test fake."""
+        return
+
 
 class _FakeClient:
     def __init__(self, post_resp: _FakeResponse, get_resp: _FakeResponse):

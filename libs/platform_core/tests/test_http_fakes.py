@@ -68,6 +68,23 @@ def test_fake_response_with_headers() -> None:
     assert resp.headers["X-Custom"] == "value"
 
 
+def test_fake_response_raise_for_status_success() -> None:
+    resp = FakeHttpxResponse(200)
+    resp.raise_for_status()  # Should not raise
+
+
+def test_fake_response_raise_for_status_client_error() -> None:
+    resp = FakeHttpxResponse(404)
+    with pytest.raises(RuntimeError, match="HTTP 404"):
+        resp.raise_for_status()
+
+
+def test_fake_response_raise_for_status_server_error() -> None:
+    resp = FakeHttpxResponse(500)
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        resp.raise_for_status()
+
+
 @pytest.mark.asyncio
 async def test_fake_async_client_post() -> None:
     resp = FakeHttpxResponse(200, {"ok": True})
@@ -147,6 +164,29 @@ def test_fake_sync_client_post() -> None:
     assert result.status_code == 201
     assert client.seen_urls == ["http://api/create"]
     assert client.seen_headers["Token"] == "abc"
+
+
+def test_fake_sync_client_get() -> None:
+    resp = FakeHttpxResponse(200, {"data": "value"})
+    client = FakeHttpxClient(resp)
+    result = client.get("http://api/data", headers={"Auth": "key"})
+    assert result.status_code == 200
+    assert client.seen_urls == ["http://api/data"]
+    assert client.seen_headers["Auth"] == "key"
+
+
+def test_fake_sync_client_get_no_headers() -> None:
+    resp = FakeHttpxResponse(200, {"data": "value"})
+    client = FakeHttpxClient(resp)
+    result = client.get("http://api/data")
+    assert result.status_code == 200
+    assert client.seen_urls == ["http://api/data"]
+
+
+def test_fake_sync_client_get_no_response_raises() -> None:
+    client = FakeHttpxClient(None)
+    with pytest.raises(RuntimeError, match="No response configured"):
+        client.get("http://test")
 
 
 def test_fake_sync_client_close() -> None:
