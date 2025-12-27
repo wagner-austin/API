@@ -11,8 +11,7 @@ your codebase capabilities and personal interests.
 poetry add platform-kaggle
 ```
 
-Requires valid Kaggle API credentials in `~/.kaggle/kaggle.json` or via
-environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`).
+Requires valid Kaggle API credentials via the `KAGGLE_API_TOKEN` environment variable.
 
 ## Dependencies
 
@@ -191,9 +190,9 @@ finally:
 
 ### Available Fakes
 
-- `FakeKaggleApi` - Low-level API fake wrapping Kaggle module
+- `FakeKaggleApi` - Low-level API fake implementing `KaggleApiProtocol`
 - `FakeKaggleClient` - High-level client fake with `list_competitions` and `get_competition`
-- `FakeKaggleModule` - Fake for the Kaggle Python module
+- `FakeKagglePageFetcher` - Page fetcher fake with `fetch_pages` and `get_competition_id`
 
 ### Factory Functions
 
@@ -201,6 +200,8 @@ finally:
 - `make_fake_kaggle_competition()` - Create raw Kaggle API competition objects
 - `make_fake_capability()` - Create test CodebaseCapability instances
 - `make_fake_profile()` - Create test CodebaseProfile instances
+- `make_fake_competition_page()` - Create test CompetitionPage instances
+- `make_fake_competition_pages()` - Create test CompetitionPages instances
 - `make_interest_filter()` - Create InterestFilter instances
 
 ## Types
@@ -209,6 +210,8 @@ All types are exported from the package:
 
 - `Competition` - Competition metadata (immutable `__slots__` class)
 - `CompetitionMatch` - Match result with score
+- `CompetitionPage` - Single page with id, name, content
+- `CompetitionPages` - All pages for a competition (description, evaluation, timeline, rules)
 - `CodebaseProfile` - Detected capabilities (from `platform_codebase`)
 - `CodebaseCapability` - Individual capability (from `platform_codebase`)
 - `InterestFilter` - Filter configuration
@@ -236,10 +239,10 @@ The library uses a hooks pattern for dependency injection:
 
 | Hook | Type | Purpose |
 |------|------|---------|
-| `hooks.kaggle_api_factory` | `() -> KaggleApiProtocol` | Creates low-level Kaggle API |
+| `hooks.kaggle_api_factory` | `() -> KaggleApiProtocol` | Returns pre-authenticated Kaggle API |
 | `hooks.kaggle_client` | `() -> KaggleClientProtocol` | Creates high-level client |
-| `hooks.kaggle_module` | `() -> KaggleModuleProtocol` | Creates Kaggle module wrapper |
 | `hooks.profile_scanner` | `(Path) -> CodebaseProfile` | Scans codebase for capabilities |
+| `hooks.page_fetcher` | `() -> KagglePageFetcherProtocol` | Creates page fetcher for competition content |
 
 ## Service Integration
 
@@ -252,9 +255,8 @@ The library uses a hooks pattern for dependency injection:
 platform-kaggle = { path = "../platform_kaggle", develop = true }
 ```
 
-2. Set up Kaggle credentials (one of):
-   - Create `~/.kaggle/kaggle.json` with your API key
-   - Set `KAGGLE_USERNAME` and `KAGGLE_KEY` environment variables
+2. Set up Kaggle credentials:
+   - Set `KAGGLE_API_TOKEN` environment variable with your API token
 
 3. Import and use:
 
@@ -297,6 +299,84 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+```
+
+## Fetching Competition Page Content
+
+The library provides access to full competition page content (Description, Evaluation, Timeline, Rules) via Kaggle's internal API:
+
+```python
+from platform_kaggle import create_page_fetcher
+
+# Create an initialized page fetcher
+fetcher = create_page_fetcher()
+
+# Get competition ID from slug
+comp_id = fetcher.get_competition_id("titanic")  # Returns 3136
+
+# Fetch all pages for a competition
+pages = fetcher.fetch_pages(comp_id)
+
+# Access structured content
+print(pages.description)  # Full description markdown
+print(pages.evaluation)   # Evaluation criteria
+print(pages.timeline)     # Competition timeline
+print(pages.rules)        # Competition rules
+
+# Access individual pages
+for page in pages.pages:
+    print(f"{page.name}: {len(page.content)} chars")
+```
+
+### Session Management
+
+For multiple requests, reuse the session:
+
+```python
+from platform_kaggle import KaggleSession, KagglePageFetcher
+
+# Create and initialize session once
+session = KaggleSession()
+session.initialize()
+
+# Create fetcher with session
+fetcher = KagglePageFetcher(session)
+
+# Make multiple requests
+pages1 = fetcher.fetch_pages(3136)  # Titanic
+pages2 = fetcher.fetch_pages(5407)  # House Prices
+```
+
+### Testing Page Fetcher
+
+```python
+from platform_kaggle import (
+    FakeKagglePageFetcher,
+    make_fake_competition_pages,
+    hooks,
+    reset_hooks,
+)
+
+# Create fake with test data
+fake_pages = make_fake_competition_pages(
+    competition_id=12345,
+    description="Test description",
+    evaluation="Test evaluation",
+)
+fake_fetcher = FakeKagglePageFetcher(
+    pages={12345: fake_pages},
+    competition_ids={"test-comp": 12345},
+)
+
+# Install via hooks
+hooks.page_fetcher = lambda: fake_fetcher
+
+try:
+    # Your test code
+    pages = fake_fetcher.fetch_pages(12345)
+    assert pages.description == "Test description"
+finally:
+    reset_hooks()
 ```
 
 ### Using in a FastAPI Service

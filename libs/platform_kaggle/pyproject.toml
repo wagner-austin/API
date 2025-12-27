@@ -48,6 +48,11 @@ files = ["src", "tests", "scripts"]
 mypy_path = ["src"]
 explicit_package_bases = true
 
+[[tool.mypy.overrides]]
+module = ["kaggle", "kaggle.*", "kagglesdk", "kagglesdk.*"]
+ignore_missing_imports = true
+follow_untyped_imports = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
