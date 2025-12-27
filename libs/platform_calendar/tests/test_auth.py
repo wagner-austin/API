@@ -5,10 +5,9 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, CalendarErrorCode
 from platform_core.json_utils import dump_json_str
+from platform_core.oauth import generate_code_challenge, generate_code_verifier
 
 from platform_calendar.auth import (
-    _generate_code_challenge,
-    _generate_code_verifier,
     authorize,
     build_auth_url,
     exchange_code_for_tokens,
@@ -374,27 +373,27 @@ class TestGetValidTokens:
 
 class TestPKCEFunctions:
     def test_generate_code_verifier_is_url_safe(self) -> None:
-        verifier = _generate_code_verifier()
+        verifier = generate_code_verifier()
         # Should be URL-safe base64 (letters, digits, hyphen, underscore)
         # Verifier should be ~86 chars (64 bytes base64url encoded)
-        assert verifier  # non-empty
+        assert len(verifier) >= 43
         for char in verifier:
             assert char.isalnum() or char in "-_"
 
     def test_generate_code_verifier_unique(self) -> None:
-        v1 = _generate_code_verifier()
-        v2 = _generate_code_verifier()
+        v1 = generate_code_verifier()
+        v2 = generate_code_verifier()
         assert v1 != v2
 
     def test_generate_code_challenge_deterministic(self) -> None:
         verifier = "test_verifier_12345"
-        c1 = _generate_code_challenge(verifier)
-        c2 = _generate_code_challenge(verifier)
+        c1 = generate_code_challenge(verifier)
+        c2 = generate_code_challenge(verifier)
         assert c1 == c2
 
     def test_generate_code_challenge_format(self) -> None:
         verifier = "test_verifier"
-        challenge = _generate_code_challenge(verifier)
+        challenge = generate_code_challenge(verifier)
         # Should be URL-safe base64 without padding
         assert "=" not in challenge
         for char in challenge:

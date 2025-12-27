@@ -1,9 +1,15 @@
-"""OAuth 2.0 authentication flow for Google Calendar API."""
+"""OAuth 2.0 authentication flow for Google Calendar API.
+
+Uses centralized OAuth utilities from platform_core.oauth for:
+- PKCE generation (generate_code_verifier, generate_code_challenge)
+- Authorization URL building (build_authorization_url)
+- Token expiry checking (is_token_expired)
+
+Google-specific functionality (error codes, hooks, API endpoints) remains here.
+"""
 
 from __future__ import annotations
 
-import hashlib
-import secrets
 import urllib.parse
 
 from platform_core.errors import AppError, CalendarErrorCode
@@ -12,6 +18,14 @@ from platform_core.json_utils import (
     JSONTypeError,
     load_json_str,
     narrow_json_to_dict,
+)
+from platform_core.oauth import (
+    generate_code_challenge,
+    generate_code_verifier,
+    generate_state,
+)
+from platform_core.oauth import (
+    is_token_expired as _core_is_token_expired,
 )
 
 from platform_calendar.config import (
@@ -25,29 +39,6 @@ from platform_calendar.types import (
     OAuthTokens,
     decode_google_token_response,
 )
-
-# Type alias for the specific AppError used in this module
-AuthenticationError = AppError[CalendarErrorCode]
-TokenExpiredError = AppError[CalendarErrorCode]
-
-# =============================================================================
-# PKCE Helpers
-# =============================================================================
-
-
-def _generate_code_verifier() -> str:
-    """Generate a random code verifier for PKCE."""
-    return secrets.token_urlsafe(64)
-
-
-def _generate_code_challenge(verifier: str) -> str:
-    """Generate code challenge from verifier using S256 method."""
-    digest = hashlib.sha256(verifier.encode("ascii")).digest()
-    # Base64url encode without padding
-    import base64
-
-    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-
 
 # =============================================================================
 # Authorization URL
@@ -236,6 +227,9 @@ def refresh_access_token(
 def is_token_expired(tokens: OAuthTokens, *, buffer_seconds: int = 60) -> bool:
     """Check if access token is expired or will expire soon.
 
+    Uses centralized is_token_expired from platform_core.oauth with
+    current time from hooks.
+
     Args:
         tokens: OAuth tokens to check.
         buffer_seconds: Consider expired if within this many seconds of expiry.
@@ -243,8 +237,11 @@ def is_token_expired(tokens: OAuthTokens, *, buffer_seconds: int = 60) -> bool:
     Returns:
         True if token is expired or will expire within buffer.
     """
-    current_time = hooks.current_time()
-    return tokens["expires_at"] <= current_time + buffer_seconds
+    return _core_is_token_expired(
+        tokens,
+        hooks.current_time(),
+        buffer_seconds=buffer_seconds,
+    )
 
 
 def get_valid_tokens(credentials: OAuthCredentials, tokens: OAuthTokens) -> OAuthTokens:
@@ -287,10 +284,10 @@ def authorize(credentials: OAuthCredentials) -> OAuthTokens:
     Raises:
         AppError[CalendarErrorCode]: If authorization fails.
     """
-    # Generate PKCE values
-    code_verifier = _generate_code_verifier()
-    code_challenge = _generate_code_challenge(code_verifier)
-    state = secrets.token_urlsafe(32)
+    # Generate PKCE values using centralized utilities
+    code_verifier = generate_code_verifier()
+    code_challenge = generate_code_challenge(code_verifier)
+    state = generate_state()
 
     # Build and open auth URL
     auth_url = build_auth_url(credentials, code_challenge=code_challenge, state=state)

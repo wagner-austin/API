@@ -6,7 +6,12 @@ The `platform_calendar` library provides Google Calendar API integration for tra
 
 ## Dependencies
 
-- `platform-core` - JSON utilities (`require_*` helpers, `load_json_str`, `dump_json_str`), error handling (`AppError`, `CalendarErrorCode`)
+- `platform-core` - OAuth types and utilities:
+  - `oauth_types.py`: `OAuthCredentials`, `OAuthTokens`, `OAuthTokenResponse`, `TokenType` with encode/decode
+  - `oauth.py`: PKCE functions (`generate_code_verifier`, `generate_code_challenge`, `generate_state`), `is_token_expired`
+  - `oauth_testing.py`: `make_token_response_json`, `make_error_response_json`
+  - `json_utils.py`: `require_*` helpers, `load_json_str`, `dump_json_str`
+  - `errors.py`: `AppError`, `CalendarErrorCode`
 
 No external HTTP libraries - uses Python stdlib (`urllib.request`, `webbrowser`) for OAuth and API calls.
 
@@ -65,9 +70,21 @@ Endpoints:
 
 ## Core Types (types.py)
 
-### OAuth Types
+### OAuth Types (re-exported from platform_core)
+
+OAuth types are defined in `platform_core.oauth_types` and re-exported here for convenience:
 
 ```python
+# Re-exported from platform_core.oauth_types
+from platform_core.oauth_types import OAuthCredentials as OAuthCredentials
+from platform_core.oauth_types import OAuthTokens as OAuthTokens
+from platform_core.oauth_types import OAuthTokenResponse as OAuthTokenResponse
+from platform_core.oauth_types import TokenType as TokenType
+from platform_core.oauth_types import decode_oauth_credentials as decode_oauth_credentials
+from platform_core.oauth_types import decode_oauth_tokens as decode_oauth_tokens
+from platform_core.oauth_types import encode_oauth_credentials as encode_oauth_credentials
+from platform_core.oauth_types import encode_oauth_tokens as encode_oauth_tokens
+
 class OAuthCredentials(TypedDict):
     client_id: str
     client_secret: str
@@ -137,9 +154,17 @@ class TrackedCompetition(TypedDict):
 
 ### 1. auth.py - OAuth 2.0 Flow
 
-PKCE-based OAuth for desktop applications:
+PKCE-based OAuth for desktop applications. Uses centralized PKCE utilities from `platform_core.oauth`:
 
 ```python
+# PKCE functions imported from platform_core
+from platform_core.oauth import (
+    generate_code_challenge,
+    generate_code_verifier,
+    generate_state,
+)
+from platform_core.oauth import is_token_expired as _core_is_token_expired
+
 def build_auth_url(credentials: OAuthCredentials, code_verifier: str) -> str:
     """Build Google OAuth authorization URL with PKCE."""
 
@@ -298,6 +323,7 @@ class FakeCalendarClient(CalendarClientProtocol):
 #### Factory Functions
 
 ```python
+# Calendar-specific factories
 def make_fake_event(...) -> CalendarEvent
 def make_fake_calendar(...) -> CalendarListItem
 def make_fake_tokens(tokens: OAuthTokens) -> LoadTokensHook
@@ -310,6 +336,10 @@ def make_raising_http_get(exc: BaseException) -> HttpGetHook
 def make_raising_http_post(exc: BaseException) -> HttpPostHook
 def make_raising_http_patch(exc: BaseException) -> HttpPatchHook
 def make_raising_http_delete(exc: BaseException) -> HttpDeleteHook
+
+# Re-exported from platform_core.oauth_testing
+from platform_core.oauth_testing import make_token_response_json
+from platform_core.oauth_testing import make_error_response_json
 ```
 
 ## FastAPI Service Integration

@@ -27,12 +27,16 @@ poetry add platform-calendar
 
 ## Features
 
-- **OAuth 2.0 Authentication**: Secure PKCE-based authentication with Google Calendar API
+- **OAuth 2.0 Authentication**: Secure PKCE-based authentication with Google Calendar API (uses `platform_core.oauth` utilities)
 - **Competition Tracking**: Track Kaggle, Devpost, and other competition deadlines
 - **Automatic Reminders**: Default 1 day + 1 hour before deadline (configurable)
 - **Strict Typing**: mypy strict mode, no Any, 100% test coverage
 - **Project Mapping**: Link competitions to your codebase projects
 - **Testable Design**: Hooks-based dependency injection for full testability
+
+## Dependencies
+
+- `platform-core` - OAuth types and PKCE utilities, JSON utilities, error handling
 
 ## Setup
 
@@ -614,5 +618,5 @@ make test   # Run tests only
 ## Requirements
 
 - Python 3.11+
-- platform-core (for error handling and JSON utilities)
+- platform-core (OAuth types, PKCE utilities, error handling, JSON utilities)
 - 100% test coverage enforced

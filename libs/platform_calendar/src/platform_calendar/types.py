@@ -1,4 +1,8 @@
-"""TypedDict definitions for Google Calendar API and competition tracking."""
+"""TypedDict definitions for Google Calendar API and competition tracking.
+
+OAuth types (OAuthCredentials, OAuthTokens, OAuthTokenResponse) are re-exported
+from platform_core.oauth_types for backward compatibility.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,18 @@ from platform_core.json_utils import (
     require_str,
 )
 
+# Re-export OAuth types from platform_core
+from platform_core.oauth_types import OAuthCredentials as OAuthCredentials
+from platform_core.oauth_types import OAuthTokenResponse as OAuthTokenResponse
+from platform_core.oauth_types import OAuthTokens as OAuthTokens
+from platform_core.oauth_types import TokenType as TokenType
+from platform_core.oauth_types import decode_oauth_credentials as decode_oauth_credentials
+from platform_core.oauth_types import decode_oauth_token_response as decode_oauth_token_response
+from platform_core.oauth_types import decode_oauth_tokens as decode_oauth_tokens
+from platform_core.oauth_types import encode_oauth_credentials as encode_oauth_credentials
+from platform_core.oauth_types import encode_oauth_token_response as encode_oauth_token_response
+from platform_core.oauth_types import encode_oauth_tokens as encode_oauth_tokens
+
 # =============================================================================
 # Literal Types
 # =============================================================================
@@ -22,7 +38,6 @@ from platform_core.json_utils import (
 EventStatus = Literal["confirmed", "tentative", "cancelled"]
 ReminderMethod = Literal["email", "popup"]
 CompetitionSource = Literal["kaggle", "devpost", "manual"]
-TokenType = Literal["Bearer"]
 CalendarAccessRole = Literal["freeBusyReader", "reader", "writer", "owner"]
 
 # Default reminders: 1 day (1440 min) + 1 hour (60 min) before deadline
@@ -66,14 +81,6 @@ def _require_competition_source(obj: JSONObject, key: str) -> CompetitionSource:
     if value == "manual":
         return "manual"
     raise JSONTypeError(f"Field '{key}' must be kaggle/devpost/manual, got '{value}'")
-
-
-def _require_token_type(obj: JSONObject, key: str) -> TokenType:
-    """Extract and validate TokenType from JSON object."""
-    value = require_str(obj, key)
-    if value == "Bearer":
-        return "Bearer"
-    raise JSONTypeError(f"Field '{key}' must be Bearer, got '{value}'")
 
 
 def _require_access_role(obj: JSONObject, key: str) -> CalendarAccessRole:
@@ -334,68 +341,6 @@ def decode_calendar_list_item(data: JSONObject) -> CalendarListItem:
 
 
 # =============================================================================
-# OAuth Types
-# =============================================================================
-
-
-class OAuthCredentials(TypedDict):
-    """OAuth 2.0 client credentials."""
-
-    client_id: str
-    client_secret: str
-    redirect_uri: str
-
-
-def encode_oauth_credentials(c: OAuthCredentials) -> JSONObject:
-    """Encode OAuthCredentials to JSON-serializable dict."""
-    result: JSONObject = {
-        "client_id": c["client_id"],
-        "client_secret": c["client_secret"],
-        "redirect_uri": c["redirect_uri"],
-    }
-    return result
-
-
-def decode_oauth_credentials(data: JSONObject) -> OAuthCredentials:
-    """Decode OAuthCredentials from dict with validation."""
-    return OAuthCredentials(
-        client_id=require_str(data, "client_id"),
-        client_secret=require_str(data, "client_secret"),
-        redirect_uri=require_str(data, "redirect_uri"),
-    )
-
-
-class OAuthTokens(TypedDict):
-    """OAuth 2.0 access and refresh tokens."""
-
-    access_token: str
-    refresh_token: str
-    expires_at: int  # Unix timestamp
-    token_type: TokenType
-
-
-def encode_oauth_tokens(t: OAuthTokens) -> JSONObject:
-    """Encode OAuthTokens to JSON-serializable dict."""
-    result: JSONObject = {
-        "access_token": t["access_token"],
-        "refresh_token": t["refresh_token"],
-        "expires_at": t["expires_at"],
-        "token_type": t["token_type"],
-    }
-    return result
-
-
-def decode_oauth_tokens(data: JSONObject) -> OAuthTokens:
-    """Decode OAuthTokens from dict with validation."""
-    return OAuthTokens(
-        access_token=require_str(data, "access_token"),
-        refresh_token=require_str(data, "refresh_token"),
-        expires_at=require_int(data, "expires_at"),
-        token_type=_require_token_type(data, "token_type"),
-    )
-
-
-# =============================================================================
 # Competition Tracking Types
 # =============================================================================
 
@@ -511,20 +456,68 @@ def decode_google_credentials_file(data: JSONObject) -> GoogleCredentialsFile:
     )
 
 
-class GoogleTokenResponse(TypedDict):
-    """Response from Google OAuth token endpoint."""
-
-    access_token: str
-    refresh_token: str | None  # Only on initial auth, not refresh
-    expires_in: int  # Seconds until expiration
-    token_type: str
+# GoogleTokenResponse is now an alias to the centralized OAuthTokenResponse.
+# Kept for backward compatibility with existing code.
+GoogleTokenResponse = OAuthTokenResponse
 
 
 def decode_google_token_response(data: JSONObject) -> GoogleTokenResponse:
-    """Decode Google token response with validation."""
-    return GoogleTokenResponse(
-        access_token=require_str(data, "access_token"),
-        refresh_token=optional_str(data, "refresh_token"),
-        expires_in=require_int(data, "expires_in"),
-        token_type=require_str(data, "token_type"),
-    )
+    """Decode Google token response with validation.
+
+    This is an alias to decode_oauth_token_response for backward compatibility.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated GoogleTokenResponse (same as OAuthTokenResponse).
+
+    Raises:
+        JSONTypeError: If required fields are missing or invalid.
+    """
+    return decode_oauth_token_response(data)
+
+
+__all__ = [
+    "DEFAULT_REMINDERS",
+    "CalendarAccessRole",
+    "CalendarEvent",
+    "CalendarListItem",
+    "CompetitionSource",
+    "CompetitionsFile",
+    "EventDateTime",
+    "EventReminders",
+    "EventStatus",
+    "GoogleCredentialsFile",
+    "GoogleInstalledCredentials",
+    "GoogleTokenResponse",
+    "OAuthCredentials",
+    "OAuthTokenResponse",
+    "OAuthTokens",
+    "ReminderMethod",
+    "ReminderOverride",
+    "TokenType",
+    "TrackedCompetition",
+    "decode_calendar_event",
+    "decode_calendar_list_item",
+    "decode_competitions_file",
+    "decode_event_datetime",
+    "decode_event_reminders",
+    "decode_google_credentials_file",
+    "decode_google_token_response",
+    "decode_oauth_credentials",
+    "decode_oauth_token_response",
+    "decode_oauth_tokens",
+    "decode_reminder_override",
+    "decode_tracked_competition",
+    "encode_calendar_event",
+    "encode_calendar_list_item",
+    "encode_competitions_file",
+    "encode_event_datetime",
+    "encode_event_reminders",
+    "encode_oauth_credentials",
+    "encode_oauth_token_response",
+    "encode_oauth_tokens",
+    "encode_reminder_override",
+    "encode_tracked_competition",
+]

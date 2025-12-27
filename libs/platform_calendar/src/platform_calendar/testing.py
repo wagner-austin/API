@@ -1,4 +1,8 @@
-"""Test utilities, fakes, and hooks for platform_calendar."""
+"""Test utilities, fakes, and hooks for platform_calendar.
+
+Re-exports common OAuth test utilities from platform_core.oauth_testing
+for convenience. Calendar-specific fakes and hooks are defined here.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +10,12 @@ from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, CalendarErrorCode
+
+# Re-export OAuth testing utilities from platform_core for convenience.
+# Note: platform_calendar has its own make_fake_credentials/make_fake_tokens
+# that create hook functions, so we don't re-export the platform_core versions
+# which return data directly.
+from platform_core.oauth_testing import make_error_response_json, make_token_response_json
 
 from platform_calendar.types import (
     CalendarEvent,
@@ -1096,6 +1106,7 @@ __all__ = [
     "WriteFileHook",
     "_prod_http_patch",
     "hooks",
+    "make_error_response_json",
     "make_fake_calendar",
     "make_fake_console",
     "make_fake_credentials",
@@ -1112,5 +1123,6 @@ __all__ = [
     "make_raising_http_get",
     "make_raising_http_patch",
     "make_raising_http_post",
+    "make_token_response_json",
     "reset_hooks",
 ]

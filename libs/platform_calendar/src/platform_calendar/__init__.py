@@ -32,9 +32,22 @@ Example usage:
     synced = sync_competition(client, competition=comp)
 """
 
-# Types
 # Errors - from platform_core
 from platform_core.errors import AppError, CalendarErrorCode
+
+# OAuth types - from platform_core
+from platform_core.oauth_types import (
+    OAuthCredentials,
+    OAuthTokenResponse,
+    OAuthTokens,
+    TokenType,
+    decode_oauth_credentials,
+    decode_oauth_token_response,
+    decode_oauth_tokens,
+    encode_oauth_credentials,
+    encode_oauth_token_response,
+    encode_oauth_tokens,
+)
 
 # Auth
 from platform_calendar.auth import (
@@ -112,11 +125,8 @@ from platform_calendar.types import (
     GoogleCredentialsFile,
     GoogleInstalledCredentials,
     GoogleTokenResponse,
-    OAuthCredentials,
-    OAuthTokens,
     ReminderMethod,
     ReminderOverride,
-    TokenType,
     TrackedCompetition,
     decode_calendar_event,
     decode_calendar_list_item,
@@ -125,8 +135,6 @@ from platform_calendar.types import (
     decode_event_reminders,
     decode_google_credentials_file,
     decode_google_token_response,
-    decode_oauth_credentials,
-    decode_oauth_tokens,
     decode_reminder_override,
     decode_tracked_competition,
     encode_calendar_event,
@@ -134,28 +142,20 @@ from platform_calendar.types import (
     encode_competitions_file,
     encode_event_datetime,
     encode_event_reminders,
-    encode_oauth_credentials,
-    encode_oauth_tokens,
     encode_reminder_override,
     encode_tracked_competition,
 )
 
 __all__ = [
-    # Config
     "CALENDAR_SCOPES",
-    # Types - Constants
     "DEFAULT_REMINDERS",
     "GOOGLE_AUTH_URL",
     "GOOGLE_CALENDAR_API_BASE",
     "GOOGLE_TOKEN_URL",
-    # Errors - from platform_core
     "AppError",
-    # Types - Literals
     "CalendarAccessRole",
-    # Testing
     "CalendarClientProtocol",
     "CalendarErrorCode",
-    # Types - TypedDicts
     "CalendarEvent",
     "CalendarListItem",
     "CompetitionSource",
@@ -172,18 +172,16 @@ __all__ = [
     "HTTPErrorProtocol",
     "HooksContainer",
     "OAuthCredentials",
+    "OAuthTokenResponse",
     "OAuthTokens",
     "ReminderMethod",
     "ReminderOverride",
     "TokenType",
     "TrackedCompetition",
-    # Competitions
     "add_competition",
-    # Auth
     "authorize",
     "build_auth_url",
     "create_competition_event",
-    # Types - Encode/Decode
     "decode_calendar_event",
     "decode_calendar_list_item",
     "decode_competitions_file",
@@ -192,6 +190,7 @@ __all__ = [
     "decode_google_credentials_file",
     "decode_google_token_response",
     "decode_oauth_credentials",
+    "decode_oauth_token_response",
     "decode_oauth_tokens",
     "decode_reminder_override",
     "decode_tracked_competition",
@@ -201,6 +200,7 @@ __all__ = [
     "encode_event_datetime",
     "encode_event_reminders",
     "encode_oauth_credentials",
+    "encode_oauth_token_response",
     "encode_oauth_tokens",
     "encode_reminder_override",
     "encode_tracked_competition",
@@ -210,7 +210,6 @@ __all__ = [
     "get_credentials_path",
     "get_tokens_path",
     "get_valid_tokens",
-    # Client
     "google_calendar_client",
     "hooks",
     "is_token_expired",
