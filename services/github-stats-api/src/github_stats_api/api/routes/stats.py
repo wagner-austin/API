@@ -4,17 +4,26 @@ from typing import Protocol
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
+from platform_codebase import parse_github_repo, scan_libs_from_github, scan_services_from_github
+from platform_kaggle import build_profile
 
-from ..._test_hooks import get_client_hook
+from ..._test_hooks import get_client_hook, get_github_client_hook
 from ...client import GitHubClient
 from ...settings import Settings
 from ...svg_renderer import (
+    build_capabilities_response,
     build_language_stats,
     build_user_stats,
+    render_capabilities_card,
     render_langs_card,
     render_stats_card,
 )
-from ..validators.stats import decode_langs_request, decode_stats_request
+from ..schemas.stats import Capability
+from ..validators.stats import (
+    decode_capabilities_request,
+    decode_langs_request,
+    decode_stats_request,
+)
 
 _HTTP_TIMEOUT_SECONDS = 30.0
 
@@ -187,6 +196,78 @@ class _StatsRoutes:
             headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
         )
 
+    def get_capabilities(
+        self,
+        request: Request,
+        repo: str | None = Query(default=None, description="GitHub repo (owner/repo)"),
+        theme: str | None = Query(default=None, description="Color theme"),
+        hide_border: str | None = Query(default=None, description="Hide border"),
+    ) -> Response:
+        """Get codebase capabilities SVG card.
+
+        Args:
+            request: FastAPI request.
+            repo: GitHub repository in owner/repo format.
+            theme: Color theme name.
+            hide_border: Whether to hide border.
+
+        Returns:
+            SVG response.
+        """
+        req = decode_capabilities_request(
+            repo=repo,
+            theme=theme,
+            hide_border=hide_border,
+        )
+
+        settings = self._settings_provider()
+
+        # Parse repo and scan via GitHub API
+        owner, repo_name = parse_github_repo(req["repo"])
+
+        build_github_client = get_github_client_hook()
+        github_client = build_github_client(settings["github_token"])
+
+        libs = scan_libs_from_github(github_client, owner, repo_name)
+        services = scan_services_from_github(github_client, owner, repo_name)
+
+        # Build profile using platform_kaggle
+        profile = build_profile(libs, services)
+
+        # Convert CodebaseCapability objects to our Capability TypedDict
+        capabilities: list[Capability] = []
+        for cap in profile.capabilities:
+            capabilities.append(
+                {
+                    "name": cap.name,
+                    "strength": cap.strength,
+                    "tags": cap.tags,
+                    "description": cap.description,
+                }
+            )
+
+        response = build_capabilities_response(
+            repo=req["repo"],
+            capabilities=tuple(capabilities),
+            ml_backends=profile.ml_backends,
+            frameworks=profile.frameworks,
+            data_formats=profile.data_formats,
+            task_types=profile.task_types,
+        )
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name=req["theme"],
+            hide_border=req["hide_border"],
+        )
+
+        cache_ttl = settings["cache_ttl_seconds"]
+        return Response(
+            content=svg,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
+        )
+
 
 def build_router(settings_provider: _SettingsProvider) -> APIRouter:
     """Build stats router.
@@ -213,6 +294,13 @@ def build_router(settings_provider: _SettingsProvider) -> APIRouter:
         methods=["GET"],
         name="get_top_langs",
         summary="Get top languages card",
+    )
+    router.add_api_route(
+        "/api/capabilities",
+        handler.get_capabilities,
+        methods=["GET"],
+        name="get_capabilities",
+        summary="Get codebase capabilities card",
     )
 
     return router

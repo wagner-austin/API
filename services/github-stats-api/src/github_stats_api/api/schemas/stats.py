@@ -113,10 +113,78 @@ class LangsResponse(TypedDict, total=True):
     total_size: int
 
 
+# Theme literal type for reuse
+ThemeName = Literal[
+    "default",
+    "dark",
+    "dracula",
+    "github_dark",
+    "transparent",
+]
+
+# Capability strength literal type (matches platform_codebase)
+CapabilityStrength = Literal["strong", "moderate", "basic"]
+
+
+class CapabilitiesRequest(TypedDict, total=True):
+    """Request for codebase capabilities card.
+
+    Attributes:
+        repo: GitHub repository in 'owner/repo' format.
+        theme: Color theme for the card.
+        hide_border: Whether to hide the card border.
+    """
+
+    repo: str
+    theme: ThemeName
+    hide_border: bool
+
+
+class Capability(TypedDict, total=True):
+    """A detected codebase capability.
+
+    Attributes:
+        name: Capability identifier (e.g., 'xgboost_tabular').
+        strength: Capability strength level.
+        tags: Tuple of tags this capability matches.
+        description: Human-readable description.
+    """
+
+    name: str
+    strength: CapabilityStrength
+    tags: tuple[str, ...]
+    description: str
+
+
+class CapabilitiesResponse(TypedDict, total=True):
+    """Response containing codebase capabilities.
+
+    Attributes:
+        repo: GitHub repository scanned.
+        capabilities: List of detected capabilities.
+        ml_backends: Tuple of ML backend names.
+        frameworks: Tuple of framework names.
+        data_formats: Tuple of supported data formats.
+        task_types: Tuple of supported task types.
+    """
+
+    repo: str
+    capabilities: tuple[Capability, ...]
+    ml_backends: tuple[str, ...]
+    frameworks: tuple[str, ...]
+    data_formats: tuple[str, ...]
+    task_types: tuple[str, ...]
+
+
 __all__ = [
+    "CapabilitiesRequest",
+    "CapabilitiesResponse",
+    "Capability",
+    "CapabilityStrength",
     "LangsRequest",
     "LangsResponse",
     "LanguageStats",
     "StatsRequest",
+    "ThemeName",
     "UserStats",
 ]

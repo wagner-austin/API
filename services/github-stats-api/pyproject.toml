@@ -20,6 +20,8 @@ hypercorn = "^0.18"
 httpx = "^0.28"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
+platform-codebase = { path = "../../libs/platform_codebase", develop = true }
+platform-kaggle = { path = "../../libs/platform_kaggle", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

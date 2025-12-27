@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from github_stats_api.api.schemas.stats import LanguageStats, UserStats
+from github_stats_api.api.schemas.stats import (
+    CapabilitiesResponse,
+    Capability,
+    LanguageStats,
+    UserStats,
+)
 from github_stats_api.svg_renderer import (
     _calculate_rank,
     _escape_xml,
     _format_number,
+    build_capabilities_response,
     build_language_stats,
     build_user_stats,
+    render_capabilities_card,
     render_langs_card,
     render_stats_card,
 )
@@ -721,3 +728,229 @@ class TestBuildLanguageStatsTypeValidation:
         stats, _total = build_language_stats(languages)
         assert len(stats) == 1
         assert stats[0]["name"] == "JavaScript"
+
+
+class TestBuildCapabilitiesResponse:
+    """Tests for build_capabilities_response function."""
+
+    def test_build_capabilities_response_basic(self) -> None:
+        """Test building capabilities response."""
+        cap: Capability = {
+            "name": "xgboost_tabular",
+            "strength": "strong",
+            "tags": ("ml", "tabular", "xgboost"),
+            "description": "XGBoost gradient boosting",
+        }
+
+        response = build_capabilities_response(
+            repo="owner/repo",
+            capabilities=(cap,),
+            ml_backends=("xgboost", "lightgbm"),
+            frameworks=("fastapi",),
+            data_formats=("csv", "parquet"),
+            task_types=("binary_classification",),
+        )
+
+        assert response["repo"] == "owner/repo"
+        assert len(response["capabilities"]) == 1
+        assert response["capabilities"][0]["name"] == "xgboost_tabular"
+        assert response["ml_backends"] == ("xgboost", "lightgbm")
+        assert response["frameworks"] == ("fastapi",)
+        assert response["data_formats"] == ("csv", "parquet")
+        assert response["task_types"] == ("binary_classification",)
+
+    def test_build_capabilities_response_empty(self) -> None:
+        """Test building capabilities response with no capabilities."""
+        response = build_capabilities_response(
+            repo="owner/repo",
+            capabilities=(),
+            ml_backends=(),
+            frameworks=(),
+            data_formats=(),
+            task_types=(),
+        )
+
+        assert response["repo"] == "owner/repo"
+        assert response["capabilities"] == ()
+        assert response["ml_backends"] == ()
+
+
+class TestRenderCapabilitiesCard:
+    """Tests for render_capabilities_card function."""
+
+    def test_render_capabilities_card_basic(self) -> None:
+        """Test rendering capabilities card."""
+        cap: Capability = {
+            "name": "xgboost_tabular",
+            "strength": "strong",
+            "tags": ("ml", "tabular"),
+            "description": "XGBoost gradient boosting",
+        }
+
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": (cap,),
+            "ml_backends": ("xgboost",),
+            "frameworks": ("fastapi",),
+            "data_formats": ("csv",),
+            "task_types": ("binary_classification",),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="default",
+            hide_border=False,
+        )
+
+        assert svg.startswith("<svg")
+        assert "</svg>" in svg
+        assert "Codebase Capabilities" in svg
+        assert "Xgboost Tabular" in svg  # Title-cased
+        assert "strong" in svg
+        assert "xgboost" in svg
+        assert "Binary Classification" in svg
+
+    def test_render_capabilities_card_multiple_capabilities(self) -> None:
+        """Test rendering capabilities card with multiple capabilities."""
+        caps: tuple[Capability, ...] = (
+            {
+                "name": "xgboost_tabular",
+                "strength": "strong",
+                "tags": ("ml",),
+                "description": "XGBoost",
+            },
+            {
+                "name": "fastapi_rest",
+                "strength": "moderate",
+                "tags": ("web",),
+                "description": "FastAPI REST",
+            },
+            {
+                "name": "pytorch_cv",
+                "strength": "basic",
+                "tags": ("cv",),
+                "description": "PyTorch CV",
+            },
+        )
+
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": caps,
+            "ml_backends": ("xgboost", "pytorch"),
+            "frameworks": ("fastapi",),
+            "data_formats": ("csv", "parquet"),
+            "task_types": ("binary_classification", "image_classification"),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="dracula",
+            hide_border=True,
+        )
+
+        assert svg.startswith("<svg")
+        assert "Xgboost Tabular" in svg
+        assert "Fastapi Rest" in svg
+        assert "Pytorch Cv" in svg
+        assert "strong" in svg
+        assert "moderate" in svg
+        assert "basic" in svg
+        # Check strength classes
+        assert "strength-strong" in svg
+        assert "strength-moderate" in svg
+        assert "strength-basic" in svg
+
+    def test_render_capabilities_card_no_capabilities(self) -> None:
+        """Test rendering capabilities card with no capabilities."""
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": (),
+            "ml_backends": (),
+            "frameworks": (),
+            "data_formats": (),
+            "task_types": (),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="default",
+            hide_border=False,
+        )
+
+        assert svg.startswith("<svg")
+        assert "</svg>" in svg
+        assert "Codebase Capabilities" in svg
+
+    def test_render_capabilities_card_with_theme(self) -> None:
+        """Test that theme colors are applied."""
+        cap: Capability = {
+            "name": "test_cap",
+            "strength": "strong",
+            "tags": (),
+            "description": "Test",
+        }
+
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": (cap,),
+            "ml_backends": (),
+            "frameworks": (),
+            "data_formats": (),
+            "task_types": (),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="dracula",
+            hide_border=False,
+        )
+
+        assert "#282a36" in svg  # dracula bg color
+        assert "#ff79c6" in svg  # dracula title color
+
+    def test_render_capabilities_card_many_task_types(self) -> None:
+        """Test rendering card with more than 6 task types shows +N more."""
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": (),
+            "ml_backends": (),
+            "frameworks": (),
+            "data_formats": (),
+            "task_types": (
+                "type1",
+                "type2",
+                "type3",
+                "type4",
+                "type5",
+                "type6",
+                "type7",
+                "type8",
+            ),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="default",
+            hide_border=False,
+        )
+
+        assert "+2 more" in svg
+
+    def test_render_capabilities_card_hide_border(self) -> None:
+        """Test hiding border on capabilities card."""
+        response: CapabilitiesResponse = {
+            "repo": "owner/repo",
+            "capabilities": (),
+            "ml_backends": (),
+            "frameworks": (),
+            "data_formats": (),
+            "task_types": (),
+        }
+
+        svg = render_capabilities_card(
+            response=response,
+            theme_name="default",
+            hide_border=True,
+        )
+
+        assert 'stroke-opacity="0"' in svg

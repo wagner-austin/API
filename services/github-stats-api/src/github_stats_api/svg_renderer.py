@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from .api.schemas.stats import LanguageStats, UserStats
+from .api.schemas.stats import CapabilitiesResponse, Capability, LanguageStats, UserStats
 from .themes import get_theme
 
 # Rank thresholds based on activity percentiles
@@ -409,9 +409,144 @@ def build_language_stats(
     return result, total_size
 
 
+def render_capabilities_card(
+    response: CapabilitiesResponse,
+    theme_name: str,
+    hide_border: bool,
+) -> str:
+    """Render codebase capabilities SVG card.
+
+    Args:
+        response: Capabilities response data.
+        theme_name: Theme name.
+        hide_border: Whether to hide the border.
+
+    Returns:
+        SVG string.
+    """
+    theme = get_theme(theme_name)
+
+    capabilities = response["capabilities"]
+    ml_backends = response["ml_backends"]
+    task_types = response["task_types"]
+
+    # Card dimensions - dynamic based on content
+    width = 495
+    # Header + capabilities + ML backends + task types + padding
+    cap_rows = (len(capabilities) + 1) // 2  # 2 per row
+    backend_row_count = 1 if ml_backends else 0
+    task_row_count = 1 if task_types else 0
+    height = 80 + cap_rows * 35 + backend_row_count * 35 + task_row_count * 35
+
+    title_color = theme["title_color"]
+    text_color = theme["text_color"]
+    icon_color = theme["icon_color"]
+
+    svg_parts = [
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg">',
+        "<style>",
+        f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
+        f".section {{ font: 600 14px 'Segoe UI', sans-serif; fill: {title_color}; }}",
+        f".cap-name {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
+        f".cap-desc {{ font: 400 10px 'Segoe UI', sans-serif; fill: {text_color}; "
+        "opacity: 0.7; }}",
+        f".tag {{ font: 400 10px 'Segoe UI', sans-serif; fill: {icon_color}; }}",
+        ".strength-strong { fill: #2ecc71; }",
+        ".strength-moderate { fill: #f1c40f; }",
+        ".strength-basic { fill: #95a5a6; }",
+        "</style>",
+        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
+        f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
+        f'stroke-opacity="{0 if hide_border else 1}"/>',
+        '<text x="25" y="35" class="header">Codebase Capabilities</text>',
+    ]
+
+    y_offset = 60
+
+    # Render capabilities (2 per row)
+    if capabilities:
+        for i, cap in enumerate(capabilities):
+            col = i % 2
+            row = i // 2
+            x = 25 + col * 235
+            y = y_offset + row * 35
+
+            # Strength indicator
+            strength_class = f"strength-{cap['strength']}"
+            svg_parts.append(f'<circle cx="{x + 5}" cy="{y - 4}" r="4" class="{strength_class}"/>')
+
+            # Capability name
+            cap_name = _escape_xml(cap["name"].replace("_", " ").title())
+            svg_parts.append(f'<text x="{x + 15}" y="{y}" class="cap-name">{cap_name}</text>')
+
+            # Strength label
+            svg_parts.append(
+                f'<text x="{x + 15}" y="{y + 12}" class="cap-desc">{cap["strength"]}</text>'
+            )
+
+        y_offset += cap_rows * 35 + 10
+
+    # Render ML backends
+    if ml_backends:
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="section">ML Backends</text>')
+        y_offset += 18
+        backends_str = ", ".join(_escape_xml(b) for b in ml_backends)
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{backends_str}</text>')
+        y_offset += 25
+
+    # Render task types
+    if task_types:
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="section">Task Types</text>')
+        y_offset += 18
+        # Format task types nicely
+        tasks_formatted = [t.replace("_", " ").title() for t in task_types]
+        tasks_str = ", ".join(_escape_xml(t) for t in tasks_formatted[:6])
+        if len(task_types) > 6:
+            tasks_str += f" +{len(task_types) - 6} more"
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{tasks_str}</text>')
+
+    svg_parts.append("</svg>")
+
+    return "\n".join(svg_parts)
+
+
+def build_capabilities_response(
+    repo: str,
+    capabilities: tuple[Capability, ...],
+    ml_backends: tuple[str, ...],
+    frameworks: tuple[str, ...],
+    data_formats: tuple[str, ...],
+    task_types: tuple[str, ...],
+) -> CapabilitiesResponse:
+    """Build CapabilitiesResponse from profile data.
+
+    Args:
+        repo: GitHub repository string.
+        capabilities: Tuple of detected capabilities.
+        ml_backends: Tuple of ML backend names.
+        frameworks: Tuple of framework names.
+        data_formats: Tuple of data format names.
+        task_types: Tuple of task type names.
+
+    Returns:
+        CapabilitiesResponse TypedDict.
+    """
+    return {
+        "repo": repo,
+        "capabilities": capabilities,
+        "ml_backends": ml_backends,
+        "frameworks": frameworks,
+        "data_formats": data_formats,
+        "task_types": task_types,
+    }
+
+
 __all__ = [
+    "build_capabilities_response",
     "build_language_stats",
     "build_user_stats",
+    "render_capabilities_card",
     "render_langs_card",
     "render_stats_card",
 ]

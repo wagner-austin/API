@@ -4,6 +4,7 @@ import pytest
 from platform_core.errors import AppError
 
 from github_stats_api.api.validators.stats import (
+    decode_capabilities_request,
     decode_langs_request,
     decode_stats_request,
 )
@@ -414,3 +415,181 @@ class TestDecodeLangsRequest:
             )
         assert exc_info.value.http_status == 400
         assert "must be true/false" in exc_info.value.message
+
+
+class TestDecodeCapabilitiesRequest:
+    """Tests for decode_capabilities_request function."""
+
+    def test_decode_capabilities_request_minimal(self) -> None:
+        """Test decoding with just repo."""
+        req = decode_capabilities_request(
+            repo="owner/repo",
+            theme=None,
+            hide_border=None,
+        )
+
+        assert req["repo"] == "owner/repo"
+        assert req["theme"] == "default"
+        assert req["hide_border"] is False
+
+    def test_decode_capabilities_request_all_options(self) -> None:
+        """Test decoding with all options specified."""
+        req = decode_capabilities_request(
+            repo="wagner-austin/API",
+            theme="dracula",
+            hide_border="true",
+        )
+
+        assert req["repo"] == "wagner-austin/API"
+        assert req["theme"] == "dracula"
+        assert req["hide_border"] is True
+
+    def test_decode_capabilities_request_missing_repo_raises(self) -> None:
+        """Test that missing repo raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo=None,
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "repo is required" in exc_info.value.message
+
+    def test_decode_capabilities_request_empty_repo_raises(self) -> None:
+        """Test that empty repo raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="   ",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "repo is required" in exc_info.value.message
+
+    def test_decode_capabilities_request_invalid_format_no_slash_raises(self) -> None:
+        """Test that repo without slash raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="just-a-repo",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "owner/repo" in exc_info.value.message
+
+    def test_decode_capabilities_request_invalid_format_too_many_slashes_raises(self) -> None:
+        """Test that repo with too many slashes raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner/repo/extra",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "owner/repo" in exc_info.value.message
+
+    def test_decode_capabilities_request_empty_owner_raises(self) -> None:
+        """Test that empty owner raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="/repo",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "owner/repo" in exc_info.value.message
+
+    def test_decode_capabilities_request_empty_repo_name_raises(self) -> None:
+        """Test that empty repo name raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner/",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "owner/repo" in exc_info.value.message
+
+    def test_decode_capabilities_request_owner_too_long_raises(self) -> None:
+        """Test that owner over 39 chars raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="a" * 40 + "/repo",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "39 characters" in exc_info.value.message
+
+    def test_decode_capabilities_request_owner_invalid_char_raises(self) -> None:
+        """Test that invalid owner character raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner_name/repo",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "invalid character" in exc_info.value.message
+
+    def test_decode_capabilities_request_repo_name_too_long_raises(self) -> None:
+        """Test that repo name over 100 chars raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner/" + "a" * 101,
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "100 characters" in exc_info.value.message
+
+    def test_decode_capabilities_request_repo_name_invalid_char_raises(self) -> None:
+        """Test that invalid repo name character raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner/repo@name",
+                theme=None,
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "invalid character" in exc_info.value.message
+
+    def test_decode_capabilities_request_accepts_valid_repo_names(self) -> None:
+        """Test that valid repo name formats are accepted."""
+        # Test various valid repo name formats
+        valid_repos = [
+            "owner/my-repo",
+            "owner/my_repo",
+            "owner/my.repo",
+            "owner/my-repo_name.v2",
+            "owner123/repo456",
+        ]
+        for repo in valid_repos:
+            req = decode_capabilities_request(
+                repo=repo,
+                theme=None,
+                hide_border=None,
+            )
+            assert req["repo"] == repo
+
+    def test_decode_capabilities_request_invalid_theme_raises(self) -> None:
+        """Test that invalid theme raises AppError."""
+        with pytest.raises(AppError) as exc_info:
+            decode_capabilities_request(
+                repo="owner/repo",
+                theme="invalid-theme",
+                hide_border=None,
+            )
+
+        assert exc_info.value.http_status == 400
+        assert "theme must be one of" in exc_info.value.message

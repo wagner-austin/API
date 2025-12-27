@@ -4,11 +4,17 @@ from collections.abc import Generator
 
 import httpx
 import pytest
+from platform_codebase import FakeGitHubClient, GitHubClientProtocol
 from platform_core.http_client import HttpxAsyncClient
 from platform_core.json_utils import JSONValue
 from platform_core.testing import FakeHttpxAsyncClient, FakeHttpxResponse
 
-from github_stats_api._test_hooks import reset_client_hook, set_client_hook
+from github_stats_api._test_hooks import (
+    reset_client_hook,
+    reset_github_client_hook,
+    set_client_hook,
+    set_github_client_hook,
+)
 from github_stats_api.api.main import create_app
 from github_stats_api.settings import Settings
 
@@ -307,6 +313,179 @@ class TestTopLangsEndpoint:
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/top-langs?username=testuser")
+
+        assert "Cache-Control" in response.headers
+        assert "max-age=60" in response.headers["Cache-Control"]
+
+
+def _make_fake_github_client_with_xgboost() -> FakeGitHubClient:
+    """Create a fake GitHub client with XGBoost capability."""
+    return FakeGitHubClient(
+        directories={
+            "libs": ["platform_ml"],
+            "services": ["ml-api"],
+        },
+        files={
+            "libs/platform_ml/pyproject.toml": """
+[tool.poetry]
+name = "platform-ml"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+xgboost = "^2.0.0"
+lightgbm = "^4.0.0"
+""",
+            "services/ml-api/pyproject.toml": """
+[tool.poetry]
+name = "ml-api"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.100.0"
+""",
+        },
+        path_patterns={},
+    )
+
+
+def _make_fake_github_client_empty() -> FakeGitHubClient:
+    """Create a fake GitHub client with no libs/services."""
+    return FakeGitHubClient(
+        directories={
+            "libs": [],
+            "services": [],
+        },
+        files={},
+        path_patterns={},
+    )
+
+
+class TestCapabilitiesEndpoint:
+    """Tests for /api/capabilities endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_hooks(self) -> Generator[None, None, None]:
+        """Reset hooks after each test."""
+        yield
+        reset_client_hook()
+        reset_github_client_hook()
+
+    async def test_get_capabilities_returns_svg(self) -> None:
+        """Test /api/capabilities endpoint returns SVG card."""
+        fake_client = _make_fake_github_client_with_xgboost()
+
+        def build_fake_github_client(token: str) -> GitHubClientProtocol:
+            return fake_client
+
+        set_github_client_hook(build_fake_github_client)
+
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=owner/repo")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert "<svg" in response.text
+        assert "Codebase Capabilities" in response.text
+
+    async def test_get_capabilities_with_theme(self) -> None:
+        """Test /api/capabilities endpoint with theme parameter."""
+        fake_client = _make_fake_github_client_with_xgboost()
+
+        def build_fake_github_client(token: str) -> GitHubClientProtocol:
+            return fake_client
+
+        set_github_client_hook(build_fake_github_client)
+
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=owner/repo&theme=dracula")
+
+        assert response.status_code == 200
+        assert "<svg" in response.text
+        assert "#282a36" in response.text  # dracula bg color
+
+    async def test_get_capabilities_with_hide_border(self) -> None:
+        """Test /api/capabilities endpoint with hide_border parameter."""
+        fake_client = _make_fake_github_client_with_xgboost()
+
+        def build_fake_github_client(token: str) -> GitHubClientProtocol:
+            return fake_client
+
+        set_github_client_hook(build_fake_github_client)
+
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=owner/repo&hide_border=true")
+
+        assert response.status_code == 200
+        assert 'stroke-opacity="0"' in response.text
+
+    async def test_get_capabilities_empty_repo(self) -> None:
+        """Test /api/capabilities endpoint with empty repo."""
+        fake_client = _make_fake_github_client_empty()
+
+        def build_fake_github_client(token: str) -> GitHubClientProtocol:
+            return fake_client
+
+        set_github_client_hook(build_fake_github_client)
+
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=owner/empty-repo")
+
+        assert response.status_code == 200
+        assert "<svg" in response.text
+
+    async def test_get_capabilities_missing_repo_returns_error(self) -> None:
+        """Test /api/capabilities endpoint without repo returns 400."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities")
+
+        assert response.status_code == 400
+
+    async def test_get_capabilities_invalid_repo_format_returns_error(self) -> None:
+        """Test /api/capabilities endpoint with invalid repo format returns 400."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=invalid-format")
+
+        assert response.status_code == 400
+
+    async def test_get_capabilities_cache_control_header(self) -> None:
+        """Test /api/capabilities endpoint sets cache-control header."""
+        fake_client = _make_fake_github_client_with_xgboost()
+
+        def build_fake_github_client(token: str) -> GitHubClientProtocol:
+            return fake_client
+
+        set_github_client_hook(build_fake_github_client)
+
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/capabilities?repo=owner/repo")
 
         assert "Cache-Control" in response.headers
         assert "max-age=60" in response.headers["Cache-Control"]

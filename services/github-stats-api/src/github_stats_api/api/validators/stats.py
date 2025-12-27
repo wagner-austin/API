@@ -4,7 +4,7 @@ from typing import Literal
 
 from platform_core.errors import AppError, ErrorCode
 
-from ..schemas.stats import LangsRequest, StatsRequest
+from ..schemas.stats import CapabilitiesRequest, LangsRequest, StatsRequest
 
 _THEMES: frozenset[str] = frozenset(
     {
@@ -314,7 +314,97 @@ def decode_langs_request(
     }
 
 
+def _require_repo(repo: str | None) -> str:
+    """Require and validate GitHub repository in owner/repo format.
+
+    Args:
+        repo: Raw repo string from query params.
+
+    Returns:
+        Validated repo string in 'owner/repo' format.
+
+    Raises:
+        AppError: If repo is missing or invalid format.
+    """
+    if repo is None or repo.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="repo is required (format: owner/repo)",
+            http_status=400,
+        )
+    cleaned = repo.strip()
+    parts = cleaned.split("/")
+    if len(parts) != 2:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="repo must be in format 'owner/repo'",
+            http_status=400,
+        )
+    owner, repo_name = parts
+    if owner == "" or repo_name == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="repo must be in format 'owner/repo'",
+            http_status=400,
+        )
+    # Validate owner (same rules as username)
+    if len(owner) > 39:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="repo owner must be 39 characters or less",
+            http_status=400,
+        )
+    for i, ch in enumerate(owner):
+        if not (ch.isalnum() or ch == "-"):
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"repo owner contains invalid character at position {i}",
+                http_status=400,
+            )
+    # Validate repo name (alphanumeric, hyphens, underscores, dots)
+    if len(repo_name) > 100:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="repo name must be 100 characters or less",
+            http_status=400,
+        )
+    for i, ch in enumerate(repo_name):
+        if not (ch.isalnum() or ch in "-_."):
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"repo name contains invalid character at position {i}",
+                http_status=400,
+            )
+    return cleaned
+
+
+def decode_capabilities_request(
+    repo: str | None,
+    theme: str | None,
+    hide_border: str | None,
+) -> CapabilitiesRequest:
+    """Decode and validate capabilities request from query parameters.
+
+    Args:
+        repo: GitHub repository in 'owner/repo' format.
+        theme: Color theme.
+        hide_border: Whether to hide border.
+
+    Returns:
+        Validated CapabilitiesRequest TypedDict.
+
+    Raises:
+        AppError: If validation fails.
+    """
+    return {
+        "repo": _require_repo(repo),
+        "theme": _narrow_theme(theme),
+        "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
+    }
+
+
 __all__ = [
+    "decode_capabilities_request",
     "decode_langs_request",
     "decode_stats_request",
 ]
