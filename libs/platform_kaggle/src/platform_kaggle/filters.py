@@ -7,11 +7,48 @@ categories, and reward thresholds.
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 
 from .types import (
     Competition,
     InterestFilter,
 )
+
+# -----------------------------------------------------------------------------
+# Deadline Filtering
+# -----------------------------------------------------------------------------
+
+
+def _parse_deadline(deadline: str) -> datetime:
+    """Parse deadline string to datetime.
+
+    Args:
+        deadline: Deadline string like "2025-08-06 23:59:00" or "2025-08-06".
+
+    Returns:
+        Parsed datetime in UTC.
+    """
+    # Try full format first, then date-only format
+    if " " in deadline:
+        dt = datetime.strptime(deadline, "%Y-%m-%d %H:%M:%S")
+    else:
+        dt = datetime.strptime(deadline, "%Y-%m-%d")
+    return dt.replace(tzinfo=UTC)
+
+
+def _is_active(competition: Competition) -> bool:
+    """Check if competition deadline has not passed.
+
+    Args:
+        competition: Competition to check.
+
+    Returns:
+        True if competition deadline is in the future.
+    """
+    now = datetime.now(UTC)
+    deadline = _parse_deadline(competition.deadline)
+    return deadline > now
+
 
 # -----------------------------------------------------------------------------
 # Reward Parsing
@@ -150,12 +187,15 @@ def _passes_filter(
 def filter_competitions(
     competitions: tuple[Competition, ...],
     interests: InterestFilter,
+    *,
+    active_only: bool = True,
 ) -> tuple[Competition, ...]:
     """Filter competitions by user interests.
 
     Args:
         competitions: Competitions to filter.
         interests: Interest filter criteria.
+        active_only: If True, exclude competitions past their deadline.
 
     Returns:
         Tuple of competitions matching the filter.
@@ -163,6 +203,8 @@ def filter_competitions(
     result: list[Competition] = []
 
     for comp in competitions:
+        if active_only and not _is_active(comp):
+            continue
         if _passes_filter(comp, interests):
             result.append(comp)
 

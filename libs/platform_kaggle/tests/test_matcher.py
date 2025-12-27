@@ -5,13 +5,18 @@ from __future__ import annotations
 from platform_kaggle.matcher import (
     _calculate_match_score,
     _determine_recommendation,
+    _extract_requirements_from_description,
     _infer_competition_requirements,
     _normalize_tag,
     _tags_overlap,
     match_competition,
     match_competitions,
 )
-from platform_kaggle.testing import make_fake_capability, make_fake_competition
+from platform_kaggle.testing import (
+    make_fake_capability,
+    make_fake_competition,
+    make_fake_competition_pages,
+)
 from platform_kaggle.types import CodebaseProfile
 
 
@@ -62,69 +67,88 @@ class TestInferCompetitionRequirements:
     def test_tabular_competition(self) -> None:
         """Test inferring requirements for tabular competition."""
         comp = make_fake_competition(tags=("tabular",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "xgboost_tabular" in reqs
         assert "lightgbm_tabular" in reqs
+        assert unmapped == ()
 
     def test_structured_competition(self) -> None:
         """Test inferring requirements for structured data competition."""
         comp = make_fake_competition(tags=("structured",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "xgboost_tabular" in reqs
+        assert unmapped == ()
 
     def test_classification_competition(self) -> None:
         """Test inferring requirements for classification competition."""
         comp = make_fake_competition(tags=("classification",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "sklearn_ml" in reqs
+        assert unmapped == ()
 
     def test_time_series_competition(self) -> None:
         """Test inferring requirements for time series competition."""
         comp = make_fake_competition(tags=("time-series",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "pytorch_deep_learning" in reqs
+        assert unmapped == ()
 
     def test_forecasting_competition(self) -> None:
         """Test inferring requirements for forecasting competition."""
         comp = make_fake_competition(tags=("forecasting",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "pytorch_deep_learning" in reqs
+        assert unmapped == ()
 
     def test_nlp_competition(self) -> None:
         """Test inferring requirements for NLP competition."""
         comp = make_fake_competition(tags=("nlp",))
-        reqs = _infer_competition_requirements(comp)
-        assert "language_identification" in reqs
+        reqs, unmapped = _infer_competition_requirements(comp)
+        assert "huggingface_transformers" in reqs
+        assert unmapped == ()
 
     def test_text_competition(self) -> None:
         """Test inferring requirements for text competition."""
         comp = make_fake_competition(tags=("text",))
-        reqs = _infer_competition_requirements(comp)
-        assert "language_identification" in reqs
+        reqs, unmapped = _infer_competition_requirements(comp)
+        assert "huggingface_transformers" in reqs
+        assert unmapped == ()
 
     def test_speech_competition(self) -> None:
         """Test inferring requirements for speech competition."""
         comp = make_fake_competition(tags=("speech",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "speech_to_text" in reqs
+        assert unmapped == ()
 
     def test_audio_competition(self) -> None:
         """Test inferring requirements for audio competition."""
         comp = make_fake_competition(tags=("audio",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "speech_to_text" in reqs
+        assert unmapped == ()
 
     def test_optimization_competition(self) -> None:
         """Test inferring requirements for optimization competition."""
         comp = make_fake_competition(tags=("optimization",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert "hyperparameter_optimization" in reqs
+        assert unmapped == ()
 
-    def test_no_requirements(self) -> None:
-        """Test no requirements inferred for unknown tags."""
+    def test_no_requirements_returns_unmapped(self) -> None:
+        """Test unknown tags are returned as unmapped."""
         comp = make_fake_competition(tags=("unique-tag",))
-        reqs = _infer_competition_requirements(comp)
+        reqs, unmapped = _infer_competition_requirements(comp)
         assert reqs == ()
+        assert "unique-tag" in unmapped
+
+    def test_mixed_mapped_and_unmapped(self) -> None:
+        """Test competition with both mapped and unmapped tags."""
+        comp = make_fake_competition(tags=("tabular", "custom-metric", "mathematics"))
+        reqs, unmapped = _infer_competition_requirements(comp)
+        assert "xgboost_tabular" in reqs
+        assert "custom-metric" in unmapped
+        assert "mathematics" in unmapped
 
 
 class TestCalculateMatchScore:
@@ -234,6 +258,27 @@ class TestMatchCompetition:
         # Should have sklearn_ml as matched
         assert "sklearn_ml" in match.matched_capabilities
 
+    def test_unmapped_tag_covered_by_capability_tags(self) -> None:
+        """Test unmapped competition tag doesn't count as missing if covered by capability."""
+        # "finance" is not in _TAG_CAPABILITY_MAP but our capability has it as a tag
+        comp = make_fake_competition(tags=("tabular", "finance"))
+        cap = make_fake_capability(
+            name="xgboost_tabular",
+            tags=("tabular", "finance"),  # Capability covers "finance"
+        )
+        profile = CodebaseProfile(
+            capabilities=(cap,),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+
+        match = match_competition(comp, profile)
+
+        # "finance" is unmapped but covered by capability tags, so NOT missing
+        assert "finance" not in match.missing_capabilities
+        assert "xgboost_tabular" in match.matched_capabilities
+
 
 class TestMatchCompetitions:
     """Tests for match_competitions function."""
@@ -300,3 +345,233 @@ class TestMatchCompetitions:
         # Should be sorted by score descending
         scores = [m.match_score for m in matches]
         assert scores == sorted(scores, reverse=True)
+
+    def test_match_with_pages_map(self) -> None:
+        """Test matching with pages map for description-based matching."""
+        comps = (make_fake_competition(ref="comp1", tags=("tabular",)),)
+        profile = CodebaseProfile(
+            capabilities=(),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+        # Pages require mobile development (hard requirement)
+        pages = make_fake_competition_pages(
+            description="Build an on-device mobile app",
+        )
+        pages_map = {"comp1": pages}
+
+        matches = match_competitions(comps, profile, pages_map=pages_map)
+
+        assert len(matches) == 1
+        # Missing mobile_development hard requirement should reduce score
+        assert "mobile_development" in matches[0].missing_capabilities
+
+
+class TestExtractRequirementsFromDescription:
+    """Tests for _extract_requirements_from_description function."""
+
+    def test_extracts_gemma_hard_requirement(self) -> None:
+        """Test extracting Gemma as hard requirement."""
+        pages = make_fake_competition_pages(
+            description="Use Gemma 3n to build an app",
+        )
+        hard, _soft = _extract_requirements_from_description(pages)
+        assert "gemma_model" in hard
+
+    def test_extracts_llama_soft_requirement(self) -> None:
+        """Test extracting LLaMA as soft requirement (mentioned, not mandated)."""
+        pages = make_fake_competition_pages(
+            description="Fine-tune LLaMA for your task",
+        )
+        _hard, soft = _extract_requirements_from_description(pages)
+        assert "llama_model" in soft
+
+    def test_extracts_mobile_hard_requirement(self) -> None:
+        """Test extracting mobile as hard requirement."""
+        pages = make_fake_competition_pages(
+            description="Build an on-device mobile-first solution",
+        )
+        hard, _soft = _extract_requirements_from_description(pages)
+        assert "mobile_development" in hard
+
+    def test_extracts_video_submission_hard_requirement(self) -> None:
+        """Test extracting video submission as hard requirement."""
+        pages = make_fake_competition_pages(
+            description="Submit a video demonstrating your solution",
+        )
+        hard, _soft = _extract_requirements_from_description(pages)
+        assert "video_production" in hard
+
+    def test_extracts_pytorch_soft_requirement(self) -> None:
+        """Test extracting PyTorch as soft requirement."""
+        pages = make_fake_competition_pages(
+            description="Use PyTorch to train your model",
+        )
+        _hard, soft = _extract_requirements_from_description(pages)
+        assert "pytorch_deep_learning" in soft
+
+    def test_extracts_xgboost_soft_requirement(self) -> None:
+        """Test extracting XGBoost as soft requirement."""
+        pages = make_fake_competition_pages(
+            description="XGBoost baseline available in the starter notebook",
+        )
+        _hard, soft = _extract_requirements_from_description(pages)
+        assert "xgboost_tabular" in soft
+
+    def test_extracts_from_evaluation(self) -> None:
+        """Test extracting requirements from evaluation section."""
+        pages = make_fake_competition_pages(
+            description="Train a model",
+            evaluation="Your sklearn model should achieve high accuracy",
+        )
+        _hard, soft = _extract_requirements_from_description(pages)
+        assert "sklearn_ml" in soft
+
+    def test_extracts_from_rules(self) -> None:
+        """Test extracting requirements from rules section."""
+        pages = make_fake_competition_pages(
+            description="Train a model",
+            rules="Models must run on-device",
+        )
+        hard, _soft = _extract_requirements_from_description(pages)
+        assert "mobile_development" in hard
+
+    def test_no_requirements(self) -> None:
+        """Test no requirements extracted from generic description."""
+        pages = make_fake_competition_pages(
+            description="Predict the target variable",
+        )
+        hard, soft = _extract_requirements_from_description(pages)
+        assert hard == ()
+        assert soft == ()
+
+
+class TestCalculateMatchScoreWithHardRequirements:
+    """Tests for _calculate_match_score with hard requirements."""
+
+    def test_missing_hard_caps_max_score(self) -> None:
+        """Test missing hard requirements cap the max score."""
+        # With 1 missing hard cap, max score is 0.3 - 0.15 = 0.15
+        score = _calculate_match_score(
+            ("cap1", "cap2"),
+            (),
+            ("hard_cap1",),
+        )
+        assert score <= 0.15
+
+    def test_multiple_missing_hard_caps(self) -> None:
+        """Test multiple missing hard requirements reduce score further."""
+        score = _calculate_match_score(
+            ("cap1",),
+            (),
+            ("hard1", "hard2"),
+        )
+        # 2 missing hard caps: max_score = 0.3 - 0.30 = 0.0
+        assert score == 0.0
+
+    def test_no_missing_hard_caps_normal_score(self) -> None:
+        """Test no missing hard caps allows normal score calculation."""
+        score = _calculate_match_score(
+            ("cap1", "cap2"),
+            (),
+            (),
+        )
+        assert score == 1.0
+
+
+class TestMatchCompetitionWithPages:
+    """Tests for match_competition with pages parameter."""
+
+    def test_match_with_pages_hard_requirement_missing(self) -> None:
+        """Test matching with missing hard requirement from description."""
+        comp = make_fake_competition(tags=("tabular",))
+        cap = make_fake_capability(
+            name="xgboost_tabular",
+            tags=("tabular",),
+        )
+        profile = CodebaseProfile(
+            capabilities=(cap,),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+        # Description requires Gemma (hard requirement we don't have)
+        pages = make_fake_competition_pages(
+            description="Use Gemma 3n for this tabular task",
+        )
+
+        match = match_competition(comp, profile, pages)
+
+        assert "gemma_model" in match.missing_capabilities
+        # Score should be capped due to missing hard requirement
+        assert match.match_score <= 0.3
+
+    def test_match_with_pages_soft_requirement_matched(self) -> None:
+        """Test matching with soft requirement from description."""
+        comp = make_fake_competition(tags=("tabular",))
+        cap = make_fake_capability(
+            name="xgboost_tabular",
+            tags=("tabular",),
+        )
+        profile = CodebaseProfile(
+            capabilities=(cap,),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+        # Description mentions XGBoost (soft requirement we have)
+        pages = make_fake_competition_pages(
+            description="Use XGBoost or LightGBM for best results",
+        )
+
+        match = match_competition(comp, profile, pages)
+
+        assert "xgboost_tabular" in match.matched_capabilities
+
+    def test_match_with_empty_pages(self) -> None:
+        """Test matching with empty pages uses only tags."""
+        comp = make_fake_competition(tags=("tabular",))
+        cap = make_fake_capability(
+            name="xgboost_tabular",
+            tags=("tabular",),
+        )
+        profile = CodebaseProfile(
+            capabilities=(cap,),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+        # Empty pages (no description text)
+        pages = make_fake_competition_pages(
+            description="",
+            evaluation="",
+            rules="",
+        )
+
+        match = match_competition(comp, profile, pages)
+
+        assert match.match_score > 0.3  # Normal scoring
+
+    def test_match_pages_with_matched_hard_requirement(self) -> None:
+        """Test matching when we have the hard requirement capability."""
+        comp = make_fake_competition(tags=())
+        cap = make_fake_capability(
+            name="gemma_model",
+            tags=("llm", "gemma"),
+        )
+        profile = CodebaseProfile(
+            capabilities=(cap,),
+            ml_backends=(),
+            data_formats=(),
+            task_types=(),
+        )
+        # Description requires Gemma (hard requirement we have)
+        pages = make_fake_competition_pages(
+            description="Build with Gemma 3n",
+        )
+
+        match = match_competition(comp, profile, pages)
+
+        assert "gemma_model" in match.matched_capabilities
+        assert "gemma_model" not in match.missing_capabilities

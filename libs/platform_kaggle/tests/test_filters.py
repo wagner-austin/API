@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from platform_kaggle.filters import (
     _has_any_tag,
     _has_excluded_tag,
+    _is_active,
     _normalize_tag,
+    _parse_deadline,
     _parse_reward_amount,
     _passes_filter,
     filter_competitions,
@@ -65,6 +69,62 @@ class TestNormalizeTag:
     def test_strip_whitespace(self) -> None:
         """Test whitespace is stripped."""
         assert _normalize_tag("  tabular  ") == "tabular"
+
+
+class TestParseDeadline:
+    """Tests for _parse_deadline function."""
+
+    def test_parse_standard_format(self) -> None:
+        """Test parsing standard deadline format."""
+        result = _parse_deadline("2025-08-06 23:59:00")
+        assert result.year == 2025
+        assert result.month == 8
+        assert result.day == 6
+        assert result.hour == 23
+        assert result.minute == 59
+        assert result.tzinfo == UTC
+
+    def test_parse_midnight(self) -> None:
+        """Test parsing midnight deadline."""
+        result = _parse_deadline("2025-01-01 00:00:00")
+        assert result.year == 2025
+        assert result.month == 1
+        assert result.day == 1
+        assert result.hour == 0
+
+    def test_parse_date_only(self) -> None:
+        """Test parsing date-only deadline format."""
+        result = _parse_deadline("2025-12-31")
+        assert result.year == 2025
+        assert result.month == 12
+        assert result.day == 31
+        assert result.hour == 0
+        assert result.tzinfo == UTC
+
+
+class TestIsActive:
+    """Tests for _is_active function."""
+
+    def test_future_deadline_is_active(self) -> None:
+        """Test competition with future deadline is active."""
+        future = datetime.now(UTC) + timedelta(days=30)
+        deadline = future.strftime("%Y-%m-%d %H:%M:%S")
+        comp = make_fake_competition(deadline=deadline)
+        assert _is_active(comp) is True
+
+    def test_past_deadline_is_not_active(self) -> None:
+        """Test competition with past deadline is not active."""
+        past = datetime.now(UTC) - timedelta(days=30)
+        deadline = past.strftime("%Y-%m-%d %H:%M:%S")
+        comp = make_fake_competition(deadline=deadline)
+        assert _is_active(comp) is False
+
+    def test_deadline_just_passed_is_not_active(self) -> None:
+        """Test competition with recently passed deadline is not active."""
+        past = datetime.now(UTC) - timedelta(hours=1)
+        deadline = past.strftime("%Y-%m-%d %H:%M:%S")
+        comp = make_fake_competition(deadline=deadline)
+        assert _is_active(comp) is False
 
 
 class TestHasAnyTag:
@@ -254,6 +314,74 @@ class TestFilterCompetitions:
             categories=None,
         )
 
+        filtered = filter_competitions(comps, filter_)
+
+        assert filtered == ()
+
+    def test_active_only_excludes_past_competitions(self) -> None:
+        """Test active_only filters out past competitions."""
+        future = datetime.now(UTC) + timedelta(days=30)
+        past = datetime.now(UTC) - timedelta(days=30)
+        comps = (
+            make_fake_competition(
+                ref="active-comp",
+                deadline=future.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+            make_fake_competition(
+                ref="expired-comp",
+                deadline=past.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        filter_ = InterestFilter(
+            include_tags=(),
+            exclude_tags=(),
+            min_reward=None,
+            categories=None,
+        )
+
+        filtered = filter_competitions(comps, filter_, active_only=True)
+
+        assert len(filtered) == 1
+        assert filtered[0].ref == "active-comp"
+
+    def test_active_only_false_includes_past_competitions(self) -> None:
+        """Test active_only=False includes past competitions."""
+        past = datetime.now(UTC) - timedelta(days=30)
+        comps = (
+            make_fake_competition(
+                ref="expired-comp",
+                deadline=past.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        filter_ = InterestFilter(
+            include_tags=(),
+            exclude_tags=(),
+            min_reward=None,
+            categories=None,
+        )
+
+        filtered = filter_competitions(comps, filter_, active_only=False)
+
+        assert len(filtered) == 1
+        assert filtered[0].ref == "expired-comp"
+
+    def test_active_only_defaults_to_true(self) -> None:
+        """Test active_only defaults to True."""
+        past = datetime.now(UTC) - timedelta(days=30)
+        comps = (
+            make_fake_competition(
+                ref="expired-comp",
+                deadline=past.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        filter_ = InterestFilter(
+            include_tags=(),
+            exclude_tags=(),
+            min_reward=None,
+            categories=None,
+        )
+
+        # Default behavior should exclude past competitions
         filtered = filter_competitions(comps, filter_)
 
         assert filtered == ()
