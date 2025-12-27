@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
+from platform_core.logging import get_logger
 
 from opportunity_radar_api.api.container import ServiceContainer, create_production_container
 from opportunity_radar_api.api.routes import codebase as routes_codebase
@@ -48,5 +49,7 @@ def create_app(
     app.include_router(routes_codebase.build_router(container))
     app.include_router(routes_kaggle.build_router(container))
     app.include_router(routes_devpost.build_router(container))
+
+    get_logger(__name__).info("API application initialized")
 
     return app
