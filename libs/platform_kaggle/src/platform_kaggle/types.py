@@ -7,6 +7,7 @@ from platform_codebase.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal, Protocol, runtime_checkable
 
 from platform_codebase import (
@@ -45,6 +46,8 @@ __all__ = [
     "Competition",
     "CompetitionCategory",
     "CompetitionMatch",
+    "CompetitionPage",
+    "CompetitionPages",
     "CompetitionsResponseProtocol",
     "InterestFilter",
     "KaggleApiClassProtocol",
@@ -53,17 +56,23 @@ __all__ = [
     "KaggleClientProtocol",
     "KaggleCompetitionProtocol",
     "KaggleModuleProtocol",
+    "KagglePageFetcherProtocol",
+    "KagglePreAuthModuleProtocol",
     "KaggleTagProtocol",
     "LibInfo",
     "MatchRecommendation",
     "ServiceInfo",
     "decode_capability",
     "decode_competition",
+    "decode_competition_page",
+    "decode_competition_pages",
     "decode_filter",
     "decode_match",
     "decode_profile",
     "encode_capability",
     "encode_competition",
+    "encode_competition_page",
+    "encode_competition_pages",
     "encode_filter",
     "encode_match",
     "encode_profile",
@@ -481,6 +490,181 @@ def decode_filter(data: JSONObject) -> InterestFilter:
 
 
 # -----------------------------------------------------------------------------
+# CompetitionPage
+# -----------------------------------------------------------------------------
+
+
+class CompetitionPage:
+    """A single page of competition content from Kaggle's internal API.
+
+    Attributes:
+        id: Numeric page ID.
+        name: Page name (e.g., "Description", "Evaluation", "Timeline").
+        content: Markdown content of the page.
+    """
+
+    __slots__ = ("content", "id", "name")
+
+    def __init__(
+        self,
+        *,
+        id: int,
+        name: str,
+        content: str,
+    ) -> None:
+        """Initialize competition page.
+
+        Args:
+            id: Numeric page ID.
+            name: Page name.
+            content: Markdown content.
+        """
+        self.id = id
+        self.name = name
+        self.content = content
+
+
+def encode_competition_page(page: CompetitionPage) -> JSONObject:
+    """Encode CompetitionPage to JSON-serializable dict.
+
+    Args:
+        page: CompetitionPage to encode.
+
+    Returns:
+        JSON-serializable dict.
+    """
+    result: JSONObject = {
+        "id": page.id,
+        "name": page.name,
+        "content": page.content,
+    }
+    return result
+
+
+def decode_competition_page(data: JSONObject) -> CompetitionPage:
+    """Decode CompetitionPage from dict with validation.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated CompetitionPage.
+
+    Raises:
+        JSONTypeError: If validation fails.
+    """
+    return CompetitionPage(
+        id=require_int(data, "id"),
+        name=require_str(data, "name"),
+        content=require_str(data, "content"),
+    )
+
+
+# -----------------------------------------------------------------------------
+# CompetitionPages
+# -----------------------------------------------------------------------------
+
+
+class CompetitionPages:
+    """Collection of competition pages with convenient accessors.
+
+    Provides quick access to common pages (description, evaluation, etc.)
+    while also exposing the full list of pages.
+
+    Attributes:
+        competition_id: Numeric Kaggle competition ID.
+        pages: Tuple of all pages.
+        description: Content of the Description page (empty if not found).
+        evaluation: Content of the Evaluation page (empty if not found).
+        timeline: Content of the Timeline page (empty if not found).
+        rules: Content of the Rules page (empty if not found).
+    """
+
+    __slots__ = (
+        "competition_id",
+        "description",
+        "evaluation",
+        "pages",
+        "rules",
+        "timeline",
+    )
+
+    def __init__(
+        self,
+        *,
+        competition_id: int,
+        pages: tuple[CompetitionPage, ...],
+        description: str,
+        evaluation: str,
+        timeline: str,
+        rules: str,
+    ) -> None:
+        """Initialize competition pages collection.
+
+        Args:
+            competition_id: Numeric Kaggle competition ID.
+            pages: Tuple of all pages.
+            description: Content of the Description page.
+            evaluation: Content of the Evaluation page.
+            timeline: Content of the Timeline page.
+            rules: Content of the Rules page.
+        """
+        self.competition_id = competition_id
+        self.pages = pages
+        self.description = description
+        self.evaluation = evaluation
+        self.timeline = timeline
+        self.rules = rules
+
+
+def encode_competition_pages(pages: CompetitionPages) -> JSONObject:
+    """Encode CompetitionPages to JSON-serializable dict.
+
+    Args:
+        pages: CompetitionPages to encode.
+
+    Returns:
+        JSON-serializable dict.
+    """
+    result: JSONObject = {
+        "competition_id": pages.competition_id,
+        "pages": [encode_competition_page(p) for p in pages.pages],
+        "description": pages.description,
+        "evaluation": pages.evaluation,
+        "timeline": pages.timeline,
+        "rules": pages.rules,
+    }
+    return result
+
+
+def decode_competition_pages(data: JSONObject) -> CompetitionPages:
+    """Decode CompetitionPages from dict with validation.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated CompetitionPages.
+
+    Raises:
+        JSONTypeError: If validation fails.
+    """
+    pages_raw = require_list(data, "pages")
+    pages: list[CompetitionPage] = []
+    for i, page_data in enumerate(pages_raw):
+        pages.append(decode_competition_page(_require_dict_value(page_data, f"pages[{i}]")))
+
+    return CompetitionPages(
+        competition_id=require_int(data, "competition_id"),
+        pages=tuple(pages),
+        description=require_str(data, "description"),
+        evaluation=require_str(data, "evaluation"),
+        timeline=require_str(data, "timeline"),
+        rules=require_str(data, "rules"),
+    )
+
+
+# -----------------------------------------------------------------------------
 # Protocols
 # -----------------------------------------------------------------------------
 
@@ -495,11 +679,12 @@ class KaggleCompetitionProtocol(Protocol):
     """Protocol for Kaggle API competition object (ApiCompetition).
 
     The real Kaggle API returns ApiCompetition objects with these attributes.
+    Types match the real kagglesdk.competitions.types.ApiCompetition.
     """
 
     @property
     def ref(self) -> str:
-        """Competition reference slug."""
+        """Competition reference URL (full Kaggle URL)."""
         ...
 
     @property
@@ -518,8 +703,8 @@ class KaggleCompetitionProtocol(Protocol):
         ...
 
     @property
-    def deadline(self) -> str:
-        """Deadline as ISO 8601 date string."""
+    def deadline(self) -> datetime:
+        """Deadline (datetime object from Kaggle API)."""
         ...
 
     @property
@@ -528,8 +713,8 @@ class KaggleCompetitionProtocol(Protocol):
         ...
 
     @property
-    def tags(self) -> Sequence[KaggleTagProtocol]:
-        """Competition tags."""
+    def tags(self) -> Sequence[KaggleTagProtocol | None] | None:
+        """Competition tags (may contain None items or be None)."""
         ...
 
     @property
@@ -547,8 +732,8 @@ class CompetitionsResponseProtocol(Protocol):
     """Protocol for competitions_list response (new Kaggle API format)."""
 
     @property
-    def competitions(self) -> Sequence[KaggleCompetitionProtocol]:
-        """Get sequence of competition objects."""
+    def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
+        """Get sequence of competition objects (may contain None or be None)."""
         ...
 
 
@@ -561,17 +746,27 @@ class KaggleApiProtocol(Protocol):
 
     def competitions_list(
         self,
-        search: str = "",
-        category: str = "",
-    ) -> CompetitionsResponseProtocol:
+        group: str | None = None,
+        category: str | None = None,
+        sort_by: str | None = None,
+        page: int | None = None,
+        search: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> CompetitionsResponseProtocol | None:
         """List competitions with optional filters.
 
         Args:
-            search: Optional search query.
-            category: Optional category filter.
+            group: Competition group filter.
+            category: Category filter.
+            sort_by: Sort order.
+            page: Page number.
+            search: Search query.
+            page_size: Results per page.
+            page_token: Pagination token.
 
         Returns:
-            Response wrapper with competitions list.
+            Response wrapper with competitions list, or None.
         """
         ...
 
@@ -592,6 +787,16 @@ class KaggleModuleProtocol(Protocol):
     """Protocol for the kaggle API module."""
 
     KaggleApi: KaggleApiClassProtocol
+
+
+class KagglePreAuthModuleProtocol(Protocol):
+    """Protocol for kaggle module with pre-authenticated global api.
+
+    The kaggle package creates and authenticates a global `api` object
+    at import time in its __init__.py. This protocol allows typed access.
+    """
+
+    api: KaggleApiProtocol
 
 
 class KaggleApiFactoryProtocol(Protocol):
@@ -635,5 +840,39 @@ class KaggleClientProtocol(Protocol):
 
         Returns:
             Competition if found, None otherwise.
+        """
+        ...
+
+
+@runtime_checkable
+class KagglePageFetcherProtocol(Protocol):
+    """Protocol for fetching competition pages from Kaggle's internal API."""
+
+    def fetch_pages(self, competition_id: int) -> CompetitionPages:
+        """Fetch all pages for a competition.
+
+        Args:
+            competition_id: Numeric Kaggle competition ID.
+
+        Returns:
+            CompetitionPages containing all page content.
+
+        Raises:
+            RuntimeError: If the API request fails.
+        """
+        ...
+
+    def get_competition_id(self, slug: str) -> int:
+        """Get the numeric competition ID from a slug.
+
+        Args:
+            slug: Competition slug (e.g., "google-gemma-3n-hackathon").
+
+        Returns:
+            Numeric competition ID.
+
+        Raises:
+            RuntimeError: If the API request fails.
+            JSONTypeError: If response parsing fails.
         """
         ...
