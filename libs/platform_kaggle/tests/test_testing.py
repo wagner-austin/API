@@ -7,9 +7,7 @@ from platform_kaggle.testing import (
     FakeKaggleApi,
     FakeKaggleClient,
     FakeKaggleCompetition,
-    FakeKaggleModule,
     KaggleApiProtocol,
-    _FakeKaggleApiClass,
     hooks,
     make_fake_capability,
     make_fake_competition,
@@ -24,13 +22,16 @@ class TestFakeKaggleCompetition:
 
     def test_creation(self) -> None:
         """Test creating a FakeKaggleCompetition."""
+        from datetime import datetime
+
         tag = FakeApiTag("tabular")
+        deadline = datetime(2025, 12, 31, 23, 59, 59)
         comp = FakeKaggleCompetition(
             ref="test-comp",
             title="Test Competition",
             category="Playground",
             reward="Knowledge",
-            deadline="2025-12-31",
+            deadline=deadline,
             team_count=100,
             tags=[tag],
             description="Test description",
@@ -40,10 +41,16 @@ class TestFakeKaggleCompetition:
         assert comp.title == "Test Competition"
         assert comp.category == "Playground"
         assert comp.reward == "Knowledge"
-        assert comp.deadline == "2025-12-31"
+        assert comp.deadline == deadline
         assert comp.team_count == 100
-        assert len(comp.tags) == 1
-        assert comp.tags[0].ref == "tabular"
+        tags = comp.tags
+        if tags is None:
+            raise AssertionError("tags should not be None")
+        assert len(tags) == 1
+        first_tag = tags[0]
+        if first_tag is None:
+            raise AssertionError("first tag should not be None")
+        assert first_tag.ref == "tabular"
         assert comp.description == "Test description"
         assert comp.url == "https://example.com"
 
@@ -58,11 +65,16 @@ class TestFakeKaggleApi:
         assert api._list_calls == []
         assert api._authenticated is False
 
+    def test_creation_with_none_competitions(self) -> None:
+        """Test creating FakeKaggleApi with competitions=None."""
+        api = FakeKaggleApi(competitions=None)
+        assert api._competitions == []
+
     def test_creation_with_competitions(self) -> None:
         """Test creating FakeKaggleApi with competitions."""
         comp = make_fake_kaggle_competition(ref="test")
         api = FakeKaggleApi(competitions=(comp,))
-        assert len(api._competitions) == 1
+        assert api._competitions[0] is comp
 
     def test_authenticate(self) -> None:
         """Test authenticate method."""
@@ -70,6 +82,23 @@ class TestFakeKaggleApi:
         assert api._authenticated is False
         api.authenticate()
         assert api._authenticated is True
+
+    def test_competitions_list_skips_none_in_list(self) -> None:
+        """Test competitions_list skips None items in the competitions list."""
+        comp = make_fake_kaggle_competition(ref="valid-comp", title="Valid")
+        # Create list with None items - type allows Sequence[...Protocol | None]
+        comps_with_nones: list[FakeKaggleCompetition | None] = [None, comp, None]
+        api = FakeKaggleApi(competitions=comps_with_nones)
+
+        response = api.competitions_list()
+
+        if response is None:
+            raise AssertionError("response should not be None")
+        competitions = response.competitions
+        if competitions is None:
+            raise AssertionError("competitions should not be None")
+        # Should only contain the valid competition (None items skipped)
+        assert competitions[0] is comp
 
     def test_competitions_list_all(self) -> None:
         """Test listing all competitions."""
@@ -79,7 +108,12 @@ class TestFakeKaggleApi:
 
         response = api.competitions_list()
 
-        assert len(response.competitions) == 2
+        if response is None:
+            raise AssertionError("response should not be None")
+        competitions = response.competitions
+        if competitions is None:
+            raise AssertionError("competitions should not be None")
+        assert len(competitions) == 2
         assert api._list_calls == [{"search": "", "category": ""}]
 
     def test_competitions_list_with_search(self) -> None:
@@ -90,9 +124,17 @@ class TestFakeKaggleApi:
 
         response = api.competitions_list(search="tabular")
 
-        assert len(response.competitions) == 1
+        if response is None:
+            raise AssertionError("response should not be None")
+        competitions = response.competitions
+        if competitions is None:
+            raise AssertionError("competitions should not be None")
+        assert len(competitions) == 1
+        first = competitions[0]
+        if first is None:
+            raise AssertionError("first competition should not be None")
         # Kaggle API 1.8.3 returns full URL in ref field
-        assert response.competitions[0].ref == "https://www.kaggle.com/competitions/tabular-comp"
+        assert first.ref == "https://www.kaggle.com/competitions/tabular-comp"
 
     def test_competitions_list_search_by_ref(self) -> None:
         """Test listing competitions with search matching ref."""
@@ -102,9 +144,17 @@ class TestFakeKaggleApi:
 
         response = api.competitions_list(search="special")
 
-        assert len(response.competitions) == 1
+        if response is None:
+            raise AssertionError("response should not be None")
+        competitions = response.competitions
+        if competitions is None:
+            raise AssertionError("competitions should not be None")
+        assert len(competitions) == 1
+        first = competitions[0]
+        if first is None:
+            raise AssertionError("first competition should not be None")
         # Kaggle API 1.8.3 returns full URL in ref field
-        assert response.competitions[0].ref == "https://www.kaggle.com/competitions/my-special-comp"
+        assert first.ref == "https://www.kaggle.com/competitions/my-special-comp"
 
     def test_competitions_list_with_category(self) -> None:
         """Test listing competitions with category filter."""
@@ -118,9 +168,17 @@ class TestFakeKaggleApi:
 
         response = api.competitions_list(category="featured")
 
-        assert len(response.competitions) == 1
+        if response is None:
+            raise AssertionError("response should not be None")
+        competitions = response.competitions
+        if competitions is None:
+            raise AssertionError("competitions should not be None")
+        assert len(competitions) == 1
+        first = competitions[0]
+        if first is None:
+            raise AssertionError("first competition should not be None")
         # Kaggle API 1.8.3 returns full URL in ref field
-        assert response.competitions[0].ref == "https://www.kaggle.com/competitions/featured-comp"
+        assert first.ref == "https://www.kaggle.com/competitions/featured-comp"
 
 
 class TestFakeKaggleClient:
@@ -247,8 +305,14 @@ class TestMakeFakeKaggleCompetition:
         assert comp.category == "Playground"
         assert comp.reward == "Knowledge"
         assert comp.team_count == 100
-        assert len(comp.tags) == 1
-        assert comp.tags[0].ref == "tabular"
+        tags = comp.tags
+        if tags is None:
+            raise AssertionError("tags should not be None")
+        assert len(tags) == 1
+        first_tag = tags[0]
+        if first_tag is None:
+            raise AssertionError("first tag should not be None")
+        assert first_tag.ref == "tabular"
 
     def test_custom_values(self) -> None:
         """Test creating kaggle competition with custom values."""
@@ -262,9 +326,26 @@ class TestMakeFakeKaggleCompetition:
         assert comp.ref == "https://www.kaggle.com/competitions/custom"
         assert comp.title == "Custom"
         assert comp.team_count == 500
-        assert len(comp.tags) == 2
-        assert comp.tags[0].ref == "a"
-        assert comp.tags[1].ref == "b"
+        tags = comp.tags
+        if tags is None:
+            raise AssertionError("tags should not be None")
+        assert len(tags) == 2
+        tag0 = tags[0]
+        tag1 = tags[1]
+        if tag0 is None:
+            raise AssertionError("tag 0 should not be None")
+        if tag1 is None:
+            raise AssertionError("tag 1 should not be None")
+        assert tag0.ref == "a"
+        assert tag1.ref == "b"
+
+    def test_custom_deadline(self) -> None:
+        """Test creating kaggle competition with custom deadline."""
+        from datetime import datetime
+
+        custom_deadline = datetime(2026, 6, 15, 12, 0, 0)
+        comp = make_fake_kaggle_competition(deadline=custom_deadline)
+        assert comp.deadline == custom_deadline
 
 
 class TestMakeFakeCapability:
@@ -359,79 +440,6 @@ class TestHooks:
             assert comps[0].ref == "test-ref"
         finally:
             hooks.kaggle_client = original
-
-
-class TestFakeKaggleModule:
-    """Tests for FakeKaggleModule class."""
-
-    def test_creation(self) -> None:
-        """Test creating a FakeKaggleModule."""
-        fake_api = FakeKaggleApi()
-        module = FakeKaggleModule(api=fake_api)
-        created_api = module.KaggleApi()
-        assert created_api is fake_api
-
-    def test_kaggle_api_returns_same_instance(self) -> None:
-        """Test KaggleApi() returns the same API instance each call."""
-        fake_api = FakeKaggleApi()
-        module = FakeKaggleModule(api=fake_api)
-
-        # Call KaggleApi() multiple times
-        api1 = module.KaggleApi()
-        api2 = module.KaggleApi()
-
-        # Should return the same instance
-        assert api1 is api2
-        assert api1 is fake_api
-
-
-class TestDefaultKaggleModule:
-    """Tests for _default_kaggle_module function."""
-
-    def test_default_kaggle_module_imports_kaggle(self) -> None:
-        """Test _default_kaggle_module imports the kaggle module."""
-        import sys
-        from types import ModuleType
-
-        from platform_kaggle.testing import _default_kaggle_module
-        from platform_kaggle.types import KaggleApiClassProtocol
-
-        # Create a ModuleType subclass with proper KaggleApi attribute
-        class _TestExtModule(ModuleType):
-            """Test module subclass with typed KaggleApi attribute."""
-
-            KaggleApi: KaggleApiClassProtocol
-
-            def __init__(self, api_class: KaggleApiClassProtocol) -> None:
-                super().__init__("kaggle.api.kaggle_api_extended")
-                self.KaggleApi = api_class
-
-        # Create fake kaggle module structure
-        fake_api = FakeKaggleApi()
-        fake_api_class = _FakeKaggleApiClass(fake_api)
-        fake_ext_module = _TestExtModule(fake_api_class)
-
-        # Save originals if they exist
-        saved_modules: dict[str, ModuleType] = {}
-        for name in ["kaggle", "kaggle.api", "kaggle.api.kaggle_api_extended"]:
-            if name in sys.modules:
-                saved_modules[name] = sys.modules[name]
-
-        # Inject fake module - _TestExtModule is a ModuleType subclass
-        sys.modules["kaggle.api.kaggle_api_extended"] = fake_ext_module
-
-        try:
-            mod = _default_kaggle_module()
-            # Verify it returns the fake module with callable KaggleApi
-            api_class = mod.KaggleApi
-            assert callable(api_class)
-        finally:
-            # Restore original modules
-            for name in ["kaggle", "kaggle.api", "kaggle.api.kaggle_api_extended"]:
-                if name in saved_modules:
-                    sys.modules[name] = saved_modules[name]
-                elif name in sys.modules:
-                    del sys.modules[name]
 
 
 class TestProductionHooks:

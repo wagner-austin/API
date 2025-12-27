@@ -7,6 +7,7 @@ for testing. Production code sets hooks at startup; tests set them to fakes.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from pathlib import Path
 
 from platform_kaggle.types import (
@@ -15,13 +16,14 @@ from platform_kaggle.types import (
     CodebaseProfile,
     Competition,
     CompetitionCategory,
+    CompetitionPage,
+    CompetitionPages,
     CompetitionsResponseProtocol,
-    KaggleApiClassProtocol,
     KaggleApiFactoryProtocol,
     KaggleApiProtocol,
     KaggleClientProtocol,
     KaggleCompetitionProtocol,
-    KaggleModuleProtocol,
+    KagglePageFetcherProtocol,
 )
 
 # -----------------------------------------------------------------------------
@@ -29,8 +31,8 @@ from platform_kaggle.types import (
 # -----------------------------------------------------------------------------
 
 KaggleClientHook = Callable[[], KaggleClientProtocol]
+PageFetcherHook = Callable[[], KagglePageFetcherProtocol]
 ProfileScannerHook = Callable[[Path], CodebaseProfile]
-KaggleModuleHook = Callable[[], KaggleModuleProtocol]
 
 
 # -----------------------------------------------------------------------------
@@ -42,53 +44,40 @@ class HooksContainer:
     """Container for dependency injection hooks.
 
     Attributes:
-        kaggle_api_factory: Factory for low-level Kaggle API.
+        kaggle_api_factory: Factory for Kaggle API (returns pre-authenticated api).
         kaggle_client: Factory for Kaggle client.
+        page_fetcher: Factory for page fetcher.
         profile_scanner: Factory for codebase profile scanner.
-        kaggle_module: Factory for kaggle module import.
     """
 
     kaggle_api_factory: KaggleApiFactoryProtocol
     kaggle_client: KaggleClientHook
+    page_fetcher: PageFetcherHook
     profile_scanner: ProfileScannerHook
-    kaggle_module: KaggleModuleHook
 
 
 hooks = HooksContainer()
 
 
-def _init_production_hooks() -> None:
+def _init_hooks() -> None:
     """Initialize hooks with production implementations."""
-    # Import here to avoid circular dependency
-    from platform_kaggle._production import default_kaggle_api_factory, make_kaggle_client
+    from platform_kaggle._production import _get_kaggle_api, make_kaggle_client
     from platform_kaggle.capabilities import scan_codebase
+    from platform_kaggle.internal_api import create_page_fetcher
 
-    hooks.kaggle_api_factory = default_kaggle_api_factory
+    hooks.kaggle_api_factory = _get_kaggle_api
     hooks.kaggle_client = make_kaggle_client
+    hooks.page_fetcher = create_page_fetcher
     hooks.profile_scanner = scan_codebase
-
-
-def _default_kaggle_module() -> KaggleModuleProtocol:
-    """Default kaggle module importer."""
-    mod: KaggleModuleProtocol = __import__("kaggle.api.kaggle_api_extended", fromlist=["KaggleApi"])
-    return mod
-
-
-def _init_minimal_hooks() -> None:
-    """Initialize only low-level hooks (for module import time)."""
-    from platform_kaggle._production import default_kaggle_api_factory
-
-    hooks.kaggle_api_factory = default_kaggle_api_factory
-    hooks.kaggle_module = _default_kaggle_module
 
 
 def reset_hooks() -> None:
     """Reset hooks to production implementations (for test teardown)."""
-    _init_production_hooks()
+    _init_hooks()
 
 
-# Initialize minimal hooks on module load to break circular import
-_init_minimal_hooks()
+# Initialize hooks on module load
+_init_hooks()
 
 
 # -----------------------------------------------------------------------------
@@ -118,13 +107,13 @@ class FakeKaggleCompetition:
     """Fake Kaggle competition object matching ApiCompetition structure.
 
     Attributes:
-        ref: Competition reference slug.
+        ref: Competition reference URL (full Kaggle URL).
         title: Competition title.
         category: Competition category string.
         reward: Prize description.
-        deadline: Deadline as ISO 8601 date string.
+        deadline: Deadline as datetime.
         team_count: Number of teams.
-        tags: Sequence of FakeApiTag objects.
+        tags: Sequence of FakeApiTag objects (may contain None or be None).
         description: Short description.
         url: Full Kaggle URL.
     """
@@ -148,22 +137,22 @@ class FakeKaggleCompetition:
         title: str,
         category: str,
         reward: str,
-        deadline: str,
+        deadline: datetime,
         team_count: int,
-        tags: Sequence[FakeApiTag],
+        tags: Sequence[FakeApiTag | None] | None,
         description: str,
         url: str,
     ) -> None:
         """Initialize fake competition.
 
         Args:
-            ref: Competition reference slug.
+            ref: Competition reference URL (full Kaggle URL).
             title: Competition title.
             category: Competition category string.
             reward: Prize description.
-            deadline: Deadline as ISO 8601 date string.
+            deadline: Deadline as datetime.
             team_count: Number of teams.
-            tags: Sequence of FakeApiTag objects.
+            tags: Sequence of FakeApiTag objects (may contain None or be None).
             description: Short description.
             url: Full Kaggle URL.
         """
@@ -183,16 +172,16 @@ class FakeCompetitionsResponse:
 
     __slots__ = ("_competitions",)
 
-    def __init__(self, competitions: Sequence[KaggleCompetitionProtocol]) -> None:
+    def __init__(self, competitions: Sequence[KaggleCompetitionProtocol | None] | None) -> None:
         """Initialize fake response.
 
         Args:
-            competitions: Sequence of competition objects.
+            competitions: Sequence of competition objects (may contain None or be None).
         """
         self._competitions = competitions
 
     @property
-    def competitions(self) -> Sequence[KaggleCompetitionProtocol]:
+    def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
         """Get competitions sequence."""
         return self._competitions
 
@@ -210,14 +199,17 @@ class FakeKaggleApi:
 
     def __init__(
         self,
-        competitions: Sequence[KaggleCompetitionProtocol] = (),
+        competitions: Sequence[KaggleCompetitionProtocol | None] | None = (),
     ) -> None:
         """Initialize fake API.
 
         Args:
             competitions: Competitions to return from competitions_list.
         """
-        self._competitions: list[KaggleCompetitionProtocol] = list(competitions)
+        if competitions is None:
+            self._competitions: list[KaggleCompetitionProtocol | None] = []
+        else:
+            self._competitions = list(competitions)
         self._list_calls: list[dict[str, str]] = []
         self._authenticated = False
 
@@ -227,85 +219,43 @@ class FakeKaggleApi:
 
     def competitions_list(
         self,
-        search: str = "",
-        category: str = "",
-    ) -> CompetitionsResponseProtocol:
+        group: str | None = None,
+        category: str | None = None,
+        sort_by: str | None = None,
+        page: int | None = None,
+        search: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> CompetitionsResponseProtocol | None:
         """Return configured competitions, optionally filtered.
 
         Args:
-            search: Optional search query.
+            group: Competition group filter (unused in fake).
             category: Optional category filter.
+            sort_by: Sort order (unused in fake).
+            page: Page number (unused in fake).
+            search: Optional search query.
+            page_size: Results per page (unused in fake).
+            page_token: Pagination token (unused in fake).
 
         Returns:
             Response wrapper with competitions list (matches new Kaggle API format).
         """
-        self._list_calls.append({"search": search, "category": category})
-        result: list[KaggleCompetitionProtocol] = list(self._competitions)
-        if search:
-            search_lower = search.lower()
-            result = [
-                c
-                for c in result
-                if search_lower in c.title.lower() or search_lower in c.ref.lower()
-            ]
-        if category:
-            result = [c for c in result if c.category.lower() == category.lower()]
+        self._list_calls.append({"search": search or "", "category": category or ""})
+        result: list[KaggleCompetitionProtocol | None] = []
+        for c in self._competitions:
+            if c is None:
+                continue
+            include = True
+            if search:
+                search_lower = search.lower()
+                include = search_lower in c.title.lower() or search_lower in c.ref.lower()
+            if include and category:
+                include = c.category.lower() == category.lower()
+            if include:
+                result.append(c)
 
         return FakeCompetitionsResponse(result)
-
-
-# -----------------------------------------------------------------------------
-# Fake Module Implementation
-# -----------------------------------------------------------------------------
-
-
-class _FakeKaggleApiClass:
-    """Fake KaggleApi class that creates FakeKaggleApi instances.
-
-    This class is used as the KaggleApi attribute of FakeKaggleModule.
-    When called (instantiated), it returns the configured FakeKaggleApi.
-    """
-
-    __slots__ = ("_api",)
-
-    def __init__(self, api: FakeKaggleApi) -> None:
-        """Initialize with the API instance to return.
-
-        Args:
-            api: The FakeKaggleApi instance to return when called.
-        """
-        self._api = api
-
-    def __call__(self) -> KaggleApiProtocol:
-        """Create and return the fake API instance.
-
-        Returns:
-            The configured FakeKaggleApi instance.
-        """
-        return self._api
-
-
-class FakeKaggleModule:
-    """Fake kaggle module for testing.
-
-    This class mimics the kaggle.api.kaggle_api_extended module structure.
-    It has a KaggleApi attribute that is a class-like callable.
-
-    Attributes:
-        KaggleApi: Callable that returns FakeKaggleApi instances.
-    """
-
-    __slots__ = ("KaggleApi",)
-
-    KaggleApi: KaggleApiClassProtocol
-
-    def __init__(self, api: FakeKaggleApi) -> None:
-        """Initialize fake module.
-
-        Args:
-            api: The FakeKaggleApi instance to return from KaggleApi().
-        """
-        self.KaggleApi = _FakeKaggleApiClass(api)
 
 
 # -----------------------------------------------------------------------------
@@ -375,6 +325,77 @@ class FakeKaggleClient:
 
 
 # -----------------------------------------------------------------------------
+# Fake Page Fetcher Implementation
+# -----------------------------------------------------------------------------
+
+
+class FakeKagglePageFetcher:
+    """Fake page fetcher for testing.
+
+    Attributes:
+        _pages: Mapping of competition ID to pages.
+        _competition_ids: Mapping of slug to competition ID.
+        _fetch_calls: Record of calls to fetch_pages.
+        _id_calls: Record of calls to get_competition_id.
+    """
+
+    __slots__ = ("_competition_ids", "_fetch_calls", "_id_calls", "_pages")
+
+    def __init__(
+        self,
+        pages: dict[int, CompetitionPages] | None = None,
+        competition_ids: dict[str, int] | None = None,
+    ) -> None:
+        """Initialize fake page fetcher.
+
+        Args:
+            pages: Mapping of competition ID to CompetitionPages.
+            competition_ids: Mapping of slug to competition ID.
+        """
+        self._pages: dict[int, CompetitionPages] = pages if pages is not None else {}
+        self._competition_ids: dict[str, int] = (
+            competition_ids if competition_ids is not None else {}
+        )
+        self._fetch_calls: list[int] = []
+        self._id_calls: list[str] = []
+
+    def fetch_pages(self, competition_id: int) -> CompetitionPages:
+        """Fetch pages for a competition.
+
+        Args:
+            competition_id: Numeric Kaggle competition ID.
+
+        Returns:
+            CompetitionPages for the competition.
+
+        Raises:
+            RuntimeError: If competition ID not configured.
+        """
+        self._fetch_calls.append(competition_id)
+        if competition_id not in self._pages:
+            raise RuntimeError(f"Competition {competition_id} not found")
+        return self._pages[competition_id]
+
+    def get_competition_id(self, slug: str) -> int:
+        """Get competition ID from slug.
+
+        Args:
+            slug: Competition slug.
+
+        Returns:
+            Numeric competition ID.
+
+        Raises:
+            RuntimeError: If competition slug not configured.
+        """
+        self._id_calls.append(slug)
+        comp_id = self._competition_ids.get(slug)
+        if comp_id is None:
+            raise RuntimeError(f"Competition '{slug}' not found")
+        return comp_id
+
+
+# -----------------------------------------------------------------------------
 # Factory Functions for Tests
 # -----------------------------------------------------------------------------
 
@@ -424,7 +445,7 @@ def make_fake_kaggle_competition(
     title: str = "Test Competition",
     category: str = "Playground",
     reward: str = "Knowledge",
-    deadline: str = "2025-12-31",
+    deadline: datetime | None = None,
     team_count: int = 100,
     tags: tuple[str, ...] = ("tabular",),
     description: str = "Test description",
@@ -438,7 +459,7 @@ def make_fake_kaggle_competition(
         title: Competition title.
         category: Competition category string.
         reward: Prize description.
-        deadline: Deadline as ISO 8601 date string.
+        deadline: Deadline as datetime (defaults to 2025-12-31).
         team_count: Number of teams.
         tags: Tuple of tag strings (converted to FakeApiTag objects).
         description: Short description.
@@ -447,6 +468,8 @@ def make_fake_kaggle_competition(
         FakeKaggleCompetition instance with ref as full URL.
     """
     url = f"https://www.kaggle.com/competitions/{ref}"
+    if deadline is None:
+        deadline = datetime(2025, 12, 31, 23, 59, 59)
     return FakeKaggleCompetition(
         ref=url,  # Kaggle API 1.8.3 returns full URL in ref field
         title=title,
@@ -512,23 +535,86 @@ def make_fake_profile(
     )
 
 
+def make_fake_competition_page(
+    *,
+    id: int = 1,
+    name: str = "Description",
+    content: str = "Test content",
+) -> CompetitionPage:
+    """Factory for creating test CompetitionPage instances.
+
+    Args:
+        id: Page ID.
+        name: Page name (e.g., "Description", "Evaluation").
+        content: Markdown content.
+
+    Returns:
+        CompetitionPage instance.
+    """
+    return CompetitionPage(
+        id=id,
+        name=name,
+        content=content,
+    )
+
+
+def make_fake_competition_pages(
+    *,
+    competition_id: int = 12345,
+    pages: tuple[CompetitionPage, ...] | None = None,
+    description: str = "Test description",
+    evaluation: str = "Test evaluation",
+    timeline: str = "Test timeline",
+    rules: str = "Test rules",
+) -> CompetitionPages:
+    """Factory for creating test CompetitionPages instances.
+
+    Args:
+        competition_id: Numeric competition ID.
+        pages: Tuple of pages. If None, creates default pages from content args.
+        description: Description page content.
+        evaluation: Evaluation page content.
+        timeline: Timeline page content.
+        rules: Rules page content.
+
+    Returns:
+        CompetitionPages instance.
+    """
+    if pages is None:
+        pages = (
+            CompetitionPage(id=1, name="Description", content=description),
+            CompetitionPage(id=2, name="Evaluation", content=evaluation),
+            CompetitionPage(id=3, name="Timeline", content=timeline),
+            CompetitionPage(id=4, name="Rules", content=rules),
+        )
+    return CompetitionPages(
+        competition_id=competition_id,
+        pages=pages,
+        description=description,
+        evaluation=evaluation,
+        timeline=timeline,
+        rules=rules,
+    )
+
+
 __all__ = [
     "FakeApiTag",
     "FakeCompetitionsResponse",
     "FakeKaggleApi",
     "FakeKaggleClient",
     "FakeKaggleCompetition",
-    "FakeKaggleModule",
+    "FakeKagglePageFetcher",
     "HooksContainer",
     "KaggleApiFactoryProtocol",
     "KaggleApiProtocol",
     "KaggleClientHook",
-    "KaggleModuleHook",
+    "PageFetcherHook",
     "ProfileScannerHook",
-    "_FakeKaggleApiClass",
     "hooks",
     "make_fake_capability",
     "make_fake_competition",
+    "make_fake_competition_page",
+    "make_fake_competition_pages",
     "make_fake_kaggle_competition",
     "make_fake_profile",
     "reset_hooks",

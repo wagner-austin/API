@@ -10,8 +10,9 @@ from platform_kaggle import (
     get_codebase_profile,
     hooks,
     make_fake_competition,
+    make_fake_competition_pages,
 )
-from platform_kaggle.testing import FakeKaggleClient
+from platform_kaggle.testing import FakeKaggleClient, FakeKagglePageFetcher
 
 
 class TestFindCompetitions:
@@ -26,7 +27,7 @@ class TestFindCompetitions:
         fake_client = FakeKaggleClient(competitions=competitions)
         hooks.kaggle_client = lambda: fake_client
 
-        matches = find_competitions(codebase_root=tmp_path)
+        matches = find_competitions(codebase_root=tmp_path, fetch_descriptions=False)
         assert len(matches) == 2
 
     def test_find_competitions_with_interests(self, tmp_path: Path) -> None:
@@ -44,7 +45,9 @@ class TestFindCompetitions:
             min_reward=None,
             categories=None,
         )
-        matches = find_competitions(interests=interests, codebase_root=tmp_path)
+        matches = find_competitions(
+            interests=interests, codebase_root=tmp_path, fetch_descriptions=False
+        )
         assert len(matches) == 1
         assert matches[0].competition.ref == "comp1"
 
@@ -69,7 +72,9 @@ lightgbm = "^4.0.0"
         fake_client = FakeKaggleClient(competitions=competitions)
         hooks.kaggle_client = lambda: fake_client
 
-        matches = find_competitions(match_codebase=True, codebase_root=tmp_path)
+        matches = find_competitions(
+            match_codebase=True, codebase_root=tmp_path, fetch_descriptions=False
+        )
         assert len(matches) == 1
         # Should have matched capabilities from lightgbm detection
         assert matches[0].match_score > 0.0
@@ -113,6 +118,14 @@ python = "^3.11"
         fake_client = FakeKaggleClient(competitions=competitions)
         hooks.kaggle_client = lambda: fake_client
 
+        # Set up page fetcher with empty pages
+        pages = make_fake_competition_pages(description="A deep learning competition")
+        fake_fetcher = FakeKagglePageFetcher(
+            competition_ids={"comp1": 1},
+            pages={1: pages},
+        )
+        hooks.page_fetcher = lambda: fake_fetcher
+
         # With high min_score, no matches
         matches = find_competitions(
             match_codebase=True,
@@ -128,11 +141,81 @@ python = "^3.11"
         fake_client = FakeKaggleClient(competitions=competitions)
         hooks.kaggle_client = lambda: fake_client
 
+        # Set up page fetcher
+        pages = make_fake_competition_pages(description="A test competition")
+        fake_fetcher = FakeKagglePageFetcher(
+            competition_ids={"comp1": 1},
+            pages={1: pages},
+        )
+        hooks.page_fetcher = lambda: fake_fetcher
+
         # Don't pass codebase_root, let it auto-detect
         matches = find_competitions(match_codebase=True)
         # Should return our competition
         assert len(matches) == 1
         assert matches[0].competition.ref == "comp1"
+
+    def test_find_competitions_active_only_false_skips_deadline_filter(
+        self, tmp_path: Path
+    ) -> None:
+        """Test find_competitions with active_only=False includes expired competitions."""
+        # Use a past deadline
+        competitions = (make_fake_competition(ref="expired", deadline="2020-01-01"),)
+        fake_client = FakeKaggleClient(competitions=competitions)
+        hooks.kaggle_client = lambda: fake_client
+
+        # With active_only=False, should include expired competition
+        matches = find_competitions(
+            interests=None,
+            match_codebase=False,
+            active_only=False,
+            codebase_root=tmp_path,
+        )
+        assert len(matches) == 1
+        assert matches[0].competition.ref == "expired"
+
+    def test_find_competitions_with_fetch_descriptions(self, tmp_path: Path) -> None:
+        """Test find_competitions fetches descriptions for better matching."""
+        # Create libs with transformers capability
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        lib_dir = libs_dir / "test_lib"
+        lib_dir.mkdir()
+        (lib_dir / "pyproject.toml").write_text("""
+[tool.poetry]
+name = "test-lib"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+transformers = "^4.0.0"
+""")
+
+        # Competition with tags that would normally match transformers
+        competitions = (make_fake_competition(ref="gemma-comp", tags=("text",)),)
+        fake_client = FakeKaggleClient(competitions=competitions)
+        hooks.kaggle_client = lambda: fake_client
+
+        # Pages that mention Gemma (hard requirement we don't have)
+        pages = make_fake_competition_pages(
+            description="Use Gemma 3n to build a mobile app",
+        )
+        # FakeKagglePageFetcher uses competition_ids (slug->id) and pages (id->pages)
+        fake_fetcher = FakeKagglePageFetcher(
+            competition_ids={"gemma-comp": 12345},
+            pages={12345: pages},
+        )
+        hooks.page_fetcher = lambda: fake_fetcher
+
+        # With fetch_descriptions=True, should detect hard requirement
+        matches = find_competitions(
+            match_codebase=True,
+            codebase_root=tmp_path,
+            fetch_descriptions=True,
+        )
+        assert len(matches) == 1
+        # Should have low score due to missing gemma_model hard requirement
+        assert matches[0].match_score <= 0.3
+        assert "gemma_model" in matches[0].missing_capabilities
 
 
 class TestGetCodebaseProfile:
