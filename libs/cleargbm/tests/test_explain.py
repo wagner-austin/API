@@ -1,11 +1,10 @@
-"""Tests for cleargbm.explain module.
-
-Built from scratch - uses only Python stdlib (no numpy).
-"""
+"""Tests for cleargbm.explain module."""
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from cleargbm.ensemble import train_gradient_boosting
 from cleargbm.explain import (
@@ -27,6 +26,21 @@ from cleargbm.types import (
 )
 
 
+def _float_matrix(data: list[list[float]]) -> NDArray[np.float64]:
+    """Create a 2D float array from nested list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _float_array(data: list[float]) -> NDArray[np.float64]:
+    """Create a 1D float array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _int_array(data: list[int]) -> NDArray[np.int64]:
+    """Create a 1D int array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.int64)
+
+
 def _make_config(
     n_estimators: int = 5,
     max_depth: int = 3,
@@ -41,6 +55,7 @@ def _make_config(
     reg_alpha: float = 0.0,
     reg_lambda: float = 0.0,
     n_jobs: int = 1,
+    early_stopping_rounds: int | None = None,
 ) -> GradientBoostingConfig:
     """Create a test configuration."""
     return GradientBoostingConfig(
@@ -58,24 +73,25 @@ def _make_config(
         reg_alpha=reg_alpha,
         reg_lambda=reg_lambda,
         n_jobs=n_jobs,
+        early_stopping_rounds=early_stopping_rounds,
     )
 
 
-def _train_simple_model() -> tuple[
-    tuple[tuple[float, ...], ...], tuple[int, ...], GradientBoostingModel
-]:
+def _train_simple_model() -> tuple[NDArray[np.float64], NDArray[np.int64], GradientBoostingModel]:
     """Train a simple model for testing."""
-    x_train: tuple[tuple[float, ...], ...] = (
-        (0.0, 0.0),
-        (0.0, 1.0),
-        (0.1, 0.0),
-        (0.1, 1.0),
-        (0.9, 0.0),
-        (0.9, 1.0),
-        (1.0, 0.0),
-        (1.0, 1.0),
+    x_train = _float_matrix(
+        [
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [0.1, 0.0],
+            [0.1, 1.0],
+            [0.9, 0.0],
+            [0.9, 1.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+        ]
     )
-    y_train = (0, 0, 0, 0, 1, 1, 1, 1)
+    y_train = _int_array([0, 0, 0, 0, 1, 1, 1, 1])
     config = _make_config(n_estimators=5, max_depth=2)
 
     model = train_gradient_boosting(
@@ -97,7 +113,8 @@ class TestExplainPrediction:
         """Should generate explanation for a prediction."""
         _, _, model = _train_simple_model()
 
-        explanation = explain_prediction(model, (0.0, 0.0))
+        x_test = _float_array([0.0, 0.0])
+        explanation = explain_prediction(model, x_test)
 
         assert explanation["final_probability"] >= 0.0
         assert explanation["final_probability"] <= 1.0
@@ -109,9 +126,11 @@ class TestExplainPrediction:
         _, _, model = _train_simple_model()
 
         # Low value should predict class 0 (low probability)
-        expl_low = explain_prediction(model, (0.0, 0.5))
+        x_low = _float_array([0.0, 0.5])
+        expl_low = explain_prediction(model, x_low)
         # High value should predict class 1 (high probability)
-        expl_high = explain_prediction(model, (1.0, 0.5))
+        x_high = _float_array([1.0, 0.5])
+        expl_high = explain_prediction(model, x_high)
 
         assert expl_low["final_probability"] < expl_high["final_probability"]
 
@@ -120,13 +139,16 @@ class TestExplainPrediction:
         _, _, model = _train_simple_model()
 
         with pytest.raises(ValueError, match="features"):
-            explain_prediction(model, (0.0,))  # Only 1 feature, model expects 2
+            # Only 1 feature, model expects 2
+            x_wrong = _float_array([0.0])
+            explain_prediction(model, x_wrong)
 
     def test_base_prediction_included(self) -> None:
         """Explanation should include base prediction."""
         _, _, model = _train_simple_model()
 
-        explanation = explain_prediction(model, (0.5, 0.5))
+        x_test = _float_array([0.5, 0.5])
+        explanation = explain_prediction(model, x_test)
 
         assert explanation["base_prediction"] == model["base_prediction"]
 
@@ -653,13 +675,16 @@ class TestGetFeatureInteractions:
     def test_finds_interactions(self) -> None:
         """Should find feature interactions."""
         # Train with data where both features matter
-        x_train: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x_train: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.0),
+                (0.0, 1.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+            ),
+            dtype=np.float64,
         )
-        y_train = (0, 1, 1, 0)  # XOR-like
+        y_train: NDArray[np.int64] = np.array((0, 1, 1, 0), dtype=np.int64)  # XOR-like
         config = _make_config(n_estimators=10, max_depth=3)
 
         model = train_gradient_boosting(

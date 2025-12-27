@@ -1,12 +1,17 @@
 """Gradient boosting ensemble training and prediction.
 
-Built from scratch - uses only Python stdlib (no numpy).
+Uses numpy arrays for efficient data representation.
+Supports early stopping when validation loss stops improving.
 """
 
 from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from typing import TypedDict
+
+import numpy as np
+from numpy.typing import NDArray
 
 from cleargbm._test_hooks import WorkerPoolProtocol, create_worker_pool
 from cleargbm.histogram import precompute_feature_bins
@@ -14,17 +19,205 @@ from cleargbm.losses import BinaryLogLoss, raw_to_proba, sigmoid
 from cleargbm.tree import build_tree, predict_tree
 from cleargbm.types import (
     DecisionTree,
-    FloatArray,
-    FloatMatrix,
     GradientBoostingConfig,
     GradientBoostingModel,
     TrainingProgress,
 )
 
 
+class _EarlyStoppingState(TypedDict):
+    """Internal state for early stopping tracking.
+
+    Args:
+        best_val_loss: Best validation loss seen so far.
+        best_round: Zero-indexed round where best loss was achieved.
+        rounds_without_improvement: Consecutive rounds without improvement.
+        should_stop: Whether to stop training.
+    """
+
+    best_val_loss: float
+    best_round: int
+    rounds_without_improvement: int
+    should_stop: bool
+
+
+def _init_early_stopping_state() -> _EarlyStoppingState:
+    """Initialize early stopping state.
+
+    Returns:
+        Initial state with best_val_loss set to infinity.
+    """
+    return _EarlyStoppingState(
+        best_val_loss=float("inf"),
+        best_round=0,
+        rounds_without_improvement=0,
+        should_stop=False,
+    )
+
+
+def _update_early_stopping_state(
+    state: _EarlyStoppingState,
+    val_loss: float,
+    tree_idx: int,
+    patience: int,
+) -> _EarlyStoppingState:
+    """Update early stopping state with new validation loss.
+
+    Args:
+        state: Current early stopping state.
+        val_loss: Validation loss for current round.
+        tree_idx: Zero-indexed tree/round index.
+        patience: Number of rounds without improvement before stopping.
+
+    Returns:
+        Updated early stopping state (new instance).
+    """
+    if val_loss < state["best_val_loss"]:
+        # Improvement: reset counter
+        return _EarlyStoppingState(
+            best_val_loss=val_loss,
+            best_round=tree_idx,
+            rounds_without_improvement=0,
+            should_stop=False,
+        )
+
+    # No improvement
+    new_rounds_without_improvement = state["rounds_without_improvement"] + 1
+    should_stop = new_rounds_without_improvement >= patience
+
+    return _EarlyStoppingState(
+        best_val_loss=state["best_val_loss"],
+        best_round=state["best_round"],
+        rounds_without_improvement=new_rounds_without_improvement,
+        should_stop=should_stop,
+    )
+
+
+class _ValidationState(TypedDict):
+    """State for validation tracking during training.
+
+    Args:
+        x_val: Validation feature matrix.
+        y_val: Validation labels.
+        raw_preds: Current raw predictions on validation set.
+        early_stopping_rounds: Patience for early stopping (None = disabled).
+        es_state: Early stopping state tracker.
+    """
+
+    x_val: NDArray[np.float64]
+    y_val: NDArray[np.int64]
+    raw_preds: NDArray[np.float64]
+    early_stopping_rounds: int
+    es_state: _EarlyStoppingState
+
+
+def _update_validation(
+    val_state: _ValidationState,
+    tree: DecisionTree,
+    tree_idx: int,
+    learning_rate: float,
+) -> tuple[float, _ValidationState]:
+    """Update validation predictions and early stopping state.
+
+    Args:
+        val_state: Current validation state.
+        tree: Newly built tree.
+        tree_idx: Zero-indexed tree index.
+        learning_rate: Learning rate for prediction updates.
+
+    Returns:
+        Tuple of (validation loss, updated validation state).
+    """
+    tree_preds = predict_tree(tree, val_state["x_val"])
+    new_raw_preds = _add_tree_predictions(val_state["raw_preds"], tree_preds, learning_rate)
+    val_loss = _compute_loss(val_state["y_val"], new_raw_preds)
+
+    new_es_state = _update_early_stopping_state(
+        val_state["es_state"],
+        val_loss,
+        tree_idx,
+        val_state["early_stopping_rounds"],
+    )
+
+    return val_loss, _ValidationState(
+        x_val=val_state["x_val"],
+        y_val=val_state["y_val"],
+        raw_preds=new_raw_preds,
+        early_stopping_rounds=val_state["early_stopping_rounds"],
+        es_state=new_es_state,
+    )
+
+
+def _validate_training_inputs(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.int64],
+    feature_names: tuple[str, ...],
+) -> None:
+    """Validate training inputs.
+
+    Args:
+        x_train: Training feature matrix.
+        y_train: Training labels.
+        feature_names: Feature names.
+
+    Raises:
+        ValueError: If inputs are invalid.
+    """
+    n_train: int = x_train.shape[0]
+    if n_train == 0:
+        raise ValueError("x_train must not be empty")
+    n_y: int = y_train.shape[0]
+    if n_train != n_y:
+        raise ValueError(f"x_train and y_train must have same length, got {n_train} and {n_y}")
+    n_features: int = x_train.shape[1]
+    if n_features != len(feature_names):
+        raise ValueError(
+            f"x_train has {n_features} features but {len(feature_names)} feature names provided"
+        )
+
+
+class _SimpleValState(TypedDict):
+    """State for simple validation tracking (no early stopping).
+
+    Args:
+        x_val: Validation feature matrix.
+        y_val: Validation labels.
+        raw_preds: Current raw predictions.
+    """
+
+    x_val: NDArray[np.float64]
+    y_val: NDArray[np.int64]
+    raw_preds: NDArray[np.float64]
+
+
+def _update_simple_validation(
+    state: _SimpleValState,
+    tree: DecisionTree,
+    learning_rate: float,
+) -> tuple[float, _SimpleValState]:
+    """Update simple validation predictions (no early stopping).
+
+    Args:
+        state: Current validation state.
+        tree: Newly built tree.
+        learning_rate: Learning rate.
+
+    Returns:
+        Tuple of (validation loss, updated state).
+    """
+    tree_preds = predict_tree(tree, state["x_val"])
+    new_raw_preds = _add_tree_predictions(state["raw_preds"], tree_preds, learning_rate)
+    val_loss = _compute_loss(state["y_val"], new_raw_preds)
+    return val_loss, _SimpleValState(
+        x_val=state["x_val"],
+        y_val=state["y_val"],
+        raw_preds=new_raw_preds,
+    )
+
+
 def _compute_loss(
-    y_true: tuple[int, ...],
-    raw_preds: FloatArray,
+    y_true: NDArray[np.int64],
+    raw_preds: NDArray[np.float64],
 ) -> float:
     """Compute binary log loss from raw predictions.
 
@@ -41,10 +234,10 @@ def _compute_loss(
 
 
 def _add_tree_predictions(
-    raw_preds: FloatArray,
-    tree_preds: FloatArray,
+    raw_preds: NDArray[np.float64],
+    tree_preds: NDArray[np.float64],
     learning_rate: float,
-) -> FloatArray:
+) -> NDArray[np.float64]:
     """Add scaled tree predictions to raw predictions.
 
     Args:
@@ -55,20 +248,21 @@ def _add_tree_predictions(
     Returns:
         Updated raw predictions.
     """
-    return tuple(rp + learning_rate * tp for rp, tp in zip(raw_preds, tree_preds, strict=True))
+    result: NDArray[np.float64] = raw_preds + learning_rate * tree_preds
+    return result
 
 
 def _create_worker_pool(
     n_jobs: int,
     bin_edges_raw: tuple[tuple[float, ...], ...],
-    sample_bins: tuple[tuple[int, ...], ...],
+    sample_bins: NDArray[np.int64],
 ) -> WorkerPoolProtocol | None:
     """Create an initialized worker pool or return None.
 
     Args:
         n_jobs: Number of parallel workers (-1 = all cores, 1 = sequential).
         bin_edges_raw: Raw bin edges for each feature (pickle-safe tuples).
-        sample_bins: Per-sample bin assignments for each feature.
+        sample_bins: Per-sample bin assignments (n_samples, n_features).
 
     Returns:
         WorkerPoolProtocol or None if sequential.
@@ -80,15 +274,20 @@ def _create_worker_pool(
 
 
 def train_gradient_boosting(
-    x_train: FloatMatrix,
-    y_train: tuple[int, ...],
-    x_val: FloatMatrix | None,
-    y_val: tuple[int, ...] | None,
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.int64],
+    x_val: NDArray[np.float64] | None,
+    y_val: NDArray[np.int64] | None,
     config: GradientBoostingConfig,
     feature_names: tuple[str, ...],
     progress_callback: Callable[[TrainingProgress], None] | None = None,
 ) -> GradientBoostingModel:
     """Train gradient boosting classifier.
+
+    Supports early stopping when validation loss stops improving. When
+    early_stopping_rounds is set in config and validation data is provided,
+    training stops after the specified number of rounds without improvement.
+    The returned model contains only trees up to and including the best round.
 
     Args:
         x_train: Training feature matrix (n_samples, n_features).
@@ -100,22 +299,14 @@ def train_gradient_boosting(
         progress_callback: Optional callback for progress updates.
 
     Returns:
-        Trained gradient boosting model.
+        Trained gradient boosting model. If early stopping is enabled and
+        triggered, the model contains only trees up to the best round.
 
     Raises:
         ValueError: If x_train is empty or dimensions don't match.
     """
-    if len(x_train) == 0:
-        raise ValueError("x_train must not be empty")
-    if len(x_train) != len(y_train):
-        raise ValueError(
-            f"x_train and y_train must have same length, got {len(x_train)} and {len(y_train)}"
-        )
-    if len(x_train[0]) != len(feature_names):
-        raise ValueError(
-            f"x_train has {len(x_train[0])} features but "
-            f"{len(feature_names)} feature names provided"
-        )
+    _validate_training_inputs(x_train, y_train, feature_names)
+    n_train: int = x_train.shape[0]
 
     # Initialize loss function
     loss_fn = BinaryLogLoss()
@@ -124,14 +315,30 @@ def train_gradient_boosting(
     base_prediction = loss_fn.initial_prediction(y_train)
 
     # Initialize raw predictions for all training samples
-    n_train = len(x_train)
-    raw_preds_train: FloatArray = tuple(base_prediction for _ in range(n_train))
+    raw_preds_train: NDArray[np.float64] = np.full(n_train, base_prediction, dtype=np.float64)
 
-    # Initialize validation predictions if validation set provided
-    raw_preds_val: FloatArray | None = None
+    # Initialize validation state based on config
+    early_stopping_rounds = config["early_stopping_rounds"]
+    val_state: _ValidationState | None = None
+    simple_val_state: _SimpleValState | None = None
+
     if x_val is not None and y_val is not None:
-        n_val = len(x_val)
-        raw_preds_val = tuple(base_prediction for _ in range(n_val))
+        n_val: int = x_val.shape[0]
+        initial_val_preds: NDArray[np.float64] = np.full(n_val, base_prediction, dtype=np.float64)
+        if early_stopping_rounds is not None:
+            val_state = _ValidationState(
+                x_val=x_val,
+                y_val=y_val,
+                raw_preds=initial_val_preds,
+                early_stopping_rounds=early_stopping_rounds,
+                es_state=_init_early_stopping_state(),
+            )
+        else:
+            simple_val_state = _SimpleValState(
+                x_val=x_val,
+                y_val=y_val,
+                raw_preds=initial_val_preds,
+            )
 
     # Build trees
     trees: list[DecisionTree] = []
@@ -171,16 +378,17 @@ def train_gradient_boosting(
         tree_preds_train = predict_tree(tree, x_train)
         raw_preds_train = _add_tree_predictions(raw_preds_train, tree_preds_train, learning_rate)
 
-        # Update validation predictions if available
+        # Update validation predictions and early stopping state
         val_loss: float | None = None
-        if x_val is not None and y_val is not None and raw_preds_val is not None:
-            tree_preds_val = predict_tree(tree, x_val)
-            raw_preds_val = _add_tree_predictions(raw_preds_val, tree_preds_val, learning_rate)
-            val_loss = _compute_loss(y_val, raw_preds_val)
+        if val_state is not None:
+            val_loss, val_state = _update_validation(val_state, tree, tree_idx, learning_rate)
+        elif simple_val_state is not None:
+            val_loss, simple_val_state = _update_simple_validation(
+                simple_val_state, tree, learning_rate
+            )
 
         # Report progress
         train_loss = _compute_loss(y_train, raw_preds_train)
-
         if progress_callback is not None:
             progress = TrainingProgress(
                 tree_index=tree_idx,
@@ -190,13 +398,25 @@ def train_gradient_boosting(
             )
             progress_callback(progress)
 
+        # Check early stopping
+        if val_state is not None and val_state["es_state"]["should_stop"]:
+            break
+
     # Clean up worker pool
     if pool is not None:
         pool.close()
         pool.join()
 
+    # If early stopping was enabled, return only trees up to best round
+    final_trees: tuple[DecisionTree, ...]
+    if val_state is not None:
+        best_round = val_state["es_state"]["best_round"]
+        final_trees = tuple(trees[: best_round + 1])
+    else:
+        final_trees = tuple(trees)
+
     return GradientBoostingModel(
-        trees=tuple(trees),
+        trees=final_trees,
         base_prediction=base_prediction,
         learning_rate=learning_rate,
         feature_names=feature_names,
@@ -207,8 +427,8 @@ def train_gradient_boosting(
 
 def predict_raw(
     model: GradientBoostingModel,
-    x: FloatMatrix,
-) -> FloatArray:
+    x: NDArray[np.float64],
+) -> NDArray[np.float64]:
     """Predict raw scores (log-odds) for samples.
 
     Args:
@@ -221,19 +441,20 @@ def predict_raw(
     Raises:
         ValueError: If x is empty or has wrong number of features.
     """
-    if len(x) == 0:
+    n_samples: int = x.shape[0]
+    if n_samples == 0:
         raise ValueError("x must not be empty")
-    if len(x[0]) != len(model["feature_names"]):
+    n_features: int = x.shape[1]
+    if n_features != len(model["feature_names"]):
         raise ValueError(
-            f"x has {len(x[0])} features but model expects {len(model['feature_names'])}"
+            f"x has {n_features} features but model expects {len(model['feature_names'])}"
         )
 
-    n_samples = len(x)
     base_prediction = model["base_prediction"]
     learning_rate = model["learning_rate"]
 
     # Start with base prediction
-    raw_preds: FloatArray = tuple(base_prediction for _ in range(n_samples))
+    raw_preds: NDArray[np.float64] = np.full(n_samples, base_prediction, dtype=np.float64)
 
     # Add contributions from each tree
     for tree in model["trees"]:
@@ -245,7 +466,7 @@ def predict_raw(
 
 def predict_proba(
     model: GradientBoostingModel,
-    x: FloatMatrix,
+    x: NDArray[np.float64],
 ) -> tuple[tuple[float, float], ...]:
     """Predict class probabilities.
 
@@ -263,8 +484,10 @@ def predict_proba(
     raw_preds = predict_raw(model, x)
 
     result: list[tuple[float, float]] = []
-    for raw in raw_preds:
-        prob_1 = sigmoid(raw)
+    n_samples: int = raw_preds.shape[0]
+    for i in range(n_samples):
+        raw_val: float = raw_preds.item(i)
+        prob_1 = sigmoid(raw_val)
         prob_0 = 1.0 - prob_1
         result.append((prob_0, prob_1))
 

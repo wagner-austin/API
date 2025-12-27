@@ -5,8 +5,6 @@ Bins each feature into K cuts once, then builds gradient/hessian histograms
 per feature and scans bins with prefix sums to evaluate splits.
 
 Supports NaN values via dedicated NaN bin (last bin in histogram).
-
-Built from scratch - uses only Python stdlib (no numpy).
 """
 
 from __future__ import annotations
@@ -14,7 +12,11 @@ from __future__ import annotations
 import math
 from typing import Literal, NamedTuple
 
-from cleargbm.types import FloatArray, FloatMatrix, IntArray
+import numpy as np
+from numpy.typing import NDArray
+
+from cleargbm._test_hooks import create_histogram_buffer
+from cleargbm.buffers import HistogramBuffer
 
 # NaN bin is always the last bin (index = n_regular_bins)
 NAN_BIN_OFFSET: Literal[1] = 1
@@ -36,26 +38,12 @@ class FeatureBins(NamedTuple):
 
     Args:
         bin_edges: Bin edges for each feature.
-        sample_bins: Per-sample bin ID for each feature.
-                     sample_bins[feature_idx][sample_idx] = bin_id
+        sample_bins: Per-sample bin ID for each feature (2D array).
+                     sample_bins[sample_idx, feature_idx] = bin_id
     """
 
     bin_edges: tuple[BinEdges, ...]
-    sample_bins: tuple[IntArray, ...]
-
-
-class Histogram(NamedTuple):
-    """Gradient/hessian histogram for a single feature.
-
-    Args:
-        gradient_sums: Sum of gradients in each bin.
-        hessian_sums: Sum of hessians in each bin.
-        counts: Number of samples in each bin.
-    """
-
-    gradient_sums: tuple[float, ...]
-    hessian_sums: tuple[float, ...]
-    counts: tuple[int, ...]
+    sample_bins: NDArray[np.int64]  # Shape: (n_samples, n_features)
 
 
 class HistogramSplit(NamedTuple):
@@ -77,7 +65,7 @@ class HistogramSplit(NamedTuple):
 
 
 def compute_bin_edges(
-    x: FloatMatrix,
+    x: NDArray[np.float64],
     n_features: int,
     max_bins: int,
 ) -> tuple[BinEdges, ...]:
@@ -95,22 +83,23 @@ def compute_bin_edges(
     Returns:
         Tuple of BinEdges, one per feature.
     """
-    n_samples = len(x)
     result: list[BinEdges] = []
 
     for feat_idx in range(n_features):
-        # Extract feature values, excluding NaN
-        values: list[float] = [
-            x[i][feat_idx] for i in range(n_samples) if not math.isnan(x[i][feat_idx])
-        ]
+        # Extract feature column
+        col: NDArray[np.float64] = x[:, feat_idx]
+
+        # Filter out NaN values
+        valid_mask: NDArray[np.bool_] = ~np.isnan(col)
+        valid_values: NDArray[np.float64] = col[valid_mask]
 
         # Handle case where all values are NaN
-        if not values:
+        if valid_values.size == 0:
             result.append(BinEdges(edges=()))
             continue
 
-        sorted_values = sorted(values)
-        n_valid = len(sorted_values)
+        sorted_values: NDArray[np.float64] = np.sort(valid_values)
+        n_valid = sorted_values.size
 
         # Compute quantile edges
         n_edges = max_bins - 1
@@ -121,7 +110,8 @@ def compute_bin_edges(
             # So pos is always in [0, n_valid-1]
             q = edge_idx / max_bins
             pos = int(q * (n_valid - 1))
-            edge_value = sorted_values[pos]
+            # Use .item(idx) on array for proper typing (returns Python float)
+            edge_value: float = sorted_values.item(pos)
             # Avoid duplicate edges
             if not edges or edge_value > edges[-1]:
                 edges.append(edge_value)
@@ -160,9 +150,9 @@ def _assign_bin(value: float, edges: tuple[float, ...], nan_bin: int) -> int:
 
 
 def bin_samples(
-    x: FloatMatrix,
+    x: NDArray[np.float64],
     bin_edges: tuple[BinEdges, ...],
-) -> tuple[IntArray, ...]:
+) -> NDArray[np.int64]:
     """Assign each sample to bins for each feature.
 
     NaN values are assigned to a dedicated NaN bin (last bin).
@@ -172,26 +162,31 @@ def bin_samples(
         bin_edges: Bin edges for each feature.
 
     Returns:
-        Tuple of IntArray, one per feature. sample_bins[f][i] = bin ID for
-        sample i on feature f. NaN values get bin ID = len(edges) + 1.
+        2D array of shape (n_samples, n_features) with bin IDs.
+        sample_bins[i, f] = bin ID for sample i on feature f.
+        NaN values get bin ID = len(edges) + 1.
     """
-    n_samples = len(x)
+    n_samples = x.shape[0]
     n_features = len(bin_edges)
-    result: list[IntArray] = []
+    result: NDArray[np.int64] = np.zeros((n_samples, n_features), dtype=np.int64)
 
     for feat_idx in range(n_features):
         edges = bin_edges[feat_idx].edges
         # NaN bin is after all regular bins: len(edges) + 1
         # Regular bins: 0 to len(edges), NaN bin: len(edges) + 1
         nan_bin = len(edges) + NAN_BIN_OFFSET
-        bins: list[int] = [_assign_bin(x[i][feat_idx], edges, nan_bin) for i in range(n_samples)]
-        result.append(tuple(bins))
+        # Extract feature column for proper typing
+        feat_col: NDArray[np.float64] = x[:, feat_idx]
+        for i in range(n_samples):
+            # Use .item(idx) on array for proper typing
+            val: float = feat_col.item(i)
+            result[i, feat_idx] = _assign_bin(val, edges, nan_bin)
 
-    return tuple(result)
+    return result
 
 
 def precompute_feature_bins(
-    x: FloatMatrix,
+    x: NDArray[np.float64],
     max_bins: int,
 ) -> FeatureBins:
     """Precompute all bin assignments for the dataset.
@@ -206,65 +201,62 @@ def precompute_feature_bins(
     Returns:
         FeatureBins containing edges and per-sample bin assignments.
     """
-    n_features = len(x[0]) if x else 0
+    n_features = x.shape[1] if x.size > 0 else 0
     edges = compute_bin_edges(x, n_features, max_bins)
     sample_bins = bin_samples(x, edges)
     return FeatureBins(bin_edges=edges, sample_bins=sample_bins)
 
 
 def build_histogram(
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
-    sample_bins: IntArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_bins: NDArray[np.int64],
     n_bins: int,
-) -> Histogram:
+) -> HistogramBuffer:
     """Build gradient/hessian histogram for one feature in a node.
+
+    Uses HistogramBuffer for efficient in-place accumulation with
+    pre-allocated numpy arrays.
 
     Args:
         sample_indices: Indices of samples in this node.
         gradients: Gradient for each sample (full dataset).
         hessians: Hessian for each sample (full dataset).
-        sample_bins: Bin ID for each sample on this feature.
+        sample_bins: Bin ID for each sample on this feature (1D array).
         n_bins: Number of bins.
 
     Returns:
-        Histogram with gradient/hessian sums per bin.
+        HistogramBuffer with gradient/hessian sums per bin.
     """
-    g_sums: list[float] = [0.0] * n_bins
-    h_sums: list[float] = [0.0] * n_bins
-    counts: list[int] = [0] * n_bins
+    buf = create_histogram_buffer(n_bins)
 
-    for idx in sample_indices:
-        bin_id = sample_bins[idx]
-        g_sums[bin_id] += gradients[idx]
-        h_sums[bin_id] += hessians[idx]
-        counts[bin_id] += 1
+    # Use vectorized batch accumulation
+    bins_for_node: NDArray[np.int64] = sample_bins[sample_indices]
+    grads_for_node: NDArray[np.float64] = gradients[sample_indices]
+    hess_for_node: NDArray[np.float64] = hessians[sample_indices]
+    buf.accumulate_batch(bins_for_node, grads_for_node, hess_for_node)
 
-    return Histogram(
-        gradient_sums=tuple(g_sums),
-        hessian_sums=tuple(h_sums),
-        counts=tuple(counts),
-    )
+    return buf
 
 
-def subtract_histogram(parent: Histogram, child: Histogram) -> Histogram:
+def subtract_histogram(parent: HistogramBuffer, child: HistogramBuffer) -> HistogramBuffer:
     """Compute sibling histogram by subtraction.
 
     sibling = parent - child (the histogram trick for 2x speedup).
 
+    Uses numpy operations for efficient subtraction.
+
     Args:
-        parent: Parent node histogram.
-        child: One child's histogram.
+        parent: Parent node histogram buffer.
+        child: One child's histogram buffer.
 
     Returns:
-        Other child's histogram.
+        Other child's histogram buffer.
     """
-    # Use map + sub for faster tuple creation
-    g_sums = tuple(p - c for p, c in zip(parent.gradient_sums, child.gradient_sums, strict=True))
-    h_sums = tuple(p - c for p, c in zip(parent.hessian_sums, child.hessian_sums, strict=True))
-    counts = tuple(p - c for p, c in zip(parent.counts, child.counts, strict=True))
-    return Histogram(gradient_sums=g_sums, hessian_sums=h_sums, counts=counts)
+    sibling = create_histogram_buffer(parent.n_bins)
+    sibling.subtract_into(parent, child)
+    return sibling
 
 
 def _compute_split_gain(
@@ -362,7 +354,7 @@ def _evaluate_nan_direction(
 
 
 def find_best_split_from_histogram(
-    histogram: Histogram,
+    histogram: HistogramBuffer,
     bin_edges: BinEdges,
     feature_index: int,
     min_samples_leaf: int,
@@ -374,7 +366,7 @@ def find_best_split_from_histogram(
     both NaN-goes-left and NaN-goes-right scenarios for each split.
 
     Args:
-        histogram: Gradient/hessian histogram (includes NaN bin as last bin).
+        histogram: Gradient/hessian histogram buffer (includes NaN bin as last bin).
         bin_edges: Bin edges for threshold lookup.
         feature_index: Feature index.
         min_samples_leaf: Minimum samples in each leaf.
@@ -383,21 +375,25 @@ def find_best_split_from_histogram(
     Returns:
         Best split or None if no valid split.
     """
-    n_bins = len(histogram.gradient_sums)
+    n_bins = histogram.n_bins
     edges = bin_edges.edges
     n_regular_bins = len(edges) + 1  # Bins 0..len(edges)
     nan_bin_idx = n_regular_bins  # NaN bin is at index len(edges) + 1
 
     # Extract NaN bin stats (if histogram has NaN bin)
     has_nan_bin = n_bins > n_regular_bins
-    g_nan = histogram.gradient_sums[nan_bin_idx] if has_nan_bin else 0.0
-    h_nan = histogram.hessian_sums[nan_bin_idx] if has_nan_bin else 0.0
-    n_nan = histogram.counts[nan_bin_idx] if has_nan_bin else 0
+    g_nan = histogram.get_gradient_sum(nan_bin_idx) if has_nan_bin else 0.0
+    h_nan = histogram.get_hessian_sum(nan_bin_idx) if has_nan_bin else 0.0
+    n_nan = histogram.get_count(nan_bin_idx) if has_nan_bin else 0
 
     # Compute totals for regular bins only
-    g_regular = sum(histogram.gradient_sums[:n_regular_bins])
-    h_regular = sum(histogram.hessian_sums[:n_regular_bins])
-    n_regular = sum(histogram.counts[:n_regular_bins])
+    g_regular = 0.0
+    h_regular = 0.0
+    n_regular = 0
+    for i in range(n_regular_bins):
+        g_regular += histogram.get_gradient_sum(i)
+        h_regular += histogram.get_hessian_sum(i)
+        n_regular += histogram.get_count(i)
 
     # Total including NaN
     g_total = g_regular + g_nan
@@ -419,9 +415,9 @@ def find_best_split_from_histogram(
 
     # Scan regular bins (split after each bin)
     for bin_idx in range(n_regular_bins - 1):
-        g_left_base += histogram.gradient_sums[bin_idx]
-        h_left_base += histogram.hessian_sums[bin_idx]
-        n_left_base += histogram.counts[bin_idx]
+        g_left_base += histogram.get_gradient_sum(bin_idx)
+        h_left_base += histogram.get_hessian_sum(bin_idx)
+        n_left_base += histogram.get_count(bin_idx)
 
         # Try both NaN directions and pick the best
         for nan_dir in ("left", "right"):
@@ -464,12 +460,12 @@ def find_best_split_from_histogram(
 
 
 def partition_by_bin(
-    sample_indices: tuple[int, ...],
-    sample_bins: IntArray,
+    sample_indices: NDArray[np.int64],
+    sample_bins: NDArray[np.int64],
     split_bin: int,
     nan_bin: int,
     nan_direction: Literal["left", "right"],
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """Partition samples into left/right based on bin split.
 
     Samples in bins <= split_bin go left, others go right.
@@ -477,38 +473,40 @@ def partition_by_bin(
 
     Args:
         sample_indices: Indices of samples in this node.
-        sample_bins: Bin ID for each sample on the split feature.
+        sample_bins: Bin ID for each sample on the split feature (1D array).
         split_bin: Split at this bin (inclusive left).
         nan_bin: Bin ID for NaN samples.
         nan_direction: Direction for NaN samples ("left" or "right").
 
     Returns:
-        Tuple of (left_indices, right_indices).
+        Tuple of (left_indices, right_indices) as numpy arrays.
     """
-    left: list[int] = []
-    right: list[int] = []
+    # Get bin IDs for the samples in this node
+    bins_for_node: NDArray[np.int64] = sample_bins[sample_indices]
 
-    for idx in sample_indices:
-        bin_id = sample_bins[idx]
-        if bin_id == nan_bin:
-            # NaN sample: route based on nan_direction
-            if nan_direction == "left":
-                left.append(idx)
-            else:
-                right.append(idx)
-        elif bin_id <= split_bin:
-            left.append(idx)
-        else:
-            right.append(idx)
+    # Create masks for partitioning
+    is_nan: NDArray[np.bool_] = bins_for_node == nan_bin
+    is_left_regular: NDArray[np.bool_] = (bins_for_node <= split_bin) & ~is_nan
+    is_right_regular: NDArray[np.bool_] = (bins_for_node > split_bin) & ~is_nan
 
-    return tuple(left), tuple(right)
+    if nan_direction == "left":
+        left_mask: NDArray[np.bool_] = is_left_regular | is_nan
+        right_mask: NDArray[np.bool_] = is_right_regular
+    else:
+        left_mask = is_left_regular
+        right_mask = is_right_regular | is_nan
+
+    left_indices: NDArray[np.int64] = sample_indices[left_mask]
+    right_indices: NDArray[np.int64] = sample_indices[right_mask]
+
+    return left_indices, right_indices
 
 
 __all__ = [
     "NAN_BIN_OFFSET",
     "BinEdges",
     "FeatureBins",
-    "Histogram",
+    "HistogramBuffer",
     "HistogramSplit",
     "_check_monotonicity_constraint",
     "_evaluate_nan_direction",

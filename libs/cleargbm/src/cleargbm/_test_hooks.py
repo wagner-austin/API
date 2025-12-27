@@ -4,8 +4,6 @@ These hooks allow testing without mocking. Tests inject fakes,
 production uses real implementations.
 
 This module is private (underscore prefix) - not for external use.
-
-Built from scratch - uses only Python stdlib (no numpy).
 """
 
 from __future__ import annotations
@@ -15,7 +13,10 @@ import random
 from collections.abc import Callable
 from typing import Protocol
 
-from cleargbm.histogram import Histogram
+import numpy as np
+from numpy.typing import NDArray
+
+from cleargbm.buffers import FloatBuffer, HistogramBuffer, IntBuffer
 
 
 class RandomStateProtocol(Protocol):
@@ -193,26 +194,28 @@ class WorkerPoolProtocol(Protocol):
             [
                 tuple[
                     tuple[int, ...],  # feature_indices (batch)
-                    tuple[int, ...],  # sample_indices
+                    bytes,  # sample_indices as bytes
+                    int,  # n_indices
                     str,  # grad_shm_name
                     str,  # hess_shm_name
                     int,  # n_samples
                     tuple[int, ...],  # n_bins per feature
                 ]
             ],
-            list[tuple[int, Histogram]],
+            list[tuple[int, HistogramBuffer]],
         ],
         args_list: list[
             tuple[
                 tuple[int, ...],
-                tuple[int, ...],
+                bytes,
+                int,
                 str,
                 str,
                 int,
                 tuple[int, ...],
             ]
         ],
-    ) -> list[list[tuple[int, Histogram]]]:
+    ) -> list[list[tuple[int, HistogramBuffer]]]:
         """Apply batched histogram worker to each batch.
 
         Args:
@@ -220,7 +223,7 @@ class WorkerPoolProtocol(Protocol):
             args_list: Batched args with shared memory names for gradients/hessians.
 
         Returns:
-            List of lists of (feature_idx, histogram) tuples.
+            List of lists of (feature_idx, HistogramBuffer) tuples.
         """
         ...
 
@@ -240,21 +243,25 @@ class _MultiprocessingPoolWrapper:
         self,
         n_workers: int,
         bin_edges: tuple[tuple[float, ...], ...],
-        sample_bins: tuple[tuple[int, ...], ...],
+        sample_bins: NDArray[np.int64],
     ) -> None:
         """Initialize pool with feature_bins set in workers.
 
         Args:
             n_workers: Number of worker processes.
             bin_edges: Bin edges for each feature (raw tuples for pickle).
-            sample_bins: Per-sample bin assignments for each feature.
+            sample_bins: Per-sample bin assignments (n_samples, n_features).
         """
         from cleargbm.parallel import _worker_initializer
+
+        # Convert 2D numpy array to bytes for IPC
+        n_samples, n_features = sample_bins.shape
+        sample_bins_flat: bytes = sample_bins.tobytes()
 
         self._pool: multiprocessing.pool.Pool = multiprocessing.Pool(
             n_workers,
             initializer=_worker_initializer,
-            initargs=(bin_edges, sample_bins),
+            initargs=(bin_edges, sample_bins_flat, n_samples, n_features),
         )
         self._n_workers = n_workers
 
@@ -264,26 +271,28 @@ class _MultiprocessingPoolWrapper:
             [
                 tuple[
                     tuple[int, ...],
-                    tuple[int, ...],
+                    bytes,  # sample_indices as bytes
+                    int,  # n_indices
                     str,
                     str,
                     int,
                     tuple[int, ...],
                 ]
             ],
-            list[tuple[int, Histogram]],
+            list[tuple[int, HistogramBuffer]],
         ],
         args_list: list[
             tuple[
                 tuple[int, ...],
-                tuple[int, ...],
+                bytes,  # sample_indices as bytes
+                int,  # n_indices
                 str,
                 str,
                 int,
                 tuple[int, ...],
             ]
         ],
-    ) -> list[list[tuple[int, Histogram]]]:
+    ) -> list[list[tuple[int, HistogramBuffer]]]:
         """Apply batched histogram worker to each batch.
 
         Args:
@@ -291,7 +300,7 @@ class _MultiprocessingPoolWrapper:
             args_list: Batched args with shared memory names.
 
         Returns:
-            List of lists of (feature_idx, histogram) tuples.
+            List of lists of (feature_idx, HistogramBuffer) tuples.
         """
         return self._pool.map(func, args_list)
 
@@ -307,14 +316,14 @@ class _MultiprocessingPoolWrapper:
 def _default_pool_factory(
     n_workers: int,
     bin_edges: tuple[tuple[float, ...], ...],
-    sample_bins: tuple[tuple[int, ...], ...],
+    sample_bins: NDArray[np.int64],
 ) -> WorkerPoolProtocol:
     """Production implementation - creates pool with initializer.
 
     Args:
         n_workers: Number of worker processes.
         bin_edges: Bin edges for each feature.
-        sample_bins: Per-sample bin assignments.
+        sample_bins: Per-sample bin assignments (n_samples, n_features).
 
     Returns:
         WorkerPool instance with feature_bins initialized.
@@ -325,7 +334,7 @@ def _default_pool_factory(
 # Module-level hook for pool factory.
 # Tests can override to provide sequential or fake behavior.
 _pool_factory: Callable[
-    [int, tuple[tuple[float, ...], ...], tuple[tuple[int, ...], ...]],
+    [int, tuple[tuple[float, ...], ...], NDArray[np.int64]],
     WorkerPoolProtocol,
 ] = _default_pool_factory
 
@@ -333,14 +342,14 @@ _pool_factory: Callable[
 def create_worker_pool(
     n_workers: int,
     bin_edges: tuple[tuple[float, ...], ...],
-    sample_bins: tuple[tuple[int, ...], ...],
+    sample_bins: NDArray[np.int64],
 ) -> WorkerPoolProtocol:
     """Create a worker pool with feature_bins initialized in workers.
 
     Args:
         n_workers: Number of worker processes.
         bin_edges: Bin edges for each feature.
-        sample_bins: Per-sample bin assignments.
+        sample_bins: Per-sample bin assignments (n_samples, n_features).
 
     Returns:
         WorkerPool instance with initialized feature_bins.
@@ -348,9 +357,99 @@ def create_worker_pool(
     return _pool_factory(n_workers, bin_edges, sample_bins)
 
 
+# =============================================================================
+# Buffer Factory Hooks
+# =============================================================================
+
+
+def _default_float_buffer_factory(size: int) -> FloatBuffer:
+    """Production implementation - creates FloatBuffer.
+
+    Args:
+        size: Number of elements in buffer.
+
+    Returns:
+        FloatBuffer instance.
+    """
+    return FloatBuffer(size)
+
+
+def _default_int_buffer_factory(size: int) -> IntBuffer:
+    """Production implementation - creates IntBuffer.
+
+    Args:
+        size: Number of elements in buffer.
+
+    Returns:
+        IntBuffer instance.
+    """
+    return IntBuffer(size)
+
+
+def _default_histogram_buffer_factory(n_bins: int) -> HistogramBuffer:
+    """Production implementation - creates HistogramBuffer.
+
+    Args:
+        n_bins: Number of bins in histogram.
+
+    Returns:
+        HistogramBuffer instance.
+    """
+    return HistogramBuffer(n_bins)
+
+
+# Module-level hooks for buffer factories.
+# Tests can override to provide instrumented or fake buffers.
+_float_buffer_factory: Callable[[int], FloatBuffer] = _default_float_buffer_factory
+_int_buffer_factory: Callable[[int], IntBuffer] = _default_int_buffer_factory
+_histogram_buffer_factory: Callable[[int], HistogramBuffer] = _default_histogram_buffer_factory
+
+
+def create_float_buffer(size: int) -> FloatBuffer:
+    """Create a float buffer.
+
+    Args:
+        size: Number of elements in buffer.
+
+    Returns:
+        FloatBuffer instance.
+    """
+    return _float_buffer_factory(size)
+
+
+def create_int_buffer(size: int) -> IntBuffer:
+    """Create an int buffer.
+
+    Args:
+        size: Number of elements in buffer.
+
+    Returns:
+        IntBuffer instance.
+    """
+    return _int_buffer_factory(size)
+
+
+def create_histogram_buffer(n_bins: int) -> HistogramBuffer:
+    """Create a histogram buffer.
+
+    Args:
+        n_bins: Number of bins in histogram.
+
+    Returns:
+        HistogramBuffer instance.
+    """
+    return _histogram_buffer_factory(n_bins)
+
+
 __all__ = [
+    "FloatBuffer",
+    "HistogramBuffer",
+    "IntBuffer",
     "RandomStateProtocol",
     "WorkerPoolProtocol",
+    "create_float_buffer",
+    "create_histogram_buffer",
+    "create_int_buffer",
     "create_worker_pool",
     "get_random_state",
 ]

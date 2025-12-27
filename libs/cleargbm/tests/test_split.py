@@ -5,7 +5,9 @@ Split computation helpers for gradient boosting trees.
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from cleargbm.split import (
     _check_monotonicity,
@@ -28,8 +30,8 @@ class TestComputeLeafValue:
 
     def test_positive_gradients(self) -> None:
         """Positive gradients should give negative leaf value."""
-        gradients = (1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25), dtype=np.float64)
 
         value = _compute_leaf_value(gradients, hessians)
 
@@ -38,8 +40,8 @@ class TestComputeLeafValue:
 
     def test_negative_gradients(self) -> None:
         """Negative gradients should give positive leaf value."""
-        gradients = (-1.0, -1.0)
-        hessians = (0.5, 0.5)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)
 
         value = _compute_leaf_value(gradients, hessians)
 
@@ -48,8 +50,8 @@ class TestComputeLeafValue:
 
     def test_zero_hessian_returns_zero(self) -> None:
         """Zero hessian should return 0.0 to avoid division by zero."""
-        gradients = (1.0, 1.0)
-        hessians = (0.0, 0.0)
+        gradients: NDArray[np.float64] = np.array((1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.zeros(2, dtype=np.float64)
 
         value = _compute_leaf_value(gradients, hessians)
 
@@ -57,18 +59,22 @@ class TestComputeLeafValue:
 
     def test_mismatched_lengths_raises(self) -> None:
         """Different length arrays should raise ValueError."""
+        gradients: NDArray[np.float64] = np.array((1.0, 2.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.5,), dtype=np.float64)
         with pytest.raises(ValueError, match="same length"):
-            _compute_leaf_value((1.0, 2.0), (0.5,))
+            _compute_leaf_value(gradients, hessians)
 
     def test_empty_arrays_raises(self) -> None:
         """Empty arrays should raise ValueError."""
+        gradients: NDArray[np.float64] = np.zeros(0, dtype=np.float64)
+        hessians: NDArray[np.float64] = np.zeros(0, dtype=np.float64)
         with pytest.raises(ValueError, match="empty arrays"):
-            _compute_leaf_value((), ())
+            _compute_leaf_value(gradients, hessians)
 
     def test_l2_regularization_shrinks_value(self) -> None:
         """L2 regularization should shrink leaf value."""
-        gradients = (1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25), dtype=np.float64)
 
         # Without L2: -G/H = -3.0/0.75 = -4.0
         value_no_reg = _compute_leaf_value(gradients, hessians)
@@ -81,8 +87,8 @@ class TestComputeLeafValue:
 
     def test_l1_regularization_soft_threshold(self) -> None:
         """L1 regularization should apply soft thresholding."""
-        gradients = (2.0, 2.0)  # G = 4.0
-        hessians = (0.5, 0.5)  # H = 1.0
+        gradients: NDArray[np.float64] = np.array((2.0, 2.0), dtype=np.float64)  # G = 4.0
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)  # H = 1.0
 
         # Without L1: -G/H = -4.0/1.0 = -4.0
         value_no_reg = _compute_leaf_value(gradients, hessians)
@@ -95,8 +101,8 @@ class TestComputeLeafValue:
 
     def test_l1_regularization_shrinks_to_zero(self) -> None:
         """L1 regularization should shrink to zero when |G| <= alpha."""
-        gradients = (0.5, 0.5)  # G = 1.0
-        hessians = (0.5, 0.5)  # H = 1.0
+        gradients: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)  # G = 1.0
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)  # H = 1.0
 
         # With L1 (alpha=2.0): |G|=1.0 <= alpha=2.0, so value = 0
         value = _compute_leaf_value(gradients, hessians, reg_alpha=2.0, reg_lambda=0.0)
@@ -104,8 +110,8 @@ class TestComputeLeafValue:
 
     def test_l1_negative_gradient(self) -> None:
         """L1 regularization should work with negative gradients."""
-        gradients = (-2.0, -2.0)  # G = -4.0
-        hessians = (0.5, 0.5)  # H = 1.0
+        gradients: NDArray[np.float64] = np.array((-2.0, -2.0), dtype=np.float64)  # G = -4.0
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)  # H = 1.0
 
         # With L1 (alpha=1.0, lambda=0.0): -sign(G) * max(|G|-alpha, 0) / H
         # = -(-1) * max(4-1, 0) / 1 = 3.0
@@ -114,8 +120,8 @@ class TestComputeLeafValue:
 
     def test_l1_l2_combined(self) -> None:
         """L1 and L2 regularization should work together."""
-        gradients = (2.0, 2.0)  # G = 4.0
-        hessians = (0.5, 0.5)  # H = 1.0
+        gradients: NDArray[np.float64] = np.array((2.0, 2.0), dtype=np.float64)  # G = 4.0
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)  # H = 1.0
 
         # With L1 (alpha=1.0) and L2 (lambda=1.0):
         # -sign(G) * max(|G|-alpha, 0) / (H + lambda)
@@ -268,8 +274,8 @@ class TestFindSplitForFeature:
         """Should find a valid split for clearly separable data."""
         # Feature values: 0.0, 0.0, 1.0, 1.0 (indices 0,1,2,3)
         sorted_pairs: list[tuple[float, int]] = [(0.0, 0), (0.0, 1), (1.0, 2), (1.0, 3)]
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
 
         split = _find_split_for_feature(
             sorted_pairs=sorted_pairs,
@@ -291,8 +297,8 @@ class TestFindSplitForFeature:
     def test_no_split_when_all_same_value(self) -> None:
         """Should return None when all feature values are the same."""
         sorted_pairs: list[tuple[float, int]] = [(1.0, 0), (1.0, 1), (1.0, 2), (1.0, 3)]
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
 
         split = _find_split_for_feature(
             sorted_pairs=sorted_pairs,
@@ -315,8 +321,10 @@ class TestFindSplitForFeature:
         # Gradients: negative on left (want higher pred), positive on right (want lower pred)
         # This means: left should have higher value, right should have lower value
         # With increasing constraint (1), left must be <= right, which contradicts
-        gradients = (-2.0, -1.0, 1.0, 2.0)  # g_left < 0 means higher pred on left
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array(
+            (-2.0, -1.0, 1.0, 2.0), dtype=np.float64
+        )  # g_left < 0 means higher pred on left
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
 
         split = _find_split_for_feature(
             sorted_pairs=sorted_pairs,
@@ -339,20 +347,24 @@ class TestFindBestSplit:
     def test_finds_best_among_features(self) -> None:
         """Should find the best split among multiple features."""
         # Feature 0 perfectly separates, feature 1 does not
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.5),
+                (0.0, 0.5),
+                (1.0, 0.5),
+                (1.0, 0.5),
+            ),
+            dtype=np.float64,
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         split = find_best_split(
             x=x,
             gradients=gradients,
             hessians=hessians,
-            sample_indices=(0, 1, 2, 3),
+            sample_indices=sample_indices,
             feature_indices=(0, 1),
             min_samples_leaf=1,
             monotonic_constraint=0,
@@ -365,15 +377,16 @@ class TestFindBestSplit:
 
     def test_returns_none_when_too_few_samples(self) -> None:
         """Should return None when fewer samples than 2*min_samples_leaf."""
-        x: tuple[tuple[float, ...], ...] = ((0.0,), (1.0,))
-        gradients = (-1.0, 1.0)
-        hessians = (0.25, 0.25)
+        x: NDArray[np.float64] = np.array(((0.0,), (1.0,)), dtype=np.float64)
+        gradients: NDArray[np.float64] = np.array((-1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1), dtype=np.int64)
 
         split = find_best_split(
             x=x,
             gradients=gradients,
             hessians=hessians,
-            sample_indices=(0, 1),
+            sample_indices=sample_indices,
             feature_indices=(0,),
             min_samples_leaf=2,  # Need 4 samples but only have 2
             monotonic_constraint=0,
@@ -387,12 +400,13 @@ class TestCreateLeafNode:
 
     def test_creates_proper_leaf(self) -> None:
         """Should create a leaf node with correct values."""
-        gradients = (-1.0, -1.0)
-        hessians = (0.5, 0.5)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.5, 0.5), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1), dtype=np.int64)
 
         node = _create_leaf_node(
             node_id=5,
-            sample_indices=(0, 1),
+            sample_indices=sample_indices,
             gradients=gradients,
             hessians=hessians,
         )
@@ -414,16 +428,17 @@ class TestCreateInternalNode:
             feature_index=0,
             threshold=0.5,
             gain=10.0,
-            left_indices=(0, 1),
-            right_indices=(2, 3),
+            left_indices=np.array((0, 1), dtype=np.int64),
+            right_indices=np.array((2, 3), dtype=np.int64),
             nan_direction="left",
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         node = _create_internal_node(
             node_id=0,
-            sample_indices=(0, 1, 2, 3),
+            sample_indices=sample_indices,
             gradients=gradients,
             hessians=hessians,
             split=split,
@@ -443,14 +458,18 @@ class TestFindBestSplitWithConstraints:
 
     def test_respects_monotonic_constraints(self) -> None:
         """Should respect monotonic constraints when set."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (1.0,),
-            (2.0,),
-            (3.0,),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0,),
+                (1.0,),
+                (2.0,),
+                (3.0,),
+            ),
+            dtype=np.float64,
         )
-        gradients = (1.0, 0.5, -0.5, -1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((1.0, 0.5, -0.5, -1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         # With increasing constraint on feature 0
         config = make_config()
@@ -460,7 +479,7 @@ class TestFindBestSplitWithConstraints:
             x=x,
             gradients=gradients,
             hessians=hessians,
-            sample_indices=(0, 1, 2, 3),
+            sample_indices=sample_indices,
             feature_indices=(0,),
             config=config_with_constraint,
         )
@@ -473,14 +492,18 @@ class TestFindBestSplitWithConstraints:
         """Should select feature with best gain among multiple features."""
         # Feature 0: perfect separation (best split)
         # Feature 1: no separation (worse split or no split)
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.5),
+                (0.0, 0.5),
+                (1.0, 0.5),
+                (1.0, 0.5),
+            ),
+            dtype=np.float64,
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config = make_config(min_samples_leaf=1)
 
@@ -488,7 +511,7 @@ class TestFindBestSplitWithConstraints:
             x=x,
             gradients=gradients,
             hessians=hessians,
-            sample_indices=(0, 1, 2, 3),
+            sample_indices=sample_indices,
             feature_indices=(0, 1),  # Both features checked
             config=config,
         )

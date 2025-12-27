@@ -13,6 +13,9 @@ from __future__ import annotations
 import sys
 import time
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm.ensemble import train_gradient_boosting
 from cleargbm.types import (
     GradientBoostingConfig,
@@ -35,11 +38,10 @@ def generate_sample_data(
     n_samples: int,
     n_features: int,
     seed: int = 42,
-) -> tuple[tuple[tuple[float, ...], ...], tuple[int, ...]]:
+) -> tuple[NDArray[np.float64], NDArray[np.int64]]:
     """Generate synthetic classification data for tuning.
 
     Uses a simple linear decision boundary with noise.
-    Pure Python random - no numpy.
 
     Args:
         n_samples: Number of samples to generate.
@@ -49,32 +51,20 @@ def generate_sample_data(
     Returns:
         Tuple of (X, y) where X is feature matrix and y is labels.
     """
-    # Simple LCG random number generator
-    state = seed
-    a = 1103515245
-    c = 12345
-    m = 2**31
+    rng = np.random.default_rng(seed)
 
-    def random_float() -> float:
-        nonlocal state
-        state = (a * state + c) % m
-        return state / m
+    # Generate random features
+    x: NDArray[np.float64] = rng.random((n_samples, n_features), dtype=np.float64)
 
-    x: list[tuple[float, ...]] = []
-    y: list[int] = []
+    # Decision: sum of first half > sum of second half + noise
+    half = n_features // 2
+    sum_first_half: NDArray[np.float64] = np.sum(x[:, :half], axis=1)
+    sum_second_half: NDArray[np.float64] = np.sum(x[:, half:], axis=1)
+    score: NDArray[np.float64] = sum_first_half - sum_second_half
+    noise: NDArray[np.float64] = rng.random(n_samples, dtype=np.float64) - 0.5
+    y: NDArray[np.int64] = (score + noise * 0.5 > 0).astype(np.int64)
 
-    for _ in range(n_samples):
-        features = tuple(random_float() for _ in range(n_features))
-        # Decision: sum of first half > sum of second half
-        half = n_features // 2
-        score = sum(features[:half]) - sum(features[half:])
-        # Add noise
-        noise = random_float() - 0.5
-        label = 1 if score + noise * 0.5 > 0 else 0
-        x.append(features)
-        y.append(label)
-
-    return tuple(x), tuple(y)
+    return x, y
 
 
 def make_config(
@@ -113,12 +103,13 @@ def make_config(
         reg_alpha=0.0,
         reg_lambda=0.0,
         n_jobs=n_jobs,
+        early_stopping_rounds=None,
     )
 
 
 def time_config(
-    x: tuple[tuple[float, ...], ...],
-    y: tuple[int, ...],
+    x: NDArray[np.float64],
+    y: NDArray[np.int64],
     feature_names: tuple[str, ...],
     config: GradientBoostingConfig,
 ) -> TimingResult:
@@ -169,8 +160,8 @@ def time_config(
 
 
 def run_autotune(
-    x: tuple[tuple[float, ...], ...],
-    y: tuple[int, ...],
+    x: NDArray[np.float64],
+    y: NDArray[np.int64],
     n_estimators: int = 5,
     max_depth: int = 4,
     learning_rate: float = 0.1,
@@ -181,8 +172,8 @@ def run_autotune(
     """Run autotune grid search.
 
     Args:
-        x: Feature matrix.
-        y: Labels.
+        x: Feature matrix (n_samples, n_features).
+        y: Labels (n_samples,).
         n_estimators: Number of trees per config.
         max_depth: Tree depth for tuning.
         learning_rate: Learning rate for tuning.
@@ -194,8 +185,8 @@ def run_autotune(
         TuningReport with recommendations.
     """
     start_time = time.perf_counter()
-    n_samples = len(x)
-    n_features = len(x[0]) if x else 0
+    n_samples: int = x.shape[0]
+    n_features: int = x.shape[1] if x.size > 0 else 0
     feature_names = tuple(f"f{i}" for i in range(n_features))
 
     if verbose:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import runpy
 import sys
 
+import numpy as np
 import pytest
 from scripts.benchmark import (
     BenchmarkResult,
@@ -35,30 +36,36 @@ class TestGenerateSyntheticData:
         """Should generate correct number of samples and features."""
         x, y = generate_synthetic_data(n_samples=100, n_features=5, seed=42)
 
-        assert len(x) == 100
-        assert len(y) == 100
-        assert len(x[0]) == 5
+        n_samples: int = x.shape[0]
+        n_features: int = x.shape[1]
+        n_labels: int = y.shape[0]
+        assert n_samples == 100
+        assert n_labels == 100
+        assert n_features == 5
 
     def test_generates_binary_labels(self) -> None:
         """Should generate only 0 and 1 labels."""
         _, y = generate_synthetic_data(n_samples=100, n_features=5, seed=42)
 
-        assert all(label in (0, 1) for label in y)
+        n_labels: int = y.shape[0]
+        for i in range(n_labels):
+            label: int = y.item(i)
+            assert label in (0, 1)
 
     def test_deterministic_with_seed(self) -> None:
         """Same seed should produce same data."""
         x1, y1 = generate_synthetic_data(n_samples=50, n_features=3, seed=123)
         x2, y2 = generate_synthetic_data(n_samples=50, n_features=3, seed=123)
 
-        assert x1 == x2
-        assert y1 == y2
+        assert np.array_equal(x1, x2)
+        assert np.array_equal(y1, y2)
 
     def test_different_seeds_produce_different_data(self) -> None:
         """Different seeds should produce different data."""
         x1, _ = generate_synthetic_data(n_samples=50, n_features=3, seed=1)
         x2, _ = generate_synthetic_data(n_samples=50, n_features=3, seed=2)
 
-        assert x1 != x2
+        assert not np.array_equal(x1, x2)
 
 
 class TestMakeConfig:

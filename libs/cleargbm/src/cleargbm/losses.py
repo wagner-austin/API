@@ -1,6 +1,6 @@
 """Loss functions with gradients and hessians for gradient boosting.
 
-Built from scratch - uses only Python stdlib (no numpy).
+Uses numpy arrays for efficient vectorized operations.
 """
 
 from __future__ import annotations
@@ -8,7 +8,8 @@ from __future__ import annotations
 import math
 from typing import Protocol
 
-from cleargbm.types import FloatArray
+import numpy as np
+from numpy.typing import NDArray
 
 
 class LossFunction(Protocol):
@@ -16,8 +17,8 @@ class LossFunction(Protocol):
 
     def loss(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
     ) -> float:
         """Compute mean loss.
 
@@ -32,9 +33,9 @@ class LossFunction(Protocol):
 
     def gradients(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
-    ) -> FloatArray:
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
         """Compute gradients (first derivative of loss w.r.t. predictions).
 
         Args:
@@ -48,9 +49,9 @@ class LossFunction(Protocol):
 
     def hessians(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
-    ) -> FloatArray:
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
         """Compute hessians (second derivative for Newton step).
 
         Args:
@@ -64,7 +65,7 @@ class LossFunction(Protocol):
 
     def initial_prediction(
         self,
-        y_true: tuple[int, ...],
+        y_true: NDArray[np.int64],
     ) -> float:
         """Compute initial prediction (before any trees).
 
@@ -99,7 +100,7 @@ def sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x_clipped))
 
 
-def sigmoid_array(x: FloatArray) -> FloatArray:
+def sigmoid_array(x: NDArray[np.float64]) -> NDArray[np.float64]:
     """Compute sigmoid function for array with numerical stability.
 
     Args:
@@ -108,8 +109,10 @@ def sigmoid_array(x: FloatArray) -> FloatArray:
     Returns:
         Probabilities in [0, 1].
     """
-    # Use map for faster tuple creation
-    return tuple(map(sigmoid, x))
+    # Vectorized sigmoid with clipping for stability
+    x_clipped: NDArray[np.float64] = np.clip(x, -500.0, 500.0)
+    result: NDArray[np.float64] = 1.0 / (1.0 + np.exp(-x_clipped))
+    return result
 
 
 class BinaryLogLoss:
@@ -123,8 +126,8 @@ class BinaryLogLoss:
 
     def loss(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
     ) -> float:
         """Compute mean binary cross-entropy loss.
 
@@ -139,29 +142,31 @@ class BinaryLogLoss:
             ValueError: If y_true and y_pred have different lengths.
             ValueError: If y_true is empty.
         """
-        if len(y_true) != len(y_pred):
-            raise ValueError(
-                f"y_true and y_pred must have same length, got {len(y_true)} and {len(y_pred)}"
-            )
-        if len(y_true) == 0:
+        n_true: int = int(y_true.shape[0])
+        n_pred: int = int(y_pred.shape[0])
+        if n_true != n_pred:
+            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
+        if n_true == 0:
             raise ValueError("y_true must not be empty")
 
         # Clip predictions to avoid log(0)
         eps = 1e-15
-        total_loss = 0.0
-        for y, p in zip(y_true, y_pred, strict=True):
-            p_clipped = max(eps, min(1.0 - eps, p))
-            if y == 1:
-                total_loss -= math.log(p_clipped)
-            else:
-                total_loss -= math.log(1.0 - p_clipped)
-        return total_loss / len(y_true)
+        p_clipped: NDArray[np.float64] = np.clip(y_pred, eps, 1.0 - eps)
+
+        # Vectorized log loss computation
+        y_float: NDArray[np.float64] = y_true.astype(np.float64)
+        losses: NDArray[np.float64] = -(
+            y_float * np.log(p_clipped) + (1.0 - y_float) * np.log(1.0 - p_clipped)
+        )
+        total_loss: float = float(np.sum(losses))
+        mean_loss: float = total_loss / n_true
+        return mean_loss
 
     def gradients(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
-    ) -> FloatArray:
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
         """Compute gradients (p - y).
 
         The gradient of log loss with respect to the raw prediction
@@ -177,17 +182,19 @@ class BinaryLogLoss:
         Raises:
             ValueError: If y_true and y_pred have different lengths.
         """
-        if len(y_true) != len(y_pred):
-            raise ValueError(
-                f"y_true and y_pred must have same length, got {len(y_true)} and {len(y_pred)}"
-            )
-        return tuple(p - float(y) for y, p in zip(y_true, y_pred, strict=True))
+        n_true: int = int(y_true.shape[0])
+        n_pred: int = int(y_pred.shape[0])
+        if n_true != n_pred:
+            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
+        y_float: NDArray[np.float64] = y_true.astype(np.float64)
+        result: NDArray[np.float64] = y_pred - y_float
+        return result
 
     def hessians(
         self,
-        y_true: tuple[int, ...],
-        y_pred: FloatArray,
-    ) -> FloatArray:
+        y_true: NDArray[np.int64],
+        y_pred: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
         """Compute hessians (p * (1-p)).
 
         The second derivative of log loss is p * (1-p), which is always
@@ -203,21 +210,19 @@ class BinaryLogLoss:
         Raises:
             ValueError: If y_true and y_pred have different lengths.
         """
-        if len(y_true) != len(y_pred):
-            raise ValueError(
-                f"y_true and y_pred must have same length, got {len(y_true)} and {len(y_pred)}"
-            )
+        n_true: int = int(y_true.shape[0])
+        n_pred: int = int(y_pred.shape[0])
+        if n_true != n_pred:
+            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
         # Clip to avoid numerical issues at boundaries
         eps = 1e-15
-        result: list[float] = []
-        for p in y_pred:
-            p_clipped = max(eps, min(1.0 - eps, p))
-            result.append(p_clipped * (1.0 - p_clipped))
-        return tuple(result)
+        p_clipped: NDArray[np.float64] = np.clip(y_pred, eps, 1.0 - eps)
+        result: NDArray[np.float64] = p_clipped * (1.0 - p_clipped)
+        return result
 
     def initial_prediction(
         self,
-        y_true: tuple[int, ...],
+        y_true: NDArray[np.int64],
     ) -> float:
         """Compute initial prediction (log-odds of positive class rate).
 
@@ -231,12 +236,12 @@ class BinaryLogLoss:
             ValueError: If y_true is empty.
             ValueError: If all labels are the same (cannot compute log-odds).
         """
-        if len(y_true) == 0:
+        n_total: int = int(y_true.shape[0])
+        if n_total == 0:
             raise ValueError("y_true must not be empty")
 
-        n_positive = sum(y_true)
-        n_total = len(y_true)
-        p_positive = n_positive / n_total
+        n_positive: int = int(np.sum(y_true))
+        p_positive: float = n_positive / n_total
 
         # Handle edge cases where all samples are one class
         eps = 1e-15
@@ -251,9 +256,9 @@ class BinaryLogLoss:
 
 def compute_raw_predictions(
     base_prediction: float,
-    tree_predictions: tuple[FloatArray, ...],
+    tree_predictions: tuple[NDArray[np.float64], ...],
     learning_rate: float,
-) -> FloatArray:
+) -> NDArray[np.float64]:
     """Compute raw predictions from base and tree contributions.
 
     Args:
@@ -271,27 +276,27 @@ def compute_raw_predictions(
     if len(tree_predictions) == 0:
         raise ValueError("tree_predictions must not be empty")
 
-    n_samples = len(tree_predictions[0])
+    n_samples: int = int(tree_predictions[0].shape[0])
     for i, preds in enumerate(tree_predictions):
-        if len(preds) != n_samples:
+        preds_len: int = int(preds.shape[0])
+        if preds_len != n_samples:
             raise ValueError(
                 f"All tree predictions must have same length. "
                 f"tree_predictions[0] has {n_samples}, "
-                f"tree_predictions[{i}] has {len(preds)}"
+                f"tree_predictions[{i}] has {preds_len}"
             )
 
     # Start with base prediction for all samples
-    raw_preds = [base_prediction] * n_samples
+    raw_preds: NDArray[np.float64] = np.full(n_samples, base_prediction, dtype=np.float64)
 
     # Add scaled tree contributions
     for tree_preds in tree_predictions:
-        for j, pred in enumerate(tree_preds):
-            raw_preds[j] += learning_rate * pred
+        raw_preds = raw_preds + learning_rate * tree_preds
 
-    return tuple(raw_preds)
+    return raw_preds
 
 
-def raw_to_proba(raw_predictions: FloatArray) -> FloatArray:
+def raw_to_proba(raw_predictions: NDArray[np.float64]) -> NDArray[np.float64]:
     """Convert raw predictions (log-odds) to probabilities.
 
     Args:

@@ -1,6 +1,6 @@
 """Decision tree implementation for gradient boosting.
 
-Built from scratch - uses only Python stdlib (no numpy).
+Uses numpy arrays for efficient data representation.
 Uses histogram binning for O(K) split finding instead of O(n log n).
 """
 
@@ -9,10 +9,13 @@ from __future__ import annotations
 import math
 from typing import Literal
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm._test_hooks import RandomStateProtocol, WorkerPoolProtocol, get_random_state
+from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
     FeatureBins,
-    Histogram,
     build_histogram,
     precompute_feature_bins,
     subtract_histogram,
@@ -21,8 +24,6 @@ from cleargbm.parallel import _find_best_histogram_split_with_cache
 from cleargbm.split import _compute_leaf_value, _create_leaf_node
 from cleargbm.types import (
     DecisionTree,
-    FloatArray,
-    FloatMatrix,
     GradientBoostingConfig,
     SplitCondition,
     TreeNode,
@@ -53,9 +54,9 @@ def _should_be_leaf(
 
 
 def build_tree(
-    x: FloatMatrix,
-    gradients: FloatArray,
-    hessians: FloatArray,
+    x: NDArray[np.float64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     config: GradientBoostingConfig,
     feature_names: tuple[str, ...],
     feature_bins: FeatureBins | None = None,
@@ -78,15 +79,17 @@ def build_tree(
     Raises:
         ValueError: If input shapes are inconsistent.
     """
-    n_samples = len(x)
+    n_samples: int = int(x.shape[0])
     if n_samples == 0:
         raise ValueError("x must not be empty")
 
-    n_features = len(x[0])
-    if len(gradients) != n_samples:
-        raise ValueError(f"gradients length {len(gradients)} != x rows {n_samples}")
-    if len(hessians) != n_samples:
-        raise ValueError(f"hessians length {len(hessians)} != x rows {n_samples}")
+    n_features: int = int(x.shape[1])
+    n_gradients: int = int(gradients.shape[0])
+    n_hessians: int = int(hessians.shape[0])
+    if n_gradients != n_samples:
+        raise ValueError(f"gradients length {n_gradients} != x rows {n_samples}")
+    if n_hessians != n_samples:
+        raise ValueError(f"hessians length {n_hessians} != x rows {n_samples}")
     if len(feature_names) != n_features:
         raise ValueError(f"feature_names length {len(feature_names)} != x cols {n_features}")
 
@@ -132,7 +135,7 @@ def _get_sample_indices(
     n_samples: int,
     subsample: float,
     rng: RandomStateProtocol,
-) -> tuple[int, ...]:
+) -> NDArray[np.int64]:
     """Get sample indices for tree building.
 
     Args:
@@ -141,19 +144,21 @@ def _get_sample_indices(
         rng: Random state.
 
     Returns:
-        Tuple of sample indices.
+        Numpy array of sample indices.
     """
     if subsample < 1.0:
         n_subsample = max(1, int(n_samples * subsample))
-        return rng.choice(n_samples, size=n_subsample, replace=False)
-    return tuple(range(n_samples))
+        choice_result = rng.choice(n_samples, size=n_subsample, replace=False)
+        indices: NDArray[np.int64] = np.asarray(choice_result, dtype=np.int64)
+        return indices
+    return np.arange(n_samples, dtype=np.int64)
 
 
 def _build_tree_with_histograms(
-    x: FloatMatrix,
-    gradients: FloatArray,
-    hessians: FloatArray,
-    sample_indices: tuple[int, ...],
+    x: NDArray[np.float64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_indices: NDArray[np.int64],
     config: GradientBoostingConfig,
     feature_names: tuple[str, ...],
     n_features: int,
@@ -189,9 +194,9 @@ def _build_tree_with_histograms(
     node_children: dict[int, tuple[int | None, int | None]] = {}
 
     # Stack entries: (sample_indices, depth, parent_id, is_left_child, precomputed_histograms)
-    # precomputed_histograms is a dict mapping feature_idx -> Histogram, or None if not available
+    # precomputed_histograms is a dict mapping feature_idx -> HistogramBuffer, or None
     stack: list[
-        tuple[tuple[int, ...], int, int | None, bool | None, dict[int, Histogram] | None]
+        tuple[NDArray[np.int64], int, int | None, bool | None, dict[int, HistogramBuffer] | None]
     ] = [(sample_indices, 0, None, None, None)]
 
     while stack:
@@ -204,7 +209,8 @@ def _build_tree_with_histograms(
         reg_alpha = config["reg_alpha"]
         reg_lambda = config["reg_lambda"]
 
-        if _should_be_leaf(depth, len(current_indices), config):
+        n_samples_current = current_indices.shape[0]
+        if _should_be_leaf(depth, n_samples_current, config):
             nodes.append(
                 _create_leaf_node(
                     node_id, current_indices, gradients, hessians, reg_alpha, reg_lambda
@@ -235,7 +241,10 @@ def _build_tree_with_histograms(
             n_leaves += 1
             continue
 
-        # Create internal node
+        # Create internal node - compute leaf value from gradients/hessians at current indices
+        grads_node: NDArray[np.float64] = gradients[current_indices]
+        hess_node: NDArray[np.float64] = hessians[current_indices]
+        node_value = _compute_leaf_value(grads_node, hess_node, reg_alpha, reg_lambda)
         nodes.append(
             TreeNode(
                 node_id=node_id,
@@ -244,13 +253,8 @@ def _build_tree_with_histograms(
                 feature_name=feature_names[best_split["feature_index"]],
                 threshold=best_split["threshold"],
                 nan_direction=best_split["nan_direction"],
-                value=_compute_leaf_value(
-                    tuple(gradients[i] for i in current_indices),
-                    tuple(hessians[i] for i in current_indices),
-                    reg_alpha,
-                    reg_lambda,
-                ),
-                n_samples=len(current_indices),
+                value=node_value,
+                n_samples=n_samples_current,
                 left_child=None,
                 right_child=None,
             )
@@ -277,13 +281,13 @@ def _build_tree_with_histograms(
 
 
 def _compute_child_histograms(
-    left_indices: tuple[int, ...],
-    right_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    left_indices: NDArray[np.int64],
+    right_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     feature_bins: FeatureBins,
-    parent_histograms: dict[int, Histogram],
-) -> tuple[dict[int, Histogram], dict[int, Histogram]]:
+    parent_histograms: dict[int, HistogramBuffer],
+) -> tuple[dict[int, HistogramBuffer], dict[int, HistogramBuffer]]:
     """Compute histograms for both children using sibling subtraction.
 
     Builds histogram for smaller child and derives larger child via subtraction.
@@ -300,22 +304,26 @@ def _compute_child_histograms(
     Returns:
         Tuple of (left_histograms, right_histograms).
     """
-    left_histograms: dict[int, Histogram] = {}
-    right_histograms: dict[int, Histogram] = {}
+    left_histograms: dict[int, HistogramBuffer] = {}
+    right_histograms: dict[int, HistogramBuffer] = {}
 
     # Determine which child is smaller
-    left_is_smaller = len(left_indices) <= len(right_indices)
-    smaller_indices = left_indices if left_is_smaller else right_indices
+    n_left: int = int(left_indices.shape[0])
+    n_right: int = int(right_indices.shape[0])
+    left_is_smaller: bool = n_left <= n_right
+    smaller_indices: NDArray[np.int64] = left_indices if left_is_smaller else right_indices
 
     for feat_idx, parent_hist in parent_histograms.items():
-        n_bins = len(parent_hist.gradient_sums)
+        n_bins = parent_hist.n_bins
 
         # Build histogram for smaller child
+        # sample_bins is now 2D: (n_samples, n_features), access column for this feature
+        feat_bins: NDArray[np.int64] = feature_bins.sample_bins[:, feat_idx]
         smaller_hist = build_histogram(
             smaller_indices,
             gradients,
             hessians,
-            feature_bins.sample_bins[feat_idx],
+            feat_bins,
             n_bins,
         )
 
@@ -430,12 +438,12 @@ def _compute_max_depth(nodes: list[TreeNode]) -> int:
     return depth_of(0, 0)
 
 
-def _predict_single(tree: DecisionTree, x_single: FloatArray) -> float:
+def _predict_single(tree: DecisionTree, x_single: NDArray[np.float64]) -> float:
     """Get prediction for a single sample.
 
     Args:
         tree: Trained decision tree.
-        x_single: Single sample feature vector.
+        x_single: Single sample feature vector (1D array).
 
     Returns:
         Prediction value.
@@ -454,7 +462,7 @@ def _predict_single(tree: DecisionTree, x_single: FloatArray) -> float:
         if feature_idx is None or threshold is None:
             return node["value"]
 
-        feature_value = x_single[feature_idx]
+        feature_value: float = x_single.item(feature_idx)
 
         # Handle NaN values using stored nan_direction
         if math.isnan(feature_value):
@@ -473,8 +481,8 @@ def _predict_single(tree: DecisionTree, x_single: FloatArray) -> float:
 
 def predict_tree(
     tree: DecisionTree,
-    x: FloatMatrix,
-) -> FloatArray:
+    x: NDArray[np.float64],
+) -> NDArray[np.float64]:
     """Get predictions from tree for all samples.
 
     Args:
@@ -482,14 +490,19 @@ def predict_tree(
         x: Feature matrix (n_samples, n_features).
 
     Returns:
-        Prediction for each sample.
+        Prediction array for each sample.
     """
-    return tuple(_predict_single(tree, sample) for sample in x)
+    n_samples: int = int(x.shape[0])
+    predictions: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
+    for i in range(n_samples):
+        x_row: NDArray[np.float64] = x[i, :]
+        predictions[i] = _predict_single(tree, x_row)
+    return predictions
 
 
 def explain_tree_prediction(
     tree: DecisionTree,
-    x_single: FloatArray,
+    x_single: NDArray[np.float64],
     tree_index: int = 0,
 ) -> TreePredictionExplanation:
     """Explain prediction for a single sample.
@@ -531,7 +544,7 @@ def explain_tree_prediction(
                 n_samples_in_leaf=node["n_samples"],
             )
 
-        feature_value = x_single[feature_idx]
+        feature_value: float = x_single.item(feature_idx)
 
         # Handle NaN values using stored nan_direction
         if math.isnan(feature_value):

@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from operator import itemgetter
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm.losses import sigmoid
 from cleargbm.tree import explain_tree_prediction
 from cleargbm.types import (
     DecisionTree,
     FeatureContribution,
-    FloatArray,
     GradientBoostingModel,
     PredictionExplanation,
     Rule,
@@ -23,7 +25,7 @@ from cleargbm.types import (
 
 def explain_prediction(
     model: GradientBoostingModel,
-    x_single: FloatArray,
+    x_single: NDArray[np.float64],
 ) -> PredictionExplanation:
     """Generate full explanation for a single prediction.
 

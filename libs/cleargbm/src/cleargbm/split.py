@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from operator import itemgetter
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm.types import (
-    FloatArray,
-    FloatMatrix,
     GradientBoostingConfig,
     SplitCandidate,
     TreeNode,
@@ -17,8 +18,8 @@ from cleargbm.types import (
 
 
 def _compute_leaf_value(
-    gradients: FloatArray,
-    hessians: FloatArray,
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     reg_alpha: float = 0.0,
     reg_lambda: float = 0.0,
 ) -> float:
@@ -42,16 +43,17 @@ def _compute_leaf_value(
         ValueError: If gradients and hessians have different lengths.
         ValueError: If inputs are empty.
     """
-    if len(gradients) != len(hessians):
+    n_grads: int = int(gradients.shape[0])
+    n_hess: int = int(hessians.shape[0])
+    if n_grads != n_hess:
         raise ValueError(
-            f"gradients and hessians must have same length, "
-            f"got {len(gradients)} and {len(hessians)}"
+            f"gradients and hessians must have same length, got {n_grads} and {n_hess}"
         )
-    if len(gradients) == 0:
+    if n_grads == 0:
         raise ValueError("Cannot compute leaf value from empty arrays")
 
-    g_sum = sum(gradients)
-    h_sum = sum(hessians)
+    g_sum: float = float(np.sum(gradients))
+    h_sum: float = float(np.sum(hessians))
 
     # L2 regularization: add lambda to hessian sum
     h_reg = h_sum + reg_lambda
@@ -150,8 +152,8 @@ def _check_monotonicity(
 
 def _find_split_for_feature(
     sorted_pairs: list[tuple[float, int]],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     g_total: float,
     h_total: float,
     min_samples_leaf: int,
@@ -185,11 +187,11 @@ def _find_split_for_feature(
 
     for split_pos in range(min_samples_leaf, n_samples - min_samples_leaf + 1):
         _, sample_idx = sorted_pairs[split_pos - 1]
-        g_left += gradients[sample_idx]
-        h_left += hessians[sample_idx]
+        g_left += gradients.item(sample_idx)
+        h_left += hessians.item(sample_idx)
 
-        g_right = g_total - g_left
-        h_right = h_total - h_left
+        g_right: float = g_total - g_left
+        h_right: float = h_total - h_left
 
         # Skip if same feature value as next sample
         # Note: split_pos is always < n_samples due to loop bounds
@@ -209,12 +211,14 @@ def _find_split_for_feature(
             best_split_pos = split_pos
             # Compute threshold only when we find a better split
             best_threshold = _compute_threshold(sorted_pairs, split_pos, n_samples)
-    # Only create tuples once for the best split found
+    # Only create arrays once for the best split found
     if best_split_pos < 0:
         return None
 
-    left_indices = tuple(idx for _, idx in sorted_pairs[:best_split_pos])
-    right_indices = tuple(idx for _, idx in sorted_pairs[best_split_pos:])
+    left_idx_tuple: tuple[int, ...] = tuple(idx for _, idx in sorted_pairs[:best_split_pos])
+    right_idx_tuple: tuple[int, ...] = tuple(idx for _, idx in sorted_pairs[best_split_pos:])
+    left_indices: NDArray[np.int64] = np.array(left_idx_tuple, dtype=np.int64)
+    right_indices: NDArray[np.int64] = np.array(right_idx_tuple, dtype=np.int64)
     # Exact split finding defaults NaN to left (histogram path learns optimal direction)
     return SplitCandidate(
         feature_index=feature_idx,
@@ -247,10 +251,10 @@ def _compute_threshold(
 
 
 def find_best_split(
-    x: FloatMatrix,
-    gradients: FloatArray,
-    hessians: FloatArray,
-    sample_indices: tuple[int, ...],
+    x: NDArray[np.float64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_indices: NDArray[np.int64],
     feature_indices: tuple[int, ...],
     min_samples_leaf: int,
     monotonic_constraint: int,
@@ -271,17 +275,25 @@ def find_best_split(
     Returns:
         Best split candidate, or None if no valid split exists.
     """
-    n_samples = len(sample_indices)
+    n_samples: int = int(sample_indices.shape[0])
     if n_samples < 2 * min_samples_leaf:
         return None
 
-    g_total = sum(gradients[i] for i in sample_indices)
-    h_total = sum(hessians[i] for i in sample_indices)
+    g_total: float = float(np.sum(gradients[sample_indices]))
+    h_total: float = float(np.sum(hessians[sample_indices]))
 
     best_split: SplitCandidate | None = None
 
     for feature_idx in feature_indices:
-        feature_values: list[tuple[float, int]] = [(x[i][feature_idx], i) for i in sample_indices]
+        # Build list of (feature_value, sample_idx) for sorting
+        # Extract feature column and index into it using sample_indices
+        feat_col: NDArray[np.float64] = x[:, feature_idx]
+        # Use .item(idx) on array for proper typing (avoids Any from numpy indexing)
+        feature_values: list[tuple[float, int]] = []
+        for i in range(n_samples):
+            idx_int: int = sample_indices.item(i)
+            val: float = feat_col.item(idx_int)
+            feature_values.append((val, idx_int))
         sorted_pairs: list[tuple[float, int]] = sorted(feature_values, key=itemgetter(0))
 
         split = _find_split_for_feature(
@@ -303,9 +315,9 @@ def find_best_split(
 
 def _create_leaf_node(
     node_id: int,
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     reg_alpha: float = 0.0,
     reg_lambda: float = 0.0,
 ) -> TreeNode:
@@ -322,9 +334,9 @@ def _create_leaf_node(
     Returns:
         Leaf TreeNode.
     """
-    # Use map + __getitem__ for faster tuple creation
-    node_gradients = tuple(gradients[i] for i in sample_indices)
-    node_hessians = tuple(hessians[i] for i in sample_indices)
+    # Extract gradients/hessians for this node's samples
+    node_gradients: NDArray[np.float64] = gradients[sample_indices]
+    node_hessians: NDArray[np.float64] = hessians[sample_indices]
     leaf_value = _compute_leaf_value(node_gradients, node_hessians, reg_alpha, reg_lambda)
 
     return TreeNode(
@@ -335,7 +347,7 @@ def _create_leaf_node(
         threshold=None,
         nan_direction=None,
         value=leaf_value,
-        n_samples=len(sample_indices),
+        n_samples=sample_indices.shape[0],
         left_child=None,
         right_child=None,
     )
@@ -343,9 +355,9 @@ def _create_leaf_node(
 
 def _create_internal_node(
     node_id: int,
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     split: SplitCandidate,
     feature_names: tuple[str, ...],
     reg_alpha: float = 0.0,
@@ -366,9 +378,9 @@ def _create_internal_node(
     Returns:
         Internal TreeNode.
     """
-    # Use map + __getitem__ for faster tuple creation
-    node_gradients = tuple(gradients[i] for i in sample_indices)
-    node_hessians = tuple(hessians[i] for i in sample_indices)
+    # Extract gradients/hessians for this node's samples
+    node_gradients: NDArray[np.float64] = gradients[sample_indices]
+    node_hessians: NDArray[np.float64] = hessians[sample_indices]
     leaf_value = _compute_leaf_value(node_gradients, node_hessians, reg_alpha, reg_lambda)
 
     return TreeNode(
@@ -379,17 +391,17 @@ def _create_internal_node(
         threshold=split["threshold"],
         nan_direction=split["nan_direction"],
         value=leaf_value,
-        n_samples=len(sample_indices),
+        n_samples=sample_indices.shape[0],
         left_child=None,
         right_child=None,
     )
 
 
 def _find_best_split_with_constraints(
-    x: FloatMatrix,
-    gradients: FloatArray,
-    hessians: FloatArray,
-    sample_indices: tuple[int, ...],
+    x: NDArray[np.float64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_indices: NDArray[np.int64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
 ) -> SplitCandidate | None:

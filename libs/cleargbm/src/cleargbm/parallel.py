@@ -12,19 +12,21 @@ Architecture:
 from __future__ import annotations
 
 import os
-import struct
 from multiprocessing import shared_memory
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm._test_hooks import WorkerPoolProtocol
+from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
     NAN_BIN_OFFSET,
     FeatureBins,
-    Histogram,
     build_histogram,
     find_best_split_from_histogram,
     partition_by_bin,
 )
-from cleargbm.types import FloatArray, GradientBoostingConfig, SplitCandidate
+from cleargbm.types import GradientBoostingConfig, SplitCandidate
 
 # =============================================================================
 # Worker Global State (set via pool initializer)
@@ -38,7 +40,9 @@ _WORKER_FEATURE_BINS: FeatureBins | None = None
 
 def _worker_initializer(
     bin_edges: tuple[tuple[float, ...], ...],
-    sample_bins: tuple[tuple[int, ...], ...],
+    sample_bins_flat: bytes,
+    n_samples: int,
+    n_features: int,
 ) -> None:
     """Initialize worker process with feature bins.
 
@@ -47,15 +51,22 @@ def _worker_initializer(
 
     Args:
         bin_edges: Bin edges for each feature (as raw tuples for pickling).
-        sample_bins: Per-sample bin assignments for each feature.
+        sample_bins_flat: Flattened sample bins as bytes (for efficient IPC).
+        n_samples: Number of samples.
+        n_features: Number of features.
     """
     global _WORKER_FEATURE_BINS
     from cleargbm.histogram import BinEdges, FeatureBins
 
+    # Reconstruct sample_bins as 2D numpy array from bytes
+    sample_bins_arr: NDArray[np.int64] = np.frombuffer(sample_bins_flat, dtype=np.int64).reshape(
+        (n_samples, n_features)
+    )
+
     # Reconstruct FeatureBins from raw tuples
     _WORKER_FEATURE_BINS = FeatureBins(
         bin_edges=tuple(BinEdges(edges=edges) for edges in bin_edges),
-        sample_bins=sample_bins,
+        sample_bins=sample_bins_arr.copy(),  # Make a copy to own the data
     )
 
 
@@ -73,26 +84,7 @@ def _resolve_n_jobs(n_jobs: int) -> int:
     return n_jobs
 
 
-def _unpack_double(buf: memoryview, offset: int) -> float:
-    """Unpack a double from buffer at offset.
-
-    Uses bytes slicing and struct.unpack to avoid mypy issues with
-    struct.unpack_from returning tuple[Any, ...].
-
-    Args:
-        buf: Buffer to read from.
-        offset: Byte offset.
-
-    Returns:
-        The unpacked float value.
-    """
-    # Extract 8 bytes and unpack as double
-    data = bytes(buf[offset : offset + 8])
-    unpacked: tuple[float] = struct.unpack("d", data)
-    return unpacked[0]
-
-
-def _read_floats_from_shm(shm_name: str, n: int) -> FloatArray:
+def _read_floats_from_shm(shm_name: str, n: int) -> NDArray[np.float64]:
     """Read n floats from shared memory by name.
 
     Args:
@@ -100,7 +92,7 @@ def _read_floats_from_shm(shm_name: str, n: int) -> FloatArray:
         n: Number of floats to read.
 
     Returns:
-        Tuple of floats.
+        Numpy array of floats.
 
     Raises:
         RuntimeError: If shared memory buffer is not available.
@@ -110,11 +102,11 @@ def _read_floats_from_shm(shm_name: str, n: int) -> FloatArray:
         buf = shm.buf
         # buf is always valid after successful SharedMemory creation
         assert buf is not None, "Shared memory buffer is not available"
-        result: list[float] = []
-        for i in range(n):
-            value = _unpack_double(buf, i * 8)
-            result.append(value)
-        return tuple(result)
+        # Read directly into numpy array using frombuffer
+        arr: NDArray[np.float64] = np.frombuffer(
+            bytes(buf[: n * 8]), dtype=np.float64
+        ).copy()  # Copy to own the data
+        return arr
     finally:
         shm.close()
 
@@ -122,44 +114,58 @@ def _read_floats_from_shm(shm_name: str, n: int) -> FloatArray:
 def _build_histogram_worker_batched(
     args: tuple[
         tuple[int, ...],
-        tuple[int, ...],
+        bytes,  # sample_indices as bytes (int64)
+        int,  # n_indices
         str,
         str,
         int,
         tuple[int, ...],
     ],
-) -> list[tuple[int, Histogram]]:
+) -> list[tuple[int, HistogramBuffer]]:
     """Build histograms for a batch of features using global feature_bins.
 
     Accesses _WORKER_FEATURE_BINS from pool initializer. Reads gradients
     and hessians from shared memory by name.
 
     Args:
-        args: Tuple of (feature_indices, sample_indices, grad_shm_name,
-              hess_shm_name, n_samples, n_bins_per_feature).
+        args: Tuple of (feature_indices, sample_indices_bytes, n_indices,
+              grad_shm_name, hess_shm_name, n_samples, n_bins_per_feature).
 
     Returns:
-        List of (feature_index, histogram) tuples.
+        List of (feature_index, HistogramBuffer) tuples.
 
     Raises:
         RuntimeError: If _WORKER_FEATURE_BINS not initialized.
     """
-    feat_indices, sample_indices, grad_shm_name, hess_shm_name, n_samples, batch_n_bins = args
+    (
+        feat_indices,
+        sample_indices_bytes,
+        _n_indices,
+        grad_shm_name,
+        hess_shm_name,
+        n_samples,
+        batch_n_bins,
+    ) = args
 
     if _WORKER_FEATURE_BINS is None:
         raise RuntimeError("Worker not initialized: _WORKER_FEATURE_BINS is None")
+
+    # Reconstruct sample_indices as numpy array
+    sample_indices: NDArray[np.int64] = np.frombuffer(sample_indices_bytes, dtype=np.int64).copy()
 
     # Read gradients/hessians from shared memory
     gradients = _read_floats_from_shm(grad_shm_name, n_samples)
     hessians = _read_floats_from_shm(hess_shm_name, n_samples)
 
-    results: list[tuple[int, Histogram]] = []
+    results: list[tuple[int, HistogramBuffer]] = []
     for i, feat_idx in enumerate(feat_indices):
+        # Access sample_bins column for this feature
+        feat_bins: NDArray[np.int64] = _WORKER_FEATURE_BINS.sample_bins[:, feat_idx]
         histogram = build_histogram(
             sample_indices,
             gradients,
             hessians,
-            _WORKER_FEATURE_BINS.sample_bins[feat_idx],
+            feat_bins,
             batch_n_bins[i],
         )
         results.append((feat_idx, histogram))
@@ -167,15 +173,15 @@ def _build_histogram_worker_batched(
 
 
 def _find_best_histogram_split_with_cache(
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
     feature_bins: FeatureBins,
-    cached_histograms: dict[int, Histogram] | None,
+    cached_histograms: dict[int, HistogramBuffer] | None,
     pool: WorkerPoolProtocol | None = None,
-) -> tuple[SplitCandidate | None, dict[int, Histogram]]:
+) -> tuple[SplitCandidate | None, dict[int, HistogramBuffer]]:
     """Find best split using histogram-based search with optional cache.
 
     Uses cached histograms from parent's sibling subtraction when available,
@@ -223,14 +229,14 @@ def _find_best_histogram_split_with_cache(
 
 
 def _find_best_histogram_split_sequential(
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
     feature_bins: FeatureBins,
-    cached_histograms: dict[int, Histogram] | None,
-) -> tuple[SplitCandidate | None, dict[int, Histogram]]:
+    cached_histograms: dict[int, HistogramBuffer] | None,
+) -> tuple[SplitCandidate | None, dict[int, HistogramBuffer]]:
     """Sequential histogram split finding (n_jobs=1).
 
     Args:
@@ -247,7 +253,7 @@ def _find_best_histogram_split_sequential(
     """
     constraints = config["monotonic_constraints"]
     best_split: SplitCandidate | None = None
-    histograms: dict[int, Histogram] = {}
+    histograms: dict[int, HistogramBuffer] = {}
 
     for feat_idx in feature_indices:
         # n_bins includes NaN bin: regular bins + 1 for NaN
@@ -256,13 +262,14 @@ def _find_best_histogram_split_sequential(
         n_bins = n_regular_bins + NAN_BIN_OFFSET  # +1 for NaN bin
         nan_bin = n_regular_bins  # NaN bin is at index n_regular_bins
 
+        # Get sample_bins column for this feature
+        feat_bins: NDArray[np.int64] = feature_bins.sample_bins[:, feat_idx]
+
         # Use cached histogram if available, otherwise build from scratch
         if cached_histograms is not None and feat_idx in cached_histograms:
             histogram = cached_histograms[feat_idx]
         else:
-            histogram = build_histogram(
-                sample_indices, gradients, hessians, feature_bins.sample_bins[feat_idx], n_bins
-            )
+            histogram = build_histogram(sample_indices, gradients, hessians, feat_bins, n_bins)
 
         # Store histogram for use in sibling subtraction
         histograms[feat_idx] = histogram
@@ -284,7 +291,7 @@ def _find_best_histogram_split_sequential(
             continue
         left_indices, right_indices = partition_by_bin(
             sample_indices,
-            feature_bins.sample_bins[feat_idx],
+            feat_bins,
             split_result.bin_index,
             nan_bin,
             split_result.nan_direction,
@@ -303,7 +310,7 @@ def _find_best_histogram_split_sequential(
 
 def _build_batched_args(
     uncached_features: list[int],
-    sample_indices: tuple[int, ...],
+    sample_indices: NDArray[np.int64],
     grad_shm_name: str,
     hess_shm_name: str,
     n_samples: int,
@@ -312,7 +319,8 @@ def _build_batched_args(
 ) -> list[
     tuple[
         tuple[int, ...],
-        tuple[int, ...],
+        bytes,  # sample_indices as bytes
+        int,  # n_indices
         str,
         str,
         int,
@@ -336,6 +344,10 @@ def _build_batched_args(
     Returns:
         List of batched argument tuples.
     """
+    # Convert sample_indices to bytes for IPC
+    sample_indices_bytes: bytes = sample_indices.tobytes()
+    n_indices = sample_indices.shape[0]
+
     # Compute n_bins for each uncached feature
     n_bins_list: list[int] = []
     for feat_idx in uncached_features:
@@ -350,7 +362,8 @@ def _build_batched_args(
     batched_args: list[
         tuple[
             tuple[int, ...],
-            tuple[int, ...],
+            bytes,
+            int,
             str,
             str,
             int,
@@ -363,10 +376,11 @@ def _build_batched_args(
         batch_feat_indices = tuple(uncached_features[batch_start:batch_end])
         batch_n_bins = tuple(n_bins_list[batch_start:batch_end])
 
-        # Pass shared memory names instead of arrays
+        # Pass shared memory names and sample indices as bytes
         batch_args = (
             batch_feat_indices,
-            sample_indices,
+            sample_indices_bytes,
+            n_indices,
             grad_shm_name,
             hess_shm_name,
             n_samples,
@@ -378,15 +392,15 @@ def _build_batched_args(
 
 
 def _find_best_histogram_split_parallel(
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
     feature_bins: FeatureBins,
-    cached_histograms: dict[int, Histogram] | None,
+    cached_histograms: dict[int, HistogramBuffer] | None,
     pool: WorkerPoolProtocol,
-) -> tuple[SplitCandidate | None, dict[int, Histogram]]:
+) -> tuple[SplitCandidate | None, dict[int, HistogramBuffer]]:
     """Parallel histogram split finding using batched workers.
 
     Uses batched workers with shared memory: gradients/hessians are written
@@ -406,7 +420,7 @@ def _find_best_histogram_split_parallel(
     Returns:
         Tuple of (best split candidate or None, histograms built for all features).
     """
-    histograms: dict[int, Histogram] = {}
+    histograms: dict[int, HistogramBuffer] = {}
     n_jobs = _resolve_n_jobs(config["n_jobs"])
 
     # Separate features into cached and uncached
@@ -419,19 +433,22 @@ def _find_best_histogram_split_parallel(
 
     # Build histograms for uncached features using batched workers
     if uncached_features:
-        n_samples = len(gradients)
+        n_samples: int = gradients.shape[0]
+        shm_size: int = n_samples * 8
         # Create shared memory for gradients and hessians
-        shm_grad = shared_memory.SharedMemory(create=True, size=n_samples * 8)
-        shm_hess = shared_memory.SharedMemory(create=True, size=n_samples * 8)
+        shm_grad = shared_memory.SharedMemory(create=True, size=shm_size)
+        shm_hess = shared_memory.SharedMemory(create=True, size=shm_size)
         try:
-            # Write floats to shared memory using struct.pack_into
+            # Write numpy arrays to shared memory efficiently
             grad_buf = shm_grad.buf
             hess_buf = shm_hess.buf
             # Buffers are always valid after successful SharedMemory creation
             assert grad_buf is not None and hess_buf is not None
-            for i in range(n_samples):
-                struct.pack_into("d", grad_buf, i * 8, gradients[i])
-                struct.pack_into("d", hess_buf, i * 8, hessians[i])
+            # Copy numpy array bytes directly into shared memory
+            grad_bytes: bytes = gradients.tobytes()
+            hess_bytes: bytes = hessians.tobytes()
+            grad_buf[:shm_size] = grad_bytes
+            hess_buf[:shm_size] = hess_bytes
 
             batched_args = _build_batched_args(
                 uncached_features,
@@ -464,11 +481,11 @@ def _find_best_histogram_split_parallel(
 
 
 def _select_best_split(
-    sample_indices: tuple[int, ...],
+    sample_indices: NDArray[np.int64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
     feature_bins: FeatureBins,
-    histograms: dict[int, Histogram],
+    histograms: dict[int, HistogramBuffer],
 ) -> SplitCandidate | None:
     """Select best split from histograms with deterministic tie-breaking.
 
@@ -490,6 +507,9 @@ def _select_best_split(
         n_edges = len(feature_bins.bin_edges[feat_idx].edges)
         nan_bin = n_edges + 1
 
+        # Get sample_bins column for this feature
+        feat_bins: NDArray[np.int64] = feature_bins.sample_bins[:, feat_idx]
+
         histogram = histograms[feat_idx]
         constraint = 0 if constraints is None else constraints[feat_idx]
         split_result = find_best_split_from_histogram(
@@ -507,7 +527,7 @@ def _select_best_split(
 
         left_indices, right_indices = partition_by_bin(
             sample_indices,
-            feature_bins.sample_bins[feat_idx],
+            feat_bins,
             split_result.bin_index,
             nan_bin,
             split_result.nan_direction,
@@ -525,9 +545,9 @@ def _select_best_split(
 
 
 def _find_best_histogram_split(
-    sample_indices: tuple[int, ...],
-    gradients: FloatArray,
-    hessians: FloatArray,
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
     feature_indices: tuple[int, ...],
     config: GradientBoostingConfig,
     feature_bins: FeatureBins,

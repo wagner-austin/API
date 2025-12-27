@@ -7,11 +7,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import numpy as np
+from numpy.typing import NDArray
+
 import cleargbm.parallel as parallel_module
+from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
     BinEdges,
     FeatureBins,
-    Histogram,
     build_histogram,
     precompute_feature_bins,
 )
@@ -25,9 +28,28 @@ from cleargbm.parallel import (
     _worker_initializer,
 )
 from cleargbm.tree import build_tree
-from cleargbm.types import FloatArray
 
 from .conftest import make_config
+
+
+def _float_matrix(data: list[list[float]]) -> NDArray[np.float64]:
+    """Create a 2D float array from nested list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _float_array(data: list[float]) -> NDArray[np.float64]:
+    """Create a 1D float array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _int_array(data: list[int]) -> NDArray[np.int64]:
+    """Create a 1D int array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.int64)
+
+
+def _int_matrix(data: list[list[int]]) -> NDArray[np.int64]:
+    """Create a 2D int array from nested list (helper for strict typing)."""
+    return np.array(data, dtype=np.int64)
 
 
 class _FakeSequentialPool:
@@ -43,13 +65,13 @@ class _FakeSequentialPool:
     def __init__(
         self,
         bin_edges: tuple[tuple[float, ...], ...],
-        sample_bins: tuple[tuple[int, ...], ...],
+        sample_bins: NDArray[np.int64],
     ) -> None:
         """Initialize with feature bins data.
 
         Args:
             bin_edges: Bin edges for each feature.
-            sample_bins: Per-sample bin assignments for each feature.
+            sample_bins: Per-sample bin assignments (n_samples, n_features).
         """
         self._bin_edges = bin_edges
         self._sample_bins = sample_bins
@@ -60,26 +82,28 @@ class _FakeSequentialPool:
             [
                 tuple[
                     tuple[int, ...],
-                    tuple[int, ...],
+                    bytes,  # sample_indices as bytes
+                    int,  # n_indices
                     str,
                     str,
                     int,
                     tuple[int, ...],
                 ]
             ],
-            list[tuple[int, Histogram]],
+            list[tuple[int, HistogramBuffer]],
         ],
         args_list: list[
             tuple[
                 tuple[int, ...],
-                tuple[int, ...],
+                bytes,  # sample_indices as bytes
+                int,  # n_indices
                 str,
                 str,
                 int,
                 tuple[int, ...],
             ]
         ],
-    ) -> list[list[tuple[int, Histogram]]]:
+    ) -> list[list[tuple[int, HistogramBuffer]]]:
         """Process batched items sequentially.
 
         Sets up the global _WORKER_FEATURE_BINS before calling workers,
@@ -131,15 +155,19 @@ class TestWorkerInitializer:
     """Tests for _worker_initializer."""
 
     def test_sets_global_feature_bins(self) -> None:
-        """Should set _WORKER_FEATURE_BINS global from raw tuples."""
+        """Should set _WORKER_FEATURE_BINS global from bytes."""
         bin_edges = ((0.5, 1.5), (0.25, 0.75))
-        sample_bins = ((0, 1, 2, 0), (0, 1, 0, 1))
+        # Create sample_bins as 2D numpy array (n_samples=4, n_features=2)
+        sample_bins_arr = _int_matrix([[0, 0], [1, 1], [2, 0], [0, 1]])
+        sample_bins_flat = sample_bins_arr.tobytes()
+        n_samples = 4
+        n_features = 2
 
         # Ensure global is None before
         parallel_module._WORKER_FEATURE_BINS = None
 
         try:
-            _worker_initializer(bin_edges, sample_bins)
+            _worker_initializer(bin_edges, sample_bins_flat, n_samples, n_features)
 
             # Verify global was set
             fb = parallel_module._WORKER_FEATURE_BINS
@@ -151,19 +179,25 @@ class TestWorkerInitializer:
             assert fb.bin_edges[0].edges == (0.5, 1.5)
             assert fb.bin_edges[1].edges == (0.25, 0.75)
 
-            # Verify sample_bins were set correctly
-            assert fb.sample_bins == sample_bins
+            # Verify sample_bins were set correctly as 2D numpy array
+            fb_shape = fb.sample_bins.shape
+            assert fb_shape[0] == n_samples
+            assert fb_shape[1] == n_features
         finally:
             parallel_module._WORKER_FEATURE_BINS = None
 
     def test_reconstructs_bin_edges_namedtuple(self) -> None:
         """Should reconstruct BinEdges NamedTuples from raw tuples."""
         bin_edges = ((1.0,),)
-        sample_bins = ((0, 1),)
+        # Create sample_bins as 2D numpy array (n_samples=2, n_features=1)
+        sample_bins_arr = _int_matrix([[0], [1]])
+        sample_bins_flat = sample_bins_arr.tobytes()
+        n_samples = 2
+        n_features = 1
 
         parallel_module._WORKER_FEATURE_BINS = None
         try:
-            _worker_initializer(bin_edges, sample_bins)
+            _worker_initializer(bin_edges, sample_bins_flat, n_samples, n_features)
 
             fb = parallel_module._WORKER_FEATURE_BINS
             if fb is None:
@@ -185,11 +219,13 @@ class TestBuildHistogramWorkerBatched:
         import struct
         from multiprocessing import shared_memory
 
-        gradients: FloatArray = (-1.0, -1.0, 1.0, 1.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
-        sample_bins_f0 = (0, 0, 1, 1)  # 2 bins for feature 0
-        sample_bins_f1 = (0, 1, 0, 1)  # 2 bins for feature 1
+        gradients: tuple[float, ...] = (-1.0, -1.0, 1.0, 1.0)
+        hessians: tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)
+        sample_indices_arr: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
+        sample_indices_bytes: bytes = sample_indices_arr.tobytes()
+        n_indices = 4
+        # 2D sample_bins: (n_samples, n_features)
+        sample_bins: NDArray[np.int64] = np.array(((0, 0), (0, 1), (1, 0), (1, 1)), dtype=np.int64)
         n_bins_f0 = 2
         n_bins_f1 = 2
         n_samples = len(gradients)
@@ -209,12 +245,21 @@ class TestBuildHistogramWorkerBatched:
             # Set up global feature_bins (mimics pool initializer)
             parallel_module._WORKER_FEATURE_BINS = FeatureBins(
                 bin_edges=(BinEdges(edges=(0.5,)), BinEdges(edges=(0.5,))),
-                sample_bins=(sample_bins_f0, sample_bins_f1),
+                sample_bins=sample_bins,
             )
             try:
-                args = (
+                args: tuple[
+                    tuple[int, ...],
+                    bytes,
+                    int,
+                    str,
+                    str,
+                    int,
+                    tuple[int, ...],
+                ] = (
                     (0, 1),  # feature indices
-                    sample_indices,
+                    sample_indices_bytes,
+                    n_indices,
                     shm_grad.name,
                     shm_hess.name,
                     n_samples,
@@ -228,8 +273,8 @@ class TestBuildHistogramWorkerBatched:
 
                 assert feat_idx_0 == 0
                 assert feat_idx_1 == 1
-                assert len(histogram_0.gradient_sums) == 2
-                assert len(histogram_1.gradient_sums) == 2
+                assert histogram_0.n_bins == 2
+                assert histogram_1.n_bins == 2
             finally:
                 parallel_module._WORKER_FEATURE_BINS = None
         finally:
@@ -243,12 +288,14 @@ class TestBuildHistogramWorkerBatched:
         import struct
         from multiprocessing import shared_memory
 
-        gradients: FloatArray = (-1.0, 1.0)
-        hessians: FloatArray = (0.5, 0.5)
-        sample_indices = (0, 1)
-        sample_bins = (0, 1)
+        gradients = _float_array([-1.0, 1.0])
+        hessians = _float_array([0.5, 0.5])
+        sample_indices = _int_array([0, 1])
+        sample_indices_bytes = sample_indices.tobytes()
+        n_indices = 2
+        sample_bins_2d = _int_matrix([[0], [1]])
         n_bins = 2
-        n_samples = len(gradients)
+        n_samples: int = gradients.shape[0]
 
         # Create shared memory for gradients/hessians
         shm_grad = shared_memory.SharedMemory(create=True, size=n_samples * 8)
@@ -259,18 +306,21 @@ class TestBuildHistogramWorkerBatched:
             if grad_buf is None or hess_buf is None:
                 raise RuntimeError("Buffer not available")
             for i in range(n_samples):
-                struct.pack_into("d", grad_buf, i * 8, gradients[i])
-                struct.pack_into("d", hess_buf, i * 8, hessians[i])
+                grad_val: float = gradients.item(i)
+                hess_val: float = hessians.item(i)
+                struct.pack_into("d", grad_buf, i * 8, grad_val)
+                struct.pack_into("d", hess_buf, i * 8, hess_val)
 
             # Set up global feature_bins (mimics pool initializer)
             parallel_module._WORKER_FEATURE_BINS = FeatureBins(
                 bin_edges=(BinEdges(edges=(0.5,)),),
-                sample_bins=(sample_bins,),
+                sample_bins=sample_bins_2d,
             )
             try:
                 args = (
                     (0,),  # single feature
-                    sample_indices,
+                    sample_indices_bytes,
+                    n_indices,
                     shm_grad.name,
                     shm_hess.name,
                     n_samples,
@@ -281,7 +331,7 @@ class TestBuildHistogramWorkerBatched:
                 assert len(results) == 1
                 feat_idx, histogram = results[0]
                 assert feat_idx == 0
-                assert len(histogram.gradient_sums) == 2
+                assert histogram.n_bins == 2
             finally:
                 parallel_module._WORKER_FEATURE_BINS = None
         finally:
@@ -298,9 +348,9 @@ class TestBuildHistogramWorkerBatched:
         # Ensure global is None
         parallel_module._WORKER_FEATURE_BINS = None
 
-        gradients: FloatArray = (0.0, 0.0)
-        hessians: FloatArray = (0.5, 0.5)
-        n_samples = len(gradients)
+        gradients = _float_array([0.0, 0.0])
+        hessians = _float_array([0.5, 0.5])
+        n_samples: int = gradients.shape[0]
 
         shm_grad = shared_memory.SharedMemory(create=True, size=n_samples * 8)
         shm_hess = shared_memory.SharedMemory(create=True, size=n_samples * 8)
@@ -310,12 +360,17 @@ class TestBuildHistogramWorkerBatched:
             if grad_buf is None or hess_buf is None:
                 raise RuntimeError("Buffer not available")
             for i in range(n_samples):
-                struct.pack_into("d", grad_buf, i * 8, gradients[i])
-                struct.pack_into("d", hess_buf, i * 8, hessians[i])
+                grad_val: float = gradients.item(i)
+                hess_val: float = hessians.item(i)
+                struct.pack_into("d", grad_buf, i * 8, grad_val)
+                struct.pack_into("d", hess_buf, i * 8, hess_val)
 
+            sample_indices = _int_array([0, 1])
+            sample_indices_bytes = sample_indices.tobytes()
             args = (
                 (0,),
-                (0, 1),
+                sample_indices_bytes,
+                2,  # n_indices
                 shm_grad.name,
                 shm_hess.name,
                 n_samples,
@@ -342,18 +397,13 @@ class TestFindBestHistogramSplit:
 
     def test_finds_best_split(self) -> None:
         """Should find best split using histogram approach."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (0.0,),
-            (1.0,),
-            (1.0,),
-        )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        x: NDArray[np.float64] = np.array(((0.0,), (0.0,), (1.0,), (1.0,)), dtype=np.float64)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
-        sample_indices = (0, 1, 2, 3)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         split = _find_best_histogram_split(
             sample_indices=sample_indices,
@@ -373,16 +423,13 @@ class TestFindBestHistogramSplit:
 
     def test_returns_none_when_no_valid_split(self) -> None:
         """Should return None when no valid split exists."""
-        x: tuple[tuple[float, ...], ...] = (
-            (1.0,),
-            (1.0,),
-        )
-        gradients = (-1.0, 1.0)
-        hessians = (0.25, 0.25)
+        x: NDArray[np.float64] = np.array(((1.0,), (1.0,)), dtype=np.float64)
+        gradients: NDArray[np.float64] = np.array((-1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25), dtype=np.float64)
         config = make_config(min_samples_leaf=2)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
-        sample_indices = (0, 1)
+        sample_indices: NDArray[np.int64] = np.array((0, 1), dtype=np.int64)
 
         split = _find_best_histogram_split(
             sample_indices=sample_indices,
@@ -403,18 +450,13 @@ class TestFindBestHistogramSplitWithCache:
 
     def test_uses_cached_histogram(self) -> None:
         """Should use cached histogram when available."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (0.0,),
-            (1.0,),
-            (1.0,),
-        )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        x: NDArray[np.float64] = np.array(((0.0,), (0.0,), (1.0,), (1.0,)), dtype=np.float64)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
-        sample_indices = (0, 1, 2, 3)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         # First call to get histograms
         _, histograms = _find_best_histogram_split_with_cache(
@@ -430,7 +472,7 @@ class TestFindBestHistogramSplitWithCache:
         # Histograms should be populated - verify by accessing specific fields
         assert 0 in histograms
         # Verify histogram has bins (number depends on unique quantiles in data)
-        n_bins = len(histograms[0].gradient_sums)
+        n_bins = histograms[0].n_bins
         assert n_bins >= 2  # At least 2 bins for this data
 
         # Second call with cached histograms should still work
@@ -450,22 +492,19 @@ class TestFindBestHistogramSplitWithCache:
 
     def test_builds_histogram_for_uncached_feature(self) -> None:
         """Should build histogram for features not in cache."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x: NDArray[np.float64] = np.array(
+            ((0.0, 0.5), (0.0, 0.5), (1.0, 0.5), (1.0, 0.5)), dtype=np.float64
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -1.0, 1.0, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
-        sample_indices = (0, 1, 2, 3)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         # Create cache with only feature 0
-        cached = {
-            0: Histogram(
+        cached: dict[int, HistogramBuffer] = {
+            0: HistogramBuffer.from_tuples(
                 gradient_sums=(0.0,) * 64,
                 hessian_sums=(0.0,) * 64,
                 counts=(0,) * 64,
@@ -493,15 +532,12 @@ class TestParallelHistogramSplit:
 
     def test_parallel_matches_sequential(self) -> None:
         """Parallel and sequential should give identical results."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x: NDArray[np.float64] = np.array(
+            ((0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)), dtype=np.float64
         )
-        gradients: FloatArray = (-1.0, -0.5, 0.5, 1.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
+        gradients: NDArray[np.float64] = np.array((-1.0, -0.5, 0.5, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config_seq = make_config(min_samples_leaf=1, n_jobs=1)
         config_par = make_config(min_samples_leaf=1, n_jobs=2)
@@ -547,25 +583,23 @@ class TestParallelHistogramSplit:
 
     def test_parallel_uses_cached_histograms(self) -> None:
         """Parallel should use cached histograms from sibling subtraction."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x: NDArray[np.float64] = np.array(
+            ((0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0)), dtype=np.float64
         )
-        gradients: FloatArray = (-1.0, -0.5, 0.5, 1.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
+        gradients: NDArray[np.float64] = np.array((-1.0, -0.5, 0.5, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config = make_config(min_samples_leaf=1, n_jobs=2)
         feature_bins = precompute_feature_bins(x, config["max_bins"])
 
         # Pre-build cached histograms
+        feat_bins_0: NDArray[np.int64] = feature_bins.sample_bins[:, 0]
         cached_hist_0 = build_histogram(
             sample_indices,
             gradients,
             hessians,
-            feature_bins.sample_bins[0],
+            feat_bins_0,
             len(feature_bins.bin_edges[0].edges) + 1,
         )
         cached_histograms = {0: cached_hist_0}
@@ -595,15 +629,18 @@ class TestParallelHistogramSplit:
     def test_parallel_with_no_valid_splits(self) -> None:
         """Parallel should return None when no valid splits exist."""
         # All same values - no valid splits
-        x: tuple[tuple[float, ...], ...] = (
-            (0.5, 0.5),
-            (0.5, 0.5),
-            (0.5, 0.5),
-            (0.5, 0.5),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.5, 0.5),
+                (0.5, 0.5),
+                (0.5, 0.5),
+                (0.5, 0.5),
+            ),
+            dtype=np.float64,
         )
-        gradients: FloatArray = (0.0, 0.0, 0.0, 0.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
+        gradients: NDArray[np.float64] = np.array((0.0, 0.0, 0.0, 0.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config = make_config(min_samples_leaf=1, n_jobs=2)
         feature_bins = precompute_feature_bins(x, config["max_bins"])
@@ -627,15 +664,18 @@ class TestParallelHistogramSplit:
 
     def test_dispatch_uses_parallel_when_pool_provided(self) -> None:
         """_find_best_histogram_split_with_cache should use parallel when pool provided."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.0),
+                (0.0, 1.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+            ),
+            dtype=np.float64,
         )
-        gradients: FloatArray = (-1.0, -0.5, 0.5, 1.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
+        gradients: NDArray[np.float64] = np.array((-1.0, -0.5, 0.5, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config = make_config(min_samples_leaf=1, n_jobs=2)
         feature_bins = precompute_feature_bins(x, config["max_bins"])
@@ -665,15 +705,18 @@ class TestParallelHistogramSplit:
 
     def test_dispatch_uses_sequential_when_no_pool(self) -> None:
         """_find_best_histogram_split_with_cache uses sequential when no pool provided."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.0),
+                (0.0, 1.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+            ),
+            dtype=np.float64,
         )
-        gradients: FloatArray = (-1.0, -0.5, 0.5, 1.0)
-        hessians: FloatArray = (0.25, 0.25, 0.25, 0.25)
-        sample_indices = (0, 1, 2, 3)
+        gradients: NDArray[np.float64] = np.array((-1.0, -0.5, 0.5, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
+        sample_indices: NDArray[np.int64] = np.array((0, 1, 2, 3), dtype=np.int64)
 
         config = make_config(min_samples_leaf=1, n_jobs=2)
         feature_bins = precompute_feature_bins(x, config["max_bins"])
@@ -703,16 +746,21 @@ class TestBuildTreeWithNJobs:
 
     def test_build_tree_with_parallel(self) -> None:
         """Should build tree with parallel histogram computation."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (0.0, 2.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (1.0, 2.0),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.0),
+                (0.0, 1.0),
+                (0.0, 2.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+                (1.0, 2.0),
+            ),
+            dtype=np.float64,
         )
-        gradients = (-1.0, -0.5, -0.3, 0.3, 0.5, 1.0)
-        hessians = (0.2, 0.2, 0.2, 0.2, 0.2, 0.2)
+        gradients: NDArray[np.float64] = np.array(
+            (-1.0, -0.5, -0.3, 0.3, 0.5, 1.0), dtype=np.float64
+        )
+        hessians: NDArray[np.float64] = np.array((0.2, 0.2, 0.2, 0.2, 0.2, 0.2), dtype=np.float64)
         config = make_config(max_depth=2, min_samples_leaf=1, n_jobs=2)
 
         tree = build_tree(
@@ -728,14 +776,17 @@ class TestBuildTreeWithNJobs:
 
     def test_build_tree_deterministic_with_parallel(self) -> None:
         """Should produce same tree with n_jobs=1 and n_jobs=2."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.0),
-            (0.0, 1.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
+        x: NDArray[np.float64] = np.array(
+            (
+                (0.0, 0.0),
+                (0.0, 1.0),
+                (1.0, 0.0),
+                (1.0, 1.0),
+            ),
+            dtype=np.float64,
         )
-        gradients = (-1.0, -0.5, 0.5, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients: NDArray[np.float64] = np.array((-1.0, -0.5, 0.5, 1.0), dtype=np.float64)
+        hessians: NDArray[np.float64] = np.array((0.25, 0.25, 0.25, 0.25), dtype=np.float64)
 
         config_seq = make_config(max_depth=2, min_samples_leaf=1, n_jobs=1, random_state=42)
         config_par = make_config(max_depth=2, min_samples_leaf=1, n_jobs=2, random_state=42)

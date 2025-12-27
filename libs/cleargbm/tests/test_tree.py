@@ -1,13 +1,17 @@
 """Tests for cleargbm.tree module.
 
 Core tree building, prediction, and explanation functions.
+Uses numpy arrays for all array operations.
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
-from cleargbm.histogram import Histogram, precompute_feature_bins
+from cleargbm.buffers import HistogramBuffer
+from cleargbm.histogram import precompute_feature_bins
 from cleargbm.tree import (
     _compute_child_histograms,
     _compute_max_depth,
@@ -24,6 +28,21 @@ from cleargbm.tree import (
 from cleargbm.types import DecisionTree, TreeNode
 
 from .conftest import make_config
+
+
+def _float_matrix(data: list[list[float]]) -> NDArray[np.float64]:
+    """Create a 2D float array from nested list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _float_array(data: list[float]) -> NDArray[np.float64]:
+    """Create a 1D float array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.float64)
+
+
+def _int_array(data: list[int]) -> NDArray[np.int64]:
+    """Create a 1D int array from list (helper for strict typing)."""
+    return np.array(data, dtype=np.int64)
 
 
 class TestShouldBeLeaf:
@@ -56,15 +75,16 @@ class TestBuildTree:
 
     def test_builds_tree_for_simple_data(self) -> None:
         """Should build a tree for simple separable data."""
-        # Feature 0 perfectly separates the data
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x = _float_matrix(
+            [
+                [0.0, 0.5],
+                [0.0, 0.5],
+                [1.0, 0.5],
+                [1.0, 0.5],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         tree = build_tree(
@@ -82,56 +102,57 @@ class TestBuildTree:
 
     def test_empty_x_raises(self) -> None:
         """Should raise ValueError for empty input."""
+        x_empty: NDArray[np.float64] = np.zeros((0, 1), dtype=np.float64)
         with pytest.raises(ValueError, match="not be empty"):
             build_tree(
-                x=(),
-                gradients=(),
-                hessians=(),
+                x=x_empty,
+                gradients=_float_array([]),
+                hessians=_float_array([]),
                 config=make_config(),
                 feature_names=(),
             )
 
     def test_mismatched_gradients_raises(self) -> None:
         """Should raise ValueError for mismatched gradient length."""
-        x: tuple[tuple[float, ...], ...] = ((0.0,), (1.0,))
+        x = _float_matrix([[0.0], [1.0]])
         with pytest.raises(ValueError, match="gradients length"):
             build_tree(
                 x=x,
-                gradients=(1.0,),  # Wrong length
-                hessians=(0.5, 0.5),
+                gradients=_float_array([1.0]),  # Wrong length
+                hessians=_float_array([0.5, 0.5]),
                 config=make_config(),
                 feature_names=("f0",),
             )
 
     def test_mismatched_hessians_raises(self) -> None:
         """Should raise ValueError for mismatched hessian length."""
-        x: tuple[tuple[float, ...], ...] = ((0.0,), (1.0,))
+        x = _float_matrix([[0.0], [1.0]])
         with pytest.raises(ValueError, match="hessians length"):
             build_tree(
                 x=x,
-                gradients=(1.0, -1.0),
-                hessians=(0.5,),  # Wrong length
+                gradients=_float_array([1.0, -1.0]),
+                hessians=_float_array([0.5]),  # Wrong length
                 config=make_config(),
                 feature_names=("f0",),
             )
 
     def test_mismatched_feature_names_raises(self) -> None:
         """Should raise ValueError for mismatched feature names."""
-        x: tuple[tuple[float, ...], ...] = ((0.0, 1.0),)
+        x = _float_matrix([[0.0, 1.0]])
         with pytest.raises(ValueError, match="feature_names length"):
             build_tree(
                 x=x,
-                gradients=(1.0,),
-                hessians=(0.5,),
+                gradients=_float_array([1.0]),
+                hessians=_float_array([0.5]),
                 config=make_config(),
                 feature_names=("f0",),  # Only 1 name but 2 features
             )
 
     def test_with_subsampling(self) -> None:
         """Should work with row subsampling."""
-        x: tuple[tuple[float, ...], ...] = tuple((float(i),) for i in range(20))
-        gradients = tuple(1.0 if i < 10 else -1.0 for i in range(20))
-        hessians = tuple(0.25 for _ in range(20))
+        x = _float_matrix([[float(i)] for i in range(20)])
+        gradients = _float_array([1.0 if i < 10 else -1.0 for i in range(20)])
+        hessians = _float_array([0.25 for _ in range(20)])
         config = make_config(subsample=0.5)
 
         tree = build_tree(
@@ -146,14 +167,16 @@ class TestBuildTree:
 
     def test_with_max_features(self) -> None:
         """Should work with feature subsampling."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5, 0.3),
-            (0.0, 0.5, 0.3),
-            (1.0, 0.5, 0.3),
-            (1.0, 0.5, 0.3),
+        x = _float_matrix(
+            [
+                [0.0, 0.5, 0.3],
+                [0.0, 0.5, 0.3],
+                [1.0, 0.5, 0.3],
+                [1.0, 0.5, 0.3],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_features=1)
 
         tree = build_tree(
@@ -168,14 +191,16 @@ class TestBuildTree:
 
     def test_with_max_features_equals_n_features(self) -> None:
         """max_features == n_features should use all features."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5, 0.3),
-            (0.0, 0.5, 0.3),
-            (1.0, 0.5, 0.3),
-            (1.0, 0.5, 0.3),
+        x = _float_matrix(
+            [
+                [0.0, 0.5, 0.3],
+                [0.0, 0.5, 0.3],
+                [1.0, 0.5, 0.3],
+                [1.0, 0.5, 0.3],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         # max_features = 3 = n_features
         config = make_config(max_features=3)
 
@@ -191,14 +216,16 @@ class TestBuildTree:
 
     def test_with_max_features_exceeds_n_features(self) -> None:
         """max_features > n_features should use all features."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x = _float_matrix(
+            [
+                [0.0, 0.5],
+                [0.0, 0.5],
+                [1.0, 0.5],
+                [1.0, 0.5],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         # max_features = 10 > n_features = 2
         config = make_config(max_features=10)
 
@@ -214,14 +241,16 @@ class TestBuildTree:
 
     def test_with_max_features_deterministic(self) -> None:
         """Same seed with max_features should produce same tree."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5, 0.8),
-            (0.1, 0.4, 0.7),
-            (0.9, 0.6, 0.2),
-            (1.0, 0.3, 0.1),
+        x = _float_matrix(
+            [
+                [0.0, 0.5, 0.8],
+                [0.1, 0.4, 0.7],
+                [0.9, 0.6, 0.2],
+                [1.0, 0.3, 0.1],
+            ]
         )
-        gradients = (-1.0, -0.5, 0.5, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -0.5, 0.5, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_features=1, random_state=42)
 
         tree1 = build_tree(
@@ -248,14 +277,16 @@ class TestBuildTree:
 
     def test_with_precomputed_feature_bins(self) -> None:
         """Should use precomputed feature bins when passed."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0, 0.5),
-            (0.0, 0.5),
-            (1.0, 0.5),
-            (1.0, 0.5),
+        x = _float_matrix(
+            [
+                [0.0, 0.5],
+                [0.0, 0.5],
+                [1.0, 0.5],
+                [1.0, 0.5],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         # Precompute bins
@@ -280,14 +311,16 @@ class TestPredictTree:
 
     def test_predicts_correct_values(self) -> None:
         """Should predict correct values based on tree structure."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (0.0,),
-            (1.0,),
-            (1.0,),
+        x = _float_matrix(
+            [
+                [0.0],
+                [0.0],
+                [1.0],
+                [1.0],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_depth=1, min_samples_leaf=1)
 
         tree = build_tree(
@@ -301,13 +334,18 @@ class TestPredictTree:
         # Predict on the training data
         predictions = predict_tree(tree, x)
 
-        assert len(predictions) == 4
+        n_preds: int = predictions.shape[0]
+        assert n_preds == 4
         # First two samples should have same prediction
-        assert predictions[0] == predictions[1]
+        pred_0: float = predictions.item(0)
+        pred_1: float = predictions.item(1)
+        pred_2: float = predictions.item(2)
+        pred_3: float = predictions.item(3)
+        assert pred_0 == pred_1
         # Last two should have same prediction
-        assert predictions[2] == predictions[3]
+        assert pred_2 == pred_3
         # Left and right should be different
-        assert predictions[0] != predictions[2]
+        assert pred_0 != pred_2
 
     def test_predicts_nan_values_using_nan_direction(self) -> None:
         """NaN values should follow nan_direction when predicting."""
@@ -359,9 +397,12 @@ class TestPredictTree:
         )
 
         # Predict with NaN value - should go left and get -1.0
-        predictions = predict_tree(tree, ((math.nan,),))
-        assert len(predictions) == 1
-        assert abs(predictions[0] - (-1.0)) < 1e-10
+        x_nan = _float_matrix([[math.nan]])
+        predictions = predict_tree(tree, x_nan)
+        n_preds: int = predictions.shape[0]
+        assert n_preds == 1
+        pred_val: float = predictions.item(0)
+        assert abs(pred_val - (-1.0)) < 1e-10
 
 
 class TestExplainTreePrediction:
@@ -369,14 +410,16 @@ class TestExplainTreePrediction:
 
     def test_explanation_contains_path(self) -> None:
         """Explanation should contain the path taken through tree."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (1.0,),
-            (2.0,),
-            (3.0,),
+        x = _float_matrix(
+            [
+                [0.0],
+                [1.0],
+                [2.0],
+                [3.0],
+            ]
         )
-        gradients = (-1.0, -0.5, 0.5, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -0.5, 0.5, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         tree = build_tree(
@@ -388,7 +431,8 @@ class TestExplainTreePrediction:
         )
 
         # Explain prediction for first sample
-        explanation = explain_tree_prediction(tree, (0.0,), tree_index=5)
+        x_test = _float_array([0.0])
+        explanation = explain_tree_prediction(tree, x_test, tree_index=5)
 
         assert explanation["tree_index"] == 5
         # Path should have entries for internal nodes traversed
@@ -399,14 +443,16 @@ class TestExplainTreePrediction:
     def test_explanation_right_path(self) -> None:
         """Explanation should track right path correctly."""
         # Build a simple tree where high values go right
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (1.0,),
-            (2.0,),
-            (3.0,),
+        x = _float_matrix(
+            [
+                [0.0],
+                [1.0],
+                [2.0],
+                [3.0],
+            ]
         )
-        gradients = (-1.0, -0.5, 0.5, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -0.5, 0.5, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_depth=2, min_samples_leaf=1)
 
         tree = build_tree(
@@ -418,7 +464,8 @@ class TestExplainTreePrediction:
         )
 
         # Use a high value to go right
-        explanation = explain_tree_prediction(tree, (3.0,), tree_index=0)
+        x_test = _float_array([3.0])
+        explanation = explain_tree_prediction(tree, x_test, tree_index=0)
 
         # Should have at least one path entry where direction is right
         has_right = any(step["direction"] == "right" for step in explanation["path"])
@@ -447,7 +494,8 @@ class TestExplainTreePrediction:
             feature_names=("f0",),
         )
 
-        explanation = explain_tree_prediction(tree, (0.0,), tree_index=0)
+        x_test = _float_array([0.0])
+        explanation = explain_tree_prediction(tree, x_test, tree_index=0)
 
         # Should return the value from the node
         assert abs(explanation["prediction"] - 0.5) < 1e-10
@@ -476,7 +524,8 @@ class TestExplainTreePrediction:
             feature_names=("f0",),
         )
 
-        explanation = explain_tree_prediction(tree, (0.0,), tree_index=0)
+        x_test = _float_array([0.0])
+        explanation = explain_tree_prediction(tree, x_test, tree_index=0)
 
         # Should return node's value when child is missing
         assert abs(explanation["prediction"] - 0.7) < 1e-10
@@ -532,7 +581,8 @@ class TestExplainTreePrediction:
         )
 
         # Pass NaN value - should go left
-        explanation = explain_tree_prediction(tree, (math.nan,), tree_index=0)
+        x_nan = _float_array([math.nan])
+        explanation = explain_tree_prediction(tree, x_nan, tree_index=0)
 
         # Should predict -1.0 (left child value)
         assert abs(explanation["prediction"] - (-1.0)) < 1e-10
@@ -590,7 +640,8 @@ class TestExplainTreePrediction:
         )
 
         # Pass NaN value - should go right
-        explanation = explain_tree_prediction(tree, (math.nan,), tree_index=0)
+        x_nan = _float_array([math.nan])
+        explanation = explain_tree_prediction(tree, x_nan, tree_index=0)
 
         # Should predict 1.0 (right child value)
         assert abs(explanation["prediction"] - 1.0) < 1e-10
@@ -609,7 +660,8 @@ class TestHelperFunctions:
         rng = get_random_state(42)
         indices = _get_sample_indices(10, 1.0, rng)
 
-        assert indices == tuple(range(10))
+        expected = _int_array(list(range(10)))
+        assert np.array_equal(indices, expected)
 
     def test_get_sample_indices_subsample(self) -> None:
         """Subsampling should return fewer indices."""
@@ -618,8 +670,11 @@ class TestHelperFunctions:
         rng = get_random_state(42)
         indices = _get_sample_indices(10, 0.5, rng)
 
-        assert len(indices) == 5
-        assert all(0 <= i < 10 for i in indices)
+        n_indices: int = indices.shape[0]
+        assert n_indices == 5
+        for i in range(n_indices):
+            idx: int = indices.item(i)
+            assert 0 <= idx < 10
 
     def test_select_features_all(self) -> None:
         """All features should be returned when max_features >= n_features."""
@@ -638,7 +693,8 @@ class TestHelperFunctions:
         indices = _select_features(10, 3, rng)
 
         assert len(indices) == 3
-        assert all(0 <= i < 10 for i in indices)
+        for idx in indices:
+            assert 0 <= idx < 10
 
     def test_select_features_single(self) -> None:
         """max_features=1 should return exactly one feature."""
@@ -834,7 +890,8 @@ class TestPredictSingle:
             feature_names=("f0",),
         )
 
-        pred = _predict_single(tree, (0.0,))
+        x_test = _float_array([0.0])
+        pred = _predict_single(tree, x_test)
 
         assert pred == 0.5
 
@@ -885,10 +942,12 @@ class TestPredictSingle:
         )
 
         # x[0] = 0.0 <= 0.5, go left
-        assert _predict_single(tree, (0.0,)) == -1.0
+        x_left = _float_array([0.0])
+        assert _predict_single(tree, x_left) == -1.0
 
         # x[0] = 1.0 > 0.5, go right
-        assert _predict_single(tree, (1.0,)) == 1.0
+        x_right = _float_array([1.0])
+        assert _predict_single(tree, x_right) == 1.0
 
     def test_handles_missing_child(self) -> None:
         """Should return current node value when child is None."""
@@ -912,7 +971,8 @@ class TestPredictSingle:
             feature_names=("f0",),
         )
 
-        pred = _predict_single(tree, (0.0,))
+        x_test = _float_array([0.0])
+        pred = _predict_single(tree, x_test)
 
         assert pred == 0.5
 
@@ -938,7 +998,8 @@ class TestPredictSingle:
             feature_names=("f0",),
         )
 
-        pred = _predict_single(tree, (0.0,))
+        x_test = _float_array([0.0])
+        pred = _predict_single(tree, x_test)
 
         assert pred == 0.25
 
@@ -948,28 +1009,30 @@ class TestComputeChildHistograms:
 
     def test_computes_using_subtraction(self) -> None:
         """Should compute child histograms using sibling subtraction."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (0.0,),
-            (1.0,),
-            (1.0,),
+        x = _float_matrix(
+            [
+                [0.0],
+                [0.0],
+                [1.0],
+                [1.0],
+            ]
         )
-        gradients = (-1.0, -1.0, 1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, 1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_bins=4)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
 
         # Create parent histogram
-        parent_hist = Histogram(
+        parent_hist = HistogramBuffer.from_tuples(
             gradient_sums=(0.0, -2.0, 2.0, 0.0),
             hessian_sums=(0.0, 0.5, 0.5, 0.0),
             counts=(0, 2, 2, 0),
         )
-        parent_histograms = {0: parent_hist}
+        parent_histograms: dict[int, HistogramBuffer] = {0: parent_hist}
 
-        left_indices = (0, 1)
-        right_indices = (2, 3)
+        left_indices = _int_array([0, 1])
+        right_indices = _int_array([2, 3])
 
         left_hists, right_hists = _compute_child_histograms(
             left_indices=left_indices,
@@ -986,36 +1049,38 @@ class TestComputeChildHistograms:
 
         # Sum of child histograms should equal parent
         for i in range(4):
-            left_g = left_hists[0].gradient_sums[i]
-            right_g = right_hists[0].gradient_sums[i]
-            parent_g = parent_hist.gradient_sums[i]
+            left_g = left_hists[0].get_gradient_sum(i)
+            right_g = right_hists[0].get_gradient_sum(i)
+            parent_g = parent_hist.get_gradient_sum(i)
             assert abs(left_g + right_g - parent_g) < 1e-10
 
     def test_smaller_child_built_directly(self) -> None:
         """Should build smaller child directly and derive larger via subtraction."""
-        x: tuple[tuple[float, ...], ...] = (
-            (0.0,),
-            (0.0,),
-            (0.0,),
-            (1.0,),
+        x = _float_matrix(
+            [
+                [0.0],
+                [0.0],
+                [0.0],
+                [1.0],
+            ]
         )
-        gradients = (-1.0, -1.0, -1.0, 1.0)
-        hessians = (0.25, 0.25, 0.25, 0.25)
+        gradients = _float_array([-1.0, -1.0, -1.0, 1.0])
+        hessians = _float_array([0.25, 0.25, 0.25, 0.25])
         config = make_config(max_bins=4)
 
         feature_bins = precompute_feature_bins(x, config["max_bins"])
 
         # Parent has all 4 samples
-        parent_hist = Histogram(
+        parent_hist = HistogramBuffer.from_tuples(
             gradient_sums=(0.0, -3.0, 1.0, 0.0),
             hessian_sums=(0.0, 0.75, 0.25, 0.0),
             counts=(0, 3, 1, 0),
         )
-        parent_histograms = {0: parent_hist}
+        parent_histograms: dict[int, HistogramBuffer] = {0: parent_hist}
 
         # Right is smaller (1 sample)
-        left_indices = (0, 1, 2)
-        right_indices = (3,)
+        left_indices = _int_array([0, 1, 2])
+        right_indices = _int_array([3])
 
         left_hists, right_hists = _compute_child_histograms(
             left_indices=left_indices,
@@ -1031,6 +1096,6 @@ class TestComputeChildHistograms:
         assert 0 in right_hists
 
         # Verify counts add up
-        left_count = sum(left_hists[0].counts)
-        right_count = sum(right_hists[0].counts)
-        assert left_count + right_count == sum(parent_hist.counts)
+        left_count = sum(left_hists[0].counts_tuple())
+        right_count = sum(right_hists[0].counts_tuple())
+        assert left_count + right_count == sum(parent_hist.counts_tuple())

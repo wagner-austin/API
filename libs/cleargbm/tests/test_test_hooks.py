@@ -1,13 +1,13 @@
-"""Tests for cleargbm._test_hooks module.
-
-Built from scratch - uses only Python stdlib (no numpy).
-"""
+"""Tests for cleargbm._test_hooks module."""
 
 from __future__ import annotations
 
 from cleargbm._test_hooks import (
     RandomStateProtocol,
     _PythonRandomStateWrapper,
+    create_float_buffer,
+    create_histogram_buffer,
+    create_int_buffer,
     get_random_state,
 )
 
@@ -126,3 +126,78 @@ class TestRandomStateProtocol:
 
         result = accepts_protocol(wrapper)
         assert result == 5
+
+
+class TestCreateFloatBuffer:
+    """Tests for create_float_buffer factory hook."""
+
+    def test_creates_float_buffer(self) -> None:
+        """create_float_buffer creates FloatBuffer with correct size."""
+        buf = create_float_buffer(5)
+        assert len(buf) == 5
+
+    def test_buffer_initialized_to_zero(self) -> None:
+        """Buffer should be initialized to zero."""
+        buf = create_float_buffer(3)
+        for i in range(3):
+            assert buf.get(i) == 0.0
+
+    def test_buffer_is_functional(self) -> None:
+        """Created buffer should be fully functional."""
+        buf = create_float_buffer(3)
+        buf.set(0, 1.5)
+        buf.set(1, 2.5)
+        assert buf.get(0) == 1.5
+        assert buf.get(1) == 2.5
+
+
+class TestCreateIntBuffer:
+    """Tests for create_int_buffer factory hook."""
+
+    def test_creates_int_buffer(self) -> None:
+        """create_int_buffer creates IntBuffer with correct size."""
+        buf = create_int_buffer(5)
+        assert len(buf) == 5
+
+    def test_buffer_initialized_to_zero(self) -> None:
+        """Buffer should be initialized to zero."""
+        buf = create_int_buffer(3)
+        for i in range(3):
+            assert buf.get(i) == 0
+
+    def test_buffer_is_functional(self) -> None:
+        """Created buffer should be fully functional."""
+        buf = create_int_buffer(3)
+        buf.set(0, 10)
+        buf.set(1, 20)
+        assert buf.get(0) == 10
+        assert buf.get(1) == 20
+
+
+class TestCreateHistogramBuffer:
+    """Tests for create_histogram_buffer factory hook."""
+
+    def test_creates_histogram_buffer(self) -> None:
+        """create_histogram_buffer creates HistogramBuffer with correct size."""
+        buf = create_histogram_buffer(5)
+        assert buf.n_bins == 5
+
+    def test_buffer_initialized_to_zero(self) -> None:
+        """Buffer should be initialized to zero."""
+        buf = create_histogram_buffer(3)
+        for i in range(3):
+            assert buf.get_gradient_sum(i) == 0.0
+            assert buf.get_hessian_sum(i) == 0.0
+            assert buf.get_count(i) == 0
+
+    def test_buffer_is_functional(self) -> None:
+        """Created buffer should be fully functional."""
+        buf = create_histogram_buffer(3)
+        buf.accumulate(0, 1.0, 0.5)
+        buf.accumulate(1, 2.0, 1.0)
+        assert buf.get_gradient_sum(0) == 1.0
+        assert buf.get_hessian_sum(0) == 0.5
+        assert buf.get_count(0) == 1
+        assert buf.get_gradient_sum(1) == 2.0
+        assert buf.get_hessian_sum(1) == 1.0
+        assert buf.get_count(1) == 1

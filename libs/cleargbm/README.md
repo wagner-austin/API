@@ -2,14 +2,14 @@
 
 *Gradient Boosting You Can See Through*
 
-From-scratch interpretable gradient boosting with zero external dependencies. Built for transparency and explainability using only Python stdlib.
+High-performance interpretable gradient boosting built on numpy. Designed for transparency and explainability with strict typing and zero compromises.
 
 ## Features
 
-- **From Scratch**: Pure Python stdlib implementation - no numpy, sklearn, xgboost, or lightgbm
+- **High Performance**: Numpy-backed arrays with vectorized histogram building and sibling subtraction
 - **Interpretable by Design**: Rule extraction, contribution breakdown, feature interactions
 - **Histogram-Based Optimization**: LightGBM-style O(K) split finding instead of O(n log n) sorting
-- **Strict Typing**: 100% typed with TypedDicts, Protocols, no Any/cast/ignore
+- **Strict Typing**: 100% typed with `NDArray[np.float64]`/`NDArray[np.int64]`, TypedDicts, Protocols - no Any/cast/ignore
 - **Production Ready**: Plugs into covenant_ml as a ClassifierBackend
 
 ## Installation
@@ -114,12 +114,13 @@ poetry run python -m scripts.autotune --samples 10000 --features 50
 
 | Feature | XGBoost | LightGBM | ClearGBM |
 |---------|---------|----------|----------|
-| Speed | Fast | Faster | Moderate |
+| Speed | Fast | Faster | Good |
 | Accuracy | Excellent | Excellent | Good |
 | Interpretability | Limited | Limited | First-class |
-| Dependencies | C++ lib | C++ lib | Python stdlib only |
+| Dependencies | C++ lib | C++ lib | numpy only |
 | Rule extraction | Post-hoc | Post-hoc | Built-in |
 | Split algorithm | Exact/Histogram | Histogram | Histogram |
+| Typing | Weak | Weak | Strict (no Any) |
 
 ## Configuration Reference
 
@@ -155,5 +156,6 @@ See [docs/plan.md](docs/plan.md) for detailed architecture and implementation pl
 ## Requirements
 
 - Python 3.11+
-- No external dependencies (pure Python stdlib)
+- numpy ^2.3.5
 - 100% test coverage enforced
+- Strict mypy typing (disallow_any_expr = true)
