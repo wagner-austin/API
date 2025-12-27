@@ -17,6 +17,7 @@ include = ["src/platform_kaggle/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
+platform-codebase = { path = "../platform_codebase", develop = true }
 kaggle = "^1.8.0"
 
 [tool.poetry.group.dev.dependencies]

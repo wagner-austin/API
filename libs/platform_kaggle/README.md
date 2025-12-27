@@ -14,6 +14,12 @@ poetry add platform-kaggle
 Requires valid Kaggle API credentials in `~/.kaggle/kaggle.json` or via
 environment variables (`KAGGLE_USERNAME`, `KAGGLE_KEY`).
 
+## Dependencies
+
+- `platform-core` - JSON utilities, HTTP client protocols
+- `platform-codebase` - Shared codebase scanning and capability detection
+- `kaggle` - Official Kaggle API client
+
 ## Quick Start
 
 ```python
@@ -72,17 +78,75 @@ filtered = filter_competitions(competitions, interests)
 
 ### Codebase Capability Matching
 
-The library scans your codebase to detect ML capabilities:
+The library scans your codebase to detect ML capabilities using `platform_codebase`:
 
 ```python
 from platform_kaggle import get_codebase_profile
 
 profile = get_codebase_profile()
 # Returns capabilities like:
-# - ml_backends: ("xgboost", "lightgbm", "sklearn")
-# - data_formats: ("csv", "parquet")
-# - task_types: ("binary_classification", "regression")
+# - ml_backends: ("xgboost", "lightgbm", "pytorch", "transformers", ...)
+# - data_formats: ("csv", "parquet", "excel")
+# - task_types: ("binary_classification", "image_classification", "text_generation", ...)
+# - capabilities: detected from pyproject.toml dependencies
 ```
+
+#### Detected Capabilities
+
+The library automatically detects capabilities based on dependencies in `pyproject.toml`:
+
+| Dependency | Capability Detected | Tags |
+|------------|---------------------|------|
+| `xgboost` | `xgboost_tabular` | tabular, classification, regression |
+| `lightgbm` | `lightgbm_tabular` | tabular, classification, regression |
+| `catboost` | (ml_backend only) | - |
+| `torch` | `pytorch_deep_learning` | deep-learning, neural-network |
+| `scikit-learn` | `sklearn_ml` | tabular, classification, regression |
+| `optuna` | `hyperparameter_optimization` | optimization, hyperparameter-tuning |
+| `torchvision` | `torchvision_cv` | computer-vision, image, image-classification |
+| `pillow` | `image_processing` | image, image-processing |
+| `opencv-python` | `opencv_cv` | computer-vision, image, video |
+| `transformers` | `huggingface_transformers` | nlp, text-classification, text-generation, llm |
+| `datasets` | `huggingface_datasets` | data, huggingface |
+| `tokenizers` | `tokenization` | nlp, tokenization |
+| `sentencepiece` | `sentencepiece_tokenization` | nlp, tokenization |
+| `fasttext` / `fasttext-wheel` | `language_identification` | nlp, language-detection, multilingual |
+| `openai` | `speech_to_text` | nlp, speech, transcription, whisper |
+| `*.rules` files | `transliteration` | nlp, transliteration, script-conversion |
+
+#### Detected Task Types
+
+| Dependency | Task Types Added |
+|------------|-----------------|
+| `xgboost`, `lightgbm` | binary_classification, multiclass_classification, regression |
+| `torch` | time_series, sequence_modeling |
+| `scikit-learn` | clustering |
+| `torchvision` | image_classification, object_detection |
+| `transformers` | text_classification, text_generation, token_classification, question_answering, summarization, translation |
+| `openai` | speech_recognition, translation |
+
+#### Building Profiles from Pre-scanned Data
+
+For containerized environments that scan via GitHub API, use `build_profile` with pre-scanned libs and services:
+
+```python
+from platform_codebase import scan_libs_from_github, scan_services_from_github, GitHubClient
+from platform_kaggle import build_profile
+
+# Scan via GitHub
+client = GitHubClient(token="ghp_your_token")
+libs = scan_libs_from_github(client, "owner", "repo")
+services = scan_services_from_github(client, "owner", "repo")
+
+# Build capability profile from scanned data
+profile = build_profile(libs, services)
+
+# Same profile structure as get_codebase_profile()
+print(profile.ml_backends)    # ("xgboost", "lightgbm", "pytorch")
+print(profile.capabilities)   # Detected capabilities
+```
+
+This separation allows capability detection to work with data from any source (local filesystem, GitHub API, etc.).
 
 Competitions are matched against these capabilities:
 
@@ -105,6 +169,7 @@ from platform_kaggle import (
     FakeKaggleClient,
     hooks,
     make_fake_competition,
+    reset_hooks,
 )
 
 # Create fake client with test data
@@ -115,28 +180,41 @@ fake_client = FakeKaggleClient(
 )
 
 # Install via hooks
-original = hooks.kaggle_client
 hooks.kaggle_client = lambda: fake_client
 
 try:
     # Your test code here
     ...
 finally:
-    hooks.kaggle_client = original
+    reset_hooks()
 ```
+
+### Available Fakes
+
+- `FakeKaggleApi` - Low-level API fake wrapping Kaggle module
+- `FakeKaggleClient` - High-level client fake with `list_competitions` and `get_competition`
+- `FakeKaggleModule` - Fake for the Kaggle Python module
+
+### Factory Functions
+
+- `make_fake_competition()` - Create test Competition instances
+- `make_fake_kaggle_competition()` - Create raw Kaggle API competition objects
+- `make_fake_capability()` - Create test CodebaseCapability instances
+- `make_fake_profile()` - Create test CodebaseProfile instances
+- `make_interest_filter()` - Create InterestFilter instances
 
 ## Types
 
 All types are exported from the package:
 
-- `Competition` - Competition metadata
+- `Competition` - Competition metadata (immutable `__slots__` class)
 - `CompetitionMatch` - Match result with score
-- `CodebaseProfile` - Detected capabilities
-- `CodebaseCapability` - Individual capability
+- `CodebaseProfile` - Detected capabilities (from `platform_codebase`)
+- `CodebaseCapability` - Individual capability (from `platform_codebase`)
 - `InterestFilter` - Filter configuration
-- `CompetitionCategory` - Literal type for categories
-- `CapabilityStrength` - Literal type for strength levels
-- `MatchRecommendation` - Literal type for recommendations
+- `CompetitionCategory` - Literal type: `"Featured" | "Research" | "Playground" | ...`
+- `CapabilityStrength` - Literal type: `"strong" | "moderate" | "basic"`
+- `MatchRecommendation` - Literal type: `"strong_fit" | "good_fit" | "stretch" | "new_territory"`
 
 ## JSON Serialization
 
@@ -152,6 +230,171 @@ data = encode_competition(competition)
 competition = decode_competition(data)
 ```
 
+## Hooks System
+
+The library uses a hooks pattern for dependency injection:
+
+| Hook | Type | Purpose |
+|------|------|---------|
+| `hooks.kaggle_api_factory` | `() -> KaggleApiProtocol` | Creates low-level Kaggle API |
+| `hooks.kaggle_client` | `() -> KaggleClientProtocol` | Creates high-level client |
+| `hooks.kaggle_module` | `() -> KaggleModuleProtocol` | Creates Kaggle module wrapper |
+| `hooks.profile_scanner` | `(Path) -> CodebaseProfile` | Scans codebase for capabilities |
+
+## Service Integration
+
+### Adding to Your Project
+
+1. Add the dependency to your `pyproject.toml`:
+
+```toml
+[tool.poetry.dependencies]
+platform-kaggle = { path = "../platform_kaggle", develop = true }
+```
+
+2. Set up Kaggle credentials (one of):
+   - Create `~/.kaggle/kaggle.json` with your API key
+   - Set `KAGGLE_USERNAME` and `KAGGLE_KEY` environment variables
+
+3. Import and use:
+
+```python
+from platform_kaggle import find_competitions, make_interest_filter
+```
+
+### Basic Usage in a Script
+
+```python
+from platform_kaggle import (
+    find_competitions,
+    make_interest_filter,
+    encode_match,
+)
+
+def main() -> None:
+    # Define what you're interested in
+    interests = make_interest_filter(
+        include_tags=("tabular", "nlp", "classification"),
+        exclude_tags=("computer-vision",),
+        min_reward=None,  # Include "Knowledge" competitions
+        categories=("Featured", "Research", "Playground"),
+    )
+
+    # Find matching competitions
+    matches = find_competitions(
+        interests=interests,
+        match_codebase=True,  # Score against your codebase capabilities
+        min_match_score=0.3,  # Only show 30%+ matches
+    )
+
+    # Process results
+    for match in matches:
+        print(f"{match.competition.title}")
+        print(f"  Score: {match.match_score:.0%}")
+        print(f"  Fit: {match.recommendation}")
+        print(f"  Deadline: {match.competition.deadline}")
+        print()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Using in a FastAPI Service
+
+```python
+from fastapi import FastAPI, Query
+from platform_kaggle import (
+    find_competitions,
+    make_interest_filter,
+    encode_match,
+    CompetitionCategory,
+)
+
+app = FastAPI()
+
+@app.get("/competitions")
+def list_competitions(
+    tags: list[str] = Query(default=["tabular"]),
+    exclude: list[str] = Query(default=[]),
+    min_score: float = Query(default=0.0, ge=0.0, le=1.0),
+    category: CompetitionCategory | None = None,
+):
+    """Find Kaggle competitions matching criteria."""
+    interests = make_interest_filter(
+        include_tags=tuple(tags),
+        exclude_tags=tuple(exclude),
+        categories=(category,) if category else None,
+    )
+
+    matches = find_competitions(
+        interests=interests,
+        match_codebase=True,
+        min_match_score=min_score,
+    )
+
+    return [encode_match(m) for m in matches]
+
+
+@app.get("/competitions/{ref}")
+def get_competition(ref: str):
+    """Get a specific competition by reference."""
+    from platform_kaggle import KaggleClient, encode_competition
+
+    client = KaggleClient()
+    comp = client.get_competition(ref)
+    if comp is None:
+        raise HTTPException(404, f"Competition {ref} not found")
+    return encode_competition(comp)
+```
+
+### Testing Your Integration
+
+```python
+import pytest
+from platform_kaggle import (
+    hooks,
+    reset_hooks,
+    FakeKaggleClient,
+    make_fake_competition,
+)
+
+@pytest.fixture(autouse=True)
+def reset_kaggle_hooks():
+    """Reset hooks after each test."""
+    yield
+    reset_hooks()
+
+def test_my_competition_endpoint():
+    # Set up fake data
+    fake_comp = make_fake_competition(
+        ref="test-comp",
+        title="Test Competition",
+        tags=("tabular", "classification"),
+    )
+    fake_client = FakeKaggleClient(competitions=(fake_comp,))
+    hooks.kaggle_client = lambda: fake_client
+
+    # Test your code
+    from myapp import list_competitions
+    result = list_competitions(tags=["tabular"])
+
+    assert len(result) == 1
+    assert result[0]["competition"]["ref"] == "test-comp"
+```
+
 ## Architecture
 
 See [docs/architecture-plan.md](docs/architecture-plan.md) for the full design document.
+
+## Development
+
+```bash
+# Run all checks (guard, lint, format, type check, tests)
+make check
+
+# Run tests only
+make test
+
+# Run linting only
+make lint
+```
