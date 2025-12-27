@@ -79,6 +79,24 @@ def test_list_competitions_without_codebase_matching(
     assert "ref" in comp  # Direct competition, not match wrapper
 
 
+def test_list_competitions_without_fetch_descriptions(
+    fake_container: ServiceContainer,
+) -> None:
+    """Test listing competitions without fetching descriptions."""
+    app = create_app(container=fake_container)
+    client = TestClient(app)
+
+    response = client.get("/kaggle/competitions", params={"fetch_descriptions": False})
+
+    assert response.status_code == 200
+    data = narrow_json_to_list(load_json_str(response.text))
+    assert len(data) == 1
+    match = narrow_json_to_dict(data[0])
+    # Should still return matches, just without description-based scoring
+    assert "competition" in match
+    assert "match_score" in match
+
+
 def test_get_competition_found(fake_container: ServiceContainer) -> None:
     """Test getting specific competition by ref."""
     app = create_app(container=fake_container)

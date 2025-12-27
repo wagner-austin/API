@@ -22,7 +22,13 @@ from platform_codebase import (
     scan_services as codebase_scan_services,
 )
 from platform_devpost import DevpostClient, DevpostClientProtocol
-from platform_kaggle import KaggleClient, KaggleClientProtocol, build_profile
+from platform_kaggle import (
+    KaggleClient,
+    KaggleClientProtocol,
+    KagglePageFetcherProtocol,
+    build_profile,
+    create_page_fetcher,
+)
 
 from opportunity_radar_api.config import OpportunityRadarSettings
 
@@ -41,6 +47,7 @@ class ServiceContainer:
         "_codebase_profile_factory",
         "_devpost_client_factory",
         "_kaggle_client_factory",
+        "_kaggle_page_fetcher_factory",
         "_libs_scanner",
         "_services_scanner",
         "monorepo_root",
@@ -51,6 +58,7 @@ class ServiceContainer:
         *,
         monorepo_root: Path,
         kaggle_client_factory: Callable[[], KaggleClientProtocol],
+        kaggle_page_fetcher_factory: Callable[[], KagglePageFetcherProtocol],
         devpost_client_factory: Callable[[], DevpostClientProtocol],
         codebase_profile_factory: Callable[[Path], CodebaseProfile],
         libs_scanner: Callable[[Path], tuple[LibInfo, ...]],
@@ -61,6 +69,7 @@ class ServiceContainer:
         Args:
             monorepo_root: Path to monorepo root.
             kaggle_client_factory: Factory for Kaggle client.
+            kaggle_page_fetcher_factory: Factory for Kaggle page fetcher.
             devpost_client_factory: Factory for Devpost client.
             codebase_profile_factory: Factory for codebase profile.
             libs_scanner: Function to scan libs directory.
@@ -68,6 +77,7 @@ class ServiceContainer:
         """
         self.monorepo_root = monorepo_root
         self._kaggle_client_factory = kaggle_client_factory
+        self._kaggle_page_fetcher_factory = kaggle_page_fetcher_factory
         self._devpost_client_factory = devpost_client_factory
         self._codebase_profile_factory = codebase_profile_factory
         self._libs_scanner = libs_scanner
@@ -80,6 +90,14 @@ class ServiceContainer:
             Configured Kaggle client.
         """
         return self._kaggle_client_factory()
+
+    def get_kaggle_page_fetcher(self) -> KagglePageFetcherProtocol:
+        """Get Kaggle page fetcher for competition descriptions.
+
+        Returns:
+            Configured Kaggle page fetcher.
+        """
+        return self._kaggle_page_fetcher_factory()
 
     def get_devpost_client(self) -> DevpostClientProtocol:
         """Get Devpost API client.
@@ -179,6 +197,7 @@ def create_production_container(
         return ServiceContainer(
             monorepo_root=effective_root,
             kaggle_client_factory=KaggleClient,
+            kaggle_page_fetcher_factory=create_page_fetcher,
             devpost_client_factory=DevpostClient,
             codebase_profile_factory=github_profile_factory,
             libs_scanner=github_libs_scanner,
@@ -192,6 +211,7 @@ def create_production_container(
     return ServiceContainer(
         monorepo_root=monorepo_root,
         kaggle_client_factory=KaggleClient,
+        kaggle_page_fetcher_factory=create_page_fetcher,
         devpost_client_factory=DevpostClient,
         codebase_profile_factory=_default_codebase_profile_factory,
         libs_scanner=codebase_scan_libs,

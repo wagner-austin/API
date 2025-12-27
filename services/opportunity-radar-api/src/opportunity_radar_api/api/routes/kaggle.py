@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 from platform_core.json_utils import JSONObject
 from platform_kaggle import (
+    CompetitionPages,
     encode_competition,
     encode_match,
     filter_competitions,
@@ -37,6 +38,8 @@ def build_router(container: ServiceContainer) -> APIRouter:
         exclude: Annotated[list[str], Query()] = _EXCLUDE_QUERY,
         min_score: Annotated[float, Query(ge=0.0, le=1.0)] = 0.0,
         match_codebase: bool = True,
+        active_only: bool = True,
+        fetch_descriptions: bool = True,
     ) -> list[JSONObject]:
         """Find Kaggle competitions matching criteria.
 
@@ -45,6 +48,8 @@ def build_router(container: ServiceContainer) -> APIRouter:
             exclude: Tags to exclude (must not have any).
             min_score: Minimum match score (0.0-1.0).
             match_codebase: Whether to score against codebase capabilities.
+            active_only: If True, exclude competitions past their deadline.
+            fetch_descriptions: If True, fetch descriptions for better matching.
 
         Returns:
             List of competition matches as JSON.
@@ -52,20 +57,29 @@ def build_router(container: ServiceContainer) -> APIRouter:
         client = container.get_kaggle_client()
         competitions = client.list_competitions()
 
-        # Apply interest filter if tags provided
-        if tags:
-            interests = make_interest_filter(
-                include_tags=tuple(tags),
-                exclude_tags=tuple(exclude),
-                min_reward=None,
-                categories=None,
-            )
-            competitions = filter_competitions(competitions, interests)
+        # Apply interest filter (with optional deadline filtering)
+        interests = make_interest_filter(
+            include_tags=tuple(tags) if tags else (),
+            exclude_tags=tuple(exclude),
+            min_reward=None,
+            categories=None,
+        )
+        competitions = filter_competitions(competitions, interests, active_only=active_only)
 
         # Match against codebase capabilities
         if match_codebase:
             profile = container.get_codebase_profile()
-            matches = match_competitions(competitions, profile)
+
+            # Fetch descriptions for better matching if requested
+            pages_map: dict[str, CompetitionPages] = {}
+            if fetch_descriptions:
+                fetcher = container.get_kaggle_page_fetcher()
+                for comp in competitions:
+                    comp_id = fetcher.get_competition_id(comp.ref)
+                    pages = fetcher.fetch_pages(comp_id)
+                    pages_map[comp.ref] = pages
+
+            matches = match_competitions(competitions, profile, pages_map=pages_map)
             # Filter by minimum score
             matches = tuple(m for m in matches if m.match_score >= min_score)
             return [encode_match(m) for m in matches]

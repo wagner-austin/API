@@ -10,7 +10,12 @@ from platform_codebase.testing import make_fake_lib_info, make_fake_profile, mak
 from platform_devpost import Hackathon
 from platform_devpost.testing import FakeDevpostClient, make_fake_hackathon
 from platform_kaggle import Competition
-from platform_kaggle.testing import FakeKaggleClient, make_fake_competition
+from platform_kaggle.testing import (
+    FakeKaggleClient,
+    FakeKagglePageFetcher,
+    make_fake_competition,
+    make_fake_competition_pages,
+)
 
 from opportunity_radar_api.api.container import ServiceContainer
 from opportunity_radar_api.config import OpportunityRadarSettings
@@ -65,6 +70,15 @@ def _make_fake_kaggle_client(fake_competition: Competition) -> FakeKaggleClient:
     return FakeKaggleClient(competitions=(fake_competition,))
 
 
+def _make_fake_page_fetcher(fake_competition: Competition) -> FakeKagglePageFetcher:
+    """Create a fake page fetcher with test data."""
+    pages = make_fake_competition_pages(description="Test competition description")
+    return FakeKagglePageFetcher(
+        competition_ids={fake_competition.ref: 1},
+        pages={1: pages},
+    )
+
+
 def _make_fake_devpost_client(fake_hackathon: Hackathon) -> FakeDevpostClient:
     """Create a fake Devpost client with test data."""
     return FakeDevpostClient(hackathons=(fake_hackathon,))
@@ -72,6 +86,7 @@ def _make_fake_devpost_client(fake_hackathon: Hackathon) -> FakeDevpostClient:
 
 def _make_fake_container(
     fake_kaggle_client: FakeKaggleClient,
+    fake_page_fetcher: FakeKagglePageFetcher,
     fake_devpost_client: FakeDevpostClient,
     fake_profile: CodebaseProfile,
     fake_lib_info: LibInfo,
@@ -82,6 +97,7 @@ def _make_fake_container(
     return ServiceContainer(
         monorepo_root=tmp_path,
         kaggle_client_factory=lambda: fake_kaggle_client,
+        kaggle_page_fetcher_factory=lambda: fake_page_fetcher,
         devpost_client_factory=lambda: fake_devpost_client,
         codebase_profile_factory=lambda root: fake_profile,
         libs_scanner=lambda root: (fake_lib_info,),
@@ -107,6 +123,7 @@ fake_profile = pytest.fixture(_make_fake_profile)
 fake_lib_info = pytest.fixture(_make_fake_lib_info)
 fake_service_info = pytest.fixture(_make_fake_service_info)
 fake_kaggle_client = pytest.fixture(_make_fake_kaggle_client)
+fake_page_fetcher = pytest.fixture(_make_fake_page_fetcher)
 fake_devpost_client = pytest.fixture(_make_fake_devpost_client)
 fake_container = pytest.fixture(_make_fake_container)
 fake_settings = pytest.fixture(_make_fake_settings)

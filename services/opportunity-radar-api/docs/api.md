@@ -12,7 +12,7 @@ Complete API documentation for the opportunity-radar-api service.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `KAGGLE_API_TOKEN` | No | - | Kaggle API token (or use `~/.kaggle/kaggle.json`) |
+| `KAGGLE_API_TOKEN` | Yes | - | Kaggle API token for API access |
 | `PORT` | No | `8010` | Server port |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `LOG_FORMAT` | No | `json` | Log format: `json` or `text` |
@@ -184,6 +184,8 @@ Find Kaggle competitions matching criteria.
 | `exclude` | string[] | No | `[]` | Tags to exclude (repeatable) |
 | `min_score` | float | No | `0.0` | Minimum match score (0.0-1.0) |
 | `match_codebase` | bool | No | `true` | Score against codebase capabilities |
+| `active_only` | bool | No | `true` | Exclude competitions past their deadline |
+| `fetch_descriptions` | bool | No | `true` | Fetch full descriptions for better matching |
 
 **Response (200) - With codebase matching:**
 ```json
@@ -244,6 +246,12 @@ curl "http://localhost:8000/kaggle/competitions?tags=nlp&exclude=image&exclude=c
 
 # Get all competitions without scoring
 curl "http://localhost:8000/kaggle/competitions?match_codebase=false"
+
+# Include expired competitions (for historical analysis)
+curl "http://localhost:8000/kaggle/competitions?active_only=false"
+
+# Skip description fetching for faster responses (less accurate matching)
+curl "http://localhost:8000/kaggle/competitions?fetch_descriptions=false"
 ```
 
 ---
