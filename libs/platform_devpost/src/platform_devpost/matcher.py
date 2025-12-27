@@ -15,8 +15,32 @@ from platform_devpost.types import (
 
 # Theme to capability tag mapping
 THEME_TAG_MAPPING: dict[str, tuple[str, ...]] = {
-    "machine learning": ("ml", "ai", "data-science"),
-    "artificial intelligence": ("ai", "ml", "deep-learning"),
+    "machine learning": (
+        "ml",
+        "ai",
+        "data-science",
+        "tabular",
+        "classification",
+        "regression",
+        "deep-learning",
+        "neural-network",
+        "nlp",
+        "xgboost",
+        "lightgbm",
+        "pytorch",
+        "sklearn",
+        "transformers",
+    ),
+    "artificial intelligence": (
+        "ai",
+        "ml",
+        "deep-learning",
+        "neural-network",
+        "nlp",
+        "transformers",
+        "text-generation",
+        "llm",
+    ),
     "web": ("web", "frontend", "backend"),
     "api": ("api", "backend", "http"),
     "mobile": ("mobile", "ios", "android"),
@@ -51,12 +75,16 @@ def _get_hackathon_tags(hackathon: Hackathon) -> set[str]:
 
     for theme in hackathon.themes:
         theme_lower = theme.name.lower()
-        tags.add(theme_lower)
 
-        # Add mapped tags
+        # Add mapped tags if we have a mapping, otherwise add raw theme
+        has_mapping = False
         for key, mapped_tags in THEME_TAG_MAPPING.items():
             if key in theme_lower:
                 tags.update(mapped_tags)
+                has_mapping = True
+
+        if not has_mapping:
+            tags.add(theme_lower)
 
     return tags
 

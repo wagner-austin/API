@@ -57,6 +57,13 @@ class TestGetHackathonTags:
         assert "api" in tags
         assert "backend" in tags
 
+    def test_unmapped_theme_added_as_raw(self) -> None:
+        """Test theme with no mapping is added as raw lowercased name."""
+        theme = make_fake_theme(name="SomeRandomTheme123")
+        h = make_fake_hackathon(themes=(theme,))
+        tags = _get_hackathon_tags(h)
+        assert "somerandomtheme123" in tags
+
 
 class TestGetProfileTags:
     """Tests for _get_profile_tags function."""
