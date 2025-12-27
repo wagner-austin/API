@@ -12,6 +12,7 @@ import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets import DatasetRegistry
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -25,6 +26,7 @@ from scripts.optimize.modes import (
 
 from .conftest import (
     FakeSaveModelBackend,
+    make_fake_cleargbm_result,
     make_fake_dataset_config,
     make_fake_lightgbm_result,
     make_fake_loaded_dataset,
@@ -99,7 +101,7 @@ class TestComparePresets:
         original = _hooks.xgboost_runner
         _hooks.xgboost_runner = fake_runner
         try:
-            compare_presets("xgboost", "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("xgboost",), "taiwan", 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
             assert "none" in presets_called
             assert "log_only" in presets_called
@@ -151,7 +153,7 @@ class TestComparePresets:
         original = _hooks.mlp_runner
         _hooks.mlp_runner = fake_runner
         try:
-            compare_presets("mlp", "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("mlp",), "taiwan", 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.mlp_runner = original
@@ -197,7 +199,7 @@ class TestComparePresets:
         original = _hooks.lightgbm_runner
         _hooks.lightgbm_runner = fake_runner
         try:
-            compare_presets("lightgbm", "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("lightgbm",), "taiwan", 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.lightgbm_runner = original
@@ -243,10 +245,55 @@ class TestComparePresets:
         original = _hooks.lstm_runner
         _hooks.lstm_runner = fake_runner
         try:
-            compare_presets("lstm", "taiwan", 10, "cpu", None, save_model=False)
+            compare_presets(("lstm",), "taiwan", 10, "cpu", None, save_model=False)
             assert len(presets_called) == 4
         finally:
             _hooks.lstm_runner = original
+
+    def test_runs_all_presets_cleargbm(self) -> None:
+        """Test compare_presets runs all four presets with ClearGBM."""
+        presets_called: list[str] = []
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
+        ) -> ClearGBMOptimizationResult:
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "trial_number": 1,
+                        "n_trials_total": 5,
+                        "current_auc": 0.80,
+                        "best_auc": 0.80,
+                        "best_trial": 1,
+                        "is_best": True,
+                        "best_learning_rate": 0.1,
+                        "best_n_estimators": 100,
+                        "best_max_depth": 5,
+                    }
+                )
+            _ = phase_callback  # Available for phase reporting
+            if "none" in config_json and "log_only" not in config_json:
+                presets_called.append("none")
+            elif "log_only" in config_json:
+                presets_called.append("log_only")
+            elif "ratios_only" in config_json:
+                presets_called.append("ratios_only")
+            else:
+                presets_called.append("full")
+            return make_fake_cleargbm_result()
+
+        original = _hooks.cleargbm_runner
+        _hooks.cleargbm_runner = fake_runner
+        try:
+            compare_presets(("cleargbm",), "taiwan", 10, "cpu", None, save_model=False)
+            assert len(presets_called) == 4
+        finally:
+            _hooks.cleargbm_runner = original
 
     def test_compare_presets_with_save_model_true(self, tmp_path: Path) -> None:
         """Test compare_presets with save_model=True.
@@ -304,7 +351,7 @@ class TestComparePresets:
 
             # Run with save_model=True
             compare_presets(
-                "xgboost", "taiwan", 5, "cpu", None, save_model=True, project_root=tmp_path
+                ("xgboost",), "taiwan", 5, "cpu", None, save_model=True, project_root=tmp_path
             )
 
             # Verify all presets were called

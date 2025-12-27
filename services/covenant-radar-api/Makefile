@@ -21,7 +21,7 @@ lint:
 test:
 	poetry lock
 	poetry install --with dev
-	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run pytest -n auto -v @covArgs
+	poetry run pytest -o "addopts=" -n auto --dist loadscope -v --cov=src --cov=scripts --cov-branch --cov-report=term-missing
 
 # Check: run lint then test
 check: lint | test

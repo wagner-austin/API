@@ -18,7 +18,6 @@ from platform_core.logging import (
     get_rich_console,
 )
 
-from scripts.optimize._formatters import format_elapsed
 from scripts.optimize._runners import (
     _run_cleargbm_with_progress,
     _run_lightgbm_with_progress,
@@ -92,10 +91,11 @@ def compare_presets(
 
         for backend in backends:
             for preset in presets:
-                progress.update(
-                    task,
-                    description=f"Running [bold cyan]{backend.upper()}[/bold cyan] / [yellow]{preset}[/yellow]...",
+                desc = (
+                    f"Running [bold cyan]{backend.upper()}[/bold cyan] "
+                    f"/ [yellow]{preset}[/yellow]..."
                 )
+                progress.update(task, description=desc)
 
                 if backend == "xgboost":
                     result, elapsed, _ = _run_xgboost_with_progress(
@@ -128,7 +128,15 @@ def compare_presets(
                         project_root=project_root,
                     )
 
-                results.append((backend, preset, result["best_val_auc"], result["n_features"], elapsed))
+                results.append(
+                    (
+                        backend,
+                        preset,
+                        result["best_val_auc"],
+                        result["n_features"],
+                        elapsed,
+                    )
+                )
                 progress.advance(task)
 
     _print_multi_backend_preset_comparison(results, dataset)
@@ -198,9 +206,11 @@ def _print_multi_backend_preset_comparison(
     console = get_rich_console()
 
     console.print()
-    table = create_rich_table(
-        title=f"[bold magenta]Backend × Preset Comparison - {dataset.upper()}[/bold magenta] [dim](sorted by AUC)[/dim]"
+    title = (
+        f"[bold magenta]Backend x Preset Comparison - {dataset.upper()}[/bold magenta] "
+        "[dim](sorted by AUC)[/dim]"
     )
+    table = create_rich_table(title=title)
     table.add_column("Rank", style="bold white", justify="center")
     table.add_column("Backend", style="cyan")
     table.add_column("Preset", style="blue")
@@ -570,11 +580,7 @@ def _print_multi_backend_summary(
     console.print()
 
 
-# Re-export for backwards compatibility
-_format_elapsed = format_elapsed
-
 __all__ = [
-    "_format_elapsed",
     "compare_presets",
     "run_all_datasets",
     "run_multiple_backends",

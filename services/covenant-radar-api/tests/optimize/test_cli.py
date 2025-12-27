@@ -77,6 +77,11 @@ class TestParseSingleBackend:
         result: str = _parse_single_backend("lstm")
         assert result == "lstm"
 
+    def test_parse_cleargbm(self) -> None:
+        """Test parsing cleargbm backend."""
+        result: str = _parse_single_backend("cleargbm")
+        assert result == "cleargbm"
+
     def test_parse_invalid_raises_system_exit(self) -> None:
         """Test parsing invalid backend raises SystemExit."""
         with pytest.raises(SystemExit) as exc_info:

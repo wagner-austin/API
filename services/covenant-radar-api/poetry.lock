@@ -234,6 +234,9 @@ groups = ["main"]
 files = []
 develop = true
 
+[package.dependencies]
+numpy = "^2.3.5"
+
 [package.source]
 type = "directory"
 url = "../../libs/cleargbm"

@@ -204,6 +204,10 @@ class TestParseBackendName:
         """'lightgbm' is accepted."""
         assert parse_backend_name("lightgbm") == "lightgbm"
 
+    def test_parse_backend_name_accepts_cleargbm(self) -> None:
+        """'cleargbm' is accepted."""
+        assert parse_backend_name("cleargbm") == "cleargbm"
+
     def test_parse_backend_name_rejects_invalid_string(self) -> None:
         """Invalid backend name raises ValueError."""
         with pytest.raises(ValueError, match="backend must be one of"):

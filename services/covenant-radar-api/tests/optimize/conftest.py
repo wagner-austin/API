@@ -19,6 +19,7 @@ from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
+    ClearGBMConfig,
     EvalMetrics,
     FeatureImportance,
     LightGBMConfig,
@@ -30,6 +31,7 @@ from covenant_ml.types import (
 from numpy.typing import NDArray
 from platform_core.logging import setup_rich_logging
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -242,6 +244,55 @@ def make_fake_lstm_result(
     }
 
 
+def make_fake_cleargbm_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_val_auc: float = 0.85,
+) -> ClearGBMOptimizationResult:
+    """Create a fake ClearGBM optimization result for testing."""
+    return {
+        "backend": "cleargbm",
+        "status": "complete",
+        "dataset": dataset,
+        "n_samples": 1000,
+        "n_features": 100,
+        "feature_preset": feature_preset,
+        "n_trials_complete": 10,
+        "n_trials_pruned": 2,
+        "n_trials_failed": 0,
+        "best_trial_number": 5,
+        "best_val_auc": best_val_auc,
+        "best_max_depth": 5,
+        "best_n_estimators": 100,
+        "best_learning_rate": 0.1,
+        "best_min_samples_split": 10,
+        "best_min_samples_leaf": 5,
+        "best_max_bins": 64,
+        "best_subsample": 1.0,
+        "duration_seconds": 10.0,
+        "recommended_config": ClearGBMConfig(
+            n_estimators=100,
+            max_depth=5,
+            learning_rate=0.1,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            max_features=None,
+            max_bins=64,
+            subsample=1.0,
+            random_state=42,
+            track_contributions=True,
+            monotonic_constraints=None,
+            reg_alpha=0.0,
+            reg_lambda=0.0,
+            n_jobs=1,
+            train_ratio=0.7,
+            val_ratio=0.15,
+            test_ratio=0.15,
+            early_stopping_rounds=10,
+        ),
+    }
+
+
 # =============================================================================
 # Fake Backend Classes for save_model=True Tests
 # =============================================================================
@@ -415,6 +466,7 @@ __all__ = [
     "FakePreparedClassifier",
     "FakeSaveModelBackend",
     "FeaturePresetLiteral",
+    "make_fake_cleargbm_result",
     "make_fake_dataset_config",
     "make_fake_lightgbm_result",
     "make_fake_loaded_dataset",

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import scripts._test_hooks as _hooks
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -17,6 +18,7 @@ from scripts._test_hooks import (
 )
 from scripts.optimize.runner import (
     get_project_root,
+    run_cleargbm,
     run_lightgbm,
     run_lstm,
     run_mlp,
@@ -24,6 +26,7 @@ from scripts.optimize.runner import (
 )
 
 from .conftest import (
+    make_fake_cleargbm_result,
     make_fake_lightgbm_result,
     make_fake_lstm_result,
     make_fake_mlp_result,
@@ -300,3 +303,69 @@ class TestRunLSTM:
             assert "60" in config_json
         finally:
             _hooks.lstm_runner = original
+
+
+class TestRunClearGBM:
+    """Tests for run_cleargbm function."""
+
+    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
+        """Test run_cleargbm uses the cleargbm_runner hook."""
+        fake_result = make_fake_cleargbm_result()
+        call_args: list[tuple[str, Path, Path]] = []
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
+        ) -> ClearGBMOptimizationResult:
+            _ = progress_callback  # Available for progress reporting
+            _ = phase_callback  # Available for phase reporting
+            call_args.append((config_json, external_dir, output_dir))
+            return fake_result
+
+        original = _hooks.cleargbm_runner
+        _hooks.cleargbm_runner = fake_runner
+        try:
+            result: ClearGBMOptimizationResult = run_cleargbm("taiwan", 10, "full", "cpu", None)
+            assert result == fake_result
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert "taiwan" in config_json
+            assert "10" in config_json
+            assert "full" in config_json
+            # ClearGBM-specific config
+            assert "early_stopping_rounds" in config_json
+        finally:
+            _hooks.cleargbm_runner = original
+
+    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
+        """Test run_cleargbm includes timeout in config when provided."""
+        fake_result = make_fake_cleargbm_result()
+        call_args: list[tuple[str, Path, Path]] = []
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
+        ) -> ClearGBMOptimizationResult:
+            _ = progress_callback  # Available for progress reporting
+            _ = phase_callback  # Available for phase reporting
+            call_args.append((config_json, external_dir, output_dir))
+            return fake_result
+
+        original = _hooks.cleargbm_runner
+        _hooks.cleargbm_runner = fake_runner
+        try:
+            run_cleargbm("taiwan", 10, "full", "cpu", 60)
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert "timeout_seconds" in config_json
+            assert "60" in config_json
+        finally:
+            _hooks.cleargbm_runner = original

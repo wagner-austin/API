@@ -59,4 +59,6 @@ def suppress_verbose_logging() -> None:
 
     # Suppress XGBoost/LightGBM GPU fallback warnings
     warnings.filterwarnings("ignore", message=".*No visible GPU is found.*", category=UserWarning)
-    warnings.filterwarnings("ignore", message=".*Device is changed from GPU to CPU.*", category=UserWarning)
+    warnings.filterwarnings(
+        "ignore", message=".*Device is changed from GPU to CPU.*", category=UserWarning
+    )

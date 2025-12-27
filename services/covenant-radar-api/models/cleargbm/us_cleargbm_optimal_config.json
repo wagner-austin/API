@@ -1,0 +1,1 @@
+{"n_estimators":144,"max_depth":10,"learning_rate":0.19030368381735815,"min_samples_split":38,"min_samples_leaf":13,"max_features":null,"max_bins":32,"subsample":0.8404460046972835,"random_state":42,"track_contributions":true,"monotonic_constraints":null,"reg_alpha":0.0,"reg_lambda":0.0,"n_jobs":1,"train_ratio":0.7,"val_ratio":0.15,"test_ratio":0.15,"early_stopping_rounds":10}

@@ -16,6 +16,7 @@ from scripts.optimize.display import (
 from scripts.optimize.history import XGBoostHistoryEntry
 
 from .conftest import (
+    make_fake_cleargbm_result,
     make_fake_lightgbm_result,
     make_fake_lstm_result,
     make_fake_mlp_result,
@@ -63,6 +64,13 @@ class TestCreateHyperparamsTable:
         """Test table is created for LSTM hyperparameters."""
         result = make_fake_lstm_result()
         table = create_hyperparams_table("lstm", result)
+        assert callable(table.add_column)
+        assert callable(table.add_row)
+
+    def test_creates_cleargbm_table(self) -> None:
+        """Test table is created for ClearGBM hyperparameters."""
+        result = make_fake_cleargbm_result()
+        table = create_hyperparams_table("cleargbm", result)
         assert callable(table.add_column)
         assert callable(table.add_row)
 
@@ -122,20 +130,20 @@ class TestFormatElapsed:
 
     def test_formats_seconds_under_one_minute(self) -> None:
         """Test format for times under 60 seconds."""
-        from scripts.optimize.modes import _format_elapsed
+        from scripts.optimize._formatters import format_elapsed
 
-        assert _format_elapsed(0.0) == "0s"
-        assert _format_elapsed(30.5) == "30s"
-        assert _format_elapsed(59.9) == "60s"
+        assert format_elapsed(0.0) == "0s"
+        assert format_elapsed(30.5) == "30s"
+        assert format_elapsed(59.9) == "60s"
 
     def test_formats_minutes_and_seconds(self) -> None:
         """Test format for times >= 60 seconds."""
-        from scripts.optimize.modes import _format_elapsed
+        from scripts.optimize._formatters import format_elapsed
 
-        assert _format_elapsed(60.0) == "1m 00s"
-        assert _format_elapsed(90.0) == "1m 30s"
-        assert _format_elapsed(125.0) == "2m 05s"
-        assert _format_elapsed(3661.0) == "61m 01s"
+        assert format_elapsed(60.0) == "1m 00s"
+        assert format_elapsed(90.0) == "1m 30s"
+        assert format_elapsed(125.0) == "2m 05s"
+        assert format_elapsed(3661.0) == "61m 01s"
 
 
 class TestFormatDelta:

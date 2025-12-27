@@ -38,7 +38,7 @@ Pluggable dataset loading system and cross-validation support for bankruptcy pre
 | `CSVLoader` | `datasets/loaders/csv_loader.py` |
 | `ARFFLoader` | `datasets/loaders/arff_loader.py` |
 
-**Registered datasets:** taiwan, us, polish (3 of 38+)
+**Registered datasets:** taiwan, us, polish, kaggle_company_bankruptcy, kaggle_credit_default, kaggle_credit_risk, kaggle_heloc, kaggle_give_me_credit, kaggle_loan_default (9 of 38+)
 
 ### Preprocessing (`covenant_ml.preprocessing`)
 
@@ -54,7 +54,7 @@ Pluggable dataset loading system and cross-validation support for bankruptcy pre
 3. Impute missing values (median per feature)
 4. Z-score normalization (mean=0, std=1)
 
-All backends (XGBoost, LightGBM, MLP, LSTM) use `preprocess_data_splits()`.
+All backends (XGBoost, LightGBM, ClearGBM, MLP, LSTM) use `preprocess_data_splits()`.
 
 ### Service Integration
 

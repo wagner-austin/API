@@ -14,6 +14,7 @@ import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets import DatasetRegistry
 from scripts._test_hooks import (
+    ClearGBMOptimizationResult,
     LightGBMOptimizationResult,
     LSTMOptimizationResult,
     MLPOptimizationResult,
@@ -23,6 +24,7 @@ from scripts.optimize._runners import run_single_with_progress
 
 from .conftest import (
     FakeSaveModelBackend,
+    make_fake_cleargbm_result,
     make_fake_dataset_config,
     make_fake_lightgbm_result,
     make_fake_loaded_dataset,
@@ -345,6 +347,93 @@ class TestRunSingleWithProgress:
             assert result["result"]["backend"] == "lstm"
         finally:
             _hooks.lstm_runner = original
+
+    def test_runs_cleargbm_backend(self) -> None:
+        """Test run_single_with_progress uses ClearGBM backend correctly."""
+        call_count = 0
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
+            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
+            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
+        ) -> ClearGBMOptimizationResult:
+            nonlocal call_count
+            call_count += 1
+            # Exercise the phase callback if provided
+            if phase_callback is not None:
+                phase_callback(
+                    {
+                        "phase": "loading_data",
+                        "dataset": "taiwan",
+                        "n_samples": 0,
+                        "n_features": 0,
+                    }
+                )
+                phase_callback(
+                    {
+                        "phase": "feature_engineering",
+                        "dataset": "taiwan",
+                        "n_samples": 1000,
+                        "n_features": 100,
+                    }
+                )
+                phase_callback(
+                    {
+                        "phase": "optimizing",
+                        "dataset": "taiwan",
+                        "n_samples": 1000,
+                        "n_features": 150,
+                    }
+                )
+                phase_callback(
+                    {
+                        "phase": "saving",
+                        "dataset": "taiwan",
+                        "n_samples": 1000,
+                        "n_features": 150,
+                    }
+                )
+            if progress_callback is not None:
+                progress_callback(
+                    {
+                        "trial_number": 1,
+                        "n_trials_total": 5,
+                        "current_auc": 0.80,
+                        "best_auc": 0.80,
+                        "best_trial": 1,
+                        "is_best": True,
+                        "best_learning_rate": 0.1,
+                        "best_max_depth": 5,
+                        "best_n_estimators": 100,
+                    }
+                )
+            if loading_progress_callback is not None:
+                loading_progress_callback(
+                    {
+                        "dataset": "taiwan",
+                        "phase": "reading",
+                        "percent_complete": 100.0,
+                        "rows_processed": 1000,
+                        "rows_total": 1000,
+                        "message": "Loaded 1000 rows",
+                    }
+                )
+            return make_fake_cleargbm_result()
+
+        original = _hooks.cleargbm_runner
+        _hooks.cleargbm_runner = fake_runner
+        try:
+            result = run_single_with_progress(
+                "cleargbm", "taiwan", 5, "full", "cpu", None, save_model=False
+            )
+            assert call_count == 1
+            assert result["backend"] == "cleargbm"
+            assert result["result"]["backend"] == "cleargbm"
+        finally:
+            _hooks.cleargbm_runner = original
 
     def test_run_single_with_save_model_true(self, tmp_path: Path) -> None:
         """Test run_single_with_progress with save_model=True.

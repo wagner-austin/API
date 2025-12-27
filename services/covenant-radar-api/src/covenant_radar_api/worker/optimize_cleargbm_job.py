@@ -485,13 +485,8 @@ def run_cleargbm_optimization(
         f.write(dump_json_str(result_dict))
 
     # Build config dict - handle None values for JSON serialization
+    # Note: monotonic_constraints is always None since _generate_cleargbm_config doesn't set it
     max_features_val: JSONValue = recommended_config["max_features"]
-    monotonic_raw = recommended_config["monotonic_constraints"]
-    monotonic_val: dict[str, JSONValue] | None = None
-    if monotonic_raw is not None:
-        monotonic_val = {}
-        for k, v in monotonic_raw.items():
-            monotonic_val[k] = v
 
     config_dict: dict[str, JSONValue] = {
         "n_estimators": recommended_config["n_estimators"],
@@ -504,7 +499,7 @@ def run_cleargbm_optimization(
         "subsample": recommended_config["subsample"],
         "random_state": recommended_config["random_state"],
         "track_contributions": recommended_config["track_contributions"],
-        "monotonic_constraints": monotonic_val,
+        "monotonic_constraints": None,
         "reg_alpha": recommended_config["reg_alpha"],
         "reg_lambda": recommended_config["reg_lambda"],
         "n_jobs": recommended_config["n_jobs"],
@@ -570,14 +565,9 @@ def process_cleargbm_optimize_job(config_json: str) -> dict[str, JSONValue]:
     result = run_cleargbm_optimization(config_json, external_dir, output_dir)
 
     # Convert to JSON-serializable dict - handle None values
+    # Note: monotonic_constraints is always None since _generate_cleargbm_config doesn't set it
     rec_config = result["recommended_config"]
     max_features_json: JSONValue = rec_config["max_features"]
-    monotonic_raw = rec_config["monotonic_constraints"]
-    monotonic_json: dict[str, JSONValue] | None = None
-    if monotonic_raw is not None:
-        monotonic_json = {}
-        for k, v in monotonic_raw.items():
-            monotonic_json[k] = v
 
     config_json_dict: dict[str, JSONValue] = {
         "n_estimators": rec_config["n_estimators"],
@@ -590,7 +580,7 @@ def process_cleargbm_optimize_job(config_json: str) -> dict[str, JSONValue]:
         "subsample": rec_config["subsample"],
         "random_state": rec_config["random_state"],
         "track_contributions": rec_config["track_contributions"],
-        "monotonic_constraints": monotonic_json,
+        "monotonic_constraints": None,
         "reg_alpha": rec_config["reg_alpha"],
         "reg_lambda": rec_config["reg_lambda"],
         "n_jobs": rec_config["n_jobs"],
