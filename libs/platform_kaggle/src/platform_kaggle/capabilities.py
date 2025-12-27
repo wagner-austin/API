@@ -46,7 +46,15 @@ def _detect_ml_capabilities(
             CodebaseCapability(
                 name="xgboost_tabular",
                 strength="strong",
-                tags=("tabular", "classification", "regression", "xgboost"),
+                tags=(
+                    "tabular",
+                    "classification",
+                    "regression",
+                    "xgboost",
+                    "ml",
+                    "ai",
+                    "data-science",
+                ),
                 description="XGBoost gradient boosting for tabular data",
             )
         )
@@ -57,7 +65,15 @@ def _detect_ml_capabilities(
             CodebaseCapability(
                 name="lightgbm_tabular",
                 strength="strong",
-                tags=("tabular", "classification", "regression", "lightgbm"),
+                tags=(
+                    "tabular",
+                    "classification",
+                    "regression",
+                    "lightgbm",
+                    "ml",
+                    "ai",
+                    "data-science",
+                ),
                 description="LightGBM for large-scale tabular data",
             )
         )
@@ -68,7 +84,7 @@ def _detect_ml_capabilities(
             CodebaseCapability(
                 name="pytorch_deep_learning",
                 strength="strong",
-                tags=("deep-learning", "neural-network", "pytorch"),
+                tags=("deep-learning", "neural-network", "pytorch", "ml", "ai"),
                 description="PyTorch for deep learning models",
             )
         )
@@ -79,7 +95,7 @@ def _detect_ml_capabilities(
             CodebaseCapability(
                 name="hyperparameter_optimization",
                 strength="strong",
-                tags=("optimization", "hyperparameter-tuning", "optuna"),
+                tags=("optimization", "hyperparameter-tuning", "optuna", "ml"),
                 description="Optuna for hyperparameter optimization",
             )
         )
@@ -90,7 +106,15 @@ def _detect_ml_capabilities(
             CodebaseCapability(
                 name="sklearn_ml",
                 strength="moderate",
-                tags=("tabular", "classification", "regression", "sklearn"),
+                tags=(
+                    "tabular",
+                    "classification",
+                    "regression",
+                    "sklearn",
+                    "ml",
+                    "ai",
+                    "data-science",
+                ),
                 description="scikit-learn for machine learning",
             )
         )
@@ -216,6 +240,45 @@ def _detect_transformers_capabilities(
                 description="SentencePiece for subword tokenization",
             )
         )
+
+    return tuple(capabilities)
+
+
+def _detect_domain_capabilities(
+    libs: tuple[LibInfo, ...],
+    services: tuple[ServiceInfo, ...],
+) -> tuple[CodebaseCapability, ...]:
+    """Detect domain-specific capabilities from service names.
+
+    Args:
+        libs: Scanned library information.
+        services: Scanned service information.
+
+    Returns:
+        Tuple of detected domain capabilities.
+    """
+    capabilities: list[CodebaseCapability] = []
+
+    # Check for fintech/loan-related services
+    for service in services:
+        name_lower = service.name.lower()
+        if "covenant" in name_lower or "loan" in name_lower:
+            capabilities.append(
+                CodebaseCapability(
+                    name="loan_covenant_monitoring",
+                    strength="strong",
+                    tags=(
+                        "fintech",
+                        "finance",
+                        "banking",
+                        "loans",
+                        "risk",
+                        "compliance",
+                    ),
+                    description="Loan covenant monitoring and breach prediction",
+                )
+            )
+            break  # Only add once
 
     return tuple(capabilities)
 
@@ -426,8 +489,9 @@ def build_profile(
     cv_caps = _detect_cv_capabilities(libs, services)
     transformers_caps = _detect_transformers_capabilities(libs, services)
     nlp_caps = _detect_nlp_capabilities(libs, services)
+    domain_caps = _detect_domain_capabilities(libs, services)
 
-    all_caps = ml_caps + cv_caps + transformers_caps + nlp_caps
+    all_caps = ml_caps + cv_caps + transformers_caps + nlp_caps + domain_caps
 
     return CodebaseProfile(
         capabilities=all_caps,

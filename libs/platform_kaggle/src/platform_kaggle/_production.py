@@ -1,39 +1,29 @@
-"""Production implementations for Kaggle API access.
-
-This module contains production implementations that use the hooks system
-for testability. Tests can override hooks.kaggle_module to provide fakes.
-"""
+"""Production implementations for Kaggle API access."""
 
 from __future__ import annotations
 
 from .types import KaggleApiProtocol, KaggleClientProtocol
 
 
-def create_kaggle_api() -> KaggleApiProtocol:
-    """Create and authenticate real Kaggle API client.
+def _get_kaggle_api() -> KaggleApiProtocol:
+    """Return the pre-authenticated kaggle.api singleton.
 
-    This function:
-    1. Gets the kaggle module via hooks.kaggle_module
-    2. Creates a KaggleApi instance
-    3. Calls authenticate() which reads ~/.kaggle/kaggle.json
-
-    Returns:
-        Authenticated KaggleApi instance.
-
-    Raises:
-        SystemExit: If kaggle.json credentials file is not found.
+    The kaggle module authenticates at import time using KAGGLE_API_TOKEN.
     """
-    from .testing import hooks
+    import kaggle
 
-    kaggle_mod = hooks.kaggle_module()
-    api: KaggleApiProtocol = kaggle_mod.KaggleApi()
-    api.authenticate()
+    api: KaggleApiProtocol = kaggle.api
     return api
 
 
 def default_kaggle_api_factory() -> KaggleApiProtocol:
-    """Production factory for Kaggle API - calls create_kaggle_api."""
-    return create_kaggle_api()
+    """Factory that uses hooks.kaggle_api_factory.
+
+    In production, returns kaggle.api. Tests can override via hooks.
+    """
+    from .testing import hooks
+
+    return hooks.kaggle_api_factory()
 
 
 def make_kaggle_client() -> KaggleClientProtocol:

@@ -1,8 +1,8 @@
 """Kaggle API client wrapper.
 
 Provides a typed interface to the Kaggle API for listing and retrieving
-competition metadata. Authentication is handled via kaggle.json or
-environment variables.
+competition metadata. Authentication is handled via the KAGGLE_API_TOKEN
+environment variable.
 """
 
 from __future__ import annotations
@@ -101,8 +101,8 @@ class KaggleClient:
     """Kaggle API client for competition discovery.
 
     Wraps the Kaggle Python API to provide typed access to competition
-    metadata. Requires authentication via kaggle.json or environment
-    variables (KAGGLE_USERNAME, KAGGLE_KEY).
+    metadata. Requires authentication via KAGGLE_API_TOKEN environment
+    variable.
 
     Attributes:
         _api: Authenticated Kaggle API instance.
@@ -130,19 +130,30 @@ class KaggleClient:
         Returns:
             Tuple of matching competitions.
         """
-        search_str = search if search is not None else ""
-        category_str = _to_api_category(category) if category is not None else ""
+        category_str = _to_api_category(category) if category is not None else None
 
         response = self._api.competitions_list(
-            search=search_str,
+            search=search,
             category=category_str,
         )
 
+        # API can return None
+        if response is None:
+            return ()
+
         # New Kaggle API returns wrapper with .competitions property
         # Items are ApiCompetition objects with attribute access
+        # Both the list and individual items can be None
 
         result: list[Competition] = []
-        for comp in response.competitions:
+        competitions = response.competitions
+        if competitions is None:
+            return ()
+
+        for comp in competitions:
+            if comp is None:
+                continue
+
             # Extract fields using attribute access
             # Kaggle API 1.8.3 returns URLs in ref field, extract slug
             ref_url = str(comp.ref)
@@ -152,7 +163,14 @@ class KaggleClient:
             reward = str(comp.reward)
             deadline = str(comp.deadline)
             team_count = int(comp.team_count)
-            tags = tuple(str(t.ref) for t in comp.tags)
+
+            # Tags can be None or contain None items
+            raw_tags = comp.tags
+            if raw_tags is None:
+                tags: tuple[str, ...] = ()
+            else:
+                tags = tuple(str(t.ref) for t in raw_tags if t is not None)
+
             description = str(comp.description)
             url = str(comp.url)
 
@@ -181,13 +199,30 @@ class KaggleClient:
             Competition if found, None otherwise.
         """
         # Search for the competition by ref
-        response = self._api.competitions_list(search=ref, category="")
+        response = self._api.competitions_list(search=ref)
 
-        for comp in response.competitions:
+        if response is None:
+            return None
+
+        competitions = response.competitions
+        if competitions is None:
+            return None
+
+        for comp in competitions:
+            if comp is None:
+                continue
+
             # Kaggle API 1.8.3 returns URLs in ref field, extract slug
             ref_url = str(comp.ref)
             comp_ref = _extract_ref_slug(ref_url)
             if comp_ref == ref:
+                # Tags can be None or contain None items
+                raw_tags = comp.tags
+                if raw_tags is None:
+                    tags: tuple[str, ...] = ()
+                else:
+                    tags = tuple(str(t.ref) for t in raw_tags if t is not None)
+
                 return Competition(
                     ref=comp_ref,
                     title=str(comp.title),
@@ -195,7 +230,7 @@ class KaggleClient:
                     reward=str(comp.reward),
                     deadline=str(comp.deadline),
                     team_count=int(comp.team_count),
-                    tags=tuple(str(t.ref) for t in comp.tags),
+                    tags=tags,
                     description=str(comp.description),
                     url=str(comp.url),
                 )

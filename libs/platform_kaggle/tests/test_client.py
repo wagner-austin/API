@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from datetime import datetime
+
 import pytest
 
 from platform_kaggle.client import (
@@ -11,10 +14,168 @@ from platform_kaggle.client import (
     _to_api_category,
 )
 from platform_kaggle.testing import (
+    FakeApiTag,
     FakeKaggleApi,
     hooks,
     make_fake_kaggle_competition,
 )
+from platform_kaggle.types import (
+    CompetitionsResponseProtocol,
+    KaggleCompetitionProtocol,
+    KaggleTagProtocol,
+)
+
+# -----------------------------------------------------------------------------
+# Test Fixture Classes for Null Path Testing
+# -----------------------------------------------------------------------------
+
+
+class _NoneReturningApi:
+    """Fake API that returns None from competitions_list."""
+
+    def authenticate(self) -> None:
+        """No-op authenticate."""
+
+    def competitions_list(
+        self,
+        group: str | None = None,
+        category: str | None = None,
+        sort_by: str | None = None,
+        page: int | None = None,
+        search: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> CompetitionsResponseProtocol | None:
+        """Return None to simulate API failure."""
+        return None
+
+
+class _NoneCompetitionsResponse:
+    """Response with None competitions."""
+
+    @property
+    def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
+        """Return None competitions."""
+        return None
+
+
+class _NoneCompetitionsApi:
+    """Fake API that returns response with None competitions."""
+
+    def authenticate(self) -> None:
+        """No-op authenticate."""
+
+    def competitions_list(
+        self,
+        group: str | None = None,
+        category: str | None = None,
+        sort_by: str | None = None,
+        page: int | None = None,
+        search: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
+    ) -> CompetitionsResponseProtocol | None:
+        """Return response with None competitions."""
+        return _NoneCompetitionsResponse()
+
+
+class _MixedCompetitionsResponse:
+    """Response with None item in competitions list."""
+
+    def __init__(self, comps: Sequence[KaggleCompetitionProtocol | None]) -> None:
+        self._comps = comps
+
+    @property
+    def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
+        """Return competitions with None item."""
+        return self._comps
+
+
+class _CompetitionWithNoneTags:
+    """Competition with None tags."""
+
+    def __init__(self, ref_slug: str) -> None:
+        self._ref_slug = ref_slug
+        self._deadline = datetime(2025, 12, 31)
+
+    @property
+    def ref(self) -> str:
+        return f"https://www.kaggle.com/competitions/{self._ref_slug}"
+
+    @property
+    def title(self) -> str:
+        return "Null Tags Comp"
+
+    @property
+    def category(self) -> str:
+        return "Playground"
+
+    @property
+    def reward(self) -> str:
+        return "Knowledge"
+
+    @property
+    def deadline(self) -> datetime:
+        return self._deadline
+
+    @property
+    def team_count(self) -> int:
+        return 100
+
+    @property
+    def tags(self) -> Sequence[KaggleTagProtocol | None] | None:
+        return None
+
+    @property
+    def description(self) -> str:
+        return "Test"
+
+    @property
+    def url(self) -> str:
+        return f"https://www.kaggle.com/competitions/{self._ref_slug}"
+
+
+class _CompetitionWithNoneInTags:
+    """Competition with None item in tags list."""
+
+    def __init__(self) -> None:
+        self._deadline = datetime(2025, 12, 31)
+
+    @property
+    def ref(self) -> str:
+        return "https://www.kaggle.com/competitions/mixed-tags-comp"
+
+    @property
+    def title(self) -> str:
+        return "Mixed Tags Comp"
+
+    @property
+    def category(self) -> str:
+        return "Playground"
+
+    @property
+    def reward(self) -> str:
+        return "Knowledge"
+
+    @property
+    def deadline(self) -> datetime:
+        return self._deadline
+
+    @property
+    def team_count(self) -> int:
+        return 100
+
+    @property
+    def tags(self) -> Sequence[KaggleTagProtocol | None] | None:
+        return [FakeApiTag("valid-tag"), None, FakeApiTag("another-tag")]
+
+    @property
+    def description(self) -> str:
+        return "Test"
+
+    @property
+    def url(self) -> str:
+        return "https://www.kaggle.com/competitions/mixed-tags-comp"
 
 
 class TestNormalizeCategory:
@@ -284,5 +445,203 @@ class TestKaggleClient:
             if comp is None:
                 raise AssertionError("Expected competition to be found")
             assert comp.ref == "comp-target"
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_list_competitions_api_returns_none(self) -> None:
+        """Test list_competitions handles None response from API."""
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneReturningApi()
+
+        try:
+            client = KaggleClient()
+            result = client.list_competitions()
+            assert result == ()
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_list_competitions_competitions_is_none(self) -> None:
+        """Test list_competitions handles None competitions in response."""
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneCompetitionsApi()
+
+        try:
+            client = KaggleClient()
+            result = client.list_competitions()
+            assert result == ()
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_list_competitions_skips_none_competition(self) -> None:
+        """Test list_competitions skips None items in competitions list."""
+
+        class _MixedCompetitionsApi:
+            """Fake API that returns response with None item in list."""
+
+            def authenticate(self) -> None:
+                """No-op authenticate."""
+
+            def competitions_list(
+                self,
+                group: str | None = None,
+                category: str | None = None,
+                sort_by: str | None = None,
+                page: int | None = None,
+                search: str | None = None,
+                page_size: int | None = None,
+                page_token: str | None = None,
+            ) -> CompetitionsResponseProtocol | None:
+                """Return response with None item."""
+                valid_comp = make_fake_kaggle_competition(ref="valid-comp")
+                return _MixedCompetitionsResponse([None, valid_comp, None])
+
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _MixedCompetitionsApi()
+
+        try:
+            client = KaggleClient()
+            result = client.list_competitions()
+            # Should skip None items and only return valid competition
+            assert result[0].ref == "valid-comp"
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_list_competitions_handles_none_tags(self) -> None:
+        """Test list_competitions handles None tags on competition."""
+
+        class _NoneTagsResponse:
+            """Response with competitions having None tags."""
+
+            @property
+            def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
+                return [_CompetitionWithNoneTags("null-tags-comp"), _CompetitionWithNoneInTags()]
+
+        class _NoneTagsApi:
+            """Fake API for testing None tags handling."""
+
+            def authenticate(self) -> None:
+                pass
+
+            def competitions_list(
+                self,
+                group: str | None = None,
+                category: str | None = None,
+                sort_by: str | None = None,
+                page: int | None = None,
+                search: str | None = None,
+                page_size: int | None = None,
+                page_token: str | None = None,
+            ) -> CompetitionsResponseProtocol | None:
+                return _NoneTagsResponse()
+
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneTagsApi()
+
+        try:
+            client = KaggleClient()
+            result = client.list_competitions()
+
+            # First competition has None tags -> empty tuple
+            assert result[0].tags == ()
+            # Second competition has [valid, None, valid] -> (valid, valid)
+            assert result[1].tags == ("valid-tag", "another-tag")
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_get_competition_api_returns_none(self) -> None:
+        """Test get_competition handles None response from API."""
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneReturningApi()
+
+        try:
+            client = KaggleClient()
+            result = client.get_competition("any-ref")
+            assert result is None
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_get_competition_competitions_is_none(self) -> None:
+        """Test get_competition handles None competitions in response."""
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneCompetitionsApi()
+
+        try:
+            client = KaggleClient()
+            result = client.get_competition("any-ref")
+            assert result is None
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_get_competition_skips_none_in_list(self) -> None:
+        """Test get_competition skips None items when searching."""
+
+        class _MixedApi:
+            """Fake API with None items in response."""
+
+            def authenticate(self) -> None:
+                pass
+
+            def competitions_list(
+                self,
+                group: str | None = None,
+                category: str | None = None,
+                sort_by: str | None = None,
+                page: int | None = None,
+                search: str | None = None,
+                page_size: int | None = None,
+                page_token: str | None = None,
+            ) -> CompetitionsResponseProtocol | None:
+                target = make_fake_kaggle_competition(ref="target-comp")
+                return _MixedCompetitionsResponse([None, target, None])
+
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _MixedApi()
+
+        try:
+            client = KaggleClient()
+            result = client.get_competition("target-comp")
+            if result is None:
+                raise AssertionError("Expected to find competition")
+            assert result.ref == "target-comp"
+        finally:
+            hooks.kaggle_api_factory = original
+
+    def test_get_competition_handles_none_tags(self) -> None:
+        """Test get_competition handles None tags on found competition."""
+
+        class _NoneTagsResponse:
+            """Response with competition with None tags."""
+
+            @property
+            def competitions(self) -> Sequence[KaggleCompetitionProtocol | None] | None:
+                return [_CompetitionWithNoneTags("target")]
+
+        class _NoneTagsApi:
+            """Fake API for None tags test."""
+
+            def authenticate(self) -> None:
+                pass
+
+            def competitions_list(
+                self,
+                group: str | None = None,
+                category: str | None = None,
+                sort_by: str | None = None,
+                page: int | None = None,
+                search: str | None = None,
+                page_size: int | None = None,
+                page_token: str | None = None,
+            ) -> CompetitionsResponseProtocol | None:
+                return _NoneTagsResponse()
+
+        original = hooks.kaggle_api_factory
+        hooks.kaggle_api_factory = lambda: _NoneTagsApi()
+
+        try:
+            client = KaggleClient()
+            result = client.get_competition("target")
+            if result is None:
+                raise AssertionError("Expected to find competition")
+            assert result.tags == ()
         finally:
             hooks.kaggle_api_factory = original
