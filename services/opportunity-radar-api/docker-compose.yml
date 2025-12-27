@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/opportunity-radar-api/Dockerfile
+    container_name: opportunity-radar-api
+    ports:
+      - "8010:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opportunity.rule=PathPrefix(`/opportunity`)"
+      - "traefik.http.routers.opportunity.middlewares=opportunity-strip"
+      - "traefik.http.middlewares.opportunity-strip.stripprefix.prefixes=/opportunity"
+      - "traefik.http.services.opportunity.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - platform-network
+
+networks:
+  platform-network:
+    external: true
