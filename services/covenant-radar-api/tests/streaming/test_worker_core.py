@@ -283,6 +283,35 @@ class TestStreamingWorkerRun:
         assert total_messages == 5
         assert total_periods == 1
 
+    def test_run_exits_on_shutdown(self) -> None:
+        """Run loop exits when shutdown() is called via on_poll callback."""
+        (
+            worker,
+            fake_consumer,
+            _fake_producer,
+            _,
+            _,
+            _deal_repo,
+            _covenant_repo,
+            _,
+            _,
+        ) = make_streaming_worker()
+
+        # Set callback to trigger shutdown after first poll
+        def trigger_shutdown() -> None:
+            if fake_consumer.poll_count >= 1:
+                worker.shutdown()
+
+        fake_consumer.set_on_poll(trigger_shutdown)
+
+        # Run without max_iterations - should exit via shutdown
+        total_messages, total_periods = worker.run()
+
+        # Verify loop exited after shutdown was triggered
+        assert fake_consumer.poll_count >= 1
+        assert total_messages == 0
+        assert total_periods == 0
+
     def test_shutdown_processes_remaining_buffers(self) -> None:
         """Shutdown processes remaining buffered periods."""
         (

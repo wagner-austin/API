@@ -715,6 +715,8 @@ class FakeKafkaConsumer:
         self.message_queue: list[FakeConsumedMessage] = []
         self.commit_count = 0
         self.closed = False
+        self.poll_count = 0
+        self._on_poll: Callable[[], None] | None = None
 
     def subscribe(self, topics: tuple[str, ...]) -> None:
         """Record subscribed topics.
@@ -733,9 +735,20 @@ class FakeKafkaConsumer:
         Returns:
             Next message or None if queue empty.
         """
+        self.poll_count += 1
+        if self._on_poll is not None:
+            self._on_poll()
         if not self.message_queue:
             return None
         return self.message_queue.pop(0)
+
+    def set_on_poll(self, callback: Callable[[], None] | None) -> None:
+        """Set callback to invoke on each poll.
+
+        Args:
+            callback: Function to call on poll, or None to clear.
+        """
+        self._on_poll = callback
 
     def commit(self) -> None:
         """Increment commit counter."""
