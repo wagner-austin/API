@@ -20,7 +20,6 @@ fastapi = "^0.124"
 hypercorn = "^0.18"
 httpx = "^0.28"
 
-# Monorepo libs
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-codebase = { path = "../../libs/platform_codebase", develop = true }
 platform-kaggle = { path = "../../libs/platform_kaggle", develop = true }
@@ -59,7 +58,7 @@ disallow_any_explicit = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv", "typings"]
+exclude = [".venv"]
 
 [tool.ruff.lint]
 select = [

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -10,28 +10,25 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _find_monorepo_root_impl(start: Path) -> Path:
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
+
+
+_is_dir: Callable[[Path], bool] = _default_is_dir
+
+
+def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
-        if (current / "libs").is_dir():
+        if _is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")
         current = current.parent
 
 
-def _find_monorepo_root(start: Path) -> Path:
-    """Find monorepo root, using hook if set."""
-    # Import here to avoid circular imports at module load time
-    from model_trainer.core import _test_hooks
-
-    hook = _test_hooks.guard_find_monorepo_root
-    if hook is not None:
-        return hook(start)
-    return _find_monorepo_root_impl(start)
-
-
-def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -39,17 +36,6 @@ def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
     mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
     run_for_project: _RunForProject = mod.run_for_project
     return run_for_project
-
-
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load orchestrator, using hook if set."""
-    # Import here to avoid circular imports at module load time
-    from model_trainer.core import _test_hooks
-
-    hook = _test_hooks.guard_load_orchestrator
-    if hook is not None:
-        return hook(monorepo_root)
-    return _load_orchestrator_impl(monorepo_root)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

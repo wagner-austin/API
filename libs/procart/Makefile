@@ -3,7 +3,6 @@ SHELL := powershell.exe
 
 .PHONY: lint test check
 
-# Lint: venv cleanup, guards, Ruff, Mypy
 lint:
 	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
 	poetry lock
@@ -13,12 +12,10 @@ lint:
 	poetry run ruff format .
 	poetry run mypy src tests scripts
 
-# Test: install deps, then pytest with branch+statement coverage
 test:
 	poetry lock
 	poetry install --with dev
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run pytest -n auto -v @covArgs
 
-# Check: run lint then test
 check: lint | test
 

@@ -10,19 +10,18 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _default_is_dir(path: Path) -> bool:
+def _default_is_dir(p: Path) -> bool:
     """Production implementation - uses Path.is_dir()."""
-    return path.is_dir()
+    return p.is_dir()
 
 
-# Hook for testing - allows injecting a fake is_dir check.
-_is_dir_hook: Callable[[Path], bool] = _default_is_dir
+_is_dir: Callable[[Path], bool] = _default_is_dir
 
 
 def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
-        if _is_dir_hook(current / "libs"):
+        if _is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")

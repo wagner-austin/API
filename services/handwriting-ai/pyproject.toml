@@ -9,7 +9,6 @@ description = "Handwriting AI service for MNIST digit inference (HTTP)."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "handwriting_ai", from = "src" },
-  # Include runtime worker scripts as a package for console entry import
   { include = "scripts" },
 ]
 readme = "README.md"
@@ -28,7 +27,6 @@ Pillow = "^10.4.0"
 numpy = ">=1.26,<3"
 python-multipart = "^0.0.20"
 typing-extensions = "^4.12.2"
-# Torch CUDA 12.4 (explicit CUDA wheels for GPU support)
 torch = {version = "^2.5", source = "pytorch-cu124"}
 torchvision = {version = "^0.20", source = "pytorch-cu124"}
 redis = "^7.1"
@@ -93,7 +91,6 @@ no_implicit_reexport = true
 show_error_codes = true
 pretty = true
 files = ["src", "tests", "scripts"]
-# Include local typings and the monorepo guards library
 mypy_path = ["src"]
 explicit_package_bases = true
 

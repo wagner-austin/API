@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -10,12 +10,18 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _find_monorepo_root(start: Path) -> Path:
-    from platform_discord.testing import hooks
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
 
+
+_is_dir: Callable[[Path], bool] = _default_is_dir
+
+
+def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
-        if hooks.path_is_dir(current / "libs"):
+        if _is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")

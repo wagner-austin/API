@@ -11,6 +11,7 @@ packages = [
   { include = "instrument_io", from = "src" },
   { include = "scripts" },
 ]
+readme = "README.md"
 include = ["src/instrument_io/py.typed"]
 
 [tool.poetry.dependencies]

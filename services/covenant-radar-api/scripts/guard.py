@@ -10,12 +10,11 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _default_is_dir(path: Path) -> bool:
-    """Default is_dir check using Path.is_dir()."""
-    return path.is_dir()
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
 
 
-# Hook for is_dir checks - tests can override to simulate missing directories.
 _is_dir: Callable[[Path], bool] = _default_is_dir
 
 

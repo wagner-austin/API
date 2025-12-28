@@ -9,6 +9,7 @@ description = "Core music analytics library for Music Wrapped (TypedDict + Proto
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_music", from = "src" },
+  { include = "scripts" },
 ]
 readme = "README.md"
 include = ["src/platform_music/py.typed"]
@@ -51,7 +52,7 @@ explicit_package_bases = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv", "typings"]
+exclude = [".venv"]
 
 [tool.ruff.lint]
 select = [

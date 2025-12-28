@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "procart-api"
 version = "0.1.0"
 description = "Strict, typed FastAPI service orchestrating procart rendering."
-authors = ["PROJECTS Team <dev@example.com>"]
+authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "procart_api", from = "src" },
   { include = "scripts" },
@@ -74,7 +74,7 @@ mypy-init-return = true
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
-"typing.TypeAlias" = { msg = "Do not use TypeAlias; expand unions explicitly." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.coverage.run]
 source = ["src", "scripts"]

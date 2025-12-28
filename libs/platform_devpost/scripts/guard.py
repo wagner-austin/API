@@ -1,5 +1,3 @@
-"""Guard script for platform_devpost."""
-
 from __future__ import annotations
 
 import sys
@@ -9,30 +7,11 @@ from typing import Protocol
 
 
 class _RunForProject(Protocol):
-    """Protocol for run_for_project function."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project.
-
-        Args:
-            monorepo_root: Path to monorepo root.
-            project_root: Path to project root.
-
-        Returns:
-            Exit code (0 for success, non-zero for failure).
-        """
-        ...
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
 def _default_is_dir(p: Path) -> bool:
-    """Production implementation - uses Path.is_dir().
-
-    Args:
-        p: Path to check.
-
-    Returns:
-        True if path is a directory, False otherwise.
-    """
+    """Production implementation - uses Path.is_dir()."""
     return p.is_dir()
 
 
@@ -40,17 +19,6 @@ _is_dir: Callable[[Path], bool] = _default_is_dir
 
 
 def _find_monorepo_root(start: Path) -> Path:
-    """Find the monorepo root by looking for libs directory.
-
-    Args:
-        start: Starting path to search from.
-
-    Returns:
-        Path to monorepo root.
-
-    Raises:
-        RuntimeError: If monorepo root not found.
-    """
     current = start
     while True:
         if _is_dir(current / "libs"):
@@ -61,14 +29,6 @@ def _find_monorepo_root(start: Path) -> Path:
 
 
 def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load the orchestrator from monorepo_guards.
-
-    Args:
-        monorepo_root: Path to monorepo root.
-
-    Returns:
-        The run_for_project function.
-    """
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -79,14 +39,6 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run guards for this project.
-
-    Args:
-        argv: Command line arguments. If None, uses sys.argv[1:].
-
-    Returns:
-        Exit code (0 for success, non-zero for failure).
-    """
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root(project_root)

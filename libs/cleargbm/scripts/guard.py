@@ -1,12 +1,7 @@
-"""Guard script runner for cleargbm.
-
-Loads and runs monorepo_guards against the cleargbm library.
-"""
-
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -15,21 +10,18 @@ class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
+
+
+_is_dir: Callable[[Path], bool] = _default_is_dir
+
+
 def _find_monorepo_root(start: Path) -> Path:
-    """Find the monorepo root containing 'libs' directory.
-
-    Args:
-        start: Starting path to search from.
-
-    Returns:
-        Path to monorepo root.
-
-    Raises:
-        RuntimeError: If monorepo root not found.
-    """
     current = start
     while True:
-        if (current / "libs").is_dir():
+        if _is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")
@@ -37,14 +29,6 @@ def _find_monorepo_root(start: Path) -> Path:
 
 
 def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load the monorepo_guards orchestrator.
-
-    Args:
-        monorepo_root: Path to monorepo root.
-
-    Returns:
-        The run_for_project function.
-    """
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -55,14 +39,6 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run guard checks for cleargbm.
-
-    Args:
-        argv: Command line arguments (uses sys.argv if None).
-
-    Returns:
-        Exit code (0 = success, non-zero = failure).
-    """
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root(project_root)

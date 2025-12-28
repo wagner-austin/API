@@ -53,7 +53,7 @@ explicit_package_bases = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv", "typings"]
+exclude = [".venv"]
 
 [tool.ruff.lint]
 select = [

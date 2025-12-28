@@ -1,9 +1,7 @@
-"""Guard script for code quality checks."""
-
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -17,28 +15,10 @@ def _default_is_dir(p: Path) -> bool:
     return p.is_dir()
 
 
-def _is_dir(p: Path) -> bool:
-    """Check if path is a directory, using hook if set."""
-    # Import here to avoid circular imports
-    from opportunity_radar_api import _test_hooks
-
-    if _test_hooks.guard_is_dir is not None:
-        return _test_hooks.guard_is_dir(p)
-    return _default_is_dir(p)
+_is_dir: Callable[[Path], bool] = _default_is_dir
 
 
-def _find_monorepo_root_impl(start: Path) -> Path:
-    """Find monorepo root by looking for libs directory.
-
-    Args:
-        start: Starting path to search from.
-
-    Returns:
-        Path to monorepo root.
-
-    Raises:
-        RuntimeError: If libs directory not found.
-    """
+def _find_monorepo_root(start: Path) -> Path:
     current = start
     while True:
         if _is_dir(current / "libs"):
@@ -48,24 +28,7 @@ def _find_monorepo_root_impl(start: Path) -> Path:
         current = current.parent
 
 
-def _find_monorepo_root(start: Path) -> Path:
-    """Find monorepo root, using hook if set."""
-    from opportunity_radar_api import _test_hooks
-
-    if _test_hooks.guard_find_monorepo_root is not None:
-        return _test_hooks.guard_find_monorepo_root(start)
-    return _find_monorepo_root_impl(start)
-
-
-def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
-    """Load the monorepo guards orchestrator.
-
-    Args:
-        monorepo_root: Path to monorepo root.
-
-    Returns:
-        The run_for_project function from orchestrator.
-    """
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -75,24 +38,7 @@ def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
     return run_for_project
 
 
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load orchestrator, using hook if set."""
-    from opportunity_radar_api import _test_hooks
-
-    if _test_hooks.guard_load_orchestrator is not None:
-        return _test_hooks.guard_load_orchestrator(monorepo_root)
-    return _load_orchestrator_impl(monorepo_root)
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run guard checks for this project.
-
-    Args:
-        argv: Command line arguments. If None, uses sys.argv[1:].
-
-    Returns:
-        Exit code from guard checks.
-    """
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root(project_root)

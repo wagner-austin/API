@@ -1,17 +1,48 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Protocol
 
-from handwriting_ai import _test_hooks
+
+class _RunForProject(Protocol):
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+
+
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
+
+
+_is_dir: Callable[[Path], bool] = _default_is_dir
+
+
+def _find_monorepo_root(start: Path) -> Path:
+    current = start
+    while True:
+        if _is_dir(current / "libs"):
+            return current
+        if current.parent == current:
+            raise RuntimeError("monorepo root with 'libs' directory not found")
+        current = current.parent
+
+
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+    libs_path = monorepo_root / "libs"
+    guards_src = libs_path / "monorepo_guards" / "src"
+    sys.path.insert(0, str(guards_src))
+    sys.path.insert(0, str(libs_path))
+    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
+    run_for_project: _RunForProject = mod.run_for_project
+    return run_for_project
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
-    monorepo_root = _test_hooks.guard_find_monorepo_root(project_root)
-    run_for_project = _test_hooks.guard_load_orchestrator(monorepo_root)
+    monorepo_root = _find_monorepo_root(project_root)
+    run_for_project = _load_orchestrator(monorepo_root)
 
     args = list(argv) if argv is not None else list(sys.argv[1:])
     root_override: Path | None = None

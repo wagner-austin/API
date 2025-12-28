@@ -1,21 +1,41 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Protocol
 
-from turkic_api import _test_hooks
-from turkic_api._test_hooks import GuardRunForProjectProtocol
+
+class _RunForProject(Protocol):
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+
+
+def _default_is_dir(p: Path) -> bool:
+    """Production implementation - uses Path.is_dir()."""
+    return p.is_dir()
+
+
+_is_dir: Callable[[Path], bool] = _default_is_dir
 
 
 def _find_monorepo_root(start: Path) -> Path:
-    """Find monorepo root using hook for test injection."""
-    return _test_hooks.guard_find_monorepo_root(start)
+    current = start
+    while True:
+        if _is_dir(current / "libs"):
+            return current
+        if current.parent == current:
+            raise RuntimeError("monorepo root with 'libs' directory not found")
+        current = current.parent
 
 
-def _load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
-    """Load orchestrator using hook for test injection."""
-    return _test_hooks.guard_load_orchestrator(monorepo_root)
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+    libs_path = monorepo_root / "libs"
+    guards_src = libs_path / "monorepo_guards" / "src"
+    sys.path.insert(0, str(guards_src))
+    sys.path.insert(0, str(libs_path))
+    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
+    run_for_project: _RunForProject = mod.run_for_project
+    return run_for_project
 
 
 def main(argv: Sequence[str] | None = None) -> int:

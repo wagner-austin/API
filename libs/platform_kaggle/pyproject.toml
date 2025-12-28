@@ -57,7 +57,7 @@ follow_untyped_imports = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv", "typings"]
+exclude = [".venv"]
 
 [tool.ruff.lint]
 select = [

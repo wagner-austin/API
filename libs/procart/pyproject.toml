@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "procart"
 version = "0.1.0"
 description = "Strict, typed procedural-art core library."
-authors = ["PROJECTS Team <dev@example.com>"]
+authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "procart", from = "src" },
   { include = "scripts" },
@@ -16,7 +16,6 @@ include = ["src/procart/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-# Core numerical/image deps for future implementation
 numpy = "^2.3.5"
 Pillow = "^11.0.0"
 
@@ -69,7 +68,7 @@ mypy-init-return = true
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Any" = { msg = "Do not use typing.Any; prefer precise types or Protocols/TypedDicts." }
 "typing.cast" = { msg = "Do not use typing.cast; prefer adapters or precise types." }
-"typing.TypeAlias" = { msg = "Do not use TypeAlias; expand unions explicitly." }
+"typing.TypeAlias" = { msg = "Do not use TypeAlias; use Literal types or expand unions explicitly." }
 
 [tool.coverage.run]
 source = ["src", "scripts"]
