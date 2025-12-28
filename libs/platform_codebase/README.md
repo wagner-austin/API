@@ -80,6 +80,22 @@ print(f"Package: {name}")
 print(f"Dependencies: {dependencies}")
 ```
 
+### Dependency Utilities
+
+Helper functions for working with scanned dependencies:
+
+```python
+from platform_codebase import collect_all_dependencies, has_dependency
+
+# Collect all dependencies from libs and services
+all_deps = collect_all_dependencies(libs, services)
+# Returns: ("fastapi", "httpx", "xgboost", ...)
+
+# Check if a specific dependency exists
+if has_dependency(all_deps, "xgboost"):
+    print("XGBoost is available")
+```
+
 ### Building Profiles
 
 Consumer libraries (platform_kaggle, platform_devpost) use the scanned data to build capability profiles:

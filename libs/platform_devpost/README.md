@@ -91,13 +91,29 @@ profile = get_codebase_profile()
 Hackathons are matched against these capabilities:
 
 ```python
-from platform_devpost import match_hackathon
+from platform_devpost import match_hackathon, match_hackathons
 
+# Match single hackathon
 match = match_hackathon(hackathon, profile)
 # match.match_score: 0.0 - 1.0
 # match.recommendation: "strong_fit" | "good_fit" | "stretch" | "new_territory"
 # match.matched_capabilities: ("python", "machine_learning")
 # match.missing_capabilities: ("mobile_development",)
+
+# Match multiple hackathons at once
+matches = match_hackathons(hackathons, profile)
+```
+
+### Scanning Codebase Directly
+
+For advanced use cases:
+
+```python
+from pathlib import Path
+from platform_devpost import scan_codebase
+
+# Scan local filesystem for capabilities
+profile = scan_codebase(Path("/path/to/monorepo"))
 ```
 
 ## Testing

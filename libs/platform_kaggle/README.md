@@ -150,13 +150,35 @@ This separation allows capability detection to work with data from any source (l
 Competitions are matched against these capabilities:
 
 ```python
-from platform_kaggle import match_competition
+from platform_kaggle import match_competition, match_competitions
 
+# Match single competition
 match = match_competition(competition, profile)
 # match.match_score: 0.0 - 1.0
 # match.recommendation: "strong_fit" | "good_fit" | "stretch" | "new_territory"
 # match.matched_capabilities: ("xgboost", "classification")
 # match.missing_capabilities: ("deep_learning",)
+
+# Match multiple competitions at once
+matches = match_competitions(competitions, profile, min_score=0.3)
+```
+
+### Building Profiles Directly
+
+For advanced use cases, use `scan_codebase` or `build_profile`:
+
+```python
+from pathlib import Path
+from platform_kaggle import scan_codebase, build_profile
+from platform_codebase import scan_libs, scan_services
+
+# Scan local filesystem
+profile = scan_codebase(Path("/path/to/monorepo"))
+
+# Or build from pre-scanned data (for GitHub API scanning)
+libs = scan_libs(root)
+services = scan_services(root)
+profile = build_profile(libs, services)
 ```
 
 ## Testing
