@@ -6,7 +6,7 @@ import runpy
 from pathlib import Path
 
 import pytest
-from scripts import guard
+from scripts import _test_hooks, guard
 
 
 def test_find_monorepo_root_success() -> None:
@@ -27,14 +27,18 @@ def test_find_monorepo_root_success() -> None:
 def test_find_monorepo_root_not_found() -> None:
     """Test _find_monorepo_root raises when libs not found."""
     # Use hook to always return False
-    original_hook = guard._is_dir_hook
-    guard._is_dir_hook = lambda _: False
+    original_hook = _test_hooks.is_dir
+
+    def fake_is_dir(path: Path) -> bool:
+        return False
+
+    _test_hooks.is_dir = fake_is_dir
 
     try:
         with pytest.raises(RuntimeError, match=r"monorepo root.*not found"):
             guard._find_monorepo_root(Path("/some/deep/path"))
     finally:
-        guard._is_dir_hook = original_hook
+        _test_hooks.is_dir = original_hook
 
 
 def test_main_runs_orchestrator() -> None:
@@ -75,13 +79,13 @@ def test_main_with_unknown_argument() -> None:
     assert rc == 0 or rc > 0  # Any valid exit code
 
 
-def test_default_is_dir() -> None:
-    """Test _default_is_dir uses Path.is_dir()."""
+def test_real_is_dir() -> None:
+    """Test _real_is_dir uses Path.is_dir()."""
     script_path = Path(__file__).resolve()
     parent = script_path.parent
 
-    assert guard._default_is_dir(parent) is True
-    assert guard._default_is_dir(parent / "nonexistent") is False
+    assert _test_hooks._real_is_dir(parent) is True
+    assert _test_hooks._real_is_dir(parent / "nonexistent") is False
 
 
 def test_guard_entrypoint_runs_as_main() -> None:
