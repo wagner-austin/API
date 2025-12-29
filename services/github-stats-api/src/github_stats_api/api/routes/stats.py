@@ -66,6 +66,7 @@ class _StatsRoutes:
         show_icons: str | None = Query(default=None, description="Show icons"),
         include_all_commits: str | None = Query(default=None, description="Include all commits"),
         hide: str | None = Query(default=None, description="Stats to hide (comma-separated)"),
+        disable_animations: str | None = Query(default=None, description="Disable animations"),
     ) -> Response:
         """Get user stats SVG card.
 
@@ -77,6 +78,7 @@ class _StatsRoutes:
             show_icons: Whether to show icons.
             include_all_commits: Include all commits.
             hide: Comma-separated stats to hide.
+            disable_animations: Whether to disable CSS animations.
 
         Returns:
             SVG response.
@@ -88,6 +90,7 @@ class _StatsRoutes:
             show_icons=show_icons,
             include_all_commits=include_all_commits,
             hide=hide,
+            disable_animations=disable_animations,
         )
 
         settings = self._settings_provider()
@@ -117,6 +120,7 @@ class _StatsRoutes:
             hide_border=req["hide_border"],
             show_icons=req["show_icons"],
             hide=req["hide"],
+            disable_animations=req["disable_animations"],
         )
 
         cache_ttl = settings["cache_ttl_seconds"]
@@ -135,6 +139,7 @@ class _StatsRoutes:
         layout: str | None = Query(default=None, description="Layout style"),
         langs_count: str | None = Query(default=None, description="Number of languages"),
         hide: str | None = Query(default=None, description="Languages to hide (comma-separated)"),
+        disable_animations: str | None = Query(default=None, description="Disable animations"),
     ) -> Response:
         """Get top languages SVG card.
 
@@ -146,6 +151,7 @@ class _StatsRoutes:
             layout: Layout style.
             langs_count: Number of languages to show.
             hide: Comma-separated languages to hide.
+            disable_animations: Whether to disable CSS animations.
 
         Returns:
             SVG response.
@@ -157,6 +163,7 @@ class _StatsRoutes:
             layout=layout,
             langs_count=langs_count,
             hide=hide,
+            disable_animations=disable_animations,
         )
 
         settings = self._settings_provider()
@@ -187,6 +194,7 @@ class _StatsRoutes:
             hide_border=req["hide_border"],
             layout=req["layout"],
             langs_count=req["langs_count"],
+            disable_animations=req["disable_animations"],
         )
 
         cache_ttl = settings["cache_ttl_seconds"]
@@ -202,6 +210,7 @@ class _StatsRoutes:
         repo: str | None = Query(default=None, description="GitHub repo (owner/repo)"),
         theme: str | None = Query(default=None, description="Color theme"),
         hide_border: str | None = Query(default=None, description="Hide border"),
+        disable_animations: str | None = Query(default=None, description="Disable animations"),
     ) -> Response:
         """Get codebase capabilities SVG card.
 
@@ -210,6 +219,7 @@ class _StatsRoutes:
             repo: GitHub repository in owner/repo format.
             theme: Color theme name.
             hide_border: Whether to hide border.
+            disable_animations: Whether to disable CSS animations.
 
         Returns:
             SVG response.
@@ -218,6 +228,7 @@ class _StatsRoutes:
             repo=repo,
             theme=theme,
             hide_border=hide_border,
+            disable_animations=disable_animations,
         )
 
         settings = self._settings_provider()
@@ -259,6 +270,7 @@ class _StatsRoutes:
             response=response,
             theme_name=req["theme"],
             hide_border=req["hide_border"],
+            disable_animations=req["disable_animations"],
         )
 
         cache_ttl = settings["cache_ttl_seconds"]
