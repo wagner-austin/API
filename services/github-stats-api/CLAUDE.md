@@ -44,7 +44,7 @@ Returns an SVG image showing detected ML/AI capabilities, backends, frameworks, 
 | Param | Default | Description |
 |-------|---------|-------------|
 | `username` | required | GitHub username |
-| `theme` | `default` | Color theme (default, dark, dracula, github_dark, transparent) |
+| `theme` | `default` | Color theme (see Available Themes below) |
 | `hide_border` | `false` | Hide card border |
 | `show_icons` | `true` | Show stat icons |
 | `include_all_commits` | `false` | Include all commits, not just current year |
@@ -55,7 +55,7 @@ Returns an SVG image showing detected ML/AI capabilities, backends, frameworks, 
 | Param | Default | Description |
 |-------|---------|-------------|
 | `username` | required | GitHub username |
-| `theme` | `default` | Color theme |
+| `theme` | `default` | Color theme (see Available Themes below) |
 | `hide_border` | `false` | Hide card border |
 | `layout` | `default` | Layout style (default, compact, donut, pie) |
 | `langs_count` | `8` | Number of languages (1-20) |
@@ -66,28 +66,30 @@ Returns an SVG image showing detected ML/AI capabilities, backends, frameworks, 
 | Param | Default | Description |
 |-------|---------|-------------|
 | `repo` | required | GitHub repo in owner/repo format |
-| `theme` | `default` | Color theme |
+| `theme` | `default` | Color theme (see Available Themes below) |
 | `hide_border` | `false` | Hide card border |
 | `disable_animations` | `false` | Disable CSS animations |
 
 ## Embedding in GitHub README
 
-### Stats Card
+### Stats Card (with animated theme)
 ```markdown
-![GitHub Stats](https://github-stats-api-production-5042.up.railway.app/api?username=wagner-austin&theme=dracula)
+![GitHub Stats](https://github-stats-api-production-5042.up.railway.app/api?username=wagner-austin&theme=cyberpunk)
 ```
 
-### Languages Card
+### Languages Card (with animated theme)
 ```markdown
-![Top Languages](https://github-stats-api-production-5042.up.railway.app/api/top-langs?username=wagner-austin&layout=compact&theme=dracula)
+![Top Languages](https://github-stats-api-production-5042.up.railway.app/api/top-langs?username=wagner-austin&layout=compact&theme=cyberpunk)
 ```
 
 ### Capabilities Card
 ```markdown
-![Codebase Capabilities](https://github-stats-api-production-5042.up.railway.app/api/capabilities?repo=wagner-austin/model-trainer&theme=dracula)
+![Codebase Capabilities](https://github-stats-api-production-5042.up.railway.app/api/capabilities?repo=wagner-austin/model-trainer&theme=cyberpunk)
 ```
 
 ## Available Themes
+
+### Basic Themes (no animations)
 
 | Theme | Description |
 |-------|-------------|
@@ -96,6 +98,18 @@ Returns an SVG image showing detected ML/AI capabilities, backends, frameworks, 
 | `dracula` | Dracula color scheme |
 | `github_dark` | GitHub's dark mode colors |
 | `transparent` | Transparent background |
+
+### Premium Themes (with animations)
+
+| Theme | Description | Effects |
+|-------|-------------|---------|
+| `cyberpunk` | Cyan/magenta neon sci-fi | Gradient, pulsing glow, twinkling sparkles |
+| `synthwave` | Pink/blue 80s retro | Gradient, pulsing glow, twinkling sparkles |
+| `neon` | Bright green/red neon | Gradient, pulsing glow, twinkling sparkles |
+| `aurora` | Green/teal northern lights | Gradient, pulsing glow, twinkling sparkles |
+| `radical` | Pink/yellow bold colors | Gradient, pulsing glow, twinkling sparkles |
+
+Premium themes include infinite CSS animations that render in GitHub READMEs.
 
 ## Available Layouts (Languages Card)
 
