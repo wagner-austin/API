@@ -6,10 +6,9 @@ import io
 import sys
 from pathlib import Path
 
+import scripts._test_hooks as test_hooks
+import scripts.guard as guard_mod
 from pytest import raises
-from scripts import guard as guard_mod
-
-from platform_workers.testing import fake_path_is_dir_false, hooks
 
 
 def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
@@ -39,7 +38,14 @@ def test_guard_main_verbose_flag_prints_exit_code(tmp_path: Path) -> None:
 
 def test_guard_find_monorepo_root_raises_without_libs(tmp_path: Path) -> None:
     """Test _find_monorepo_root raises when libs directory not found."""
-    hooks.path_is_dir = fake_path_is_dir_false
+    original_is_dir = test_hooks.is_dir
+
+    def _fake_is_dir(path: Path) -> bool:
+        return False
+
+    test_hooks.is_dir = _fake_is_dir
 
     with raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
         guard_mod._find_monorepo_root(tmp_path)
+
+    test_hooks.is_dir = original_is_dir

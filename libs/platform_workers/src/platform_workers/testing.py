@@ -86,12 +86,6 @@ class LoadRQModuleHook(Protocol):
     def __call__(self) -> _RQModuleProtocol: ...
 
 
-class PathIsDirHook(Protocol):
-    """Protocol for checking if a path is a directory."""
-
-    def __call__(self, path: str) -> bool: ...
-
-
 class FetchJobHook(Protocol):
     """Protocol for fetching RQ jobs by ID."""
 
@@ -115,7 +109,6 @@ class HooksContainer:
         load_redis_asyncio_module: Hook to load redis.asyncio module.
         load_rq_module: Hook to load rq module.
         fetch_job: Hook for fetching RQ jobs by ID.
-        path_is_dir: Hook for Path.is_dir() calls.
     """
 
     # Redis module loaders
@@ -129,9 +122,6 @@ class HooksContainer:
     # RQ job fetch hook
     fetch_job: FetchJobHook | None = None
 
-    # Path checking for guard scripts
-    path_is_dir: PathIsDirHook | None = None
-
     @classmethod
     def reset(cls) -> None:
         """Reset all hooks to None (production defaults)."""
@@ -140,7 +130,6 @@ class HooksContainer:
         cls.load_redis_asyncio_module = None
         cls.load_rq_module = None
         cls.fetch_job = None
-        cls.path_is_dir = None
 
 
 # Global hooks instance
@@ -221,11 +210,6 @@ def make_fake_load_rq_module(
     return _hook, module
 
 
-def fake_path_is_dir_false(path: str) -> bool:
-    """Hook that always returns False for path_is_dir."""
-    return False
-
-
 def make_fake_fetch_job_found(job: FakeFetchedJob) -> FetchJobHook:
     """Create a fetch_job hook that returns the given fake job.
 
@@ -296,14 +280,12 @@ __all__ = [
     "LogRecord",
     "LoggerProtocol",
     "MethodCall",
-    "PathIsDirHook",
     "Published",
     "_FakeCurrentJob",
     "_FakeRQQueueInternal",
     "_FakeRQWorkerInternal",
     # Factory functions
     "fake_kv_store_factory",
-    "fake_path_is_dir_false",
     "fake_rq_connection_factory",
     "fake_rq_queue_factory",
     "fake_rq_retry_factory",
