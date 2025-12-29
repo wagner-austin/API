@@ -162,6 +162,7 @@ class TestRenderStatsCard:
             hide_border=False,
             show_icons=True,
             hide=(),
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -190,6 +191,7 @@ class TestRenderStatsCard:
             hide_border=False,
             show_icons=True,
             hide=("stars", "commits"),
+            disable_animations=False,
         )
 
         assert "Total Stars" not in svg
@@ -216,6 +218,7 @@ class TestRenderStatsCard:
             hide_border=False,
             show_icons=True,
             hide=(),
+            disable_animations=False,
         )
 
         assert "#282a36" in svg  # dracula bg color
@@ -240,6 +243,7 @@ class TestRenderLangsCard:
             hide_border=False,
             layout="default",
             langs_count=8,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -261,6 +265,7 @@ class TestRenderLangsCard:
             hide_border=True,
             layout="compact",
             langs_count=8,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -281,6 +286,7 @@ class TestRenderLangsCard:
             hide_border=False,
             layout="donut",
             langs_count=8,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -300,6 +306,7 @@ class TestRenderLangsCard:
             hide_border=False,
             layout="pie",
             langs_count=8,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -320,6 +327,7 @@ class TestRenderLangsCard:
             hide_border=False,
             layout="compact",
             langs_count=8,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -349,6 +357,7 @@ class TestRenderStatsCardVariations:
             hide_border=False,
             show_icons=False,
             hide=(),
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -376,6 +385,7 @@ class TestRenderStatsCardVariations:
             hide_border=True,
             show_icons=True,
             hide=("prs", "issues"),
+            disable_animations=False,
         )
 
         assert "Total PRs" not in svg
@@ -402,6 +412,7 @@ class TestRenderStatsCardVariations:
             hide_border=False,
             show_icons=True,
             hide=("contribs",),
+            disable_animations=False,
         )
 
         assert "Contributed to" not in svg
@@ -800,6 +811,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="default",
             hide_border=False,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -846,6 +858,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="dracula",
             hide_border=True,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -875,6 +888,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="default",
             hide_border=False,
+            disable_animations=False,
         )
 
         assert svg.startswith("<svg")
@@ -903,6 +917,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="dracula",
             hide_border=False,
+            disable_animations=False,
         )
 
         assert "#282a36" in svg  # dracula bg color
@@ -932,6 +947,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="default",
             hide_border=False,
+            disable_animations=False,
         )
 
         assert "+2 more" in svg
@@ -951,6 +967,7 @@ class TestRenderCapabilitiesCard:
             response=response,
             theme_name="default",
             hide_border=True,
+            disable_animations=False,
         )
 
         assert 'stroke-opacity="0"' in svg
