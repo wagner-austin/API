@@ -199,13 +199,28 @@ The capabilities card displays:
 
 Available color themes:
 
-| Theme | Description |
-|-------|-------------|
-| `default` | Light theme with blue accents |
-| `dark` | Dark background with light text |
-| `dracula` | Dracula color scheme |
-| `github_dark` | GitHub's dark mode colors |
-| `transparent` | Transparent background |
+| Theme | Description | Visual Effects |
+|-------|-------------|----------------|
+| `default` | Light theme with blue accents | None |
+| `dark` | Dark background with light text | None |
+| `dracula` | Dracula color scheme | None |
+| `github_dark` | GitHub's dark mode colors | None |
+| `transparent` | Transparent background | None |
+| `cyberpunk` | Cyan/magenta neon sci-fi | Gradient, pulsing glow, twinkling sparkles |
+| `synthwave` | Pink/blue 80s retro | Gradient, pulsing glow, twinkling sparkles |
+| `neon` | Bright green/red neon | Gradient, pulsing glow, twinkling sparkles |
+| `aurora` | Green/teal northern lights | Gradient, pulsing glow, twinkling sparkles |
+| `radical` | Pink/yellow bold colors | Gradient, pulsing glow, twinkling sparkles |
+
+### Visual Effects (Premium Themes)
+
+The premium themes (cyberpunk, synthwave, neon, aurora, radical) include:
+
+- **Gradient backgrounds**: Linear color transitions instead of flat colors
+- **Pulsing glow**: Title text pulses with a neon glow effect (2s infinite animation)
+- **Twinkling sparkles**: Decorative stars that fade in/out at different speeds (1.5-2.2s infinite animations)
+
+These animations are CSS-based and render in GitHub READMEs.
 
 ### Layouts
 
@@ -285,7 +300,7 @@ All errors return JSON with consistent format:
 ```json
 {
   "code": "INVALID_INPUT",
-  "message": "theme must be one of: default, dark, dracula, github_dark, transparent",
+  "message": "theme must be one of: aurora, cyberpunk, dark, default, dracula, github_dark, neon, radical, synthwave, transparent",
   "request_id": "550e8400-e29b-41d4-a716-446655440003"
 }
 ```
