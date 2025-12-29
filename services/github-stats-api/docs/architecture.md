@@ -127,21 +127,29 @@ query userLanguages($login: String!) {
 ### Request Types
 
 ```python
+# Theme literal type for all requests
+ThemeName = Literal[
+    "default", "dark", "dracula", "github_dark", "transparent",
+    "cyberpunk", "synthwave", "neon", "aurora", "radical",
+]
+
 class StatsRequest(TypedDict, total=True):
     username: str
-    theme: Literal["default", "dark", "dracula", "github_dark", "transparent"]
+    theme: ThemeName
     hide_border: bool
     show_icons: bool
     include_all_commits: bool
     hide: tuple[str, ...]  # stats to hide
+    disable_animations: bool
 
 class LangsRequest(TypedDict, total=True):
     username: str
-    theme: Literal["default", "dark", "dracula", "github_dark", "transparent"]
+    theme: ThemeName
     hide_border: bool
     layout: Literal["default", "compact", "donut", "pie"]
     langs_count: int
     hide: tuple[str, ...]  # languages to hide
+    disable_animations: bool
 ```
 
 ### Response Types
@@ -206,22 +214,42 @@ class GitHubClient:
 ### 3. themes.py - Color Themes
 
 ```python
-class Theme(TypedDict, total=True):
-    bg_color: str
-    title_color: str
-    text_color: str
-    border_color: str
-    icon_color: str
+class GradientStop(TypedDict, total=True):
+    offset: int    # Percentage 0-100
+    color: str     # Hex color
 
+class Gradient(TypedDict, total=True):
+    angle: int                       # Degrees (0=right, 90=down)
+    stops: tuple[GradientStop, ...]  # Color stops
+
+class Theme(TypedDict, total=True):
+    bg_color: str           # Background color (fallback if no gradient)
+    title_color: str        # Title text color
+    text_color: str         # Body text color
+    border_color: str       # Border color
+    icon_color: str         # Icon color
+    gradient: Gradient | None      # Optional gradient background
+    glow_color: str | None         # Optional glow color for text
+    sparkle_color: str | None      # Optional sparkle decoration color
+    sparkle_count: int             # Number of sparkle decorations (0=none)
+
+# Basic themes (no visual effects)
 _THEMES: dict[str, Theme] = {
-    "default": {...},
+    "default": {..., "gradient": None, "glow_color": None, ...},
     "dark": {...},
     "dracula": {...},
     "github_dark": {...},
     "transparent": {...},
+    # Premium themes with visual effects
+    "cyberpunk": {..., "gradient": {...}, "glow_color": "#00fff9", "sparkle_count": 8},
+    "synthwave": {..., "gradient": {...}, "glow_color": "#f72585", "sparkle_count": 6},
+    "neon": {..., "gradient": {...}, "glow_color": "#39ff14", "sparkle_count": 10},
+    "aurora": {..., "gradient": {...}, "glow_color": "#78ffd6", "sparkle_count": 12},
+    "radical": {..., "gradient": {...}, "glow_color": "#fe428e", "sparkle_count": 8},
 }
 
 def get_theme(name: str) -> Theme: ...
+def get_theme_names() -> tuple[str, ...]: ...
 ```
 
 ### 4. svg_renderer.py - SVG Generation
