@@ -4,7 +4,7 @@ from typing import Literal
 
 from platform_core.errors import AppError, ErrorCode
 
-from ..schemas.stats import CapabilitiesRequest, LangsRequest, StatsRequest
+from ..schemas.stats import CapabilitiesRequest, LangsRequest, StatsRequest, ThemeName
 
 _THEMES: frozenset[str] = frozenset(
     {
@@ -13,6 +13,11 @@ _THEMES: frozenset[str] = frozenset(
         "dracula",
         "github_dark",
         "transparent",
+        "cyberpunk",
+        "synthwave",
+        "neon",
+        "aurora",
+        "radical",
     }
 )
 
@@ -84,10 +89,8 @@ def _require_username(username: str | None) -> str:
     return cleaned
 
 
-def _narrow_theme(
-    raw: str | None,
-) -> Literal["default", "dark", "dracula", "github_dark", "transparent"]:
-    """Narrow theme string to Literal type.
+def _require_theme(raw: str | None) -> ThemeName:
+    """Validate and narrow theme string to ThemeName Literal type.
 
     Args:
         raw: Raw theme string from query params.
@@ -106,6 +109,20 @@ def _narrow_theme(
             message=f"theme must be one of: {', '.join(sorted(_THEMES))}",
             http_status=400,
         )
+    return _narrow_theme_unchecked(raw)
+
+
+def _narrow_theme_unchecked(raw: str) -> ThemeName:
+    """Narrow validated theme string to ThemeName Literal.
+
+    This function assumes the theme has already been validated against _THEMES.
+
+    Args:
+        raw: Validated theme string.
+
+    Returns:
+        Theme literal.
+    """
     if raw == "dark":
         return "dark"
     if raw == "dracula":
@@ -114,6 +131,16 @@ def _narrow_theme(
         return "github_dark"
     if raw == "transparent":
         return "transparent"
+    if raw == "cyberpunk":
+        return "cyberpunk"
+    if raw == "synthwave":
+        return "synthwave"
+    if raw == "neon":
+        return "neon"
+    if raw == "aurora":
+        return "aurora"
+    if raw == "radical":
+        return "radical"
     return "default"
 
 
@@ -271,7 +298,7 @@ def decode_stats_request(
     """
     return {
         "username": _require_username(username),
-        "theme": _narrow_theme(theme),
+        "theme": _require_theme(theme),
         "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
         "show_icons": _parse_query_bool(show_icons, default=True, param_name="show_icons"),
         "include_all_commits": _parse_query_bool(
@@ -313,7 +340,7 @@ def decode_langs_request(
     hide_tuple = tuple(s.strip() for s in (hide or "").split(",") if s.strip())
     return {
         "username": _require_username(username),
-        "theme": _narrow_theme(theme),
+        "theme": _require_theme(theme),
         "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
         "layout": _narrow_layout(layout),
         "langs_count": _parse_langs_count(langs_count),
@@ -410,7 +437,7 @@ def decode_capabilities_request(
     """
     return {
         "repo": _require_repo(repo),
-        "theme": _narrow_theme(theme),
+        "theme": _require_theme(theme),
         "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
         "disable_animations": _parse_query_bool(
             disable_animations, default=False, param_name="disable_animations"

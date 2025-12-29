@@ -4,6 +4,20 @@ from typing import Literal
 
 from typing_extensions import TypedDict
 
+# Theme literal type for reuse across all request types
+ThemeName = Literal[
+    "default",
+    "dark",
+    "dracula",
+    "github_dark",
+    "transparent",
+    "cyberpunk",
+    "synthwave",
+    "neon",
+    "aurora",
+    "radical",
+]
+
 
 class StatsRequest(TypedDict, total=True):
     """Request for user stats card.
@@ -19,13 +33,7 @@ class StatsRequest(TypedDict, total=True):
     """
 
     username: str
-    theme: Literal[
-        "default",
-        "dark",
-        "dracula",
-        "github_dark",
-        "transparent",
-    ]
+    theme: ThemeName
     hide_border: bool
     show_icons: bool
     include_all_commits: bool
@@ -47,13 +55,7 @@ class LangsRequest(TypedDict, total=True):
     """
 
     username: str
-    theme: Literal[
-        "default",
-        "dark",
-        "dracula",
-        "github_dark",
-        "transparent",
-    ]
+    theme: ThemeName
     hide_border: bool
     layout: Literal["default", "compact", "donut", "pie"]
     langs_count: int
@@ -116,15 +118,6 @@ class LangsResponse(TypedDict, total=True):
     languages: list[LanguageStats]
     total_size: int
 
-
-# Theme literal type for reuse
-ThemeName = Literal[
-    "default",
-    "dark",
-    "dracula",
-    "github_dark",
-    "transparent",
-]
 
 # Capability strength literal type (matches platform_codebase)
 CapabilityStrength = Literal["strong", "moderate", "basic"]
