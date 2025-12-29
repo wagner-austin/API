@@ -46,7 +46,13 @@ def build_router() -> APIRouter:
         frame_index = int(req["frame_index"])
         width = int(req["width"])
         height = int(req["height"])
-        _logger.info("Preview request: scene=%s frame=%d size=%dx%d", scene["id"], frame_index, width, height)
+        _logger.info(
+            "Preview request: scene=%s frame=%d size=%dx%d",
+            scene["id"],
+            frame_index,
+            width,
+            height,
+        )
         res: Resolution = {"width": width, "height": height}
         layers = [build_module(lc) for lc in scene["layers"]]
         # Convert to runtime Layer list
