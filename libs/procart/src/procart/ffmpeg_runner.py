@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import logging
 import subprocess
 from typing import Protocol
 
+from platform_core.logging import get_logger
+
 from .types import Fps
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class FfmpegRunner(Protocol):

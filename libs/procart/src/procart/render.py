@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+from platform_core.logging import get_logger
 
 from .color import apply_tone_map
 from .images_io import ensure_dir, resize_image, write_frame_png
@@ -9,7 +9,7 @@ from .registry_camera import build_camera_from_config
 from .scene import Layer
 from .types import FrameIndex, RenderJobConfig, Resolution, SceneConfig
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 def _compose_layers(
