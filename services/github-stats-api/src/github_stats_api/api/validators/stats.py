@@ -250,6 +250,7 @@ def decode_stats_request(
     show_icons: str | None,
     include_all_commits: str | None,
     hide: str | None,
+    disable_animations: str | None,
 ) -> StatsRequest:
     """Decode and validate stats request from query parameters.
 
@@ -260,6 +261,7 @@ def decode_stats_request(
         show_icons: Whether to show icons.
         include_all_commits: Include all commits.
         hide: Comma-separated list of stats to hide.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         Validated StatsRequest TypedDict.
@@ -276,6 +278,9 @@ def decode_stats_request(
             include_all_commits, default=False, param_name="include_all_commits"
         ),
         "hide": _parse_hide_list(hide, _HIDEABLE_STATS),
+        "disable_animations": _parse_query_bool(
+            disable_animations, default=False, param_name="disable_animations"
+        ),
     }
 
 
@@ -286,6 +291,7 @@ def decode_langs_request(
     layout: str | None,
     langs_count: str | None,
     hide: str | None,
+    disable_animations: str | None,
 ) -> LangsRequest:
     """Decode and validate langs request from query parameters.
 
@@ -296,6 +302,7 @@ def decode_langs_request(
         layout: Layout style.
         langs_count: Number of languages to show.
         hide: Comma-separated list of languages to hide.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         Validated LangsRequest TypedDict.
@@ -311,6 +318,9 @@ def decode_langs_request(
         "layout": _narrow_layout(layout),
         "langs_count": _parse_langs_count(langs_count),
         "hide": hide_tuple,
+        "disable_animations": _parse_query_bool(
+            disable_animations, default=False, param_name="disable_animations"
+        ),
     }
 
 
@@ -382,6 +392,7 @@ def decode_capabilities_request(
     repo: str | None,
     theme: str | None,
     hide_border: str | None,
+    disable_animations: str | None,
 ) -> CapabilitiesRequest:
     """Decode and validate capabilities request from query parameters.
 
@@ -389,6 +400,7 @@ def decode_capabilities_request(
         repo: GitHub repository in 'owner/repo' format.
         theme: Color theme.
         hide_border: Whether to hide border.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         Validated CapabilitiesRequest TypedDict.
@@ -400,6 +412,9 @@ def decode_capabilities_request(
         "repo": _require_repo(repo),
         "theme": _narrow_theme(theme),
         "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
+        "disable_animations": _parse_query_bool(
+            disable_animations, default=False, param_name="disable_animations"
+        ),
     }
 
 
