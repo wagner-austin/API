@@ -15,6 +15,7 @@ class StatsRequest(TypedDict, total=True):
         show_icons: Whether to show icons.
         include_all_commits: Include all commits, not just current year.
         hide: List of stats to hide (stars, commits, prs, issues, contribs).
+        disable_animations: Whether to disable CSS animations.
     """
 
     username: str
@@ -29,6 +30,7 @@ class StatsRequest(TypedDict, total=True):
     show_icons: bool
     include_all_commits: bool
     hide: tuple[str, ...]
+    disable_animations: bool
 
 
 class LangsRequest(TypedDict, total=True):
@@ -41,6 +43,7 @@ class LangsRequest(TypedDict, total=True):
         layout: Layout style (default, compact, donut, pie).
         langs_count: Number of languages to show (1-20).
         hide: Languages to hide from the card.
+        disable_animations: Whether to disable CSS animations.
     """
 
     username: str
@@ -55,6 +58,7 @@ class LangsRequest(TypedDict, total=True):
     layout: Literal["default", "compact", "donut", "pie"]
     langs_count: int
     hide: tuple[str, ...]
+    disable_animations: bool
 
 
 class UserStats(TypedDict, total=True):
@@ -133,11 +137,13 @@ class CapabilitiesRequest(TypedDict, total=True):
         repo: GitHub repository in 'owner/repo' format.
         theme: Color theme for the card.
         hide_border: Whether to hide the card border.
+        disable_animations: Whether to disable CSS animations.
     """
 
     repo: str
     theme: ThemeName
     hide_border: bool
+    disable_animations: bool
 
 
 class Capability(TypedDict, total=True):
