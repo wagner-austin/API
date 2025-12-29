@@ -381,6 +381,71 @@ class TestDecodeLangsRequest:
         )
         assert req["theme"] == "dark"
 
+    def test_decode_stats_request_cyberpunk_theme(self) -> None:
+        """Test cyberpunk theme is accepted."""
+        req = decode_stats_request(
+            username="testuser",
+            theme="cyberpunk",
+            hide_border=None,
+            show_icons=None,
+            include_all_commits=None,
+            hide=None,
+            disable_animations=None,
+        )
+        assert req["theme"] == "cyberpunk"
+
+    def test_decode_stats_request_synthwave_theme(self) -> None:
+        """Test synthwave theme is accepted."""
+        req = decode_stats_request(
+            username="testuser",
+            theme="synthwave",
+            hide_border=None,
+            show_icons=None,
+            include_all_commits=None,
+            hide=None,
+            disable_animations=None,
+        )
+        assert req["theme"] == "synthwave"
+
+    def test_decode_stats_request_neon_theme(self) -> None:
+        """Test neon theme is accepted."""
+        req = decode_stats_request(
+            username="testuser",
+            theme="neon",
+            hide_border=None,
+            show_icons=None,
+            include_all_commits=None,
+            hide=None,
+            disable_animations=None,
+        )
+        assert req["theme"] == "neon"
+
+    def test_decode_stats_request_aurora_theme(self) -> None:
+        """Test aurora theme is accepted."""
+        req = decode_stats_request(
+            username="testuser",
+            theme="aurora",
+            hide_border=None,
+            show_icons=None,
+            include_all_commits=None,
+            hide=None,
+            disable_animations=None,
+        )
+        assert req["theme"] == "aurora"
+
+    def test_decode_stats_request_radical_theme(self) -> None:
+        """Test radical theme is accepted."""
+        req = decode_stats_request(
+            username="testuser",
+            theme="radical",
+            hide_border=None,
+            show_icons=None,
+            include_all_commits=None,
+            hide=None,
+            disable_animations=None,
+        )
+        assert req["theme"] == "radical"
+
     def test_decode_langs_request_donut_layout(self) -> None:
         """Test donut layout is accepted."""
         req = decode_langs_request(
