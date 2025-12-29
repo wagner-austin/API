@@ -67,6 +67,7 @@ Generate a GitHub user statistics SVG card.
 | `show_icons` | string | No | `"true"` | Show stat icons (`true`, `false`, `1`, `0`, `yes`, `no`) |
 | `include_all_commits` | string | No | `"false"` | Include private commits (`true`, `false`, `1`, `0`, `yes`, `no`) |
 | `hide` | string | No | - | Comma-separated stats to hide (see [Hideable Stats](#hideable-stats)) |
+| `disable_animations` | string | No | `"false"` | Disable CSS animations (`true`, `false`, `1`, `0`, `yes`, `no`) |
 
 **Response (200):** `image/svg+xml`
 
@@ -115,6 +116,7 @@ Generate a GitHub user's top programming languages SVG card.
 | `layout` | string | No | `"default"` | Layout style (see [Layouts](#layouts)) |
 | `langs_count` | string | No | `"8"` | Number of languages to show (1-20) |
 | `hide` | string | No | - | Comma-separated languages to hide (case-sensitive) |
+| `disable_animations` | string | No | `"false"` | Disable CSS animations (`true`, `false`, `1`, `0`, `yes`, `no`) |
 
 **Response (200):** `image/svg+xml`
 
@@ -143,6 +145,51 @@ The languages card displays:
 - Language names with official GitHub colors
 - Percentage of code in each language
 - Visual bar or chart representation (based on layout)
+
+---
+
+### GET /api/capabilities
+
+Generate a GitHub repository's codebase capabilities SVG card.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `repo` | string | Yes | - | GitHub repository in `owner/repo` format |
+| `theme` | string | No | `"default"` | Color theme (see [Themes](#themes)) |
+| `hide_border` | string | No | `"false"` | Hide card border (`true`, `false`, `1`, `0`, `yes`, `no`) |
+| `disable_animations` | string | No | `"false"` | Disable CSS animations (`true`, `false`, `1`, `0`, `yes`, `no`) |
+
+**Response (200):** `image/svg+xml`
+
+Returns an SVG image with the repository's detected capabilities.
+
+**Response Headers:**
+
+| Header | Value |
+|--------|-------|
+| `Content-Type` | `image/svg+xml` |
+| `Cache-Control` | `max-age={CACHE_TTL_SECONDS}, s-maxage={CACHE_TTL_SECONDS}` |
+
+**Example Request:**
+```
+GET /api/capabilities?repo=wagner-austin/model-trainer&theme=dracula
+```
+
+**Example - curl:**
+```bash
+curl "http://localhost:8000/api/capabilities?repo=wagner-austin/model-trainer&theme=dracula"
+```
+
+**Capabilities Card Content:**
+
+The capabilities card displays:
+- Detected ML/AI capabilities with strength indicators (strong, moderate, basic)
+- ML backends (XGBoost, PyTorch, etc.)
+- Frameworks (FastAPI, Flask, etc.)
+- Supported data formats (CSV, Parquet, etc.)
+- Task types (binary classification, image classification, etc.)
 
 ---
 
