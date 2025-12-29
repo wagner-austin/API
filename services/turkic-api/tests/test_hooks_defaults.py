@@ -7,8 +7,6 @@ import types
 from collections.abc import Generator
 from pathlib import Path
 
-import pytest
-
 from turkic_api import _test_hooks
 
 
@@ -235,24 +233,6 @@ def test_default_decode_optional_literal() -> None:
         None, "script", frozenset({"Latn", "Cyrl"})
     )
     assert result_none is None
-
-
-def test_default_guard_find_monorepo_root(tmp_path: Path) -> None:
-    """Test _default_guard_find_monorepo_root finds root with libs dir."""
-    # Create a fake monorepo structure
-    libs_dir = tmp_path / "libs"
-    libs_dir.mkdir()
-    subdir = tmp_path / "subdir"
-    subdir.mkdir()
-
-    result = _test_hooks._default_guard_find_monorepo_root(subdir)
-    assert result == tmp_path
-
-
-def test_default_guard_find_monorepo_root_not_found(tmp_path: Path) -> None:
-    """Test _default_guard_find_monorepo_root raises when not found."""
-    with pytest.raises(RuntimeError, match="monorepo root"):
-        _test_hooks._default_guard_find_monorepo_root(tmp_path)
 
 
 def test_default_wikipedia_requests_get_adapter() -> None:

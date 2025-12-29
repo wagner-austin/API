@@ -597,65 +597,6 @@ language_map: dict[str, str] = {
 
 
 # =============================================================================
-# Guard script hooks
-# =============================================================================
-
-
-class GuardRunForProjectProtocol(Protocol):
-    """Protocol for run_for_project function from monorepo_guards."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
-        """Run guards for a project."""
-        ...
-
-
-class GuardFindMonorepoRootProtocol(Protocol):
-    """Protocol for _find_monorepo_root function."""
-
-    def __call__(self, start: Path) -> Path:
-        """Find the monorepo root from a starting path."""
-        ...
-
-
-class GuardLoadOrchestratorProtocol(Protocol):
-    """Protocol for _load_orchestrator function."""
-
-    def __call__(self, monorepo_root: Path) -> GuardRunForProjectProtocol:
-        """Load the orchestrator module and return run_for_project."""
-        ...
-
-
-def _default_guard_find_monorepo_root(start: Path) -> Path:
-    """Production implementation - finds monorepo root by climbing directories."""
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
-def _default_guard_load_orchestrator(monorepo_root: Path) -> GuardRunForProjectProtocol:
-    """Production implementation - loads the orchestrator module."""
-    import sys
-
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-    run_for_project: GuardRunForProjectProtocol = mod.run_for_project
-    return run_for_project
-
-
-# Hook for guard find_monorepo_root. Tests can override to return fake paths.
-guard_find_monorepo_root: GuardFindMonorepoRootProtocol = _default_guard_find_monorepo_root
-
-# Hook for guard load_orchestrator. Tests can override to return fake orchestrators.
-guard_load_orchestrator: GuardLoadOrchestratorProtocol = _default_guard_load_orchestrator
-
-
 __all__ = [
     # Protocols
     "DataBankDownloaderFactoryProtocol",
@@ -665,9 +606,6 @@ __all__ = [
     "DecodeOptionalLiteralProtocol",
     "DecodeRequiredLiteralProtocol",
     "EnsureCorpusProtocol",
-    "GuardFindMonorepoRootProtocol",
-    "GuardLoadOrchestratorProtocol",
-    "GuardRunForProjectProtocol",
     "LangIdDownloadProtocol",
     "LangIdEnsureModelPathProtocol",
     "LangIdFastTextFactoryProtocol",
@@ -688,8 +626,6 @@ __all__ = [
     "_default_decode_required_literal",
     "_default_ensure_corpus_file",
     "_default_get_env",
-    "_default_guard_find_monorepo_root",
-    "_default_guard_load_orchestrator",
     "_default_langid_download",
     "_default_langid_ensure_model_path",
     "_default_langid_get_fasttext_factory",
@@ -707,8 +643,6 @@ __all__ = [
     "decode_required_literal",
     "ensure_corpus_file",
     "get_env",
-    "guard_find_monorepo_root",
-    "guard_load_orchestrator",
     "langid_download",
     "langid_ensure_model_path",
     "langid_get_fasttext_factory",

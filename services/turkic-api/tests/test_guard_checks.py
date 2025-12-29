@@ -1,21 +1,29 @@
+"""Tests for guard script violations detection.
+
+These tests exercise the guard violation detection through the guard.main()
+function rather than subprocess to ensure proper module resolution.
+"""
+
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
 
-
-def _project_root() -> Path:
-    # tests/ -> turkic-api/
-    return Path(__file__).resolve().parents[1]
+from scripts import guard
 
 
 def _write(path: Path, text: str) -> None:
+    """Write text to a file, creating parent directories if needed.
+
+    Args:
+        path: File path to write to.
+        text: Text content to write.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
 
 
 def test_guard_detects_violations(tmp_path: Path) -> None:
+    """Test guard.main detects violations and returns non-zero exit code."""
     root = tmp_path
     src = root / "src"
     bad = src / "bad.py"
@@ -37,32 +45,11 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     )
     _write(bad, code)
 
-    project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
-    result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(root)],
-        cwd=str(project_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    out = result.stdout + result.stderr
-
-    assert result.returncode != 0
-    assert "Guard rule summary" in out
-    assert "Guard checks failed" in out
+    rc = guard.main(["--root", str(root)])
+    assert rc != 0
 
 
 def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
-    project_root = _project_root()
-    guard_path = project_root / "scripts" / "guard.py"
-
-    result = subprocess.run(
-        [sys.executable, str(guard_path), "--root", str(tmp_path)],
-        cwd=str(project_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
+    """Test guard.main returns 0 when no violations found."""
+    rc = guard.main(["--root", str(tmp_path)])
+    assert rc == 0

@@ -1,27 +1,50 @@
+"""Guard script for running monorepo checks on this project.
+
+This script finds the monorepo root and runs the guard orchestrator
+to check for code quality violations.
+"""
+
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from scripts import _test_hooks
+
 
 class _RunForProject(Protocol):
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
+    """Protocol for the run_for_project function from monorepo_guards."""
 
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
+        """Run guard checks for a project.
 
-def _default_is_dir(p: Path) -> bool:
-    """Production implementation - uses Path.is_dir()."""
-    return p.is_dir()
+        Args:
+            monorepo_root: Path to the monorepo root directory.
+            project_root: Path to the project root directory.
 
-
-_is_dir: Callable[[Path], bool] = _default_is_dir
+        Returns:
+            Exit code: 0 for success, non-zero for failures.
+        """
+        ...
 
 
 def _find_monorepo_root(start: Path) -> Path:
+    """Find the monorepo root by searching for the libs directory.
+
+    Args:
+        start: Starting path to search from.
+
+    Returns:
+        Path to the monorepo root directory.
+
+    Raises:
+        RuntimeError: If libs directory not found in any parent.
+    """
     current = start
     while True:
-        if _is_dir(current / "libs"):
+        if _test_hooks.is_dir(current / "libs"):
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")
@@ -29,6 +52,14 @@ def _find_monorepo_root(start: Path) -> Path:
 
 
 def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+    """Load the guard orchestrator from monorepo libs.
+
+    Args:
+        monorepo_root: Path to the monorepo root directory.
+
+    Returns:
+        The run_for_project function from monorepo_guards.
+    """
     libs_path = monorepo_root / "libs"
     guards_src = libs_path / "monorepo_guards" / "src"
     sys.path.insert(0, str(guards_src))
@@ -39,6 +70,14 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run guard checks for this project.
+
+    Args:
+        argv: Command line arguments. If None, uses sys.argv[1:].
+
+    Returns:
+        Exit code: 0 for success, non-zero for failures.
+    """
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root(project_root)
