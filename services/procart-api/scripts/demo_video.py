@@ -5,18 +5,18 @@ from pathlib import Path
 from typing import Final
 
 import httpx
-from typing_extensions import TypedDict
-
 from procart.types import (
     BlackBackgroundLayerConfig,
     CameraConfigCircular,
-    NeonOrbsLayerConfig,
+    LayerConfig,
     NeonGlowConfig,
+    NeonOrbsLayerConfig,
     RenderTimingConfig,
     Resolution,
     SceneConfig,
     ToneMappingConfigExposureGamma,
 )
+from typing_extensions import TypedDict
 
 
 class _FramesRequest(TypedDict):
@@ -37,9 +37,30 @@ class _VideoResponse(TypedDict):
     video_path: str
 
 
+class _Args(TypedDict):
+    base_url: str
+    out: Path
+    width: int
+    height: int
+    fps: int
+    duration: float
+
+
 def _build_demo_scene(
     *, scene_id: str, width: int, height: int, fps: int, duration: float
 ) -> SceneConfig:
+    """Build a demo scene configuration for neon orbs rendering.
+
+    Args:
+        scene_id: Unique identifier for the scene.
+        width: Resolution width in pixels.
+        height: Resolution height in pixels.
+        fps: Frames per second for rendering.
+        duration: Duration of the scene in seconds.
+
+    Returns:
+        Complete scene configuration for rendering.
+    """
     res: Resolution = {"width": int(width), "height": int(height)}
     timing: RenderTimingConfig = {
         "duration_seconds": float(duration),
@@ -77,7 +98,7 @@ def _build_demo_scene(
         "glow": glow,
     }
 
-    layers = [bg, orbs]
+    layers: list[LayerConfig] = [bg, orbs]
     scene: SceneConfig = {
         "id": scene_id,
         "description": "procart demo scene",
@@ -90,7 +111,31 @@ def _build_demo_scene(
     return scene
 
 
-def _run_demo(base_url: str, out_dir: Path, *, width: int, height: int, fps: int, duration: float) -> Path:
+def _run_demo(
+    base_url: str,
+    out_dir: Path,
+    *,
+    width: int,
+    height: int,
+    fps: int,
+    duration: float,
+) -> Path:
+    """Execute demo rendering by calling procart-api service.
+
+    Args:
+        base_url: Base URL of the running procart-api service.
+        out_dir: Output directory for frames and video.
+        width: Render width in pixels.
+        height: Render height in pixels.
+        fps: Frames per second.
+        duration: Duration in seconds.
+
+    Returns:
+        Path to the rendered video file.
+
+    Raises:
+        httpx.HTTPStatusError: If API requests fail.
+    """
     scene_id: Final[str] = "demo"
     scene = _build_demo_scene(
         scene_id=scene_id, width=width, height=height, fps=fps, duration=duration
@@ -113,20 +158,23 @@ def _run_demo(base_url: str, out_dir: Path, *, width: int, height: int, fps: int
         # Response body is ignored to avoid json Any; path is deterministic
         # by convention: <out>/<scene_id>/frames
         _ = r_f.content
-        frames_dir = out_dir_abs / scene_id / "frames"
 
         # Encode video (service will call ffmpeg via RealFfmpegRunner)
         r_v = client.post("/render/video", json=video_req)
         r_v.raise_for_status()
         # Compute expected output path instead of parsing JSON
         _ = r_v.content
-        video_path = (out_dir_abs / scene_id / f"{scene_id}.mp4").resolve()
 
     # Return the produced video path
-    return video_path
+    return (out_dir_abs / scene_id / f"{scene_id}.mp4").resolve()
 
 
 def main() -> int:
+    """Parse arguments and run demo rendering.
+
+    Returns:
+        Exit code (0 for success).
+    """
     parser = argparse.ArgumentParser(description="Render demo frames and video via procart-api")
     parser.add_argument(
         "--base-url",
@@ -143,15 +191,38 @@ def main() -> int:
     parser.add_argument("--height", type=int, default=256)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--duration", type=float, default=2.0)
-    args = parser.parse_args()
+    namespace = parser.parse_args()
+
+    base_url_raw: str = namespace.base_url
+    out_raw: Path = namespace.out
+    width_raw: int = namespace.width
+    height_raw: int = namespace.height
+    fps_raw: int = namespace.fps
+    duration_raw: float = namespace.duration
+
+    base_url_str: str = str(base_url_raw)
+    out_path: Path = Path(out_raw)
+    width_int: int = int(width_raw)
+    height_int: int = int(height_raw)
+    fps_int: int = int(fps_raw)
+    duration_float: float = float(duration_raw)
+
+    args: _Args = {
+        "base_url": base_url_str,
+        "out": out_path,
+        "width": width_int,
+        "height": height_int,
+        "fps": fps_int,
+        "duration": duration_float,
+    }
 
     video_path = _run_demo(
-        args.base_url,
-        args.out,
-        width=args.width,
-        height=args.height,
-        fps=args.fps,
-        duration=args.duration,
+        args["base_url"],
+        args["out"],
+        width=args["width"],
+        height=args["height"],
+        fps=args["fps"],
+        duration=args["duration"],
     )
     print(str(video_path))
     return 0
