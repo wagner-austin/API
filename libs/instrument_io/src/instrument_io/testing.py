@@ -74,10 +74,6 @@ OpenImzmlFn = Callable[[Path], ImzMLParserProtocol]
 # PDF hooks
 OpenPdfFn = Callable[[Path], PDFProtocol]
 
-# Guard script hooks
-FindMonorepoRootFn = Callable[[Path], Path]
-LoadOrchestratorFn = Callable[[Path], Callable[[Path, Path], int]]
-
 # SMPS hooks
 SMPSReadLinesFn = Callable[[Path], list[str]]
 
@@ -116,10 +112,6 @@ class _HooksContainer:
 
     # PDF hooks
     open_pdf: OpenPdfFn
-
-    # Guard script hooks
-    find_monorepo_root: FindMonorepoRootFn
-    load_orchestrator: LoadOrchestratorFn
 
     # SMPS hooks
     smps_read_lines: SMPSReadLinesFn
@@ -208,41 +200,6 @@ def _prod_open_pdf(path: Path) -> PDFProtocol:
     return _open_pdf(path)
 
 
-def _prod_find_monorepo_root(start: Path) -> Path:
-    """Production implementation: find monorepo root."""
-    current = start
-    while True:
-        if (current / "libs").is_dir():
-            return current
-        if current.parent == current:
-            raise RuntimeError("monorepo root with 'libs' directory not found")
-        current = current.parent
-
-
-class _RunForProjectFn(Protocol):
-    """Protocol for dynamically loaded run_for_project function."""
-
-    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
-
-
-def _prod_load_orchestrator_impl(monorepo_root: Path) -> Callable[[Path, Path], int]:
-    """Production implementation: load orchestrator module."""
-    import sys
-
-    libs_path = monorepo_root / "libs"
-    guards_src = libs_path / "monorepo_guards" / "src"
-    sys.path.insert(0, str(guards_src))
-    sys.path.insert(0, str(libs_path))
-    mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
-
-    run_fn: _RunForProjectFn = mod.run_for_project
-
-    def _wrapper(mr: Path, pr: Path) -> int:
-        return run_fn(monorepo_root=mr, project_root=pr)
-
-    return _wrapper
-
-
 def _prod_smps_read_lines(path: Path) -> list[str]:
     """Production implementation: read SMPS file lines."""
     from instrument_io._exceptions import SMPSReadError
@@ -317,8 +274,6 @@ def _init_production_hooks() -> None:
     hooks.load_data_directory = _prod_load_data_directory
     hooks.open_imzml = _prod_open_imzml
     hooks.open_pdf = _prod_open_pdf
-    hooks.find_monorepo_root = _prod_find_monorepo_root
-    hooks.load_orchestrator = _prod_load_orchestrator_impl
     hooks.smps_read_lines = _prod_smps_read_lines
     hooks.txt_detect_encoding = _prod_txt_detect_encoding
     hooks.txt_read_text = _prod_txt_read_text
@@ -839,11 +794,9 @@ __all__ = [
     "_prod_cleanup_temp_dir",
     "_prod_convert_raw_to_mzml",
     "_prod_create_temp_dir",
-    "_prod_find_monorepo_root",
     "_prod_find_thermorawfileparser",
     "_prod_get_bundled_exe_path",
     "_prod_load_data_directory",
-    "_prod_load_orchestrator_impl",
     "_prod_mzml_reader_factory",
     "_prod_open_imzml",
     "_prod_open_pdf",

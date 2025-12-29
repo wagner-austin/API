@@ -22,7 +22,6 @@ from instrument_io.testing import (
     _FakeNdArray1D,
     _FakeNdArray2D,
     _FakeNdArray3D,
-    _prod_find_monorepo_root,
     _prod_shutil_which,
     _prod_smps_read_lines,
     _prod_txt_detect_encoding,
@@ -56,24 +55,6 @@ class TestProdShutilWhich:
         """Test that shutil.which returns None for nonexistent command."""
         result = _prod_shutil_which("nonexistent_command_12345")
         assert result is None
-
-
-class TestProdFindMonorepoRoot:
-    """Tests for _prod_find_monorepo_root function."""
-
-    def test_finds_monorepo_root(self) -> None:
-        """Test finding monorepo root from current directory."""
-        start = Path(__file__).resolve().parent
-        result = _prod_find_monorepo_root(start)
-        assert (result / "libs").is_dir()
-
-    def test_raises_when_not_found(self, tmp_path: Path) -> None:
-        """Test raises RuntimeError when no libs directory found."""
-        isolated = tmp_path / "isolated"
-        isolated.mkdir()
-        with pytest.raises(RuntimeError) as exc_info:
-            _prod_find_monorepo_root(isolated)
-        assert "libs" in str(exc_info.value)
 
 
 class TestProdSmpsReadLines:
