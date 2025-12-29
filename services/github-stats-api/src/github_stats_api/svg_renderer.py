@@ -93,12 +93,53 @@ def _format_number(num: int) -> str:
     return str(num)
 
 
+def _get_animation_css() -> str:
+    """Get CSS keyframe animations for SVG cards.
+
+    Returns:
+        CSS string with animation keyframes and classes.
+    """
+    return """
+@keyframes fadeInAnimation {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes growWidthAnimation {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+@keyframes scaleInAnimation {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+@keyframes rankCircleAnimation {
+  0% { stroke-dashoffset: 251.32; }
+  100% { stroke-dashoffset: 0; }
+}
+.fade-in { animation: fadeInAnimation 0.3s ease-in-out forwards; }
+.stagger-1 { animation-delay: 0.1s; opacity: 0; }
+.stagger-2 { animation-delay: 0.2s; opacity: 0; }
+.stagger-3 { animation-delay: 0.3s; opacity: 0; }
+.stagger-4 { animation-delay: 0.4s; opacity: 0; }
+.stagger-5 { animation-delay: 0.5s; opacity: 0; }
+.grow-width { animation: growWidthAnimation 0.6s ease-in-out forwards; transform-origin: left; }
+.scale-in { animation: scaleInAnimation 0.4s ease-in-out forwards; transform-origin: center; }
+.rank-circle-anim {
+  stroke-dasharray: 251.32;
+  stroke-dashoffset: 251.32;
+  animation: rankCircleAnimation 1s ease-in-out forwards;
+  animation-delay: 0.5s;
+}
+"""
+
+
 def render_stats_card(
     stats: UserStats,
     theme_name: str,
     hide_border: bool,
     show_icons: bool,
     hide: tuple[str, ...],
+    disable_animations: bool,
 ) -> str:
     """Render user stats SVG card.
 
@@ -108,6 +149,7 @@ def render_stats_card(
         hide_border: Whether to hide the border.
         show_icons: Whether to show icons.
         hide: Stats to hide.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         SVG string.
@@ -136,6 +178,9 @@ def render_stats_card(
     # Adjust height based on items
     height = 120 + len(items) * 25
 
+    # Build CSS with optional animations
+    animation_css = "" if disable_animations else _get_animation_css()
+
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
@@ -146,6 +191,7 @@ def render_stats_card(
         f".rank {{ font: 800 24px 'Segoe UI', sans-serif; fill: {theme['title_color']}; }}",
         f".rank-circle {{ stroke: {theme['title_color']}; fill: none; stroke-width: 6; }}",
         ".icon { font-size: 14px; }",
+        animation_css,
         "</style>",
         f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
         f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
@@ -153,24 +199,39 @@ def render_stats_card(
         f'<text x="25" y="35" class="header">{_escape_xml(stats["name"])}\'s GitHub Stats</text>',
     ]
 
-    # Render stat items
+    # Render stat items with staggered animation
     y_offset = 65
-    for icon, label, value, _ in items:
+    for idx, (icon, label, value, _) in enumerate(items):
+        stagger_class = "" if disable_animations else f" fade-in stagger-{idx + 1}"
         if show_icons:
-            svg_parts.append(f'<text x="25" y="{y_offset}" class="icon">{icon}</text>')
-            svg_parts.append(f'<text x="50" y="{y_offset}" class="stat-label">{label}:</text>')
+            svg_parts.append(
+                f'<g class="{stagger_class.strip()}">'
+                f'<text x="25" y="{y_offset}" class="icon">{icon}</text>'
+                f'<text x="50" y="{y_offset}" class="stat-label">{label}:</text>'
+                f'<text x="200" y="{y_offset}" class="stat-value">{value}</text>'
+                f"</g>"
+            )
         else:
-            svg_parts.append(f'<text x="25" y="{y_offset}" class="stat-label">{label}:</text>')
-        svg_parts.append(f'<text x="200" y="{y_offset}" class="stat-value">{value}</text>')
+            svg_parts.append(
+                f'<g class="{stagger_class.strip()}">'
+                f'<text x="25" y="{y_offset}" class="stat-label">{label}:</text>'
+                f'<text x="200" y="{y_offset}" class="stat-value">{value}</text>'
+                f"</g>"
+            )
         y_offset += 25
 
-    # Render rank circle
+    # Render rank circle with animation
     rank = stats["rank"]
     cx = width - 70
     cy = height // 2
     r = 40
-    svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" class="rank-circle"/>')
-    svg_parts.append(f'<text x="{cx}" y="{cy + 8}" text-anchor="middle" class="rank">{rank}</text>')
+    circle_class = "rank-circle" if disable_animations else "rank-circle rank-circle-anim"
+    rank_text_class = "" if disable_animations else "fade-in stagger-5"
+    svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" class="{circle_class}"/>')
+    svg_parts.append(
+        f'<text x="{cx}" y="{cy + 8}" text-anchor="middle" '
+        f'class="rank {rank_text_class}">{rank}</text>'
+    )
 
     svg_parts.append("</svg>")
 
@@ -185,6 +246,7 @@ def render_langs_card(
     hide_border: bool,
     layout: str,
     langs_count: int,
+    disable_animations: bool,
 ) -> str:
     """Render top languages SVG card.
 
@@ -196,6 +258,7 @@ def render_langs_card(
         hide_border: Whether to hide the border.
         layout: Layout style.
         langs_count: Number of languages to show.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         SVG string.
@@ -218,6 +281,8 @@ def render_langs_card(
 
     title_color = theme["title_color"]
     text_color = theme["text_color"]
+    animation_css = "" if disable_animations else _get_animation_css()
+
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
@@ -226,6 +291,7 @@ def render_langs_card(
         f".lang-name {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
         f".lang-pct {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; "
         "opacity: 0.8; }}",
+        animation_css,
         "</style>",
         f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
         f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
@@ -246,18 +312,19 @@ def render_langs_card(
             f'rx="2" fill="{theme["border_color"]}"/>'
         )
 
-        # Draw language segments
+        # Draw language segments with animation
         current_x: float = float(x_offset)
         for lang in langs:
             seg_width = (lang["percentage"] / 100) * bar_width
             if seg_width > 0:
+                anim_class = "" if disable_animations else " grow-width"
                 svg_parts.append(
                     f'<rect x="{current_x:.1f}" y="{y_offset}" width="{seg_width:.1f}" '
-                    f'height="{bar_height}" fill="{lang["color"]}"/>'
+                    f'height="{bar_height}" fill="{lang["color"]}" class="{anim_class.strip()}"/>'
                 )
                 current_x += seg_width
 
-        # Legend
+        # Legend with staggered fade-in
         y_offset += 25
         items_per_row = 3
         for i, lang in enumerate(langs):
@@ -269,10 +336,14 @@ def render_langs_card(
             lang_color = lang["color"]
             lang_name = _escape_xml(lang["name"])
             lang_pct = lang["percentage"]
-            svg_parts.append(f'<circle cx="{lx + 5}" cy="{ly - 4}" r="5" fill="{lang_color}"/>')
-            svg_parts.append(f'<text x="{lx + 15}" y="{ly}" class="lang-name">{lang_name}</text>')
+            stagger_idx = min(i + 1, 5)
+            stagger_class = "" if disable_animations else f"fade-in stagger-{stagger_idx}"
             svg_parts.append(
+                f'<g class="{stagger_class}">'
+                f'<circle cx="{lx + 5}" cy="{ly - 4}" r="5" fill="{lang_color}"/>'
+                f'<text x="{lx + 15}" y="{ly}" class="lang-name">{lang_name}</text>'
                 f'<text x="{lx + 15}" y="{ly + 12}" class="lang-pct">{lang_pct:.1f}%</text>'
+                f"</g>"
             )
 
     else:
@@ -280,14 +351,18 @@ def render_langs_card(
         y_offset = 55
         bar_width = 150
 
-        for lang in langs:
+        for idx, lang in enumerate(langs):
+            stagger_idx = min(idx + 1, 5)
+            stagger_class = "" if disable_animations else f"fade-in stagger-{stagger_idx}"
+            bar_anim_class = "" if disable_animations else " grow-width"
+
             # Language name and percentage
             svg_parts.append(
+                f'<g class="{stagger_class}">'
                 f'<text x="25" y="{y_offset}" class="lang-name">{_escape_xml(lang["name"])}</text>'
-            )
-            svg_parts.append(
                 f'<text x="{width - 25}" y="{y_offset}" text-anchor="end" class="lang-pct">'
                 f"{lang['percentage']:.2f}%</text>"
+                f"</g>"
             )
 
             # Progress bar
@@ -300,7 +375,7 @@ def render_langs_card(
             )
             svg_parts.append(
                 f'<rect x="{bar_x}" y="{bar_y}" width="{pct_width:.1f}" height="8" rx="2" '
-                f'fill="{lang["color"]}"/>'
+                f'fill="{lang["color"]}" class="{bar_anim_class.strip()}"/>'
             )
 
             y_offset += 25
@@ -413,6 +488,7 @@ def render_capabilities_card(
     response: CapabilitiesResponse,
     theme_name: str,
     hide_border: bool,
+    disable_animations: bool,
 ) -> str:
     """Render codebase capabilities SVG card.
 
@@ -420,6 +496,7 @@ def render_capabilities_card(
         response: Capabilities response data.
         theme_name: Theme name.
         hide_border: Whether to hide the border.
+        disable_animations: Whether to disable CSS animations.
 
     Returns:
         SVG string.
@@ -441,6 +518,7 @@ def render_capabilities_card(
     title_color = theme["title_color"]
     text_color = theme["text_color"]
     icon_color = theme["icon_color"]
+    animation_css = "" if disable_animations else _get_animation_css()
 
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
@@ -455,6 +533,7 @@ def render_capabilities_card(
         ".strength-strong { fill: #2ecc71; }",
         ".strength-moderate { fill: #f1c40f; }",
         ".strength-basic { fill: #95a5a6; }",
+        animation_css,
         "</style>",
         f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
         f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
@@ -464,7 +543,7 @@ def render_capabilities_card(
 
     y_offset = 60
 
-    # Render capabilities (2 per row)
+    # Render capabilities (2 per row) with staggered animation
     if capabilities:
         for i, cap in enumerate(capabilities):
             col = i % 2
@@ -472,39 +551,49 @@ def render_capabilities_card(
             x = 25 + col * 235
             y = y_offset + row * 35
 
+            stagger_idx = min(i + 1, 5)
+            stagger_class = "" if disable_animations else f"fade-in stagger-{stagger_idx}"
+
             # Strength indicator
             strength_class = f"strength-{cap['strength']}"
-            svg_parts.append(f'<circle cx="{x + 5}" cy="{y - 4}" r="4" class="{strength_class}"/>')
+            scale_class = "" if disable_animations else " scale-in"
 
-            # Capability name
-            cap_name = _escape_xml(cap["name"].replace("_", " ").title())
-            svg_parts.append(f'<text x="{x + 15}" y="{y}" class="cap-name">{cap_name}</text>')
-
-            # Strength label
             svg_parts.append(
+                f'<g class="{stagger_class}">'
+                f'<circle cx="{x + 5}" cy="{y - 4}" r="4" class="{strength_class}{scale_class}"/>'
+                f'<text x="{x + 15}" y="{y}" class="cap-name">'
+                f"{_escape_xml(cap['name'].replace('_', ' ').title())}</text>"
                 f'<text x="{x + 15}" y="{y + 12}" class="cap-desc">{cap["strength"]}</text>'
+                f"</g>"
             )
 
         y_offset += cap_rows * 35 + 10
 
-    # Render ML backends
+    # Render ML backends with fade-in
     if ml_backends:
-        svg_parts.append(f'<text x="25" y="{y_offset}" class="section">ML Backends</text>')
+        backend_class = "" if disable_animations else "fade-in stagger-3"
+        svg_parts.append(
+            f'<g class="{backend_class}">'
+            f'<text x="25" y="{y_offset}" class="section">ML Backends</text>'
+        )
         y_offset += 18
         backends_str = ", ".join(_escape_xml(b) for b in ml_backends)
-        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{backends_str}</text>')
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{backends_str}</text></g>')
         y_offset += 25
 
-    # Render task types
+    # Render task types with fade-in
     if task_types:
-        svg_parts.append(f'<text x="25" y="{y_offset}" class="section">Task Types</text>')
+        task_class = "" if disable_animations else "fade-in stagger-4"
+        svg_parts.append(
+            f'<g class="{task_class}"><text x="25" y="{y_offset}" class="section">Task Types</text>'
+        )
         y_offset += 18
         # Format task types nicely
         tasks_formatted = [t.replace("_", " ").title() for t in task_types]
         tasks_str = ", ".join(_escape_xml(t) for t in tasks_formatted[:6])
         if len(task_types) > 6:
             tasks_str += f" +{len(task_types) - 6} more"
-        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{tasks_str}</text>')
+        svg_parts.append(f'<text x="25" y="{y_offset}" class="tag">{tasks_str}</text></g>')
 
     svg_parts.append("</svg>")
 
