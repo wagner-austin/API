@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 
@@ -9,7 +10,9 @@ from platform_discord.testing import (
     FakeAsyncClient,
     FakeAsyncClientHook,
     FakePubSub,
+    _production_path_is_dir,
     fake_async_client_from_url,
+    fake_path_is_dir_false,
     fake_path_is_dir_true,
     hooks,
 )
@@ -75,7 +78,25 @@ async def test_fake_async_client_from_url_returns_working_client() -> None:
 
 def test_fake_path_is_dir_true_returns_true() -> None:
     """Cover fake_path_is_dir_true function."""
-    from pathlib import Path
-
     result = fake_path_is_dir_true(Path("/any/path"))
     assert result is True
+
+
+def test_fake_path_is_dir_false_returns_false() -> None:
+    """Cover fake_path_is_dir_false function."""
+    result = fake_path_is_dir_false(Path("/any/path"))
+    assert result is False
+
+
+def test_production_path_is_dir_returns_true_for_existing_dir(tmp_path: Path) -> None:
+    """Cover _production_path_is_dir with real directory."""
+    result = _production_path_is_dir(tmp_path)
+    assert result is True
+
+
+def test_production_path_is_dir_returns_false_for_file(tmp_path: Path) -> None:
+    """Cover _production_path_is_dir with file path."""
+    file_path = tmp_path / "test.txt"
+    file_path.write_text("test", encoding="utf-8")
+    result = _production_path_is_dir(file_path)
+    assert result is False
