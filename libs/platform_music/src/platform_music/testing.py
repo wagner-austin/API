@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 
 from platform_workers.redis import RedisStrProto, redis_for_kv
 
@@ -175,11 +174,6 @@ SpotifyClientHook = Callable[[str, str, int | str], SpotifyProto]
 AppleClientHook = Callable[[str, str], AppleMusicProto]
 YouTubeClientHook = Callable[[str, str], YouTubeMusicProto]
 
-# Guard script hooks
-RunForProjectProto = Callable[[Path, Path], int]  # Positional args version
-LoadOrchestratorHook = Callable[[Path], RunForProjectProto]
-
-
 # =============================================================================
 # Hooks Container
 # =============================================================================
@@ -199,9 +193,6 @@ class HooksContainer:
     apple_http_get: AppleHttpGetHook
     spotify_http_get: SpotifyHttpGetHook
     youtube_http_post: YouTubeHttpPostHook
-
-    # Guard script hook - optional, only used by guard script
-    load_orchestrator: LoadOrchestratorHook | None = None
 
 
 hooks = HooksContainer()
@@ -286,7 +277,6 @@ def _init_production_hooks() -> None:
     hooks.spotify_http_get = _prod_spotify_http_get
     hooks.apple_http_get = _prod_apple_http_get
     hooks.youtube_http_post = _prod_youtube_http_post
-    hooks.load_orchestrator = None
 
 
 # Initialize production hooks at module load
@@ -449,18 +439,6 @@ def make_raising_youtube_http_post(exc: BaseException) -> YouTubeHttpPostHook:
     return _hook
 
 
-def make_fake_load_orchestrator(exit_code: int = 0) -> LoadOrchestratorHook:
-    """Create a load_orchestrator hook that returns a fake runner."""
-
-    def _loader(monorepo_root: Path) -> RunForProjectProto:
-        def _runner(monorepo_root: Path, project_root: Path) -> int:
-            return exit_code
-
-        return _runner
-
-    return _loader
-
-
 # =============================================================================
 # Exports
 # =============================================================================
@@ -473,16 +451,13 @@ __all__ = [
     "FakeYouTubeMusic",
     "HooksContainer",
     "LastFmClientHook",
-    "LoadOrchestratorHook",
     "RedisClientHook",
-    "RunForProjectProto",
     "SpotifyClientHook",
     "YouTubeClientHook",
     "hooks",
     "make_fake_apple_client",
     "make_fake_apple_http_get",
     "make_fake_lastfm_client",
-    "make_fake_load_orchestrator",
     "make_fake_redis_client",
     "make_fake_spotify_client",
     "make_fake_spotify_http_get",

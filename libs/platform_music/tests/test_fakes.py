@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_music.testing import (
     FakeAppleMusic,
     FakeSpotify,
     FakeYouTubeMusic,
-    make_fake_load_orchestrator,
     make_plays,
 )
 
@@ -68,10 +65,3 @@ def test_make_plays_utility() -> None:
     for p in plays:
         assert p["service"] == "spotify"
         assert p["track"]["service"] == "spotify"
-
-
-def test_make_fake_load_orchestrator_utility() -> None:
-    loader = make_fake_load_orchestrator(exit_code=42)
-    runner = loader(Path("/fake"))
-    result = runner(Path("/mono"), Path("/proj"))
-    assert result == 42
