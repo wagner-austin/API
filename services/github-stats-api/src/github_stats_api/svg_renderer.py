@@ -512,8 +512,7 @@ def render_langs_card(
         "<style>",
         f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
         f".lang-name {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
-        f".lang-pct {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; "
-        "opacity: 0.8; }}",
+        f".lang-pct {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; opacity: 0.8; }}",
         animation_css,
         glow_css,
         sparkle_css,
