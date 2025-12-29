@@ -22,6 +22,7 @@ class TestDecodeStatsRequest:
             show_icons=None,
             include_all_commits=None,
             hide=None,
+            disable_animations=None,
         )
 
         assert req["username"] == "testuser"
@@ -30,6 +31,7 @@ class TestDecodeStatsRequest:
         assert req["show_icons"] is True
         assert req["include_all_commits"] is False
         assert req["hide"] == ()
+        assert req["disable_animations"] is False
 
     def test_decode_stats_request_all_options(self) -> None:
         """Test decoding with all options specified."""
@@ -40,6 +42,7 @@ class TestDecodeStatsRequest:
             show_icons="false",
             include_all_commits="true",
             hide="stars,commits",
+            disable_animations="true",
         )
 
         assert req["username"] == "wagner-austin"
@@ -48,6 +51,7 @@ class TestDecodeStatsRequest:
         assert req["show_icons"] is False
         assert req["include_all_commits"] is True
         assert req["hide"] == ("stars", "commits")
+        assert req["disable_animations"] is True
 
     def test_decode_stats_request_missing_username_raises(self) -> None:
         """Test that missing username raises AppError."""
@@ -59,6 +63,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -74,6 +79,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -89,6 +95,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -104,6 +111,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -119,6 +127,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -134,6 +143,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -149,6 +159,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -164,6 +175,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -179,6 +191,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide="invalid-stat",
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -194,6 +207,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
             assert req["hide_border"] is True
 
@@ -205,6 +219,7 @@ class TestDecodeStatsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
             assert req["hide_border"] is False
 
@@ -221,6 +236,7 @@ class TestDecodeLangsRequest:
             layout=None,
             langs_count=None,
             hide=None,
+            disable_animations=None,
         )
 
         assert req["username"] == "testuser"
@@ -229,6 +245,7 @@ class TestDecodeLangsRequest:
         assert req["layout"] == "default"
         assert req["langs_count"] == 8
         assert req["hide"] == ()
+        assert req["disable_animations"] is False
 
     def test_decode_langs_request_all_options(self) -> None:
         """Test decoding with all options specified."""
@@ -239,6 +256,7 @@ class TestDecodeLangsRequest:
             layout="compact",
             langs_count="10",
             hide="HTML,CSS",
+            disable_animations="true",
         )
 
         assert req["username"] == "testuser"
@@ -247,6 +265,7 @@ class TestDecodeLangsRequest:
         assert req["layout"] == "compact"
         assert req["langs_count"] == 10
         assert req["hide"] == ("HTML", "CSS")
+        assert req["disable_animations"] is True
 
     def test_decode_langs_request_rejects_low_langs_count(self) -> None:
         """Test that langs_count below 1 raises AppError."""
@@ -258,6 +277,7 @@ class TestDecodeLangsRequest:
                 layout=None,
                 langs_count="0",
                 hide=None,
+                disable_animations=None,
             )
         assert exc_info.value.http_status == 400
         assert "at least 1" in exc_info.value.message
@@ -272,6 +292,7 @@ class TestDecodeLangsRequest:
                 layout=None,
                 langs_count="100",
                 hide=None,
+                disable_animations=None,
             )
         assert exc_info.value.http_status == 400
         assert "at most 20" in exc_info.value.message
@@ -286,6 +307,7 @@ class TestDecodeLangsRequest:
                 layout="invalid",
                 langs_count=None,
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -301,6 +323,7 @@ class TestDecodeLangsRequest:
                 layout=None,
                 langs_count="not-a-number",
                 hide=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -315,6 +338,7 @@ class TestDecodeLangsRequest:
             show_icons=None,
             include_all_commits=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["theme"] == "transparent"
 
@@ -327,6 +351,7 @@ class TestDecodeLangsRequest:
             show_icons=None,
             include_all_commits=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["theme"] == "github_dark"
 
@@ -339,6 +364,7 @@ class TestDecodeLangsRequest:
             show_icons=None,
             include_all_commits=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["theme"] == "default"
 
@@ -351,6 +377,7 @@ class TestDecodeLangsRequest:
             show_icons=None,
             include_all_commits=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["theme"] == "dark"
 
@@ -363,6 +390,7 @@ class TestDecodeLangsRequest:
             layout="donut",
             langs_count=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["layout"] == "donut"
 
@@ -375,6 +403,7 @@ class TestDecodeLangsRequest:
             layout="pie",
             langs_count=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["layout"] == "pie"
 
@@ -387,6 +416,7 @@ class TestDecodeLangsRequest:
             layout="default",
             langs_count=None,
             hide=None,
+            disable_animations=None,
         )
         assert req["layout"] == "default"
 
@@ -399,6 +429,7 @@ class TestDecodeLangsRequest:
             layout=None,
             langs_count="  ",
             hide=None,
+            disable_animations=None,
         )
         assert req["langs_count"] == 8
 
@@ -412,6 +443,7 @@ class TestDecodeLangsRequest:
                 show_icons=None,
                 include_all_commits=None,
                 hide=None,
+                disable_animations=None,
             )
         assert exc_info.value.http_status == 400
         assert "must be true/false" in exc_info.value.message
@@ -426,11 +458,13 @@ class TestDecodeCapabilitiesRequest:
             repo="owner/repo",
             theme=None,
             hide_border=None,
+            disable_animations=None,
         )
 
         assert req["repo"] == "owner/repo"
         assert req["theme"] == "default"
         assert req["hide_border"] is False
+        assert req["disable_animations"] is False
 
     def test_decode_capabilities_request_all_options(self) -> None:
         """Test decoding with all options specified."""
@@ -438,11 +472,13 @@ class TestDecodeCapabilitiesRequest:
             repo="wagner-austin/API",
             theme="dracula",
             hide_border="true",
+            disable_animations="true",
         )
 
         assert req["repo"] == "wagner-austin/API"
         assert req["theme"] == "dracula"
         assert req["hide_border"] is True
+        assert req["disable_animations"] is True
 
     def test_decode_capabilities_request_missing_repo_raises(self) -> None:
         """Test that missing repo raises AppError."""
@@ -451,6 +487,7 @@ class TestDecodeCapabilitiesRequest:
                 repo=None,
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -463,6 +500,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="   ",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -475,6 +513,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="just-a-repo",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -487,6 +526,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner/repo/extra",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -499,6 +539,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="/repo",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -511,6 +552,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner/",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -523,6 +565,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="a" * 40 + "/repo",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -535,6 +578,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner_name/repo",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -547,6 +591,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner/" + "a" * 101,
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -559,6 +604,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner/repo@name",
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
@@ -579,6 +625,7 @@ class TestDecodeCapabilitiesRequest:
                 repo=repo,
                 theme=None,
                 hide_border=None,
+                disable_animations=None,
             )
             assert req["repo"] == repo
 
@@ -589,6 +636,7 @@ class TestDecodeCapabilitiesRequest:
                 repo="owner/repo",
                 theme="invalid-theme",
                 hide_border=None,
+                disable_animations=None,
             )
 
         assert exc_info.value.http_status == 400
