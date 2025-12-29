@@ -558,14 +558,12 @@ def render_langs_card(
 
             lang_color = lang["color"]
             lang_name = _escape_xml(lang["name"])
-            lang_pct = lang["percentage"]
             stagger_idx = min(i + 1, 5)
             stagger_class = "" if disable_animations else f"fade-in stagger-{stagger_idx}"
             svg_parts.append(
                 f'<g class="{stagger_class}">'
                 f'<circle cx="{lx + 5}" cy="{ly - 4}" r="5" fill="{lang_color}"/>'
                 f'<text x="{lx + 15}" y="{ly}" class="lang-name">{lang_name}</text>'
-                f'<text x="{lx + 15}" y="{ly + 12}" class="lang-pct">{lang_pct:.1f}%</text>'
                 f"</g>"
             )
 
@@ -579,12 +577,10 @@ def render_langs_card(
             stagger_class = "" if disable_animations else f"fade-in stagger-{stagger_idx}"
             bar_anim_class = "" if disable_animations else " grow-width"
 
-            # Language name and percentage
+            # Language name
             svg_parts.append(
                 f'<g class="{stagger_class}">'
                 f'<text x="25" y="{y_offset}" class="lang-name">{_escape_xml(lang["name"])}</text>'
-                f'<text x="{width - 25}" y="{y_offset}" text-anchor="end" class="lang-pct">'
-                f"{lang['percentage']:.2f}%</text>"
                 f"</g>"
             )
 
