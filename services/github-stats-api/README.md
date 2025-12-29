@@ -5,7 +5,8 @@ Strictly typed GitHub statistics SVG card generation API. A Python reimplementat
 ## Features
 
 - **SVG Card Generation**: Dynamic GitHub stats and language cards
-- **Multiple Themes**: Default, dark, dracula, github_dark, transparent
+- **10 Themes**: Basic (default, dark, dracula, github_dark, transparent) and premium with animations (cyberpunk, synthwave, neon, aurora, radical)
+- **Animated Effects**: Premium themes include pulsing glow, twinkling sparkles, and gradient backgrounds
 - **Layout Options**: Default, compact, donut, and pie layouts for language cards
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI via `_test_hooks.py` pattern
 - **100% Test Coverage**: Statements and branches
@@ -74,15 +75,30 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 
 ### Example Usage
 
-**Stats Card:**
+**Stats Card (with animated theme):**
 ```
-/api?username=wagner-austin&theme=dracula&hide_border=true&show_icons=true
+/api?username=wagner-austin&theme=cyberpunk&hide_border=true&show_icons=true
 ```
 
-**Languages Card:**
+**Languages Card (with animated theme):**
 ```
-/api/top-langs?username=wagner-austin&theme=dracula&layout=compact&langs_count=8
+/api/top-langs?username=wagner-austin&theme=cyberpunk&layout=compact&langs_count=8
 ```
+
+### Available Themes
+
+| Theme | Type | Effects |
+|-------|------|---------|
+| `default` | Basic | Light theme, no animations |
+| `dark` | Basic | Dark theme, no animations |
+| `dracula` | Basic | Dracula colors, no animations |
+| `github_dark` | Basic | GitHub dark mode, no animations |
+| `transparent` | Basic | Transparent background, no animations |
+| `cyberpunk` | Premium | Cyan/magenta with gradient, glow pulse, sparkles |
+| `synthwave` | Premium | Pink/blue 80s with gradient, glow pulse, sparkles |
+| `neon` | Premium | Green/red neon with gradient, glow pulse, sparkles |
+| `aurora` | Premium | Green/teal with gradient, glow pulse, sparkles |
+| `radical` | Premium | Pink/yellow with gradient, glow pulse, sparkles |
 
 ---
 
