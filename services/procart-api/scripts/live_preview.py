@@ -10,21 +10,49 @@ Controls:
   R: Reset defaults
   ESC: Quit
 """
+
 from __future__ import annotations
+
+from typing import Final, Literal
 
 import numpy as np
 import pygame
-
 from procart.color import apply_tone_map
+from procart.math_backend import BACKEND, FloatArray
 from procart.modules.background import BlackBackground
 from procart.modules.neon_orbs import NeonOrbs
-from procart.scene import Layer
 from procart.types import (
     NeonGlowConfig,
     NeonOrbsLayerConfig,
     Resolution,
     ToneMappingConfigExposureGamma,
 )
+from typing_extensions import TypedDict
+
+
+class RenderParams(TypedDict):
+    """Parameters for rendering neon orbs."""
+
+    orb_count: int
+    core_radius: float
+    halo_radius: float
+    core_intensity: float
+    halo_intensity: float
+    speed: float
+
+
+ParamKey = Literal[
+    "orb_count", "core_radius", "halo_radius", "core_intensity", "halo_intensity", "speed"
+]
+
+
+class _KeyConfig(TypedDict):
+    """Configuration for a single key mapping."""
+
+    param: ParamKey
+    delta: float
+    min_val: float
+    max_val: float
 
 
 def render_frame(
@@ -35,8 +63,21 @@ def render_frame(
     halo_radius: float,
     core_intensity: float,
     halo_intensity: float,
-) -> np.ndarray:
-    """Render a single frame with current parameters."""
+) -> FloatArray:
+    """Render a single frame with current parameters.
+
+    Args:
+        t: Time value for animation.
+        resolution: Frame resolution (width and height).
+        orb_count: Number of neon orbs to render.
+        core_radius: Radius of the bright core of each orb.
+        halo_radius: Radius of the glow halo around each orb.
+        core_intensity: Brightness intensity of the core.
+        halo_intensity: Brightness intensity of the halo.
+
+    Returns:
+        RGB image as uint8 FloatArray suitable for pygame display.
+    """
     # Black background
     bg_mod = BlackBackground()
 
@@ -63,30 +104,184 @@ def render_frame(
     orbs_rgba = orbs_mod.render_frame(t, resolution, 0, 0.0, 0.0)
 
     # Alpha composite (orbs over background)
-    bg_r, bg_g, bg_b = bg_rgba[:, :, 0], bg_rgba[:, :, 1], bg_rgba[:, :, 2]
-    o_r, o_g, o_b, o_a = orbs_rgba[:, :, 0], orbs_rgba[:, :, 1], orbs_rgba[:, :, 2], orbs_rgba[:, :, 3]
+    bg_r = BACKEND.channel(bg_rgba, 0)
+    bg_g = BACKEND.channel(bg_rgba, 1)
+    bg_b = BACKEND.channel(bg_rgba, 2)
+    o_r = BACKEND.channel(orbs_rgba, 0)
+    o_g = BACKEND.channel(orbs_rgba, 1)
+    o_b = BACKEND.channel(orbs_rgba, 2)
+    o_a = BACKEND.channel(orbs_rgba, 3)
 
     inv_a = 1.0 - o_a
     r = o_r + bg_r * inv_a
     g = o_g + bg_g * inv_a
     b = o_b + bg_b * inv_a
 
-    rgb_hdr = np.stack([r, g, b], axis=-1)
+    # Manually stack RGB channels using numpy
+    rgb_hdr_np = np.stack([r.tolist(), g.tolist(), b.tolist()], axis=-1)
 
-    # Tone map
+    # Tone map - numpy ndarray is compatible with FloatArray Protocol
     tone_cfg: ToneMappingConfigExposureGamma = {
         "type": "exposure_gamma",
         "exposure": 1.0,
         "gamma": 2.2,
     }
-    rgb_ldr = apply_tone_map(rgb_hdr, tone_cfg)
+
+    rgb_ldr = apply_tone_map(rgb_hdr_np, tone_cfg)
 
     # Convert to uint8 for pygame
-    rgb_uint8 = (np.clip(rgb_ldr, 0.0, 1.0) * 255).astype(np.uint8)
-    return rgb_uint8
+    rgb_clipped = BACKEND.clip(rgb_ldr, 0.0, 1.0)
+    rgb_scaled = rgb_clipped * 255.0
+    result: FloatArray = rgb_scaled.astype("uint8", copy=False)
+    return result
+
+
+def _apply_delta_to_param(
+    params: RenderParams,
+    param: ParamKey,
+    delta: float,
+    min_val: float,
+    max_val: float,
+) -> None:
+    """Apply delta to a parameter with bounds checking.
+
+    Args:
+        params: Parameter dictionary to update (mutated in place).
+        param: Key of the parameter to update.
+        delta: Amount to add to the current value.
+        min_val: Minimum allowed value.
+        max_val: Maximum allowed value.
+    """
+    if param == "orb_count":
+        current = params[param]
+        params[param] = max(int(min_val), min(int(max_val), current + int(delta)))
+    else:
+        current_val = params[param]
+        params[param] = max(min_val, min(max_val, current_val + delta))
+
+
+def _build_key_map() -> dict[int, _KeyConfig]:
+    """Build the keyboard mapping configuration.
+
+    Returns:
+        Dictionary mapping pygame key codes to their parameter configurations.
+    """
+    return {
+        pygame.K_1: {"param": "orb_count", "delta": -1.0, "min_val": 1.0, "max_val": 20.0},
+        pygame.K_2: {"param": "orb_count", "delta": 1.0, "min_val": 1.0, "max_val": 20.0},
+        pygame.K_3: {"param": "core_radius", "delta": -0.005, "min_val": 0.01, "max_val": 0.2},
+        pygame.K_4: {"param": "core_radius", "delta": 0.005, "min_val": 0.01, "max_val": 0.2},
+        pygame.K_5: {"param": "halo_radius", "delta": -0.01, "min_val": 0.02, "max_val": 0.5},
+        pygame.K_6: {"param": "halo_radius", "delta": 0.01, "min_val": 0.02, "max_val": 0.5},
+        pygame.K_7: {"param": "core_intensity", "delta": -0.2, "min_val": 0.1, "max_val": 10.0},
+        pygame.K_8: {"param": "core_intensity", "delta": 0.2, "min_val": 0.1, "max_val": 10.0},
+        pygame.K_9: {"param": "halo_intensity", "delta": -0.1, "min_val": 0.05, "max_val": 3.0},
+        pygame.K_0: {"param": "halo_intensity", "delta": 0.1, "min_val": 0.05, "max_val": 3.0},
+        pygame.K_MINUS: {"param": "speed", "delta": -0.1, "min_val": 0.1, "max_val": 3.0},
+        pygame.K_EQUALS: {"param": "speed", "delta": 0.1, "min_val": 0.1, "max_val": 3.0},
+    }
+
+
+def _handle_key_event(
+    key_code: int,
+    params: RenderParams,
+    defaults: RenderParams,
+    key_map: dict[int, _KeyConfig],
+) -> RenderParams:
+    """Handle keyboard events and update parameters.
+
+    Args:
+        key_code: Pygame key code from the event.
+        params: Current parameter values.
+        defaults: Default parameter values for reset.
+        key_map: Mapping of key codes to parameter configurations.
+
+    Returns:
+        Updated parameter dictionary.
+    """
+    k_r: Final[int] = pygame.K_r
+
+    if key_code == k_r:
+        return defaults.copy()
+
+    if key_code in key_map:
+        cfg = key_map[key_code]
+        _apply_delta_to_param(params, cfg["param"], cfg["delta"], cfg["min_val"], cfg["max_val"])
+
+    return params
+
+
+def _draw_overlay(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    clock: pygame.time.Clock,
+    params: RenderParams,
+) -> None:
+    """Draw overlay text on screen.
+
+    Args:
+        screen: Pygame surface to draw on.
+        font: Pygame font for rendering text.
+        clock: Pygame clock for FPS calculation.
+        params: Current render parameters to display.
+    """
+    fps = clock.get_fps()
+    lines = [
+        f"FPS: {fps:.1f}",
+        f"Orbs(1/2): {params['orb_count']}",
+        f"Core R(3/4): {params['core_radius']:.3f}",
+        f"Halo R(5/6): {params['halo_radius']:.2f}",
+        f"Core I(7/8): {params['core_intensity']:.1f}",
+        f"Halo I(9/0): {params['halo_intensity']:.2f}",
+        f"Speed(-/=): {params['speed']:.1f}",
+        "R=reset ESC=quit",
+    ]
+    y = 10
+    for line in lines:
+        text = font.render(line, True, (255, 255, 255), (0, 0, 0))
+        screen.blit(text, (10, y))
+        y += 20
+
+
+def _process_events(
+    params: RenderParams,
+    defaults: RenderParams,
+    key_map: dict[int, _KeyConfig],
+) -> tuple[RenderParams, bool]:
+    """Process all pygame events and update state.
+
+    Args:
+        params: Current render parameters.
+        defaults: Default parameters for reset.
+        key_map: Mapping of key codes to parameter configurations.
+
+    Returns:
+        Tuple of (updated params, continue_running flag).
+    """
+    k_escape: Final[int] = pygame.K_ESCAPE
+    quit_event: Final[int] = pygame.QUIT
+    keydown_event: Final[int] = pygame.KEYDOWN
+
+    for event in pygame.event.get():
+        if event.type == quit_event:
+            return params, False
+        if event.type == keydown_event:
+            event_key_raw: int = event.key
+            event_key: int = int(event_key_raw)
+            key_code: int = event_key
+            if key_code == k_escape:
+                return params, False
+            params = _handle_key_event(key_code, params, defaults, key_map)
+
+    return params, True
 
 
 def main() -> int:
+    """Run the interactive pygame preview loop.
+
+    Returns:
+        Exit code (0 for success).
+    """
     pygame.init()
 
     render_w, render_h = 512, 512
@@ -95,8 +290,7 @@ def main() -> int:
 
     font = pygame.font.Font(None, 24)
 
-    # Default parameters
-    defaults = {
+    defaults: RenderParams = {
         "orb_count": 3,
         "core_radius": 0.03,
         "halo_radius": 0.15,
@@ -104,96 +298,41 @@ def main() -> int:
         "halo_intensity": 0.4,
         "speed": 0.5,
     }
-    params = defaults.copy()
+    params: RenderParams = defaults.copy()
 
+    key_map = _build_key_map()
     clock = pygame.time.Clock()
     t = 0.0
-    running = True
-
     resolution: Resolution = {"width": render_w, "height": render_h}
 
     print(__doc__)
 
+    running = True
     while running:
         time_delta = clock.tick(30) / 1000.0
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                # Orb count
-                elif event.key == pygame.K_1:
-                    params["orb_count"] = max(1, params["orb_count"] - 1)
-                elif event.key == pygame.K_2:
-                    params["orb_count"] = min(20, params["orb_count"] + 1)
-                # Core radius
-                elif event.key == pygame.K_3:
-                    params["core_radius"] = max(0.01, params["core_radius"] - 0.005)
-                elif event.key == pygame.K_4:
-                    params["core_radius"] = min(0.2, params["core_radius"] + 0.005)
-                # Halo radius
-                elif event.key == pygame.K_5:
-                    params["halo_radius"] = max(0.02, params["halo_radius"] - 0.01)
-                elif event.key == pygame.K_6:
-                    params["halo_radius"] = min(0.5, params["halo_radius"] + 0.01)
-                # Core intensity
-                elif event.key == pygame.K_7:
-                    params["core_intensity"] = max(0.1, params["core_intensity"] - 0.2)
-                elif event.key == pygame.K_8:
-                    params["core_intensity"] = min(10.0, params["core_intensity"] + 0.2)
-                # Halo intensity
-                elif event.key == pygame.K_9:
-                    params["halo_intensity"] = max(0.05, params["halo_intensity"] - 0.1)
-                elif event.key == pygame.K_0:
-                    params["halo_intensity"] = min(3.0, params["halo_intensity"] + 0.1)
-                # Speed
-                elif event.key == pygame.K_MINUS:
-                    params["speed"] = max(0.1, params["speed"] - 0.1)
-                elif event.key == pygame.K_EQUALS:
-                    params["speed"] = min(3.0, params["speed"] + 0.1)
-                # Reset
-                elif event.key == pygame.K_r:
-                    params = defaults.copy()
+        params, running = _process_events(params, defaults, key_map)
 
-        # Update time (looping)
         t += time_delta * params["speed"]
         t = t % 1.0
 
-        # Render frame
         rgb = render_frame(
             t,
             resolution,
-            int(params["orb_count"]),
+            params["orb_count"],
             params["core_radius"],
             params["halo_radius"],
             params["core_intensity"],
             params["halo_intensity"],
         )
 
-        # Convert to pygame surface
-        surface = pygame.surfarray.make_surface(np.transpose(rgb, (1, 0, 2)))
+        # Convert FloatArray to numpy for pygame
+        rgb_list = rgb.tolist()
+        rgb_np = np.array(rgb_list, dtype="uint8")
+        rgb_transposed = np.transpose(rgb_np, (1, 0, 2))
+        surface = pygame.surfarray.make_surface(rgb_transposed)
         screen.blit(surface, (0, 0))
-
-        # Draw overlay text
-        fps = clock.get_fps()
-        lines = [
-            f"FPS: {fps:.1f}",
-            f"Orbs(1/2): {params['orb_count']}",
-            f"Core R(3/4): {params['core_radius']:.3f}",
-            f"Halo R(5/6): {params['halo_radius']:.2f}",
-            f"Core I(7/8): {params['core_intensity']:.1f}",
-            f"Halo I(9/0): {params['halo_intensity']:.2f}",
-            f"Speed(-/=): {params['speed']:.1f}",
-            "R=reset ESC=quit",
-        ]
-        y = 10
-        for line in lines:
-            text = font.render(line, True, (255, 255, 255), (0, 0, 0))
-            screen.blit(text, (10, y))
-            y += 20
-
+        _draw_overlay(screen, font, clock, params)
         pygame.display.flip()
 
     pygame.quit()
