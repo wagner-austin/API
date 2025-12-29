@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from scripts import _test_hooks
 from scripts import guard as guard_mod
 
 
@@ -27,34 +28,34 @@ def test_guard_main_with_unknown_flag() -> None:
 
 def test_guard_find_monorepo_root_with_hook() -> None:
     """Test _find_monorepo_root with injected is_dir hook."""
-    original_hook = guard_mod._is_dir_hook
+    original_hook = _test_hooks.is_dir
     fake_root = Path("/fake/monorepo")
 
     def fake_is_dir(path: Path) -> bool:
         return path == fake_root / "libs"
 
     try:
-        guard_mod._is_dir_hook = fake_is_dir
+        _test_hooks.is_dir = fake_is_dir
         start = fake_root / "services" / "github-stats-api"
         result = guard_mod._find_monorepo_root(start)
         assert result == fake_root, f"Expected {fake_root}, got {result}"
     finally:
-        guard_mod._is_dir_hook = original_hook
+        _test_hooks.is_dir = original_hook
 
 
 def test_guard_find_monorepo_root_raises_when_not_found() -> None:
     """Test _find_monorepo_root raises when libs not found."""
-    original_hook = guard_mod._is_dir_hook
+    original_hook = _test_hooks.is_dir
 
     def fake_is_dir_never(path: Path) -> bool:
         return False
 
     try:
-        guard_mod._is_dir_hook = fake_is_dir_never
+        _test_hooks.is_dir = fake_is_dir_never
         with pytest.raises(RuntimeError, match=r"monorepo root.*not found"):
             guard_mod._find_monorepo_root(Path("/some/random/path"))
     finally:
-        guard_mod._is_dir_hook = original_hook
+        _test_hooks.is_dir = original_hook
 
 
 def test_guard_main_block_execution() -> None:
