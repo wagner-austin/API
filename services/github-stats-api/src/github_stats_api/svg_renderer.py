@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from .api.schemas.stats import CapabilitiesResponse, Capability, LanguageStats, UserStats
-from .themes import get_theme
+from .themes import Gradient, Theme, get_theme
 
 # Rank thresholds based on activity percentiles
 _RANK_THRESHOLDS: list[tuple[str, float]] = [
@@ -38,8 +39,6 @@ def _calculate_rank(
     score = commits * 1 + prs * 2 + issues * 1 + stars * 4
 
     # Logarithmic percentile (higher = better)
-    import math
-
     percentile = 100.0 if score <= 0 else max(0.0, min(100.0, 100.0 - math.log10(score + 1) * 15.0))
 
     # Find rank using threshold lookup. Last threshold is ("C", 100) and
@@ -133,6 +132,192 @@ def _get_animation_css() -> str:
 """
 
 
+def _get_glow_css(glow_color: str) -> str:
+    """Get CSS for glow effects on text and icons with pulse animation.
+
+    Creates an infinite pulsing glow effect that continuously animates.
+    This animation runs forever so it's visible regardless of caching.
+
+    Args:
+        glow_color: Hex color for the glow effect.
+
+    Returns:
+        CSS string with glow filter, pulse animation, and classes.
+    """
+    # Build multi-line filter for 50% keyframe
+    glow_50 = (
+        f"drop-shadow(0 0 4px {glow_color}) "
+        f"drop-shadow(0 0 8px {glow_color}) "
+        f"drop-shadow(0 0 12px {glow_color})"
+    )
+    return f"""
+@keyframes glowPulse {{
+  0%, 100% {{
+    filter: drop-shadow(0 0 2px {glow_color}) drop-shadow(0 0 4px {glow_color});
+  }}
+  50% {{
+    filter: {glow_50};
+  }}
+}}
+.glow-text {{
+  animation: glowPulse 2s ease-in-out infinite;
+}}
+.glow-icon {{
+  filter: drop-shadow(0 0 2px {glow_color});
+}}
+"""
+
+
+def _render_gradient_defs(gradient: Gradient, grad_id: str) -> str:
+    """Render SVG gradient definition.
+
+    Args:
+        gradient: Gradient specification with angle and stops.
+        grad_id: Unique ID for the gradient element.
+
+    Returns:
+        SVG defs element containing the gradient.
+    """
+    # Convert angle to x1,y1,x2,y2 coordinates
+    # SVG gradients use: angle 0 = left-to-right, 90 = top-to-bottom
+    angle_rad = math.radians(gradient["angle"])
+    x1 = 50 - 50 * math.cos(angle_rad)
+    y1 = 50 - 50 * math.sin(angle_rad)
+    x2 = 50 + 50 * math.cos(angle_rad)
+    y2 = 50 + 50 * math.sin(angle_rad)
+
+    stops_svg = ""
+    for stop in gradient["stops"]:
+        stops_svg += f'<stop offset="{stop["offset"]}%" stop-color="{stop["color"]}"/>'
+
+    return f"""<defs>
+<linearGradient id="{grad_id}" x1="{x1:.1f}%" y1="{y1:.1f}%" x2="{x2:.1f}%" y2="{y2:.1f}%">
+{stops_svg}
+</linearGradient>
+</defs>"""
+
+
+def _get_sparkle_css(sparkle_color: str) -> str:
+    """Get CSS for sparkle twinkle animation.
+
+    Creates an infinite twinkling effect for sparkle decorations.
+
+    Args:
+        sparkle_color: Hex color for sparkles (used in keyframes).
+
+    Returns:
+        CSS string with twinkle keyframes and sparkle classes.
+    """
+    return """
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sparkle-1 { animation: twinkle 1.5s ease-in-out infinite; }
+.sparkle-2 { animation: twinkle 2s ease-in-out infinite 0.3s; }
+.sparkle-3 { animation: twinkle 1.8s ease-in-out infinite 0.6s; }
+.sparkle-4 { animation: twinkle 2.2s ease-in-out infinite 0.9s; }
+"""
+
+
+def _render_sparkles(
+    width: int,
+    height: int,
+    sparkle_color: str,
+    sparkle_count: int,
+) -> str:
+    """Render sparkle/star decorations with twinkle animation.
+
+    Uses deterministic positioning based on index for consistent rendering.
+    Each sparkle gets a different animation delay for staggered twinkling.
+    Caller must ensure sparkle_count > 0 before calling.
+
+    Args:
+        width: Card width in pixels.
+        height: Card height in pixels.
+        sparkle_color: Hex color for sparkles.
+        sparkle_count: Number of sparkles to render (must be > 0).
+
+    Returns:
+        SVG group element containing animated sparkle shapes.
+    """
+    sparkles: list[str] = []
+
+    # Deterministic positions using golden ratio distribution
+    phi = 1.618033988749895
+    for i in range(sparkle_count):
+        # Distribute sparkles using golden ratio for even spread
+        t = (i * phi) % 1.0
+        # Keep sparkles in margin areas (not over text)
+        if i % 2 == 0:
+            # Right side sparkles
+            x = width - 30 - (t * 40)
+            y = 20 + ((i * phi * 1.3) % 1.0) * (height - 40)
+        else:
+            # Top/bottom edge sparkles
+            x = 30 + (t * (width - 100))
+            y = 15 + (t * 20) if i % 4 == 1 else height - 15 - (t * 20)
+
+        # Vary sparkle size
+        size = 2 + (i % 3)
+
+        # Assign animation class (cycles through 1-4 for varied timing)
+        anim_class = f"sparkle sparkle-{(i % 4) + 1}"
+
+        # Four-point star shape with animation class
+        sparkle = (
+            f'<path class="{anim_class}" '
+            f'd="M{x:.1f},{y - size:.1f} L{x + size * 0.3:.1f},{y:.1f} '
+            f'L{x:.1f},{y + size:.1f} L{x - size * 0.3:.1f},{y:.1f} Z" '
+            f'fill="{sparkle_color}"/>'
+        )
+        sparkles.append(sparkle)
+
+    return f'<g class="sparkles">{"".join(sparkles)}</g>'
+
+
+def _render_background(
+    width: int,
+    height: int,
+    theme: Theme,
+    hide_border: bool,
+    grad_id: str,
+) -> tuple[str, str]:
+    """Render background rectangle with optional gradient.
+
+    Args:
+        width: Card width in pixels.
+        height: Card height in pixels.
+        theme: Theme configuration.
+        hide_border: Whether to hide the border.
+        grad_id: Gradient ID if gradient is used.
+
+    Returns:
+        Tuple of (defs_svg, rect_svg) where defs contains gradient definition.
+    """
+    gradient = theme["gradient"]
+    border_opacity = 0 if hide_border else 1
+
+    if gradient is not None:
+        defs_svg = _render_gradient_defs(gradient, grad_id)
+        fill = f"url(#{grad_id})"
+    else:
+        defs_svg = ""
+        fill = theme["bg_color"]
+
+    rect_svg = (
+        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" '
+        f'rx="4.5" fill="{fill}" stroke="{theme["border_color"]}" '
+        f'stroke-opacity="{border_opacity}"/>'
+    )
+
+    return defs_svg, rect_svg
+
+
 def render_stats_card(
     stats: UserStats,
     theme_name: str,
@@ -178,12 +363,30 @@ def render_stats_card(
     # Adjust height based on items
     height = 120 + len(items) * 25
 
-    # Build CSS with optional animations
+    # Build CSS with optional animations and glow effects
     animation_css = "" if disable_animations else _get_animation_css()
+    glow_color = theme["glow_color"]
+    glow_css = "" if glow_color is None else _get_glow_css(glow_color)
+
+    # Render background with optional gradient
+    defs_svg, rect_svg = _render_background(width, height, theme, hide_border, "stats-grad")
+
+    # Render sparkle decorations with animation CSS
+    sparkle_color = theme["sparkle_color"]
+    sparkle_count = theme["sparkle_count"]
+    sparkles_svg = ""
+    sparkle_css = ""
+    if sparkle_color is not None and sparkle_count > 0:
+        sparkles_svg = _render_sparkles(width, height, sparkle_color, sparkle_count)
+        sparkle_css = "" if disable_animations else _get_sparkle_css(sparkle_color)
+
+    # Determine header class (with or without glow)
+    header_class = "header glow-text" if glow_color is not None else "header"
 
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
+        defs_svg,
         "<style>",
         f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {theme['title_color']}; }}",
         f".stat-label {{ font: 400 14px 'Segoe UI', sans-serif; fill: {theme['text_color']}; }}",
@@ -192,11 +395,13 @@ def render_stats_card(
         f".rank-circle {{ stroke: {theme['title_color']}; fill: none; stroke-width: 6; }}",
         ".icon { font-size: 14px; }",
         animation_css,
+        glow_css,
+        sparkle_css,
         "</style>",
-        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
-        f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
-        f'stroke-opacity="{0 if hide_border else 1}"/>',
-        f'<text x="25" y="35" class="header">{_escape_xml(stats["name"])}\'s GitHub Stats</text>',
+        rect_svg,
+        sparkles_svg,
+        f'<text x="25" y="35" class="{header_class}">'
+        f"{_escape_xml(stats['name'])}'s GitHub Stats</text>",
     ]
 
     # Render stat items with staggered animation
@@ -282,21 +487,40 @@ def render_langs_card(
     title_color = theme["title_color"]
     text_color = theme["text_color"]
     animation_css = "" if disable_animations else _get_animation_css()
+    glow_color = theme["glow_color"]
+    glow_css = "" if glow_color is None else _get_glow_css(glow_color)
+
+    # Render background with optional gradient
+    defs_svg, rect_svg = _render_background(width, height, theme, hide_border, "langs-grad")
+
+    # Render sparkle decorations with animation CSS
+    sparkle_color = theme["sparkle_color"]
+    sparkle_count = theme["sparkle_count"]
+    sparkles_svg = ""
+    sparkle_css = ""
+    if sparkle_color is not None and sparkle_count > 0:
+        sparkles_svg = _render_sparkles(width, height, sparkle_color, sparkle_count)
+        sparkle_css = "" if disable_animations else _get_sparkle_css(sparkle_color)
+
+    # Determine header class (with or without glow)
+    header_class = "header glow-text" if glow_color is not None else "header"
 
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
+        defs_svg,
         "<style>",
         f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
         f".lang-name {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
         f".lang-pct {{ font: 400 12px 'Segoe UI', sans-serif; fill: {text_color}; "
         "opacity: 0.8; }}",
         animation_css,
+        glow_css,
+        sparkle_css,
         "</style>",
-        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
-        f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
-        f'stroke-opacity="{0 if hide_border else 1}"/>',
-        '<text x="25" y="35" class="header">Most Used Languages</text>',
+        rect_svg,
+        sparkles_svg,
+        f'<text x="25" y="35" class="{header_class}">Most Used Languages</text>',
     ]
 
     if layout == "compact":
@@ -519,10 +743,28 @@ def render_capabilities_card(
     text_color = theme["text_color"]
     icon_color = theme["icon_color"]
     animation_css = "" if disable_animations else _get_animation_css()
+    glow_color = theme["glow_color"]
+    glow_css = "" if glow_color is None else _get_glow_css(glow_color)
+
+    # Render background with optional gradient
+    defs_svg, rect_svg = _render_background(width, height, theme, hide_border, "caps-grad")
+
+    # Render sparkle decorations with animation CSS
+    sparkle_color = theme["sparkle_color"]
+    sparkle_count = theme["sparkle_count"]
+    sparkles_svg = ""
+    sparkle_css = ""
+    if sparkle_color is not None and sparkle_count > 0:
+        sparkles_svg = _render_sparkles(width, height, sparkle_color, sparkle_count)
+        sparkle_css = "" if disable_animations else _get_sparkle_css(sparkle_color)
+
+    # Determine header class (with or without glow)
+    header_class = "header glow-text" if glow_color is not None else "header"
 
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
+        defs_svg,
         "<style>",
         f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
         f".section {{ font: 600 14px 'Segoe UI', sans-serif; fill: {title_color}; }}",
@@ -534,11 +776,12 @@ def render_capabilities_card(
         ".strength-moderate { fill: #f1c40f; }",
         ".strength-basic { fill: #95a5a6; }",
         animation_css,
+        glow_css,
+        sparkle_css,
         "</style>",
-        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="4.5" '
-        f'fill="{theme["bg_color"]}" stroke="{theme["border_color"]}" '
-        f'stroke-opacity="{0 if hide_border else 1}"/>',
-        '<text x="25" y="35" class="header">Codebase Capabilities</text>',
+        rect_svg,
+        sparkles_svg,
+        f'<text x="25" y="35" class="{header_class}">Codebase Capabilities</text>',
     ]
 
     y_offset = 60
