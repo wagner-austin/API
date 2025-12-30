@@ -193,6 +193,99 @@ The capabilities card displays:
 
 ---
 
+### GET /api/hero
+
+Generate a hero/profile card with rain animation effect.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | Yes | - | Display name (large title text) |
+| `subtitle` | string | No | `""` | Subtitle text below the name |
+| `lines` | string | No | - | Pipe-separated info lines (e.g., `"Line 1\|Line 2\|Line 3"`) |
+| `theme` | string | No | `"default"` | Color theme (see [Themes](#themes)) |
+| `disable_animations` | string | No | `"false"` | Disable CSS animations (`true`, `false`, `1`, `0`, `yes`, `no`) |
+
+**Response (200):** `image/svg+xml`
+
+Returns an SVG image with a hero card featuring rain animation.
+
+**Response Headers:**
+
+| Header | Value |
+|--------|-------|
+| `Content-Type` | `image/svg+xml` |
+| `Cache-Control` | `max-age={CACHE_TTL_SECONDS}, s-maxage={CACHE_TTL_SECONDS}` |
+
+**Example Request:**
+```
+GET /api/hero?name=Austin%20Wagner&subtitle=Software%20Engineer&lines=Python|TypeScript|ML&theme=cyberpunk
+```
+
+**Example - curl:**
+```bash
+curl "http://localhost:8000/api/hero?name=Austin%20Wagner&subtitle=Developer&theme=cyberpunk"
+```
+
+**Hero Card Content:**
+
+The hero card displays:
+- Large display name with optional glow effect
+- Subtitle text
+- Multiple info lines (pipe-separated)
+- Rain animation effect (when animations enabled)
+
+---
+
+### GET /api/skills
+
+Generate a tech stack/skills card with colored skill icons.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `skills` | string | Yes | - | Comma-separated skill names (e.g., `"python,typescript,docker"`) |
+| `theme` | string | No | `"default"` | Color theme (see [Themes](#themes)) |
+| `hide_border` | string | No | `"false"` | Hide card border (`true`, `false`, `1`, `0`, `yes`, `no`) |
+| `disable_animations` | string | No | `"false"` | Disable CSS animations (`true`, `false`, `1`, `0`, `yes`, `no`) |
+
+**Response (200):** `image/svg+xml`
+
+Returns an SVG image with a skills card displaying technology icons.
+
+**Response Headers:**
+
+| Header | Value |
+|--------|-------|
+| `Content-Type` | `image/svg+xml` |
+| `Cache-Control` | `max-age={CACHE_TTL_SECONDS}, s-maxage={CACHE_TTL_SECONDS}` |
+
+**Example Request:**
+```
+GET /api/skills?skills=python,typescript,react,docker,redis&theme=dracula
+```
+
+**Example - curl:**
+```bash
+curl "http://localhost:8000/api/skills?skills=python,typescript,docker&theme=cyberpunk"
+```
+
+**Skills Card Content:**
+
+The skills card displays:
+- Tech Stack title
+- Two-column grid of skills with colored icons
+- Icons sourced from Simple Icons with embedded brand colors
+- Fallback circle for unrecognized skills
+
+**Supported Skills:**
+
+Icons are available for: python, typescript, javascript, react, fastapi, pytorch, docker, redis, huggingface, git, rust, go, nodejs, vue, angular, svelte, tailwind, css, html, kubernetes, linux, nginx, mongodb, postgresql, graphql, flask, django, numpy, pandas, hypercorn, and more.
+
+---
+
 ## Reference
 
 ### Themes
