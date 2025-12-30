@@ -475,13 +475,13 @@ def render_langs_card(
 
     # Card dimensions based on layout
     if layout == "compact":
-        width = 350
+        width = 495
         height = 170
     elif layout in ("donut", "pie"):
-        width = 350
+        width = 495
         height = 250
     else:  # default
-        width = 300
+        width = 495
         height = 145 + len(langs) * 25
 
     title_color = theme["title_color"]
@@ -869,11 +869,165 @@ def build_capabilities_response(
     }
 
 
+def _get_rain_css(rain_color: str, drop_count: int) -> str:
+    """Get CSS for falling rain animation.
+
+    Creates an infinite falling rain effect with randomized drops.
+
+    Args:
+        rain_color: Hex color for rain drops.
+        drop_count: Number of rain drops to animate.
+
+    Returns:
+        CSS string with rain animation keyframes and classes.
+    """
+    css_parts = [
+        """
+@keyframes rainFall {
+  0% { transform: translateY(-20px); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(350px); opacity: 0; }
+}
+"""
+    ]
+
+    # Generate unique animation for each drop with different durations/delays
+    for i in range(drop_count):
+        duration = 1.5 + (i % 5) * 0.3  # 1.5s to 2.7s
+        delay = (i * 0.15) % 2.0  # Staggered delays
+        css_parts.append(
+            f".rain-{i} {{ animation: rainFall {duration:.1f}s linear {delay:.1f}s infinite; }}"
+        )
+
+    css_parts.append(f".rain-drop {{ fill: {rain_color}; opacity: 0; }}")
+
+    return "\n".join(css_parts)
+
+
+def _render_rain_drops(width: int, height: int, rain_color: str, drop_count: int) -> str:
+    """Render SVG rain drop elements.
+
+    Args:
+        width: Card width.
+        height: Card height.
+        rain_color: Hex color for drops.
+        drop_count: Number of drops.
+
+    Returns:
+        SVG elements for rain drops.
+    """
+    drops = []
+    for i in range(drop_count):
+        # Distribute drops across width with some randomness via modulo
+        x = 10 + ((i * 37) % (width - 20))
+        # Vary drop lengths
+        length = 8 + (i % 4) * 3
+        drops.append(
+            f'<line x1="{x}" y1="0" x2="{x}" y2="{length}" '
+            f'stroke="{rain_color}" stroke-width="1" class="rain-drop rain-{i}"/>'
+        )
+    return "\n".join(drops)
+
+
+def render_hero_card(
+    name: str,
+    subtitle: str,
+    lines: tuple[str, ...],
+    theme_name: str,
+    disable_animations: bool,
+) -> str:
+    """Render a full-width hero card with rain animation.
+
+    Args:
+        name: Display name (large title).
+        subtitle: Subtitle text.
+        lines: Info lines to display.
+        theme_name: Color theme name.
+        disable_animations: Whether to disable animations.
+
+    Returns:
+        SVG string.
+    """
+    theme = get_theme(theme_name)
+
+    width = 495
+    # Dynamic height based on content
+    base_height = 120  # Name + subtitle
+    lines_height = len(lines) * 24
+    height = base_height + lines_height + 40
+
+    title_color = theme["title_color"]
+    text_color = theme["text_color"]
+    glow_color = theme["glow_color"]
+
+    # Rain uses glow color or a default cyan
+    rain_color = glow_color if glow_color is not None else "#00fff9"
+    drop_count = 25
+
+    # Get animation CSS
+    rain_css = "" if disable_animations else _get_rain_css(rain_color, drop_count)
+    glow_css = "" if glow_color is None else _get_glow_css(glow_color)
+
+    # Render background with gradient
+    defs_svg, rect_svg = _render_background(width, height, theme, False, "hero-grad")
+
+    # Render rain drops
+    if disable_animations:
+        rain_svg = ""
+    else:
+        rain_svg = _render_rain_drops(width, height, rain_color, drop_count)
+
+    # Header class with glow
+    header_class = "hero-name glow-text" if glow_color is not None else "hero-name"
+
+    svg_parts = [
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg">',
+        defs_svg,
+        "<style>",
+        f".hero-name {{ font: 700 42px 'Segoe UI', sans-serif; fill: {title_color}; }}",
+        f".hero-subtitle {{ font: 400 16px 'Segoe UI', sans-serif; fill: {text_color}; "
+        "opacity: 0.9; }}",
+        f".hero-line {{ font: 400 14px 'Segoe UI', sans-serif; fill: {text_color}; "
+        "opacity: 0.85; }}",
+        rain_css,
+        glow_css,
+        "</style>",
+        rect_svg,
+        rain_svg,
+        # Name
+        f'<text x="{width // 2}" y="50" text-anchor="middle" class="{header_class}">'
+        f"{_escape_xml(name)}</text>",
+    ]
+
+    # Subtitle
+    if subtitle:
+        svg_parts.append(
+            f'<text x="{width // 2}" y="75" text-anchor="middle" class="hero-subtitle">'
+            f"{_escape_xml(subtitle)}</text>"
+        )
+
+    # Info lines
+    y_offset = 110
+    for line in lines:
+        svg_parts.append(
+            f'<text x="{width // 2}" y="{y_offset}" text-anchor="middle" class="hero-line">'
+            f"{_escape_xml(line)}</text>"
+        )
+        y_offset += 24
+
+    svg_parts.append("</svg>")
+
+    return "\n".join(svg_parts)
+
+
 __all__ = [
     "build_capabilities_response",
     "build_language_stats",
     "build_user_stats",
     "render_capabilities_card",
+    "render_hero_card",
     "render_langs_card",
     "render_stats_card",
 ]
