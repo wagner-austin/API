@@ -1,0 +1,1 @@
+{"dataset":"taiwan","n_samples":6819,"n_features":880,"best_trial":1,"best_val_auc":0.9319865319865319,"best_max_depth":3,"best_n_estimators":227,"best_learning_rate":0.028145092716060652,"best_min_samples_split":49,"best_min_samples_leaf":17,"best_max_bins":32,"best_subsample":0.8099025726528951,"n_trials_complete":5,"duration_seconds":355.01348880003206}
