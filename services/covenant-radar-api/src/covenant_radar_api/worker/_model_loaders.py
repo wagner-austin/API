@@ -1,8 +1,8 @@
-"""Model loading functions for MLP, LSTM, and LightGBM inference.
+"""Model loading functions for MLP, LSTM, LightGBM, LogReg, and RandomForest inference.
 
 This module provides functions to load trained models from disk for inference.
 Models are loaded using saved architecture metadata (for neural networks) or
-directly from self-describing formats (for tree-based models).
+directly from self-describing formats (for tree-based and sklearn models).
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
@@ -15,10 +15,14 @@ from typing import Protocol
 import numpy as np
 from covenant_ml.types import (
     LightGBMModelMeta,
+    LogRegModelMeta,
+    LogRegPenalty,
+    LogRegSolver,
     LSTMModelMeta,
     MLPModelMeta,
     ModelMeta,
     PredictorProtocol,
+    RandomForestModelMeta,
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -124,6 +128,126 @@ def _decode_lightgbm_meta(raw: JSONObject) -> LightGBMModelMeta:
     return {"backend": "lightgbm"}
 
 
+_LOGREG_PENALTIES: dict[str, LogRegPenalty] = {
+    "l1": "l1",
+    "l2": "l2",
+    "elasticnet": "elasticnet",
+    "none": "none",
+}
+
+
+def _parse_logreg_penalty(raw: str) -> LogRegPenalty:
+    """Parse and validate logistic regression penalty type.
+
+    Args:
+        raw: Penalty string from metadata.
+
+    Returns:
+        Validated LogRegPenalty literal.
+
+    Raises:
+        JSONTypeError: If penalty is not a valid option.
+    """
+    penalty = _LOGREG_PENALTIES.get(raw)
+    if penalty is not None:
+        return penalty
+    raise JSONTypeError(f"Invalid penalty '{raw}', expected one of: l1, l2, elasticnet, none")
+
+
+_LOGREG_SOLVERS: dict[str, LogRegSolver] = {
+    "lbfgs": "lbfgs",
+    "liblinear": "liblinear",
+    "newton-cg": "newton-cg",
+    "newton-cholesky": "newton-cholesky",
+    "sag": "sag",
+    "saga": "saga",
+}
+
+
+def _parse_logreg_solver(raw: str) -> LogRegSolver:
+    """Parse and validate logistic regression solver type.
+
+    Args:
+        raw: Solver string from metadata.
+
+    Returns:
+        Validated LogRegSolver literal.
+
+    Raises:
+        JSONTypeError: If solver is not a valid option.
+    """
+    solver = _LOGREG_SOLVERS.get(raw)
+    if solver is not None:
+        return solver
+    raise JSONTypeError(
+        f"Invalid solver '{raw}', expected one of: lbfgs, liblinear, newton-cg, "
+        "newton-cholesky, sag, saga"
+    )
+
+
+def _decode_logreg_meta(raw: JSONObject) -> LogRegModelMeta:
+    """Decode and validate Logistic Regression model metadata from JSON object.
+
+    Args:
+        raw: Parsed JSON object with LogReg metadata fields.
+
+    Returns:
+        Validated LogRegModelMeta TypedDict.
+
+    Raises:
+        JSONTypeError: If any field is missing or has wrong type.
+    """
+    backend = require_str(raw, "backend")
+    if backend != "logreg":
+        raise JSONTypeError(f"Expected backend 'logreg', got '{backend}'")
+
+    n_features = require_int(raw, "n_features")
+    penalty_raw = require_str(raw, "penalty")
+    solver_raw = require_str(raw, "solver")
+
+    return {
+        "backend": "logreg",
+        "n_features": n_features,
+        "penalty": _parse_logreg_penalty(penalty_raw),
+        "solver": _parse_logreg_solver(solver_raw),
+    }
+
+
+def _decode_random_forest_meta(raw: JSONObject) -> RandomForestModelMeta:
+    """Decode and validate Random Forest model metadata from JSON object.
+
+    Args:
+        raw: Parsed JSON object with Random Forest metadata fields.
+
+    Returns:
+        Validated RandomForestModelMeta TypedDict.
+
+    Raises:
+        JSONTypeError: If any field is missing or has wrong type.
+    """
+    backend = require_str(raw, "backend")
+    if backend != "random_forest":
+        raise JSONTypeError(f"Expected backend 'random_forest', got '{backend}'")
+
+    n_features = require_int(raw, "n_features")
+    n_estimators = require_int(raw, "n_estimators")
+
+    # max_depth can be None or int
+    max_depth_raw = raw.get("max_depth")
+    max_depth: int | None = None
+    if max_depth_raw is not None:
+        if isinstance(max_depth_raw, bool) or not isinstance(max_depth_raw, int):
+            raise JSONTypeError("max_depth must be an integer or null")
+        max_depth = max_depth_raw
+
+    return {
+        "backend": "random_forest",
+        "n_features": n_features,
+        "n_estimators": n_estimators,
+        "max_depth": max_depth,
+    }
+
+
 def _load_model_metadata(meta_path: Path) -> ModelMeta:
     """Load and decode model metadata from JSON file.
 
@@ -131,7 +255,8 @@ def _load_model_metadata(meta_path: Path) -> ModelMeta:
         meta_path: Path to the metadata JSON file.
 
     Returns:
-        Decoded ModelMeta (one of MLPModelMeta, LSTMModelMeta, LightGBMModelMeta).
+        Decoded ModelMeta (one of MLPModelMeta, LSTMModelMeta, LightGBMModelMeta,
+        LogRegModelMeta, RandomForestModelMeta).
 
     Raises:
         FileNotFoundError: If metadata file doesn't exist.
@@ -149,6 +274,10 @@ def _load_model_metadata(meta_path: Path) -> ModelMeta:
         return _decode_lstm_meta(raw)
     if backend == "lightgbm":
         return _decode_lightgbm_meta(raw)
+    if backend == "logreg":
+        return _decode_logreg_meta(raw)
+    if backend == "random_forest":
+        return _decode_random_forest_meta(raw)
     raise JSONTypeError(f"Unknown backend '{backend}' in metadata")
 
 
@@ -597,15 +726,71 @@ def load_lightgbm_model(model_path: Path) -> PredictorProtocol:
 
 
 # =============================================================================
+# LogReg Model Loading
+# =============================================================================
+
+
+def load_logreg_model(model_path: Path) -> PredictorProtocol:
+    """Load Logistic Regression model from .joblib file.
+
+    LogReg models are saved using joblib serialization. The model file
+    contains the full sklearn LogisticRegression estimator.
+
+    Args:
+        model_path: Path to the saved model file (.joblib format).
+
+    Returns:
+        Prepared LogReg model implementing PredictorProtocol.
+
+    Raises:
+        FileNotFoundError: If model file doesn't exist.
+    """
+    from covenant_ml.backends.logreg import create_logreg_backend
+
+    backend = create_logreg_backend()
+    return backend.load(path=str(model_path))
+
+
+# =============================================================================
+# Random Forest Model Loading
+# =============================================================================
+
+
+def load_random_forest_model(model_path: Path) -> PredictorProtocol:
+    """Load Random Forest model from .joblib file.
+
+    Random Forest models are saved using joblib serialization. The model file
+    contains the full sklearn RandomForestClassifier estimator.
+
+    Args:
+        model_path: Path to the saved model file (.joblib format).
+
+    Returns:
+        Prepared Random Forest model implementing PredictorProtocol.
+
+    Raises:
+        FileNotFoundError: If model file doesn't exist.
+    """
+    from covenant_ml.backends.random_forest import create_random_forest_backend
+
+    backend = create_random_forest_backend()
+    return backend.load(path=str(model_path))
+
+
+# =============================================================================
 # Exports
 # =============================================================================
 
 __all__ = [
     "_decode_lightgbm_meta",
+    "_decode_logreg_meta",
     "_decode_lstm_meta",
     "_decode_mlp_meta",
+    "_decode_random_forest_meta",
     "_load_model_metadata",
     "load_lightgbm_model",
+    "load_logreg_model",
     "load_lstm_model",
     "load_mlp_model",
+    "load_random_forest_model",
 ]
