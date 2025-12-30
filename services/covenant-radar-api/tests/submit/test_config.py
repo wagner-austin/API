@@ -158,7 +158,7 @@ class TestGetTrainConfig:
     """Tests for _get_train_config dispatcher function."""
 
     def test_dispatcher_lightgbm(self) -> None:
-        """Test dispatcher returns config for lightgbm backend."""
+        """Test dispatcher returns LightGBM config for lightgbm backend."""
         submit_config = SubmitConfig(
             backend="lightgbm",
             n_estimators=100,
@@ -170,11 +170,11 @@ class TestGetTrainConfig:
             include_diff_features=True,
         )
         config = _get_train_config(submit_config)
-        # All config types have learning_rate
-        assert config["learning_rate"] == 0.1
+        expected = _build_lightgbm_config(submit_config)
+        assert config == expected
 
     def test_dispatcher_xgboost(self) -> None:
-        """Test dispatcher returns config for xgboost backend."""
+        """Test dispatcher returns XGBoost config for xgboost backend."""
         submit_config = SubmitConfig(
             backend="xgboost",
             n_estimators=200,
@@ -186,10 +186,11 @@ class TestGetTrainConfig:
             include_diff_features=True,
         )
         config = _get_train_config(submit_config)
-        assert config["learning_rate"] == 0.05
+        expected = _build_xgboost_config(submit_config)
+        assert config == expected
 
     def test_dispatcher_mlp(self) -> None:
-        """Test dispatcher returns config for mlp backend."""
+        """Test dispatcher returns MLP config for mlp backend."""
         submit_config = SubmitConfig(
             backend="mlp",
             n_estimators=50,
@@ -201,10 +202,11 @@ class TestGetTrainConfig:
             include_diff_features=False,
         )
         config = _get_train_config(submit_config)
-        assert config["learning_rate"] == 0.01
+        expected = _build_mlp_config(submit_config)
+        assert config == expected
 
     def test_dispatcher_lstm(self) -> None:
-        """Test dispatcher returns config for lstm backend."""
+        """Test dispatcher returns LSTM config for lstm backend."""
         submit_config = SubmitConfig(
             backend="lstm",
             n_estimators=30,
@@ -216,4 +218,5 @@ class TestGetTrainConfig:
             include_diff_features=False,
         )
         config = _get_train_config(submit_config)
-        assert config["learning_rate"] == 0.001
+        expected = _build_lstm_config(submit_config)
+        assert config == expected
