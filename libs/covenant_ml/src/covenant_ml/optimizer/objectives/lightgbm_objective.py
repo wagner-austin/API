@@ -9,6 +9,7 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
+import gc
 from typing import Protocol
 
 import numpy as np
@@ -359,7 +360,14 @@ class LightGBMObjective:
         )
 
         # Use our typed compute_auc instead of sklearn
-        return compute_auc(self._y_val, y_pred_proba)
+        auc = compute_auc(self._y_val, y_pred_proba)
+
+        # Force aggressive cleanup between trials to prevent memory accumulation
+        del booster
+        del y_pred_proba
+        gc.collect()
+
+        return auc
 
 
 def create_lightgbm_objective(
