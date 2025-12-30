@@ -1,6 +1,6 @@
 # covenant-ml
 
-Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports five backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), LightGBM (large-scale datasets), and ClearGBM (interpretable pure-Python gradient boosting).
+Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports seven backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), LightGBM (large-scale datasets), ClearGBM (interpretable pure-Python gradient boosting), LogReg (logistic regression baseline), and Random Forest (bagging ensemble). Includes probability calibration with isotonic regression and Platt scaling.
 
 ## Installation
 
@@ -108,17 +108,69 @@ backend = create_lstm_backend()
 outcome = backend.train(X, y, feature_names, config, output_dir)
 ```
 
+### Logistic Regression
+
+Interpretable linear baseline with L1/L2/ElasticNet regularization:
+
+```python
+from covenant_ml.backends.logreg import create_logreg_backend
+from covenant_ml.types import LogRegConfig
+
+config: LogRegConfig = {
+    "solver": "lbfgs",
+    "penalty": "l2",
+    "C": 1.0,
+    "max_iter": 100,
+    "tol": 1e-4,
+    "class_weight_balanced": True,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "l1_ratio": 0.5,
+}
+backend = create_logreg_backend()
+outcome = backend.train(x_features=X, y_labels=y, feature_names=names, config=config, output_dir=output_dir, progress=None)
+```
+
+### Random Forest
+
+Bagging ensemble with Gini-based feature importance:
+
+```python
+from covenant_ml.backends.random_forest import create_random_forest_backend
+from covenant_ml.types import RandomForestConfig
+
+config: RandomForestConfig = {
+    "n_estimators": 100,
+    "max_depth": 10,
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+    "bootstrap": True,
+    "class_weight_balanced": True,
+    "n_jobs": -1,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "random_state": 42,
+    "oob_score": False,
+}
+backend = create_random_forest_backend()
+outcome = backend.train(x_features=X, y_labels=y, feature_names=names, config=config, output_dir=output_dir, progress=None)
+```
+
 ## Backend Comparison
 
-| Aspect | XGBoost | MLP | LSTM | LightGBM | ClearGBM |
-|--------|---------|-----|------|----------|----------|
-| Model format | `.ubj` | `.pt` | `.pt` | `.txt` | `.json` |
-| Feature importances | Yes | No | No | Yes | Yes |
-| GPU support | CUDA | CUDA (fp16/bf16) | CUDA (fp16/bf16) | CUDA | CPU only |
-| Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets | Interpretability |
-| Training speed | Fast | Moderate | Slow | Very fast | Moderate |
-| Interpretability | High | Low | Low | High | Very high |
-| Dependencies | C++ lib | PyTorch | PyTorch | C++ lib | Python stdlib |
+| Aspect | XGBoost | MLP | LSTM | LightGBM | ClearGBM | LogReg | Random Forest |
+|--------|---------|-----|------|----------|----------|--------|---------------|
+| Model format | `.ubj` | `.pt` | `.pt` | `.txt` | `.json` | `.joblib` | `.joblib` |
+| Feature importances | Yes | No | No | Yes | Yes | Yes (coef) | Yes (Gini) |
+| GPU support | CUDA | CUDA (fp16/bf16) | CUDA (fp16/bf16) | CUDA | CPU only | CPU only | CPU only |
+| Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets | Interpretability | Baseline/calibration | Robust ensemble |
+| Training speed | Fast | Moderate | Slow | Very fast | Moderate | Very fast | Fast |
+| Interpretability | High | Low | Low | High | Very high | Very high | Medium |
+| Dependencies | C++ lib | PyTorch | PyTorch | C++ lib | Python stdlib | sklearn | sklearn |
 
 ## Inference
 
@@ -155,6 +207,39 @@ importance = explainer.compute_importance(model, x_data, feature_names, target_c
 | `gradient` | MLP, LSTM | Fast |
 | `integrated_gradients` | MLP, LSTM | Slow |
 | `shap_tree` | XGBoost, LightGBM, ClearGBM | Medium |
+
+## Probability Calibration
+
+Post-hoc calibration to improve probability estimates:
+
+```python
+from covenant_ml.calibration import (
+    create_isotonic_calibrator,
+    create_platt_calibrator,
+    Calibrator,
+)
+
+# Isotonic regression (non-parametric, monotonic)
+calibrator = create_isotonic_calibrator(clip_proba=True, eps=1e-10)
+result = calibrator.fit(y_true=y_val, y_prob=model_probs)
+calibrated = calibrator.transform(y_prob=test_probs)
+
+# Platt scaling (parametric, sigmoid)
+calibrator = create_platt_calibrator()
+result = calibrator.fit(y_true=y_val, y_prob=model_probs)
+calibrated = calibrator.transform(y_prob=test_probs)
+
+# Serialize and restore calibrator state
+state = calibrator.get_state()
+restored = Calibrator.load_state(state)
+```
+
+| Method | Type | Best for |
+|--------|------|----------|
+| Isotonic | Non-parametric | Flexible, any distribution |
+| Platt | Parametric (sigmoid) | Well-calibrated models needing minor adjustments |
+
+CalibrationResult includes Brier score and ECE (Expected Calibration Error) before/after calibration.
 
 ## Hyperparameter Optimization
 
