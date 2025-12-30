@@ -137,10 +137,18 @@ github_stats_api/
 │   │   └── stats.py       # Request/response types
 │   └── validators/        # Request validation
 │       └── stats.py       # Query param decoders
+├── renderers/             # SVG card renderers
+│   ├── _common.py         # Shared rendering utilities
+│   ├── stats.py           # User stats card
+│   ├── langs.py           # Languages card
+│   ├── capabilities.py    # Capabilities card
+│   ├── hero.py            # Hero card
+│   └── skills.py          # Skills/tech stack card
 ├── _test_hooks.py         # DI hooks for testing
 ├── client.py              # GitHub GraphQL client
 ├── github_client.py       # Protocol + query strings
-├── svg_renderer.py        # SVG card generation
+├── icons.py               # Skill icon SVG paths (MultiPathIcon)
+├── svg_renderer.py        # Re-exports from renderers/
 ├── themes.py              # Color theme definitions
 ├── settings.py            # Environment config
 └── asgi.py                # Production entrypoint
@@ -228,9 +236,18 @@ github-stats-api/
 │   ├── asgi.py                 # ASGI entrypoint
 │   ├── client.py               # GitHub API client
 │   ├── github_client.py        # Protocol + queries
+│   ├── icons.py                # Skill icon SVG paths (MultiPathIcon)
 │   ├── settings.py             # Config loader
-│   ├── svg_renderer.py         # SVG generation
+│   ├── svg_renderer.py         # Re-exports from renderers/
 │   ├── themes.py               # Color themes
+│   ├── renderers/
+│   │   ├── __init__.py
+│   │   ├── _common.py          # Shared rendering utilities
+│   │   ├── stats.py            # User stats card renderer
+│   │   ├── langs.py            # Languages card renderer
+│   │   ├── capabilities.py     # Capabilities card renderer
+│   │   ├── hero.py             # Hero card renderer
+│   │   └── skills.py           # Skills/tech stack card renderer
 │   └── api/
 │       ├── __init__.py
 │       ├── main.py             # App factory
