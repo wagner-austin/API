@@ -992,7 +992,7 @@ def render_hero_card(
         "<style>",
         f".hero-name {{ font: 700 42px 'Segoe UI', sans-serif; fill: {title_color}; }}",
         f".hero-subtitle {{ font: 400 16px 'Segoe UI', sans-serif; fill: {text_color}; "
-        "opacity: 0.9; }}",
+        "opacity: 0.9; }",
         f".hero-line {{ font: 400 14px 'Segoe UI', sans-serif; fill: {line_color}; }}",
         rain_css,
         glow_css,
