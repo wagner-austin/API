@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+from collections.abc import Generator
 from pathlib import Path
 from shutil import copyfile
 
@@ -23,12 +25,25 @@ from covenant_radar_api.worker._optimize_common import (
     parse_feature_preset,
 )
 from covenant_radar_api.worker.optimize_xgboost_job import (
+    XGBoostLoadingProgressInfo,
     _get_search_space,
     _parse_optimize_config,
     _parse_space_profile,
     process_xgboost_optimize_job,
     run_optimization,
 )
+
+
+@pytest.fixture(autouse=True)
+def _force_gc_after_test() -> Generator[None, None, None]:
+    """Force garbage collection after each test to prevent memory accumulation.
+
+    XGBoost optimization tests train models which consume memory.
+    When pytest-xdist runs multiple tests on the same worker, memory can accumulate
+    and cause worker crashes. This fixture ensures cleanup after each test.
+    """
+    yield
+    gc.collect()
 
 
 def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
@@ -474,8 +489,14 @@ class TestGenerateTrainConfig:
         assert config["early_stopping_rounds"] == 20
 
 
+@pytest.mark.xdist_group(name="xgboost_heavy")
+@pytest.mark.timeout(300)
 class TestRunOptimization:
-    """Integration tests for run_optimization with real data."""
+    """Integration tests for run_optimization with real data.
+
+    Uses xdist_group marker to ensure all XGBoost tests run on the same worker.
+    Timeout extended to 5 minutes per test for XGBoost optimization.
+    """
 
     def test_run_optimization_taiwan(self, tmp_path: Path) -> None:
         """run_optimization completes successfully on Taiwan dataset."""
@@ -708,8 +729,6 @@ class TestRunOptimization:
 
     def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
         """run_optimization calls loading progress callback during data loading."""
-        from covenant_radar_api.worker.optimize_xgboost_job import XGBoostLoadingProgressInfo
-
         external_dir = tmp_path / "external"
         _copy_real_taiwan(external_dir)
         output_dir = tmp_path / "optuna_output"
@@ -750,8 +769,13 @@ class TestRunOptimization:
         assert first_info["message"] != ""
 
 
+@pytest.mark.xdist_group(name="xgboost_heavy")
+@pytest.mark.timeout(300)
 class TestProcessOptimizeJob:
-    """Integration tests for process_xgboost_optimize_job entry point."""
+    """Integration tests for process_xgboost_optimize_job entry point.
+
+    Uses xdist_group marker to ensure this runs on the same worker as other XGBoost tests.
+    """
 
     def test_process_job_loads_settings_and_runs(self, tmp_path: Path) -> None:
         """process_xgboost_optimize_job loads settings from env and runs optimization."""
