@@ -981,6 +981,10 @@ def render_hero_card(
     # Header class with glow
     header_class = "hero-name glow-text" if glow_color is not None else "hero-name"
 
+    # Left-align text with white color for lines
+    left_margin = 25
+    line_color = "#ffffff"
+
     svg_parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'xmlns="http://www.w3.org/2000/svg">',
@@ -989,22 +993,21 @@ def render_hero_card(
         f".hero-name {{ font: 700 42px 'Segoe UI', sans-serif; fill: {title_color}; }}",
         f".hero-subtitle {{ font: 400 16px 'Segoe UI', sans-serif; fill: {text_color}; "
         "opacity: 0.9; }}",
-        f".hero-line {{ font: 400 14px 'Segoe UI', sans-serif; fill: {text_color}; "
-        "opacity: 0.85; }}",
+        f".hero-line {{ font: 400 14px 'Segoe UI', sans-serif; fill: {line_color}; }}",
         rain_css,
         glow_css,
         "</style>",
         rect_svg,
         rain_svg,
         # Name
-        f'<text x="{width // 2}" y="50" text-anchor="middle" class="{header_class}">'
+        f'<text x="{left_margin}" y="50" text-anchor="start" class="{header_class}">'
         f"{_escape_xml(name)}</text>",
     ]
 
     # Subtitle
     if subtitle:
         svg_parts.append(
-            f'<text x="{width // 2}" y="75" text-anchor="middle" class="hero-subtitle">'
+            f'<text x="{left_margin}" y="75" text-anchor="start" class="hero-subtitle">'
             f"{_escape_xml(subtitle)}</text>"
         )
 
@@ -1012,7 +1015,7 @@ def render_hero_card(
     y_offset = 110
     for line in lines:
         svg_parts.append(
-            f'<text x="{width // 2}" y="{y_offset}" text-anchor="middle" class="hero-line">'
+            f'<text x="{left_margin}" y="{y_offset}" text-anchor="start" class="hero-line">'
             f"{_escape_xml(line)}</text>"
         )
         y_offset += 24
