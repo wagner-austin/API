@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+from collections.abc import Generator
 from pathlib import Path
 from shutil import copyfile
 
@@ -15,6 +17,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_lstm_job import (
+    LSTMLoadingProgressInfo,
     LSTMPhaseInfo,
     LSTMTrialProgressInfo,
     _get_search_space,
@@ -25,6 +28,18 @@ from covenant_radar_api.worker.optimize_lstm_job import (
     process_lstm_optimize_job,
     run_lstm_optimization,
 )
+
+
+@pytest.fixture(autouse=True)
+def _force_gc_after_test() -> Generator[None, None, None]:
+    """Force garbage collection after each test to prevent memory accumulation.
+
+    LSTM optimization tests train PyTorch models which consume significant memory.
+    When pytest-xdist runs multiple tests on the same worker, memory can accumulate
+    and cause worker crashes. This fixture ensures cleanup after each test.
+    """
+    yield
+    gc.collect()
 
 
 def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
@@ -237,8 +252,15 @@ class TestParseOptimizeConfig:
             _parse_optimize_config(config_json)
 
 
+@pytest.mark.xdist_group(name="lstm_heavy")
+@pytest.mark.timeout(300)
 class TestRunLSTMOptimization:
-    """Integration tests for run_lstm_optimization with real data."""
+    """Integration tests for run_lstm_optimization with real data.
+
+    Uses xdist_group marker to ensure all LSTM tests run on the same worker,
+    preventing memory exhaustion from parallel LSTM training.
+    Timeout extended to 5 minutes per test for LSTM training.
+    """
 
     def test_run_optimization_taiwan(self, tmp_path: Path) -> None:
         """run_lstm_optimization completes successfully on Taiwan dataset."""
@@ -393,8 +415,6 @@ class TestRunLSTMOptimization:
 
     def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
         """run_lstm_optimization calls loading progress callback during data loading."""
-        from covenant_radar_api.worker.optimize_lstm_job import LSTMLoadingProgressInfo
-
         external_dir = tmp_path / "external"
         _copy_real_taiwan(external_dir)
         output_dir = tmp_path / "optuna_output"
@@ -472,8 +492,13 @@ class TestRunLSTMOptimization:
         assert False in best_seen, "Expected at least one non-best trial"
 
 
+@pytest.mark.xdist_group(name="lstm_heavy")
+@pytest.mark.timeout(300)
 class TestProcessLSTMOptimizeJob:
-    """Integration tests for process_lstm_optimize_job entry point."""
+    """Integration tests for process_lstm_optimize_job entry point.
+
+    Uses xdist_group marker to ensure this runs on the same worker as other LSTM tests.
+    """
 
     def test_process_job_loads_settings_and_runs(self, tmp_path: Path) -> None:
         """process_lstm_optimize_job loads settings from env and runs optimization."""
