@@ -1378,6 +1378,20 @@ class TestRenderSkillsCard:
             disable_animations=True,
         )
 
-        # svg_few has 2 skills = 1 row, svg_many has 8 skills = 2 rows
-        assert 'viewBox="0 0 495 106"' in svg_few
-        assert 'viewBox="0 0 495 142"' in svg_many
+        # svg_few has 2 skills = 1 row (2 per row), svg_many has 8 skills = 4 rows
+        assert 'viewBox="0 0 495 114"' in svg_few
+        assert 'viewBox="0 0 495 246"' in svg_many
+
+    def test_render_skills_card_has_colored_circles(self) -> None:
+        """Test that skills have colored circle icons."""
+        svg = render_skills_card(
+            skills=("Python", "Docker"),
+            theme_name="default",
+            hide_border=False,
+            disable_animations=True,
+        )
+
+        # Python color is #3776ab, Docker color is #2496ed
+        assert 'fill="#3776ab"' in svg
+        assert 'fill="#2496ed"' in svg
+        assert "<circle" in svg

@@ -1025,13 +1025,64 @@ def render_hero_card(
     return "\n".join(svg_parts)
 
 
+_SKILL_COLORS: dict[str, str] = {
+    "python": "#3776ab",
+    "typescript": "#3178c6",
+    "javascript": "#f7df1e",
+    "react": "#61dafb",
+    "fastapi": "#009688",
+    "pytorch": "#ee4c2c",
+    "docker": "#2496ed",
+    "redis": "#dc382d",
+    "postgresql": "#4169e1",
+    "postgres": "#4169e1",
+    "git": "#f05032",
+    "rust": "#dea584",
+    "go": "#00add8",
+    "java": "#ed8b00",
+    "c++": "#00599c",
+    "c#": "#512bd4",
+    "node": "#339933",
+    "nodejs": "#339933",
+    "vue": "#4fc08d",
+    "angular": "#dd0031",
+    "svelte": "#ff3e00",
+    "tailwind": "#06b6d4",
+    "css": "#1572b6",
+    "html": "#e34f26",
+    "aws": "#ff9900",
+    "azure": "#0078d4",
+    "gcp": "#4285f4",
+    "kubernetes": "#326ce5",
+    "linux": "#fcc624",
+    "nginx": "#009639",
+    "mongodb": "#47a248",
+    "mysql": "#4479a1",
+    "graphql": "#e10098",
+    "flask": "#000000",
+    "django": "#092e20",
+}
+
+
+def _get_skill_color(skill: str) -> str:
+    """Get color for a skill name.
+
+    Args:
+        skill: Skill name (case-insensitive).
+
+    Returns:
+        Hex color string.
+    """
+    return _SKILL_COLORS.get(skill.lower(), "#888888")
+
+
 def render_skills_card(
     skills: tuple[str, ...],
     theme_name: str,
     hide_border: bool,
     disable_animations: bool,
 ) -> str:
-    """Render a tech stack/skills card with skill badges.
+    """Render a tech stack/skills card with colored skill icons.
 
     Args:
         skills: Tuple of skill names.
@@ -1047,19 +1098,18 @@ def render_skills_card(
     width = 495
     title = "Tech Stack"
 
-    # Calculate layout - badges in rows
-    badge_height = 28
-    badge_margin = 8
-    row_height = badge_height + badge_margin
-    badges_per_row = 4
-    num_rows = (len(skills) + badges_per_row - 1) // badges_per_row
+    # Calculate layout - skills in rows with icon + text
+    skill_height = 32
+    skill_margin = 12
+    row_height = skill_height + skill_margin
+    skills_per_row = 2
+    num_rows = (len(skills) + skills_per_row - 1) // skills_per_row
     content_height = num_rows * row_height
-    height = 50 + content_height + 20  # title + content + padding
+    height = 55 + content_height + 15  # title + content + padding
 
     title_color = theme["title_color"]
     text_color = theme["text_color"]
     border_color = theme["border_color"]
-    icon_color = theme["icon_color"]
     glow_color = theme["glow_color"]
 
     # Get animation CSS
@@ -1093,9 +1143,7 @@ def render_skills_card(
         defs_svg,
         "<style>",
         f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
-        f".skill-text {{ font: 500 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
-        f".skill-badge {{ fill: {icon_color}; fill-opacity: 0.15; stroke: {icon_color}; "
-        "stroke-opacity: 0.5; }}",
+        f".skill-name {{ font: 600 13px 'Segoe UI', sans-serif; fill: {text_color}; }}",
         glow_css,
         sparkle_css,
         "</style>",
@@ -1105,28 +1153,32 @@ def render_skills_card(
         f'<text x="25" y="35" class="{header_class}">{_escape_xml(title)}</text>',
     ]
 
-    # Render skill badges in a grid
-    badge_width = (width - 50 - (badges_per_row - 1) * badge_margin) // badges_per_row
+    # Render skills with colored circle icons
+    col_width = (width - 50) // skills_per_row
     start_x = 25
     start_y = 55
+    icon_radius = 8
 
     for i, skill in enumerate(skills):
-        row = i // badges_per_row
-        col = i % badges_per_row
-        x = start_x + col * (badge_width + badge_margin)
+        row = i // skills_per_row
+        col = i % skills_per_row
+        x = start_x + col * col_width
         y = start_y + row * row_height
 
-        # Badge background
+        skill_color = _get_skill_color(skill)
+
+        # Colored circle icon
+        circle_x = x + icon_radius + 4
+        circle_y = y + skill_height // 2
         svg_parts.append(
-            f'<rect x="{x}" y="{y}" width="{badge_width}" height="{badge_height}" '
-            f'rx="4" class="skill-badge"/>'
+            f'<circle cx="{circle_x}" cy="{circle_y}" r="{icon_radius}" fill="{skill_color}"/>'
         )
-        # Skill text centered in badge
-        text_x = x + badge_width // 2
-        text_y = y + badge_height // 2 + 4
+
+        # Skill name text
+        text_x = circle_x + icon_radius + 10
+        text_y = y + skill_height // 2 + 5
         svg_parts.append(
-            f'<text x="{text_x}" y="{text_y}" text-anchor="middle" class="skill-text">'
-            f"{_escape_xml(skill)}</text>"
+            f'<text x="{text_x}" y="{text_y}" class="skill-name">{_escape_xml(skill)}</text>'
         )
 
     svg_parts.append("</svg>")
