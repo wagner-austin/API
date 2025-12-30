@@ -1395,3 +1395,19 @@ class TestRenderSkillsCard:
         assert 'fill="#2496ed"' in svg
         # Skills with icons use <path>, skills without use <circle>
         assert "<path" in svg or "<circle" in svg
+
+    def test_render_icon_with_transform(self) -> None:
+        """Test that _render_icon includes transform when set."""
+        from github_stats_api.icons import MultiPathIcon
+        from github_stats_api.renderers.skills import _render_icon
+
+        icon: MultiPathIcon = {
+            "viewbox_width": 24,
+            "viewbox_height": 24,
+            "paths": ({"d": "M0 0h24v24H0z", "fill": "#ff0000"},),
+            "transform": "rotate(45)",
+        }
+        result = _render_icon(icon, 10, 20, 18)
+        assert "rotate(45)" in result
+        assert "translate(10, 20)" in result
+        assert "scale(" in result
