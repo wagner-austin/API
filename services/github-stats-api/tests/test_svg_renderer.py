@@ -6,10 +6,9 @@ from github_stats_api.api.schemas.stats import (
     LanguageStats,
     UserStats,
 )
+from github_stats_api.renderers._common import escape_xml, format_number
+from github_stats_api.renderers.stats import _calculate_rank
 from github_stats_api.svg_renderer import (
-    _calculate_rank,
-    _escape_xml,
-    _format_number,
     build_capabilities_response,
     build_language_stats,
     build_user_stats,
@@ -540,50 +539,50 @@ class TestCalculateRank:
 
 
 class TestFormatNumber:
-    """Tests for _format_number function."""
+    """Tests for format_number function."""
 
-    def test_format_number_millions(self) -> None:
+    def testformat_number_millions(self) -> None:
         """Test formatting numbers in millions."""
-        assert _format_number(1_000_000) == "1.0M"
-        assert _format_number(2_500_000) == "2.5M"
-        assert _format_number(10_000_000) == "10.0M"
+        assert format_number(1_000_000) == "1.0M"
+        assert format_number(2_500_000) == "2.5M"
+        assert format_number(10_000_000) == "10.0M"
 
-    def test_format_number_thousands(self) -> None:
+    def testformat_number_thousands(self) -> None:
         """Test formatting numbers in thousands."""
-        assert _format_number(1_000) == "1.0k"
-        assert _format_number(2_500) == "2.5k"
-        assert _format_number(999_999) == "1000.0k"
+        assert format_number(1_000) == "1.0k"
+        assert format_number(2_500) == "2.5k"
+        assert format_number(999_999) == "1000.0k"
 
-    def test_format_number_small(self) -> None:
+    def testformat_number_small(self) -> None:
         """Test formatting small numbers."""
-        assert _format_number(0) == "0"
-        assert _format_number(1) == "1"
-        assert _format_number(999) == "999"
+        assert format_number(0) == "0"
+        assert format_number(1) == "1"
+        assert format_number(999) == "999"
 
 
 class TestEscapeXml:
-    """Tests for _escape_xml function."""
+    """Tests for escape_xml function."""
 
-    def test_escape_xml_ampersand(self) -> None:
+    def testescape_xml_ampersand(self) -> None:
         """Test escaping ampersand."""
-        assert _escape_xml("A & B") == "A &amp; B"
+        assert escape_xml("A & B") == "A &amp; B"
 
-    def test_escape_xml_less_than(self) -> None:
+    def testescape_xml_less_than(self) -> None:
         """Test escaping less than."""
-        assert _escape_xml("A < B") == "A &lt; B"
+        assert escape_xml("A < B") == "A &lt; B"
 
-    def test_escape_xml_greater_than(self) -> None:
+    def testescape_xml_greater_than(self) -> None:
         """Test escaping greater than."""
-        assert _escape_xml("A > B") == "A &gt; B"
+        assert escape_xml("A > B") == "A &gt; B"
 
-    def test_escape_xml_quotes(self) -> None:
+    def testescape_xml_quotes(self) -> None:
         """Test escaping quotes."""
-        assert _escape_xml('A "B" C') == "A &quot;B&quot; C"
-        assert _escape_xml("A 'B' C") == "A &apos;B&apos; C"
+        assert escape_xml('A "B" C') == "A &quot;B&quot; C"
+        assert escape_xml("A 'B' C") == "A &apos;B&apos; C"
 
-    def test_escape_xml_no_special_chars(self) -> None:
+    def testescape_xml_no_special_chars(self) -> None:
         """Test no escaping needed."""
-        assert _escape_xml("Hello World") == "Hello World"
+        assert escape_xml("Hello World") == "Hello World"
 
 
 class TestBuildUserStatsTypeValidation:
@@ -1394,4 +1393,5 @@ class TestRenderSkillsCard:
         # Python color is #3776ab, Docker color is #2496ed
         assert 'fill="#3776ab"' in svg
         assert 'fill="#2496ed"' in svg
-        assert "<circle" in svg
+        # Skills with icons use <path>, skills without use <circle>
+        assert "<path" in svg or "<circle" in svg
