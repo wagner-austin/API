@@ -89,6 +89,26 @@ class _LogRegModelProtocol(Protocol):
         ...
 
 
+class _LogRegClassifierCtor(Protocol):
+    """Protocol for LogisticRegression constructor."""
+
+    def __call__(
+        self,
+        *,
+        penalty: str | None,
+        C: float,
+        solver: str,
+        max_iter: int,
+        tol: float,
+        random_state: int,
+        class_weight: str | None,
+        l1_ratio: float | None,
+        n_jobs: int,
+    ) -> _LogRegModelProtocol:
+        """Construct LogisticRegression with given parameters."""
+        ...
+
+
 class _JoblibDumpProtocol(Protocol):
     """Protocol for joblib.dump function."""
 
@@ -143,23 +163,25 @@ LOGREG_CAPABILITIES: BackendCapabilities = {
 }
 
 
-def _get_sklearn_imports() -> tuple[type, _JoblibDumpProtocol, _JoblibLoadProtocol]:
+def _get_sklearn_imports() -> (
+    tuple[_LogRegClassifierCtor, _JoblibDumpProtocol, _JoblibLoadProtocol]
+):
     """Get sklearn LogisticRegression and joblib via dynamic import.
 
     Returns:
-        Tuple of (LogisticRegression class, joblib.dump, joblib.load).
+        Tuple of (LogisticRegression constructor, joblib.dump, joblib.load).
     """
     sklearn_module = __import__(
         "sklearn.linear_model",
         fromlist=["LogisticRegression"],
     )
-    logreg_cls: type = sklearn_module.LogisticRegression
+    logreg_ctor: _LogRegClassifierCtor = sklearn_module.LogisticRegression
 
     joblib_module = __import__("joblib", fromlist=["dump", "load"])
     dump_fn: _JoblibDumpProtocol = joblib_module.dump
     load_fn: _JoblibLoadProtocol = joblib_module.load
 
-    return logreg_cls, dump_fn, load_fn
+    return logreg_ctor, dump_fn, load_fn
 
 
 def _compute_class_weight(y_train: NDArray[np.int64]) -> float:
@@ -311,7 +333,7 @@ class LogRegBackend(ClassifierBackend):
             raise RuntimeError("LogRegBackend requires LogRegConfig")
 
         cfg: LogRegConfig = config
-        logreg_cls, dump_fn, _ = _get_sklearn_imports()
+        logreg_ctor, dump_fn, _ = _get_sklearn_imports()
 
         splits = stratified_split(
             x_features,
@@ -335,8 +357,7 @@ class LogRegBackend(ClassifierBackend):
         penalty_arg: str | None = None if cfg["penalty"] == "none" else cfg["penalty"]
         l1_ratio_arg: float | None = cfg["l1_ratio"] if cfg["penalty"] == "elasticnet" else None
 
-        # Build model - annotate result as Protocol type
-        model: _LogRegModelProtocol = logreg_cls(
+        model = logreg_ctor(
             penalty=penalty_arg,
             C=cfg["C"],
             solver=cfg["solver"],
