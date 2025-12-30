@@ -17,6 +17,7 @@ from ...svg_renderer import (
     render_capabilities_card,
     render_hero_card,
     render_langs_card,
+    render_skills_card,
     render_stats_card,
 )
 from ..schemas.stats import Capability
@@ -24,6 +25,7 @@ from ..validators.stats import (
     decode_capabilities_request,
     decode_hero_request,
     decode_langs_request,
+    decode_skills_request,
     decode_stats_request,
 )
 
@@ -329,6 +331,49 @@ class _StatsRoutes:
             headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
         )
 
+    def get_skills(
+        self,
+        request: Request,
+        skills: str | None = Query(default=None, description="Comma-separated skills"),
+        theme: str | None = Query(default=None, description="Color theme"),
+        hide_border: str | None = Query(default=None, description="Hide border"),
+        disable_animations: str | None = Query(default=None, description="Disable animations"),
+    ) -> Response:
+        """Get tech stack/skills card SVG.
+
+        Args:
+            request: FastAPI request.
+            skills: Comma-separated list of skill names.
+            theme: Color theme name.
+            hide_border: Whether to hide border.
+            disable_animations: Whether to disable CSS animations.
+
+        Returns:
+            SVG response.
+        """
+        req = decode_skills_request(
+            skills=skills,
+            theme=theme,
+            hide_border=hide_border,
+            disable_animations=disable_animations,
+        )
+
+        settings = self._settings_provider()
+
+        svg = render_skills_card(
+            skills=req["skills"],
+            theme_name=req["theme"],
+            hide_border=req["hide_border"],
+            disable_animations=req["disable_animations"],
+        )
+
+        cache_ttl = settings["cache_ttl_seconds"]
+        return Response(
+            content=svg,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
+        )
+
 
 def build_router(settings_provider: _SettingsProvider) -> APIRouter:
     """Build stats router.
@@ -369,6 +414,13 @@ def build_router(settings_provider: _SettingsProvider) -> APIRouter:
         methods=["GET"],
         name="get_hero",
         summary="Get hero card with rain animation",
+    )
+    router.add_api_route(
+        "/api/skills",
+        handler.get_skills,
+        methods=["GET"],
+        name="get_skills",
+        summary="Get tech stack/skills card",
     )
 
     return router

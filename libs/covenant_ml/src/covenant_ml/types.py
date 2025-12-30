@@ -208,8 +208,9 @@ class LightGBMConfig(TypedDict, total=True):
 class ClearGBMConfig(TypedDict, total=True):
     """Configuration for ClearGBM backend training.
 
-    ClearGBM is a pure Python gradient boosting implementation with
+    ClearGBM is a numpy-based gradient boosting implementation with
     built-in interpretability features (rule extraction, feature contributions).
+    No external C++ dependencies required.
 
     Args:
         n_estimators: Number of boosting rounds.

@@ -441,7 +441,7 @@ Both XGBoost and LightGBM search spaces include DART (Dropouts meet Multiple Add
 | `MLPConfig` | MLP neural network configuration |
 | `LSTMConfig` | LSTM sequence model configuration |
 | `LightGBMConfig` | LightGBM gradient boosting configuration |
-| `ClearGBMConfig` | ClearGBM pure-Python gradient boosting configuration |
+| `ClearGBMConfig` | ClearGBM numpy-based gradient boosting configuration |
 | `LogRegConfig` | Logistic regression configuration |
 | `RandomForestConfig` | Random forest ensemble configuration |
 | `ClassifierTrainConfig` | Union of all backend config types |

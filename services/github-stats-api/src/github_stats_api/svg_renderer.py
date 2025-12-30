@@ -1025,6 +1025,115 @@ def render_hero_card(
     return "\n".join(svg_parts)
 
 
+def render_skills_card(
+    skills: tuple[str, ...],
+    theme_name: str,
+    hide_border: bool,
+    disable_animations: bool,
+) -> str:
+    """Render a tech stack/skills card with skill badges.
+
+    Args:
+        skills: Tuple of skill names.
+        theme_name: Color theme name.
+        hide_border: Whether to hide border.
+        disable_animations: Whether to disable animations.
+
+    Returns:
+        SVG string.
+    """
+    theme = get_theme(theme_name)
+
+    width = 495
+    title = "Tech Stack"
+
+    # Calculate layout - badges in rows
+    badge_height = 28
+    badge_margin = 8
+    row_height = badge_height + badge_margin
+    badges_per_row = 4
+    num_rows = (len(skills) + badges_per_row - 1) // badges_per_row
+    content_height = num_rows * row_height
+    height = 50 + content_height + 20  # title + content + padding
+
+    title_color = theme["title_color"]
+    text_color = theme["text_color"]
+    border_color = theme["border_color"]
+    icon_color = theme["icon_color"]
+    glow_color = theme["glow_color"]
+
+    # Get animation CSS
+    glow_css = "" if glow_color is None or disable_animations else _get_glow_css(glow_color)
+
+    # Render sparkle decorations with animation CSS
+    sparkle_color = theme["sparkle_color"]
+    sparkle_count = theme["sparkle_count"]
+    sparkle_svg = ""
+    sparkle_css = ""
+    if sparkle_color is not None and sparkle_count > 0:
+        sparkle_svg = _render_sparkles(width, height, sparkle_color, sparkle_count)
+        sparkle_css = "" if disable_animations else _get_sparkle_css(sparkle_color)
+
+    # Render background
+    defs_svg, rect_svg = _render_background(width, height, theme, hide_border, "skills-grad")
+
+    # Border
+    border_opacity = "0" if hide_border else "1"
+    border_svg = (
+        f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" '
+        f'rx="4.5" fill="none" stroke="{border_color}" stroke-opacity="{border_opacity}"/>'
+    )
+
+    # Header class with glow
+    header_class = "header glow-text" if glow_color is not None else "header"
+
+    svg_parts = [
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg">',
+        defs_svg,
+        "<style>",
+        f".header {{ font: 600 18px 'Segoe UI', sans-serif; fill: {title_color}; }}",
+        f".skill-text {{ font: 500 12px 'Segoe UI', sans-serif; fill: {text_color}; }}",
+        f".skill-badge {{ fill: {icon_color}; fill-opacity: 0.15; stroke: {icon_color}; "
+        "stroke-opacity: 0.5; }}",
+        glow_css,
+        sparkle_css,
+        "</style>",
+        rect_svg,
+        border_svg,
+        sparkle_svg,
+        f'<text x="25" y="35" class="{header_class}">{_escape_xml(title)}</text>',
+    ]
+
+    # Render skill badges in a grid
+    badge_width = (width - 50 - (badges_per_row - 1) * badge_margin) // badges_per_row
+    start_x = 25
+    start_y = 55
+
+    for i, skill in enumerate(skills):
+        row = i // badges_per_row
+        col = i % badges_per_row
+        x = start_x + col * (badge_width + badge_margin)
+        y = start_y + row * row_height
+
+        # Badge background
+        svg_parts.append(
+            f'<rect x="{x}" y="{y}" width="{badge_width}" height="{badge_height}" '
+            f'rx="4" class="skill-badge"/>'
+        )
+        # Skill text centered in badge
+        text_x = x + badge_width // 2
+        text_y = y + badge_height // 2 + 4
+        svg_parts.append(
+            f'<text x="{text_x}" y="{text_y}" text-anchor="middle" class="skill-text">'
+            f"{_escape_xml(skill)}</text>"
+        )
+
+    svg_parts.append("</svg>")
+
+    return "\n".join(svg_parts)
+
+
 __all__ = [
     "build_capabilities_response",
     "build_language_stats",
@@ -1032,5 +1141,6 @@ __all__ = [
     "render_capabilities_card",
     "render_hero_card",
     "render_langs_card",
+    "render_skills_card",
     "render_stats_card",
 ]

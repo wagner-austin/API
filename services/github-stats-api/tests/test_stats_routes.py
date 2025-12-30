@@ -535,3 +535,47 @@ class TestHeroEndpoint:
 
         assert "Cache-Control" in response.headers
         assert "max-age=60" in response.headers["Cache-Control"]
+
+
+class TestSkillsEndpoint:
+    """Tests for /api/skills endpoint."""
+
+    async def test_get_skills_returns_svg(self) -> None:
+        """Test /api/skills endpoint returns SVG."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/skills?skills=Python,TypeScript,React&theme=cyberpunk"
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert "<svg" in response.text
+        assert "Tech Stack" in response.text
+        assert "Python" in response.text
+
+    async def test_get_skills_missing_skills_returns_error(self) -> None:
+        """Test /api/skills endpoint returns error when skills is missing."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/skills")
+
+        assert response.status_code == 400
+
+    async def test_get_skills_cache_control_header(self) -> None:
+        """Test /api/skills endpoint sets cache-control header."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/skills?skills=Python")
+
+        assert "Cache-Control" in response.headers
+        assert "max-age=60" in response.headers["Cache-Control"]

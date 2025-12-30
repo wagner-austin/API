@@ -1,6 +1,6 @@
 # covenant-ml
 
-Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports seven backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), LightGBM (large-scale datasets), ClearGBM (interpretable pure-Python gradient boosting), LogReg (logistic regression baseline), and Random Forest (bagging ensemble). Includes probability calibration with isotonic regression and Platt scaling.
+Pluggable ML backends for covenant breach risk prediction: training, validation, and inference. Supports seven backends: XGBoost (gradient boosting), MLP (neural networks), LSTM (temporal sequences), LightGBM (large-scale datasets), ClearGBM (numpy-based gradient boosting), LogReg (logistic regression baseline), and Random Forest (bagging ensemble). Includes probability calibration with isotonic regression and Platt scaling.
 
 ## Installation
 
@@ -72,7 +72,7 @@ outcome = backend.train(X, y, feature_names, config, output_dir)
 
 ### ClearGBM
 
-Pure Python gradient boosting with built-in interpretability:
+Numpy-based gradient boosting with built-in interpretability (no C++ dependencies):
 
 ```python
 from covenant_ml.backends.cleargbm import create_cleargbm_backend
@@ -170,7 +170,7 @@ outcome = backend.train(x_features=X, y_labels=y, feature_names=names, config=co
 | Best for | Tabular data | Non-linear patterns | Temporal sequences | Large datasets | Interpretability | Baseline/calibration | Robust ensemble |
 | Training speed | Fast | Moderate | Slow | Very fast | Moderate | Very fast | Fast |
 | Interpretability | High | Low | Low | High | Very high | Very high | Medium |
-| Dependencies | C++ lib | PyTorch | PyTorch | C++ lib | Python stdlib | sklearn | sklearn |
+| Dependencies | C++ lib | PyTorch | PyTorch | C++ lib | numpy only | sklearn | sklearn |
 
 ## Inference
 

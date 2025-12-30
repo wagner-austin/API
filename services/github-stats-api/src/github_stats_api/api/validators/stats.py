@@ -8,6 +8,7 @@ from ..schemas.stats import (
     CapabilitiesRequest,
     HeroRequest,
     LangsRequest,
+    SkillsRequest,
     StatsRequest,
     ThemeName,
 )
@@ -532,9 +533,81 @@ def decode_hero_request(
     }
 
 
+def _parse_skills(raw: str | None) -> tuple[str, ...]:
+    """Parse comma-separated skills list.
+
+    Args:
+        raw: Raw comma-separated string of skills.
+
+    Returns:
+        Tuple of skill names.
+
+    Raises:
+        AppError: If skills is empty or too many skills.
+    """
+    if raw is None or raw.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="skills is required",
+            http_status=400,
+        )
+    items = [s.strip() for s in raw.split(",") if s.strip()]
+    if len(items) == 0:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="skills is required",
+            http_status=400,
+        )
+    if len(items) > 20:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="skills must contain at most 20 items",
+            http_status=400,
+        )
+    for i, skill in enumerate(items):
+        if len(skill) > 30:
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"skill {i + 1} exceeds 30 characters",
+                http_status=400,
+            )
+    return tuple(items)
+
+
+def decode_skills_request(
+    skills: str | None,
+    theme: str | None,
+    hide_border: str | None,
+    disable_animations: str | None,
+) -> SkillsRequest:
+    """Decode and validate skills request from query parameters.
+
+    Args:
+        skills: Comma-separated list of skill names.
+        theme: Color theme.
+        hide_border: Whether to hide border.
+        disable_animations: Whether to disable CSS animations.
+
+    Returns:
+        Validated SkillsRequest TypedDict.
+
+    Raises:
+        AppError: If validation fails.
+    """
+    return {
+        "skills": _parse_skills(skills),
+        "theme": _require_theme(theme),
+        "hide_border": _parse_query_bool(hide_border, default=False, param_name="hide_border"),
+        "disable_animations": _parse_query_bool(
+            disable_animations, default=False, param_name="disable_animations"
+        ),
+    }
+
+
 __all__ = [
     "decode_capabilities_request",
     "decode_hero_request",
     "decode_langs_request",
+    "decode_skills_request",
     "decode_stats_request",
 ]

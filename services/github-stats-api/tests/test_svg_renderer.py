@@ -16,6 +16,7 @@ from github_stats_api.svg_renderer import (
     render_capabilities_card,
     render_hero_card,
     render_langs_card,
+    render_skills_card,
     render_stats_card,
 )
 
@@ -1271,3 +1272,112 @@ class TestRenderHeroCard:
         # Extract heights from viewBox - svg_few has 1 line = 184px, svg_many has 4 lines = 256px
         assert 'viewBox="0 0 495 184"' in svg_few
         assert 'viewBox="0 0 495 256"' in svg_many
+
+
+class TestRenderSkillsCard:
+    """Tests for render_skills_card function."""
+
+    def test_render_skills_card_basic(self) -> None:
+        """Test rendering basic skills card."""
+        svg = render_skills_card(
+            skills=("Python", "TypeScript", "React"),
+            theme_name="default",
+            hide_border=False,
+            disable_animations=False,
+        )
+
+        assert "<svg" in svg
+        assert "</svg>" in svg
+        assert "Tech Stack" in svg
+        assert "Python" in svg
+        assert "TypeScript" in svg
+        assert "React" in svg
+
+    def test_render_skills_card_cyberpunk_has_glow(self) -> None:
+        """Test that cyberpunk theme includes glow effect."""
+        svg = render_skills_card(
+            skills=("Python",),
+            theme_name="cyberpunk",
+            hide_border=False,
+            disable_animations=False,
+        )
+
+        assert "glowPulse" in svg
+        assert "glow-text" in svg
+
+    def test_render_skills_card_cyberpunk_has_sparkles(self) -> None:
+        """Test that cyberpunk theme includes sparkles."""
+        svg = render_skills_card(
+            skills=("Python",),
+            theme_name="cyberpunk",
+            hide_border=False,
+            disable_animations=False,
+        )
+
+        assert "sparkle" in svg
+        assert "twinkle" in svg
+
+    def test_render_skills_card_disable_animations(self) -> None:
+        """Test that disabling animations removes effects."""
+        svg = render_skills_card(
+            skills=("Python",),
+            theme_name="cyberpunk",
+            hide_border=True,
+            disable_animations=True,
+        )
+
+        assert "glowPulse" not in svg
+        assert "twinkle" not in svg
+
+    def test_render_skills_card_hide_border(self) -> None:
+        """Test that hide_border sets border opacity to 0."""
+        svg = render_skills_card(
+            skills=("Python",),
+            theme_name="default",
+            hide_border=True,
+            disable_animations=True,
+        )
+
+        assert 'stroke-opacity="0"' in svg
+
+    def test_render_skills_card_escapes_special_chars(self) -> None:
+        """Test that special characters are escaped."""
+        svg = render_skills_card(
+            skills=("C++", "C#", "F#"),
+            theme_name="default",
+            hide_border=False,
+            disable_animations=True,
+        )
+
+        assert "C++" in svg
+        assert "C#" in svg
+        assert "F#" in svg
+
+    def test_render_skills_card_dynamic_height(self) -> None:
+        """Test that height adjusts based on skill count."""
+        svg_few = render_skills_card(
+            skills=("Python", "React"),
+            theme_name="default",
+            hide_border=False,
+            disable_animations=True,
+        )
+
+        svg_many = render_skills_card(
+            skills=(
+                "Python",
+                "TypeScript",
+                "React",
+                "FastAPI",
+                "Docker",
+                "Redis",
+                "PostgreSQL",
+                "Git",
+            ),
+            theme_name="default",
+            hide_border=False,
+            disable_animations=True,
+        )
+
+        # svg_few has 2 skills = 1 row, svg_many has 8 skills = 2 rows
+        assert 'viewBox="0 0 495 106"' in svg_few
+        assert 'viewBox="0 0 495 142"' in svg_many

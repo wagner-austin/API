@@ -141,6 +141,22 @@ class HeroRequest(TypedDict, total=True):
     disable_animations: bool
 
 
+class SkillsRequest(TypedDict, total=True):
+    """Request for tech stack/skills card.
+
+    Attributes:
+        skills: Tuple of skill names to display.
+        theme: Color theme for the card.
+        hide_border: Whether to hide the card border.
+        disable_animations: Whether to disable CSS animations.
+    """
+
+    skills: tuple[str, ...]
+    theme: ThemeName
+    hide_border: bool
+    disable_animations: bool
+
+
 class CapabilitiesRequest(TypedDict, total=True):
     """Request for codebase capabilities card.
 
@@ -202,6 +218,7 @@ __all__ = [
     "LangsRequest",
     "LangsResponse",
     "LanguageStats",
+    "SkillsRequest",
     "StatsRequest",
     "ThemeName",
     "UserStats",
