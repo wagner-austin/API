@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..icons import get_skill_icon
+from ..icons import MultiPathIcon, get_skill_icon
 from ..themes import get_theme
 from ._common import (
     escape_xml,
@@ -12,56 +12,28 @@ from ._common import (
     render_sparkles,
 )
 
-_SKILL_COLORS: dict[str, str] = {
-    "python": "#3776ab",
-    "typescript": "#3178c6",
-    "javascript": "#f7df1e",
-    "react": "#61dafb",
-    "fastapi": "#009688",
-    "pytorch": "#ee4c2c",
-    "docker": "#2496ed",
-    "redis": "#dc382d",
-    "postgresql": "#4169e1",
-    "postgres": "#4169e1",
-    "git": "#f05032",
-    "rust": "#dea584",
-    "go": "#00add8",
-    "java": "#ed8b00",
-    "c++": "#00599c",
-    "c#": "#512bd4",
-    "node": "#339933",
-    "nodejs": "#339933",
-    "vue": "#4fc08d",
-    "angular": "#dd0031",
-    "svelte": "#ff3e00",
-    "tailwind": "#06b6d4",
-    "css": "#1572b6",
-    "html": "#e34f26",
-    "aws": "#ff9900",
-    "azure": "#0078d4",
-    "gcp": "#4285f4",
-    "kubernetes": "#326ce5",
-    "linux": "#fcc624",
-    "nginx": "#009639",
-    "mongodb": "#47a248",
-    "mysql": "#4479a1",
-    "graphql": "#e10098",
-    "flask": "#000000",
-    "django": "#092e20",
-    "transformers": "#ffcc00",
-    "hypercorn": "#5e81ac",
-    "huggingface": "#ffcc00",
-    "rq": "#dc382d",
-    "numpy": "#013243",
-    "pandas": "#150458",
-    "pillow": "#3776ab",
-    "httpx": "#3178c6",
-}
 
+def _render_icon(icon: MultiPathIcon, x: float, y: float, size: int) -> str:
+    """Render a multi-path icon at the given position and size.
 
-def _get_skill_color(skill: str) -> str:
-    """Get color for a skill name."""
-    return _SKILL_COLORS.get(skill.lower(), "#888888")
+    Args:
+        icon: MultiPathIcon with paths, viewBox, and transform.
+        x: X position for the icon.
+        y: Y position for the icon.
+        size: Target size in pixels.
+
+    Returns:
+        SVG group element with scaled and positioned icon paths.
+    """
+    scale = size / icon["viewbox_width"]
+    parts = [f'<g transform="translate({x}, {y}) scale({scale})']
+    if icon["transform"]:
+        parts.append(f" {icon['transform']}")
+    parts.append('">')
+    for path in icon["paths"]:
+        parts.append(f'<path d="{path["d"]}" fill="{path["fill"]}"/>')
+    parts.append("</g>")
+    return "".join(parts)
 
 
 def render_skills_card(
@@ -136,25 +108,18 @@ def render_skills_card(
         x = start_x + col * col_width
         y = start_y + row * row_height
 
-        skill_color = _get_skill_color(skill)
-        icon_path = get_skill_icon(skill)
+        icon = get_skill_icon(skill)
 
         icon_x = x + 4
         icon_y = y + (skill_height - icon_size) // 2
 
-        if icon_path:
-            scale = icon_size / 24
-            svg_parts.append(
-                f'<g transform="translate({icon_x}, {icon_y}) scale({scale})">'
-                f'<path d="{icon_path}" fill="{skill_color}"/>'
-                f"</g>"
-            )
+        if icon is not None:
+            svg_parts.append(_render_icon(icon, icon_x, icon_y, icon_size))
         else:
             circle_x = icon_x + icon_size // 2
             circle_y = icon_y + icon_size // 2
             svg_parts.append(
-                f'<circle cx="{circle_x}" cy="{circle_y}" r="{icon_size // 2}" '
-                f'fill="{skill_color}"/>'
+                f'<circle cx="{circle_x}" cy="{circle_y}" r="{icon_size // 2}" fill="#888888"/>'
             )
 
         text_x = icon_x + icon_size + 10
