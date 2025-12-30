@@ -4,7 +4,7 @@ Provides the objective function that Optuna uses to evaluate ClearGBM
 hyperparameter configurations. Pre-splits data once and pre-computes
 class weights for efficient trial evaluation.
 
-ClearGBM is a pure Python gradient boosting implementation with built-in
+ClearGBM is a numpy-based gradient boosting implementation with built-in
 interpretability features (rule extraction, feature contributions).
 
 Strict typing only: no Any, no casts, no stubs.
@@ -58,7 +58,7 @@ def _extract_positive_class_proba(
 class ClearGBMObjective:
     """ClearGBM objective that trains on pre-split data and returns validation AUC.
 
-    Uses pure Python ClearGBM library with histogram-based split finding
+    Uses numpy-based ClearGBM library with histogram-based split finding
     for efficient hyperparameter optimization.
     """
 

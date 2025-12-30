@@ -62,7 +62,7 @@ def default_registry() -> ClassifierRegistry:
     - mlp: torch-based MLP backend
     - lstm: torch-based LSTM backend for temporal sequences
     - lightgbm: LightGBM gradient boosting backend
-    - cleargbm: pure Python gradient boosting with built-in interpretability
+    - cleargbm: numpy-based gradient boosting with built-in interpretability
     - logreg: sklearn Logistic Regression (interpretable baseline)
     - random_forest: sklearn Random Forest (bagging ensemble)
     """

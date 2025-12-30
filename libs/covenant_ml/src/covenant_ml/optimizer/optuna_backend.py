@@ -1175,7 +1175,7 @@ class OptunaLightGBMOptimizer:
 class OptunaClearGBMOptimizer:
     """ClearGBM hyperparameter optimizer using Optuna TPE.
 
-    ClearGBM is a pure Python gradient boosting implementation with
+    ClearGBM is a numpy-based gradient boosting implementation with
     built-in interpretability features (rule extraction, feature contributions).
     """
 

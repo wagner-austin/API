@@ -1,6 +1,6 @@
 """ClearGBM backend for tabular binary classification.
 
-Implements ClassifierBackend protocol using the pure Python ClearGBM library.
+Implements ClassifierBackend protocol using the numpy-based ClearGBM library.
 Provides built-in interpretability (rule extraction, feature contributions).
 
 Strict typing only: no Any, no casts, no type: ignore.
@@ -189,7 +189,7 @@ def try_extract_cleargbm_model(
 class ClearGBMBackend(ClassifierBackend):
     """ClearGBM backend for tabular binary classification.
 
-    Provides pure Python gradient boosting with built-in interpretability.
+    Provides numpy-based gradient boosting with built-in interpretability.
     """
 
     def backend_name(self) -> BackendName:

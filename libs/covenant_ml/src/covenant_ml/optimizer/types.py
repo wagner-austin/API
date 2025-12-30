@@ -212,7 +212,7 @@ class LightGBMSearchSpace(_LightGBMSearchSpaceRequired, total=False):
 class ClearGBMSearchSpace(TypedDict, total=True):
     """Search space for ClearGBM hyperparameters.
 
-    ClearGBM is a pure Python from-scratch gradient boosting implementation
+    ClearGBM is a numpy-based gradient boosting implementation
     with built-in interpretability features. The search space includes:
     - n_estimators: Number of boosting rounds
     - max_depth: Maximum tree depth

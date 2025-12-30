@@ -695,7 +695,7 @@ def make_lightgbm_focused_space(
 def make_cleargbm_default_space() -> ClearGBMSearchSpace:
     """Create default ClearGBM search space for bankruptcy prediction.
 
-    ClearGBM is a pure Python gradient boosting implementation with built-in
+    ClearGBM is a numpy-based gradient boosting implementation with built-in
     interpretability features. The search space includes:
     - n_estimators 50-300 (number of boosting rounds)
     - max_depth 3-10 (tree depth control)
