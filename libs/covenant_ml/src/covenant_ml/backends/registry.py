@@ -63,6 +63,8 @@ def default_registry() -> ClassifierRegistry:
     - lstm: torch-based LSTM backend for temporal sequences
     - lightgbm: LightGBM gradient boosting backend
     - cleargbm: pure Python gradient boosting with built-in interpretability
+    - logreg: sklearn Logistic Regression (interpretable baseline)
+    - random_forest: sklearn Random Forest (bagging ensemble)
     """
     reg = ClassifierRegistry()
 
@@ -105,6 +107,22 @@ def default_registry() -> ClassifierRegistry:
     )
     create_cleargbm_backend: BackendFactory = cgbm_pkg.create_cleargbm_backend
     reg.register("cleargbm", BackendRegistration(create_cleargbm_backend))
+
+    # Logistic Regression backend
+    logreg_pkg = __import__(
+        "covenant_ml.backends.logreg",
+        fromlist=["create_logreg_backend"],
+    )
+    create_logreg_backend: BackendFactory = logreg_pkg.create_logreg_backend
+    reg.register("logreg", BackendRegistration(create_logreg_backend))
+
+    # Random Forest backend
+    rf_pkg = __import__(
+        "covenant_ml.backends.random_forest",
+        fromlist=["create_random_forest_backend"],
+    )
+    create_random_forest_backend: BackendFactory = rf_pkg.create_random_forest_backend
+    reg.register("random_forest", BackendRegistration(create_random_forest_backend))
 
     return reg
 
