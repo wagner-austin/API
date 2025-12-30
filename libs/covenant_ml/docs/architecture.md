@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `covenant_ml` library provides pluggable ML backends for covenant breach risk prediction. It supports five backends (XGBoost, LightGBM, ClearGBM, MLP, LSTM) with a unified training/inference interface, hyperparameter optimization, feature importance explainers, and dataset loading utilities.
+The `covenant_ml` library provides pluggable ML backends for covenant breach risk prediction. It supports seven backends (XGBoost, LightGBM, ClearGBM, MLP, LSTM, LogReg, Random Forest) with a unified training/inference interface, hyperparameter optimization, feature importance explainers, probability calibration, and dataset loading utilities.
 
 ## Dependencies
 
@@ -42,7 +42,10 @@ libs/covenant_ml/
 │   │   ├── lightgbm/            # LightGBM backend
 │   │   ├── cleargbm/            # ClearGBM backend
 │   │   ├── mlp/                 # MLP neural network backend
-│   │   └── lstm/                # LSTM sequence backend
+│   │   ├── lstm/                # LSTM sequence backend
+│   │   ├── logreg/              # Logistic regression backend
+│   │   └── random_forest/       # Random forest backend
+│   ├── calibration/             # Probability calibration (isotonic, Platt)
 │   ├── preprocessing/           # AutoPreprocessor pipeline
 │   ├── datasets/                # Dataset loading (tabular + time-series)
 │   ├── explainers/              # Feature importance (SHAP, permutation, gradient)
@@ -57,7 +60,10 @@ libs/covenant_ml/
     │   ├── lightgbm/
     │   ├── cleargbm/
     │   ├── mlp/
-    │   └── lstm/
+    │   ├── lstm/
+    │   ├── logreg/
+    │   └── random_forest/
+    ├── calibration/
     ├── preprocessing/
     ├── datasets/
     ├── explainers/
@@ -134,6 +140,8 @@ backends/<name>/
 | ClearGBM | `GradientBoostingModel` | `.json` | CPU only |
 | MLP | `nn.Module` | `.pt` (state_dict) | CUDA |
 | LSTM | `nn.Module` | `.pt` (state_dict) | CUDA |
+| LogReg | `LogisticRegression` | `.joblib` | CPU only |
+| Random Forest | `RandomForestClassifier` | `.joblib` | CPU only |
 
 ## Explainers Architecture
 
@@ -190,6 +198,36 @@ set_optuna_module_hook(lambda: FakeOptuna())
 | `OptunaClearGBMOptimizer` | ClearGBM | `ClearGBMSearchSpace` |
 | `OptunaMLPOptimizer` | MLP | `MLPSearchSpace` |
 | `OptunaLSTMOptimizer` | LSTM | `LSTMSearchSpace` |
+
+## Calibration Architecture
+
+Post-hoc probability calibration to improve model predictions:
+
+```python
+class Calibrator:
+    def __init__(self, config: CalibratorConfig) -> None: ...
+    def fit(self, y_true: NDArray[np.int64], y_prob: NDArray[np.float64]) -> CalibrationResult: ...
+    def transform(self, y_prob: NDArray[np.float64]) -> CalibratedPredictions: ...
+    def get_state(self) -> CalibratorState: ...
+    @classmethod
+    def load_state(cls, state: CalibratorState) -> Calibrator: ...
+```
+
+### Calibration Methods
+
+| Method | Implementation | Use Case |
+|--------|----------------|----------|
+| Isotonic | `_IsotonicWrapper` wrapping sklearn | Non-parametric, flexible |
+| Platt | Logistic regression via sklearn | Parametric sigmoid fit |
+
+### State Serialization
+
+CalibratorState TypedDict with encode/decode functions for JSON persistence:
+
+```python
+encode_calibrator_state(state: CalibratorState) -> dict[str, JSONValue]
+decode_calibrator_state(data: dict[str, JSONValue]) -> CalibratorState
+```
 
 ## Dataset Loading
 
