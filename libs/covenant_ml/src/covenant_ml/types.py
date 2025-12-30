@@ -14,7 +14,7 @@ RequestedDevice = Literal["cpu", "cuda", "auto"]
 ResolvedDevice = Literal["cpu", "cuda"]
 
 # Pluggable backend naming - all supported classifier backends
-BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm"]
+BackendName = Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm", "logreg", "random_forest"]
 
 
 class TrainConfigRequired(TypedDict, total=True):
@@ -98,7 +98,15 @@ class TrainOutcome(TypedDict, total=True):
     total_rounds: int
     early_stopped: bool
     # Union inlined to avoid forward ref
-    config: TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig
+    config: (
+        TrainConfig
+        | MLPConfig
+        | LSTMConfig
+        | LightGBMConfig
+        | ClearGBMConfig
+        | LogRegConfig
+        | RandomForestConfig
+    )
     feature_importances: list[FeatureImportance]  # Sorted by importance (descending)
     # Class weight used for training (auto-calculated if not provided in config)
     scale_pos_weight_computed: float
@@ -244,8 +252,102 @@ class ClearGBMConfig(TypedDict, total=True):
     early_stopping_rounds: int
 
 
+# Logistic Regression backend configuration
+LogRegSolver = Literal["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
+LogRegPenalty = Literal["l1", "l2", "elasticnet", "none"]
+
+
+class LogRegConfig(TypedDict, total=True):
+    """Configuration for Logistic Regression backend training.
+
+    Logistic regression provides a simple, interpretable linear classifier
+    with probabilistic outputs. It serves as a strong baseline and is useful
+    for calibration benchmarking since its outputs are naturally calibrated.
+
+    Args:
+        solver: Optimization algorithm. "lbfgs" is default for small datasets.
+            "saga" supports all penalty types including elasticnet.
+        penalty: Regularization type. "l2" (ridge) is default.
+            "l1" (lasso) for sparsity, "elasticnet" requires saga solver.
+        C: Inverse regularization strength. Smaller values = stronger reg.
+        max_iter: Maximum iterations for solver convergence.
+        tol: Tolerance for stopping criteria.
+        class_weight_balanced: If True, weights inversely proportional to
+            class frequencies. Equivalent to class_weight="balanced".
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        random_state: Random seed for reproducibility.
+        l1_ratio: ElasticNet mixing parameter (0=L2, 1=L1). Only used with
+            penalty="elasticnet" and solver="saga".
+    """
+
+    solver: LogRegSolver
+    penalty: LogRegPenalty
+    C: float
+    max_iter: int
+    tol: float
+    class_weight_balanced: bool
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    l1_ratio: float
+
+
+# Random Forest backend configuration
+class RandomForestConfig(TypedDict, total=True):
+    """Configuration for Random Forest backend training.
+
+    Random Forest is an ensemble of decision trees using bagging and
+    feature randomization. Provides robust predictions and natural
+    probability estimates (though often overconfident without calibration).
+
+    Args:
+        n_estimators: Number of trees in the forest.
+        max_depth: Maximum tree depth. None means nodes expand until pure
+            or min_samples_split is reached.
+        min_samples_split: Minimum samples to split an internal node.
+        min_samples_leaf: Minimum samples required in a leaf node.
+        max_features: Features to consider for best split.
+            "sqrt" = sqrt(n_features), "log2" = log2(n_features),
+            float = fraction, int = count, None = all features.
+        bootstrap: Whether to use bootstrap samples for trees.
+        class_weight_balanced: If True, weights inversely proportional to
+            class frequencies. Equivalent to class_weight="balanced".
+        n_jobs: Number of parallel workers (-1 = all cores).
+        train_ratio: Fraction of data for training.
+        val_ratio: Fraction of data for validation.
+        test_ratio: Fraction of data for testing.
+        random_state: Random seed for reproducibility.
+        oob_score: Whether to compute out-of-bag score (requires bootstrap).
+    """
+
+    n_estimators: int
+    max_depth: int | None
+    min_samples_split: int
+    min_samples_leaf: int
+    max_features: Literal["sqrt", "log2"] | float | int | None
+    bootstrap: bool
+    class_weight_balanced: bool
+    n_jobs: int
+    train_ratio: float
+    val_ratio: float
+    test_ratio: float
+    random_state: int
+    oob_score: bool
+
+
 # Union of backend-specific train configs
-ClassifierTrainConfig = TrainConfig | MLPConfig | LSTMConfig | LightGBMConfig | ClearGBMConfig
+ClassifierTrainConfig = (
+    TrainConfig
+    | MLPConfig
+    | LSTMConfig
+    | LightGBMConfig
+    | ClearGBMConfig
+    | LogRegConfig
+    | RandomForestConfig
+)
 
 
 # =============================================================================
@@ -313,8 +415,48 @@ class LightGBMModelMeta(TypedDict, total=True):
     backend: Literal["lightgbm"]
 
 
+class LogRegModelMeta(TypedDict, total=True):
+    """Metadata for Logistic Regression model.
+
+    Stores architecture info for model reconstruction. Logistic regression
+    models are saved as joblib files with the full sklearn estimator.
+
+    Args:
+        backend: Literal discriminator for union type narrowing.
+        n_features: Number of input features the model was trained on.
+        penalty: Regularization type used during training.
+        solver: Optimization algorithm used.
+    """
+
+    backend: Literal["logreg"]
+    n_features: int
+    penalty: LogRegPenalty
+    solver: LogRegSolver
+
+
+class RandomForestModelMeta(TypedDict, total=True):
+    """Metadata for Random Forest model.
+
+    Stores architecture info for model reconstruction. Random forest
+    models are saved as joblib files with the full sklearn estimator.
+
+    Args:
+        backend: Literal discriminator for union type narrowing.
+        n_features: Number of input features the model was trained on.
+        n_estimators: Number of trees in the forest.
+        max_depth: Maximum tree depth (None if unlimited).
+    """
+
+    backend: Literal["random_forest"]
+    n_features: int
+    n_estimators: int
+    max_depth: int | None
+
+
 # Union of model metadata types for type-safe dispatch
-ModelMeta = MLPModelMeta | LSTMModelMeta | LightGBMModelMeta
+ModelMeta = (
+    MLPModelMeta | LSTMModelMeta | LightGBMModelMeta | LogRegModelMeta | RandomForestModelMeta
+)
 
 
 class TrainProgress(TypedDict, total=True):
@@ -454,12 +596,18 @@ __all__ = [
     "LSTMPrecision",
     "LightGBMConfig",
     "LightGBMModelMeta",
+    "LogRegConfig",
+    "LogRegModelMeta",
+    "LogRegPenalty",
+    "LogRegSolver",
     "MLPConfig",
     "MLPModelMeta",
     "MLPPrecision",
     "ModelMeta",
     "PredictorProtocol",
     "Proba2DProtocol",
+    "RandomForestConfig",
+    "RandomForestModelMeta",
     "TrainConfig",
     "TrainConfigRequired",
     "TrainOutcome",
