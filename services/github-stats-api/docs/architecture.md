@@ -42,9 +42,18 @@ services/github-stats-api/
 │   ├── asgi.py                # Production ASGI entrypoint
 │   ├── settings.py            # Environment config
 │   ├── themes.py              # Color theme definitions
+│   ├── icons.py               # Skill icon SVG paths (MultiPathIcon)
 │   ├── github_client.py       # Protocol + GraphQL queries
 │   ├── client.py              # GitHub API client implementation
-│   ├── svg_renderer.py        # SVG card generation
+│   ├── svg_renderer.py        # Re-exports from renderers package
+│   ├── renderers/
+│   │   ├── __init__.py        # Package exports
+│   │   ├── _common.py         # Shared rendering utilities
+│   │   ├── stats.py           # User stats card renderer
+│   │   ├── langs.py           # Languages card renderer
+│   │   ├── capabilities.py    # Capabilities card renderer
+│   │   ├── hero.py            # Hero card renderer
+│   │   └── skills.py          # Skills/tech stack card renderer
 │   └── api/
 │       ├── __init__.py
 │       ├── main.py            # FastAPI app factory
@@ -252,8 +261,62 @@ def get_theme(name: str) -> Theme: ...
 def get_theme_names() -> tuple[str, ...]: ...
 ```
 
-### 4. svg_renderer.py - SVG Generation
+### 4. icons.py - Skill Icon Definitions
 
+Defines SVG icon paths for the skills card using a multi-path format with embedded colors:
+
+```python
+class IconPath(TypedDict, total=True):
+    d: str      # SVG path data
+    fill: str   # Hex color for this path
+
+class MultiPathIcon(TypedDict, total=True):
+    viewbox_width: int                  # SVG viewBox width
+    viewbox_height: int                 # SVG viewBox height
+    paths: tuple[IconPath, ...]         # One or more path elements
+    transform: str                      # Optional transform (e.g., "rotate(45)")
+
+def get_skill_icon(skill: str) -> MultiPathIcon | None:
+    """Get icon data for a skill name (case-insensitive)."""
+    ...
+```
+
+Icons are sourced from [Simple Icons](https://simpleicons.org/) with embedded fill colors. Each icon includes:
+- Viewbox dimensions (typically 24x24)
+- One or more SVG paths with their fill colors
+- Optional transform for icons requiring rotation/scaling
+
+### 5. svg_renderer.py - SVG Generation (Re-exports)
+
+This module re-exports all rendering functions from the `renderers` package for backwards compatibility:
+
+```python
+from .renderers import (
+    build_capabilities_response,
+    build_language_stats,
+    build_user_stats,
+    render_capabilities_card,
+    render_hero_card,
+    render_langs_card,
+    render_skills_card,
+    render_stats_card,
+)
+```
+
+### 6. renderers/ - SVG Card Renderers
+
+The `renderers` package contains specialized renderers for each card type:
+
+**renderers/_common.py** - Shared utilities:
+```python
+def escape_xml(text: str) -> str: ...
+def get_glow_css(color: str) -> str: ...
+def get_sparkle_css(color: str) -> str: ...
+def render_background(width, height, theme, hide_border, grad_id) -> tuple[str, str]: ...
+def render_sparkles(width, height, color, count) -> str: ...
+```
+
+**renderers/stats.py** - User stats card:
 ```python
 def render_stats_card(
     stats: UserStats,
@@ -261,13 +324,13 @@ def render_stats_card(
     hide_border: bool,
     show_icons: bool,
     hide: tuple[str, ...],
+    disable_animations: bool,
 ) -> str:
-    # Generate SVG string with:
-    # - Card background/border
-    # - Title with user name
-    # - Stat rows (stars, commits, PRs, issues)
-    # - Rank circle (S+, S, A+, A, B+, B, C)
+    # Card with: background, title, stat rows, rank circle
+```
 
+**renderers/langs.py** - Languages card:
+```python
 def render_langs_card(
     username: str,
     languages: list[LanguageStats],
@@ -276,14 +339,30 @@ def render_langs_card(
     hide_border: bool,
     layout: str,
     langs_count: int,
+    disable_animations: bool,
 ) -> str:
-    # Generate SVG string with:
-    # - Compact bar layout or list layout
-    # - Donut or pie chart layouts
-    # - Language colors and percentages
+    # Card with: compact bar, list, donut, or pie layout
 ```
 
-### 5. validators/stats.py - Request Validation
+**renderers/skills.py** - Skills/tech stack card:
+```python
+def _render_icon(icon: MultiPathIcon, x: float, y: float, size: int) -> str:
+    """Render a multi-path icon with scaling and optional transform."""
+    ...
+
+def render_skills_card(
+    skills: tuple[str, ...],
+    theme_name: str,
+    hide_border: bool,
+    disable_animations: bool,
+) -> str:
+    # Card with: skill icons from icons.py with embedded colors
+```
+
+**renderers/capabilities.py** - Codebase capabilities card
+**renderers/hero.py** - Hero/profile card
+
+### 7. validators/stats.py - Request Validation
 
 ```python
 def decode_stats_request(
@@ -301,7 +380,7 @@ def decode_stats_request(
 def decode_langs_request(...) -> LangsRequest: ...
 ```
 
-### 6. routes/stats.py - HTTP Endpoints
+### 8. routes/stats.py - HTTP Endpoints
 
 ```python
 async def get_stats(request: Request, ...) -> Response:
