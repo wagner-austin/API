@@ -392,6 +392,82 @@ def _real_lightgbm_loader(model_path: Path) -> PredictorProtocol:
 lightgbm_loader: LightGBMLoaderProtocol = _real_lightgbm_loader
 
 
+class LogRegLoaderProtocol(Protocol):
+    """Protocol for Logistic Regression model loader function."""
+
+    def __call__(self, model_path: Path) -> PredictorProtocol:
+        """Load LogReg model from .joblib file.
+
+        Args:
+            model_path: Path to the saved model file (.joblib format).
+
+        Returns:
+            Prepared LogReg model implementing PredictorProtocol.
+
+        Raises:
+            FileNotFoundError: If model file doesn't exist.
+        """
+        ...
+
+
+def _real_logreg_loader(model_path: Path) -> PredictorProtocol:
+    """Real implementation loading LogReg model from disk.
+
+    Args:
+        model_path: Path to the saved model file (.joblib format).
+
+    Returns:
+        Prepared LogReg model implementing PredictorProtocol.
+
+    Raises:
+        FileNotFoundError: If model file doesn't exist.
+    """
+    from covenant_radar_api.worker._model_loaders import load_logreg_model
+
+    return load_logreg_model(model_path)
+
+
+logreg_loader: LogRegLoaderProtocol = _real_logreg_loader
+
+
+class RandomForestLoaderProtocol(Protocol):
+    """Protocol for Random Forest model loader function."""
+
+    def __call__(self, model_path: Path) -> PredictorProtocol:
+        """Load Random Forest model from .joblib file.
+
+        Args:
+            model_path: Path to the saved model file (.joblib format).
+
+        Returns:
+            Prepared Random Forest model implementing PredictorProtocol.
+
+        Raises:
+            FileNotFoundError: If model file doesn't exist.
+        """
+        ...
+
+
+def _real_random_forest_loader(model_path: Path) -> PredictorProtocol:
+    """Real implementation loading Random Forest model from disk.
+
+    Args:
+        model_path: Path to the saved model file (.joblib format).
+
+    Returns:
+        Prepared Random Forest model implementing PredictorProtocol.
+
+    Raises:
+        FileNotFoundError: If model file doesn't exist.
+    """
+    from covenant_radar_api.worker._model_loaders import load_random_forest_model
+
+    return load_random_forest_model(model_path)
+
+
+random_forest_loader: RandomForestLoaderProtocol = _real_random_forest_loader
+
+
 __all__ = [
     "DatasetConfig",
     "DatasetLoaderCallable",
@@ -402,9 +478,11 @@ __all__ = [
     "LSTMLoaderProtocol",
     "LightGBMLoaderProtocol",
     "LoadedDataset",
+    "LogRegLoaderProtocol",
     "MLPLoaderProtocol",
     "PredictorProtocol",
     "ProgressCallbackProtocol",
+    "RandomForestLoaderProtocol",
     "RegistryFactory",
     "TimeSeriesDatasetConfig",
     "TimeSeriesDatasetRegistry",
@@ -415,8 +493,10 @@ __all__ = [
     "dataset_registry_factory",
     "explainer_registry_factory",
     "lightgbm_loader",
+    "logreg_loader",
     "lstm_loader",
     "mlp_loader",
+    "random_forest_loader",
     "registry_factory",
     "test_runner",
     "timeseries_loader",
