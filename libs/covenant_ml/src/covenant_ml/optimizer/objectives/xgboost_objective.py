@@ -9,6 +9,7 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
+import gc
 from typing import Literal, Protocol
 
 import numpy as np
@@ -262,7 +263,14 @@ class XGBoostObjective:
         # Predict on validation set (already on GPU)
         y_pred_proba: NDArray[np.float64] = trained_model.predict(self._val_dmatrix)
         # Use our typed compute_auc instead of sklearn
-        return compute_auc(self._y_val, y_pred_proba)
+        auc = compute_auc(self._y_val, y_pred_proba)
+
+        # Force aggressive cleanup between trials to prevent memory accumulation
+        del trained_model
+        del y_pred_proba
+        gc.collect()
+
+        return auc
 
 
 def create_xgboost_objective(
