@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+from collections.abc import Generator
 from pathlib import Path
 from shutil import copyfile
 
@@ -15,6 +17,7 @@ from platform_core.json_utils import (
 )
 
 from covenant_radar_api.worker.optimize_lightgbm_job import (
+    LightGBMLoadingProgressInfo,
     LightGBMPhaseInfo,
     LightGBMTrialProgressInfo,
     _get_search_space,
@@ -23,6 +26,18 @@ from covenant_radar_api.worker.optimize_lightgbm_job import (
     process_lightgbm_optimize_job,
     run_lightgbm_optimization,
 )
+
+
+@pytest.fixture(autouse=True)
+def _force_gc_after_test() -> Generator[None, None, None]:
+    """Force garbage collection after each test to prevent memory accumulation.
+
+    LightGBM optimization tests train models which consume memory.
+    When pytest-xdist runs multiple tests on the same worker, memory can accumulate
+    and cause worker crashes. This fixture ensures cleanup after each test.
+    """
+    yield
+    gc.collect()
 
 
 def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
@@ -222,8 +237,14 @@ class TestParseOptimizeConfig:
             _parse_optimize_config(config_json)
 
 
+@pytest.mark.xdist_group(name="lightgbm_heavy")
+@pytest.mark.timeout(300)
 class TestRunLightGBMOptimization:
-    """Integration tests for run_lightgbm_optimization with real data."""
+    """Integration tests for run_lightgbm_optimization with real data.
+
+    Uses xdist_group marker to ensure all LightGBM tests run on the same worker.
+    Timeout extended to 5 minutes per test for LightGBM optimization.
+    """
 
     def test_run_optimization_taiwan(self, tmp_path: Path) -> None:
         """run_lightgbm_optimization completes successfully on Taiwan dataset."""
@@ -393,8 +414,13 @@ class TestRunLightGBMOptimization:
             assert info["best_num_leaves"] >= 0
 
 
+@pytest.mark.xdist_group(name="lightgbm_heavy")
+@pytest.mark.timeout(300)
 class TestProcessLightGBMOptimizeJob:
-    """Integration tests for process_lightgbm_optimize_job entry point."""
+    """Integration tests for process_lightgbm_optimize_job entry point.
+
+    Uses xdist_group marker to ensure this runs on the same worker as other LightGBM tests.
+    """
 
     def test_process_job_loads_settings_and_runs(self, tmp_path: Path) -> None:
         """process_lightgbm_optimize_job loads settings from env and runs optimization."""
@@ -495,10 +521,6 @@ class TestPhaseCallbacks:
 
     def test_run_optimization_with_loading_progress_callback(self, tmp_path: Path) -> None:
         """run_lightgbm_optimization calls loading progress callback during data loading."""
-        from covenant_radar_api.worker.optimize_lightgbm_job import (
-            LightGBMLoadingProgressInfo,
-        )
-
         _copy_real_taiwan(tmp_path / "external")
         output_dir = tmp_path / "output"
         output_dir.mkdir()
