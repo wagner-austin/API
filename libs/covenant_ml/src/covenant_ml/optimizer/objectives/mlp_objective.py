@@ -176,7 +176,20 @@ class MLPObjective:
                 progress=self._epoch_callback,
             )
 
-        return outcome["best_val_auc"]
+        # Extract result before cleanup
+        best_val_auc = outcome["best_val_auc"]
+
+        # Force aggressive cleanup of PyTorch memory between trials
+        # Delete outcome dict which may hold references to config/metrics
+        del outcome
+        del backend
+
+        # Run garbage collection to free PyTorch model memory
+        import gc
+
+        gc.collect()
+
+        return best_val_auc
 
 
 def create_mlp_objective(
