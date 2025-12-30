@@ -1061,6 +1061,14 @@ _SKILL_COLORS: dict[str, str] = {
     "graphql": "#e10098",
     "flask": "#000000",
     "django": "#092e20",
+    "transformers": "#ffcc00",
+    "hypercorn": "#5e81ac",
+    "huggingface": "#ffcc00",
+    "rq": "#dc382d",
+    "numpy": "#013243",
+    "pandas": "#150458",
+    "pillow": "#3776ab",
+    "httpx": "#3178c6",
 }
 
 
