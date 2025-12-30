@@ -98,6 +98,40 @@ Detailed API documentation for covenant-ml.
 | `random_state` | int | Random seed |
 | `early_stopping_patience` | int | Epochs without improvement before stopping |
 
+### LogRegConfig
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `solver` | str | `"lbfgs"`, `"liblinear"`, `"newton-cg"`, `"newton-cholesky"`, `"sag"`, `"saga"` |
+| `penalty` | str | `"l1"`, `"l2"`, `"elasticnet"`, `"none"` |
+| `C` | float | Inverse regularization strength (smaller = stronger reg) |
+| `max_iter` | int | Maximum solver iterations |
+| `tol` | float | Tolerance for stopping criteria |
+| `class_weight_balanced` | bool | If True, weights inversely proportional to class frequencies |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `l1_ratio` | float | ElasticNet mixing (0=L2, 1=L1). Only with `penalty="elasticnet"` |
+
+### RandomForestConfig
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `n_estimators` | int | Number of trees in the forest |
+| `max_depth` | int \| None | Maximum tree depth (None = unlimited) |
+| `min_samples_split` | int | Minimum samples to split an internal node |
+| `min_samples_leaf` | int | Minimum samples required in a leaf node |
+| `max_features` | str \| float \| int \| None | Features per split: `"sqrt"`, `"log2"`, fraction, count, or None |
+| `bootstrap` | bool | Whether to use bootstrap samples |
+| `class_weight_balanced` | bool | If True, weights inversely proportional to class frequencies |
+| `n_jobs` | int | Number of parallel workers (-1 = all cores) |
+| `train_ratio` | float | Training set ratio |
+| `val_ratio` | float | Validation set ratio |
+| `test_ratio` | float | Test set ratio |
+| `random_state` | int | Random seed |
+| `oob_score` | bool | Whether to compute out-of-bag score (requires bootstrap=True) |
+
 ## Result Types
 
 ### TrainOutcome
@@ -408,6 +442,8 @@ Both XGBoost and LightGBM search spaces include DART (Dropouts meet Multiple Add
 | `LSTMConfig` | LSTM sequence model configuration |
 | `LightGBMConfig` | LightGBM gradient boosting configuration |
 | `ClearGBMConfig` | ClearGBM pure-Python gradient boosting configuration |
+| `LogRegConfig` | Logistic regression configuration |
+| `RandomForestConfig` | Random forest ensemble configuration |
 | `ClassifierTrainConfig` | Union of all backend config types |
 | `TrainOutcome` | Complete training result |
 | `TrainProgress` | Progress update during training |
@@ -416,7 +452,7 @@ Both XGBoost and LightGBM search spaces include DART (Dropouts meet Multiple Add
 | `DataSplits` | Train/val/test data splits |
 | `PreprocessedDataSplits` | Preprocessed splits with state |
 | `ProgressCallback` | Callback type for progress updates |
-| `BackendName` | Literal: `"xgboost" | "mlp" | "lstm" | "lightgbm" | "cleargbm"` |
+| `BackendName` | Literal: `"xgboost" | "mlp" | "lstm" | "lightgbm" | "cleargbm" | "logreg" | "random_forest"` |
 
 ## Manifest Types
 
@@ -430,3 +466,62 @@ TypedDicts for model manifest serialization:
 | `ManifestDataset` | Dataset info (samples, features, distribution) |
 | `ManifestTraining` | Training info (backend, config, rounds, duration) |
 | `ManifestMetrics` | Train/val/test metrics and best_val_auc |
+
+## Calibration Types
+
+### CalibratorConfig
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `method` | str | `"isotonic"` or `"platt"` |
+| `clip_proba` | bool | Whether to clip probabilities to [eps, 1-eps] |
+| `eps` | float | Epsilon for probability clipping (default 1e-10) |
+
+### IsotonicParams
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `X_thresholds` | list[float] | Sorted input probability thresholds |
+| `y_values` | list[float] | Corresponding calibrated probability values |
+
+### PlattParams
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `A` | float | Slope parameter (typically negative) |
+| `B` | float | Intercept parameter |
+
+### CalibratorState
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `method` | str | `"isotonic"` or `"platt"` |
+| `config` | CalibratorConfig | Calibrator configuration |
+| `params` | IsotonicParams \| PlattParams | Learned calibration parameters |
+
+### CalibrationResult
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | CalibratorState | Serializable calibrator state |
+| `train_brier_before` | float | Brier score before calibration |
+| `train_brier_after` | float | Brier score after calibration |
+| `train_ece_before` | float | Expected calibration error before |
+| `train_ece_after` | float | Expected calibration error after |
+
+### CalibratedPredictions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `raw_proba` | NDArray[np.float64] | Original uncalibrated probabilities |
+| `calibrated_proba` | NDArray[np.float64] | Calibrated probabilities |
+| `method` | str | Calibration method used |
+
+### Calibration Functions
+
+| Function | Description |
+|----------|-------------|
+| `create_isotonic_calibrator` | Create isotonic regression calibrator |
+| `create_platt_calibrator` | Create Platt scaling calibrator |
+| `encode_calibrator_state` | Encode CalibratorState to JSON-compatible dict |
+| `decode_calibrator_state` | Decode JSON-compatible dict to CalibratorState |
