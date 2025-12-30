@@ -4,7 +4,13 @@ from typing import Literal
 
 from platform_core.errors import AppError, ErrorCode
 
-from ..schemas.stats import CapabilitiesRequest, LangsRequest, StatsRequest, ThemeName
+from ..schemas.stats import (
+    CapabilitiesRequest,
+    HeroRequest,
+    LangsRequest,
+    StatsRequest,
+    ThemeName,
+)
 
 _THEMES: frozenset[str] = frozenset(
     {
@@ -445,8 +451,90 @@ def decode_capabilities_request(
     }
 
 
+def _parse_hero_lines(raw: str | None) -> tuple[str, ...]:
+    """Parse pipe-separated lines for hero card.
+
+    Args:
+        raw: Raw pipe-separated string of lines.
+
+    Returns:
+        Tuple of line strings (can be empty).
+    """
+    if raw is None or raw.strip() == "":
+        return ()
+    items = [s.strip() for s in raw.split("|") if s.strip()]
+    if len(items) > 8:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="lines must contain at most 8 lines",
+            http_status=400,
+        )
+    for i, line in enumerate(items):
+        if len(line) > 80:
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=f"line {i + 1} exceeds 80 characters",
+                http_status=400,
+            )
+    return tuple(items)
+
+
+def decode_hero_request(
+    name: str | None,
+    subtitle: str | None,
+    lines: str | None,
+    theme: str | None,
+    disable_animations: str | None,
+) -> HeroRequest:
+    """Decode and validate hero request from query parameters.
+
+    Args:
+        name: Display name (required).
+        subtitle: Subtitle text below name.
+        lines: Pipe-separated list of info lines.
+        theme: Color theme.
+        disable_animations: Whether to disable CSS animations.
+
+    Returns:
+        Validated HeroRequest TypedDict.
+
+    Raises:
+        AppError: If validation fails.
+    """
+    if name is None or name.strip() == "":
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="name is required",
+            http_status=400,
+        )
+    parsed_name = name.strip()
+    if len(parsed_name) > 40:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="name must be 40 characters or less",
+            http_status=400,
+        )
+    parsed_subtitle = "" if subtitle is None else subtitle.strip()
+    if len(parsed_subtitle) > 80:
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="subtitle must be 80 characters or less",
+            http_status=400,
+        )
+    return {
+        "name": parsed_name,
+        "subtitle": parsed_subtitle,
+        "lines": _parse_hero_lines(lines),
+        "theme": _require_theme(theme),
+        "disable_animations": _parse_query_bool(
+            disable_animations, default=False, param_name="disable_animations"
+        ),
+    }
+
+
 __all__ = [
     "decode_capabilities_request",
+    "decode_hero_request",
     "decode_langs_request",
     "decode_stats_request",
 ]

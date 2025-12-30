@@ -14,6 +14,7 @@ from github_stats_api.svg_renderer import (
     build_language_stats,
     build_user_stats,
     render_capabilities_card,
+    render_hero_card,
     render_langs_card,
     render_stats_card,
 )
@@ -1160,3 +1161,113 @@ class TestRenderCapabilitiesCard:
         )
 
         assert 'stroke-opacity="0"' in svg
+
+
+class TestRenderHeroCard:
+    """Tests for render_hero_card function."""
+
+    def test_render_hero_card_basic(self) -> None:
+        """Test rendering basic hero card."""
+        svg = render_hero_card(
+            name="Austin Wagner",
+            subtitle="Full-Stack Developer",
+            lines=("Location: Irvine", "Education: UC Irvine"),
+            theme_name="default",
+            disable_animations=False,
+        )
+
+        assert "<svg" in svg
+        assert "</svg>" in svg
+        assert "Austin Wagner" in svg
+        assert "Full-Stack Developer" in svg
+        assert "Location: Irvine" in svg
+        assert "Education: UC Irvine" in svg
+
+    def test_render_hero_card_no_subtitle(self) -> None:
+        """Test rendering hero card without subtitle."""
+        svg = render_hero_card(
+            name="Test User",
+            subtitle="",
+            lines=(),
+            theme_name="default",
+            disable_animations=False,
+        )
+
+        assert "<svg" in svg
+        assert "Test User" in svg
+
+    def test_render_hero_card_cyberpunk_has_rain(self) -> None:
+        """Test that cyberpunk theme includes rain animation."""
+        svg = render_hero_card(
+            name="Test",
+            subtitle="",
+            lines=(),
+            theme_name="cyberpunk",
+            disable_animations=False,
+        )
+
+        assert "rainFall" in svg
+        assert "rain-drop" in svg
+
+    def test_render_hero_card_disable_animations(self) -> None:
+        """Test that disabling animations removes rain."""
+        svg = render_hero_card(
+            name="Test",
+            subtitle="",
+            lines=(),
+            theme_name="cyberpunk",
+            disable_animations=True,
+        )
+
+        assert "rainFall" not in svg
+        assert "rain-drop" not in svg
+
+    def test_render_hero_card_cyberpunk_has_glow(self) -> None:
+        """Test that cyberpunk theme includes glow effect."""
+        svg = render_hero_card(
+            name="Test",
+            subtitle="",
+            lines=(),
+            theme_name="cyberpunk",
+            disable_animations=False,
+        )
+
+        assert "glowPulse" in svg
+        assert "glow-text" in svg
+
+    def test_render_hero_card_escapes_special_chars(self) -> None:
+        """Test that special characters are escaped."""
+        svg = render_hero_card(
+            name="Test & User",
+            subtitle="Dev <JS>",
+            lines=("Line with 'quotes'",),
+            theme_name="default",
+            disable_animations=True,
+        )
+
+        assert "&amp;" in svg
+        assert "&lt;" in svg
+        assert "&gt;" in svg
+        assert "&apos;" in svg
+
+    def test_render_hero_card_dynamic_height(self) -> None:
+        """Test that height adjusts based on line count."""
+        svg_few = render_hero_card(
+            name="Test",
+            subtitle="",
+            lines=("Line 1",),
+            theme_name="default",
+            disable_animations=True,
+        )
+
+        svg_many = render_hero_card(
+            name="Test",
+            subtitle="",
+            lines=("Line 1", "Line 2", "Line 3", "Line 4"),
+            theme_name="default",
+            disable_animations=True,
+        )
+
+        # Extract heights from viewBox - svg_few has 1 line = 184px, svg_many has 4 lines = 256px
+        assert 'viewBox="0 0 495 184"' in svg_few
+        assert 'viewBox="0 0 495 256"' in svg_many

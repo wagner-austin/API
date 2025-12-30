@@ -15,12 +15,14 @@ from ...svg_renderer import (
     build_language_stats,
     build_user_stats,
     render_capabilities_card,
+    render_hero_card,
     render_langs_card,
     render_stats_card,
 )
 from ..schemas.stats import Capability
 from ..validators.stats import (
     decode_capabilities_request,
+    decode_hero_request,
     decode_langs_request,
     decode_stats_request,
 )
@@ -280,6 +282,53 @@ class _StatsRoutes:
             headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
         )
 
+    def get_hero(
+        self,
+        request: Request,
+        name: str | None = Query(default=None, description="Display name"),
+        subtitle: str | None = Query(default=None, description="Subtitle text"),
+        lines: str | None = Query(default=None, description="Info lines (pipe-separated)"),
+        theme: str | None = Query(default=None, description="Color theme"),
+        disable_animations: str | None = Query(default=None, description="Disable animations"),
+    ) -> Response:
+        """Get hero card SVG with rain animation.
+
+        Args:
+            request: FastAPI request.
+            name: Display name (large title).
+            subtitle: Subtitle text.
+            lines: Pipe-separated info lines.
+            theme: Color theme name.
+            disable_animations: Whether to disable CSS animations.
+
+        Returns:
+            SVG response.
+        """
+        req = decode_hero_request(
+            name=name,
+            subtitle=subtitle,
+            lines=lines,
+            theme=theme,
+            disable_animations=disable_animations,
+        )
+
+        settings = self._settings_provider()
+
+        svg = render_hero_card(
+            name=req["name"],
+            subtitle=req["subtitle"],
+            lines=req["lines"],
+            theme_name=req["theme"],
+            disable_animations=req["disable_animations"],
+        )
+
+        cache_ttl = settings["cache_ttl_seconds"]
+        return Response(
+            content=svg,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": f"max-age={cache_ttl}, s-maxage={cache_ttl}"},
+        )
+
 
 def build_router(settings_provider: _SettingsProvider) -> APIRouter:
     """Build stats router.
@@ -313,6 +362,13 @@ def build_router(settings_provider: _SettingsProvider) -> APIRouter:
         methods=["GET"],
         name="get_capabilities",
         summary="Get codebase capabilities card",
+    )
+    router.add_api_route(
+        "/api/hero",
+        handler.get_hero,
+        methods=["GET"],
+        name="get_hero",
+        summary="Get hero card with rain animation",
     )
 
     return router

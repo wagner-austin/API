@@ -123,6 +123,24 @@ class LangsResponse(TypedDict, total=True):
 CapabilityStrength = Literal["strong", "moderate", "basic"]
 
 
+class HeroRequest(TypedDict, total=True):
+    """Request for full-width hero card with rain animation.
+
+    Attributes:
+        name: Display name (large title).
+        subtitle: Subtitle text below name.
+        lines: Tuple of info lines to display.
+        theme: Color theme for the card.
+        disable_animations: Whether to disable CSS animations.
+    """
+
+    name: str
+    subtitle: str
+    lines: tuple[str, ...]
+    theme: ThemeName
+    disable_animations: bool
+
+
 class CapabilitiesRequest(TypedDict, total=True):
     """Request for codebase capabilities card.
 
@@ -180,6 +198,7 @@ __all__ = [
     "CapabilitiesResponse",
     "Capability",
     "CapabilityStrength",
+    "HeroRequest",
     "LangsRequest",
     "LangsResponse",
     "LanguageStats",

@@ -489,3 +489,49 @@ class TestCapabilitiesEndpoint:
 
         assert "Cache-Control" in response.headers
         assert "max-age=60" in response.headers["Cache-Control"]
+
+
+class TestHeroEndpoint:
+    """Tests for /api/hero endpoint."""
+
+    async def test_get_hero_returns_svg(self) -> None:
+        """Test /api/hero endpoint returns SVG."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/hero?name=Austin%20Wagner"
+                "&subtitle=Full-Stack%20Developer"
+                "&lines=Location:%20Irvine|Education:%20UCI"
+                "&theme=cyberpunk"
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/svg+xml"
+        assert "<svg" in response.text
+        assert "Austin Wagner" in response.text
+
+    async def test_get_hero_missing_name_returns_error(self) -> None:
+        """Test /api/hero endpoint returns error when name is missing."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/hero")
+
+        assert response.status_code == 400
+
+    async def test_get_hero_cache_control_header(self) -> None:
+        """Test /api/hero endpoint sets cache-control header."""
+        test_settings = _make_test_settings()
+        app = create_app(test_settings)
+        transport = httpx.ASGITransport(app=app)
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/hero?name=Test")
+
+        assert "Cache-Control" in response.headers
+        assert "max-age=60" in response.headers["Cache-Control"]
