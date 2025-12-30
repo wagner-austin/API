@@ -12,6 +12,8 @@ Strict typing only: no Any, no casts, no stubs.
 
 from __future__ import annotations
 
+import gc
+
 import numpy as np
 from cleargbm.ensemble import predict_proba as cgbm_predict_proba
 from cleargbm.ensemble import train_gradient_boosting
@@ -210,7 +212,15 @@ class ClearGBMObjective:
         y_pred_proba = _extract_positive_class_proba(proba_tuple)
 
         # Use our typed compute_auc instead of sklearn
-        return compute_auc(self._y_val, y_pred_proba)
+        auc = compute_auc(self._y_val, y_pred_proba)
+
+        # Force aggressive cleanup between trials to prevent memory accumulation
+        del model
+        del proba_tuple
+        del y_pred_proba
+        gc.collect()
+
+        return auc
 
 
 def create_cleargbm_objective(
