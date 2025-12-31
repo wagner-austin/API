@@ -1,0 +1,342 @@
+"""Shared login logic for Tankpit browser automation.
+
+Provides unified guest and account login functionality used by both
+the sniffer and probe modules.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import TypedDict
+
+from platform_core.logging import get_logger
+
+from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+
+log = get_logger(__name__)
+
+
+class GuestLoginResult(TypedDict):
+    """Result of guest login attempt.
+
+    Attributes:
+        success: Whether the login was successful.
+        rate_limited: Whether guest creation was rate-limited.
+        error_message: Error message if any.
+    """
+
+    success: bool
+    rate_limited: bool
+    error_message: str
+
+
+class AccountLoginResult(TypedDict):
+    """Result of account login attempt.
+
+    Attributes:
+        success: Whether the login was successful.
+        error_message: Error message if any.
+    """
+
+    success: bool
+    error_message: str
+
+
+def _fill_tank_name(cdp: CDPSessionProtocol, tank_name: str) -> str:
+    """Fill the tank name input field.
+
+    Args:
+        cdp: CDP session for JavaScript evaluation.
+        tank_name: Name to fill in the input.
+
+    Returns:
+        Result message from JavaScript evaluation.
+    """
+    fill_js = f"""
+    (() => {{
+        const input = document.querySelector('input[name="tank_name"]');
+        if (input) {{
+            input.value = '{tank_name}';
+            return 'filled';
+        }}
+        return 'input not found';
+    }})()
+    """
+    result = cdp.send("Runtime.evaluate", {"expression": fill_js, "returnByValue": True})
+    result_obj = result.get("result")
+    if isinstance(result_obj, dict):
+        val = result_obj.get("value", "?")
+        return str(val) if val is not None else "?"
+    return "?"
+
+
+def _click_play_now(cdp: CDPSessionProtocol) -> str:
+    """Click the Play Now button.
+
+    Args:
+        cdp: CDP session for JavaScript evaluation.
+
+    Returns:
+        Result message from JavaScript evaluation.
+    """
+    submit_js = """
+    (() => {
+        const btn = document.querySelector('input[value="Play Now"]');
+        if (btn) {
+            btn.click();
+            return 'clicked Play Now';
+        }
+        const form = document.querySelector('form[action="/guest/create-tank"]');
+        if (form) {
+            form.submit();
+            return 'submitted form';
+        }
+        return 'nothing found';
+    })()
+    """
+    result = cdp.send("Runtime.evaluate", {"expression": submit_js, "returnByValue": True})
+    result_obj = result.get("result")
+    if isinstance(result_obj, dict):
+        val = result_obj.get("value", "?")
+        return str(val) if val is not None else "?"
+    return "?"
+
+
+def _check_page_errors(cdp: CDPSessionProtocol) -> str:
+    """Check for error messages on the page.
+
+    Args:
+        cdp: CDP session for JavaScript evaluation.
+
+    Returns:
+        Concatenated error messages or empty string.
+    """
+    error_js = """
+    (() => {
+        const errors = document.querySelectorAll('.error, .alert, [class*=error]');
+        return Array.from(errors).map(e => e.textContent.trim()).join(' | ');
+    })()
+    """
+    result = cdp.send("Runtime.evaluate", {"expression": error_js, "returnByValue": True})
+    result_obj = result.get("result")
+    raw_val = result_obj.get("value", "") if isinstance(result_obj, dict) else ""
+    return str(raw_val) if raw_val else ""
+
+
+def handle_guest_login(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    *,
+    tank_name_prefix: str = "B",
+) -> GuestLoginResult:
+    """Attempt guest login on the before-playing page.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+        tank_name_prefix: Prefix for generated tank name.
+
+    Returns:
+        GuestLoginResult with success status and error info.
+    """
+    if "before-playing" not in page.url:
+        return GuestLoginResult(success=True, rate_limited=False, error_message="")
+
+    log.info("Attempting guest login...")
+    page.wait_for_timeout(2000.0)
+
+    # Generate tank name and fill input
+    tank_name = f"{tank_name_prefix}{uuid.uuid4().hex[:8]}"
+    fill_result = _fill_tank_name(cdp, tank_name)
+    log.info("Fill result: %s", fill_result)
+
+    # Click submit
+    submit_result = _click_play_now(cdp)
+    log.info("Submit result: %s", submit_result)
+
+    # Wait for navigation
+    page.wait_for_timeout(3000.0)
+    log.info("After submit, URL: %s", page.url)
+
+    # Check for errors
+    error_msg = _check_page_errors(cdp)
+    if error_msg:
+        log.info("Page errors: %s", error_msg)
+
+    # Check if rate-limited
+    if "too many tanks" in error_msg.lower():
+        return GuestLoginResult(success=False, rate_limited=True, error_message=error_msg)
+
+    # Check if we're still on before-playing (indicates failure)
+    if "before-playing" in page.url:
+        return GuestLoginResult(success=False, rate_limited=False, error_message=error_msg)
+
+    return GuestLoginResult(success=True, rate_limited=False, error_message="")
+
+
+def handle_account_login(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    username: str,
+    password: str,
+) -> AccountLoginResult:
+    """Attempt account login using credentials.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+        username: Account username.
+        password: Account password.
+
+    Returns:
+        AccountLoginResult with success status and error info.
+    """
+    log.info("Logging in as %s...", username)
+
+    # Step 1: Open login overlay
+    open_js = """
+    (() => {
+        const loginLink = document.querySelector('a[href="#login"]');
+        if (loginLink) {
+            loginLink.click();
+            return 'opened login';
+        }
+        return 'login link not found';
+    })()
+    """
+    cdp.send("Runtime.evaluate", {"expression": open_js, "returnByValue": True})
+    page.wait_for_timeout(500.0)
+
+    # Step 2: Fill credentials
+    fill_login_js = f"""
+    (() => {{
+        const userInput = document.querySelector('#login-username');
+        const passInput = document.querySelector(
+            'form[action="/guest/sign-in"] input[name="password"]'
+        );
+        if (userInput) userInput.value = '{username}';
+        if (passInput) passInput.value = '{password}';
+        return userInput && passInput ? 'filled' : 'inputs not found';
+    }})()
+    """
+    cdp.send("Runtime.evaluate", {"expression": fill_login_js, "returnByValue": True})
+
+    # Step 3: Submit login
+    submit_login_js = """
+    (() => {
+        const submit = document.querySelector(
+            'form[action="/guest/sign-in"] input[type="submit"]'
+        );
+        if (submit) {
+            submit.click();
+            return 'clicked login';
+        }
+        return 'submit not found';
+    })()
+    """
+    result = cdp.send("Runtime.evaluate", {"expression": submit_login_js, "returnByValue": True})
+    result_obj = result.get("result")
+    login_val = result_obj.get("value", "?") if isinstance(result_obj, dict) else "?"
+    log.info("Login: %s", login_val)
+
+    # Wait for login to complete
+    page.wait_for_timeout(3000.0)
+    log.info("After login, URL: %s", page.url)
+
+    # Check for login errors
+    login_err_js = """
+    (() => {
+        const errors = document.querySelectorAll(
+            '.error, .alert, [class*=error], #login .message'
+        );
+        const texts = Array.from(errors).map(e => e.textContent.trim());
+        return texts.filter(t => t.length > 0).join(' | ');
+    })()
+    """
+    err_result = cdp.send("Runtime.evaluate", {"expression": login_err_js, "returnByValue": True})
+    err_obj = err_result.get("result")
+    err_raw = err_obj.get("value", "") if isinstance(err_obj, dict) else ""
+    error_msg = str(err_raw) if err_raw else ""
+
+    if error_msg:
+        log.warning("Login errors: %s", error_msg)
+        return AccountLoginResult(success=False, error_message=error_msg)
+
+    log.info("Login successful")
+    return AccountLoginResult(success=True, error_message="")
+
+
+def ensure_on_play_page(page: PageProtocol) -> None:
+    """Navigate to the play page if not already there.
+
+    Args:
+        page: Playwright page.
+    """
+    if "/play" not in page.url:
+        log.info("Navigating to game...")
+        page.goto("https://tankpit.com/play", wait_until="domcontentloaded")
+        page.wait_for_timeout(2000.0)
+        log.info("Game URL: %s", page.url)
+
+
+def handle_login_flow(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    *,
+    tank_name_prefix: str = "B",
+    allow_account_fallback: bool = True,
+) -> bool:
+    """Handle the complete login flow with optional account fallback.
+
+    Attempts guest login first, falls back to account login if rate-limited
+    and credentials are available.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+        tank_name_prefix: Prefix for generated tank name.
+        allow_account_fallback: Whether to try account login when rate-limited.
+
+    Returns:
+        True if login succeeded, False otherwise.
+    """
+    if "before-playing" not in page.url:
+        return True
+
+    # Try guest login
+    guest_result = handle_guest_login(page, cdp, tank_name_prefix=tank_name_prefix)
+
+    if guest_result["success"]:
+        ensure_on_play_page(page)
+        return True
+
+    # If rate-limited, try account login
+    if guest_result["rate_limited"] and allow_account_fallback:
+        username = _test_hooks.get_env("TANKPIT_USERNAME")
+        password = _test_hooks.get_env("TANKPIT_PASSWORD")
+
+        if username is None or password is None:
+            log.warning("Rate limited. Set TANKPIT_USERNAME and TANKPIT_PASSWORD in .env to login.")
+            return False
+
+        account_result = handle_account_login(page, cdp, username, password)
+        if account_result["success"]:
+            ensure_on_play_page(page)
+            return True
+
+        return False
+
+    # Guest login failed for other reasons
+    ensure_on_play_page(page)
+    return True
+
+
+__all__ = [
+    "AccountLoginResult",
+    "GuestLoginResult",
+    "ensure_on_play_page",
+    "handle_account_login",
+    "handle_guest_login",
+    "handle_login_flow",
+]
