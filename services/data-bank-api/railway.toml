@@ -3,6 +3,7 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
+target = "api"
 
 [deploy]
 healthcheckPath = "/readyz"
