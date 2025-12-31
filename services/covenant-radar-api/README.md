@@ -572,12 +572,14 @@ The API supports four ML backends for breach risk prediction:
 | `lstm` | `.pt` | Temporal sequences, time-series | No |
 | `lightgbm` | `.txt` | Large datasets, fast training | Yes (ranked list) |
 
-### GPU Training
+### Device Configuration
 
-All four backends support GPU acceleration via the `device` parameter:
-- `"cpu"` - Force CPU training
-- `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA)
-- `"auto"` - Auto-detect: uses GPU if available, falls back to CPU (default)
+All four backends support device selection via the `device` parameter:
+- `"cpu"` - Force CPU training (default for this service)
+- `"cuda"` - Force GPU training (requires NVIDIA GPU with CUDA libraries)
+- `"auto"` - Auto-detect: uses GPU if available, falls back to CPU
+
+**Note:** This service uses CPU-only PyTorch (~200MB) for lightweight Railway deployment. For GPU training, use the Model-Trainer service which includes CUDA-enabled PyTorch (~2.5GB).
 
 MLP and LSTM also support precision modes for GPU training:
 - `"fp32"` - Full precision (most compatible)
@@ -1082,7 +1084,7 @@ curl -X POST http://localhost:8007/ml/predict \
 | `rq` | Redis Queue |
 | `psycopg[binary,pool]` | PostgreSQL driver |
 | `xgboost` | Gradient boosting backend |
-| `torch` | MLP neural network backend |
+| `torch` | MLP/LSTM neural network backend (CPU-only build) |
 | `scikit-learn` | Feature processing |
 | `numpy` | Numerical operations |
 | `platform-core` | Logging, errors, config |
