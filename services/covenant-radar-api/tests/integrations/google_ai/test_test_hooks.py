@@ -274,11 +274,10 @@ class TestRealGeminiClientEmptyResponse:
             def models(self) -> FakeModels:
                 return FakeModels()
 
-        # Create client with a dummy key (won't be used)
-        _skip_if_no_api_key()
-        api_key = _get_gemini_api_key()
-        client = RealGeminiClient(api_key)
-        # Replace inner client with our fake
+        # Create client with a dummy key - inner client is replaced so real API
+        # is never called
+        client = RealGeminiClient("dummy-api-key-for-test")
+        # Replace inner client with our fake before any API call
         client._client = FakeInnerClient()
 
         with pytest.raises(GeminiError, match="Gemini returned empty response"):
@@ -286,34 +285,32 @@ class TestRealGeminiClientEmptyResponse:
 
 
 class TestRealGeminiClient:
-    """Tests for RealGeminiClient with real API."""
+    """Tests for RealGeminiClient instantiation (no API calls)."""
 
     def test_instantiation_stores_api_key(self) -> None:
         """Test that RealGeminiClient stores the API key."""
-        _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             RealGeminiClient,
         )
 
-        api_key = _get_gemini_api_key()
+        api_key = "test-api-key-12345"
         client = RealGeminiClient(api_key)
         assert client._api_key == api_key
 
     def test_instantiation_creates_inner_client(self) -> None:
         """Test that RealGeminiClient creates an inner client."""
-        _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             RealGeminiClient,
         )
 
-        api_key = _get_gemini_api_key()
+        api_key = "test-api-key-12345"
         client = RealGeminiClient(api_key)
         # Verify client has models attribute (the API interface)
         models = client._client.models
         assert models.__class__.__name__ == "Models"
 
     def test_generate_content_returns_text(self) -> None:
-        """Test that generate_content returns generated text."""
+        """Test that generate_content returns generated text with real API."""
         _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             RealGeminiClient,
@@ -325,7 +322,7 @@ class TestRealGeminiClient:
         assert result  # Non-empty response
 
     def test_count_tokens_returns_tuple(self) -> None:
-        """Test that count_tokens returns token count tuple."""
+        """Test that count_tokens returns token count tuple with real API."""
         _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             RealGeminiClient,
@@ -343,12 +340,11 @@ class TestCreateGenaiClient:
 
     def test_creates_genai_client(self) -> None:
         """Test that _create_genai_client creates a client."""
-        _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             _create_genai_client,
         )
 
-        api_key = _get_gemini_api_key()
+        api_key = "test-api-key-12345"
         client = _create_genai_client(api_key)
         # Verify client has models attribute
         assert client.models.__class__.__name__ == "Models"
@@ -359,11 +355,10 @@ class TestRealGeminiClientFactory:
 
     def test_creates_real_gemini_client(self) -> None:
         """Test that factory creates a RealGeminiClient."""
-        _skip_if_no_api_key()
         from covenant_radar_api.integrations.google_ai._test_hooks import (
             _real_gemini_client_factory,
         )
 
-        api_key = _get_gemini_api_key()
+        api_key = "test-api-key-12345"
         client = _real_gemini_client_factory(api_key)
         assert client.__class__.__name__ == "RealGeminiClient"
