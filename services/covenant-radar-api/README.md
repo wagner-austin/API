@@ -26,6 +26,11 @@ Loan covenant monitoring and breach prediction API service. Features determinist
   - Prediction event publishing to `covenant.predictions.v1`
   - Alert event publishing to `covenant.alerts.v1`
   - TypedDict schemas with encode/decode/TypeGuard functions
+- **Gemini AI Integration**: Google AI (Gemini) for human-readable alert summaries
+  - GeminiClient wrapper with prompt template for credit risk alerts
+  - AlertContext TypedDict with deal info, risk tier, and evaluation status
+  - Token usage tracking and latency metrics
+  - Protocol-based DI with FakeGeminiClient for testing
 - **Observability**: Datadog APM tracing and custom metrics integration
 - **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
 - **100% Test Coverage**: Statements and branches
@@ -303,6 +308,7 @@ curl http://localhost:8007/ml/models/active
 | `KAFKA__PRODUCER_LINGER_MS` | int | `5` | Producer linger time |
 | `KAFKA__PRODUCER_BATCH_SIZE` | int | `16384` | Producer batch size |
 | `KAFKA__COMPRESSION_TYPE` | string | `gzip` | Compression type |
+| `GEMINI_API_KEY` | string | - | Google AI API key for Gemini integration |
 
 ### Example .env
 
@@ -324,6 +330,9 @@ STREAMING__ENABLED=false
 CONFLUENT__BOOTSTRAP_SERVERS=pkc-xxxxx.us-east-1.aws.confluent.cloud:9092
 CONFLUENT__API_KEY=your-api-key
 CONFLUENT__API_SECRET=your-api-secret
+
+# Google AI / Gemini (optional, for alert summaries)
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 ---
@@ -353,10 +362,14 @@ covenant_radar_api/
 │   ├── train_job.py       # Model training (internal data)
 │   └── train_external_job.py # Model training (external datasets)
 ├── integrations/
-│   └── datadog/           # Datadog APM and metrics
-│       ├── metrics.py     # DogStatsD client
-│       ├── tracing.py     # APM tracing setup
-│       └── _test_hooks.py # Dependency injection
+│   ├── datadog/           # Datadog APM and metrics
+│   │   ├── metrics.py     # DogStatsD client
+│   │   ├── tracing.py     # APM tracing setup
+│   │   └── _test_hooks.py # Dependency injection
+│   └── google_ai/         # Google AI (Gemini) integration
+│       ├── client.py      # GeminiClient wrapper
+│       ├── schemas.py     # AlertContext, Request/Response TypedDicts
+│       └── _test_hooks.py # Real/Fake client implementations
 ├── streaming/             # Kafka streaming infrastructure
 │   ├── config.py          # TypedDicts for Confluent/Kafka config
 │   ├── schemas.py         # Event TypedDicts with encode/decode
@@ -1077,6 +1090,7 @@ curl -X POST http://localhost:8007/ml/predict \
 | `covenant-domain` | Domain models |
 | `covenant-persistence` | Repository layer |
 | `covenant-ml` | Pluggable ML backends |
+| `google-genai` | Google AI (Gemini) SDK |
 
 ### Development
 
