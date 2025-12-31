@@ -10,6 +10,12 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Account login fallback when guest limit reached
 - Outputs structured JSON for analysis
 
+**Phase 1.5: Automated Protocol Probe** (complete)
+- Programmatic input injection via CDP
+- Tests keyboard and mouse inputs
+- Correlates inputs with server messages
+- Discovers which inputs generate protocol commands
+
 **Phase 2: Protocol Analysis** (complete)
 - WebSocket endpoint: `wss://dorothy.tankpit.com/ws/`
 - Message format: 2-byte header + pipe-delimited fields
@@ -56,6 +62,19 @@ This will:
 3. Capture all WebSocket messages
 4. Save the session to `capture_session.json`
 
+### Probe Input Commands
+
+```bash
+make probe
+```
+
+This will:
+1. Join a game as guest
+2. Inject keyboard inputs (WASD, arrows, numbers)
+3. Inject mouse clicks at various positions
+4. Record which inputs generate server messages
+5. Save results to `probe_session.json`
+
 ### Run the Bot
 
 ```bash
@@ -92,6 +111,7 @@ make lint     # Run guards + ruff + mypy
 make test     # Run pytest with coverage
 make check    # Run lint + test
 make sniff    # Run WebSocket sniffer
+make probe    # Run input probe
 make bot      # Run bot client
 ```
 
@@ -125,13 +145,17 @@ TankpitBot/
 │   ├── __init__.py       # Package exports
 │   ├── _test_hooks.py    # Dependency injection hooks
 │   ├── types.py          # TypedDict models
+│   ├── login.py          # Shared guest/account login logic
 │   ├── sniffer.py        # WebSocket capture via Playwright
+│   ├── probe.py          # Input injection and command discovery
 │   └── bot.py            # Bot client entry point
 ├── tests/
 │   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
 │   ├── fakes.py              # Fake Playwright classes for testing
 │   ├── test_types.py         # Type encode/decode tests
+│   ├── test_login.py         # Login flow tests
 │   ├── test_sniffer.py       # Sniffer tests with fake Playwright
+│   ├── test_probe.py         # Probe tests with fake CDP
 │   ├── test_bot.py           # Bot entry point tests
 │   ├── test_test_hooks.py    # Hook function tests
 │   └── test_guard_checks.py  # Guard script tests
