@@ -58,14 +58,14 @@ WORKDIR /app
 
 USER app
 
-# ---------- API target ----------
+# ---------- Worker target ----------
+FROM runtime-base AS worker
+
+CMD ["sh", "-c", "exec covenant-rq-worker"]
+
+# ---------- API target (default) ----------
 FROM runtime-base AS api
 
 EXPOSE 8000
 
 CMD ["sh", "-c", "exec hypercorn 'covenant_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
-
-# ---------- Worker target ----------
-FROM runtime-base AS worker
-
-CMD ["sh", "-c", "exec covenant-rq-worker"]
