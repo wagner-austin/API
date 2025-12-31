@@ -1121,3 +1121,60 @@ def test_container_download_model_from_data_bank_not_found(
 
     container.close()
     _test_hooks.data_bank_client_factory = orig_factory
+
+
+def test_container_download_model_from_data_bank_client_error(
+    tmp_path: Path,
+    in_memory_store: InMemoryStore,
+    fake_kv_client: FakeRedis,
+    fake_rq_client: FakeRedisBytesClient,
+    test_settings: Settings,
+) -> None:
+    """Test _download_model_from_data_bank returns False on client errors."""
+    from platform_core.data_bank_client import DataBankClientError, HeadInfo
+
+    from covenant_radar_api.core import _test_hooks
+
+    class FakeDataBankDownloaderError:
+        """Fake downloader that raises DataBankClientError."""
+
+        def download_to_path(
+            self,
+            file_id: str,
+            dest: Path,
+            *,
+            resume: bool = True,
+            request_id: str | None = None,
+            verify_etag: bool = True,
+            chunk_size: int = 1024 * 1024,
+        ) -> HeadInfo:
+            raise DataBankClientError("transport error: Connection refused")
+
+    def fake_factory(base_url: str, api_key: str) -> FakeDataBankDownloaderError:
+        return FakeDataBankDownloaderError()
+
+    orig_factory = _test_hooks.data_bank_client_factory
+    _test_hooks.data_bank_client_factory = fake_factory
+
+    container = ServiceContainer(
+        settings=test_settings,
+        redis=fake_kv_client,
+        db_conn=InMemoryConnection(in_memory_store),
+        redis_rq=fake_rq_client,
+        model_path=str(tmp_path / "model.ubj"),
+        model_output_dir=tmp_path,
+        sector_encoder={},
+        region_encoder={},
+        ml_backend="xgboost",
+        data_bank_url="https://data-bank.example.com",
+        data_bank_key="test-api-key",
+    )
+
+    dest_path = tmp_path / "models" / "active_xgb.ubj"
+    result = container._download_model_from_data_bank(dest_path)
+
+    assert result is False
+    assert not dest_path.exists()
+
+    container.close()
+    _test_hooks.data_bank_client_factory = orig_factory

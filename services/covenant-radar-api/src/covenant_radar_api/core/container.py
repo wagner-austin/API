@@ -25,7 +25,10 @@ from covenant_persistence import (
     ensure_schema,
 )
 from platform_core.config import MLBackend
-from platform_core.data_bank_client import NotFoundError as DataBankNotFoundError
+from platform_core.data_bank_client import (
+    DataBankClientError,
+    NotFoundError as DataBankNotFoundError,
+)
 from platform_core.json_utils import JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import COVENANT_QUEUE
@@ -369,6 +372,12 @@ class ServiceContainer:
             _log.warning(
                 "Model not found in data-bank",
                 extra={"file_id": file_id},
+            )
+            return False
+        except DataBankClientError as exc:
+            _log.warning(
+                "Failed to download model from data-bank",
+                extra={"file_id": file_id, "error": str(exc)},
             )
             return False
 
