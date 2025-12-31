@@ -388,7 +388,14 @@ class ServiceContainer:
 
         # If model doesn't exist locally, try downloading from data-bank
         if not model_path.exists():
-            downloaded = self._download_model_from_data_bank(model_path)
+            # Use /tmp for downloaded models since /data may not exist
+            if self._data_bank_url and self._data_bank_key:
+                tmp_model_path = Path("/tmp/models") / model_path.name
+                downloaded = self._download_model_from_data_bank(tmp_model_path)
+                if downloaded:
+                    model_path = tmp_model_path
+            else:
+                downloaded = False
             if not downloaded:
                 _log.warning(
                     "Model file not found, predictions will fail until model is trained",
@@ -434,7 +441,14 @@ class ServiceContainer:
 
             # If model doesn't exist locally, try downloading from data-bank
             if not model_path.exists():
-                downloaded = self._download_model_from_data_bank(model_path)
+                # Use /tmp for downloaded models since /data may not exist
+                if self._data_bank_url and self._data_bank_key:
+                    tmp_model_path = Path("/tmp/models") / model_path.name
+                    downloaded = self._download_model_from_data_bank(tmp_model_path)
+                    if downloaded:
+                        model_path = tmp_model_path
+                else:
+                    downloaded = False
                 if not downloaded:
                     raise FileNotFoundError(
                         f"Model file not found: {model_path}. "
@@ -442,16 +456,16 @@ class ServiceContainer:
                     )
 
             if self._ml_backend == "xgboost":
-                self._model = self._load_xgboost_model(self._model_info["model_path"])
+                self._model = self._load_xgboost_model(str(model_path))
             elif self._ml_backend == "mlp":
-                self._model = self._load_mlp_model(self._model_info["model_path"])
+                self._model = self._load_mlp_model(str(model_path))
             elif self._ml_backend == "lstm":
-                self._model = self._load_lstm_model(self._model_info["model_path"])
+                self._model = self._load_lstm_model(str(model_path))
             else:  # lightgbm
-                self._model = self._load_lightgbm_model(self._model_info["model_path"])
+                self._model = self._load_lightgbm_model(str(model_path))
             self._model_info = ModelInfo(
                 model_id=self._model_info["model_id"],
-                model_path=self._model_info["model_path"],
+                model_path=str(model_path),
                 is_loaded=True,
             )
         return self._model
