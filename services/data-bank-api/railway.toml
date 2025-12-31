@@ -10,6 +10,7 @@ healthcheckPath = "/readyz"
 healthcheckTimeout = 100
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+startCommand = "hypercorn 'data_bank_api.api.main:create_app()' --bind [::]:${PORT:-8000}"
 
 [variables]
 DATA_ROOT = "/data/files"
