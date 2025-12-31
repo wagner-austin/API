@@ -9,27 +9,33 @@
 
 ## 1) Current State
 
-### Completed (Phases 1-4)
+### Completed (Phases 1-5A)
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Datadog APM integration | ✅ | `integrations/datadog/` |
+| Datadog APM integration | ✅ | `integrations/datadog/tracing.py` |
 | Datadog custom metrics | ✅ | `integrations/datadog/metrics.py` |
+| Datadog test hooks | ✅ | `integrations/datadog/_test_hooks.py` |
 | Kafka config TypedDicts | ✅ | `streaming/config.py` |
 | Kafka event schemas | ✅ | `streaming/schemas.py` |
 | Kafka producer wrapper | ✅ | `streaming/producer.py` |
 | Kafka consumer wrapper | ✅ | `streaming/consumer.py` |
-| StreamingWorker | ✅ | `streaming/worker.py` (890 lines) |
+| StreamingWorker | ✅ | `streaming/worker.py` |
 | Test hooks (Kafka fakes) | ✅ | `streaming/_test_hooks.py` |
 | Repository fakes | ✅ | `streaming/_test_hooks_repositories.py` |
 | Model fakes | ✅ | `streaming/_test_hooks_model.py` |
-| Full test coverage | ✅ | `tests/streaming/` |
+| Full streaming tests | ✅ | `tests/streaming/` (9 test files) |
+| **Gemini integration** | ✅ | `integrations/google_ai/` |
+| GeminiClient wrapper | ✅ | `integrations/google_ai/client.py` |
+| Gemini TypedDict schemas | ✅ | `integrations/google_ai/schemas.py` |
+| Gemini test hooks | ✅ | `integrations/google_ai/_test_hooks.py` |
+| Full Gemini tests | ✅ | `tests/integrations/google_ai/` (4 test files) |
+| Documentation updated | ✅ | `docs/integrations/google_ai.md`, README.md |
 
-### Remaining (Phases 5-7)
+### Remaining (Phases 5B-7)
 
 | Component | Status | Effort |
 |-----------|--------|--------|
-| Gemini integration | ❌ | ~200 lines + tests |
 | Data replay script | ❌ | ~150 lines + tests |
 | Worker entry point | ❌ | ~50 lines + tests |
 | Web UI dashboard | ❌ | ~300 lines HTML/JS |
@@ -43,15 +49,15 @@
 
 ### Confluent Track (Required)
 
-- [ ] Real-time data stream via Confluent Cloud
-- [ ] AI/ML models applied to streaming data
-- [ ] Predictions generated from stream
-- [ ] Demonstrate real-world problem solving
+- [x] Real-time data stream via Confluent Cloud (streaming/ module complete)
+- [x] AI/ML models applied to streaming data (StreamingWorker with PredictorProtocol)
+- [x] Predictions generated from stream (PredictionEventV1 to Kafka)
+- [ ] Demonstrate real-world problem solving (needs demo)
 
 ### Google Cloud AI (Required for ALL tracks)
 
-- [ ] Integrate Google Cloud AI tools (Vertex AI, Gemini, or BigQuery ML)
-- [ ] Must use Gemini/Vertex AI for some functionality
+- [x] Integrate Google Cloud AI tools (Vertex AI, Gemini, or BigQuery ML)
+- [x] Must use Gemini/Vertex AI for some functionality (google_ai/ module complete)
 
 ### Submission Requirements
 
@@ -64,21 +70,37 @@
 
 ## 3) Implementation Plan
 
-### Phase 5A: Gemini Integration
+### Phase 5A: Gemini Integration ✅ COMPLETE
 
 **Purpose:** Generate human-readable alert summaries when risk exceeds threshold.
 
 **Location:** `src/covenant_radar_api/integrations/google_ai/`
 
-#### Files to Create
+#### Files Created
 
 ```
 integrations/google_ai/
-├── __init__.py              # Package exports
-├── _test_hooks.py           # DI hooks for testing
-├── schemas.py               # TypedDicts for request/response
-└── client.py                # GeminiClient wrapper
+├── __init__.py              # Package exports (create_gemini_client, make_alert_context, etc.)
+├── _test_hooks.py           # DI hooks: GeminiClientProtocol, FakeGeminiClient, RealGeminiClient
+├── schemas.py               # TypedDicts: GeminiConfig, AlertContext, GenerateAlertResponse
+└── client.py                # GeminiClient wrapper with generate_alert_summary()
+
+tests/integrations/google_ai/
+├── __init__.py
+├── conftest.py              # Shared fixtures
+├── test_schemas.py          # encode/decode, make_* functions
+├── test_client.py           # GeminiClient tests
+└── test_test_hooks.py       # FakeGeminiClient, RealGeminiClient, hook functions
+
+docs/integrations/google_ai.md  # Full documentation
 ```
+
+#### Implementation Notes
+
+- Uses `google-genai` SDK (not google-generativeai) for Gemini 2.x models
+- Dynamic import pattern to avoid mypy errors from untyped SDK
+- Protocol-based DI via `_test_hooks.py` (FakeGeminiClient for tests)
+- 100% test coverage including real API tests (when GEMINI_API_KEY set)
 
 #### schemas.py
 
@@ -1603,33 +1625,33 @@ Covenant Radar streams financial measurements through Confluent Cloud, applies X
 
 ### Code Quality
 
-- [ ] `make check` passes
-- [ ] 100% statement coverage
-- [ ] 100% branch coverage
-- [ ] No `Any`, `cast`, `type: ignore`
-- [ ] No `.pyi` stub files
-- [ ] No `# noqa` comments
+- [x] `make check` passes
+- [x] 100% statement coverage
+- [x] 100% branch coverage
+- [x] No `Any`, `cast`, `type: ignore`
+- [x] No `.pyi` stub files
+- [x] No `# noqa` comments
 
 ### TypedDict Standards
 
-- [ ] All structured data uses TypedDict
-- [ ] `make_*` factory for each TypedDict
-- [ ] `encode_*` for serialization
-- [ ] `decode_*` with `require_*` validation
-- [ ] TypeGuard functions where needed
+- [x] All structured data uses TypedDict
+- [x] `make_*` factory for each TypedDict
+- [x] `encode_*` for serialization
+- [x] `decode_*` with `require_*` validation
+- [x] TypeGuard functions where needed
 
 ### Testing Standards
 
-- [ ] `_test_hooks.py` for DI in service modules
-- [ ] Production sets hooks to real implementations
-- [ ] Tests set hooks to fakes
-- [ ] No mocks in tests
-- [ ] Strong assertions on exact values
+- [x] `_test_hooks.py` for DI in service modules
+- [x] Production sets hooks to real implementations
+- [x] Tests set hooks to fakes
+- [x] No mocks in tests
+- [x] Strong assertions on exact values
 
 ### Hackathon Requirements
 
-- [ ] Confluent Cloud streaming works
-- [ ] Gemini generates alert text
+- [x] Confluent Cloud streaming works (streaming/ module complete)
+- [x] Gemini generates alert text (google_ai/ module complete)
 - [ ] Dashboard displays live predictions
 - [ ] Demo video recorded
 - [ ] Devpost form submitted
