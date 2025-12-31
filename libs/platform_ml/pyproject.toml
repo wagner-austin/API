@@ -15,8 +15,8 @@ readme = "README.md"
 include = ["src/platform_ml/py.typed"]
 
 [[tool.poetry.source]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 priority = "explicit"
 
 [tool.poetry.dependencies]
@@ -25,7 +25,7 @@ platform-core = { path = "../platform_core", develop = true }
 numpy = "^2.3.5"
 sentencepiece = "^0.2.1"
 shap = "^0.50"
-torch = {version = "^2.5", source = "pytorch-cu124"}
+torch = {version = "^2.5", source = "pytorch-cpu"}
 wandb = { version = "^0.18", optional = true }
 
 [tool.poetry.extras]
