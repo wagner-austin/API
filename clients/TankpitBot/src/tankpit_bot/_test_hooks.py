@@ -1,0 +1,449 @@
+"""Test hooks for tankpit_bot - allows injecting test dependencies.
+
+Production code uses real implementations; tests override these module-level
+symbols to inject fakes without conditionals in core logic.
+
+Strict typing only: no Any, no casts, no type: ignore, no stubs.
+"""
+
+from __future__ import annotations
+
+import types
+from collections.abc import Callable
+from pathlib import Path
+from typing import Protocol
+
+from platform_core.config import _optional_env_str
+from platform_core.json_utils import JSONObject
+
+# =============================================================================
+# Environment Variable Hook
+# =============================================================================
+
+
+def _default_get_env(key: str) -> str | None:
+    """Production implementation - reads via platform_core.
+
+    Args:
+        key: Environment variable name.
+
+    Returns:
+        Environment variable value or None if not set.
+    """
+    return _optional_env_str(key)
+
+
+get_env: Callable[[str], str | None] = _default_get_env
+
+
+# =============================================================================
+# File System Hooks
+# =============================================================================
+
+
+class WriteTextProtocol(Protocol):
+    """Protocol for writing text to a file."""
+
+    def __call__(self, path: Path, content: str) -> None:
+        """Write text content to a file.
+
+        Args:
+            path: File path to write to.
+            content: Text content to write.
+        """
+        ...
+
+
+class ReadTextProtocol(Protocol):
+    """Protocol for reading text from a file."""
+
+    def __call__(self, path: Path) -> str:
+        """Read text content from a file.
+
+        Args:
+            path: File path to read from.
+
+        Returns:
+            Text content of the file.
+
+        Raises:
+            FileNotFoundError: If file does not exist.
+        """
+        ...
+
+
+class PathExistsProtocol(Protocol):
+    """Protocol for checking if a path exists."""
+
+    def __call__(self, path: Path) -> bool:
+        """Check if path exists.
+
+        Args:
+            path: Path to check.
+
+        Returns:
+            True if path exists, False otherwise.
+        """
+        ...
+
+
+def _real_write_text(path: Path, content: str) -> None:
+    """Real implementation using Path.write_text().
+
+    Args:
+        path: File path to write to.
+        content: Text content to write.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _real_read_text(path: Path) -> str:
+    """Real implementation using Path.read_text().
+
+    Args:
+        path: File path to read from.
+
+    Returns:
+        Text content of the file.
+
+    Raises:
+        FileNotFoundError: If file does not exist.
+    """
+    return path.read_text(encoding="utf-8")
+
+
+def _real_path_exists(path: Path) -> bool:
+    """Real implementation using Path.exists().
+
+    Args:
+        path: Path to check.
+
+    Returns:
+        True if path exists, False otherwise.
+    """
+    return path.exists()
+
+
+write_text: WriteTextProtocol = _real_write_text
+read_text: ReadTextProtocol = _real_read_text
+path_exists: PathExistsProtocol = _real_path_exists
+
+
+# =============================================================================
+# Playwright Protocols - matching real Playwright sync API signatures
+# =============================================================================
+
+
+class ResponseProtocol(Protocol):
+    """Protocol for Playwright Response object."""
+
+    @property
+    def status(self) -> int:
+        """HTTP status code.
+
+        Returns:
+            Status code (e.g., 200, 404).
+        """
+        ...
+
+    @property
+    def url(self) -> str:
+        """Response URL.
+
+        Returns:
+            The URL of the response.
+        """
+        ...
+
+
+class CDPSessionProtocol(Protocol):
+    """Protocol for Playwright CDPSession.
+
+    Matches playwright.sync_api.CDPSession interface.
+    """
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Send a CDP command and return the result.
+
+        Args:
+            method: CDP method name (e.g., "Network.enable").
+            params: Optional parameters for the method.
+
+        Returns:
+            Response from CDP as a JSON object.
+        """
+        ...
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Register an event handler for CDP events.
+
+        Args:
+            event: CDP event name (e.g., "Network.webSocketFrameReceived").
+            handler: Callback that receives event params as JSONObject.
+        """
+        ...
+
+    def detach(self) -> None:
+        """Detach the CDP session from the target."""
+        ...
+
+
+class PageProtocol(Protocol):
+    """Protocol for Playwright Page.
+
+    Matches playwright.sync_api.Page interface for methods we use.
+    """
+
+    @property
+    def url(self) -> str:
+        """Get the current URL of the page."""
+        ...
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> ResponseProtocol | None:
+        """Navigate to a URL.
+
+        Args:
+            url: URL to navigate to.
+            referer: Referer header value.
+            timeout: Maximum operation time in milliseconds.
+            wait_until: When to consider operation succeeded ("load", "domcontentloaded",
+                "networkidle", "commit").
+
+        Returns:
+            Response object or None if navigation failed.
+        """
+        ...
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for specified timeout in milliseconds.
+
+        Args:
+            timeout: Timeout in milliseconds.
+        """
+        ...
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close the page.
+
+        Args:
+            reason: Reason to be reported to operations interrupted by page closure.
+            run_before_unload: Whether to run the before unload page handlers.
+        """
+        ...
+
+
+class BrowserContextProtocol(Protocol):
+    """Protocol for Playwright BrowserContext.
+
+    Matches playwright.sync_api.BrowserContext interface for methods we use.
+    """
+
+    def new_page(self) -> PageProtocol:
+        """Create a new page in the browser context.
+
+        Returns:
+            New page instance.
+        """
+        ...
+
+    def new_cdp_session(self, page: PageProtocol) -> CDPSessionProtocol:
+        """Create a new CDP session attached to the page.
+
+        Args:
+            page: Page to attach CDP session to.
+
+        Returns:
+            CDP session instance.
+        """
+        ...
+
+    def close(self, *, reason: str | None = None) -> None:
+        """Close the browser context.
+
+        Args:
+            reason: Reason to be reported to operations interrupted by context closure.
+        """
+        ...
+
+
+class BrowserProtocol(Protocol):
+    """Protocol for Playwright Browser.
+
+    Matches playwright.sync_api.Browser interface for methods we use.
+    """
+
+    def new_context(self) -> BrowserContextProtocol:
+        """Create a new browser context.
+
+        Returns:
+            New browser context instance.
+        """
+        ...
+
+    def close(self, *, reason: str | None = None) -> None:
+        """Close the browser.
+
+        Args:
+            reason: Reason to be reported to operations interrupted by browser closure.
+        """
+        ...
+
+
+class BrowserTypeLaunchProtocol(Protocol):
+    """Protocol for BrowserType.launch method."""
+
+    def __call__(
+        self,
+        *,
+        headless: bool | None = None,
+        slow_mo: float | None = None,
+        timeout: float | None = None,
+    ) -> BrowserProtocol:
+        """Launch a browser instance.
+
+        Args:
+            headless: Whether to run browser in headless mode. Defaults to True.
+            slow_mo: Slows down operations by the specified milliseconds.
+            timeout: Maximum time to wait for browser to start in milliseconds.
+
+        Returns:
+            Browser instance.
+        """
+        ...
+
+
+class BrowserTypeProtocol(Protocol):
+    """Protocol for Playwright BrowserType (e.g., playwright.chromium)."""
+
+    def launch(
+        self,
+        *,
+        headless: bool | None = None,
+        slow_mo: float | None = None,
+        timeout: float | None = None,
+    ) -> BrowserProtocol:
+        """Launch a browser instance.
+
+        Args:
+            headless: Whether to run browser in headless mode. Defaults to True.
+            slow_mo: Slows down operations by the specified milliseconds.
+            timeout: Maximum time to wait for browser to start in milliseconds.
+
+        Returns:
+            Browser instance.
+        """
+        ...
+
+
+class PlaywrightProtocol(Protocol):
+    """Protocol for Playwright instance from sync_playwright().start()."""
+
+    @property
+    def chromium(self) -> BrowserTypeProtocol:
+        """Chromium browser type.
+
+        Returns:
+            BrowserType for Chromium.
+        """
+        ...
+
+    def stop(self) -> None:
+        """Stop the Playwright instance."""
+        ...
+
+
+class SyncPlaywrightContextManagerProtocol(Protocol):
+    """Protocol for sync_playwright() context manager."""
+
+    def start(self) -> PlaywrightProtocol:
+        """Start Playwright and return the instance.
+
+        Returns:
+            Playwright instance.
+        """
+        ...
+
+    def __enter__(self) -> PlaywrightProtocol:
+        """Enter context manager.
+
+        Returns:
+            Playwright instance.
+        """
+        ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit context manager.
+
+        Args:
+            exc_type: Exception type if an exception was raised.
+            exc_val: Exception instance if an exception was raised.
+            exc_tb: Traceback if an exception was raised.
+        """
+        ...
+
+
+class SyncPlaywrightFactoryProtocol(Protocol):
+    """Protocol for sync_playwright() function."""
+
+    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
+        """Create a Playwright context manager.
+
+        Returns:
+            Context manager that yields Playwright instance.
+        """
+        ...
+
+
+# Hook for sync_playwright - tests can override
+sync_playwright: SyncPlaywrightFactoryProtocol | None = None
+
+
+def _real_get_sync_playwright() -> SyncPlaywrightFactoryProtocol:
+    """Real implementation - imports playwright.
+
+    Returns:
+        The sync_playwright factory from playwright.sync_api.
+    """
+    pw_module = __import__("playwright.sync_api", fromlist=["sync_playwright"])
+    real_sync_playwright: SyncPlaywrightFactoryProtocol = pw_module.sync_playwright
+    return real_sync_playwright
+
+
+# Hook for getting playwright - tests can override
+get_sync_playwright: Callable[[], SyncPlaywrightFactoryProtocol] = _real_get_sync_playwright
+
+
+__all__ = [
+    "BrowserContextProtocol",
+    "BrowserProtocol",
+    "BrowserTypeLaunchProtocol",
+    "BrowserTypeProtocol",
+    "CDPSessionProtocol",
+    "PageProtocol",
+    "PathExistsProtocol",
+    "PlaywrightProtocol",
+    "ReadTextProtocol",
+    "ResponseProtocol",
+    "SyncPlaywrightContextManagerProtocol",
+    "SyncPlaywrightFactoryProtocol",
+    "WriteTextProtocol",
+    "get_env",
+    "get_sync_playwright",
+    "path_exists",
+    "read_text",
+    "sync_playwright",
+    "write_text",
+]
