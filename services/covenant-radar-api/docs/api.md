@@ -2,7 +2,9 @@
 
 Complete API documentation for the covenant-radar-api service.
 
-**Base URL:** `http://localhost:8007` (default)
+**Base URL (Local):** `http://localhost:8007`
+
+**Base URL (Production):** `https://covenant-radar-api-production.up.railway.app`
 
 ---
 
