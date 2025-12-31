@@ -27,7 +27,10 @@ WORKDIR /workspace
 COPY ${APP_DIR}/pyproject.toml ${APP_DIR}/poetry.lock ${APP_DIR}/README.md ./services/covenant-radar-api/
 COPY ${APP_DIR}/src ./services/covenant-radar-api/src
 COPY ${APP_DIR}/scripts ./services/covenant-radar-api/scripts
-COPY ${APP_DIR}/data/external ./services/covenant-radar-api/data/external
+# Copy only core datasets (taiwan ~11MB, us ~11MB, polish ~21MB)
+COPY ${APP_DIR}/data/external/taiwan_data ./services/covenant-radar-api/data/external/taiwan_data
+COPY ${APP_DIR}/data/external/us_data ./services/covenant-radar-api/data/external/us_data
+COPY ${APP_DIR}/data/external/polish_data ./services/covenant-radar-api/data/external/polish_data
 COPY libs ./libs
 
 WORKDIR /workspace/services/covenant-radar-api
