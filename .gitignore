@@ -122,3 +122,6 @@ node_modules/
 # Web frontend build output
 services/grandma-api/web/assets/js/
 services/grandma-api/web/coverage/
+
+# TankpitBot captured sessions (regeneratable)
+clients/TankpitBot/capture_session.json
