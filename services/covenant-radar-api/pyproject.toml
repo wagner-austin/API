@@ -32,6 +32,8 @@ datadog = "^0.52"
 
 confluent-kafka = "^2.12"
 
+google-genai = "^1.0"
+
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
