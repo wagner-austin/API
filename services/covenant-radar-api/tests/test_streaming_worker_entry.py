@@ -510,3 +510,95 @@ class TestModuleExports:
 
         # Verify factory is callable
         assert callable(_fake_connection_factory)
+
+
+# =============================================================================
+# Tests for FakeCursor
+# =============================================================================
+
+
+class TestFakeCursor:
+    """Tests for FakeCursor class."""
+
+    def test_execute_records_query(self) -> None:
+        """Test execute records query and params."""
+        cursor = FakeCursor()
+
+        cursor.execute("SELECT * FROM table WHERE id = %s", (1,))
+
+        assert len(cursor.executed_queries) == 1
+        assert cursor.executed_queries[0] == ("SELECT * FROM table WHERE id = %s", (1,))
+
+    def test_execute_multiple_queries(self) -> None:
+        """Test execute records multiple queries."""
+        cursor = FakeCursor()
+
+        cursor.execute("SELECT 1", ())
+        cursor.execute("SELECT 2", ("param",))
+
+        assert len(cursor.executed_queries) == 2
+        assert cursor.executed_queries[0] == ("SELECT 1", ())
+        assert cursor.executed_queries[1] == ("SELECT 2", ("param",))
+
+    def test_fetchone_returns_none_when_empty(self) -> None:
+        """Test fetchone returns None when no rows."""
+        cursor = FakeCursor()
+
+        result = cursor.fetchone()
+
+        assert result is None
+
+    def test_fetchone_returns_row(self) -> None:
+        """Test fetchone returns row and removes it from list."""
+        cursor = FakeCursor()
+        cursor._rows = [(1, "test"), (2, "other")]
+
+        result = cursor.fetchone()
+
+        assert result == (1, "test")
+        assert cursor._rows == [(2, "other")]
+
+    def test_fetchall_returns_all_rows(self) -> None:
+        """Test fetchall returns all rows and clears list."""
+        cursor = FakeCursor()
+        cursor._rows = [(1, "a"), (2, "b"), (3, "c")]
+
+        result = cursor.fetchall()
+
+        assert result == [(1, "a"), (2, "b"), (3, "c")]
+        assert cursor._rows == []
+
+    def test_fetchall_returns_empty_when_no_rows(self) -> None:
+        """Test fetchall returns empty list when no rows."""
+        cursor = FakeCursor()
+
+        result = cursor.fetchall()
+
+        assert result == []
+
+    def test_rowcount_returns_set_value(self) -> None:
+        """Test rowcount returns configured value."""
+        cursor = FakeCursor()
+        cursor._rowcount = 5
+
+        assert cursor.rowcount == 5
+
+
+# =============================================================================
+# Tests for real hook implementations
+# =============================================================================
+
+
+class TestRealLoggerFactory:
+    """Tests for _real_logger_factory function."""
+
+    def test_returns_logger(self) -> None:
+        """Test returns logger that implements LoggerProtocol."""
+        from covenant_radar_api.streaming_worker_entry_hooks import _real_logger_factory
+
+        logger = _real_logger_factory("test_module")
+
+        # Should not raise - logger implements protocol
+        logger.info("test message")
+        logger.info("test with extra", extra={"key": "value"})
+        logger.error("error message")
