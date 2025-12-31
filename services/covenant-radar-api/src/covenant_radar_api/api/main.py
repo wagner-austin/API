@@ -12,6 +12,7 @@ from ..core.config import Settings, settings_from_env
 from ..core.container import ServiceContainer
 from ..integrations.datadog.tracing import setup_datadog_tracing
 from .routes import covenants as routes_covenants
+from .routes import dashboard as routes_dashboard
 from .routes import deals as routes_deals
 from .routes import evaluate as routes_evaluate
 from .routes import health as routes_health
@@ -67,5 +68,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(routes_measurements.build_router(container))
     app.include_router(routes_evaluate.build_router(container))
     app.include_router(routes_ml.build_router(container))
+    app.include_router(routes_dashboard.build_router(container))
 
     return app
