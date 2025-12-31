@@ -56,9 +56,9 @@ docs
 *.md
 !README.md
 
-# Local data directories (service-specific data should be volume-mounted)
-# Use specific paths to avoid excluding Python packages named 'data'
-services/*/data
+# Large Kaggle datasets (too big for Docker context)
+services/covenant-radar-api/data/external/kaggle_amex_default
+services/covenant-radar-api/data/external/kaggle_lending_club
 services/*/logs
 libs/*/data
 clients/*/data
