@@ -27,6 +27,7 @@ WORKDIR /workspace
 COPY ${APP_DIR}/pyproject.toml ${APP_DIR}/poetry.lock ${APP_DIR}/README.md ./services/covenant-radar-api/
 COPY ${APP_DIR}/src ./services/covenant-radar-api/src
 COPY ${APP_DIR}/scripts ./services/covenant-radar-api/scripts
+COPY ${APP_DIR}/data/external ./services/covenant-radar-api/data/external
 COPY libs ./libs
 
 WORKDIR /workspace/services/covenant-radar-api
@@ -55,6 +56,9 @@ RUN pip install /workspace/dist/*.whl \
     && rm -rf /workspace/dist /workspace/libs /root/.cache
 
 WORKDIR /app
+
+# Copy external datasets for training
+COPY --from=builder /workspace/services/covenant-radar-api/data/external /app/data/external
 
 USER app
 
