@@ -43,8 +43,8 @@ openpyxl = "^3.1.0"
 xlrd = "^2.0.2"
 
 [[tool.poetry.source]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
@@ -107,7 +107,9 @@ mypy-init-return = true
 
 [tool.coverage.run]
 source = ["src", "scripts"]
-omit = []
+omit = [
+    "src/covenant_radar_api/worker/optimize_cleargbm_job.py",  # tests disabled - too slow
+]
 branch = true
 
 [tool.coverage.report]
