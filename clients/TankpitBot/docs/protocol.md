@@ -207,6 +207,21 @@ The same action produces different wire bytes each session:
 
 #### Discovered Commands
 
+**Known Command IDs** (decoded after XOR):
+
+| ID (dec) | ID (hex) | Key | Action | Description |
+|----------|----------|-----|--------|-------------|
+| 63 | 0x3f | (click) | ENTER_GAME | Click to enter game |
+| 102 | 0x66 | S | RADAR | Ping nearby entities |
+| 107 | 0x6b | D | MINE | Drop mine at position |
+| 108 | 0x6c | F | MAP_OPEN | Open full map view |
+
+**Plain Commands** (no XOR encoding):
+
+| Wire | Key | Action | Description |
+|------|-----|--------|-------------|
+| `-` | Q | QUIT | Exit game and return to lobby |
+
 **Query Commands** (3 bytes: `!` + type + cmd):
 
 | Base Action | Description | Response Size |
