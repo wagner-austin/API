@@ -10,132 +10,150 @@ Captures WebSocket messages from tankpit.com by:
 
 from __future__ import annotations
 
-import time
-import uuid
+import base64
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger, setup_rich_logging
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.login import handle_login_flow
+from tankpit_bot.browser import (
+    BrowserSession,
+    PlaywrightNotInstalledError,
+    get_current_time_ms,
+)
 from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
-    MessageDirection,
-    decode_cdp_websocket_created_event,
-    decode_cdp_websocket_frame_event,
     encode_capture_session,
 )
 
 log = get_logger(__name__)
+
+# Default configuration constants
+DEFAULT_TARGET_URL = "https://tankpit.com"
+DEFAULT_OUTPUT_PATH = "capture_session.json"
+DEFAULT_CAPTURE_DURATION_MS = 0  # 0 = indefinite (wait until browser closed)
+
+
+def _decode_message(payload: str, direction: str) -> str:
+    """Decode a WebSocket message payload for display.
+
+    Args:
+        payload: Base64-encoded message payload.
+        direction: 'sent' or 'received'.
+
+    Returns:
+        Human-readable decoded message string.
+    """
+    tag = direction.upper()
+    try:
+        data = base64.b64decode(payload)
+    except (ValueError, TypeError):
+        return f"[{tag}] (invalid base64)"
+
+    if len(data) < 2:
+        return f"[{tag}] (too short: {data.hex()})"
+
+    # Header is 2-byte little-endian length, body follows
+    body = data[2:]
+    text = body.decode("utf-8", errors="replace")
+
+    # Dispatch to specific decoders
+    if text.startswith("%AUTH"):
+        return f"[{tag}] AUTH: {text[:60]}..."
+    if text.startswith("+") and "|" in text:
+        return _decode_plus_message(text, tag)
+    if text.startswith("*"):
+        return f"[{tag}] SELECT: room={text[1:]}"
+    if text.startswith("="):
+        return _decode_join_confirm(text, tag)
+    if text.startswith("$"):
+        return f"[{tag}] RESPONSE: {text}"
+    if text.startswith("!"):
+        return _decode_command(body, text, tag)
+    if text.startswith("."):
+        return f"[{tag}] STATE: len={len(body)} bytes"
+    # Unknown - show first 40 chars
+    preview = text[:40].replace("\n", " ")
+    return f"[{tag}] ???: {preview}..."
+
+
+def _decode_plus_message(text: str, tag: str) -> str:
+    """Decode a '+' prefixed message (ROOM_LIST or ACTION)."""
+    parts = text.split("|")
+    if len(parts) >= 3 and len(parts[0]) > 1 and parts[0][1:].isdigit():
+        room_id = parts[0][1:]
+        name = parts[1] if len(parts) > 1 else "?"
+        return f"[{tag}] ROOM_LIST: room={room_id} name={name}"
+    # Action message with coords
+    room_id = parts[0][1:] if len(parts) > 0 else "?"
+    coords = f"{parts[2]},{parts[3]}" if len(parts) >= 4 else "?"
+    return f"[{tag}] ACTION: room={room_id} coords={coords}"
+
+
+def _decode_join_confirm(text: str, tag: str) -> str:
+    """Decode a '=' prefixed JOIN_CONFIRM message."""
+    parts = text.split("|")
+    room_id = parts[0][1:] if len(parts) > 0 else "?"
+    tank_name = parts[2] if len(parts) > 2 else "?"
+    return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name}"
+
+
+def _decode_command(body: bytes, text: str, tag: str) -> str:
+    """Decode a '!' prefixed command message."""
+    if len(body) >= 2:
+        cmd = chr(body[1]) if body[1] < 128 else f"0x{body[1]:02x}"
+        rest = body[2:].hex() if len(body) > 2 else ""
+        return f"[{tag}] CMD: !{cmd} {rest}"
+    return f"[{tag}] CMD: {text}"
 
 
 class SnifferError(Exception):
     """Raised when sniffer encounters an error."""
 
 
-class PlaywrightNotInstalledError(SnifferError):
-    """Raised when Playwright hook is not installed."""
-
-
-def _get_current_time_ms() -> int:
-    """Get current time in milliseconds.
-
-    Returns:
-        Current Unix timestamp in milliseconds.
-    """
-    return int(time.time() * 1000)
-
-
-def _cdp_timestamp_to_ms(timestamp: float) -> int:
-    """Convert CDP monotonic timestamp to approximate Unix milliseconds.
-
-    CDP timestamps are monotonic and relative to some unspecified epoch.
-    We convert to approximate wall-clock time by using the current time
-    as a reference point.
-
-    Args:
-        timestamp: CDP monotonic timestamp in seconds.
-
-    Returns:
-        Approximate Unix timestamp in milliseconds.
-    """
-    # CDP timestamps are relative, so we use current time as approximation
-    # This is imprecise but sufficient for ordering and debugging
-    return int(timestamp * 1000)
-
-
-class WebSocketSniffer:
+class WebSocketSniffer(BrowserSession):
     """Captures WebSocket traffic from a browser session.
 
-    Uses Playwright to launch a browser and CDP to intercept WebSocket frames.
-    All captured messages are stored in a CaptureSession structure.
+    Extends BrowserSession with live decoding and script URL logging.
     """
 
-    def __init__(self, target_url: str, *, headless: bool = False) -> None:
+    def __init__(
+        self,
+        target_url: str,
+        *,
+        headless: bool = False,
+        live_decode: bool = False,
+        prefer_account: bool = False,
+    ) -> None:
         """Initialize the sniffer.
 
         Args:
             target_url: URL to navigate to and capture WebSocket traffic from.
             headless: Whether to run the browser in headless mode.
+            live_decode: Whether to print decoded messages in real-time.
+            prefer_account: Skip guest login and use account credentials directly.
         """
-        self._target_url = target_url
-        self._headless = headless
-        self._session_id = str(uuid.uuid4())
-        self._start_timestamp_ms = 0
-        self._messages: list[CapturedMessage] = []
-        self._ws_urls: dict[str, str] = {}  # requestId -> url mapping
+        super().__init__(target_url, headless=headless, prefer_account=prefer_account)
+        self._live_decode = live_decode
 
-    def _on_websocket_created(self, params: JSONObject) -> None:
-        """Handle Network.webSocketCreated CDP event.
+    def _on_message_captured(self, message: CapturedMessage) -> None:
+        """Log decoded message if live decode is enabled.
 
         Args:
-            params: CDP event parameters.
+            message: The captured message.
         """
-        event = decode_cdp_websocket_created_event(params)
-        self._ws_urls[event["requestId"]] = event["url"]
-
-    def _on_websocket_frame_received(self, params: JSONObject) -> None:
-        """Handle Network.webSocketFrameReceived CDP event.
-
-        Args:
-            params: CDP event parameters.
-        """
-        self._record_frame(params, "received")
-
-    def _on_websocket_frame_sent(self, params: JSONObject) -> None:
-        """Handle Network.webSocketFrameSent CDP event.
-
-        Args:
-            params: CDP event parameters.
-        """
-        self._record_frame(params, "sent")
-
-    def _record_frame(self, params: JSONObject, direction: MessageDirection) -> None:
-        """Record a WebSocket frame.
-
-        Args:
-            params: CDP event parameters.
-            direction: Whether the frame was sent or received.
-        """
-        event = decode_cdp_websocket_frame_event(params)
-        request_id = event["requestId"]
-        ws_url = self._ws_urls.get(request_id, "unknown")
-
-        message = CapturedMessage(
-            timestamp_ms=_cdp_timestamp_to_ms(event["timestamp"]),
-            direction=direction,
-            payload=event["response"]["payloadData"],
-            ws_url=ws_url,
-        )
-        self._messages.append(message)
+        if self._live_decode:
+            decoded = _decode_message(message["payload"], message["direction"])
+            log.info(decoded)
 
     def run(self, capture_duration_ms: int) -> CaptureSession:
         """Run the sniffer and capture WebSocket traffic.
 
         Args:
             capture_duration_ms: How long to capture traffic in milliseconds.
+                                 0 = wait until browser closed.
 
         Returns:
             CaptureSession containing all captured messages.
@@ -144,54 +162,53 @@ class WebSocketSniffer:
             PlaywrightNotInstalledError: If Playwright hook is not installed.
         """
         if _test_hooks.sync_playwright is None:
-            raise PlaywrightNotInstalledError(
-                "Playwright is not installed. Call _test_hooks._install_real_playwright() first."
-            )
+            raise PlaywrightNotInstalledError("Playwright is not installed.")
 
-        self._start_timestamp_ms = _get_current_time_ms()
+        self._start_timestamp_ms = get_current_time_ms()
         self._messages = []
         self._ws_urls = {}
+        self._magic = None
 
         with _test_hooks.sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=self._headless)
             context = browser.new_context()
             page = context.new_page()
-
-            # Create CDP session for network interception
             cdp = context.new_cdp_session(page)
-            cdp.send("Network.enable")
 
-            # Register WebSocket event handlers
-            cdp.on("Network.webSocketCreated", self._on_websocket_created)
-            cdp.on("Network.webSocketFrameReceived", self._on_websocket_frame_received)
-            cdp.on("Network.webSocketFrameSent", self._on_websocket_frame_sent)
+            self._setup_cdp_handlers(cdp)
 
             # Navigate to target URL
             page.goto(self._target_url, wait_until="domcontentloaded")
-
-            # Log actual URL after navigation
             log.info("Landed on %s", page.url)
 
-            # Handle login if needed
-            handle_login_flow(page, cdp, tank_name_prefix="B")
+            # Handle login
+            self._navigate_and_login(page, cdp, tank_name_prefix="B", auto_join_room=False)
 
-            # Wait for specified capture duration
-            page.wait_for_timeout(float(capture_duration_ms))
+            # Log loaded script URLs for protocol analysis
+            script_urls = page.evaluate(
+                "Array.from(document.querySelectorAll('script[src]')).map(s => s.src)"
+            )
+            if script_urls and isinstance(script_urls, list):
+                for url in script_urls:
+                    if isinstance(url, str):
+                        log.info("Script: %s", url)
 
-            # Clean up
-            cdp.detach()
-            page.close()
-            context.close()
-            browser.close()
-
-        end_timestamp_ms = _get_current_time_ms()
+            # Wait for specified capture duration (0 = wait until browser closed)
+            if capture_duration_ms <= 0:
+                log.info("Waiting indefinitely for browser close...")
+                page.wait_for_event("close", timeout=86_400_000)
+            else:
+                log.info("Waiting for %d ms...", capture_duration_ms)
+                page.wait_for_timeout(float(capture_duration_ms))
+                self._cleanup(cdp, page, context, browser)
 
         return CaptureSession(
             session_id=self._session_id,
             start_timestamp_ms=self._start_timestamp_ms,
-            end_timestamp_ms=end_timestamp_ms,
+            end_timestamp_ms=get_current_time_ms(),
             base_url=self._target_url,
             messages=self._messages,
+            magic=self._magic,
         )
 
 
@@ -201,6 +218,8 @@ def run_sniffer(
     *,
     headless: bool = False,
     capture_duration_ms: int = 30000,
+    live_decode: bool = False,
+    prefer_account: bool = False,
 ) -> CaptureSession:
     """Run the WebSocket sniffer and save results.
 
@@ -209,6 +228,8 @@ def run_sniffer(
         output_path: Path to save the capture session JSON.
         headless: Whether to run the browser in headless mode.
         capture_duration_ms: How long to capture traffic in milliseconds.
+        live_decode: Whether to print decoded messages in real-time.
+        prefer_account: Skip guest login and use account credentials directly.
 
     Returns:
         The completed CaptureSession.
@@ -216,7 +237,9 @@ def run_sniffer(
     Raises:
         PlaywrightNotInstalledError: If Playwright is not installed.
     """
-    sniffer = WebSocketSniffer(target_url, headless=headless)
+    sniffer = WebSocketSniffer(
+        target_url, headless=headless, live_decode=live_decode, prefer_account=prefer_account
+    )
     session = sniffer.run(capture_duration_ms)
 
     # Save to file
@@ -228,45 +251,42 @@ def run_sniffer(
 
 
 def main() -> None:
-    """Entry point for tankpit-sniff command.
-
-    Reads configuration from environment variables:
-    - TANKPIT_URL: Target URL (default: https://tankpit.com)
-    - TANKPIT_OUTPUT: Output file path (default: capture_session.json)
-    - TANKPIT_HEADLESS: Run headless (default: false)
-    - TANKPIT_DURATION_MS: Capture duration in ms (default: 60000)
-    """
+    """Entry point for tankpit-sniff command."""
     from dotenv import load_dotenv
 
     load_dotenv()
     setup_rich_logging(level="INFO")
 
-    # Install real Playwright hook if not already set (allows test overrides)
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
 
-    # Read config from environment
-    target_url = _test_hooks.get_env("TANKPIT_URL")
-    if target_url is None:
-        target_url = "https://tankpit.com"
-
-    output_path = _test_hooks.get_env("TANKPIT_OUTPUT")
-    if output_path is None:
-        output_path = "capture_session.json"
+    target_url = _test_hooks.get_env("TANKPIT_URL") or DEFAULT_TARGET_URL
+    output_path = _test_hooks.get_env("TANKPIT_OUTPUT") or DEFAULT_OUTPUT_PATH
 
     headless_str = _test_hooks.get_env("TANKPIT_HEADLESS")
     headless = headless_str is not None and headless_str.lower() in ("true", "1", "yes")
 
     duration_str = _test_hooks.get_env("TANKPIT_DURATION_MS")
-    capture_duration_ms = 60000
-    if duration_str is not None:
-        capture_duration_ms = int(duration_str)
+    capture_duration_ms = int(duration_str) if duration_str else DEFAULT_CAPTURE_DURATION_MS
+    log.info("Duration config: env=%s, using=%d ms", duration_str, capture_duration_ms)
+
+    live_decode_str = _test_hooks.get_env("TANKPIT_LIVE_DECODE")
+    live_decode = live_decode_str is None or live_decode_str.lower() not in ("false", "0", "no")
+
+    prefer_account_str = _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT")
+    prefer_account = prefer_account_str is not None and prefer_account_str.lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
     session = run_sniffer(
         target_url,
         output_path,
         headless=headless,
         capture_duration_ms=capture_duration_ms,
+        live_decode=live_decode,
+        prefer_account=prefer_account,
     )
 
     msg_count = len(session["messages"])
@@ -274,7 +294,6 @@ def main() -> None:
     log.info("Captured %d WebSocket messages in %.1fs", msg_count, duration_sec)
     log.info("Saved to: %s", output_path)
 
-    # Print unique WebSocket URLs discovered
     unique_urls: set[str] = set()
     for msg in session["messages"]:
         unique_urls.add(msg["ws_url"])
