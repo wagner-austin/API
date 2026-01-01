@@ -611,6 +611,7 @@ class FakeCDPSessionProbe:
         viewport_result: JSONObject | None = None,
         return_invalid_result: bool = False,
         return_missing_value: bool = False,
+        js_keypress_fails: bool = False,
     ) -> None:
         """Initialize fake CDP session for probing.
 
@@ -620,6 +621,7 @@ class FakeCDPSessionProbe:
             viewport_result: Custom viewport result to return, None uses default.
             return_invalid_result: Return non-dict result for Runtime.evaluate.
             return_missing_value: Return dict without value for Runtime.evaluate.
+            js_keypress_fails: If True, JS keypress returns ERROR instead of JS_KEYPRESS_X.
         """
         self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
         self._sent_methods: list[str] = []
@@ -629,43 +631,57 @@ class FakeCDPSessionProbe:
         self._viewport_result = viewport_result
         self._return_invalid_result = return_invalid_result
         self._return_missing_value = return_missing_value
+        self._js_keypress_fails = js_keypress_fails
         self._input_count = 0
         self._ws_url = "wss://tankpit.com/ws/"
+
+    def _handle_runtime_evaluate(self, params: JSONObject) -> JSONObject:
+        """Handle Runtime.evaluate CDP command."""
+        expression = params.get("expression", "")
+        expr_str = str(expression)
+
+        if "innerWidth" in expr_str:
+            if self._viewport_result is not None:
+                return self._viewport_result
+            return {"result": {"value": '{"w":800,"h":600}'}}
+
+        if self._return_invalid_result:
+            return {"error": "simulated error"}
+
+        if self._return_missing_value:
+            return {"result": {}}
+
+        # Detect WebSocket send via _send_websocket_bytes and emit messages
+        if "ws.send" in expr_str and "__capturedWS" in expr_str and self._emit_on_key:
+            self._input_count += 1
+            self._emit_ws_sent(f"key_input_{self._input_count}")
+            self._emit_ws_received(f"key_response_{self._input_count}")
+            return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
+
+        # Detect JS keypress for toggle close
+        if "KeyboardEvent" in expr_str and "dispatchEvent" in expr_str:
+            if self._js_keypress_fails:
+                return {"result": {"value": "ERROR"}}
+            if "'f'" in expr_str or '"f"' in expr_str:
+                return {"result": {"value": "JS_KEYPRESS_F"}}
+            return {"result": {"value": "JS_KEYPRESS_?"}}
+
+        return {"result": {"value": "success"}}
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Send CDP command and optionally emit WebSocket response."""
         self._sent_methods.append(method)
 
-        # Return viewport size for Runtime.evaluate
         if method == "Runtime.evaluate" and params is not None:
-            expression = params.get("expression", "")
-            expr_str = str(expression)
-            if "innerWidth" in expr_str:
-                if self._viewport_result is not None:
-                    return self._viewport_result
-                return {"result": {"value": '{"w":800,"h":600}'}}
-            # Return invalid result if configured
-            if self._return_invalid_result:
-                return {"error": "simulated error"}
-            # Return missing value if configured
-            if self._return_missing_value:
-                return {"result": {}}
-            # Detect WebSocket send via _send_websocket_bytes and emit messages
-            if "ws.send" in expr_str and "__capturedWS" in expr_str and self._emit_on_key:
-                self._input_count += 1
-                self._emit_ws_sent(f"key_input_{self._input_count}")
-                self._emit_ws_received(f"key_response_{self._input_count}")
-                return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
-            # Other evaluates return success
-            return {"result": {"value": "success"}}
+            return self._handle_runtime_evaluate(params)
 
-        # When mouse input is dispatched, emit a WebSocket message
         if method == "Input.dispatchMouseEvent" and self._emit_on_mouse:
             event_type = params.get("type", "") if params else ""
             if event_type == "mousePressed":
                 self._input_count += 1
                 self._emit_ws_sent(f"mouse_input_{self._input_count}")
                 self._emit_ws_received(f"mouse_response_{self._input_count}")
+
         result: JSONObject = {}
         return result
 
