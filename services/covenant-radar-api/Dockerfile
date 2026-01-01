@@ -58,6 +58,7 @@ RUN pip install /workspace/dist/*.whl \
 WORKDIR /app
 
 COPY --from=builder /workspace/services/covenant-radar-api/data/external /app/data/external
+RUN chown -R app:app /app/data
 
 USER app
 
