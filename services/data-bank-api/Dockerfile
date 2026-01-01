@@ -41,11 +41,6 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     DATA_ROOT=/data/files
 
-RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
-
-# Create data directory with correct ownership before switching to app user
-RUN mkdir -p /data/files && chown -R app:app /data/files
-
 WORKDIR /workspace
 
 COPY --from=builder /workspace/services/data-bank-api/dist/*.whl /workspace/dist/
@@ -54,8 +49,6 @@ RUN pip install /workspace/dist/*.whl /workspace/libs/platform_core /workspace/l
     && rm -rf /workspace/dist /workspace/libs /root/.cache
 
 WORKDIR /app
-
-USER app
 
 # ---------- Worker target ----------
 FROM runtime-base AS worker
