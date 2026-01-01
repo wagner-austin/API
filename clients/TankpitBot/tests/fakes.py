@@ -597,7 +597,11 @@ def fake_sync_playwright_with_magic() -> SyncPlaywrightContextManagerProtocol:
 
 
 class FakeCDPSessionProbe:
-    """Fake CDP session for probe testing that responds to input events."""
+    """Fake CDP session for probe testing that responds to WebSocket sends.
+
+    Now detects WebSocket injection (ws.send) instead of JavaScript KeyboardEvents,
+    since the probe uses WebSocket injection for sending commands.
+    """
 
     def __init__(
         self,
@@ -605,13 +609,17 @@ class FakeCDPSessionProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        return_invalid_result: bool = False,
+        return_missing_value: bool = False,
     ) -> None:
         """Initialize fake CDP session for probing.
 
         Args:
-            emit_on_key: Whether to emit messages when key inputs are injected.
+            emit_on_key: Whether to emit messages when WebSocket commands are sent.
             emit_on_mouse: Whether to emit messages when mouse inputs are injected.
             viewport_result: Custom viewport result to return, None uses default.
+            return_invalid_result: Return non-dict result for Runtime.evaluate.
+            return_missing_value: Return dict without value for Runtime.evaluate.
         """
         self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
         self._sent_methods: list[str] = []
@@ -619,6 +627,8 @@ class FakeCDPSessionProbe:
         self._emit_on_key = emit_on_key
         self._emit_on_mouse = emit_on_mouse
         self._viewport_result = viewport_result
+        self._return_invalid_result = return_invalid_result
+        self._return_missing_value = return_missing_value
         self._input_count = 0
         self._ws_url = "wss://tankpit.com/ws/"
 
@@ -629,20 +639,25 @@ class FakeCDPSessionProbe:
         # Return viewport size for Runtime.evaluate
         if method == "Runtime.evaluate" and params is not None:
             expression = params.get("expression", "")
-            if "innerWidth" in str(expression):
+            expr_str = str(expression)
+            if "innerWidth" in expr_str:
                 if self._viewport_result is not None:
                     return self._viewport_result
                 return {"result": {"value": '{"w":800,"h":600}'}}
-            # Other evaluates return success
-            return {"result": {"value": "success"}}
-
-        # When key input is dispatched, emit a WebSocket message (sent and received)
-        if method == "Input.dispatchKeyEvent" and self._emit_on_key:
-            event_type = params.get("type", "") if params else ""
-            if event_type == "keyDown":
+            # Return invalid result if configured
+            if self._return_invalid_result:
+                return {"error": "simulated error"}
+            # Return missing value if configured
+            if self._return_missing_value:
+                return {"result": {}}
+            # Detect WebSocket send via _send_websocket_bytes and emit messages
+            if "ws.send" in expr_str and "__capturedWS" in expr_str and self._emit_on_key:
                 self._input_count += 1
                 self._emit_ws_sent(f"key_input_{self._input_count}")
                 self._emit_ws_received(f"key_response_{self._input_count}")
+                return {"result": {"value": "OK"}}
+            # Other evaluates return success
+            return {"result": {"value": "success"}}
 
         # When mouse input is dispatched, emit a WebSocket message
         if method == "Input.dispatchMouseEvent" and self._emit_on_mouse:
@@ -697,6 +712,9 @@ class FakeCDPSessionProbe:
 
 class FakePageProbe:
     """Fake Playwright Page for probe testing."""
+
+    # Default magic value for XOR table construction
+    DEFAULT_MAGIC = "test_magic_12345678"
 
     def __init__(
         self,
@@ -798,13 +816,20 @@ class FakePageProbe:
         self._closed = True
 
     def evaluate(self, expression: str) -> JSONValue:
-        """Evaluate JavaScript expression - returns empty list in tests."""
-        _ = expression
+        """Evaluate JavaScript expression.
+
+        Returns magic value for tankpit.magic, empty list otherwise.
+        """
+        if expression == "tankpit.magic":
+            return self.DEFAULT_MAGIC
         return []
 
 
 class FakePageProbeNoMessages:
     """Fake Page for probe testing that doesn't emit any messages."""
+
+    # Default magic value for XOR table construction
+    DEFAULT_MAGIC = "test_magic_12345678"
 
     def __init__(self, cdp_session: FakeCDPSessionProbe) -> None:
         """Initialize fake page."""
@@ -844,8 +869,12 @@ class FakePageProbeNoMessages:
         self._closed = True
 
     def evaluate(self, expression: str) -> JSONValue:
-        """Evaluate JavaScript expression - returns empty list in tests."""
-        _ = expression
+        """Evaluate JavaScript expression.
+
+        Returns magic value for tankpit.magic, empty list otherwise.
+        """
+        if expression == "tankpit.magic":
+            return self.DEFAULT_MAGIC
         return []
 
 
