@@ -136,12 +136,14 @@ def test_encode_capture_session() -> None:
         end_timestamp_ms=5000,
         base_url="https://example.com",
         messages=[msg],
+        magic="test_magic_key",
     )
     result = encode_capture_session(session)
     assert result["session_id"] == "abc-123"
     assert result["start_timestamp_ms"] == 0
     assert result["end_timestamp_ms"] == 5000
     assert result["base_url"] == "https://example.com"
+    assert result["magic"] == "test_magic_key"
     messages_list = result["messages"]
     assert type(messages_list) is list
     assert len(messages_list) == 1
@@ -155,9 +157,11 @@ def test_encode_capture_session_with_none_end() -> None:
         end_timestamp_ms=None,
         base_url="https://example.com",
         messages=[],
+        magic=None,
     )
     result = encode_capture_session(session)
     assert result["end_timestamp_ms"] is None
+    assert result["magic"] is None
 
 
 def test_decode_capture_session() -> None:
@@ -175,11 +179,40 @@ def test_decode_capture_session() -> None:
                 "ws_url": "wss://example.com",
             }
         ],
+        "magic": "decoded_magic_key",
     }
     result = decode_capture_session(data)
     assert result["session_id"] == "abc-123"
     assert len(result["messages"]) == 1
     assert result["messages"][0]["direction"] == "sent"
+    assert result["magic"] == "decoded_magic_key"
+
+
+def test_decode_capture_session_with_none_magic() -> None:
+    """Test decoding CaptureSession with None magic."""
+    data: JSONObject = {
+        "session_id": "abc-123",
+        "start_timestamp_ms": 0,
+        "end_timestamp_ms": 5000,
+        "base_url": "https://example.com",
+        "messages": [],
+        "magic": None,
+    }
+    result = decode_capture_session(data)
+    assert result["magic"] is None
+
+
+def test_decode_capture_session_with_missing_magic() -> None:
+    """Test decoding CaptureSession with missing magic field."""
+    data: JSONObject = {
+        "session_id": "abc-123",
+        "start_timestamp_ms": 0,
+        "end_timestamp_ms": 5000,
+        "base_url": "https://example.com",
+        "messages": [],
+    }
+    result = decode_capture_session(data)
+    assert result["magic"] is None
 
 
 def test_decode_capture_session_invalid_message() -> None:
@@ -190,6 +223,7 @@ def test_decode_capture_session_invalid_message() -> None:
         "end_timestamp_ms": 5000,
         "base_url": "https://example.com",
         "messages": ["not an object"],
+        "magic": None,
     }
     with pytest.raises(JSONTypeError, match=r"messages\[0\] must be an object"):
         decode_capture_session(data)
