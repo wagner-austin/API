@@ -309,6 +309,9 @@ curl http://localhost:8007/ml/models/active
 | `KAFKA__PRODUCER_BATCH_SIZE` | int | `16384` | Producer batch size |
 | `KAFKA__COMPRESSION_TYPE` | string | `gzip` | Compression type |
 | `GEMINI_API_KEY` | string | - | Google AI API key for Gemini integration |
+| `DATA_BANK_API_URL` | string | - | URL for data-bank-api (e.g., `http://data-bank-api.railway.internal:8080`) |
+| `DATA_BANK_API_KEY` | string | - | API key for data-bank-api uploads/downloads |
+| `DATA_BANK_MODEL_FILE_ID` | string | - | Model file_id (SHA256 hash) to download from data-bank at startup |
 
 ### Example .env
 
@@ -333,6 +336,11 @@ CONFLUENT__API_SECRET=your-api-secret
 
 # Google AI / Gemini (optional, for alert summaries)
 GEMINI_API_KEY=your-gemini-api-key
+
+# Data Bank (optional, for centralized model storage)
+DATA_BANK_API_URL=http://data-bank-api.railway.internal:8080
+DATA_BANK_API_KEY=your-data-bank-api-key
+DATA_BANK_MODEL_FILE_ID=2d768b7fdb6b4919f6ddf1ace2bfef23433ec19f2ae2f7c3c454d9f9e23cfede
 ```
 
 ---
