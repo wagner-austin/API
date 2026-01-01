@@ -213,6 +213,102 @@ class BrowserSession:
         cdp.on("Network.webSocketFrameReceived", self._on_websocket_frame_received)
         cdp.on("Network.webSocketFrameSent", self._on_websocket_frame_sent)
 
+    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
+        """Set up console message listener for WebSocket debug info.
+
+        Logs console messages containing 'WS', 'Hook', or 'WebSocket'.
+
+        Args:
+            cdp: CDP session.
+        """
+        cdp.send("Runtime.enable")
+
+        def on_console(params: JSONObject) -> None:
+            msg_type = params.get("type", "?")
+            args = params.get("args", [])
+            if isinstance(args, list):
+                texts = []
+                for a in args:
+                    if isinstance(a, dict):
+                        val = a.get("value", a.get("description", "?"))
+                        texts.append(str(val) if val is not None else "?")
+                text = " ".join(texts)
+                if "WS" in text or "Hook" in text or "WebSocket" in text:
+                    log.info("[Console %s] %s", msg_type, text)
+
+        cdp.on("Runtime.consoleAPICalled", on_console)
+
+    def _log_websocket_urls(self) -> None:
+        """Log all captured WebSocket URLs."""
+        ws_urls = list(self._ws_urls.values())
+        log.info("Captured WebSocket URLs: %s", ws_urls)
+
+    def _debug_js_websocket(self, cdp: CDPSessionProtocol) -> None:
+        """Check for WebSocket instances in JavaScript and log findings.
+
+        Args:
+            cdp: CDP session.
+        """
+        debug_js = """
+        (() => {
+            let found = [];
+            for (let key in window) {
+                try {
+                    if (window[key] instanceof WebSocket) {
+                        found.push('window.' + key + ' (state=' + window[key].readyState + ')');
+                    }
+                } catch(e) {}
+            }
+            if (typeof tankpit !== 'undefined') {
+                for (let key in tankpit) {
+                    try {
+                        if (tankpit[key] instanceof WebSocket) {
+                            let s = tankpit[key].readyState;
+                            found.push('tankpit.' + key + ' (state=' + s + ')');
+                        }
+                    } catch(e) {}
+                }
+            }
+            if (window.__capturedWS) {
+                found.push('__capturedWS (state=' + window.__capturedWS.readyState + ')');
+            }
+            return found.length > 0 ? found.join(', ') : 'NO WebSocket found';
+        })()
+        """
+        debug_result = cdp.send("Runtime.evaluate", {"expression": debug_js, "returnByValue": True})
+        debug_obj = debug_result.get("result")
+        if isinstance(debug_obj, dict):
+            debug_val = debug_obj.get("value", "?")
+            log.info("JS WebSocket check: %s", debug_val)
+
+    def _log_script_urls(self, page: PageProtocol) -> None:
+        """Log all loaded script URLs for protocol analysis.
+
+        Args:
+            page: Playwright page.
+        """
+        script_urls = page.evaluate(
+            "Array.from(document.querySelectorAll('script[src]')).map(s => s.src)"
+        )
+        if script_urls and isinstance(script_urls, list):
+            log.info("Loaded scripts (%d):", len(script_urls))
+            for url in script_urls:
+                if isinstance(url, str):
+                    log.info("  - %s", url)
+
+    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
+        """Gather and log all available intel after login.
+
+        Logs WebSocket URLs, JS WebSocket instances, and script URLs.
+
+        Args:
+            page: Playwright page.
+            cdp: CDP session.
+        """
+        self._log_websocket_urls()
+        self._debug_js_websocket(cdp)
+        self._log_script_urls(page)
+
     def _capture_magic_key(self, page: PageProtocol) -> None:
         """Capture tankpit.magic XOR key from page.
 
