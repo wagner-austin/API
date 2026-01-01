@@ -49,6 +49,23 @@ This will:
 | `TANKPIT_OUTPUT` | `capture_session.json` | Output file |
 | `TANKPIT_HEADLESS` | `false` | Run headlessly |
 | `TANKPIT_DURATION_MS` | `60000` | Capture duration |
+| `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
+| `TANKPIT_PREFER_ACCOUNT` | `false` | Skip guest login, use account directly |
+
+### Live Decode Mode
+
+When `TANKPIT_LIVE_DECODE=true` (default), messages are decoded and printed in real-time as you play:
+
+```
+[SENT] AUTH: %AUTH !be 62997|...
+[RECV] ROOM_LIST: room=4 name=World (Meltdown)
+[SENT] SELECT: room=4
+[RECV] JOIN_CONFIRM: room=4 tank=Yuppler
+[SENT] CMD: !1 2d43fe
+[RECV] STATE: len=24 bytes
+```
+
+This makes protocol discovery much easier - play the game and see exactly what commands each action sends.
 
 ## Captured CDP Events
 
@@ -66,6 +83,7 @@ This will:
   "start_timestamp_ms": 1234567890000,
   "end_timestamp_ms": 1234567950000,
   "base_url": "https://tankpit.com",
+  "magic": "session-specific-xor-key",
   "messages": [
     {
       "timestamp_ms": 1234567890100,
@@ -76,6 +94,8 @@ This will:
   ]
 }
 ```
+
+The `magic` field contains the session-specific XOR key captured from `tankpit.magic` JavaScript variable after login. This key is used for encoding game commands.
 
 ## Protocol Analysis Workflow
 
@@ -106,17 +126,127 @@ WebSocket endpoint: `wss://dorothy.tankpit.com/ws/`
 ### Message Structure
 
 Each message is base64-encoded binary with:
-- **Header**: 2 bytes (message type indicator)
-- **Body**: Pipe-delimited (`|`) fields
+- **Header**: 2 bytes, little-endian **body length**
+- **Body**: Text with pipe-delimited (`|`) fields, or binary game commands
 
-### Message Types
+Example: `02 00 2a 34` = length 2, body `*4` (SELECT room 4)
 
-| Direction | Header (hex) | Type | Description |
-|-----------|--------------|------|-------------|
-| sent | `50 00` | AUTH | Authentication with session token |
-| received | `39 00` | ROOM_LIST | Room/world information |
-| sent | `02 00` | SELECT | Room selection |
-| received | `22 00` | JOIN_CONFIRM | Room join confirmation |
+### Lobby Message Types
+
+| Prefix | Type | Description |
+|--------|------|-------------|
+| `%AUTH` | AUTH | Authentication with session token |
+| `+` | ROOM_LIST | Room/world information |
+| `*` | SELECT | Room selection |
+| `=` | JOIN_CONFIRM | Room join confirmation |
+| `$` | RESPONSE | Server response/ack |
+
+### Game Controls
+
+The game uses **click-to-move** controls, not WASD. Keyboard keys are for actions:
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| Space | Shoot | Fire at mouse position |
+| S | Radar | Ping nearby entities |
+| D | Mine | Place mine at current position |
+| F | Open Map | Toggle full map view |
+| E | Nearest Enemy | Target nearest enemy |
+| 1 | Armor Shields | Toggle armor shields |
+| 2 | Dual Shots | Toggle dual shot mode |
+| 3 | Missile Shots | Toggle missile mode |
+| 4 | Homing Shots | Toggle homing mode |
+| 5 | Extra Radars | Toggle extra radar range |
+| Arrow Keys | Scope | Pan camera N/S/E/W |
+| I | Inventory | Open inventory |
+| C | Statistics | Show game statistics |
+| X | Active Forces | Show active forces |
+| Q | Quit | Exit current game |
+
+Mouse controls:
+- **Single click**: Move to position
+- **Double click**: Fire at position
+
+### Game Command Types
+
+Commands start with `!` followed by XOR-encoded bytes. The encoding key changes per session.
+
+#### Message Format
+
+```
+[2-byte length LE] + '!' + [type_byte] + [cmd_byte] + [data...]
+```
+
+- **type_byte**: Session-specific prefix (changes each login)
+- **cmd_byte**: Command identifier (XOR'd with session key)
+- **data**: Optional payload (coordinates, etc.)
+
+#### Session XOR Encoding
+
+The protocol uses per-session XOR encoding to prevent replay attacks. The encoding uses two keys:
+
+1. **Static Key**: A 1000-character string embedded in `tpclient-*.js`, starting with `Y1DcZy...`
+2. **Magic Key**: A session-specific string set in `tankpit.magic` after login
+
+The XOR encoding formula (from decompiled client):
+```javascript
+qb[rb] = staticKey.charCodeAt(rb) ^ magic.charCodeAt(rb % magic.length)
+```
+
+The sniffer automatically captures the magic key via `page.evaluate("tankpit.magic")` after login and stores it in the session JSON.
+
+The same action produces different wire bytes each session:
+
+| Session | Type Byte | MAP cmd | RADAR cmd |
+|---------|-----------|---------|-----------|
+| 1 | `!` (0x21) | `?` (0x3f) | `5` (0x35) |
+| 2 | `(` (0x28) | `.` (0x2e) | `$` (0x24) |
+| 3 | `h` (0x68) | `h` (0x68) | `b` (0x62) |
+| 4 | `"` (0x22) | `6` (0x36) | `&` (0x26) |
+| 5 | `8` (0x38) | `'` (0x27) | `-` (0x2d) |
+
+#### Discovered Commands
+
+**Query Commands** (3 bytes: `!` + type + cmd):
+
+| Base Action | Description | Response Size |
+|-------------|-------------|---------------|
+| SPAWN | Initialize/respawn | Many STATE updates |
+| MAP | Request full map | ~565-580 bytes |
+| RADAR | Ping nearby entities | ~14-28 bytes |
+| FUEL/EQUIP | Equipment panel | ~6-24 bytes |
+
+**Action Commands** (variable length):
+
+| Prefix Pattern | Action | Data | Description |
+|----------------|--------|------|-------------|
+| `!` + type + `#`-like | **SHOOT** | 2 bytes | Direction/angle vector |
+| `!` + type + `$`-like | **MINE** | 3 bytes | X, Y coordinates |
+| `!` + type + `i`-like | **MOVE** | 2 bytes | Direction + velocity |
+
+#### Example Wire Formats
+
+**RADAR request** (session with type=`"`):
+```
+03 00 21 22 26  →  len=3, body="!\"&"
+```
+
+**MINE placement** (session with type=`$`):
+```
+05 00 21 24 30 0c ab  →  len=5, body="!$" + coords(0x30, 0x0c, 0xab)
+```
+
+**SHOOT** (session with type=`#`):
+```
+04 00 21 23 1a 75  →  len=4, body="!#" + angle(0x1a, 0x75)
+```
+
+### Game State Updates
+
+Server sends binary state updates prefixed with `.` containing:
+- Player positions
+- Projectile data
+- Game objects
 
 ### Authentication Flow
 
@@ -168,8 +298,18 @@ Guest accounts are limited per IP address. After ~10 guest tanks, the server ret
 
 Solution: Use a registered account with `TANKPIT_USERNAME` and `TANKPIT_PASSWORD` environment variables.
 
-## Next Steps
+## Next Steps (Phase 3)
 
-1. Create TypedDicts for each discovered message type
-2. Implement WebSocket client that speaks the protocol
-3. Add game logic and AI strategy
+1. ~~Add live decode to sniffer~~ ✓
+2. ~~Capture XOR magic key from tankpit.magic~~ ✓
+3. ~~Implement protocol encoder/decoder module~~ ✓
+   - `codec.py` - XOR encode/decode with static + session keys
+   - `framing.py` - 2-byte length framing
+   - `decoder.py` - Session decoder for captured data
+   - `parser.py` - Lobby message parser
+   - `commands.py` - Command type definitions
+4. Complete command discovery using live decode mode
+5. Build WebSocket client with connection management (`client.py`)
+6. Implement high-level protocol layer (`protocol.py`)
+7. Implement bot entry point with game loop
+8. Add AI strategy for movement and combat
