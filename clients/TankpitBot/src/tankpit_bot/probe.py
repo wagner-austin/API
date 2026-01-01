@@ -1,10 +1,14 @@
-"""Protocol probe using Playwright and CDP input injection.
+"""Protocol probe using Playwright and WebSocket injection.
 
-Automatically discovers game commands by:
+Probes game protocol by:
 1. Launching a browser and joining the game
-2. Injecting keyboard and mouse inputs via CDP
-3. Capturing WebSocket messages sent after each input
+2. Sending known commands via WebSocket injection
+3. Capturing WebSocket responses from the server
 4. Correlating inputs with protocol messages
+
+Note: This probe sends KNOWN commands via WebSocket. It does not discover
+new commands - use the sniffer for that (play manually and observe traffic).
+Synthetic JavaScript KeyboardEvents don't work because isTrusted: false.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ import threading
 from pathlib import Path
 
 from platform_core.json_utils import (
+    JSONObject,
     dump_json_str,
     load_json_str,
     narrow_json_to_dict,
@@ -28,6 +33,20 @@ from tankpit_bot.browser import (
     PlaywrightNotInstalledError,
     get_current_time_ms,
 )
+from tankpit_bot.codec import (
+    DEFAULT_STATIC_KEY_PATH,
+    build_xor_table,
+    load_static_key,
+    xor_bytes,
+)
+from tankpit_bot.commands import (
+    CMD_MAP_OPEN,
+    CMD_MINE,
+    CMD_RADAR,
+    PLAIN_QUIT,
+)
+from tankpit_bot.framing import encode_frame
+from tankpit_bot.sniffer import _decode_message
 from tankpit_bot.types import (
     CapturedMessage,
     KeyInput,
@@ -45,20 +64,58 @@ class ProbeError(Exception):
     """Raised when probe encounters an error."""
 
 
+def extract_cdp_evaluate_value(result: JSONObject) -> str:
+    """Extract value from CDP Runtime.evaluate result.
+
+    Args:
+        result: CDP result dictionary from Runtime.evaluate.
+
+    Returns:
+        The string value from the result.
+
+    Raises:
+        ProbeError: If result structure is invalid or value is missing.
+    """
+    result_obj = result.get("result")
+    if not isinstance(result_obj, dict):
+        raise ProbeError(f"CDP Runtime.evaluate returned invalid result: {result}")
+    val = result_obj.get("value")
+    if val is None:
+        raise ProbeError(f"CDP Runtime.evaluate result missing value: {result_obj}")
+    return str(val)
+
+
+# =============================================================================
+# Key to Command Mapping
+# =============================================================================
+
+# Maps keyboard keys to their XOR-encoded command IDs
+# Only keys with known command IDs can be probed via WebSocket injection
+KEY_TO_COMMAND: dict[str, int] = {
+    "s": CMD_RADAR,  # 's' key -> radar (command ID 102)
+    "d": CMD_MINE,  # 'd' key -> mine (command ID 107)
+    "f": CMD_MAP_OPEN,  # 'f' key -> map open (command ID 108)
+}
+
+# Keys that use plain text commands (no XOR encoding)
+KEY_TO_PLAIN_COMMAND: dict[str, bytes] = {
+    "q": PLAIN_QUIT,  # 'q' key -> quit game ('-')
+}
+
+# Session type byte for XOR commands (discovered from protocol analysis)
+COMMAND_TYPE_BYTE = 2
+
 # =============================================================================
 # Default probe configuration
 # =============================================================================
 
-# Standard game action keys to probe
+# Standard game action keys to probe (only keys with known commands)
 DEFAULT_PROBE_KEYS: list[str] = [
-    "w",  # Forward
-    "s",  # Brake
-    "d",  # Right turn
-    " ",  # Fire
-    "r",  # Radar
-    "x",  # Use item
+    "s",  # Radar
+    "d",  # Mine
     "f",  # Map open
-    "f",  # Map close
+    "f",  # Map close (toggle)
+    "q",  # Quit
 ]
 
 # Mouse positions for aim testing (empty by default)
@@ -66,21 +123,39 @@ DEFAULT_MOUSE_POSITIONS: list[tuple[float, float]] = []
 
 
 class ProtocolProbe(BrowserSession):
-    """Probes game protocol by injecting inputs and capturing responses.
+    """Probes game protocol by sending commands via WebSocket.
 
-    Extends BrowserSession with input injection and result capture.
+    Extends BrowserSession with command sending and result capture.
+    Uses WebSocket injection instead of synthetic JavaScript events
+    (which don't work because isTrusted: false).
     """
 
-    def __init__(self, target_url: str, *, headless: bool = False) -> None:
+    def __init__(
+        self,
+        target_url: str,
+        *,
+        headless: bool = False,
+        static_key_path: Path | None = None,
+    ) -> None:
         """Initialize the probe.
 
         Args:
             target_url: URL to navigate to (e.g., https://tankpit.com/play).
             headless: Whether to run the browser in headless mode.
+            static_key_path: Path to static XOR key file. Uses default if None.
+
+        Raises:
+            FileNotFoundError: If static key file does not exist.
+            InvalidKeyError: If static key is empty.
         """
         super().__init__(target_url, headless=headless, prefer_account=True)
         self._results: list[ProbeResult] = []
         self._received_event = threading.Event()
+
+        # Load static key for XOR encoding
+        key_path = static_key_path if static_key_path is not None else DEFAULT_STATIC_KEY_PATH
+        self._static_key = load_static_key(key_path)
+        self._xor_table: bytes | None = None
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
         """Signal when a received message arrives.
@@ -125,28 +200,91 @@ class ProtocolProbe(BrowserSession):
 
         return (got_sent, got_received)
 
-    def _inject_key(self, cdp: CDPSessionProtocol, key: str) -> None:
-        """Inject a key press via CDP.
+    def _build_xor_table(self) -> None:
+        """Build XOR table from static key and session magic.
+
+        Must be called after magic key is captured.
+
+        Raises:
+            ProbeError: If magic key not captured.
+        """
+        if self._magic is None:
+            raise ProbeError("Cannot build XOR table: magic key not captured")
+        self._xor_table = build_xor_table(self._static_key, self._magic)
+        log.info("Built XOR table, first 10 bytes: %s", self._xor_table[:10].hex())
+
+    def _encode_xor_command(self, cmd_id: int) -> bytes:
+        """Encode an XOR command with length header.
+
+        Creates a 3-byte command (! + type + cmd_id), XOR encodes
+        the type and cmd_id bytes, and adds the 2-byte length header.
+
+        Args:
+            cmd_id: Command ID byte (e.g., CMD_RADAR, CMD_MINE).
+
+        Returns:
+            Framed command ready to send via WebSocket.
+
+        Raises:
+            ProbeError: If XOR table not initialized.
+        """
+        if self._xor_table is None:
+            raise ProbeError("XOR table not initialized")
+
+        # Raw command: ! + type + cmd_id
+        raw = bytes([0x21, COMMAND_TYPE_BYTE, cmd_id])
+
+        # XOR encode type and cmd_id bytes (skip the '!' prefix)
+        encoded = bytearray(len(raw))
+        encoded[0] = raw[0]  # '!' stays as-is
+        encoded_part = xor_bytes(self._xor_table, raw[1:], offset=0)
+        encoded[1:] = encoded_part
+
+        # Add 2-byte length header
+        return encode_frame(bytes(encoded))
+
+    def _encode_plain_command(self, body: bytes) -> bytes:
+        """Encode a plain text command with length header.
+
+        Args:
+            body: Command body (no XOR encoding needed).
+
+        Returns:
+            Framed command ready to send via WebSocket.
+        """
+        return encode_frame(body)
+
+    def _send_key_command(self, cdp: CDPSessionProtocol, key: str) -> bool:
+        """Send a game command for the given key via WebSocket.
 
         Args:
             cdp: CDP session.
-            key: Key to press (e.g., 'w', 'ArrowUp', ' ').
+            key: Key to send command for (e.g., 's', 'd', 'f', 'q').
+
+        Returns:
+            True if command was sent, False if key has no known command.
+
+        Raises:
+            ProbeError: If XOR table not initialized (for XOR commands).
         """
-        key_map: dict[str, str] = {" ": "Space"}
-        dom_key = key_map.get(key, key)
-        key_code = f"Key{key.upper()}" if len(key) == 1 and key.isalpha() else dom_key
+        # Check for XOR-encoded command
+        if key in KEY_TO_COMMAND:
+            cmd_id = KEY_TO_COMMAND[key]
+            encoded = self._encode_xor_command(cmd_id)
+            success = self._send_websocket_bytes(cdp, encoded)
+            log.info("    Sent XOR command: key=%s cmd_id=%d -> %s", key, cmd_id, success)
+            return success
 
-        log.info("    CDP keyDown: key=%s code=%s", dom_key, key_code)
+        # Check for plain text command
+        if key in KEY_TO_PLAIN_COMMAND:
+            body = KEY_TO_PLAIN_COMMAND[key]
+            encoded = self._encode_plain_command(body)
+            success = self._send_websocket_bytes(cdp, encoded)
+            log.info("    Sent plain command: key=%s body=%r -> %s", key, body, success)
+            return success
 
-        text = key if len(key) == 1 else ""
-        cdp.send(
-            "Input.dispatchKeyEvent",
-            {"type": "keyDown", "key": dom_key, "code": key_code, "text": text},
-        )
-        cdp.send(
-            "Input.dispatchKeyEvent",
-            {"type": "keyUp", "key": dom_key, "code": key_code},
-        )
+        log.warning("    Unknown key: %s (no command mapping)", key)
+        return False
 
     def _inject_mouse_click(self, cdp: CDPSessionProtocol, x: int, y: int) -> None:
         """Inject a mouse click via CDP.
@@ -171,20 +309,21 @@ class ProtocolProbe(BrowserSession):
         cdp: CDPSessionProtocol,
         key: str,
     ) -> None:
-        """Probe a single key input.
+        """Probe a single key by sending its command via WebSocket.
 
         Args:
             page: Playwright page.
             cdp: CDP session.
-            key: Key to press.
+            key: Key to probe (e.g., 's', 'd', 'f', 'q').
         """
         msg_count_before = len(self._messages)
         timestamp = get_current_time_ms()
 
         log.info("Probing key: %s (msg_count_before=%d)", key, msg_count_before)
-        self._inject_key(cdp, key)
+        sent = self._send_key_command(cdp, key)
 
-        self._wait_for_response(page, msg_count_before)
+        if sent:
+            self._wait_for_response(page, msg_count_before)
 
         all_after = self._messages[msg_count_before:]
         sent_after = [m for m in all_after if m["direction"] == "sent"]
@@ -192,8 +331,8 @@ class ProtocolProbe(BrowserSession):
 
         log.info("  -> sent %d, recv %d", len(sent_after), len(recv_after))
         for msg in all_after:
-            preview = msg["payload"][:60] if len(msg["payload"]) > 60 else msg["payload"]
-            log.info("    %s: %s", msg["direction"].upper(), preview)
+            decoded = _decode_message(msg["payload"], msg["direction"], self._magic)
+            log.info("    %s", decoded)
 
         key_input = KeyInput(key=key)
         probe_input = ProbeInput(input_type="key", key_input=key_input, mouse_input=None)
@@ -233,6 +372,9 @@ class ProtocolProbe(BrowserSession):
         recv_after = [m for m in all_after if m["direction"] == "received"]
 
         log.info("  -> sent %d, recv %d", len(sent_after), len(recv_after))
+        for msg in all_after:
+            decoded = _decode_message(msg["payload"], msg["direction"], self._magic)
+            log.info("    %s", decoded)
 
         mouse_input = MouseInput(x=x, y=y, button="left")
         probe_input = ProbeInput(input_type="mouse", key_input=None, mouse_input=mouse_input)
@@ -274,29 +416,17 @@ class ProtocolProbe(BrowserSession):
         page: PageProtocol,
         cdp: CDPSessionProtocol,
         keys: list[str],
-        viewport_w: int,
-        viewport_h: int,
     ) -> None:
-        """Probe a list of keys.
+        """Probe a list of keys by sending their commands via WebSocket.
 
         Args:
             page: Playwright page.
             cdp: CDP session.
             keys: Keys to probe.
-            viewport_w: Viewport width.
-            viewport_h: Viewport height.
         """
         for key in keys:
-            log.info("Pressing Escape to close chat/menus")
-            self._inject_key(cdp, "Escape")
-            page.wait_for_timeout(100.0)
-
-            focus_x = viewport_w // 4
-            focus_y = viewport_h // 4
-            log.info("Clicking (%d, %d) to focus game canvas", focus_x, focus_y)
-            self._inject_mouse_click(cdp, focus_x, focus_y)
-            page.wait_for_timeout(200.0)
-
+            # Wait between commands
+            page.wait_for_timeout(500.0)
             self._probe_single_key(page, cdp, key)
 
     def _probe_mouse_positions(
@@ -340,8 +470,10 @@ class ProtocolProbe(BrowserSession):
     ) -> ProbeSession:
         """Run the probe and return captured results.
 
+        Sends known commands via WebSocket injection and captures responses.
+
         Args:
-            probe_keys: List of keys to test.
+            probe_keys: List of keys to test (must have known command mappings).
             probe_mouse_positions: List of (x_fraction, y_fraction) positions.
             wait_after_join_ms: Time to wait after joining game (unused, kept for API compat).
             wait_after_input_ms: Time to wait after each input (unused, kept for API compat).
@@ -352,6 +484,7 @@ class ProtocolProbe(BrowserSession):
         Raises:
             PlaywrightNotInstalledError: If Playwright hook is not installed.
             GameNotJoinedError: If failed to join game.
+            ProbeError: If magic key not captured (needed for XOR encoding).
         """
         _ = wait_after_join_ms  # Unused - wait logic is in _wait_for_game_ready
         _ = wait_after_input_ms  # Unused - wait logic is in _wait_for_response
@@ -374,10 +507,14 @@ class ProtocolProbe(BrowserSession):
             self._navigate_and_login(page, cdp, tank_name_prefix="P", auto_join_room=True)
             self._wait_for_game_ready(page)
 
+            # Build XOR table now that magic key is captured
+            self._build_xor_table()
+
             viewport_w, viewport_h = self._get_viewport_size(cdp)
             log.info("Viewport size: %dx%d", viewport_w, viewport_h)
 
-            self._probe_keys(page, cdp, probe_keys, viewport_w, viewport_h)
+            # Send commands via WebSocket injection
+            self._probe_keys(page, cdp, probe_keys)
             self._probe_mouse_positions(page, cdp, probe_mouse_positions, viewport_w, viewport_h)
 
             log.info("Waiting 10 seconds to observe...")
@@ -484,10 +621,22 @@ def main() -> None:
     wait_input_str = _test_hooks.get_env("TANKPIT_WAIT_INPUT_MS")
     wait_after_input_ms = int(wait_input_str) if wait_input_str else 1000
 
+    # Basic CLI arg parsing for keys
+    argv = _test_hooks.get_argv()
+
+    probe_keys = None
+    if "--keys" in argv:
+        idx = argv.index("--keys")
+        if idx + 1 < len(argv):
+            keys_str = argv[idx + 1]
+            probe_keys = [k.strip() for k in keys_str.split(",")]
+            log.info("Overriding probe keys: %s", probe_keys)
+
     session = run_probe(
         target_url,
         output_path,
         headless=headless,
+        probe_keys=probe_keys,
         wait_after_join_ms=wait_after_join_ms,
         wait_after_input_ms=wait_after_input_ms,
     )
@@ -504,13 +653,17 @@ def main() -> None:
 
 
 __all__ = [
+    "COMMAND_TYPE_BYTE",
     "DEFAULT_MOUSE_POSITIONS",
     "DEFAULT_PROBE_KEYS",
+    "KEY_TO_COMMAND",
+    "KEY_TO_PLAIN_COMMAND",
     "GameNotJoinedError",
     "PlaywrightNotInstalledError",
     "ProbeError",
     "ProtocolProbe",
     "_log_discovered_commands",
+    "extract_cdp_evaluate_value",
     "main",
     "run_probe",
 ]
