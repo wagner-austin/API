@@ -156,6 +156,7 @@ TankpitBot/
 │   ├── _test_hooks.py    # Dependency injection hooks
 │   ├── types.py          # TypedDict models
 │   ├── login.py          # Shared guest/account login logic
+│   ├── browser.py        # Shared browser session base class
 │   ├── sniffer.py        # WebSocket capture via Playwright
 │   ├── probe.py          # Input injection and command discovery
 │   ├── codec.py          # XOR encode/decode with static + session keys
@@ -169,14 +170,22 @@ TankpitBot/
 │   ├── fakes.py              # Fake Playwright classes for testing
 │   ├── test_types.py         # Type encode/decode tests
 │   ├── test_login.py         # Login flow tests
+│   ├── test_browser.py       # BrowserSession tests
 │   ├── test_sniffer.py       # Sniffer tests with fake Playwright
 │   ├── test_probe.py         # Probe tests with fake CDP
+│   ├── test_codec.py         # XOR codec tests
+│   ├── test_framing.py       # Framing encode/decode tests
+│   ├── test_decoder.py       # Session decoder tests
+│   ├── test_parser.py        # Lobby message parser tests
+│   ├── test_commands.py      # Command type tests
 │   ├── test_bot.py           # Bot entry point tests
 │   ├── test_test_hooks.py    # Hook function tests
-│   └── test_guard_checks.py  # Guard script tests
+│   ├── test_guard_checks.py  # Guard script tests
+│   └── test_verify_decode.py # Verify decode script tests
 ├── scripts/
 │   ├── guard.py          # Monorepo guard orchestrator
-│   └── _test_hooks.py    # Guard test hooks
+│   ├── _test_hooks.py    # Guard test hooks
+│   └── verify_decode.py  # Session decoder CLI
 ├── docs/
 │   └── protocol.md       # Protocol documentation
 ├── pyproject.toml        # Poetry + tool config
