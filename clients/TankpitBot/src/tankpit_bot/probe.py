@@ -254,7 +254,7 @@ class ProtocolProbe(BrowserSession):
         """
         return encode_frame(body)
 
-    def _send_key_command(self, cdp: CDPSessionProtocol, key: str) -> bool:
+    def _send_key_command(self, cdp: CDPSessionProtocol, key: str) -> str:
         """Send a game command for the given key via WebSocket.
 
         Args:
@@ -262,7 +262,7 @@ class ProtocolProbe(BrowserSession):
             key: Key to send command for (e.g., 's', 'd', 'f', 'q').
 
         Returns:
-            True if command was sent, False if key has no known command.
+            Status string from WebSocket send, or 'UNKNOWN_KEY' if no mapping.
 
         Raises:
             ProbeError: If XOR table not initialized (for XOR commands).
@@ -271,20 +271,20 @@ class ProtocolProbe(BrowserSession):
         if key in KEY_TO_COMMAND:
             cmd_id = KEY_TO_COMMAND[key]
             encoded = self._encode_xor_command(cmd_id)
-            success = self._send_websocket_bytes(cdp, encoded)
-            log.info("    Sent XOR command: key=%s cmd_id=%d -> %s", key, cmd_id, success)
-            return success
+            result = self._send_websocket_bytes(cdp, encoded)
+            log.info("    Sent XOR command: key=%s cmd_id=%d -> %s", key, cmd_id, result)
+            return result
 
         # Check for plain text command
         if key in KEY_TO_PLAIN_COMMAND:
             body = KEY_TO_PLAIN_COMMAND[key]
             encoded = self._encode_plain_command(body)
-            success = self._send_websocket_bytes(cdp, encoded)
-            log.info("    Sent plain command: key=%s body=%r -> %s", key, body, success)
-            return success
+            result = self._send_websocket_bytes(cdp, encoded)
+            log.info("    Sent plain command: key=%s body=%r -> %s", key, body, result)
+            return result
 
         log.warning("    Unknown key: %s (no command mapping)", key)
-        return False
+        return "UNKNOWN_KEY"
 
     def _inject_mouse_click(self, cdp: CDPSessionProtocol, x: int, y: int) -> None:
         """Inject a mouse click via CDP.
@@ -320,9 +320,9 @@ class ProtocolProbe(BrowserSession):
         timestamp = get_current_time_ms()
 
         log.info("Probing key: %s (msg_count_before=%d)", key, msg_count_before)
-        sent = self._send_key_command(cdp, key)
+        result = self._send_key_command(cdp, key)
 
-        if sent:
+        if result.startswith("SENT_"):
             self._wait_for_response(page, msg_count_before)
 
         all_after = self._messages[msg_count_before:]
@@ -336,13 +336,13 @@ class ProtocolProbe(BrowserSession):
 
         key_input = KeyInput(key=key)
         probe_input = ProbeInput(input_type="key", key_input=key_input, mouse_input=None)
-        result = ProbeResult(
+        probe_result = ProbeResult(
             input=probe_input,
             timestamp_ms=timestamp,
             messages_before_count=msg_count_before,
             messages_after=sent_after,
         )
-        self._results.append(result)
+        self._results.append(probe_result)
 
     def _probe_single_mouse(
         self,
