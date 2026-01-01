@@ -178,9 +178,36 @@ class BrowserSession:
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
         """Set up CDP event handlers for WebSocket capture.
 
+        Also installs a WebSocket prototype hook to capture the game's
+        WebSocket instance for later command injection.
+
         Args:
             cdp: CDP session.
         """
+        # Enable Page domain first - required for script injection to work
+        cdp.send("Page.enable")
+
+        # Install WebSocket prototype hook BEFORE any page loads
+        # This captures the WebSocket instance when the game first sends data
+        cdp.send(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+            (function() {
+                window.__capturedWS = null;
+                const origSend = WebSocket.prototype.send;
+                WebSocket.prototype.send = function(data) {
+                    if (!window.__capturedWS && this.readyState === 1) {
+                        window.__capturedWS = this;
+                    }
+                    return origSend.call(this, data);
+                };
+            })();
+            """
+            },
+        )
+
+        # Enable Network domain for WebSocket frame capture
         cdp.send("Network.enable")
         cdp.on("Network.webSocketCreated", self._on_websocket_created)
         cdp.on("Network.webSocketFrameReceived", self._on_websocket_frame_received)
@@ -196,6 +223,44 @@ class BrowserSession:
         if isinstance(magic_value, str) and len(magic_value) > 0:
             self._magic = magic_value
             log.info("Captured magic key: %s...", magic_value[:20])
+
+    def _send_websocket_bytes(self, cdp: CDPSessionProtocol, data: bytes) -> bool:
+        """Send raw bytes via the captured WebSocket.
+
+        Uses the WebSocket instance captured by the prototype hook installed
+        in _setup_cdp_handlers.
+
+        Args:
+            cdp: CDP session.
+            data: Raw bytes to send.
+
+        Returns:
+            True if sent successfully, False otherwise.
+        """
+        import base64
+
+        b64 = base64.b64encode(data).decode()
+
+        send_js = f"""
+        (() => {{
+            const ws = window.__capturedWS;
+            if (!ws) return 'NO_WS';
+            if (ws.readyState !== 1) return 'NOT_OPEN';
+            const binary = atob('{b64}');
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {{
+                bytes[i] = binary.charCodeAt(i);
+            }}
+            ws.send(bytes.buffer);
+            return 'OK';
+        }})()
+        """
+        result = cdp.send("Runtime.evaluate", {"expression": send_js, "returnByValue": True})
+        result_obj = result.get("result")
+        if isinstance(result_obj, dict):
+            status = result_obj.get("value")
+            return status == "OK"
+        return False
 
     def _wait_for_game_ready(self, page: PageProtocol) -> None:
         """Wait for game to fully load (message flow stabilizes).
