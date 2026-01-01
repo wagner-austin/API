@@ -102,6 +102,11 @@ KEY_TO_PLAIN_COMMAND: dict[str, bytes] = {
     "q": PLAIN_QUIT,  # 'q' key -> quit game ('-')
 }
 
+# Toggle keys that open/close UI elements
+# First press: WebSocket command to open
+# Second press: JavaScript keypress to close (matches test_map_command.py)
+TOGGLE_KEYS: set[str] = {"f"}
+
 # Session type byte for XOR commands (discovered from protocol analysis)
 COMMAND_TYPE_BYTE = 2
 
@@ -109,12 +114,12 @@ COMMAND_TYPE_BYTE = 2
 # Default probe configuration
 # =============================================================================
 
-# Standard game action keys to probe (only keys with known commands)
+# Standard game action keys to probe (matches test_map_command.py order)
 DEFAULT_PROBE_KEYS: list[str] = [
+    "f",  # Map open (WebSocket)
+    "f",  # Map close (JS keypress toggle)
     "s",  # Radar
     "d",  # Mine
-    "f",  # Map open
-    "f",  # Map close (toggle)
     "q",  # Quit
 ]
 
@@ -156,6 +161,9 @@ class ProtocolProbe(BrowserSession):
         key_path = static_key_path if static_key_path is not None else DEFAULT_STATIC_KEY_PATH
         self._static_key = load_static_key(key_path)
         self._xor_table: bytes | None = None
+
+        # Track open toggle keys (e.g., map opened with 'f')
+        self._open_toggles: set[str] = set()
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
         """Signal when a received message arrives.
@@ -286,6 +294,42 @@ class ProtocolProbe(BrowserSession):
         log.warning("    Unknown key: %s (no command mapping)", key)
         return "UNKNOWN_KEY"
 
+    def _send_js_keypress(self, cdp: CDPSessionProtocol, key: str) -> str:
+        """Send a JavaScript keypress event to close a toggle UI.
+
+        Used for closing UI elements (like map) that were opened via WebSocket.
+        Matches test_map_command.py behavior: dispatches KeyboardEvent to multiple targets.
+
+        Args:
+            cdp: CDP session.
+            key: Key to send (e.g., 'f').
+
+        Returns:
+            Status string from JavaScript execution.
+        """
+        key_code = ord(key.upper()) if len(key) == 1 else 0
+        js_code = f"""
+        (() => {{
+            const targets = [document, window, document.body,
+                             document.querySelector('canvas')];
+            for (let target of targets) {{
+                if (!target) continue;
+                const event = new KeyboardEvent('keydown', {{
+                    key: '{key}', code: 'Key{key.upper()}', keyCode: {key_code}, which: {key_code},
+                    bubbles: true, cancelable: true
+                }});
+                target.dispatchEvent(event);
+            }}
+            return 'JS_KEYPRESS_{key.upper()}';
+        }})()
+        """
+        result = cdp.send("Runtime.evaluate", {"expression": js_code, "returnByValue": True})
+        result_obj = result.get("result")
+        if isinstance(result_obj, dict):
+            val = result_obj.get("value", "?")
+            return str(val) if val is not None else "?"
+        return "?"
+
     def _inject_mouse_click(self, cdp: CDPSessionProtocol, x: int, y: int) -> None:
         """Inject a mouse click via CDP.
 
@@ -309,7 +353,11 @@ class ProtocolProbe(BrowserSession):
         cdp: CDPSessionProtocol,
         key: str,
     ) -> None:
-        """Probe a single key by sending its command via WebSocket.
+        """Probe a single key by sending its command via WebSocket or JS keypress.
+
+        For toggle keys (like 'f' for map):
+        - First press: WebSocket command to open
+        - Second press: JavaScript keypress to close (matches test_map_command.py)
 
         Args:
             page: Playwright page.
@@ -319,11 +367,23 @@ class ProtocolProbe(BrowserSession):
         msg_count_before = len(self._messages)
         timestamp = get_current_time_ms()
 
-        log.info("Probing key: %s (msg_count_before=%d)", key, msg_count_before)
-        result = self._send_key_command(cdp, key)
-
-        if result.startswith("SENT_"):
-            self._wait_for_response(page, msg_count_before)
+        # Handle toggle keys: alternate between WS open and JS close
+        if key in TOGGLE_KEYS and key in self._open_toggles:
+            log.info("Closing toggle key: %s (msg_count_before=%d)", key, msg_count_before)
+            result = self._send_js_keypress(cdp, key)
+            log.info("    Sent JS keypress: key=%s -> %s", key, result)
+            self._open_toggles.remove(key)
+            # JS keypress may trigger responses
+            if result.startswith("JS_KEYPRESS_"):
+                self._wait_for_response(page, msg_count_before)
+        else:
+            log.info("Probing key: %s (msg_count_before=%d)", key, msg_count_before)
+            result = self._send_key_command(cdp, key)
+            if result.startswith("SENT_"):
+                self._wait_for_response(page, msg_count_before)
+                # Mark toggle key as open
+                if key in TOGGLE_KEYS:
+                    self._open_toggles.add(key)
 
         all_after = self._messages[msg_count_before:]
         sent_after = [m for m in all_after if m["direction"] == "sent"]
@@ -503,8 +563,14 @@ class ProtocolProbe(BrowserSession):
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 
+            # Set up console listener and CDP handlers
+            self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)
             self._navigate_and_login(page, cdp, tank_name_prefix="P", auto_join_room=True)
+
+            # Gather all available intel
+            self._gather_intel(page, cdp)
+
             self._wait_for_game_ready(page)
 
             # Build XOR table now that magic key is captured
