@@ -994,7 +994,7 @@ Get training job status.
 ```json
 {
   "job_id": "train-job-uuid",
-  "status": "completed",
+  "status": "finished",
   "result": {
     "model_path": "/data/models/model-2024-01-01.ubj",
     "accuracy": 0.92
@@ -1010,6 +1010,7 @@ Get training job status.
 | `started` | Job is currently running |
 | `finished` | Job completed successfully |
 | `failed` | Job failed with error |
+| `not_found` | Job ID not found in queue |
 
 ---
 

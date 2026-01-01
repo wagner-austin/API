@@ -18,6 +18,7 @@ Complete API documentation for the covenant-radar-api service.
 | [Measurement Endpoints](api/measurements.md) | Financial measurement management |
 | [Evaluation Endpoints](api/evaluation.md) | Covenant compliance evaluation |
 | [ML Endpoints](api/ml.md) | Model training, optimization, prediction, and explanation |
+| [Dashboard](api/dashboard.md) | Real-time monitoring UI |
 | [CLI Tools](api/cli.md) | Command-line tools for local development |
 
 ## Integrations
@@ -85,6 +86,12 @@ Complete API documentation for the covenant-radar-api service.
 | `/ml/jobs/{job_id}` | GET | Get job status |
 | `/ml/models/active` | GET | Get active model info |
 
+### Dashboard
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/dashboard` | GET | Real-time monitoring UI (HTML) |
+
 ---
 
 ## Error Handling
@@ -150,7 +157,8 @@ When [Datadog integration](integrations/datadog.md) is enabled, logs also includ
 - `application/json` (for all POST/PUT endpoints)
 
 **Response content types:**
-- `application/json` (all endpoints)
+- `application/json` (all API endpoints)
+- `text/html` (`/dashboard` endpoint only)
 
 ---
 
