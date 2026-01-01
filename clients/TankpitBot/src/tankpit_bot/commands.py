@@ -33,6 +33,9 @@ CMD_RADAR = 102  # 0x66 - 's' key - Toggle radar display
 CMD_MINE = 107  # 0x6b - 'd' key - Drop mine
 CMD_MAP_OPEN = 108  # 0x6c - 'f' key - Open map view
 
+# XOR-encoded commands (type=3, start with '!')
+CMD_TOP10 = 49  # 0x31 - 't/r/p/b/o' keys - Leaderboard (extra byte: ff=all, 00-03=team)
+
 # Plain commands (no XOR encoding, just length header + body)
 PLAIN_QUIT = b"-"  # 'q' key - Quit game and return to lobby
 
@@ -260,6 +263,7 @@ __all__ = [
     "CMD_MAP_OPEN",
     "CMD_MINE",
     "CMD_RADAR",
+    "CMD_TOP10",
     "COMMAND_PREFIX",
     "PLAIN_QUIT",
     "ActionCommand",
