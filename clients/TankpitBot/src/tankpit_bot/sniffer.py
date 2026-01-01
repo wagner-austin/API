@@ -214,6 +214,8 @@ class WebSocketSniffer(BrowserSession):
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 
+            # Set up console listener and CDP handlers
+            self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)
 
             # Navigate to target URL
@@ -223,14 +225,8 @@ class WebSocketSniffer(BrowserSession):
             # Handle login
             self._navigate_and_login(page, cdp, tank_name_prefix="B", auto_join_room=False)
 
-            # Log loaded script URLs for protocol analysis
-            script_urls = page.evaluate(
-                "Array.from(document.querySelectorAll('script[src]')).map(s => s.src)"
-            )
-            if script_urls and isinstance(script_urls, list):
-                for url in script_urls:
-                    if isinstance(url, str):
-                        log.info("Script: %s", url)
+            # Gather all available intel
+            self._gather_intel(page, cdp)
 
             # Wait for specified capture duration (0 = wait until browser closed)
             if capture_duration_ms <= 0:
