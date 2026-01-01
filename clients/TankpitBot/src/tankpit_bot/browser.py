@@ -224,18 +224,18 @@ class BrowserSession:
             self._magic = magic_value
             log.info("Captured magic key: %s...", magic_value[:20])
 
-    def _send_websocket_bytes(self, cdp: CDPSessionProtocol, data: bytes) -> bool:
+    def _send_websocket_bytes(self, cdp: CDPSessionProtocol, data: bytes) -> str:
         """Send raw bytes via the captured WebSocket.
 
         Uses the WebSocket instance captured by the prototype hook installed
-        in _setup_cdp_handlers.
+        in _setup_cdp_handlers, with fallbacks to tankpit.ws and window.ws.
 
         Args:
             cdp: CDP session.
             data: Raw bytes to send.
 
         Returns:
-            True if sent successfully, False otherwise.
+            Status string: 'SENT_N_BYTES via URL' on success, error message otherwise.
         """
         import base64
 
@@ -243,24 +243,44 @@ class BrowserSession:
 
         send_js = f"""
         (() => {{
-            const ws = window.__capturedWS;
-            if (!ws) return 'NO_WS';
-            if (ws.readyState !== 1) return 'NOT_OPEN';
+            // Use captured WebSocket from prototype hook
+            let ws = window.__capturedWS;
+
+            // Fallback: try common locations
+            if (!ws && typeof tankpit !== 'undefined' && tankpit.ws) {{
+                ws = tankpit.ws;
+            }}
+            if (!ws && typeof window.ws !== 'undefined') {{
+                ws = window.ws;
+            }}
+
+            if (!ws) {{
+                let status = window.__capturedWS ? 'exists' : 'null';
+                return 'NO_WEBSOCKET_FOUND (__capturedWS=' + status + ')';
+            }}
+
+            if (ws.readyState !== 1) {{
+                return 'WEBSOCKET_NOT_OPEN: ' + ws.readyState;
+            }}
+
+            // Decode base64 to binary
             const binary = atob('{b64}');
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) {{
                 bytes[i] = binary.charCodeAt(i);
             }}
+
+            // Send as binary
             ws.send(bytes.buffer);
-            return 'OK';
+            return 'SENT_' + bytes.length + '_BYTES via ' + ws.url;
         }})()
         """
         result = cdp.send("Runtime.evaluate", {"expression": send_js, "returnByValue": True})
         result_obj = result.get("result")
         if isinstance(result_obj, dict):
-            status = result_obj.get("value")
-            return status == "OK"
-        return False
+            val = result_obj.get("value", "?")
+            return str(val) if val is not None else "?"
+        return "?"
 
     def _wait_for_game_ready(self, page: PageProtocol) -> None:
         """Wait for game to fully load (message flow stabilizes).
