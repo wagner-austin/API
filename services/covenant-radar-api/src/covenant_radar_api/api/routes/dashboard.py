@@ -314,7 +314,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         // Check API health
         async function checkHealth() {
             try {
-                const response = await fetch('/health');
+                const response = await fetch('/healthz');
                 const badge = document.getElementById('status-badge');
                 if (response.ok) {
                     badge.textContent = 'Online';
@@ -480,9 +480,6 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             refreshAll();
-
-            // Demo mode: simulate predictions every 3 seconds
-            setInterval(simulatePrediction, 3000);
 
             // Refresh health and jobs every 10 seconds
             setInterval(refreshAll, 10000);
