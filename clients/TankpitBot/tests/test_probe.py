@@ -7,6 +7,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import SyncPlaywrightFactoryProtocol
+from tankpit_bot.browser import BrowserError, cdp_timestamp_to_ms, get_current_time_ms
 from tankpit_bot.probe import (
     DEFAULT_MOUSE_POSITIONS,
     DEFAULT_PROBE_KEYS,
@@ -14,8 +15,6 @@ from tankpit_bot.probe import (
     PlaywrightNotInstalledError,
     ProbeError,
     ProtocolProbe,
-    _cdp_timestamp_to_ms,
-    _get_current_time_ms,
     _log_discovered_commands,
     main,
     run_probe,
@@ -33,15 +32,15 @@ from tests.fakes import (
 
 
 def test_get_current_time_ms_returns_int() -> None:
-    """Test _get_current_time_ms returns an integer."""
-    result = _get_current_time_ms()
+    """Test get_current_time_ms returns an integer."""
+    result = get_current_time_ms()
     assert type(result) is int
     assert result > 0
 
 
 def test_cdp_timestamp_to_ms() -> None:
-    """Test _cdp_timestamp_to_ms converts seconds to milliseconds."""
-    result = _cdp_timestamp_to_ms(12345.678)
+    """Test cdp_timestamp_to_ms converts seconds to milliseconds."""
+    result = cdp_timestamp_to_ms(12345.678)
     assert result == 12345678
 
 
@@ -50,30 +49,22 @@ def test_cdp_timestamp_to_ms() -> None:
 # =============================================================================
 
 
-def test_default_probe_keys_contains_wasd() -> None:
-    """Test DEFAULT_PROBE_KEYS contains basic movement keys."""
-    assert "w" in DEFAULT_PROBE_KEYS
-    assert "a" in DEFAULT_PROBE_KEYS
-    assert "s" in DEFAULT_PROBE_KEYS
-    assert "d" in DEFAULT_PROBE_KEYS
+def test_default_probe_keys_contains_game_hotkeys() -> None:
+    """Test DEFAULT_PROBE_KEYS contains core game action keys."""
+    assert "w" in DEFAULT_PROBE_KEYS  # Forward
+    assert "s" in DEFAULT_PROBE_KEYS  # Brake
+    assert "d" in DEFAULT_PROBE_KEYS  # Turn right
+    assert " " in DEFAULT_PROBE_KEYS  # Fire
+    assert "r" in DEFAULT_PROBE_KEYS  # Radar
+    assert "x" in DEFAULT_PROBE_KEYS  # Use item
+    assert "f" in DEFAULT_PROBE_KEYS  # Map open/close
+    # Keys discovered via protocol probe
+    assert DEFAULT_PROBE_KEYS == ["w", "s", "d", " ", "r", "x", "f", "f"]
 
 
-def test_default_probe_keys_contains_arrows() -> None:
-    """Test DEFAULT_PROBE_KEYS contains arrow keys."""
-    assert "ArrowUp" in DEFAULT_PROBE_KEYS
-    assert "ArrowDown" in DEFAULT_PROBE_KEYS
-    assert "ArrowLeft" in DEFAULT_PROBE_KEYS
-    assert "ArrowRight" in DEFAULT_PROBE_KEYS
-
-
-def test_default_mouse_positions_contains_center() -> None:
-    """Test DEFAULT_MOUSE_POSITIONS contains center position."""
-    assert (0.5, 0.5) in DEFAULT_MOUSE_POSITIONS
-
-
-def test_default_mouse_positions_has_five_entries() -> None:
-    """Test DEFAULT_MOUSE_POSITIONS has 5 positions."""
-    assert len(DEFAULT_MOUSE_POSITIONS) == 5
+def test_default_mouse_positions_is_empty() -> None:
+    """Test DEFAULT_MOUSE_POSITIONS is empty (no mouse probing by default)."""
+    assert len(DEFAULT_MOUSE_POSITIONS) == 0
 
 
 # =============================================================================
@@ -296,7 +287,8 @@ def test_main_prints_discovered_commands(
 
     captured = capsys.readouterr()
     output = captured.out
-    assert "Discovered: Key 'w'" in output
+    # f is the first key (Map toggle)
+    assert "Discovered: Key 'f'" in output
 
 
 def test_protocol_probe_run_mouse_emits_messages(fake_fs: FakeFileSystem) -> None:
@@ -320,21 +312,21 @@ def test_protocol_probe_run_mouse_emits_messages(fake_fs: FakeFileSystem) -> Non
     assert len(result["messages_after"]) == 1
 
 
-def test_main_prints_mouse_discovered_commands(
+def test_main_prints_key_discovered_commands(
     fake_env: FakeEnv,
     fake_fs: FakeFileSystem,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Test main() prints discovered mouse commands that generated messages."""
-    from tests.fakes import fake_sync_playwright_probe_mouse_emits
-
-    _test_hooks.sync_playwright = fake_sync_playwright_probe_mouse_emits
+    """Test main() prints discovered key commands that generated messages."""
+    _test_hooks.sync_playwright = fake_sync_playwright_probe
 
     main()
 
     captured = capsys.readouterr()
     output = captured.out
-    assert "Discovered: Mouse" in output
+    # Keys should generate messages
+    assert "Discovered: Key 'w'" in output
+    assert "Discovered: Key 's'" in output
 
 
 def test_run_probe_multiple_mouse_positions_with_messages(
@@ -365,16 +357,12 @@ def test_run_probe_multiple_mouse_positions_with_messages(
         assert r["input"]["input_type"] == "mouse"
 
 
-def test_main_prints_both_key_and_mouse_commands(
+def test_main_prints_all_default_key_commands(
     fake_env: FakeEnv,
     fake_fs: FakeFileSystem,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Test main() prints both key and mouse discovered commands.
-
-    This test uses a probe that emits messages on both key and mouse inputs
-    to cover the loop iteration from mouse (573) back to for (567).
-    """
+    """Test main() prints all discovered key commands from defaults."""
     from tests.fakes import fake_sync_playwright_probe_both_emit
 
     _test_hooks.sync_playwright = fake_sync_playwright_probe_both_emit
@@ -383,8 +371,11 @@ def test_main_prints_both_key_and_mouse_commands(
 
     captured = capsys.readouterr()
     output = captured.out
+    # All default keys should generate discovered messages
     assert "Discovered: Key 'w'" in output
-    assert "Discovered: Mouse" in output
+    assert "Discovered: Key 's'" in output
+    assert "Discovered: Key 'd'" in output
+    assert "Discovered: Key 'f'" in output
 
 
 def test_protocol_probe_run_no_key_emit(fake_fs: FakeFileSystem) -> None:
@@ -475,14 +466,14 @@ def test_probe_error_is_exception() -> None:
     assert str(err) == "test error"
 
 
-def test_playwright_not_installed_error_is_probe_error() -> None:
-    """Test PlaywrightNotInstalledError is a ProbeError."""
-    assert issubclass(PlaywrightNotInstalledError, ProbeError)
+def test_playwright_not_installed_error_is_browser_error() -> None:
+    """Test PlaywrightNotInstalledError is a BrowserError."""
+    assert issubclass(PlaywrightNotInstalledError, BrowserError)
 
 
-def test_game_not_joined_error_is_probe_error() -> None:
-    """Test GameNotJoinedError is a ProbeError."""
-    assert issubclass(GameNotJoinedError, ProbeError)
+def test_game_not_joined_error_is_browser_error() -> None:
+    """Test GameNotJoinedError is a BrowserError."""
+    assert issubclass(GameNotJoinedError, BrowserError)
 
 
 # =============================================================================
@@ -512,3 +503,57 @@ def test_log_discovered_commands_mouse_with_none_input() -> None:
     )
     # Should not raise, just skip logging
     _log_discovered_commands([result])
+
+
+def test_log_discovered_commands_mouse_with_messages(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test _log_discovered_commands logs mouse results with messages."""
+    from tankpit_bot.types import CapturedMessage, MouseInput
+
+    result = ProbeResult(
+        input=ProbeInput(
+            input_type="mouse",
+            key_input=None,
+            mouse_input=MouseInput(x=100, y=200, button="left"),
+        ),
+        timestamp_ms=12345,
+        messages_before_count=0,
+        messages_after=[
+            CapturedMessage(
+                timestamp_ms=12346,
+                direction="sent",
+                payload="test_payload",
+                ws_url="wss://test.com/ws",
+            )
+        ],
+    )
+    _log_discovered_commands([result])
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Discovered: Mouse (100,200) -> 1 msg(s)" in output
+
+
+def test_protocol_probe_run_stabilization_reset(fake_fs: FakeFileSystem) -> None:
+    """Test probe stabilization loop resets when new messages arrive.
+
+    This covers the branch where stable_checks is reset to 0 when
+    messages continue to arrive during the stabilization wait.
+    """
+    from tests.fakes import fake_sync_playwright_probe_delayed_messages
+
+    _test_hooks.sync_playwright = fake_sync_playwright_probe_delayed_messages
+
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+    session = probe.run(
+        probe_keys=["w"],
+        probe_mouse_positions=[],
+        wait_after_join_ms=100,
+        wait_after_input_ms=50,
+    )
+
+    # Should still complete successfully with extra message from stabilization
+    assert len(session["results"]) == 1
+    # Should have captured the extra message during stabilization
+    assert len(probe._messages) > 2  # More than just initial auth + room_list
