@@ -89,6 +89,7 @@ class ServiceContainer:
         _ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
         _data_bank_url: URL for data-bank-api (empty if not configured).
         _data_bank_key: API key for data-bank-api (empty if not configured).
+        _data_bank_model_file_id: Model file_id to download from data-bank.
     """
 
     settings: Settings
@@ -103,6 +104,7 @@ class ServiceContainer:
     _ml_backend: MLBackend
     _data_bank_url: str
     _data_bank_key: str
+    _data_bank_model_file_id: str
 
     def __init__(
         self: ServiceContainer,
@@ -117,6 +119,7 @@ class ServiceContainer:
         ml_backend: MLBackend,
         data_bank_url: str = "",
         data_bank_key: str = "",
+        data_bank_model_file_id: str = "",
     ) -> None:
         """Initialize container with dependencies.
 
@@ -132,6 +135,7 @@ class ServiceContainer:
             ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
             data_bank_url: URL for data-bank-api (empty if not configured).
             data_bank_key: API key for data-bank-api (empty if not configured).
+            data_bank_model_file_id: Model file_id to download from data-bank.
         """
         self.settings = settings
         self.redis = redis
@@ -149,6 +153,7 @@ class ServiceContainer:
         self._ml_backend = ml_backend
         self._data_bank_url = data_bank_url
         self._data_bank_key = data_bank_key
+        self._data_bank_model_file_id = data_bank_model_file_id
 
     @classmethod
     def from_settings(
@@ -199,6 +204,7 @@ class ServiceContainer:
         # Get data-bank config
         data_bank_url = settings["app"]["data_bank_api_url"]
         data_bank_key = settings["app"]["data_bank_api_key"]
+        data_bank_model_file_id = settings["app"]["data_bank_model_file_id"]
 
         container = cls(
             settings=settings,
@@ -212,6 +218,7 @@ class ServiceContainer:
             ml_backend=ml_backend,
             data_bank_url=data_bank_url,
             data_bank_key=data_bank_key,
+            data_bank_model_file_id=data_bank_model_file_id,
         )
 
         if eager_load_model:
@@ -315,19 +322,15 @@ class ServiceContainer:
         return worker_hooks.lightgbm_loader(model_p)
 
     def _get_model_file_id(self: ServiceContainer) -> str:
-        """Get the file_id to download from data-bank based on backend.
+        """Get the file_id to download from data-bank.
+
+        Returns the configured DATA_BANK_MODEL_FILE_ID if set, otherwise
+        returns an empty string indicating no model should be downloaded.
 
         Returns:
-            File ID string matching the active model filename.
+            File ID string (SHA256 hash) or empty string if not configured.
         """
-        if self._ml_backend == "xgboost":
-            return "active_xgb.ubj"
-        if self._ml_backend == "mlp":
-            return "active_mlp.pt"
-        if self._ml_backend == "lstm":
-            return "active_lstm.pt"
-        # lightgbm
-        return "active_lgbm.txt"
+        return self._data_bank_model_file_id
 
     def _download_model_from_data_bank(self: ServiceContainer, dest_path: Path) -> bool:
         """Download model from data-bank-api if configured.
@@ -344,6 +347,10 @@ class ServiceContainer:
             return False
 
         file_id = self._get_model_file_id()
+        if not file_id:
+            _log.debug("No model file_id configured, skipping download")
+            return False
+
         _log.info(
             "Attempting to download model from data-bank",
             extra={"file_id": file_id, "dest_path": str(dest_path)},
