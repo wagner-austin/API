@@ -36,12 +36,43 @@ DEFAULT_OUTPUT_PATH = "capture_session.json"
 DEFAULT_CAPTURE_DURATION_MS = 0  # 0 = indefinite (wait until browser closed)
 
 
-def _decode_message(payload: str, direction: str) -> str:
+def _decode_text_message(text: str, body_len: int, tag: str) -> str:
+    """Decode a text-based protocol message.
+
+    Args:
+        text: Decoded text body.
+        body_len: Original body length in bytes.
+        tag: Direction tag (SENT/RECEIVED).
+
+    Returns:
+        Human-readable decoded message string.
+    """
+    if text == "-":
+        return f"[{tag}] QUIT: -"
+    if text.startswith("%AUTH"):
+        return f"[{tag}] AUTH: {text[:60]}..."
+    if text.startswith("+") and "|" in text:
+        return _decode_plus_message(text, tag)
+    if text.startswith("*"):
+        return f"[{tag}] SELECT: room={text[1:]}"
+    if text.startswith("="):
+        return _decode_join_confirm(text, tag)
+    if text.startswith("$"):
+        return f"[{tag}] RESPONSE: {text}"
+    if text.startswith("."):
+        return f"[{tag}] STATE: len={body_len} bytes"
+    # Unknown - show first 40 chars
+    preview = text[:40].replace("\n", " ")
+    return f"[{tag}] ???: {preview}..."
+
+
+def _decode_message(payload: str, direction: str, magic: str | None = None) -> str:
     """Decode a WebSocket message payload for display.
 
     Args:
         payload: Base64-encoded message payload.
         direction: 'sent' or 'received'.
+        magic: Captured XOR magic key.
 
     Returns:
         Human-readable decoded message string.
@@ -57,26 +88,13 @@ def _decode_message(payload: str, direction: str) -> str:
 
     # Header is 2-byte little-endian length, body follows
     body = data[2:]
-    text = body.decode("utf-8", errors="replace")
 
-    # Dispatch to specific decoders
-    if text.startswith("%AUTH"):
-        return f"[{tag}] AUTH: {text[:60]}..."
-    if text.startswith("+") and "|" in text:
-        return _decode_plus_message(text, tag)
-    if text.startswith("*"):
-        return f"[{tag}] SELECT: room={text[1:]}"
-    if text.startswith("="):
-        return _decode_join_confirm(text, tag)
-    if text.startswith("$"):
-        return f"[{tag}] RESPONSE: {text}"
-    if text.startswith("!"):
-        return _decode_command(body, text, tag)
-    if text.startswith("."):
-        return f"[{tag}] STATE: len={len(body)} bytes"
-    # Unknown - show first 40 chars
-    preview = text[:40].replace("\n", " ")
-    return f"[{tag}] ???: {preview}..."
+    # Handle XOR commands (starting with '!')
+    if len(body) > 0 and body[0] == 0x21:  # 0x21 is '!'
+        return _decode_command(body, tag, magic)
+
+    text = body.decode("utf-8", errors="replace")
+    return _decode_text_message(text, len(body), tag)
 
 
 def _decode_plus_message(text: str, tag: str) -> str:
@@ -100,13 +118,34 @@ def _decode_join_confirm(text: str, tag: str) -> str:
     return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name}"
 
 
-def _decode_command(body: bytes, text: str, tag: str) -> str:
+def _decode_command(body: bytes, tag: str, magic: str | None = None) -> str:
     """Decode a '!' prefixed command message."""
-    if len(body) >= 2:
-        cmd = chr(body[1]) if body[1] < 128 else f"0x{body[1]:02x}"
-        rest = body[2:].hex() if len(body) > 2 else ""
-        return f"[{tag}] CMD: !{cmd} {rest}"
-    return f"[{tag}] CMD: {text}"
+    if len(body) < 3:
+        return f"[{tag}] CMD: ! (too short: {body.hex()})"
+
+    # XOR decrypt if magic is available
+    if magic:
+        # Load static key (assuming same directory as this file)
+        static_key_path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
+        if _test_hooks.path_exists(static_key_path):
+            static_key = _test_hooks.read_text(static_key_path).strip()
+            # Build table
+            table = bytearray(len(static_key))
+            for i in range(len(static_key)):
+                table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
+
+            # Decrypt
+            decrypted = bytearray(len(body))
+            decrypted[0] = body[0]  # '!'
+            for i in range(1, len(body)):
+                decrypted[i] = body[i] ^ table[i - 1]
+
+            cmd_type = decrypted[1]
+            cmd_id = decrypted[2]
+            return f"[{tag}] CMD: ! type={cmd_type} id={cmd_id}"
+
+    # Fallback to hex if no magic or decrypt failed
+    return f"[{tag}] CMD: ! {body.hex()}"
 
 
 class SnifferError(Exception):
@@ -145,7 +184,7 @@ class WebSocketSniffer(BrowserSession):
             message: The captured message.
         """
         if self._live_decode:
-            decoded = _decode_message(message["payload"], message["direction"])
+            decoded = _decode_message(message["payload"], message["direction"], self._magic)
             log.info(decoded)
 
     def run(self, capture_duration_ms: int) -> CaptureSession:
@@ -196,6 +235,9 @@ class WebSocketSniffer(BrowserSession):
             # Wait for specified capture duration (0 = wait until browser closed)
             if capture_duration_ms <= 0:
                 log.info("Waiting indefinitely for browser close...")
+                # We can't easily run capture_loop in background with sync playwright
+                # without blocking. But _capture_magic_key is called in _navigate_and_login.
+                # Let's just ensure it's captured once we are in game.
                 page.wait_for_event("close", timeout=86_400_000)
             else:
                 log.info("Waiting for %d ms...", capture_duration_ms)
