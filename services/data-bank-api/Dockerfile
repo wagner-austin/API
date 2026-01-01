@@ -43,6 +43,9 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
 
+# Create data directory with correct ownership before switching to app user
+RUN mkdir -p /data/files && chown -R app:app /data/files
+
 WORKDIR /workspace
 
 COPY --from=builder /workspace/services/data-bank-api/dist/*.whl /workspace/dist/
