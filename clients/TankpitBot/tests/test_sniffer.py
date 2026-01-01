@@ -466,8 +466,9 @@ def test_main_logs_script_urls(
 
     captured = capsys.readouterr()
     output = captured.out
-    assert "Script: https://tankpit.com/js/game.js" in output
-    assert "Script: https://tankpit.com/js/protocol.js" in output
+    assert "Loaded scripts (2):" in output
+    assert "- https://tankpit.com/js/game.js" in output
+    assert "- https://tankpit.com/js/protocol.js" in output
 
 
 def test_main_logs_only_string_script_urls(
@@ -483,11 +484,12 @@ def test_main_logs_only_string_script_urls(
     captured = capsys.readouterr()
     output = captured.out
     # Should log the valid string URLs
-    assert "Script: https://tankpit.com/js/valid.js" in output
-    assert "Script: https://tankpit.com/js/another.js" in output
+    assert "Loaded scripts (4):" in output
+    assert "- https://tankpit.com/js/valid.js" in output
+    assert "- https://tankpit.com/js/another.js" in output
     # Should NOT log the non-string values (123, None)
-    assert "Script: 123" not in output
-    assert "Script: None" not in output
+    assert "- 123" not in output
+    assert "- None" not in output
 
 
 # =============================================================================
