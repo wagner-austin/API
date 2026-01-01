@@ -625,7 +625,7 @@ def test_protocol_probe_send_key_command_unknown_key(
     # 'w' is not in KEY_TO_COMMAND or KEY_TO_PLAIN_COMMAND
     result = probe._send_key_command(cdp, "w")
 
-    assert result is False
+    assert result == "UNKNOWN_KEY"
     captured = capsys.readouterr()
     output = captured.out
     assert "Unknown key: w" in output
@@ -703,5 +703,5 @@ def test_send_websocket_bytes_returns_false_on_non_dict_result(
     # Call _send_websocket_bytes with the fake CDP
     result = session._send_websocket_bytes(cdp, b"test_data")
 
-    # Should return False since result["result"] is not a dict
-    assert result is False
+    # Should return "?" since result["result"] is not a dict
+    assert result == "?"
