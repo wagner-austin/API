@@ -10,7 +10,7 @@ from __future__ import annotations
 import types
 from collections.abc import Callable
 
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot._test_hooks import (
     BrowserContextProtocol,
@@ -130,13 +130,27 @@ class FakeCDPSessionRateLimited:
 class FakePage:
     """Fake Playwright Page that emits WebSocket events."""
 
-    def __init__(self, cdp_session: FakeCDPSession | FakeCDPSessionRateLimited) -> None:
-        """Initialize fake page."""
+    def __init__(
+        self,
+        cdp_session: FakeCDPSession | FakeCDPSessionRateLimited,
+        *,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
+    ) -> None:
+        """Initialize fake page.
+
+        Args:
+            cdp_session: CDP session to use for events.
+            script_urls: Optional list of script URLs to return from evaluate.
+            magic: Optional magic value to return for tankpit.magic evaluate.
+        """
         self._cdp_session = cdp_session
         self._goto_url: str | None = None
         self._wait_timeout: float | None = None
         self._closed = False
         self._url = ""
+        self._script_urls: list[JSONValue] = script_urls if script_urls is not None else []
+        self._magic = magic
 
     @property
     def url(self) -> str:
@@ -181,10 +195,45 @@ class FakePage:
             },
         )
 
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event - also emit WebSocket events like wait_for_timeout."""
+        _ = (event, timeout)
+        # Emit the same events as wait_for_timeout for test compatibility
+        self._cdp_session.emit_event(
+            "Network.webSocketCreated",
+            {"requestId": "1.1", "url": "wss://example.com/ws"},
+        )
+        self._cdp_session.emit_event(
+            "Network.webSocketFrameSent",
+            {
+                "requestId": "1.1",
+                "timestamp": 100.0,
+                "response": {"opcode": 1, "mask": True, "payloadData": "sent message"},
+            },
+        )
+        self._cdp_session.emit_event(
+            "Network.webSocketFrameReceived",
+            {
+                "requestId": "1.1",
+                "timestamp": 100.5,
+                "response": {"opcode": 1, "mask": False, "payloadData": "received message"},
+            },
+        )
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
         self._closed = True
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression.
+
+        Returns:
+            Magic value if expression is 'tankpit.magic', otherwise script_urls.
+        """
+        if expression == "tankpit.magic":
+            return self._magic
+        return self._script_urls
 
 
 class FakePageNoMessages:
@@ -218,10 +267,19 @@ class FakePageNoMessages:
         """Wait without emitting any WebSocket events."""
         _ = timeout
 
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event - returns immediately in tests."""
+        _ = (event, timeout)
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
         self._closed = True
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression - returns empty list in tests."""
+        _ = expression
+        return []
 
 
 class FakeBrowserContext:
@@ -233,8 +291,18 @@ class FakeBrowserContext:
         emit_messages: bool = True,
         rate_limited: bool = False,
         login_fails: bool = False,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
     ) -> None:
-        """Initialize fake browser context."""
+        """Initialize fake browser context.
+
+        Args:
+            emit_messages: Whether to emit WebSocket messages.
+            rate_limited: Whether to simulate rate limiting.
+            login_fails: Whether login should fail.
+            script_urls: Script URLs to return from page.evaluate().
+            magic: Magic value to return for tankpit.magic evaluate.
+        """
         cdp: FakeCDPSession | FakeCDPSessionRateLimited = (
             FakeCDPSessionRateLimited(login_fails=login_fails) if rate_limited else FakeCDPSession()
         )
@@ -243,12 +311,14 @@ class FakeBrowserContext:
         self._closed = False
         self._emit_messages = emit_messages
         self._rate_limited = rate_limited
+        self._script_urls = script_urls
+        self._magic = magic
 
     def new_page(self) -> PageProtocol:
         """Create new page."""
         page: FakePage | FakePageNoMessages
         if self._emit_messages:
-            page = FakePage(self._cdp_session)
+            page = FakePage(self._cdp_session, script_urls=self._script_urls, magic=self._magic)
         else:
             page = FakePageNoMessages(self._cdp_session)
         self._pages.append(page)
@@ -274,13 +344,25 @@ class FakeBrowser:
         emit_messages: bool = True,
         rate_limited: bool = False,
         login_fails: bool = False,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
     ) -> None:
-        """Initialize fake browser."""
+        """Initialize fake browser.
+
+        Args:
+            emit_messages: Whether to emit WebSocket messages.
+            rate_limited: Whether to simulate rate limiting.
+            login_fails: Whether login should fail.
+            script_urls: Script URLs to return from page.evaluate().
+            magic: Magic value to return for tankpit.magic evaluate.
+        """
         self._contexts: list[FakeBrowserContext] = []
         self._closed = False
         self._emit_messages = emit_messages
         self._rate_limited = rate_limited
         self._login_fails = login_fails
+        self._script_urls = script_urls
+        self._magic = magic
 
     def new_context(self) -> BrowserContextProtocol:
         """Create new context."""
@@ -288,6 +370,8 @@ class FakeBrowser:
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,
             login_fails=self._login_fails,
+            script_urls=self._script_urls,
+            magic=self._magic,
         )
         self._contexts.append(ctx)
         return ctx
@@ -307,12 +391,24 @@ class FakeBrowserType:
         emit_messages: bool = True,
         rate_limited: bool = False,
         login_fails: bool = False,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
     ) -> None:
-        """Initialize fake browser type."""
+        """Initialize fake browser type.
+
+        Args:
+            emit_messages: Whether to emit WebSocket messages.
+            rate_limited: Whether to simulate rate limiting.
+            login_fails: Whether login should fail.
+            script_urls: Script URLs to return from page.evaluate().
+            magic: Magic value to return for tankpit.magic evaluate.
+        """
         self._browsers: list[FakeBrowser] = []
         self._emit_messages = emit_messages
         self._rate_limited = rate_limited
         self._login_fails = login_fails
+        self._script_urls = script_urls
+        self._magic = magic
 
     def launch(
         self,
@@ -327,6 +423,8 @@ class FakeBrowserType:
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,
             login_fails=self._login_fails,
+            script_urls=self._script_urls,
+            magic=self._magic,
         )
         self._browsers.append(browser)
         return browser
@@ -341,12 +439,24 @@ class FakePlaywright:
         emit_messages: bool = True,
         rate_limited: bool = False,
         login_fails: bool = False,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
     ) -> None:
-        """Initialize fake Playwright."""
+        """Initialize fake Playwright.
+
+        Args:
+            emit_messages: Whether to emit WebSocket messages.
+            rate_limited: Whether to simulate rate limiting.
+            login_fails: Whether login should fail.
+            script_urls: Script URLs to return from page.evaluate().
+            magic: Magic value to return for tankpit.magic evaluate.
+        """
         self._chromium = FakeBrowserType(
             emit_messages=emit_messages,
             rate_limited=rate_limited,
             login_fails=login_fails,
+            script_urls=script_urls,
+            magic=magic,
         )
         self._stopped = False
 
@@ -369,12 +479,24 @@ class FakeSyncPlaywrightContextManager:
         emit_messages: bool = True,
         rate_limited: bool = False,
         login_fails: bool = False,
+        script_urls: list[JSONValue] | None = None,
+        magic: str | None = None,
     ) -> None:
-        """Initialize fake context manager."""
+        """Initialize fake context manager.
+
+        Args:
+            emit_messages: Whether to emit WebSocket messages.
+            rate_limited: Whether to simulate rate limiting.
+            login_fails: Whether login should fail.
+            script_urls: Script URLs to return from page.evaluate().
+            magic: Magic value to return for tankpit.magic evaluate.
+        """
         self._playwright: FakePlaywright | None = None
         self._emit_messages = emit_messages
         self._rate_limited = rate_limited
         self._login_fails = login_fails
+        self._script_urls = script_urls
+        self._magic = magic
 
     def start(self) -> PlaywrightProtocol:
         """Start Playwright."""
@@ -382,6 +504,8 @@ class FakeSyncPlaywrightContextManager:
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,
             login_fails=self._login_fails,
+            script_urls=self._script_urls,
+            magic=self._magic,
         )
         return self._playwright
 
@@ -419,6 +543,52 @@ def fake_sync_playwright_rate_limited() -> SyncPlaywrightContextManagerProtocol:
 def fake_sync_playwright_login_fails() -> SyncPlaywrightContextManagerProtocol:
     """Create fake sync_playwright that simulates rate-limiting with failed login."""
     return FakeSyncPlaywrightContextManager(emit_messages=True, rate_limited=True, login_fails=True)
+
+
+def fake_sync_playwright_with_scripts() -> SyncPlaywrightContextManagerProtocol:
+    """Create fake sync_playwright that returns script URLs from page.evaluate().
+
+    Returns:
+        Context manager that produces pages returning script URLs.
+    """
+    return FakeSyncPlaywrightContextManager(
+        emit_messages=True,
+        script_urls=[
+            "https://tankpit.com/js/game.js",
+            "https://tankpit.com/js/protocol.js",
+        ],
+    )
+
+
+def fake_sync_playwright_with_mixed_scripts() -> SyncPlaywrightContextManagerProtocol:
+    """Create fake sync_playwright with mixed types in script_urls list.
+
+    This tests the isinstance(url, str) check by including non-string values.
+
+    Returns:
+        Context manager that produces pages returning mixed script URL types.
+    """
+    return FakeSyncPlaywrightContextManager(
+        emit_messages=True,
+        script_urls=[
+            "https://tankpit.com/js/valid.js",
+            123,  # Non-string value to test isinstance check
+            None,  # Another non-string value
+            "https://tankpit.com/js/another.js",
+        ],
+    )
+
+
+def fake_sync_playwright_with_magic() -> SyncPlaywrightContextManagerProtocol:
+    """Create fake sync_playwright that returns a magic value for tankpit.magic.
+
+    Returns:
+        Context manager that produces pages returning magic value.
+    """
+    return FakeSyncPlaywrightContextManager(
+        emit_messages=True,
+        magic="test_magic_xor_key_value",
+    )
 
 
 # =============================================================================
@@ -466,12 +636,13 @@ class FakeCDPSessionProbe:
             # Other evaluates return success
             return {"result": {"value": "success"}}
 
-        # When key input is dispatched, emit a WebSocket message
+        # When key input is dispatched, emit a WebSocket message (sent and received)
         if method == "Input.dispatchKeyEvent" and self._emit_on_key:
             event_type = params.get("type", "") if params else ""
             if event_type == "keyDown":
                 self._input_count += 1
                 self._emit_ws_sent(f"key_input_{self._input_count}")
+                self._emit_ws_received(f"key_response_{self._input_count}")
 
         # When mouse input is dispatched, emit a WebSocket message
         if method == "Input.dispatchMouseEvent" and self._emit_on_mouse:
@@ -479,6 +650,7 @@ class FakeCDPSessionProbe:
             if event_type == "mousePressed":
                 self._input_count += 1
                 self._emit_ws_sent(f"mouse_input_{self._input_count}")
+                self._emit_ws_received(f"mouse_response_{self._input_count}")
         result: JSONObject = {}
         return result
 
@@ -491,6 +663,18 @@ class FakeCDPSessionProbe:
                         "requestId": "1.1",
                         "timestamp": 100.0 + self._input_count,
                         "response": {"opcode": 1, "mask": True, "payloadData": payload},
+                    }
+                )
+
+    def _emit_ws_received(self, payload: str) -> None:
+        """Emit a WebSocket received event."""
+        if "Network.webSocketFrameReceived" in self._handlers:
+            for handler in self._handlers["Network.webSocketFrameReceived"]:
+                handler(
+                    {
+                        "requestId": "1.1",
+                        "timestamp": 100.0 + self._input_count + 0.001,
+                        "response": {"opcode": 1, "mask": False, "payloadData": payload},
                     }
                 )
 
@@ -520,6 +704,7 @@ class FakePageProbe:
         *,
         before_playing: bool = False,
         login_redirects_to_play: bool = False,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake page for probing.
 
@@ -527,6 +712,7 @@ class FakePageProbe:
             cdp_session: CDP session to use.
             before_playing: Whether to simulate being on before-playing page.
             login_redirects_to_play: If True, simulates login redirecting to /play.
+            emit_during_stabilization: If True, emit messages during stabilization loop.
         """
         self._cdp_session = cdp_session
         self._closed = False
@@ -535,6 +721,7 @@ class FakePageProbe:
         self._login_redirects_to_play = login_redirects_to_play
         self._first_wait = True
         self._wait_count = 0
+        self._emit_during_stabilization = emit_during_stabilization
 
     @property
     def url(self) -> str:
@@ -589,11 +776,31 @@ class FakePageProbe:
                     "response": {"opcode": 1, "mask": False, "payloadData": "room_list"},
                 },
             )
+        elif self._emit_during_stabilization and self._wait_count == 5:
+            # Emit extra message during stabilization loop (iteration 2)
+            # Calls: 1=join_room, 2=join_room, 3=pre-stabilization, 4=loop iter 1, 5=loop iter 2
+            self._cdp_session.emit_event(
+                "Network.webSocketFrameReceived",
+                {
+                    "requestId": "1.1",
+                    "timestamp": 3.0,
+                    "response": {"opcode": 1, "mask": False, "payloadData": "extra_msg"},
+                },
+            )
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event - returns immediately in tests."""
+        _ = (event, timeout)
 
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
         self._closed = True
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression - returns empty list in tests."""
+        _ = expression
+        return []
 
 
 class FakePageProbeNoMessages:
@@ -627,10 +834,19 @@ class FakePageProbeNoMessages:
         """Wait without emitting any WebSocket events."""
         _ = timeout
 
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event - returns immediately in tests."""
+        _ = (event, timeout)
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
         self._closed = True
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression - returns empty list in tests."""
+        _ = expression
+        return []
 
 
 class FakeBrowserContextProbe:
@@ -645,6 +861,7 @@ class FakeBrowserContextProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake browser context for probing.
 
@@ -655,6 +872,7 @@ class FakeBrowserContextProbe:
             emit_on_key: Whether to emit messages on key input.
             emit_on_mouse: Whether to emit messages on mouse input.
             viewport_result: Custom viewport result to return.
+            emit_during_stabilization: If True, emit during stabilization loop.
         """
         self._cdp_session = FakeCDPSessionProbe(
             emit_on_key=emit_on_key if emit_messages else False,
@@ -666,12 +884,17 @@ class FakeBrowserContextProbe:
         self._emit_messages = emit_messages
         self._before_playing = before_playing
         self._login_redirects_to_play = login_redirects_to_play
+        self._emit_during_stabilization = emit_during_stabilization
 
     def new_page(self) -> PageProtocol:
         """Create new page."""
         page: FakePageProbe | FakePageProbeNoMessages
         if self._emit_messages:
-            page = FakePageProbe(self._cdp_session, before_playing=self._before_playing)
+            page = FakePageProbe(
+                self._cdp_session,
+                before_playing=self._before_playing,
+                emit_during_stabilization=self._emit_during_stabilization,
+            )
         else:
             page = FakePageProbeNoMessages(self._cdp_session)
         self._pages.append(page)
@@ -699,6 +922,7 @@ class FakeBrowserProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake browser for probing.
 
@@ -708,6 +932,7 @@ class FakeBrowserProbe:
             emit_on_key: Whether to emit messages on key input.
             emit_on_mouse: Whether to emit messages on mouse input.
             viewport_result: Custom viewport result to return.
+            emit_during_stabilization: If True, emit during stabilization loop.
         """
         self._contexts: list[FakeBrowserContextProbe] = []
         self._closed = False
@@ -716,6 +941,7 @@ class FakeBrowserProbe:
         self._emit_on_key = emit_on_key
         self._emit_on_mouse = emit_on_mouse
         self._viewport_result = viewport_result
+        self._emit_during_stabilization = emit_during_stabilization
 
     def new_context(self) -> BrowserContextProtocol:
         """Create new context."""
@@ -725,6 +951,7 @@ class FakeBrowserProbe:
             emit_on_key=self._emit_on_key,
             emit_on_mouse=self._emit_on_mouse,
             viewport_result=self._viewport_result,
+            emit_during_stabilization=self._emit_during_stabilization,
         )
         self._contexts.append(ctx)
         return ctx
@@ -746,6 +973,7 @@ class FakeBrowserTypeProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake browser type for probing.
 
@@ -755,6 +983,7 @@ class FakeBrowserTypeProbe:
             emit_on_key: Whether to emit messages on key input.
             emit_on_mouse: Whether to emit messages on mouse input.
             viewport_result: Custom viewport result to return.
+            emit_during_stabilization: If True, emit during stabilization loop.
         """
         self._browsers: list[FakeBrowserProbe] = []
         self._emit_messages = emit_messages
@@ -762,6 +991,7 @@ class FakeBrowserTypeProbe:
         self._emit_on_key = emit_on_key
         self._emit_on_mouse = emit_on_mouse
         self._viewport_result = viewport_result
+        self._emit_during_stabilization = emit_during_stabilization
 
     def launch(
         self,
@@ -778,6 +1008,7 @@ class FakeBrowserTypeProbe:
             emit_on_key=self._emit_on_key,
             emit_on_mouse=self._emit_on_mouse,
             viewport_result=self._viewport_result,
+            emit_during_stabilization=self._emit_during_stabilization,
         )
         self._browsers.append(browser)
         return browser
@@ -794,6 +1025,7 @@ class FakePlaywrightProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake Playwright for probing.
 
@@ -803,6 +1035,7 @@ class FakePlaywrightProbe:
             emit_on_key: Whether to emit messages on key input.
             emit_on_mouse: Whether to emit messages on mouse input.
             viewport_result: Custom viewport result to return.
+            emit_during_stabilization: If True, emit during stabilization loop.
         """
         self._chromium = FakeBrowserTypeProbe(
             emit_messages=emit_messages,
@@ -810,6 +1043,7 @@ class FakePlaywrightProbe:
             emit_on_key=emit_on_key,
             emit_on_mouse=emit_on_mouse,
             viewport_result=viewport_result,
+            emit_during_stabilization=emit_during_stabilization,
         )
         self._stopped = False
 
@@ -834,6 +1068,7 @@ class FakeSyncPlaywrightContextManagerProbe:
         emit_on_key: bool = True,
         emit_on_mouse: bool = False,
         viewport_result: JSONObject | None = None,
+        emit_during_stabilization: bool = False,
     ) -> None:
         """Initialize fake context manager for probing.
 
@@ -843,6 +1078,7 @@ class FakeSyncPlaywrightContextManagerProbe:
             emit_on_key: Whether to emit messages on key input.
             emit_on_mouse: Whether to emit messages on mouse input.
             viewport_result: Custom viewport result to return.
+            emit_during_stabilization: If True, emit during stabilization loop.
         """
         self._playwright: FakePlaywrightProbe | None = None
         self._emit_messages = emit_messages
@@ -850,6 +1086,7 @@ class FakeSyncPlaywrightContextManagerProbe:
         self._emit_on_key = emit_on_key
         self._emit_on_mouse = emit_on_mouse
         self._viewport_result = viewport_result
+        self._emit_during_stabilization = emit_during_stabilization
 
     def start(self) -> PlaywrightProtocol:
         """Start Playwright."""
@@ -859,6 +1096,7 @@ class FakeSyncPlaywrightContextManagerProbe:
             emit_on_key=self._emit_on_key,
             emit_on_mouse=self._emit_on_mouse,
             viewport_result=self._viewport_result,
+            emit_during_stabilization=self._emit_during_stabilization,
         )
         return self._playwright
 
@@ -940,6 +1178,18 @@ def fake_sync_playwright_probe_both_emit() -> SyncPlaywrightContextManagerProtoc
     )
 
 
+def fake_sync_playwright_probe_delayed_messages() -> SyncPlaywrightContextManagerProtocol:
+    """Create fake sync_playwright for probe that emits during stabilization.
+
+    This tests the branch where message count changes during the stabilization
+    wait loop, triggering the stable_checks reset.
+    """
+    return FakeSyncPlaywrightContextManagerProbe(
+        emit_messages=True,
+        emit_during_stabilization=True,
+    )
+
+
 __all__ = [
     "FakeBrowser",
     "FakeBrowserContext",
@@ -965,10 +1215,14 @@ __all__ = [
     "fake_sync_playwright_probe",
     "fake_sync_playwright_probe_before_playing",
     "fake_sync_playwright_probe_both_emit",
+    "fake_sync_playwright_probe_delayed_messages",
     "fake_sync_playwright_probe_invalid_viewport",
     "fake_sync_playwright_probe_mouse_emits",
     "fake_sync_playwright_probe_no_key_emits",
     "fake_sync_playwright_probe_no_messages",
     "fake_sync_playwright_probe_non_dict_viewport",
     "fake_sync_playwright_rate_limited",
+    "fake_sync_playwright_with_magic",
+    "fake_sync_playwright_with_mixed_scripts",
+    "fake_sync_playwright_with_scripts",
 ]
