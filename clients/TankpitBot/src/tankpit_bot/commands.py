@@ -23,6 +23,19 @@ from platform_core.json_utils import (
 # Command prefix byte (this is known from protocol analysis)
 COMMAND_PREFIX = ord("!")
 
+# =============================================================================
+# Known Command IDs (discovered from protocol analysis)
+# =============================================================================
+
+# XOR-encoded commands (type=2, start with '!')
+CMD_ENTER_GAME = 63  # 0x3f - Click to enter game
+CMD_RADAR = 102  # 0x66 - 's' key - Toggle radar display
+CMD_MINE = 107  # 0x6b - 'd' key - Drop mine
+CMD_MAP_OPEN = 108  # 0x6c - 'f' key - Open map view
+
+# Plain commands (no XOR encoding, just length header + body)
+PLAIN_QUIT = b"-"  # 'q' key - Quit game and return to lobby
+
 
 # =============================================================================
 # Command TypedDicts
@@ -243,7 +256,12 @@ def deserialize_command(data: bytes, type_byte: int) -> QueryCommand | ActionCom
 
 
 __all__ = [
+    "CMD_ENTER_GAME",
+    "CMD_MAP_OPEN",
+    "CMD_MINE",
+    "CMD_RADAR",
     "COMMAND_PREFIX",
+    "PLAIN_QUIT",
     "ActionCommand",
     "CommandType",
     "QueryCommand",
