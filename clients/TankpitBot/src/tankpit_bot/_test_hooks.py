@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from platform_core.config import _optional_env_str
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 
 # =============================================================================
 # Environment Variable Hook
@@ -230,12 +230,32 @@ class PageProtocol(Protocol):
         """
         ...
 
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event to be fired.
+
+        Args:
+            event: Event name to wait for (e.g., "close").
+            timeout: Maximum wait time in milliseconds.
+        """
+        ...
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close the page.
 
         Args:
             reason: Reason to be reported to operations interrupted by page closure.
             run_before_unload: Whether to run the before unload page handlers.
+        """
+        ...
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression in the page context.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+
+        Returns:
+            Result of the expression evaluation.
         """
         ...
 
