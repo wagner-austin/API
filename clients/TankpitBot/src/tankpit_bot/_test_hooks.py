@@ -431,6 +431,25 @@ class SyncPlaywrightFactoryProtocol(Protocol):
 sync_playwright: SyncPlaywrightFactoryProtocol | None = None
 
 
+# =============================================================================
+# CLI Argument Hook
+# =============================================================================
+
+
+def _real_get_argv() -> list[str]:
+    """Real implementation - returns sys.argv.
+
+    Returns:
+        The command line arguments.
+    """
+    import sys
+
+    return sys.argv
+
+
+get_argv: Callable[[], list[str]] = _real_get_argv
+
+
 def _real_get_sync_playwright() -> SyncPlaywrightFactoryProtocol:
     """Real implementation - imports playwright.
 
@@ -460,6 +479,7 @@ __all__ = [
     "SyncPlaywrightContextManagerProtocol",
     "SyncPlaywrightFactoryProtocol",
     "WriteTextProtocol",
+    "get_argv",
     "get_env",
     "get_sync_playwright",
     "path_exists",
