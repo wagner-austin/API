@@ -655,7 +655,7 @@ class FakeCDPSessionProbe:
                 self._input_count += 1
                 self._emit_ws_sent(f"key_input_{self._input_count}")
                 self._emit_ws_received(f"key_response_{self._input_count}")
-                return {"result": {"value": "OK"}}
+                return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
             # Other evaluates return success
             return {"result": {"value": "success"}}
 
