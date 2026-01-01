@@ -280,29 +280,124 @@ def ensure_on_play_page(page: PageProtocol) -> None:
         log.info("Game URL: %s", page.url)
 
 
-def handle_login_flow(
+def _click_map(cdp: CDPSessionProtocol) -> str:
+    """Click the map to enter the game at center position.
+
+    Args:
+        cdp: CDP session for JavaScript evaluation.
+
+    Returns:
+        Result message from JavaScript evaluation.
+    """
+    map_js = """
+    (() => {
+        const fieldImage = document.getElementById('field-image');
+        if (!fieldImage) return 'no field-image';
+
+        const rect = fieldImage.getBoundingClientRect();
+        const event = new MouseEvent('click', {
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+            bubbles: true
+        });
+        fieldImage.dispatchEvent(event);
+        return 'clicked field-image at center';
+    })()
+    """
+    result = cdp.send("Runtime.evaluate", {"expression": map_js, "returnByValue": True})
+    result_obj = result.get("result")
+    if isinstance(result_obj, dict):
+        val = result_obj.get("value", "?")
+        return str(val) if val is not None else "?"
+    return "?"
+
+
+def join_room(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+) -> bool:
+    """Join the game by clicking the map.
+
+    Clicks the field-image (map) to enter the game at center position.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+
+    Returns:
+        True if game was joined, False otherwise.
+    """
+    log.info("Joining game...")
+
+    # Wait for lobby to load
+    page.wait_for_timeout(2000.0)
+
+    # Try map click first
+    map_result = _click_map(cdp)
+    log.info("Map click: %s", map_result)
+
+    if "no field-image" in map_result:
+        return False
+
+    page.wait_for_timeout(3000.0)
+    return True
+
+
+def _try_account_login_with_env(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+) -> bool | None:
+    """Attempt account login using environment credentials.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+
+    Returns:
+        True if login succeeded, False if login failed, None if no credentials.
+    """
+    username = _test_hooks.get_env("TANKPIT_USERNAME")
+    password = _test_hooks.get_env("TANKPIT_PASSWORD")
+
+    if username is None or password is None:
+        return None
+
+    account_result = handle_account_login(page, cdp, username, password)
+    return account_result["success"]
+
+
+def _do_login(
     page: PageProtocol,
     cdp: CDPSessionProtocol,
     *,
-    tank_name_prefix: str = "B",
-    allow_account_fallback: bool = True,
+    tank_name_prefix: str,
+    allow_account_fallback: bool,
+    prefer_account: bool,
 ) -> bool:
-    """Handle the complete login flow with optional account fallback.
-
-    Attempts guest login first, falls back to account login if rate-limited
-    and credentials are available.
+    """Perform the login flow without room joining.
 
     Args:
         page: Playwright page.
         cdp: CDP session for JavaScript evaluation.
         tank_name_prefix: Prefix for generated tank name.
         allow_account_fallback: Whether to try account login when rate-limited.
+        prefer_account: Skip guest login and use account credentials directly.
 
     Returns:
         True if login succeeded, False otherwise.
     """
     if "before-playing" not in page.url:
         return True
+
+    # If prefer_account, skip guest login and go straight to account
+    if prefer_account:
+        result = _try_account_login_with_env(page, cdp)
+        if result is None:
+            log.warning("prefer_account=True but TANKPIT_USERNAME/TANKPIT_PASSWORD not set.")
+            return False
+        if result:
+            ensure_on_play_page(page)
+        return result
 
     # Try guest login
     guest_result = handle_guest_login(page, cdp, tank_name_prefix=tank_name_prefix)
@@ -313,23 +408,57 @@ def handle_login_flow(
 
     # If rate-limited, try account login
     if guest_result["rate_limited"] and allow_account_fallback:
-        username = _test_hooks.get_env("TANKPIT_USERNAME")
-        password = _test_hooks.get_env("TANKPIT_PASSWORD")
-
-        if username is None or password is None:
+        result = _try_account_login_with_env(page, cdp)
+        if result is None:
             log.warning("Rate limited. Set TANKPIT_USERNAME and TANKPIT_PASSWORD in .env to login.")
             return False
-
-        account_result = handle_account_login(page, cdp, username, password)
-        if account_result["success"]:
+        if result:
             ensure_on_play_page(page)
-            return True
+        return result
 
-        return False
-
-    # Guest login failed for other reasons
+    # Guest login failed for other reasons - still go to play page
     ensure_on_play_page(page)
     return True
+
+
+def handle_login_flow(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    *,
+    tank_name_prefix: str = "B",
+    allow_account_fallback: bool = True,
+    prefer_account: bool = False,
+    auto_join_room: bool = False,
+) -> bool:
+    """Handle the complete login flow with optional account fallback.
+
+    Attempts guest login first, falls back to account login if rate-limited
+    and credentials are available. If prefer_account is True, skips guest
+    login entirely and uses account credentials directly.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session for JavaScript evaluation.
+        tank_name_prefix: Prefix for generated tank name.
+        allow_account_fallback: Whether to try account login when rate-limited.
+        prefer_account: Skip guest login and use account credentials directly.
+        auto_join_room: Whether to automatically join a room after login.
+
+    Returns:
+        True if login succeeded, False otherwise.
+    """
+    success = _do_login(
+        page,
+        cdp,
+        tank_name_prefix=tank_name_prefix,
+        allow_account_fallback=allow_account_fallback,
+        prefer_account=prefer_account,
+    )
+
+    if success and auto_join_room:
+        join_room(page, cdp)
+
+    return success
 
 
 __all__ = [
@@ -339,4 +468,5 @@ __all__ = [
     "handle_account_login",
     "handle_guest_login",
     "handle_login_flow",
+    "join_room",
 ]
