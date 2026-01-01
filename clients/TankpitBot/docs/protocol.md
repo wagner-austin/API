@@ -6,7 +6,21 @@ This document describes the WebSocket protocol used by Tankpit.com and the disco
 
 Tankpit uses WebSocket connections for real-time game communication. Since no public protocol documentation exists, we capture and analyze traffic to reverse-engineer the protocol.
 
-## Sniffer Architecture
+## Shared Architecture
+
+Both sniffer and probe inherit from `BrowserSession` (in `browser.py`) which provides:
+
+- **CDP Setup**: WebSocket event handlers for frame capture
+- **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
+- **Intel Gathering**:
+  - Console listener (filters for WS/Hook/WebSocket keywords)
+  - WebSocket URL logging
+  - JavaScript WebSocket debug check
+  - Script URL logging
+- **Magic Key Capture**: Reads `tankpit.magic` for XOR encoding
+- **Login Integration**: Guest or account authentication
+
+### Sniffer Architecture
 
 The sniffer uses Playwright with Chrome DevTools Protocol (CDP) to intercept WebSocket traffic:
 
@@ -14,6 +28,12 @@ The sniffer uses Playwright with Chrome DevTools Protocol (CDP) to intercept Web
 ┌─────────────────┐
 │  Playwright     │
 │  sync_api       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  BrowserSession │  Console listener
+│  CDP Handlers   │  Intel gathering
 └────────┬────────┘
          │
          ▼
@@ -28,6 +48,37 @@ The sniffer uses Playwright with Chrome DevTools Protocol (CDP) to intercept Web
 │  JSON output    │
 └─────────────────┘
 ```
+
+### Probe Architecture
+
+The probe sends commands via WebSocket injection (not synthetic JS events):
+
+```
+┌─────────────────┐
+│  BrowserSession │  WebSocket prototype hook
+│  CDP Handlers   │  Console + intel gathering
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  XOR Encoding   │  Static key + session magic
+│  Command Build  │  encode_frame(XOR'd bytes)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  WebSocket      │  window.__capturedWS.send()
+│  Injection      │  (or fallback to tankpit.ws)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Toggle Keys    │  First press: WS open
+│  State Machine  │  Second press: JS close
+└─────────────────┘
+```
+
+**Why WebSocket Injection?** Synthetic JavaScript KeyboardEvents don't work because browsers set `isTrusted: false` on programmatically created events. The game ignores untrusted events, so we must inject commands directly via the WebSocket.
 
 ## Running the Sniffer
 
@@ -66,6 +117,50 @@ When `TANKPIT_LIVE_DECODE=true` (default), messages are decoded and printed in r
 ```
 
 This makes protocol discovery much easier - play the game and see exactly what commands each action sends.
+
+## Running the Probe
+
+```bash
+make probe
+```
+
+This will:
+1. Join a game using account credentials
+2. Install WebSocket prototype hook to capture game's WebSocket
+3. Send known commands via WebSocket injection:
+   - `f` - Map open (XOR command via WebSocket)
+   - `f` - Map close (JavaScript keypress toggle)
+   - `s` - Radar (XOR command)
+   - `d` - Mine (XOR command)
+   - `q` - Quit (plain command)
+4. Record WebSocket responses from the server
+5. Save results to `probe_session.json`
+
+### Toggle Key Behavior
+
+Some keys (like `f` for map) are toggle keys that open/close UI elements:
+
+- **First press**: Sends XOR-encoded command via WebSocket to open UI
+- **Second press**: Sends JavaScript keypress to close UI (the game handles closing locally)
+
+This matches how the game works: opening the map requires a server command, but closing it is handled client-side.
+
+### WebSocket Prototype Hook
+
+The probe captures the game's WebSocket instance before the page loads:
+
+```javascript
+window.__capturedWS = null;
+const origSend = WebSocket.prototype.send;
+WebSocket.prototype.send = function(data) {
+    if (!window.__capturedWS && this.readyState === 1) {
+        window.__capturedWS = this;
+    }
+    return origSend.call(this, data);
+};
+```
+
+This hook is injected via `Page.addScriptToEvaluateOnNewDocument` in CDP.
 
 ## Captured CDP Events
 

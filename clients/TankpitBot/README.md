@@ -11,10 +11,10 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Outputs structured JSON for analysis
 
 **Phase 1.5: Automated Protocol Probe** (complete)
-- Programmatic input injection via CDP
-- Tests keyboard and mouse inputs
-- Correlates inputs with server messages
-- Discovers which inputs generate protocol commands
+- WebSocket injection of known commands (not synthetic JS events)
+- Toggle key support (first press opens via WS, second closes via JS)
+- Correlates inputs with server responses
+- Default sequence: map open/close, radar, mine, quit
 
 **Phase 2: Protocol Analysis** (complete)
 - WebSocket endpoint: `wss://dorothy.tankpit.com/ws/`
@@ -37,6 +37,9 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 ## Features
 
 - **Protocol Discovery**: Captures WebSocket traffic via Playwright CDP integration
+- **WebSocket Injection**: Sends commands via captured WebSocket (synthetic JS events don't work)
+- **Intel Gathering**: Console listener, WebSocket URLs, JS debug info, script URLs
+- **Shared Architecture**: BrowserSession base class for sniffer and probe
 - **Type Safety**: mypy strict mode, zero `Any` types, TypedDict models
 - **100% Test Coverage**: Statements and branches
 - **Monorepo Integration**: Guard rules, platform_core utilities
@@ -76,11 +79,18 @@ make probe
 ```
 
 This will:
-1. Join a game as guest
-2. Inject keyboard inputs (WASD, arrows, numbers)
-3. Inject mouse clicks at various positions
-4. Record which inputs generate server messages
+1. Join a game using account credentials
+2. Capture the game's WebSocket via prototype hook
+3. Send known commands via WebSocket injection:
+   - `f` - Map open (XOR command via WebSocket)
+   - `f` - Map close (JavaScript keypress toggle)
+   - `s` - Radar (XOR command)
+   - `d` - Mine (XOR command)
+   - `q` - Quit (plain command)
+4. Record WebSocket responses from the server
 5. Save results to `probe_session.json`
+
+**Note**: Synthetic JavaScript KeyboardEvents don't work because browsers set `isTrusted: false` on programmatically created events. The probe uses WebSocket injection instead.
 
 ### Run the Bot
 
@@ -194,12 +204,32 @@ TankpitBot/
 
 ## Architecture
 
+### Shared BrowserSession Base Class
+
+Both sniffer and probe inherit from `BrowserSession` which provides:
+
+- **CDP Setup**: WebSocket event handlers for frame capture
+- **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
+- **Intel Gathering**:
+  - Console listener (filters for WS/Hook/WebSocket keywords)
+  - WebSocket URL logging
+  - JavaScript WebSocket debug check
+  - Script URL logging
+- **Magic Key Capture**: Reads `tankpit.magic` for XOR encoding
+- **Login Integration**: Guest or account authentication
+
 ### Sniffer Flow
 
 ```
 ┌─────────────────┐
 │  Playwright     │
 │  sync_api       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  BrowserSession │  Console listener
+│  CDP Handlers   │  Intel gathering
 └────────┬────────┘
          │
          ▼
@@ -211,6 +241,39 @@ TankpitBot/
          ▼
 ┌─────────────────┐
 │  CaptureSession │
+│  JSON output    │
+└─────────────────┘
+```
+
+### Probe Flow
+
+```
+┌─────────────────┐
+│  BrowserSession │  WebSocket prototype hook
+│  CDP Handlers   │  Console + intel gathering
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  XOR Encoding   │  Static key + session magic
+│  Command Build  │  encode_frame(XOR'd bytes)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  WebSocket      │  window.__capturedWS.send()
+│  Injection      │  (or fallback to tankpit.ws)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Toggle Keys    │  First press: WS open
+│  State Machine  │  Second press: JS close
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  ProbeSession   │
 │  JSON output    │
 └─────────────────┘
 ```
