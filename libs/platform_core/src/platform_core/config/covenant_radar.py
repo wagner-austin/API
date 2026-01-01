@@ -66,6 +66,7 @@ class CovenantRadarAppConfig(TypedDict, total=True):
     active_model_path_mlp: str
     data_bank_api_url: str
     data_bank_api_key: str
+    data_bank_model_file_id: str
 
 
 class CovenantRadarSettings(TypedDict, total=True):
@@ -129,6 +130,7 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         APP__ACTIVE_MODEL_PATH_MLP: Active MLP model path (default: /data/models/active_mlp.pt)
         DATA_BANK_API_URL: URL for data-bank-api (default: empty)
         DATA_BANK_API_KEY: API key for data-bank-api (default: empty)
+        DATA_BANK_MODEL_FILE_ID: Model file_id to download from data-bank (default: empty)
         DATADOG__ENABLED: Enable Datadog integration (default: false)
         DATADOG__SERVICE: Service name for traces (default: covenant-radar-api)
         DATADOG__ENV: Environment name (dev/staging/production, default: dev)
@@ -188,6 +190,7 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "active_model_path_mlp": active_model_path_mlp,
         "data_bank_api_url": _parse_str("DATA_BANK_API_URL", ""),
         "data_bank_api_key": _parse_str("DATA_BANK_API_KEY", ""),
+        "data_bank_model_file_id": _parse_str("DATA_BANK_MODEL_FILE_ID", ""),
     }
 
     datadog_cfg: CovenantRadarDatadogConfig = {
