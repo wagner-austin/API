@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
-from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import SyncPlaywrightFactoryProtocol
@@ -16,6 +18,7 @@ from tankpit_bot.probe import (
     ProbeError,
     ProtocolProbe,
     _log_discovered_commands,
+    extract_cdp_evaluate_value,
     main,
     run_probe,
 )
@@ -29,6 +32,39 @@ from tests.fakes import (
 # =============================================================================
 # Helper Function Tests
 # =============================================================================
+
+
+def test_extract_cdp_evaluate_value_success() -> None:
+    """Test extract_cdp_evaluate_value extracts value from valid result."""
+    result: JSONObject = {"result": {"value": "test_value"}}
+    assert extract_cdp_evaluate_value(result) == "test_value"
+
+
+def test_extract_cdp_evaluate_value_converts_to_string() -> None:
+    """Test extract_cdp_evaluate_value converts non-string values to string."""
+    result: JSONObject = {"result": {"value": 123}}
+    assert extract_cdp_evaluate_value(result) == "123"
+
+
+def test_extract_cdp_evaluate_value_raises_on_invalid_result() -> None:
+    """Test extract_cdp_evaluate_value raises ProbeError when result is not dict."""
+    result: JSONObject = {"error": "simulated error"}
+    with pytest.raises(ProbeError, match=r"CDP Runtime\.evaluate returned invalid result"):
+        extract_cdp_evaluate_value(result)
+
+
+def test_extract_cdp_evaluate_value_raises_on_missing_value() -> None:
+    """Test extract_cdp_evaluate_value raises ProbeError when value is missing."""
+    result: JSONObject = {"result": {}}
+    with pytest.raises(ProbeError, match=r"CDP Runtime\.evaluate result missing value"):
+        extract_cdp_evaluate_value(result)
+
+
+def test_extract_cdp_evaluate_value_raises_on_none_value() -> None:
+    """Test extract_cdp_evaluate_value raises ProbeError when value is None."""
+    result: JSONObject = {"result": {"value": None}}
+    with pytest.raises(ProbeError, match=r"CDP Runtime\.evaluate result missing value"):
+        extract_cdp_evaluate_value(result)
 
 
 def test_get_current_time_ms_returns_int() -> None:
@@ -49,17 +85,18 @@ def test_cdp_timestamp_to_ms() -> None:
 # =============================================================================
 
 
-def test_default_probe_keys_contains_game_hotkeys() -> None:
-    """Test DEFAULT_PROBE_KEYS contains core game action keys."""
-    assert "w" in DEFAULT_PROBE_KEYS  # Forward
-    assert "s" in DEFAULT_PROBE_KEYS  # Brake
-    assert "d" in DEFAULT_PROBE_KEYS  # Turn right
-    assert " " in DEFAULT_PROBE_KEYS  # Fire
-    assert "r" in DEFAULT_PROBE_KEYS  # Radar
-    assert "x" in DEFAULT_PROBE_KEYS  # Use item
-    assert "f" in DEFAULT_PROBE_KEYS  # Map open/close
-    # Keys discovered via protocol probe
-    assert DEFAULT_PROBE_KEYS == ["w", "s", "d", " ", "r", "x", "f", "f"]
+def test_default_probe_keys_contains_known_commands() -> None:
+    """Test DEFAULT_PROBE_KEYS contains keys with known command mappings."""
+    # Only keys with known command IDs are included
+    assert "s" in DEFAULT_PROBE_KEYS  # Radar (CMD_RADAR = 102)
+    assert "d" in DEFAULT_PROBE_KEYS  # Mine (CMD_MINE = 107)
+    assert "f" in DEFAULT_PROBE_KEYS  # Map open (CMD_MAP_OPEN = 108)
+    assert "q" in DEFAULT_PROBE_KEYS  # Quit (plain command '-')
+    # Keys without known commands are NOT included
+    assert "w" not in DEFAULT_PROBE_KEYS  # Unknown
+    assert " " not in DEFAULT_PROBE_KEYS  # Unknown
+    # Exact expected list
+    assert DEFAULT_PROBE_KEYS == ["s", "d", "f", "f", "q"]
 
 
 def test_default_mouse_positions_is_empty() -> None:
@@ -85,7 +122,7 @@ def test_protocol_probe_run_without_playwright() -> None:
     probe = ProtocolProbe("https://tankpit.com/play")
     with pytest.raises(PlaywrightNotInstalledError, match="Playwright is not installed"):
         probe.run(
-            probe_keys=["w"],
+            probe_keys=["s"],  # Use key with known command mapping
             probe_mouse_positions=[],
             wait_after_join_ms=1000,
             wait_after_input_ms=100,
@@ -99,7 +136,7 @@ def test_protocol_probe_run_game_not_joined(fake_fs: FakeFileSystem) -> None:
     probe = ProtocolProbe("https://tankpit.com/play")
     with pytest.raises(GameNotJoinedError, match="No WebSocket messages captured"):
         probe.run(
-            probe_keys=["w"],
+            probe_keys=["s"],  # Use key with known command mapping
             probe_mouse_positions=[],
             wait_after_join_ms=1000,
             wait_after_input_ms=100,
@@ -112,7 +149,7 @@ def test_protocol_probe_run_captures_key_inputs(fake_fs: FakeFileSystem) -> None
 
     probe = ProtocolProbe("https://tankpit.com/play", headless=True)
     session = probe.run(
-        probe_keys=["w", "a"],
+        probe_keys=["s", "d"],  # Use keys with known command mappings
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -121,12 +158,12 @@ def test_protocol_probe_run_captures_key_inputs(fake_fs: FakeFileSystem) -> None
     assert session["base_url"] == "https://tankpit.com/play"
     assert len(session["results"]) == 2
 
-    # First result should be for key 'w'
+    # First result should be for key 's' (radar)
     first_result = session["results"][0]
     assert first_result["input"]["input_type"] == "key"
     key_input = first_result["input"]["key_input"]
     assert type(key_input) is dict
-    assert key_input["key"] == "w"
+    assert key_input["key"] == "s"
     # Should have captured a sent message
     assert len(first_result["messages_after"]) == 1
 
@@ -168,7 +205,7 @@ def test_run_probe_saves_to_file(fake_fs: FakeFileSystem) -> None:
         "https://tankpit.com/play",
         "probe_output.json",
         headless=True,
-        probe_keys=["w"],
+        probe_keys=["s"],  # Use key with known command mapping
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -287,8 +324,8 @@ def test_main_prints_discovered_commands(
 
     captured = capsys.readouterr()
     output = captured.out
-    # f is the first key (Map toggle)
-    assert "Discovered: Key 'f'" in output
+    # s is the first key (Radar) in DEFAULT_PROBE_KEYS
+    assert "Discovered: Key 's'" in output
 
 
 def test_protocol_probe_run_mouse_emits_messages(fake_fs: FakeFileSystem) -> None:
@@ -324,9 +361,9 @@ def test_main_prints_key_discovered_commands(
 
     captured = capsys.readouterr()
     output = captured.out
-    # Keys should generate messages
-    assert "Discovered: Key 'w'" in output
+    # Keys with known command mappings should generate messages
     assert "Discovered: Key 's'" in output
+    assert "Discovered: Key 'd'" in output
 
 
 def test_run_probe_multiple_mouse_positions_with_messages(
@@ -371,11 +408,11 @@ def test_main_prints_all_default_key_commands(
 
     captured = capsys.readouterr()
     output = captured.out
-    # All default keys should generate discovered messages
-    assert "Discovered: Key 'w'" in output
+    # All default keys with known command mappings should generate discovered messages
     assert "Discovered: Key 's'" in output
     assert "Discovered: Key 'd'" in output
     assert "Discovered: Key 'f'" in output
+    assert "Discovered: Key 'q'" in output
 
 
 def test_protocol_probe_run_no_key_emit(fake_fs: FakeFileSystem) -> None:
@@ -386,7 +423,7 @@ def test_protocol_probe_run_no_key_emit(fake_fs: FakeFileSystem) -> None:
 
     probe = ProtocolProbe("https://tankpit.com/play", headless=True)
     session = probe.run(
-        probe_keys=["w"],
+        probe_keys=["s"],  # Use key with known command mapping
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -426,7 +463,7 @@ def test_protocol_probe_run_invalid_viewport(fake_fs: FakeFileSystem) -> None:
 
     probe = ProtocolProbe("https://tankpit.com/play", headless=True)
     session = probe.run(
-        probe_keys=["w"],
+        probe_keys=["s"],  # Use key with known command mapping
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -444,7 +481,7 @@ def test_protocol_probe_run_non_dict_viewport(fake_fs: FakeFileSystem) -> None:
 
     probe = ProtocolProbe("https://tankpit.com/play", headless=True)
     session = probe.run(
-        probe_keys=["w"],
+        probe_keys=["s"],  # Use key with known command mapping
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -547,7 +584,7 @@ def test_protocol_probe_run_stabilization_reset(fake_fs: FakeFileSystem) -> None
 
     probe = ProtocolProbe("https://tankpit.com/play", headless=True)
     session = probe.run(
-        probe_keys=["w"],
+        probe_keys=["s"],  # Use key with known command mapping
         probe_mouse_positions=[],
         wait_after_join_ms=100,
         wait_after_input_ms=50,
@@ -557,3 +594,114 @@ def test_protocol_probe_run_stabilization_reset(fake_fs: FakeFileSystem) -> None
     assert len(session["results"]) == 1
     # Should have captured the extra message during stabilization
     assert len(probe._messages) > 2  # More than just initial auth + room_list
+
+
+def test_protocol_probe_build_xor_table_raises_without_magic(fake_fs: FakeFileSystem) -> None:
+    """Test _build_xor_table raises ProbeError when magic is not captured."""
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+    # Magic is None by default
+    with pytest.raises(ProbeError, match="Cannot build XOR table: magic key not captured"):
+        probe._build_xor_table()
+
+
+def test_protocol_probe_encode_xor_command_raises_without_table(fake_fs: FakeFileSystem) -> None:
+    """Test _encode_xor_command raises ProbeError when XOR table is not built."""
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+    # XOR table is None by default
+    with pytest.raises(ProbeError, match="XOR table not initialized"):
+        probe._encode_xor_command(102)  # CMD_RADAR
+
+
+def test_protocol_probe_send_key_command_unknown_key(
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test _send_key_command returns False for unknown keys."""
+    from tests.fakes import FakeCDPSessionProbe
+
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+    cdp = FakeCDPSessionProbe()
+
+    # 'w' is not in KEY_TO_COMMAND or KEY_TO_PLAIN_COMMAND
+    result = probe._send_key_command(cdp, "w")
+
+    assert result is False
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Unknown key: w" in output
+
+
+def test_main_with_keys_cli_arg(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() parses --keys CLI argument."""
+    _test_hooks.sync_playwright = fake_sync_playwright_probe
+
+    # Set argv hook to return args with --keys
+    _test_hooks.get_argv = lambda: ["probe", "--keys", "s,d,f"]
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    # Should have overridden the default keys
+    assert "Overriding probe keys" in output
+    assert "Probe complete:" in output
+
+
+def test_main_with_keys_cli_arg_missing_value(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() ignores --keys when no value follows."""
+    _test_hooks.sync_playwright = fake_sync_playwright_probe
+
+    # Set argv hook to return args with --keys at the end (no value)
+    _test_hooks.get_argv = lambda: ["probe", "--keys"]
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    # Should NOT print "Overriding probe keys" since no value provided
+    assert "Overriding probe keys" not in output
+    # Should still complete with defaults
+    assert "Probe complete:" in output
+
+
+def test_send_websocket_bytes_returns_false_on_non_dict_result(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Test _send_websocket_bytes returns False when result is not a dict."""
+
+    from tankpit_bot.browser import BrowserSession
+
+    class FakeCDPNonDictResult:
+        """Fake CDP session that returns non-dict result for ws.send."""
+
+        def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+            """Return non-dict result for ws.send evaluation."""
+            _ = method
+            _ = params
+            # Return result where "result" is a string, not a dict
+            return {"result": "NOT_A_DICT"}
+
+        def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+            """Stub handler registration."""
+            _ = event
+            _ = handler
+
+        def detach(self) -> None:
+            """Stub detach."""
+
+    session = BrowserSession("https://tankpit.com/play", headless=True)
+    cdp = FakeCDPNonDictResult()
+
+    # Call _send_websocket_bytes with the fake CDP
+    result = session._send_websocket_bytes(cdp, b"test_data")
+
+    # Should return False since result["result"] is not a dict
+    assert result is False
