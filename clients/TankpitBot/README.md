@@ -23,8 +23,15 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Both guest and authenticated flows captured
 - See `docs/protocol.md` for details
 
-**Phase 3: Bot Implementation** (next)
-- WebSocket client speaking the discovered protocol
+**Phase 2.5: Protocol Decoding** (complete)
+- XOR codec with static + session magic keys
+- 2-byte framing encode/decode
+- Session decoder for captured data
+- Lobby message parser (room list, game record, status, etc.)
+
+**Phase 3: Bot Implementation** (in progress)
+- Direct WebSocket client (no browser)
+- High-level protocol send/receive
 - Game logic and AI strategy
 
 ## Features
@@ -95,6 +102,8 @@ cp .env.example .env
 | `TANKPIT_OUTPUT` | `capture_session.json` | Output file path |
 | `TANKPIT_HEADLESS` | `true` | Run browser headlessly |
 | `TANKPIT_DURATION_MS` | `60000` | Capture duration in ms |
+| `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
+| `TANKPIT_PREFER_ACCOUNT` | `false` | Skip guest login, use account directly |
 | `TANKPIT_USERNAME` | (none) | Account username for login |
 | `TANKPIT_PASSWORD` | (none) | Account password for login |
 | `PYTHONUTF8` | `1` | Windows console UTF-8 support |
@@ -112,6 +121,7 @@ make test     # Run pytest with coverage
 make check    # Run lint + test
 make sniff    # Run WebSocket sniffer
 make probe    # Run input probe
+make decode   # Decode captured session
 make bot      # Run bot client
 ```
 
@@ -148,6 +158,11 @@ TankpitBot/
 │   ├── login.py          # Shared guest/account login logic
 │   ├── sniffer.py        # WebSocket capture via Playwright
 │   ├── probe.py          # Input injection and command discovery
+│   ├── codec.py          # XOR encode/decode with static + session keys
+│   ├── framing.py        # 2-byte length framing encode/decode
+│   ├── decoder.py        # Session decoder for captured data
+│   ├── parser.py         # Lobby message parser (room list, etc.)
+│   ├── commands.py       # Command type definitions
 │   └── bot.py            # Bot client entry point
 ├── tests/
 │   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
@@ -208,6 +223,7 @@ class CaptureSession(TypedDict):
     end_timestamp_ms: int | None
     base_url: str
     messages: list[CapturedMessage]
+    magic: str | None  # XOR key from tankpit.magic
 
 # CDP WebSocket frame event
 class CDPWebSocketFrameEvent(TypedDict):
