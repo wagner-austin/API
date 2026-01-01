@@ -21,6 +21,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_path_exists = _test_hooks.path_exists
     original_sync_playwright = _test_hooks.sync_playwright
     original_get_sync_playwright = _test_hooks.get_sync_playwright
+    original_get_argv = _test_hooks.get_argv
 
     yield
 
@@ -31,6 +32,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.path_exists = original_path_exists
     _test_hooks.sync_playwright = original_sync_playwright
     _test_hooks.get_sync_playwright = original_get_sync_playwright
+    _test_hooks.get_argv = original_get_argv
 
 
 @pytest.fixture(autouse=True)
@@ -153,13 +155,25 @@ class FakeFileSystem:
 def fake_fs() -> FakeFileSystem:
     """Create a FakeFileSystem and install it as hooks.
 
+    Pre-populates the static XOR key file used by the codec and probe modules.
+
     Returns:
         FakeFileSystem instance.
     """
+    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+    # Create a 1000-character fake static key for testing
+    # This matches the expected format of the real key
+    fake_static_key = "Y" + "A" * 999
+
     fs = FakeFileSystem()
     _test_hooks.write_text = fs.write_text
     _test_hooks.read_text = fs.read_text
     _test_hooks.path_exists = fs.path_exists
+
+    # Pre-populate the static key file
+    fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
+
     return fs
 
 
