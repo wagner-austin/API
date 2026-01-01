@@ -89,6 +89,13 @@ def test_decode_message_unknown() -> None:
     assert "[RECEIVED] ???:" in result
 
 
+def test_decode_message_quit() -> None:
+    """Test _decode_message decodes QUIT messages (dash character)."""
+    payload = _make_payload(b"-")
+    result = _decode_message(payload, "sent")
+    assert result == "[SENT] QUIT: -"
+
+
 def test_decode_plus_message_room_list() -> None:
     """Test _decode_plus_message decodes ROOM_LIST messages."""
     result = _decode_plus_message("+4|World (Meltdown)|42|flags", "RECV")
@@ -123,24 +130,52 @@ def test_decode_join_confirm_short() -> None:
 
 
 def test_decode_command_with_rest() -> None:
-    """Test _decode_command decodes commands with additional data."""
+    """Test _decode_command decodes commands with additional data (no magic)."""
     # Use actual binary bytes, not ASCII string
     body = bytes([0x21, 0x31, 0x2D, 0x43, 0xFE])  # !1-C<0xFE>
-    result = _decode_command(body, "!1...", "SENT")
-    assert result == "[SENT] CMD: !1 2d43fe"
+    result = _decode_command(body, "SENT")
+    assert result == "[SENT] CMD: ! 21312d43fe"
+
+
+def test_decode_command_with_magic_xor_decryption() -> None:
+    """Test _decode_command decodes commands with XOR decryption when magic provided."""
+    from pathlib import Path
+
+    # Check if static key exists (required for XOR decryption)
+    static_key_path = Path(__file__).parent.parent / "xor_static_key.txt"
+    if not static_key_path.exists():
+        pytest.skip("xor_static_key.txt not found")
+
+    # Read the static key
+    static_key = static_key_path.read_text().strip()
+    magic = "test_magic_key_20char"  # 20 char magic key
+
+    # Build the XOR table manually to know what encoded bytes to send
+    table = bytearray(len(static_key))
+    for i in range(len(static_key)):
+        table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
+
+    # We want to decode type=2, id=63 (enter game command)
+    # Encoded bytes: type_encoded = 2 ^ table[0], id_encoded = 63 ^ table[1]
+    type_encoded = 2 ^ table[0]
+    id_encoded = 63 ^ table[1]
+    body = bytes([0x21, type_encoded, id_encoded])
+
+    result = _decode_command(body, "SENT", magic)
+    assert result == "[SENT] CMD: ! type=2 id=63"
 
 
 def test_decode_command_short() -> None:
     """Test _decode_command handles short command messages."""
-    result = _decode_command(b"!", "!", "SENT")
-    assert result == "[SENT] CMD: !"
+    result = _decode_command(b"!", "SENT")
+    assert result == "[SENT] CMD: ! (too short: 21)"
 
 
 def test_decode_command_non_ascii() -> None:
-    """Test _decode_command handles non-ASCII command bytes."""
+    """Test _decode_command handles non-ASCII command bytes (no magic)."""
     body = bytes([0x21, 0x90, 0xAB, 0xCD])  # !<0x90><0xAB><0xCD>
-    result = _decode_command(body, "!", "SENT")
-    assert result == "[SENT] CMD: !0x90 abcd"
+    result = _decode_command(body, "SENT")
+    assert result == "[SENT] CMD: ! 2190abcd"
 
 
 def test_decode_message_calls_decode_plus_for_room_list() -> None:
@@ -161,7 +196,28 @@ def test_decode_message_calls_decode_command() -> None:
     """Test _decode_message routes to _decode_command."""
     payload = _make_payload(b"!7b")
     result = _decode_message(payload, "sent")
-    assert result == "[SENT] CMD: !7 62"
+    # Without magic key, just shows raw hex
+    assert result == "[SENT] CMD: ! 213762"
+
+
+def test_decode_message_command_with_magic_but_no_static_key() -> None:
+    """Test _decode_message falls back to hex when static key file doesn't exist.
+
+    This covers the branch where magic is provided but static key file is missing.
+    """
+    from tests.conftest import FakeFileSystem
+
+    # Create a fake filesystem that has NO static key file
+    fs = FakeFileSystem()
+    _test_hooks.read_text = fs.read_text
+    _test_hooks.path_exists = fs.path_exists
+
+    payload = _make_payload(b"!7b")
+    # Provide magic key, but static key file doesn't exist
+    result = _decode_message(payload, "sent", magic="test_magic")
+
+    # Should fall back to hex output since static key file is missing
+    assert result == "[SENT] CMD: ! 213762"
 
 
 # =============================================================================
