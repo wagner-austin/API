@@ -1,7 +1,7 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: lint test check install sniff probe bot
+.PHONY: lint test check install sniff probe bot decode
 
 install:
 	poetry lock
@@ -24,11 +24,14 @@ test:
 
 check: lint | test
 
-sniff:
+sniff: install
 	poetry run tankpit-sniff
 
-probe:
+probe: install
 	poetry run tankpit-probe
 
-bot:
+bot: install
 	poetry run tankpit-bot
+
+decode:
+	poetry run python -m scripts.verify_decode
