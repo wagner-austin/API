@@ -12,6 +12,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     optional_int,
+    optional_str,
     require_bool,
     require_float,
     require_int,
@@ -171,6 +172,7 @@ class CaptureSession(TypedDict):
         end_timestamp_ms: Unix timestamp when capture ended (None if ongoing).
         base_url: Base URL of the site being captured.
         messages: List of captured messages.
+        magic: XOR magic key from tankpit.magic (None if not captured).
     """
 
     session_id: str
@@ -178,6 +180,7 @@ class CaptureSession(TypedDict):
     end_timestamp_ms: int | None
     base_url: str
     messages: list[CapturedMessage]
+    magic: str | None
 
 
 def encode_capture_session(session: CaptureSession) -> JSONObject:
@@ -196,6 +199,7 @@ def encode_capture_session(session: CaptureSession) -> JSONObject:
         "end_timestamp_ms": session["end_timestamp_ms"],
         "base_url": session["base_url"],
         "messages": encoded_messages,
+        "magic": session["magic"],
     }
     return result
 
@@ -225,6 +229,7 @@ def decode_capture_session(data: JSONObject) -> CaptureSession:
         end_timestamp_ms=optional_int(data, "end_timestamp_ms"),
         base_url=require_str(data, "base_url"),
         messages=messages,
+        magic=optional_str(data, "magic"),
     )
 
 
