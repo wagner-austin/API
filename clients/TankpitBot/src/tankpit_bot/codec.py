@@ -1,0 +1,208 @@
+"""XOR codec for Tankpit game protocol.
+
+The protocol uses per-session XOR encoding with two keys:
+1. Static key: 1000-char string embedded in client JS
+2. Magic key: Session-specific string set in tankpit.magic after login
+
+The XOR table is built by XORing static key with magic key (cycling):
+    table[i] = static_key[i] ^ magic[i % len(magic)]
+
+Game commands are then XOR'd with this table before sending.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from tankpit_bot import _test_hooks
+
+# Default path to static XOR key file (relative to project root)
+DEFAULT_STATIC_KEY_PATH = Path(__file__).parent.parent.parent / "xor_static_key.txt"
+
+
+class CodecError(Exception):
+    """Base error for codec operations."""
+
+
+class InvalidKeyError(CodecError):
+    """Raised when a key is invalid (empty or wrong format)."""
+
+
+def load_static_key(path: Path) -> str:
+    """Load the static XOR key from a file.
+
+    Args:
+        path: Path to the static key file.
+
+    Returns:
+        The static key string (stripped of whitespace).
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        InvalidKeyError: If the key is empty after stripping.
+    """
+    content = _test_hooks.read_text(path)
+    key = content.strip()
+    if len(key) == 0:
+        raise InvalidKeyError("Static key file is empty")
+    return key
+
+
+def build_xor_table(static_key: str, magic: str) -> bytes:
+    """Build XOR encoding table from static key and magic.
+
+    The table is built by XORing each character of the static key with
+    the magic key (cycling through magic if it's shorter).
+
+    Args:
+        static_key: The static XOR key from client JS.
+        magic: The session-specific magic key from tankpit.magic.
+
+    Returns:
+        XOR table as bytes, same length as static_key.
+
+    Raises:
+        InvalidKeyError: If either key is empty.
+    """
+    if len(static_key) == 0:
+        raise InvalidKeyError("Static key is empty")
+    if len(magic) == 0:
+        raise InvalidKeyError("Magic key is empty")
+
+    magic_len = len(magic)
+    table = bytearray(len(static_key))
+
+    for i, char in enumerate(static_key):
+        static_byte = ord(char)
+        magic_byte = ord(magic[i % magic_len])
+        table[i] = static_byte ^ magic_byte
+
+    return bytes(table)
+
+
+def xor_bytes(table: bytes, data: bytes, offset: int = 0) -> bytes:
+    """XOR data with the encoding table.
+
+    Since XOR is symmetric, this function works for both encoding and decoding.
+
+    Args:
+        table: The XOR encoding table.
+        data: Data bytes to encode/decode.
+        offset: Starting position in the table (for commands that skip bytes).
+
+    Returns:
+        XOR'd bytes, same length as data.
+
+    Raises:
+        InvalidKeyError: If table is empty.
+        ValueError: If offset + len(data) exceeds table length.
+    """
+    if len(table) == 0:
+        raise InvalidKeyError("XOR table is empty")
+    if len(data) == 0:
+        return b""
+
+    end_pos = offset + len(data)
+    if end_pos > len(table):
+        raise ValueError(
+            f"Data extends beyond table: offset={offset}, "
+            f"data_len={len(data)}, table_len={len(table)}"
+        )
+
+    result = bytearray(len(data))
+    for i, byte in enumerate(data):
+        result[i] = byte ^ table[offset + i]
+
+    return bytes(result)
+
+
+class ProtocolCodec:
+    """Encoder/decoder for Tankpit game protocol.
+
+    Holds the XOR table and provides encode/decode methods.
+    """
+
+    def __init__(self, static_key: str, magic: str) -> None:
+        """Initialize codec with keys.
+
+        Args:
+            static_key: The static XOR key from client JS.
+            magic: The session-specific magic key from tankpit.magic.
+
+        Raises:
+            InvalidKeyError: If either key is empty.
+        """
+        self._table = build_xor_table(static_key, magic)
+
+    @property
+    def table(self) -> bytes:
+        """Get the XOR encoding table.
+
+        Returns:
+            The XOR table as bytes.
+        """
+        return self._table
+
+    def encode(self, data: bytes, offset: int = 0) -> bytes:
+        """Encode data using the XOR table.
+
+        Args:
+            data: Data bytes to encode.
+            offset: Starting position in the table.
+
+        Returns:
+            Encoded bytes.
+
+        Raises:
+            ValueError: If offset + len(data) exceeds table length.
+        """
+        return xor_bytes(self._table, data, offset)
+
+    def decode(self, data: bytes, offset: int = 0) -> bytes:
+        """Decode data using the XOR table.
+
+        Since XOR is symmetric, this is identical to encode.
+
+        Args:
+            data: Data bytes to decode.
+            offset: Starting position in the table.
+
+        Returns:
+            Decoded bytes.
+
+        Raises:
+            ValueError: If offset + len(data) exceeds table length.
+        """
+        return xor_bytes(self._table, data, offset)
+
+
+def create_codec(static_key_path: Path, magic: str) -> ProtocolCodec:
+    """Create a protocol codec by loading static key from file.
+
+    Convenience function that loads the static key and creates a codec.
+
+    Args:
+        static_key_path: Path to the static key file.
+        magic: The session-specific magic key from tankpit.magic.
+
+    Returns:
+        Configured ProtocolCodec instance.
+
+    Raises:
+        FileNotFoundError: If static key file does not exist.
+        InvalidKeyError: If any key is empty.
+    """
+    static_key = load_static_key(static_key_path)
+    return ProtocolCodec(static_key, magic)
+
+
+__all__ = [
+    "DEFAULT_STATIC_KEY_PATH",
+    "CodecError",
+    "InvalidKeyError",
+    "ProtocolCodec",
+    "build_xor_table",
+    "create_codec",
+    "load_static_key",
+    "xor_bytes",
+]
