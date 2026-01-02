@@ -96,6 +96,8 @@ def _coerce_verbose_response(raw: RawVerboseInput) -> VerboseResponse:
     text_val = raw.get("text")
     if not isinstance(text_val, str):
         raise JSONTypeError("verbose response missing text")
+    lang_val = raw.get("language")
+    language: str | None = lang_val if isinstance(lang_val, str) else None
     segs_val = raw.get("segments")
     if not isinstance(segs_val, list):
         raise JSONTypeError("verbose response missing segments list")
@@ -115,7 +117,7 @@ def _coerce_verbose_response(raw: RawVerboseInput) -> VerboseResponse:
         start = _as_float(start_raw)
         end = _as_float(end_raw)
         segs.append(VerboseSegment(text=text, start=start, end=end))
-    return VerboseResponse(text=text_val, segments=segs)
+    return VerboseResponse(text=text_val, language=language, segments=segs)
 
 
 def to_verbose_response(
