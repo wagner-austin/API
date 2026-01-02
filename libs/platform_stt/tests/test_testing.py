@@ -37,6 +37,7 @@ class TestFakeSTTClient:
         """Initialize with custom response."""
         response = VerboseResponse(
             text="Custom",
+            language="en",
             segments=[VerboseSegment(text="Custom", start=0.0, end=1.0)],
         )
         client = FakeSTTClient(response=response)
@@ -63,10 +64,12 @@ class TestFakeSTTClient:
         """Translate returns separate translate response."""
         response = VerboseResponse(
             text="Transcribed",
+            language="es",
             segments=[VerboseSegment(text="Transcribed", start=0.0, end=1.0)],
         )
         translate_response = VerboseResponse(
             text="Translated",
+            language="es",
             segments=[VerboseSegment(text="Translated", start=0.0, end=1.0)],
         )
         client = FakeSTTClient(response=response, translate_response=translate_response)
@@ -79,6 +82,7 @@ class TestFakeSTTClient:
         """Translate falls back to main response if no translate response."""
         response = VerboseResponse(
             text="Same",
+            language="en",
             segments=[VerboseSegment(text="Same", start=0.0, end=1.0)],
         )
         client = FakeSTTClient(response=response)
@@ -98,6 +102,7 @@ class TestFakeSTTClient:
         """Process with translate task."""
         translate_response = VerboseResponse(
             text="Translated",
+            language="es",
             segments=[VerboseSegment(text="Translated", start=0.0, end=1.0)],
         )
         client = FakeSTTClient(translate_response=translate_response)

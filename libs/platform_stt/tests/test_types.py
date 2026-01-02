@@ -200,10 +200,12 @@ class TestVerboseResponse:
         """Encode VerboseResponse to dict."""
         response = VerboseResponse(
             text="hello world",
+            language="en",
             segments=[VerboseSegment(text="hello", start=0.0, end=0.5)],
         )
         result = encode_verbose_response(response)
         assert result["text"] == "hello world"
+        assert result["language"] == "en"
         # Check segments is correctly encoded
         assert result["segments"] == [{"text": "hello", "start": 0.0, "end": 0.5}]
 
@@ -211,17 +213,31 @@ class TestVerboseResponse:
         """Decode dict to VerboseResponse."""
         obj: JSONObject = {
             "text": "hello world",
+            "language": "en",
             "segments": [{"text": "hello", "start": 0.0, "end": 0.5}],
         }
         result = decode_verbose_response(obj)
         assert result["text"] == "hello world"
+        assert result["language"] == "en"
+        assert len(result["segments"]) == 1
+
+    def test_decode_verbose_response_no_language(self) -> None:
+        """Decode dict to VerboseResponse when language is missing."""
+        obj: JSONObject = {
+            "text": "hello world",
+            "segments": [{"text": "hello", "start": 0.0, "end": 0.5}],
+        }
+        result = decode_verbose_response(obj)
+        assert result["text"] == "hello world"
+        assert result["language"] is None
         assert len(result["segments"]) == 1
 
     def test_require_verbose_response(self) -> None:
         """Validate and convert JSONValue."""
-        obj: JSONObject = {"text": "test", "segments": []}
+        obj: JSONObject = {"text": "test", "language": "vi", "segments": []}
         result = require_verbose_response(obj)
         assert result["text"] == "test"
+        assert result["language"] == "vi"
 
     def test_require_verbose_response_not_dict(self) -> None:
         """Reject non-dict value."""

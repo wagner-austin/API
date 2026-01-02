@@ -20,6 +20,7 @@ class FakeTranscribeFn:
         """Initialize with optional list of responses to return sequentially."""
         default = VerboseResponse(
             text="Test",
+            language="en",
             segments=[VerboseSegment(text="Test", start=0.0, end=1.0)],
         )
         self._responses = responses or [default]
@@ -75,6 +76,7 @@ class FailingThenSuccessFn:
             raise OSError("Transient error")
         return VerboseResponse(
             text="Success",
+            language="en",
             segments=[VerboseSegment(text="Success", start=0.0, end=1.0)],
         )
 
@@ -153,6 +155,7 @@ class TestParallelTranscriber:
 
         response = VerboseResponse(
             text="Hello world",
+            language="en",
             segments=[
                 VerboseSegment(text="Hello", start=0.0, end=0.5),
                 VerboseSegment(text="world", start=0.5, end=1.0),
@@ -186,10 +189,12 @@ class TestParallelTranscriber:
         responses = [
             VerboseResponse(
                 text="First",
+                language="en",
                 segments=[VerboseSegment(text="First", start=0.0, end=1.0)],
             ),
             VerboseResponse(
                 text="Second",
+                language="en",
                 segments=[VerboseSegment(text="Second", start=0.0, end=1.0)],
             ),
         ]

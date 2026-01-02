@@ -101,10 +101,23 @@ class TestToVerboseResponse:
         """Convert raw dict to VerboseResponse."""
         raw: RawVerboseDict = {
             "text": "Hello world",
+            "language": "en",
             "segments": [{"text": "Hello", "start": 0.0, "end": 0.5}],
         }
         result = to_verbose_response(raw)
         assert result["text"] == "Hello world"
+        assert result["language"] == "en"
+        assert len(result["segments"]) == 1
+
+    def test_to_verbose_response_no_language(self) -> None:
+        """Handle missing language field gracefully."""
+        raw: RawVerboseDict = {
+            "text": "Hello world",
+            "segments": [{"text": "Hello", "start": 0.0, "end": 0.5}],
+        }
+        result = to_verbose_response(raw)
+        assert result["text"] == "Hello world"
+        assert result["language"] is None
         assert len(result["segments"]) == 1
 
     def test_to_verbose_response_missing_text(self) -> None:
@@ -212,6 +225,7 @@ class TestConvertVerboseToSegments:
         """Convert VerboseResponse segments to TranscriptSegments."""
         response = VerboseResponse(
             text="Hello world",
+            language="en",
             segments=[
                 VerboseSegment(text="Hello", start=0.0, end=0.5),
                 VerboseSegment(text="world", start=0.5, end=1.0),
@@ -227,6 +241,7 @@ class TestConvertVerboseToSegments:
         """Filter out empty text segments."""
         response = VerboseResponse(
             text="Hello",
+            language="en",
             segments=[
                 VerboseSegment(text="Hello", start=0.0, end=0.5),
                 VerboseSegment(text="", start=0.5, end=0.6),
@@ -240,6 +255,7 @@ class TestConvertVerboseToSegments:
         """Handle negative duration (clamp to 0)."""
         response = VerboseResponse(
             text="Test",
+            language="en",
             segments=[VerboseSegment(text="Test", start=1.0, end=0.5)],
         )
         result = convert_verbose_to_segments(response)
@@ -249,6 +265,7 @@ class TestConvertVerboseToSegments:
         """Strip whitespace from segment text."""
         response = VerboseResponse(
             text="Test",
+            language="en",
             segments=[VerboseSegment(text="  Test  ", start=0.0, end=1.0)],
         )
         result = convert_verbose_to_segments(response)

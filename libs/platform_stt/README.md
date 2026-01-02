@@ -266,7 +266,7 @@ from platform_stt.testing import (
 
 # Create fake STT client for testing
 fake_client = FakeSTTClient(
-    response=VerboseResponse(text="Test", segments=[]),
+    response=VerboseResponse(text="Test", language="en", segments=[]),
 )
 
 # Create fake language ID model
