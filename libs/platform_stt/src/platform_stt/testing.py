@@ -61,6 +61,7 @@ class FakeSTTClient:
         """
         default = VerboseResponse(
             text="Test transcription",
+            language="en",
             segments=[VerboseSegment(text="Test", start=0.0, end=1.0)],
         )
         self._response = response or default
