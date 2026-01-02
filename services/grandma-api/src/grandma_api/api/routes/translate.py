@@ -72,9 +72,19 @@ def build_router(container: ServiceContainer) -> APIRouter:
 
         result = client.translate(file=audio_file)
 
-        logger.info("Translation complete", extra={"text_length": len(result["text"])})
+        text = result["text"]
+        language = result["language"]
+        text_preview = text[:100] + "..." if len(text) > 100 else text
+        logger.info(
+            "Translation complete",
+            extra={
+                "detected_language": language,
+                "text_length": len(text),
+                "text_preview": text_preview,
+            },
+        )
 
-        return TranslationResponse(text=result["text"])
+        return TranslationResponse(text=text)
 
     router.add_api_route("/translate", _translate, methods=["POST"])
     return router
