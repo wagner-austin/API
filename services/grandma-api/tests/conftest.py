@@ -31,6 +31,7 @@ class FakeSTTClient:
         """
         default = VerboseResponse(
             text="Hello from grandmother",
+            language="vi",
             segments=[VerboseSegment(text="Hello", start=0.0, end=1.0)],
         )
         self._response = response if response is not None else default

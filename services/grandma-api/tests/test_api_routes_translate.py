@@ -30,6 +30,7 @@ def test_translate_success() -> None:
     response_text = "Hello, how are you grandmother?"
     fake_response = VerboseResponse(
         text=response_text,
+        language="vi",
         segments=[VerboseSegment(text=response_text, start=0.0, end=2.0)],
     )
     settings = _make_test_settings()
