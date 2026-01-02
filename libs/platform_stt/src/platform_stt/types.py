@@ -276,6 +276,7 @@ class VerboseResponse(TypedDict):
     """OpenAI Whisper verbose_json response format."""
 
     text: str
+    language: str | None
     segments: list[VerboseSegment]
 
 
@@ -343,6 +344,7 @@ def encode_verbose_response(response: VerboseResponse) -> JSONObject:
     segments: list[JSONValue] = [encode_verbose_segment(s) for s in response["segments"]]
     return {
         "text": response["text"],
+        "language": response["language"],
         "segments": segments,
     }
 
@@ -360,11 +362,12 @@ def decode_verbose_response(obj: JSONObject) -> VerboseResponse:
         JSONTypeError: If required fields are missing or have wrong types.
     """
     text = require_str(obj, "text")
+    language = optional_str(obj, "language")
     segments_raw = require_list(obj, "segments")
     segments: list[VerboseSegment] = []
     for item in segments_raw:
         segments.append(require_verbose_segment(item))
-    return VerboseResponse(text=text, segments=segments)
+    return VerboseResponse(text=text, language=language, segments=segments)
 
 
 def require_verbose_response(obj: JSONValue) -> VerboseResponse:
