@@ -137,6 +137,8 @@ def test_encode_capture_session() -> None:
         base_url="https://example.com",
         messages=[msg],
         magic="test_magic_key",
+        game_log=[],
+        tank_names={},
     )
     result = encode_capture_session(session)
     assert result["session_id"] == "abc-123"
@@ -147,6 +149,8 @@ def test_encode_capture_session() -> None:
     messages_list = result["messages"]
     assert type(messages_list) is list
     assert len(messages_list) == 1
+    assert result["game_log"] == []
+    assert result["tank_names"] == {}
 
 
 def test_encode_capture_session_with_none_end() -> None:
@@ -158,6 +162,8 @@ def test_encode_capture_session_with_none_end() -> None:
         base_url="https://example.com",
         messages=[],
         magic=None,
+        game_log=[],
+        tank_names={},
     )
     result = encode_capture_session(session)
     assert result["end_timestamp_ms"] is None
