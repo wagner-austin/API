@@ -77,6 +77,42 @@ def _real_path_exists(path: Path) -> bool:
 path_exists: PathExistsProtocol = _real_path_exists
 
 
+class ReadTextProtocol(Protocol):
+    """Protocol for reading text from a file."""
+
+    def __call__(self, path: Path) -> str:
+        """Read text from a file.
+
+        Args:
+            path: Path to the file.
+
+        Returns:
+            File contents as string.
+
+        Raises:
+            FileNotFoundError: If file doesn't exist.
+        """
+        ...
+
+
+def _real_read_text(path: Path) -> str:
+    """Real implementation using Path.read_text().
+
+    Args:
+        path: Path to the file.
+
+    Returns:
+        File contents as string.
+
+    Raises:
+        FileNotFoundError: If file doesn't exist.
+    """
+    return path.read_text(encoding="utf-8")
+
+
+read_text: ReadTextProtocol = _real_read_text
+
+
 class SessionDecoderProtocol(Protocol):
     """Protocol for session decoder interface."""
 
@@ -147,10 +183,12 @@ __all__ = [
     "LoadAndDecodeSessionFunc",
     "LogLevel",
     "PathExistsProtocol",
+    "ReadTextProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
     "is_dir",
     "load_and_decode_session",
     "path_exists",
+    "read_text",
     "setup_rich_logging",
 ]
