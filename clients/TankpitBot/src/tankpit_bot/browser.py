@@ -24,6 +24,19 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
     PageProtocol,
 )
+from tankpit_bot.combat import CombatEvent, CombatTracker
+from tankpit_bot.dom_scraper import (
+    GameLogEntry,
+    GameLogScraper,
+)
+from tankpit_bot.fuel_probe import (
+    FuelProbeResult,
+    FuelProber,
+)
+from tankpit_bot.inventory import (
+    InventoryChange,
+    InventoryScraper,
+)
 from tankpit_bot.login import handle_login_flow
 from tankpit_bot.types import (
     CapturedMessage,
@@ -106,6 +119,11 @@ class BrowserSession:
         self._messages: list[CapturedMessage] = []
         self._ws_urls: dict[str, str] = {}  # requestId -> url mapping
         self._magic: str | None = None
+        self._game_log_scraper: GameLogScraper | None = None
+        self._inventory_scraper: InventoryScraper | None = None
+        self._combat_tracker: CombatTracker | None = None
+        self._fuel_prober: FuelProber | None = None
+        self._last_fuel_result: FuelProbeResult | None = None
 
     @property
     def session_id(self) -> str:
@@ -121,6 +139,116 @@ class BrowserSession:
     def magic(self) -> str | None:
         """Get captured magic key for XOR decoding."""
         return self._magic
+
+    def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
+        """Initialize the game log scraper.
+
+        Args:
+            cdp: CDP session for DOM access.
+        """
+        self._game_log_scraper = GameLogScraper(cdp)
+        log.info("Game log scraper initialized")
+
+    def _poll_game_log(self) -> list[GameLogEntry]:
+        """Poll for new game log entries, log them, and process combat.
+
+        Returns:
+            List of new entries found since last poll.
+        """
+        if self._game_log_scraper is None:
+            return []
+        new_entries = self._game_log_scraper.get_new_entries()
+        for entry in new_entries:
+            self._process_game_log_entry(entry)
+        return new_entries
+
+    def _process_game_log_entry(self, entry: GameLogEntry) -> None:
+        """Process a single game log entry.
+
+        Args:
+            entry: The game log entry to process.
+        """
+        prefix = f"[GAME:{entry['category'].upper()}]"
+        log.info("%s %s", prefix, entry["text"])
+        # Process combat events
+        if entry["category"] != "combat" or self._combat_tracker is None:
+            return
+        event = self._combat_tracker.process_log_line(entry["text"])
+        if event is None:
+            return
+        self._combat_tracker.log_event(event)
+
+    def _init_combat_tracker(self) -> None:
+        """Initialize the combat tracker."""
+        self._combat_tracker = CombatTracker()
+        log.info("Combat tracker initialized")
+
+    def _get_combat_events(self) -> list[CombatEvent]:
+        """Get all recorded combat events.
+
+        Returns:
+            List of CombatEvents, or empty list if tracker not initialized.
+        """
+        if self._combat_tracker is None:
+            return []
+        return self._combat_tracker.get_events()
+
+    def _init_inventory_scraper(self, cdp: CDPSessionProtocol) -> None:
+        """Initialize the inventory scraper.
+
+        Args:
+            cdp: CDP session for DOM access.
+        """
+        self._inventory_scraper = InventoryScraper(cdp)
+        log.info("Inventory scraper initialized")
+
+    def _poll_inventory(self) -> list[InventoryChange]:
+        """Poll for inventory changes and log them.
+
+        Returns:
+            List of changes found since last poll.
+        """
+        if self._inventory_scraper is None:
+            return []
+        return self._inventory_scraper.log_changes()
+
+    def _init_fuel_prober(self, cdp: CDPSessionProtocol) -> None:
+        """Initialize the fuel prober.
+
+        Args:
+            cdp: CDP session for JavaScript execution.
+        """
+        self._fuel_prober = FuelProber(cdp)
+        log.info("Fuel prober initialized")
+
+    def _poll_fuel(self) -> FuelProbeResult | None:
+        """Poll for fuel values and log findings.
+
+        Returns:
+            FuelProbeResult if prober initialized, None otherwise.
+        """
+        if self._fuel_prober is None:
+            return None
+
+        result = self._fuel_prober.probe()
+
+        # Log any interesting findings
+        if result["js_variables"]:
+            for var in result["js_variables"]:
+                log.info("[FUEL:JS] %s = %s", var["path"], var["value"])
+
+        if result["dom_bars"]:
+            for bar in result["dom_bars"]:
+                if bar["width"]:
+                    log.info(
+                        "[FUEL:DOM] %s width=%s class=%s",
+                        bar["tag"],
+                        bar["width"],
+                        bar["class_name"][:20] if bar["class_name"] else "",
+                    )
+
+        self._last_fuel_result = result
+        return result
 
     def _on_websocket_created(self, params: JSONObject) -> None:
         """Handle Network.webSocketCreated CDP event.
