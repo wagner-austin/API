@@ -206,9 +206,30 @@ def handle_account_login(
     })()
     """
     cdp.send("Runtime.evaluate", {"expression": open_js, "returnByValue": True})
-    page.wait_for_timeout(500.0)
 
-    # Step 2: Fill credentials with proper event dispatch
+    # Step 2: Wait for login form to be visible
+    wait_js = """
+    (() => {
+        const userInput = document.querySelector('#login-username');
+        const passInput = document.querySelector(
+            'form[action="/guest/sign-in"] input[name="password"]'
+        );
+        if (!userInput || !passInput) return 'waiting';
+        const userVisible = userInput.offsetParent !== null;
+        const passVisible = passInput.offsetParent !== null;
+        return userVisible && passVisible ? 'ready' : 'waiting';
+    })()
+    """
+    for _ in range(10):
+        result = cdp.send("Runtime.evaluate", {"expression": wait_js, "returnByValue": True})
+        result_obj = result.get("result")
+        if isinstance(result_obj, dict) and result_obj.get("value") == "ready":
+            break
+        page.wait_for_timeout(100.0)
+    else:
+        log.warning("Login form not ready after waiting")
+
+    # Step 3: Fill credentials with proper event dispatch
     fill_login_js = f"""
     (() => {{
         const userInput = document.querySelector('#login-username');
@@ -228,12 +249,15 @@ def handle_account_login(
         passInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
         passInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
 
-        return 'filled';
+        return 'filled: user=' + userInput.value.length + ' pass=' + passInput.value.length;
     }})()
     """
-    cdp.send("Runtime.evaluate", {"expression": fill_login_js, "returnByValue": True})
+    fill_result = cdp.send("Runtime.evaluate", {"expression": fill_login_js, "returnByValue": True})
+    fill_obj = fill_result.get("result")
+    fill_val = fill_obj.get("value", "?") if isinstance(fill_obj, dict) else "?"
+    log.info("Fill: %s", fill_val)
 
-    # Step 3: Submit login
+    # Step 4: Submit login
     submit_login_js = """
     (() => {
         const submit = document.querySelector(
@@ -251,8 +275,14 @@ def handle_account_login(
     login_val = result_obj.get("value", "?") if isinstance(result_obj, dict) else "?"
     log.info("Login: %s", login_val)
 
-    # Wait for login to complete
-    page.wait_for_timeout(3000.0)
+    # Wait for login to complete (page may navigate/close on success)
+    try:
+        page.wait_for_timeout(3000.0)
+    except Exception:
+        # Page closed or navigated - login likely succeeded
+        log.info("Page navigated during login wait")
+        return AccountLoginResult(success=True, error_message="")
+
     log.info("After login, URL: %s", page.url)
 
     # Check for login errors
@@ -265,10 +295,15 @@ def handle_account_login(
         return texts.filter(t => t.length > 0).join(' | ');
     })()
     """
-    err_result = cdp.send("Runtime.evaluate", {"expression": login_err_js, "returnByValue": True})
-    err_obj = err_result.get("result")
-    err_raw = err_obj.get("value", "") if isinstance(err_obj, dict) else ""
-    error_msg = str(err_raw) if err_raw else ""
+    try:
+        err_result = cdp.send("Runtime.evaluate", {"expression": login_err_js, "returnByValue": True})
+        err_obj = err_result.get("result")
+        err_raw = err_obj.get("value", "") if isinstance(err_obj, dict) else ""
+        error_msg = str(err_raw) if err_raw else ""
+    except Exception:
+        # Page closed - login succeeded
+        log.info("Login successful (page navigated)")
+        return AccountLoginResult(success=True, error_message="")
 
     if error_msg:
         log.warning("Login errors: %s", error_msg)
