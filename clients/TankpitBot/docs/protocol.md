@@ -240,27 +240,34 @@ Example: `02 00 2a 34` = length 2, body `*4` (SELECT room 4)
 
 The game uses **click-to-move** controls, not WASD. Keyboard keys are for actions:
 
-| Key | Action | Description |
-|-----|--------|-------------|
-| Space | Shoot | Fire at mouse position |
-| S | Radar | Ping nearby entities |
-| D | Mine | Place mine at current position |
-| F | Open Map | Toggle full map view |
-| E | Nearest Enemy | Target nearest enemy |
-| 1 | Armor Shields | Toggle armor shields |
-| 2 | Dual Shots | Toggle dual shot mode |
-| 3 | Missile Shots | Toggle missile mode |
-| 4 | Homing Shots | Toggle homing mode |
-| 5 | Extra Radars | Toggle extra radar range |
-| Arrow Keys | Scope | Pan camera N/S/E/W |
-| I | Inventory | Open inventory |
-| C | Statistics | Show game statistics |
-| X | Active Forces | Show active forces |
-| Q | Quit | Exit current game |
+| Key | Action | Description | Protocol |
+|-----|--------|-------------|----------|
+| Space | Shoot | Fire at mouse position | XOR cmd |
+| S | Radar | Ping nearby entities | XOR type=2 |
+| D | Mine | Place mine at current position | XOR type=2 |
+| F | Open Map | Toggle full map view | XOR type=2 |
+| E | Nearest Enemy | Target nearest enemy | XOR type=2 |
+| 1-5 | Equipment | Toggle armor/dual/missile/homing/radar | XOR type=3 |
+| Arrow Keys | Scope | Pan camera N/S/E/W | XOR type=3 |
+| PageUp/Down | Scope | Pan camera NE/SE | XOR type=3 |
+| Home/End | Scope | Pan camera NW/SW | XOR type=3 |
+| I | Inventory | Show inventory | XOR type=2 |
+| C | Statistics | Show game statistics | XOR type=2 |
+| X | Active Forces | Show team force counts | XOR type=2 |
+| / | Active Players | Show players in room | XOR type=2 |
+| T/R/P/B/O | Top 10 | Leaderboard (all/red/purple/blue/orange) | XOR type=3 |
+| F6 | Ping | Check server latency | XOR type=2 |
+| L | Sound | Toggle sound on/off | Plain V140/V040 |
+| A | Autoscroll | Toggle autoscroll | Plain A0/A1 |
+| H | Help | Show help overlay | Client-only |
+| M | Tips | Toggle tips display | Client-only |
+| N | Next Tip | Show next tip | Client-only |
+| Q | Quit | Exit current game | Plain `-` |
 
 Mouse controls:
 - **Single click**: Move to position
 - **Double click**: Fire at position
+- **Click and hold**: Pick up / Drop items
 
 ### Game Command Types
 
@@ -304,18 +311,212 @@ The same action produces different wire bytes each session:
 
 **Known Command IDs** (decoded after XOR):
 
-| ID (dec) | ID (hex) | Key | Action | Description |
-|----------|----------|-----|--------|-------------|
-| 63 | 0x3f | (click) | ENTER_GAME | Click to enter game |
-| 102 | 0x66 | S | RADAR | Ping nearby entities |
-| 107 | 0x6b | D | MINE | Drop mine at position |
-| 108 | 0x6c | F | MAP_OPEN | Open full map view |
+| ID (dec) | ID (hex) | Key | Type | Action | Description |
+|----------|----------|-----|------|--------|-------------|
+| 42 | 0x2a | X | 2 | ACTIVE_FORCES | Show team force counts |
+| 46 | 0x2e | F6 | 2 | PING | Server latency check |
+| 47 | 0x2f | / | 2 | ACTIVE_PLAYERS | Show players in room |
+| 49 | 0x31 | T/R/P/B/O | 3 | TOP10 | Leaderboard (+extra byte: ff=all, 00-03=team) |
+| 63 | 0x3f | (click) | 2 | ENTER_GAME | Click to enter game |
+| 90 | 0x5a | Arrows/Page | 3 | SCOPE | Pan camera (+extra byte: direction) |
+| 102 | 0x66 | S | 2 | RADAR | Ping nearby entities |
+| 104 | 0x68 | E | 2 | NEAREST_ENEMY | Target nearest enemy |
+| 105 | 0x69 | I | 2 | INVENTORY | Show inventory |
+| 107 | 0x6b | D | 2 | MINE | Deploy 3x3 mine grid at current position (no payload) |
+| 108 | 0x6c | F | 2 | MAP_OPEN | Open full map view |
+| 114 | 0x72 | 1-5 | 3 | TOGGLE_EQUIPMENT | Toggle equipment (+extra byte: slot) |
+| 118 | 0x76 | C | 2 | STATISTICS | Show player statistics |
+| 106 | 0x6a | Long press | 4 | PICKUP_MOVE | Move to pickup fuel/equipment (+2 byte payload: X, Y) |
+| 112 | 0x70 | Click | 4 | MOVE | Move to coordinates (+2 byte payload: X, Y) |
+| 116 | 0x74 | Map click | 4 | MAP_TELEPORT | Teleport via map (+2 byte payload: X, Y) |
+| 115 | 0x73 | Space | 6 | SHOOT | Fire at coordinates (+4 byte payload: X, Y, target_id) |
+
+**Movement Command** (type=4, cmd_id=0x70):
+
+The movement command is sent when clicking on the game canvas to move the tank.
+
+| Wire Format | Decoded | Description |
+|-------------|---------|-------------|
+| `! + type=4 + id=112 + X + Y` | Move to (X, Y) | 5 bytes total |
+
+- X and Y are single bytes (0-255), meaning the **map is 256x256**
+- Coordinates match the LOCATION displayed in-game
+
+Example from captured session (ending at LOCATION 93,100):
+```
+Encoded: 05 00 21 2f 2e 5d 64  →  len=5, body=`! / . ] d`
+Decoded: type=4, id=112, X=93, Y=100  →  Move to (93, 100)
+```
+
+**Shoot Command** (type=6, cmd_id=0x73):
+
+The shoot command is sent when pressing Spacebar to fire at the mouse position.
+
+| Wire Format | Decoded | Description |
+|-------------|---------|-------------|
+| `! + type=6 + id=115 + X + Y + id_lo + id_hi` | Fire at (X, Y) | 7 bytes total |
+
+- X and Y are target coordinates (single bytes, 0-255)
+- Bytes 3-4 are **target entity ID** (little-endian, 0x0000 if no specific target)
+- Server calculates trajectory from tank position to target
+- Shot type (regular, dual, missile, homing) determined by enabled equipment state
+
+Tested shots at empty ground (no target):
+```
+Fire West  → payload=[102, 64, 0, 0]
+Fire North → payload=[106, 60, 0, 0]
+Fire East  → payload=[113, 64, 0, 0]
+Fire SE    → payload=[108, 70, 0, 0]
+```
+
+Tested shots at multiple enemy tanks (entity IDs confirmed):
+```
+Red tank at 186,96     → payload=[186, 96, 31, 2]   entity_id=543 (0x021F)
+Red tank at 209,123    → payload=[209, 123, 31, 2]  entity_id=543 (same tank)
+Blue private at 230,165→ payload=[230, 165, 46, 2]  entity_id=558 (0x022E)
+Red-4 private at 63,132→ payload=[63, 132, 27, 2]   entity_id=539 (0x021B)
+```
+
+Each tank has a unique entity ID. The same tank retains its ID even after moving.
+
+**Map Teleport Command** (type=4, cmd_id=0x74):
+
+Teleport to a location via the map view. Fuel cost is distance-dependent.
+
+| Wire Format | Decoded | Description |
+|-------------|---------|-------------|
+| `! + type=4 + id=116 + X + Y` | Teleport to (X, Y) | 5 bytes total |
+
+- Requires map to be open first (CMD_MAP_OPEN, 'f' key)
+- X and Y are destination coordinates (single bytes, 0-255)
+
+Tested teleports:
+```
+Teleport to 195,79 → payload=[195, 79]
+Teleport to 209,90 → payload=[209, 90]
+```
+
+**Pickup Move Command** (type=4, cmd_id=0x6a):
+
+Move to pick up fuel or equipment. Triggered by long press on fuel/equipment.
+
+| Wire Format | Decoded | Description |
+|-------------|---------|-------------|
+| `! + type=4 + id=106 + X + Y` | Pickup at (X, Y) | 5 bytes total |
+
+- Same payload format as regular move
+- Tank moves to location and picks up item
+- Inventory full prevents pickup
+
+**Ping Command** (type=2, cmd_id=0x2e):
+
+| Key | Action | Response |
+|-----|--------|----------|
+| F6 | PING | Latency in milliseconds (e.g., "60 ms") |
+
+**Scope/View Commands** (type=3, cmd_id=0x5a):
+
+| Key | Extra Byte | Direction | Description |
+|-----|------------|-----------|-------------|
+| ArrowUp | 0x00 | North | Pan camera north |
+| ArrowRight | 0x02 | East | Pan camera east |
+| PageDown | 0x03 | Southeast | Pan camera southeast |
+| End | 0x05 | Southwest | Pan camera southwest |
+| ArrowLeft | 0x06 | West | Pan camera west |
+| Home | 0x07 | Northwest | Pan camera northwest |
+
+Response: `Z` + viewport data with entity positions
 
 **Plain Commands** (no XOR encoding):
 
 | Wire | Key | Action | Description |
 |------|-----|--------|-------------|
 | `-` | Q | QUIT | Exit game and return to lobby |
+| `A0` | A | AUTOSCROLL_ON | Enable autoscroll |
+| `A1` | A | AUTOSCROLL_OFF | Disable autoscroll |
+
+**Equipment Toggle Commands** (type=3, cmd_id=0x72):
+
+| Key | Extra Byte | Action | Description |
+|-----|------------|--------|-------------|
+| 1 | 0x31 | TOGGLE_ARMOR | Toggle armor shields |
+| 2 | 0x32 | TOGGLE_DUAL | Toggle dual shots |
+| 3 | 0x33 | TOGGLE_MISSILE | Toggle missile shots |
+| 4 | 0x34 | TOGGLE_HOMING | Toggle homing shots |
+| 5 | 0x35 | TOGGLE_RADAR | Toggle extra radars |
+
+Response format: `t(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1)` - each byte 0=off, 1=on
+
+**Sound Toggle Commands** (plain, no XOR):
+
+| Wire | Action | Description |
+|------|--------|-------------|
+| `V140` | SOUND_ON | Enable sound |
+| `V040` | SOUND_OFF | Disable sound |
+
+**Local-Only Commands** (no server message):
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| H | HELP | Show help overlay (client-side only) |
+
+#### Response Formats
+
+**Statistics (V prefix)** - 15 bytes:
+```
+V(1) + hours(2 LE) + mins(1) + secs(1) + destroyed(2 LE) + deactivated(2 LE) + pad(5) + promo_pts(1)
+Example: 5600000b0b0000000000000000001a = 0h11m11s, 0 destroyed, 0 deactivated, 26 promo pts
+```
+
+**Inventory (I prefix)** - 8 bytes:
+```
+I(1) + version(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1) + slot6(1)
+Encoding: bit 7 (0x80) = disabled flag, bits 0-6 = count
+- 0x94 = 0x80 | 0x14 = 20 items, disabled
+- 0x14 = 20 items, enabled
+- 0x00 = empty
+Example: 49029494949494 = 20 of each, all disabled
+```
+
+**Active Forces (* prefix)** - 5 bytes:
+```
+*(1) + red(1) + purple(1) + blue(1) + orange(1)
+Example: 2a0909090a = red=9, purple=9, blue=9, orange=10
+```
+
+**Active Players (/ prefix)** - 4+ bytes:
+```
+/(1) + capacity(1) + count(2 LE) + player_data...
+Example: 2f3c0200 = capacity=60, count=2
+```
+
+**Nearest Enemy (H prefix)** - 7 bytes:
+```
+H(1) + x(1) + y(1) + team(1) + player_num(1) + rank(1) + ?(1)
+Team: 0=red, 1=purple, 2=blue, 3=orange
+Rank: 0x1b=private (others TBD)
+Example: 483f8400011b02 = coords=[63,132], red, private
+```
+
+**Leaderboard (1 prefix)** - variable:
+```
+1(1) + team(1) + pad(4) + entries...
+Entry: rank(1) + mystery(1) + score(2 LE) + team(1) + 0x08 + namelen(1) + name
+Team filter: 0x00=red, 0x01=purple, 0x02=blue, 0x03=orange, 0xff=all
+```
+
+**Toggle State (t prefix)** - 6 bytes:
+```
+t(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1)
+Each byte: 0=off, 1=on
+Example: 740101010101 = all 5 equipment types active
+```
+
+**Map Data (L prefix)** - ~673 bytes:
+```
+L(1) + map_data...
+Binary blob containing map tile/entity data
+```
 
 **Query Commands** (3 bytes: `!` + type + cmd):
 
@@ -357,6 +558,180 @@ Server sends binary state updates prefixed with `.` containing:
 - Player positions
 - Projectile data
 - Game objects
+
+### Initial State on Join
+
+When joining a game, the server automatically pushes several messages:
+
+1. **Join Confirmation** with spawn coordinates:
+   ```
+   +2|3|128|128|<encoded_data>...
+   ```
+   Fields: `+<room_id>|<team>|<x>|<y>|<session_data>`
+
+   The coordinates (128,128) represent your spawn LOCATION displayed in-game.
+
+2. **Inventory State** (pushed without request):
+   ```
+   I(1) + version(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1) + slot6(1)
+   ```
+   The server sends this automatically - no need to press 'I' key.
+
+3. **Equipment Toggle State** (pushed without request):
+   ```
+   t(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1)
+   ```
+   Shows which equipment is currently enabled (each byte: 0=off, 1=on).
+
+4. **Viewport Data** (Z prefix):
+   ```
+   Z + x(1) + y(1) + <entity_data>...
+   ```
+   Contains visible entities in current viewport.
+
+### Recurring State Messages
+
+These state update subtypes appear continuously during gameplay:
+
+| Subtype | Char | Description |
+|---------|------|-------------|
+| 0x21 | `!` | Entity position updates |
+| 0x2e | `.` | Tank status sync (rank position, fuel) |
+| 0x3d | `=` | Position confirmation |
+| 0x3f | `?` | Heartbeat/sync |
+| 0x46 | `F` | Fuel/energy update |
+| 0x4b | `K` | Kill/event notification |
+| 0x4f | `O` | Object state |
+| 0x5a | `Z` | Viewport entity data |
+
+### HIT Event Message (12 bytes)
+
+Hit events are 12-byte state messages that notify of combat hits:
+
+```
+.(1) + 0x6c(1) + data(8) + hit_type(1) + 0x60(1)
+```
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | subtype | 0x2e (`.`) |
+| 1 | 1 | type | 0x6c (108) |
+| 2-8 | 7 | data | Hit event data (coords, damage, etc.) |
+| 9 | 1 | hit_type | 1=you were hit, 2=you hit enemy |
+| 10 | 1 | unknown | Variable |
+| 11 | 1 | footer | 0x60 (96) |
+
+Examples from combat:
+```
+You hit enemy: 2e6c450b106b4b6f23024760 (byte 9 = 0x02)
+Enemy hit you: 2e6c440710684b6c23014760 (byte 9 = 0x01)
+```
+
+### Tank Status Sync Message (0x2E subtype 0x03, 13 bytes)
+
+Periodic state update containing leaderboard position and fuel. Different from the 14-byte fuel message below which uses other subtypes.
+
+**Format (13 bytes, about self, subtype 0x03):**
+```
+.(1) + subtype(1) + tank_id(2 LE) + flags(3) + rank_pos(2 BE) + unknown(2) + fuel(2 LE)
+```
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | sig | 0x2E (`.`) |
+| 1 | 1 | subtype | 0x03 = about self, 0x01 = about others |
+| 2-3 | 2 | tank_id | Tank ID (little-endian) |
+| 4-6 | 3 | flags | Status flags (observed: 030200, 020200) |
+| 7-8 | 2 | rank_pos | Leaderboard position (big-endian, 1 = top) |
+| 9-10 | 2 | unknown | Always 0x0000 in captures (purpose TBD) |
+| 11-12 | 2 | fuel | Fuel/HP value (little-endian) |
+
+**Note:** Bytes 7-8 are leaderboard position, NOT promotion points. Promotion points come from the 0x56 Statistics message.
+
+**Format (9 bytes, about others, subtype 0x01):**
+```
+.(1) + 0x01(1) + tank_id(2 LE) + data(5)
+```
+
+### Supervisor Message (0x52, 4+ bytes)
+
+Server supervisor notification. Trigger conditions not fully understood.
+
+**Format:**
+```
+R(1) + 0x01(1) + 0x00(1) + status(1) [+ text...]
+```
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | sig | 0x52 (`R`) |
+| 1 | 1 | byte1 | Always 0x01 |
+| 2 | 1 | byte2 | Always 0x00 |
+| 3 | 1 | status | Status value |
+| 4+ | var | text | Optional ASCII text (when status=128) |
+
+**Observed status values:**
+- `1` - Post-event state
+- `4` - Normal state
+- `7` - Seen after equipment gains
+- `8` - Seen occasionally
+- `128` (0x80) - Contains text message (e.g., "Congratulations!")
+
+**Testing observations:**
+- NOT a timer/heartbeat (5 min idle = zero messages)
+- NOT consistently triggered by combat, movement, or equipment
+- Sometimes appears after equipment gains
+- status=128 with "Congratulations!" appeared in one session (context unclear)
+- Trigger appears to be server-side state, not player actions
+
+### Tank Fuel Message (0x2E, 14 bytes, XOR-encoded subtypes)
+
+14-byte state message containing player tank fuel (which equals HP). Uses subtypes other than 0x03 (e.g., 0x06, 0x0f, 0x15):
+
+```
+.(1) + subtype(1) + data(10) + fuel(2 LE)
+```
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | prefix | 0x2e (`.`) |
+| 1 | 1 | subtype | Varies per session (XOR encoded, e.g., 0x06, 0x0f, 0x15) |
+| 2-11 | 10 | data | Entity/status fields |
+| 12-13 | 2 | fuel | XOR-encoded fuel value (u16 little-endian) |
+
+**Fuel Decoding Formula (XOR required!):**
+
+```python
+decoded_fuel = (body[12] ^ xor_table[12]) | ((body[13] ^ xor_table[13]) << 8)
+```
+
+Where:
+- `xor_table[i] = static_key[i] ^ magic[i % len(magic)]`
+- Track delta changes between updates to monitor fuel consumption
+
+**Verified Fuel Costs:**
+
+| Action | Fuel Cost |
+|--------|-----------|
+| Radar (S key) | -10 |
+| Movement | -1 per tile |
+| Fuel deposit | -100 |
+| Teleport | -50 to -500 (distance) |
+| Combat damage | -30 to -50 per hit |
+| Fuel pickup | +100 to +200 |
+
+**Example timeline (XOR decoded):**
+```
+Time    Event      decoded   delta
+----------------------------------
+41.4s   RADAR
+42.3s   STATE      151       -10   <- radar cost
+54.3s   STATE       17      -100   <- fuel deposit
+64.3s   STATE      123      +116   <- fuel pickup
+```
+
+**Note:** The subtype byte (body[1]) varies per session because it's also XOR encoded.
+Common subtypes observed: 0x13, 0x1b, 0x40, 0x45
 
 ### Authentication Flow
 
