@@ -1,0 +1,50 @@
+So the platform libs ARE already implementing exactly what the refactor plan describes, but using TypedDict
+  instead of dataclasses (which is banned)! Let me check if we're actually USING these in turkic-api.
+
+● PERFECT! The platform libs already have everything using TypedDict (not dataclasses):
+
+  ✅ platform_core/turkic_events.py: Event system with TypedDict
+  ✅ platform_core/turkic_jobs.py: TurkicJobStatus TypedDict + turkic_job_key()
+  ✅ platform_core/queues.py: TURKIC_QUEUE = "turkic"
+
+  Now let me check if we're actually USING these in turkic-api:
+
+● Bash(grep -r "from platform_core" src/turkic_api/ | head -10)
+  ⎿  src/turkic_api/api/dependencies.py:from platform_core.queues import TURKIC_QUEUE
+     src/turkic_api/api/dependencies.py:    Uses shared platform helpers and a fixed queue name from platform_core.
+     Binary file src/turkic_api/api/__pycache__/dependencies.cpython-311.pyc matches
+
+● Bash(grep -r "TurkicJobStatus\|turkic_job_key\|TURKIC_QUEUE\|turkic.job.started" src/turkic_api/ | head -10)
+  ⎿  src/turkic_api/api/dependencies.py:from platform_core.queues import TURKIC_QUEUE
+     src/turkic_api/api/dependencies.py:    queue_name = TURKIC_QUEUE
+     Binary file src/turkic_api/api/__pycache__/dependencies.cpython-311.pyc matches
+
+∴ Thinking…
+
+  So we're ONLY using TURKIC_QUEUE but NOT:
+  - TurkicJobStatus TypedDict
+  - turkic_job_key() function
+  - Event publishing system
+
+  We're still doing manual Redis hset/hget and using our own api/models.py TypedDict instead of the shared one.
+
+  So the refactor document is:
+  1. Still partially valid (describes what we SHOULD do)
+  2. Infrastructure exists (platform libs)
+  3. NOT yet fully implemented in turkic-api
+
+  This means REFACTOR_TURKIC_API.md is actually a valid TODO/roadmap document, not legacy! It describes the next phase of
+  work.
+
+● Ah ha! So here's the reality:
+
+  What we're using:
+  - ✅ TURKIC_QUEUE from platform_core
+
+  What we're NOT using (but exists in platform libs):
+  - ❌ TurkicJobStatus TypedDict (we have our own api/models.JobStatus)
+  - ❌ turkic_job_key() function (we hardcode f"job:{job_id}")
+  - ❌ Event publishing system (StartedV1, ProgressV1, CompletedV1, FailedV1)
+  - ❌ platform_workers/rq_harness.py (if it exists)
+
+  So REFACTOR_TURKIC_API.md is NOT legacy - it's an ACTIVE ROADMAP for completing the platform integration!
