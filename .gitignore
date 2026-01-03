@@ -125,3 +125,4 @@ services/grandma-api/web/coverage/
 
 # TankpitBot captured sessions (regeneratable)
 clients/TankpitBot/capture_session.json
+clients/TankpitBot/raw_capture.json
