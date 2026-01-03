@@ -263,17 +263,17 @@ class SessionDecoder:
 
         raw_hex = body.hex()
 
-        # XOR decode the body (skip the '!' prefix which isn't encoded)
-        # Actually, looking at the protocol, the entire body including '!' is on the wire
-        # but the '!' itself may or may not be XOR'd. Let's decode the whole thing.
-        decoded = self._codec.decode(body)
+        # The '!' prefix is NOT XOR encoded, only the bytes after it.
+        # XOR decode body[1:] starting at offset 0 of the XOR table.
+        decoded_payload = self._codec.decode(body[1:], offset=0)
+        decoded = body[0:1] + decoded_payload
         decoded_hex = decoded.hex()
 
         # Extract command parts from decoded bytes
         # Format: '!' + type_byte + cmd_byte + data
-        type_byte = decoded[1]
-        cmd_byte = decoded[2]
-        data_hex = decoded[3:].hex() if len(decoded) > 3 else ""
+        type_byte = decoded_payload[0]
+        cmd_byte = decoded_payload[1]
+        data_hex = decoded_payload[2:].hex() if len(decoded_payload) > 2 else ""
 
         cmd = DecodedCommand(
             timestamp_ms=timestamp_ms,
