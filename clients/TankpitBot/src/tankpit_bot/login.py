@@ -208,16 +208,27 @@ def handle_account_login(
     cdp.send("Runtime.evaluate", {"expression": open_js, "returnByValue": True})
     page.wait_for_timeout(500.0)
 
-    # Step 2: Fill credentials
+    # Step 2: Fill credentials with proper event dispatch
     fill_login_js = f"""
     (() => {{
         const userInput = document.querySelector('#login-username');
         const passInput = document.querySelector(
             'form[action="/guest/sign-in"] input[name="password"]'
         );
-        if (userInput) userInput.value = '{username}';
-        if (passInput) passInput.value = '{password}';
-        return userInput && passInput ? 'filled' : 'inputs not found';
+        if (!userInput || !passInput) return 'inputs not found';
+
+        // Set values and dispatch events to trigger form validation
+        userInput.focus();
+        userInput.value = '{username}';
+        userInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        userInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+        passInput.focus();
+        passInput.value = '{password}';
+        passInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        passInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+        return 'filled';
     }})()
     """
     cdp.send("Runtime.evaluate", {"expression": fill_login_js, "returnByValue": True})
