@@ -220,6 +220,15 @@ class FakePage:
             },
         )
 
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for JavaScript function to return truthy.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        _ = (expression, timeout)
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
@@ -270,6 +279,15 @@ class FakePageNoMessages:
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for JavaScript function to return truthy.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        _ = (expression, timeout)
 
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
@@ -826,6 +844,15 @@ class FakePageProbe:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
 
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for JavaScript function to return truthy.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        _ = (expression, timeout)
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
         _ = (reason, run_before_unload)
@@ -878,6 +905,15 @@ class FakePageProbeNoMessages:
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for JavaScript function to return truthy.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        _ = (expression, timeout)
 
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""

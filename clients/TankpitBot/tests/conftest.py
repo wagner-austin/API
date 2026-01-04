@@ -6,9 +6,78 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONObject
 from scripts import _test_hooks as scripts_test_hooks
 
 from tankpit_bot import _test_hooks
+
+
+class FakeCDPSessionSimple:
+    """Simple fake CDP session for testing with configurable responses.
+
+    Used for testing code that only needs send() without event handlers.
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty response queue."""
+        self._responses: list[JSONObject] = []
+        self._response_index: int = 0
+        self._calls: list[tuple[str, JSONObject | None]] = []
+
+    def add_response(self, response: JSONObject) -> None:
+        """Add a response to return on next send() call.
+
+        Args:
+            response: The response to return.
+        """
+        self._responses.append(response)
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Send a CDP command and return configured response.
+
+        Args:
+            method: CDP method name.
+            params: Optional parameters.
+
+        Returns:
+            Next configured response, or empty dict if none configured.
+        """
+        self._calls.append((method, params))
+
+        if self._response_index < len(self._responses):
+            response = self._responses[self._response_index]
+            self._response_index += 1
+            return response
+        return {}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Register event handler (no-op for testing).
+
+        Args:
+            event: Event name.
+            handler: Event handler.
+        """
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Detach session (no-op for testing)."""
+
+    def get_calls(self) -> list[tuple[str, JSONObject | None]]:
+        """Get all recorded send() calls.
+
+        Returns:
+            List of (method, params) tuples.
+        """
+        return list(self._calls)
+
+    @property
+    def call_count(self) -> int:
+        """Get number of send() calls made.
+
+        Returns:
+            Number of calls.
+        """
+        return len(self._calls)
 
 
 @pytest.fixture(autouse=True)
@@ -191,3 +260,13 @@ def make_fake_get_env(env_vars: dict[str, str]) -> Callable[[str], str | None]:
         return env_vars.get(key)
 
     return _get
+
+
+@pytest.fixture()
+def fake_cdp() -> FakeCDPSessionSimple:
+    """Create a FakeCDPSessionSimple for testing.
+
+    Returns:
+        FakeCDPSessionSimple instance.
+    """
+    return FakeCDPSessionSimple()

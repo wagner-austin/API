@@ -239,6 +239,15 @@ class PageProtocol(Protocol):
         """
         ...
 
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for a JavaScript function to return truthy value.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        ...
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close the page.
 
