@@ -12,11 +12,15 @@ from tankpit_bot.types import (
     CDPWebSocketCreatedEvent,
     CDPWebSocketFrame,
     CDPWebSocketFrameEvent,
+    CombatEvent,
+    GameLogEntryWithTimestamp,
     KeyInput,
+    MessageStats,
     MouseInput,
     ProbeInput,
     ProbeResult,
     ProbeSession,
+    SessionSummary,
     SnifferConfig,
     WebSocketInfo,
     decode_bot_config,
@@ -38,11 +42,14 @@ from tankpit_bot.types import (
     encode_cdp_websocket_created_event,
     encode_cdp_websocket_frame,
     encode_cdp_websocket_frame_event,
+    encode_combat_event,
     encode_key_input,
+    encode_message_stats,
     encode_mouse_input,
     encode_probe_input,
     encode_probe_result,
     encode_probe_session,
+    encode_session_summary,
     encode_sniffer_config,
     encode_websocket_info,
 )
@@ -805,3 +812,259 @@ def test_decode_probe_session_invalid_result() -> None:
     }
     with pytest.raises(JSONTypeError, match=r"results\[0\] must be an object"):
         decode_probe_session(data)
+
+
+# =============================================================================
+# CaptureSession with game_log and tank_names Tests
+# =============================================================================
+
+
+def test_encode_capture_session_with_game_log_and_tank_names() -> None:
+    """Test encoding CaptureSession with non-empty game_log and tank_names."""
+    log_entry = GameLogEntryWithTimestamp(
+        timestamp_ms=1000,
+        text="You hit enemy-1",
+        category="combat",
+    )
+    session = CaptureSession(
+        session_id="session-456",
+        start_timestamp_ms=0,
+        end_timestamp_ms=5000,
+        base_url="https://tankpit.com",
+        messages=[],
+        magic="xor_key_here",
+        game_log=[log_entry],
+        tank_names={"123": "Player1", "456": "Enemy2"},
+    )
+    result = encode_capture_session(session)
+    # Verify tank_names dict was converted (exercises _str_dict_to_json)
+    tank_names = result["tank_names"]
+    assert type(tank_names) is dict
+    assert tank_names["123"] == "Player1"
+    assert tank_names["456"] == "Enemy2"
+    # Verify game_log was encoded
+    game_log = result["game_log"]
+    assert type(game_log) is list
+    assert len(game_log) == 1
+
+
+def test_decode_capture_session_with_game_log_and_tank_names() -> None:
+    """Test decoding CaptureSession with game_log and tank_names."""
+    data: JSONObject = {
+        "session_id": "session-789",
+        "start_timestamp_ms": 0,
+        "end_timestamp_ms": 10000,
+        "base_url": "https://tankpit.com",
+        "messages": [],
+        "magic": "decoded_key",
+        "game_log": [
+            {
+                "timestamp_ms": 500,
+                "text": "Enemy destroyed",
+                "category": "combat",
+            }
+        ],
+        "tank_names": {"100": "TankA", "200": "TankB"},
+    }
+    result = decode_capture_session(data)
+    # Verify game_log was decoded (exercises lines 307-308)
+    assert len(result["game_log"]) == 1
+    assert result["game_log"][0]["text"] == "Enemy destroyed"
+    # Verify tank_names was decoded (exercises lines 321-322)
+    assert result["tank_names"]["100"] == "TankA"
+    assert result["tank_names"]["200"] == "TankB"
+
+
+def test_decode_capture_session_with_non_dict_game_log_entry() -> None:
+    """Test decoding CaptureSession skips non-dict game_log entries."""
+    data: JSONObject = {
+        "session_id": "session-skip",
+        "start_timestamp_ms": 0,
+        "end_timestamp_ms": 10000,
+        "base_url": "https://tankpit.com",
+        "messages": [],
+        "magic": None,
+        "game_log": [
+            "not a dict",
+            {
+                "timestamp_ms": 500,
+                "text": "Valid entry",
+                "category": "info",
+            },
+        ],
+        "tank_names": {},
+    }
+    result = decode_capture_session(data)
+    # Only the valid dict entry should be decoded
+    assert len(result["game_log"]) == 1
+    assert result["game_log"][0]["text"] == "Valid entry"
+
+
+def test_decode_capture_session_with_non_string_tank_name_values() -> None:
+    """Test decoding CaptureSession skips non-string tank_names."""
+    data: JSONObject = {
+        "session_id": "session-names",
+        "start_timestamp_ms": 0,
+        "end_timestamp_ms": 10000,
+        "base_url": "https://tankpit.com",
+        "messages": [],
+        "magic": None,
+        "game_log": [],
+        "tank_names": {"100": "ValidName", "200": 12345, "300": None},
+    }
+    result = decode_capture_session(data)
+    # Only the valid string value should be decoded
+    assert len(result["tank_names"]) == 1
+    assert result["tank_names"]["100"] == "ValidName"
+
+
+# =============================================================================
+# CombatEvent and MessageStats Tests
+# =============================================================================
+
+
+def test_encode_combat_event() -> None:
+    """Test encoding CombatEvent to JSON."""
+    event = CombatEvent(
+        timestamp_ms=1234567890,
+        event_type="hit",
+        target="enemy-tank",
+        tank_id=42,
+    )
+    result = encode_combat_event(event)
+    assert result["timestamp_ms"] == 1234567890
+    assert result["event_type"] == "hit"
+    assert result["target"] == "enemy-tank"
+    assert result["tank_id"] == 42
+
+
+def test_encode_combat_event_with_none_tank_id() -> None:
+    """Test encoding CombatEvent with None tank_id."""
+    event = CombatEvent(
+        timestamp_ms=1000,
+        event_type="kill",
+        target="victim",
+        tank_id=None,
+    )
+    result = encode_combat_event(event)
+    assert result["tank_id"] is None
+
+
+def test_encode_message_stats() -> None:
+    """Test encoding MessageStats to JSON."""
+    stats = MessageStats(
+        decoded={"len=11 combat_hit": 5, "len=13 position": 10},
+        unknown={
+            "len=7": {"count": 3, "samples": ["abc123", "def456"]},
+        },
+        total_received=100,
+        decode_coverage="85% understood",
+    )
+    result = encode_message_stats(stats)
+    # Verify decoded dict was converted (exercises _int_dict_to_json)
+    decoded = result["decoded"]
+    assert type(decoded) is dict
+    assert decoded["len=11 combat_hit"] == 5
+    # Verify unknown dict was converted with nested list (exercises lines 398-408)
+    unknown = result["unknown"]
+    assert type(unknown) is dict
+    len7_entry = unknown["len=7"]
+    assert type(len7_entry) is dict
+    assert len7_entry["count"] == 3
+    samples = len7_entry["samples"]
+    assert type(samples) is list
+    assert len(samples) == 2
+
+
+def test_encode_message_stats_with_int_in_unknown() -> None:
+    """Test encoding MessageStats handles non-list values in unknown."""
+    stats = MessageStats(
+        decoded={},
+        unknown={
+            "len=5": {"count": 7},  # count is int, not list
+        },
+        total_received=10,
+        decode_coverage="70%",
+    )
+    result = encode_message_stats(stats)
+    unknown = result["unknown"]
+    assert type(unknown) is dict
+    len5_entry = unknown["len=5"]
+    assert type(len5_entry) is dict
+    assert len5_entry["count"] == 7
+
+
+# =============================================================================
+# SessionSummary Tests
+# =============================================================================
+
+
+def test_encode_session_summary() -> None:
+    """Test encoding SessionSummary to JSON."""
+    combat_event = CombatEvent(
+        timestamp_ms=1000,
+        event_type="hit",
+        target="enemy",
+        tank_id=10,
+    )
+    log_entry = GameLogEntryWithTimestamp(
+        timestamp_ms=1000,
+        text="You hit enemy",
+        category="combat",
+    )
+    stats = MessageStats(
+        decoded={"combat": 5},
+        unknown={},
+        total_received=50,
+        decode_coverage="100%",
+    )
+    summary = SessionSummary(
+        session_id="summary-123",
+        start_timestamp_ms=0,
+        end_timestamp_ms=10000,
+        magic="xor_key",
+        tanks={"1": "Player", "2": "Enemy"},
+        combat=[combat_event],
+        equipment_gains=[{"type": "armor", "value": 10}],
+        game_log=[log_entry],
+        message_stats=stats,
+    )
+    result = encode_session_summary(summary)
+    assert result["session_id"] == "summary-123"
+    # Verify tanks dict conversion (exercises _str_dict_to_json)
+    tanks = result["tanks"]
+    assert type(tanks) is dict
+    assert tanks["1"] == "Player"
+    # Verify equipment_gains conversion (exercises _mixed_dict_to_json, lines 452-453)
+    equipment = result["equipment_gains"]
+    assert type(equipment) is list
+    assert len(equipment) == 1
+    equipment_entry = equipment[0]
+    assert type(equipment_entry) is dict
+    assert equipment_entry["type"] == "armor"
+    assert equipment_entry["value"] == 10
+
+
+def test_encode_session_summary_empty_equipment() -> None:
+    """Test encoding SessionSummary with empty equipment_gains."""
+    stats = MessageStats(
+        decoded={},
+        unknown={},
+        total_received=0,
+        decode_coverage="0%",
+    )
+    summary = SessionSummary(
+        session_id="empty-summary",
+        start_timestamp_ms=0,
+        end_timestamp_ms=1000,
+        magic=None,
+        tanks={},
+        combat=[],
+        equipment_gains=[],
+        game_log=[],
+        message_stats=stats,
+    )
+    result = encode_session_summary(summary)
+    equipment = result["equipment_gains"]
+    assert type(equipment) is list
+    assert len(equipment) == 0

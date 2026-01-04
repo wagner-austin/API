@@ -20,6 +20,52 @@ from platform_core.json_utils import (
     require_str,
 )
 
+
+def _str_dict_to_json(source: dict[str, str]) -> JSONObject:
+    """Convert dict[str, str] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
+
+def _int_dict_to_json(source: dict[str, int]) -> JSONObject:
+    """Convert dict[str, int] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and int values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
+
+def _mixed_dict_to_json(source: dict[str, int | str]) -> JSONObject:
+    """Convert dict[str, int | str] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and int or str values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
+
 # =============================================================================
 # Literal Types
 # =============================================================================
@@ -219,6 +265,8 @@ def encode_capture_session(session: CaptureSession) -> JSONObject:
         }
         for entry in session["game_log"]
     ]
+    # Convert tank_names dict (dict[str, str] -> JSONObject)
+    tank_names_json: JSONObject = _str_dict_to_json(session["tank_names"])
     result: JSONObject = {
         "session_id": session["session_id"],
         "start_timestamp_ms": session["start_timestamp_ms"],
@@ -227,7 +275,7 @@ def encode_capture_session(session: CaptureSession) -> JSONObject:
         "messages": encoded_messages,
         "magic": session["magic"],
         "game_log": encoded_game_log,
-        "tank_names": session["tank_names"],
+        "tank_names": tank_names_json,
     }
     return result
 
@@ -255,7 +303,7 @@ def decode_capture_session(data: JSONObject) -> CaptureSession:
     game_log: list[GameLogEntryWithTimestamp] = []
     raw_game_log = data.get("game_log")
     if raw_game_log is not None and isinstance(raw_game_log, list):
-        for idx, raw_entry in enumerate(raw_game_log):
+        for raw_entry in raw_game_log:
             if isinstance(raw_entry, dict):
                 game_log.append(
                     GameLogEntryWithTimestamp(
@@ -322,6 +370,51 @@ class CombatEvent(TypedDict):
     tank_id: int | None
 
 
+def encode_combat_event(event: CombatEvent) -> JSONObject:
+    """Encode CombatEvent to JSON-serializable dict."""
+    return {
+        "timestamp_ms": event["timestamp_ms"],
+        "event_type": event["event_type"],
+        "target": event["target"],
+        "tank_id": event["tank_id"],
+    }
+
+
+def encode_message_stats(stats: MessageStats) -> JSONObject:
+    """Encode MessageStats to JSON-serializable dict.
+
+    Args:
+        stats: MessageStats to encode.
+
+    Returns:
+        JSON-serializable dict.
+    """
+    # Convert decoded dict (dict[str, int] -> dict[str, JSONValue])
+    decoded_json: JSONObject = _int_dict_to_json(stats["decoded"])
+
+    # Convert unknown dict (nested structure)
+    unknown_json: JSONObject = {}
+    for sig, data in stats["unknown"].items():
+        entry: JSONObject = {}
+        for key, val in data.items():
+            if isinstance(val, list):
+                # Convert list[str] to list[JSONValue]
+                json_list: list[JSONValue] = []
+                for item in val:
+                    json_list.append(item)
+                entry[key] = json_list
+            else:
+                entry[key] = val
+        unknown_json[sig] = entry
+
+    return {
+        "decoded": decoded_json,
+        "unknown": unknown_json,
+        "total_received": stats["total_received"],
+        "decode_coverage": stats["decode_coverage"],
+    }
+
+
 class SessionSummary(TypedDict):
     """Processed/decoded session data for easy analysis.
 
@@ -350,19 +443,28 @@ class SessionSummary(TypedDict):
 
 def encode_session_summary(summary: SessionSummary) -> JSONObject:
     """Encode SessionSummary to JSON-serializable dict."""
+    # Convert tanks dict (dict[str, str] -> JSONObject)
+    tanks_json: JSONObject = _str_dict_to_json(summary["tanks"])
+
+    # Convert equipment_gains list (list[dict[str, int | str]] -> list[JSONValue])
+    equipment_json: list[JSONValue] = []
+    for gain in summary["equipment_gains"]:
+        entry: JSONObject = _mixed_dict_to_json(gain)
+        equipment_json.append(entry)
+
     return {
         "session_id": summary["session_id"],
         "start_timestamp_ms": summary["start_timestamp_ms"],
         "end_timestamp_ms": summary["end_timestamp_ms"],
         "magic": summary["magic"],
-        "tanks": summary["tanks"],
-        "combat": [dict(e) for e in summary["combat"]],
-        "equipment_gains": summary["equipment_gains"],
+        "tanks": tanks_json,
+        "combat": [encode_combat_event(e) for e in summary["combat"]],
+        "equipment_gains": equipment_json,
         "game_log": [
             {"timestamp_ms": e["timestamp_ms"], "text": e["text"], "category": e["category"]}
             for e in summary["game_log"]
         ],
-        "message_stats": dict(summary["message_stats"]),
+        "message_stats": encode_message_stats(summary["message_stats"]),
     }
 
 
