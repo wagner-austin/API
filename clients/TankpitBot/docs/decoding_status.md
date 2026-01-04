@@ -2,12 +2,52 @@
 
 ## Coverage Metric
 
-**100% decoder coverage on captured messages**
+**94% signature coverage, 92% fully decoded**
 
-- 28 message types in protocol.py
-- All captured binary messages fully decoded
+- 31+ message types in protocol.py
+- Length-based identification for session-independent decoding
+- Container decoder (container_decoder.py) for 0x2E subtypes
+- Recent session: 54 messages, 92% signature matched, 82% fully understood
 - 3 messages recently captured (need full decoding: 0x28, 0x4C, 0x4D)
-- 2 message types not yet captured (0x29, 0x2F)
+
+---
+
+## Length-Based Message Identification
+
+XOR encoding with per-session magic keys makes byte-based message identification unreliable across sessions. Instead, we use **message length** for session-independent identification:
+
+### Exact Length Matches
+
+| Length | Message Type | Decode Level |
+|--------|-------------|--------------|
+| 1 | heartbeat | IDENTIFIED |
+| 2-3 | tank_status_sync | FULL |
+| 4 | player_ack | IDENTIFIED |
+| 5 | entity_sync | IDENTIFIED |
+| 6 | tank_leave | FULL |
+| 7 | player_list_extended | FULL |
+| 9 | tank_status_short | FULL |
+| 10 | tank_update_compact | FULL |
+| 11 | combat_hit | FULL |
+| 13 | position_update | FULL |
+| 14 | tank_update_extended | FULL |
+| 15 | tank_update_full | FULL |
+| 16-20 | tank_registry | FULL |
+
+### Range-Based Matches
+
+| Length Range | Message Type | Decode Level |
+|-------------|-------------|--------------|
+| 21-28 | entity_extended | IDENTIFIED |
+| 29-60 | tip_notification | IDENTIFIED |
+| 80-130 | chunk_data | IDENTIFIED |
+| 500+ | world_state | IDENTIFIED |
+
+**Decode Levels:**
+- **FULL**: Complete field-by-field decoding with TypedDict structure
+- **IDENTIFIED**: Message type known, structure partially decoded
+
+**Implementation:** See `_identify_by_length()` in `sniffer.py` and `container_decoder.py`
 
 ---
 
@@ -41,13 +81,6 @@
 | 0x74 | equip_toggle | 7 | `armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` (0=OFF,1=ON) |
 
 ---
-
-## Not Captured (Need Live Testing) - 2 Messages
-
-| Sig | Name | Trigger | Notes |
-|-----|------|---------|-------|
-| 0x29 | tank_leave | Watch player disconnect | Sent when player leaves |
-| 0x2F | player_update | Press `/` key | Active players list response |
 
 ## Recently Captured (Need Decoding) - 3 Messages
 
@@ -150,6 +183,46 @@
 | 5 | Captain |
 | 6 | Major |
 | 7 | General |
+
+### 0x2E Tank Leave (6 bytes)
+
+Sent when a tank leaves the game. Decoded in `container_decoder.py`.
+
+```
+[0]    u8    subtype (varies by session)
+[1]    u8    flags (0x13, 0x4A observed)
+[2-3]  u16   tank_id (LE)
+[4-5]  u16   extra_data
+```
+
+**Trigger:** Player disconnects or exits the game.
+
+**Examples:**
+- `7f138b004213` → tank_id=139 (Arterial) left the game
+- `204a845d5201` → tank_id=23940 left the game (large ID)
+
+### 0x2E Player List Response (4 or 7 bytes)
+
+Response to pressing `/` key. Shows active players in room.
+
+**Short format (4 bytes) - Single player or empty response:**
+```
+[0]    u8    subtype (varies by session)
+[1-3]  bytes response_data
+```
+
+**Extended format (7 bytes) - Multiple players:**
+```
+[0]    u8    subtype (varies by session)
+[1-3]  bytes response_data
+[4-6]  bytes extended_data (additional player info)
+```
+
+**Trigger:** Player presses `/` key to view active players list.
+
+**Example:**
+- `79990507` (4 bytes) → single player response
+- `79990507ce1144` (7 bytes) → multiple players response
 
 ### 0x3E Tank Status (from JS client analysis)
 
