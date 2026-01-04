@@ -68,6 +68,10 @@ class FakeCDPLogin:
             if "#login" in expression:
                 self._account_login_started = True
 
+            # Login form visibility check (looking for 'ready'/'waiting')
+            if "login-username" in expression and "offsetParent" in expression:
+                return {"result": {"value": "ready"}}
+
             return {"result": {"value": "success"}}
         return {}
 
@@ -155,6 +159,10 @@ class FakePageLogin:
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for a JavaScript function - returns immediately in tests."""
+        _ = (expression, timeout)
 
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close page."""
@@ -373,7 +381,6 @@ def test_handle_login_flow_rate_limited_with_credentials() -> None:
     """Login flow succeeds with account login after rate limiting."""
     page = FakePageLogin(
         start_url="https://tankpit.com/before-playing",
-        stays_on_before_playing=True,
     )
     cdp = FakeCDPLogin(rate_limited=True)
 
@@ -622,7 +629,6 @@ def test_handle_login_flow_auto_join_after_rate_limit_fallback() -> None:
     """Login flow auto-joins room after rate-limited account fallback."""
     page = FakePageLogin(
         start_url="https://tankpit.com/before-playing",
-        stays_on_before_playing=True,
     )
     cdp = FakeCDPLogin(rate_limited=True)
 
@@ -654,3 +660,148 @@ def test_handle_login_flow_auto_join_after_guest_failure_no_rate_limit() -> None
 
     assert result is True
     assert cdp.join_room_called is True
+
+
+# =============================================================================
+# Tests for account login edge cases
+# =============================================================================
+
+
+class FakeCDPLoginFormNeverReady:
+    """Fake CDP where login form is never ready (returns 'waiting' always)."""
+
+    def __init__(self) -> None:
+        """Initialize fake CDP session."""
+        self._account_login_started = False
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Send CDP command."""
+        if method == "Runtime.evaluate":
+            expression = str(params.get("expression", "")) if params else ""
+
+            # Open login overlay
+            if "#login" in expression:
+                self._account_login_started = True
+
+            # Login form visibility check - ALWAYS return 'waiting'
+            if "login-username" in expression and "offsetParent" in expression:
+                return {"result": {"value": "waiting"}}
+
+            return {"result": {"value": "success"}}
+        return {}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Register event handler."""
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Detach CDP session."""
+
+
+class FakePageLoginTimeout:
+    """Fake page that stays on before-playing forever (for timeout testing)."""
+
+    def __init__(self) -> None:
+        """Initialize fake page."""
+        self._url = "https://tankpit.com/before-playing"
+        self._wait_count = 0
+
+    @property
+    def url(self) -> str:
+        """Get current URL - always stays on before-playing."""
+        return self._url
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> ResponseProtocol | None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+        return None
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for timeout."""
+        _ = timeout
+        self._wait_count += 1
+        # Never transition to /play - causes timeout
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for a JavaScript function."""
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression."""
+        _ = expression
+        return []
+
+
+class FakeCDPLoginNoErrors:
+    """Fake CDP that returns no errors during account login (for timeout testing)."""
+
+    def __init__(self) -> None:
+        """Initialize fake CDP session."""
+        self._account_login_started = False
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Send CDP command."""
+        if method == "Runtime.evaluate":
+            expression = str(params.get("expression", "")) if params else ""
+
+            # Open login overlay
+            if "#login" in expression:
+                self._account_login_started = True
+
+            # Form visibility check - return ready
+            if "login-username" in expression and "offsetParent" in expression:
+                return {"result": {"value": "ready"}}
+
+            # Error check - return empty (no errors)
+            if "errors" in expression or "error" in expression:
+                return {"result": {"value": ""}}
+
+            return {"result": {"value": "success"}}
+        return {}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Register event handler."""
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Detach CDP session."""
+
+
+def test_handle_account_login_form_never_ready() -> None:
+    """Account login warns when form is never ready after 10 retries."""
+    page = FakePageLogin(start_url="https://tankpit.com/before-playing")
+    cdp = FakeCDPLoginFormNeverReady()
+
+    # This exercises lines 228-230 (for/else: form not ready after waiting)
+    result = handle_account_login(page, cdp, "testuser", "testpass")
+
+    # Login still succeeds because fake page transitions to /play after 2 waits
+    assert result["success"] is True
+
+
+def test_handle_account_login_timeout() -> None:
+    """Account login times out when login never completes."""
+    page = FakePageLoginTimeout()
+    cdp = FakeCDPLoginNoErrors()
+
+    # This exercises lines 313-314 (login timeout)
+    result = handle_account_login(page, cdp, "testuser", "testpass")
+
+    assert result["success"] is False
+    assert "timeout" in result["error_message"].lower()

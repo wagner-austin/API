@@ -275,42 +275,43 @@ def handle_account_login(
     login_val = result_obj.get("value", "?") if isinstance(result_obj, dict) else "?"
     log.info("Login: %s", login_val)
 
-    # Wait for login to complete (page may navigate/close on success)
-    try:
-        page.wait_for_timeout(3000.0)
-    except Exception:
-        # Page closed or navigated - login likely succeeded
-        log.info("Page navigated during login wait")
-        return AccountLoginResult(success=True, error_message="")
+    # Poll for navigation or error state (login redirects to /play on success)
+    for _ in range(30):  # 30 x 100ms = 3 seconds max
+        page.wait_for_timeout(100.0)
+        current_url = page.url
 
-    log.info("After login, URL: %s", page.url)
+        # Success: navigated away from login page
+        if "/play" in current_url:
+            log.info("Login successful, navigated to: %s", current_url)
+            return AccountLoginResult(success=True, error_message="")
 
-    # Check for login errors
-    login_err_js = """
-    (() => {
-        const errors = document.querySelectorAll(
-            '.error, .alert, [class*=error], #login .message'
-        );
-        const texts = Array.from(errors).map(e => e.textContent.trim());
-        return texts.filter(t => t.length > 0).join(' | ');
-    })()
-    """
-    try:
-        err_result = cdp.send("Runtime.evaluate", {"expression": login_err_js, "returnByValue": True})
-        err_obj = err_result.get("result")
-        err_raw = err_obj.get("value", "") if isinstance(err_obj, dict) else ""
-        error_msg = str(err_raw) if err_raw else ""
-    except Exception:
-        # Page closed - login succeeded
-        log.info("Login successful (page navigated)")
-        return AccountLoginResult(success=True, error_message="")
+        # Still on before-playing - check if there's an error or still processing
+        if "before-playing" in current_url:
+            # Check for error messages
+            login_err_js = """
+            (() => {
+                const errors = document.querySelectorAll(
+                    '.error, .alert, [class*=error], #login .message'
+                );
+                const texts = Array.from(errors).map(e => e.textContent.trim());
+                return texts.filter(t => t.length > 0).join(' | ');
+            })()
+            """
+            err_result = cdp.send(
+                "Runtime.evaluate", {"expression": login_err_js, "returnByValue": True}
+            )
+            err_obj = err_result.get("result")
+            err_raw = err_obj.get("value", "") if isinstance(err_obj, dict) else ""
+            error_msg = str(err_raw) if err_raw else ""
 
-    if error_msg:
-        log.warning("Login errors: %s", error_msg)
-        return AccountLoginResult(success=False, error_message=error_msg)
+            if error_msg:
+                log.warning("Login errors: %s", error_msg)
+                return AccountLoginResult(success=False, error_message=error_msg)
+            # No error yet, keep polling
 
-    log.info("Login successful")
-    return AccountLoginResult(success=True, error_message="")
+    # Timeout waiting for login completion
+    log.warning("Login timeout: still on %s after 3 seconds", page.url)
+    return AccountLoginResult(success=False, error_message="Login timeout")
 
 
 def ensure_on_play_page(page: PageProtocol) -> None:
