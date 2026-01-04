@@ -26,7 +26,9 @@ log = get_logger(__name__)
 # =============================================================================
 
 
-LogCategory = Literal["location", "action", "combat", "equipment", "teleport", "tip", "fuel", "other"]
+LogCategory = Literal[
+    "location", "action", "combat", "equipment", "teleport", "tip", "fuel", "other"
+]
 
 
 class GameLogEntry(TypedDict):

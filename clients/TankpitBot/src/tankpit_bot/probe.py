@@ -159,7 +159,8 @@ class ProtocolProbe(BrowserSession):
 
         # Load static key for XOR encoding
         key_path = static_key_path if static_key_path is not None else DEFAULT_STATIC_KEY_PATH
-        self._static_key = load_static_key(key_path)
+        static_key = load_static_key(key_path)
+        self._static_key: str = static_key
         self._xor_table: bytes | None = None
 
         # Track open toggle keys (e.g., map opened with 'f')
