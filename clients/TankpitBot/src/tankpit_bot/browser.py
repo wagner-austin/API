@@ -11,8 +11,10 @@ Both sniffer.py and probe.py inherit from this to avoid code duplication.
 
 from __future__ import annotations
 
+import base64
 import time
 import uuid
+from pathlib import Path
 
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
@@ -30,8 +32,8 @@ from tankpit_bot.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.fuel_probe import (
-    FuelProbeResult,
     FuelProber,
+    FuelProbeResult,
 )
 from tankpit_bot.inventory import (
     InventoryChange,
@@ -46,6 +48,147 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
+
+# Known binary message signatures from TankPit protocol.
+# These are the first decoded byte of binary messages after XOR decoding.
+KNOWN_PROTOCOL_SIGNATURES: frozenset[int] = frozenset(
+    {
+        0x21,
+        0x28,
+        0x29,
+        0x2B,
+        0x2E,
+        0x2F,
+        0x3D,
+        0x3E,
+        0x3F,
+        0x41,
+        0x43,
+        0x45,
+        0x46,
+        0x47,
+        0x49,
+        0x4A,
+        0x4B,
+        0x4C,
+        0x4D,
+        0x4F,
+        0x52,
+        0x53,
+        0x54,
+        0x56,
+        0x58,
+        0x5A,
+        0x64,
+        0x67,
+        0x74,
+    }
+)
+
+# Text message type bytes that should be skipped during XOR analysis.
+TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x2B, 0x2D, 0x3D, 0x25, 0x2A, 0x7E})
+
+# Path to the static XOR key file.
+STATIC_KEY_PATH: Path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
+
+# Expected length of the static XOR key.
+STATIC_KEY_LENGTH: int = 1000
+
+
+def extract_xor_first_bytes(messages: list[CapturedMessage]) -> list[int]:
+    """Extract first XOR-encoded bytes from binary messages.
+
+    Parses received messages, skips text messages, and extracts the first
+    XOR-encoded data byte from each binary message.
+
+    Args:
+        messages: List of captured WebSocket messages.
+
+    Returns:
+        List of first XOR-encoded bytes from binary messages.
+    """
+    raw_first_bytes: list[int] = []
+
+    for msg in messages:
+        if msg["direction"] != "received":
+            continue
+
+        payload_b64 = msg["payload"]
+        payload = base64.b64decode(payload_b64)
+
+        if len(payload) < 4:
+            continue
+
+        # First 2 bytes are length header, byte[2] is message type
+        msg_type = payload[2]
+
+        # Skip text messages
+        if msg_type in TEXT_MESSAGE_TYPES:
+            continue
+
+        # Binary messages have XOR-encoded data starting at byte[3]
+        raw_first_bytes.append(payload[3])
+
+    return raw_first_bytes
+
+
+def find_best_static_byte(raw_first_bytes: list[int], magic_first_byte: int) -> tuple[int, int]:
+    """Find the static key's first byte that maximizes known signature matches.
+
+    Brute-forces all 256 possible values to find which static[0] produces
+    the most known protocol signatures when XOR'd with captured data.
+
+    Args:
+        raw_first_bytes: First XOR-encoded bytes from binary messages.
+        magic_first_byte: ASCII value of magic key's first character.
+
+    Returns:
+        Tuple of (best_static_byte, match_count).
+    """
+    best_static_0 = 0
+    best_coverage = 0
+
+    for static_0 in range(256):
+        table_0 = static_0 ^ magic_first_byte
+        known_count = sum(
+            1 for raw_0 in raw_first_bytes if (raw_0 ^ table_0) in KNOWN_PROTOCOL_SIGNATURES
+        )
+        if known_count > best_coverage:
+            best_coverage = known_count
+            best_static_0 = static_0
+
+    return best_static_0, best_coverage
+
+
+def load_static_key() -> str:
+    """Load the static XOR key from file.
+
+    Returns:
+        The 1000-character static key.
+
+    Raises:
+        FileNotFoundError: If key file does not exist.
+        ValueError: If key is not exactly 1000 characters.
+    """
+    content = _test_hooks.read_text(STATIC_KEY_PATH)
+    key = content.strip()
+    if len(key) != STATIC_KEY_LENGTH:
+        raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
+    return key
+
+
+def save_static_key(key: str) -> None:
+    """Save the static XOR key to file.
+
+    Args:
+        key: The 1000-character static key.
+
+    Raises:
+        ValueError: If key is not exactly 1000 characters.
+    """
+    if len(key) != STATIC_KEY_LENGTH:
+        raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
+    _test_hooks.write_text(STATIC_KEY_PATH, key + "\n")
 
 
 class BrowserError(Exception):
@@ -69,20 +212,34 @@ def get_current_time_ms() -> int:
     return int(time.time() * 1000)
 
 
-def cdp_timestamp_to_ms(timestamp: float) -> int:
-    """Convert CDP monotonic timestamp to approximate Unix milliseconds.
+# Global offset for CDP timestamp conversion (set on first message)
+_cdp_time_offset_ms: int | None = None
 
-    CDP timestamps are monotonic and relative to some unspecified epoch.
-    We convert to approximate wall-clock time by using the current time
-    as a reference point.
+
+def cdp_timestamp_to_ms(timestamp: float) -> int:
+    """Convert CDP monotonic timestamp to Unix milliseconds.
+
+    CDP timestamps are monotonic seconds since browser start.
+    We calculate an offset on first call to convert to Unix time.
 
     Args:
         timestamp: CDP monotonic timestamp in seconds.
 
     Returns:
-        Approximate Unix timestamp in milliseconds.
+        Unix timestamp in milliseconds.
     """
-    return int(timestamp * 1000)
+    global _cdp_time_offset_ms
+    cdp_ms = int(timestamp * 1000)
+    if _cdp_time_offset_ms is None:
+        # First call - calculate offset from current time
+        _cdp_time_offset_ms = get_current_time_ms() - cdp_ms
+    return cdp_ms + _cdp_time_offset_ms
+
+
+def reset_cdp_time_offset() -> None:
+    """Reset CDP time offset for new browser session."""
+    global _cdp_time_offset_ms
+    _cdp_time_offset_ms = None
 
 
 class BrowserSession:
@@ -119,6 +276,7 @@ class BrowserSession:
         self._messages: list[CapturedMessage] = []
         self._ws_urls: dict[str, str] = {}  # requestId -> url mapping
         self._magic: str | None = None
+        self._static_key: str | None = None
         self._game_log_scraper: GameLogScraper | None = None
         self._inventory_scraper: InventoryScraper | None = None
         self._combat_tracker: CombatTracker | None = None
@@ -139,6 +297,11 @@ class BrowserSession:
     def magic(self) -> str | None:
         """Get captured magic key for XOR decoding."""
         return self._magic
+
+    @property
+    def static_key(self) -> str | None:
+        """Get captured static XOR key from game JS."""
+        return self._static_key
 
     def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
         """Initialize the game log scraper.
@@ -436,6 +599,7 @@ class BrowserSession:
         self._log_websocket_urls()
         self._debug_js_websocket(cdp)
         self._log_script_urls(page)
+        self._capture_static_key(page)
 
     def _capture_magic_key(self, page: PageProtocol) -> None:
         """Capture tankpit.magic XOR key from page.
@@ -447,6 +611,91 @@ class BrowserSession:
         if isinstance(magic_value, str) and len(magic_value) > 0:
             self._magic = magic_value
             log.info("Captured magic key: %s...", magic_value[:20])
+
+    def _capture_static_key(self, page: PageProtocol) -> None:
+        """Extract static XOR key from tpclient JS source.
+
+        Args:
+            page: Playwright page.
+        """
+        import re
+
+        # Wait for tpclient script to be loaded
+        js_check_loaded = (
+            "Array.from(document.querySelectorAll('script[src]'))"
+            ".some(s => s.src.includes('tpclient'))"
+        )
+        page.wait_for_function(js_check_loaded, timeout=10000)
+
+        # Get the URL
+        js_get_url = (
+            "Array.from(document.querySelectorAll('script[src]'))"
+            ".find(s => s.src.includes('tpclient'))?.src"
+        )
+        tpclient_url = page.evaluate(js_get_url)
+        if not isinstance(tpclient_url, str):
+            log.warning("Could not find tpclient script URL")
+            return
+
+        # Fetch the JS content
+        js_content = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
+        if not isinstance(js_content, str):
+            log.warning("Could not fetch tpclient JS content")
+            return
+
+        # Extract 1000-char static key: any 1000-char quoted string
+        match = re.search(r'"([^"]{1000})"', js_content)
+        if not match:
+            log.warning("Could not find static key in tpclient JS")
+            return
+
+        static_key: str = match.group(1)
+        self._static_key = static_key
+        save_static_key(static_key)
+        log.info("Captured static key: %s...", static_key[:20])
+
+    def _derive_static_key_from_messages(self) -> None:
+        """Derive static key by analyzing captured messages.
+
+        Uses brute-force to find which static[0] value makes captured messages
+        decode to known protocol signatures. This is robust against game updates.
+
+        Raises:
+            FileNotFoundError: If static key file does not exist.
+            ValueError: If static key file has invalid content.
+        """
+        if not self._magic or not self._messages:
+            return
+
+        raw_first_bytes = extract_xor_first_bytes(self._messages)
+        if not raw_first_bytes:
+            log.warning("No binary messages to derive static key from")
+            return
+
+        magic_0 = ord(self._magic[0])
+        best_static_0, best_coverage = find_best_static_byte(raw_first_bytes, magic_0)
+
+        if best_coverage == 0:
+            log.warning("Could not derive static key - no known signatures matched")
+            return
+
+        pct = 100 * best_coverage / len(raw_first_bytes)
+        log.info(
+            "Derived static[0]=0x%02x (%r) with %.1f%% coverage (%d/%d)",
+            best_static_0,
+            chr(best_static_0),
+            pct,
+            best_coverage,
+            len(raw_first_bytes),
+        )
+
+        current_key = load_static_key()
+        new_key = chr(best_static_0) + current_key[1:]
+
+        if new_key != current_key:
+            self._static_key = new_key
+            save_static_key(new_key)
+            log.info("Updated static key file: %s", STATIC_KEY_PATH)
 
     def _send_websocket_bytes(self, cdp: CDPSessionProtocol, data: bytes) -> str:
         """Send raw bytes via the captured WebSocket.
@@ -560,6 +809,8 @@ class BrowserSession:
         page = context.new_page()
         cdp = context.new_cdp_session(page)
 
+        # Reset CDP time offset for new session
+        reset_cdp_time_offset()
         self._setup_cdp_handlers(cdp)
 
         return browser, context, page, cdp
@@ -620,5 +871,10 @@ __all__ = [
     "GameNotJoinedError",
     "PlaywrightNotInstalledError",
     "cdp_timestamp_to_ms",
+    "extract_xor_first_bytes",
+    "find_best_static_byte",
     "get_current_time_ms",
+    "load_static_key",
+    "reset_cdp_time_offset",
+    "save_static_key",
 ]
