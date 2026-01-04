@@ -11,17 +11,21 @@ Captures WebSocket messages from tankpit.com by:
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable
 from pathlib import Path
+from typing import ClassVar
 
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger, setup_rich_logging
 
-from tankpit_bot import _test_hooks
+from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.browser import (
     BrowserSession,
     PlaywrightNotInstalledError,
     get_current_time_ms,
+    reset_cdp_time_offset,
 )
+from tankpit_bot.dom_scraper import GameLogEntry
 from tankpit_bot.types import (
     CapturedMessage,
     CaptureSession,
@@ -33,6 +37,7 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
+
 
 class PositionTracker:
     """Tracks position from movement response messages.
@@ -89,7 +94,7 @@ class PositionTracker:
             (x, y) tuple of FROM position, or None if invalid.
         """
         # Movement responses are 17-21 bytes
-        if len(body) < 6 or body[0] != 0x2e:
+        if len(body) < 6 or body[0] != 0x2E:
             return None
         if not (17 <= len(body) <= 21):
             return None
@@ -120,7 +125,7 @@ class PositionTracker:
             True if this is a blocked movement response.
         """
         # 5-byte 0x2e messages appear to indicate blocked movement
-        return len(body) == 5 and body[0] == 0x2e
+        return len(body) == 5 and body[0] == 0x2E
 
     def update_from_move(self, target_x: int, target_y: int) -> None:
         """Update current position from MOVE command target."""
@@ -135,9 +140,9 @@ class PositionTracker:
         Returns:
             Position status string, or None if not a position message.
         """
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in position message")
             return None
 
         if len(data) < 4:
@@ -150,7 +155,7 @@ class PositionTracker:
             return "[POS:BLOCKED]"
 
         # Check for movement response (17-21 bytes)
-        if len(body) < 17 or len(body) > 21 or body[0] != 0x2e:
+        if len(body) < 17 or len(body) > 21 or body[0] != 0x2E:
             return None
 
         pos = self.decode_position(body)
@@ -221,9 +226,9 @@ class DeactivationTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in deactivation message")
             return None
 
         if len(data) < 4:
@@ -267,6 +272,9 @@ class DeactivationTracker:
         return self._deaths
 
 
+ITEM_NAMES: tuple[str, ...] = ("armor", "dual", "missile", "homing", "radar")
+
+
 class ItemPickupTracker:
     """Tracks item pickup events from 0x49 messages.
 
@@ -306,6 +314,45 @@ class ItemPickupTracker:
             table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
         self._xor_table = bytes(table)
 
+    def _decode_pickup(self, payload: str) -> tuple[int, int, int, int, int] | None:
+        """Decode pickup message and extract quantities.
+
+        Args:
+            payload: Base64 encoded message payload.
+
+        Returns:
+            Tuple of (armor, dual, missile, homing, radar) or None if invalid.
+        """
+        if self._xor_table is None:
+            return None
+
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in pickup message")
+            return None
+
+        if len(data) < 4:
+            return None
+
+        body = data[2:]
+        if len(body) != 8 or body[0] != 0x2E:
+            return None
+
+        decoded = bytearray(7)
+        for i in range(7):
+            decoded[i] = body[i + 1] ^ self._xor_table[i]
+
+        if decoded[0] != 0x67 or decoded[1] != 0x01:
+            return None
+
+        armor = decoded[2]
+        dual = decoded[3]
+        missile = decoded[4]
+        homing = decoded[5]
+        radar = decoded[6] if len(decoded) > 6 else 0
+
+        return (armor, dual, missile, homing, radar)
+
     def process_message(self, payload: str) -> str | None:
         """Process a message and return item pickup status if relevant.
 
@@ -315,60 +362,21 @@ class ItemPickupTracker:
         Returns:
             Item pickup status string, or None if not an item pickup message.
         """
-        if self._xor_table is None:
+        quantities = self._decode_pickup(payload)
+        if quantities is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        if all(q == 0 for q in quantities):
             return None
 
-        if len(data) < 4:
-            return None
-
-        body = data[2:]
-
-        # Item pickup messages are 8 bytes: 0x2E + variable subtype + 6 data bytes
-        if len(body) != 8 or body[0] != 0x2E:
-            return None
-
-        # XOR decode from byte 1 (7 bytes total)
-        decoded = bytearray(7)
-        for i in range(7):
-            decoded[i] = body[i + 1] ^ self._xor_table[i]
-
-        # Item pickups decode to: 67 01 [armor] [dual] [missile] [homing] [radar]
-        # Equipment indices from client JS gc array:
-        # 0=armor shield, 1=dual shot, 2=missile shot, 3=homing shot, 4=extra radar
-        # The signature 0x67 0x01 identifies this as an item pickup
-        if decoded[0] != 0x67 or decoded[1] != 0x01:
-            return None
-
-        armor = decoded[2]    # Index 0: armor shield
-        dual = decoded[3]     # Index 1: dual shot
-        missile = decoded[4]  # Index 2: missile shot
-        homing = decoded[5]   # Index 3: homing shot
-        radar = decoded[6] if len(decoded) > 6 else 0  # Index 4: extra radar
-
-        if armor == 0 and dual == 0 and missile == 0 and homing == 0 and radar == 0:
-            return None
-
+        armor, _, missile, homing, _ = quantities
         self._total_armor += armor
         self._total_missile += missile
         self._total_homing += homing
 
-        items = []
-        if armor:
-            items.append(f"{armor} armor")
-        if dual:
-            items.append(f"{dual} dual")
-        if missile:
-            items.append(f"{missile} missile")
-        if homing:
-            items.append(f"{homing} homing")
-        if radar:
-            items.append(f"{radar} radar")
-
+        items = [
+            f"{qty} {name}" for qty, name in zip(quantities, ITEM_NAMES, strict=True) if qty > 0
+        ]
         return f"[PICKUP] {', '.join(items)}"
 
 
@@ -410,6 +418,62 @@ class RadarTracker:
             table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
         self._xor_table = bytes(table)
 
+    def _decode_radar(self, payload: str) -> tuple[int, bytearray] | None:
+        """Decode radar message and extract count and records.
+
+        Args:
+            payload: Base64 encoded message payload.
+
+        Returns:
+            Tuple of (count, records_bytes) or None if invalid.
+        """
+        if self._xor_table is None:
+            return None
+
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in radar message")
+            return None
+
+        if len(data) < 4:
+            return None
+
+        body = data[2:]
+        if len(body) < 4 or body[0] != 0x2E or body[1] != 0x70:
+            return None
+
+        decoded = bytearray(len(body) - 1)
+        for i in range(len(decoded)):
+            if i < len(self._xor_table):
+                decoded[i] = body[i + 1] ^ self._xor_table[i]
+            else:
+                decoded[i] = body[i + 1]
+
+        if decoded[0] != 0x4F:
+            return None
+
+        count = decoded[1]
+        records = decoded[3:]
+        return (count, records)
+
+    def _classify_entity(self, x: int, y: int, val_unsigned: int) -> tuple[str, str]:
+        """Classify radar entity by value.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+            val_unsigned: Unsigned 16-bit value.
+
+        Returns:
+            Tuple of (category, formatted_string).
+        """
+        if val_unsigned == 0xFFFF:
+            return ("tanks", f"({x},{y})")
+        if val_unsigned >= 0x8000:
+            val_signed = val_unsigned - 0x10000
+            return ("equip", f"({x},{y})={abs(val_signed)}")
+        return ("fuel", f"({x},{y})={val_unsigned}")
+
     def process_message(self, payload: str) -> str | None:
         """Process a message and return radar results if relevant.
 
@@ -419,73 +483,27 @@ class RadarTracker:
         Returns:
             Radar results string, or None if not a radar result message.
         """
-        if self._xor_table is None:
+        result = self._decode_radar(payload)
+        if result is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
-            return None
-
-        if len(data) < 4:
-            return None
-
-        body = data[2:]
-
-        # Radar result messages start with 0x2E 0x70
-        if len(body) < 4 or body[0] != 0x2E or body[1] != 0x70:
-            return None
-
-        # XOR decode from byte 1
-        decoded = bytearray(len(body) - 1)
-        for i in range(len(decoded)):
-            if i < len(self._xor_table):
-                decoded[i] = body[i + 1] ^ self._xor_table[i]
-            else:
-                decoded[i] = body[i + 1]
-
-        # Format: 0x4F [count] 0x00 [records...]
-        if decoded[0] != 0x4F:
-            return None
-
-        count = decoded[1]
+        count, records = result
         if count == 0:
             return "[RADAR] No entities found"
 
-        # Parse entity records (4 bytes each)
-        # Cache value interpretation (from client JS):
-        # - Positive (0x0000-0x7FFF): fuel containers with amount
-        # - Negative (0x8000-0xFFFE): equipment (abs value = type?)
-        # - 0xFFFF: tank/entity
-        records = decoded[3:]  # Skip marker, count, unknown byte
-        fuel_containers = []
-        equipment = []
-        tanks = []
+        entities: dict[str, list[str]] = {"fuel": [], "equip": [], "tanks": []}
 
         for i in range(0, min(len(records) - 3, count * 4), 4):
             x = records[i]
             y = records[i + 1]
-            val_lo = records[i + 2]
-            val_hi = records[i + 3]
-            val_unsigned = val_lo | (val_hi << 8)
-
-            if val_unsigned == 0xFFFF:
-                tanks.append(f"({x},{y})")
-            elif val_unsigned >= 0x8000:
-                # Negative value = equipment
-                # Convert to signed: val_signed = val_unsigned - 0x10000
-                val_signed = val_unsigned - 0x10000
-                equipment.append(f"({x},{y})={abs(val_signed)}")
-            else:
-                fuel_containers.append(f"({x},{y})={val_unsigned}")
+            val_unsigned = records[i + 2] | (records[i + 3] << 8)
+            category, formatted = self._classify_entity(x, y, val_unsigned)
+            entities[category].append(formatted)
 
         parts = []
-        if fuel_containers:
-            parts.append(f"fuel: {' '.join(fuel_containers)}")
-        if equipment:
-            parts.append(f"equip: {' '.join(equipment)}")
-        if tanks:
-            parts.append(f"tanks: {' '.join(tanks)}")
+        for key, label in [("fuel", "fuel"), ("equip", "equip"), ("tanks", "tanks")]:
+            if entities[key]:
+                parts.append(f"{label}: {' '.join(entities[key])}")
 
         return f"[RADAR] {count} found - {'; '.join(parts)}"
 
@@ -493,7 +511,16 @@ class RadarTracker:
 # Team color names from client JS
 TEAM_COLORS = ["red", "purple", "blue", "orange"]
 # Rank names from client JS
-RANK_NAMES = ["recruit", "private", "corporal", "sergeant", "lieutenant", "captain", "major", "general"]
+RANK_NAMES = [
+    "recruit",
+    "private",
+    "corporal",
+    "sergeant",
+    "lieutenant",
+    "captain",
+    "major",
+    "general",
+]
 
 
 class TankTracker:
@@ -510,7 +537,22 @@ class TankTracker:
         """Initialize tracker."""
         self._xor_table: bytes | None = None
         self._static_key: str | None = None
-        self._tanks: dict[int, dict] = {}  # tank_id -> info
+        self._tanks: dict[int, dict[str, str | int]] = {}
+        self._dispatch: dict[int, tuple[int, Callable[[bytearray], str | None]]] = {
+            0x28: (4, self._parse_tank_join),  # Tank Entry '('
+            0x29: (4, self._parse_tank_leave),  # Tank Leave ')'
+            0x3E: (13, self._parse_tank_status),  # Tank Status '>'
+            # 0x3D '=' is TEXT (JOIN_CONFIRM), not binary - handled elsewhere
+            0x47: (5, self._parse_movement),  # Movement 'G'
+            0x53: (5, self._parse_shooting),  # Shooting 'S'
+            0x21: (12, self._parse_tank_info),  # Tank Info '!'
+            0x4D: (6, self._parse_player_list),  # Player List 'M'
+            0x2F: (4, self._parse_player_update),  # Player Update '/'
+            0x56: (14, self._parse_statistics),  # Statistics 'V'
+            0x2B: (3, self._parse_promotion),  # Promotion '+'
+            0x52: (4, self._parse_supervisor_msg),  # Supervisor 'R'
+            # Note: 0x2E (Status Sync) handled separately - needs raw_body
+        }
 
     def _load_static_key(self) -> str | None:
         """Load static XOR key from file."""
@@ -534,21 +576,22 @@ class TankTracker:
             table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
         self._xor_table = bytes(table)
 
-    def process_message(self, payload: str) -> str | None:
-        """Process a message and return tank info if relevant.
+    def _decode_payload(self, payload: str) -> tuple[int, bytearray, bytes] | None:
+        """Decode base64 payload and XOR decrypt.
 
         Args:
             payload: Base64 encoded message payload.
 
         Returns:
-            Tank info string, or None if not a tank-related message.
+            Tuple of (msg_type, decoded_bytes, raw_body) or None if invalid.
+            raw_body is needed because some subtypes (0x01, 0x03) are not XOR encoded.
         """
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in tank message")
             return None
 
         if len(data) < 4:
@@ -559,8 +602,6 @@ class TankTracker:
             return None
 
         msg_type = body[0]
-
-        # XOR decode from byte 1
         max_decode = min(len(body) - 1, len(self._xor_table))
         decoded = bytearray(len(body) - 1)
         for i in range(len(decoded)):
@@ -569,128 +610,97 @@ class TankTracker:
             else:
                 decoded[i] = body[i + 1]
 
-        # Check decoded signature byte
         if len(decoded) < 1:
             return None
 
-        sig = decoded[0]
+        return (msg_type, decoded, bytes(body))
 
-        # Tank Entry: decoded starts with 0x28 '('
-        if sig == 0x28 and len(decoded) >= 4:
-            return self._parse_tank_join(decoded)
+    def process_message(self, payload: str) -> str | None:
+        """Process a message and return tank info if relevant.
 
-        # Tank Leave: decoded starts with 0x29 ')'
-        if sig == 0x29 and len(decoded) >= 4:
-            return self._parse_tank_leave(decoded)
+        Args:
+            payload: Base64 encoded message payload.
 
-        # Tank Status: decoded starts with 0x3E '>'
-        if sig == 0x3E and len(decoded) >= 13:
-            return self._parse_tank_status(decoded)
+        Returns:
+            Tank info string, or None if not a tank-related message.
+        """
+        result = self._decode_payload(payload)
+        if result is None:
+            return None
 
-        # Movement Response: decoded starts with 0x3D '='
-        # Verified format from Arterial (lieutenant) and Artax (major)
-        if sig == 0x3D and len(decoded) >= 9:
-            return self._parse_movement_response(decoded)
+        msg_type, decoded, raw_body = result
 
-        # Movement: decoded starts with 0x47 'G'
-        if sig == 0x47 and len(decoded) >= 5:
-            return self._parse_movement(decoded)
+        # Handle 0x2E (Status Sync) separately - needs raw_body for subtype
+        if msg_type == 0x2E:
+            if len(decoded) < 8:
+                return None
+            return self._parse_status_sync(decoded, raw_body)
 
-        # Shooting: decoded starts with 0x53 'S'
-        if sig == 0x53 and len(decoded) >= 5:
-            return self._parse_shooting(decoded)
+        entry = self._dispatch.get(msg_type)
+        if entry is None:
+            return None
 
-        # Tank Info: decoded starts with 0x21 '!' - contains tank_id -> name mapping
-        if sig == 0x21 and len(decoded) >= 12:
-            return self._parse_tank_info(decoded)
+        min_len, handler = entry
+        if len(decoded) < min_len:
+            return None
 
-        # Player List: decoded starts with 0x4D 'M' - active players with ranks
-        if sig == 0x4D and len(decoded) >= 6:
-            return self._parse_player_list(decoded)
+        return handler(decoded)
 
-        # Player Update: decoded starts with 0x2F '/' - active players update
-        if sig == 0x2F and len(decoded) >= 4:
-            return self._parse_player_update(decoded)
-
-        # Statistics: decoded starts with 0x56 'V' - player stats response
-        if sig == 0x56 and len(decoded) >= 14:
-            return self._parse_statistics(decoded)
-
-        # Promotion: decoded starts with 0x2B '+' - rank promotion
-        if sig == 0x2B and len(decoded) >= 3:
-            return self._parse_promotion(decoded)
-
-        # Supervisor message: 0x52 'R' - purpose unknown
-        if sig == 0x52 and len(decoded) >= 4:
-            return self._parse_supervisor_msg(decoded)
-
-        # Tank status sync: 0x2E '.' - periodic state update
-        if sig == 0x2E and len(decoded) >= 9:
-            return self._parse_status_sync(decoded)
-
-        return None
-
-    def _parse_tank_join(self, decoded: bytearray) -> str:
+    def _parse_tank_join(self, decoded: bytearray) -> str | None:
         """Parse tank join message (0x28 '(').
 
-        Format from sample 280056027c0009770000:
-        - [0] = 0x28 signature
-        - [1] = subtype/flags
-        - [2-3] = tank_id (u16 LE)
-        - [4+] = additional data (position, rank, etc.)
+        decoded format (0x28 NOT included):
+        - [0] = subtype/flags
+        - [1-2] = tank_id (u16 LE)
+        - [3+] = additional data (position, rank, etc.)
         """
-        if len(decoded) < 4:
+        if len(decoded) < 3:
             return None
-        tank_id = decoded[2] | (decoded[3] << 8)
+        tank_id = decoded[1] | (decoded[2] << 8)
         name = self.get_name(tank_id)
         name_str = f"'{name}'" if name else f"id={tank_id}"
-        extra = decoded[4:].hex() if len(decoded) > 4 else ""
+        extra = decoded[3:].hex() if len(decoded) > 3 else ""
         return f"[JOIN] {name_str} data={extra}"
 
-    def _parse_tank_leave(self, decoded: bytearray) -> str:
+    def _parse_tank_leave(self, decoded: bytearray) -> str | None:
         """Parse tank leave message (0x29 ')').
 
-        Format from sample 290056020000:
-        - [0] = 0x29 signature
-        - [1] = subtype/flags
-        - [2-3] = tank_id (u16 LE)
-        - [4+] = additional data
+        decoded format (0x29 NOT included):
+        - [0] = subtype/flags
+        - [1-2] = tank_id (u16 LE)
+        - [3+] = additional data
         """
-        if len(decoded) < 4:
+        if len(decoded) < 3:
             return None
-        tank_id = decoded[2] | (decoded[3] << 8)
+        tank_id = decoded[1] | (decoded[2] << 8)
         name = self.get_name(tank_id)
         name_str = f"'{name}'" if name else f"id={tank_id}"
-        extra = decoded[4:].hex() if len(decoded) > 4 else ""
+        extra = decoded[3:].hex() if len(decoded) > 3 else ""
         return f"[LEAVE] {name_str} data={extra}"
 
-    def _parse_tank_status(self, decoded: bytearray) -> str:
+    def _parse_tank_status(self, decoded: bytearray) -> str | None:
         """Parse tank status message (0x3E).
 
-        Verified format from capture analysis:
-        - Byte 0: 0x3E signature
-        - Byte 1: info byte (rank/team encoded)
-        - Bytes 2-3: tank_id (u16 LE)
-        - Bytes 4-13: equipment/stats data
-        - Bytes 14+: tank name (null-terminated string)
+        decoded format (0x3E NOT included):
+        - [0] = info byte (rank/team encoded)
+        - [1-2] = tank_id (u16 LE)
+        - [3-12] = equipment/stats data
+        - [13+] = tank name (null-terminated string)
         """
-        if len(decoded) < 14:
+        if len(decoded) < 13:
             return None
 
-        info_byte = decoded[1]
+        info_byte = decoded[0]
         # Team in lower 2 bits, rank in bits 4-6
         team = info_byte & 0x03
         rank = (info_byte >> 4) & 0x07
 
-        tank_id = decoded[2] | (decoded[3] << 8)
+        tank_id = decoded[1] | (decoded[2] << 8)
 
-        # Name starts at byte 14
+        # Name starts at byte 13
         name = ""
-        if len(decoded) > 14:
-            try:
-                name = bytes(decoded[14:]).decode("utf-8", errors="ignore").rstrip("\x00")
-            except Exception:
-                pass
+        if len(decoded) > 13:
+            name = bytes(decoded[13:]).decode("utf-8", errors="ignore").rstrip("\x00")
 
         team_name = TEAM_COLORS[team] if team < len(TEAM_COLORS) else f"team{team}"
         rank_name = RANK_NAMES[rank] if rank < len(RANK_NAMES) else f"rank{rank}"
@@ -700,30 +710,29 @@ class TankTracker:
         name_str = f" '{name}'" if name else ""
         return f"[TANK:STATUS] id={tank_id}{name_str} {team_name} {rank_name}"
 
-    def _parse_movement_response(self, decoded: bytearray) -> str:
+    def _parse_movement_response(self, decoded: bytearray) -> str | None:
         """Parse movement response message (0x3D).
 
-        Verified format from real players (Arterial, Artax, Yuppler):
-        - [0] = 0x3D signature
-        - [1] = team
-        - [2-3] = tank_id (u16 LE)
-        - [4] = x
-        - [5] = y
-        - [6] = direction
-        - [7] = unknown (values: 1, 2, 3)
-        - [8] = rank (0-7)
-        - [9-11] = score (u24 BE) - verified: Artax 4586, Yuppler 12733
+        decoded format (0x3D NOT included):
+        - [0] = team
+        - [1-2] = tank_id (u16 LE)
+        - [3] = x
+        - [4] = y
+        - [5] = direction
+        - [6] = unknown (values: 1, 2, 3)
+        - [7] = rank (0-7)
+        - [8-10] = score (u24 BE)
         """
-        if len(decoded) < 12:
+        if len(decoded) < 11:
             return None
 
-        team = decoded[1]
-        tank_id = decoded[2] | (decoded[3] << 8)
-        x = decoded[4]
-        y = decoded[5]
-        direction = decoded[6]
-        rank = decoded[8]
-        lb_pos = (decoded[9] << 16) | (decoded[10] << 8) | decoded[11]
+        team = decoded[0]
+        tank_id = decoded[1] | (decoded[2] << 8)
+        x = decoded[3]
+        y = decoded[4]
+        # decoded[5] is direction (unused)
+        rank = decoded[7]
+        lb_pos = (decoded[8] << 16) | (decoded[9] << 8) | decoded[10]
 
         name = self.get_name(tank_id)
         team_name = TEAM_COLORS[team] if team < len(TEAM_COLORS) else f"team{team}"
@@ -741,15 +750,21 @@ class TankTracker:
         name_str = f"'{name}'" if name else f"id={tank_id}"
         return f"[MOVE:RESP] {name_str} ({team_name}) {rank_name} #{lb_pos} at ({x},{y})"
 
-    def _parse_movement(self, decoded: bytearray) -> str:
-        """Parse movement message (0x47)."""
-        # Based on Lg.h: bytes 0-1 tank_id, byte 2 x, byte 3 y, byte 4 direction
-        if len(decoded) < 5:
+    def _parse_movement(self, decoded: bytearray) -> str | None:
+        """Parse movement message (0x47).
+
+        decoded format (0x47 NOT included):
+        - [0-1] = tank_id (u16 LE)
+        - [2] = x
+        - [3] = y
+        - [4] = direction
+        """
+        if len(decoded) < 4:
             return None
-        tank_id = decoded[1] | (decoded[2] << 8)
-        x = decoded[3]
-        y = decoded[4]
-        direction = decoded[5] if len(decoded) > 5 else 0
+        tank_id = decoded[0] | (decoded[1] << 8)
+        x = decoded[2]
+        y = decoded[3]
+        direction = decoded[4] if len(decoded) > 4 else 0
 
         # Update tank position
         if tank_id in self._tanks:
@@ -761,17 +776,26 @@ class TankTracker:
 
         return f"[TANK:MOVE] id={tank_id} to ({x},{y}) dir={direction}"
 
-    def _parse_shooting(self, decoded: bytearray) -> str:
-        """Parse shooting message (0x53)."""
-        # Based on Gg.h: byte 0 shooter_team, bytes 1-2 shooter_id, byte 3 x, byte 4 y
-        if len(decoded) < 5:
-            return None
-        shooter_team = decoded[1]
-        shooter_id = decoded[2] | (decoded[3] << 8)
-        shot_x = decoded[4]
-        shot_y = decoded[5] if len(decoded) > 5 else 0
+    def _parse_shooting(self, decoded: bytearray) -> str | None:
+        """Parse shooting message (0x53).
 
-        team_name = TEAM_COLORS[shooter_team] if shooter_team < len(TEAM_COLORS) else f"team{shooter_team}"
+        decoded format (0x53 NOT included):
+        - [0] = shooter_team
+        - [1-2] = shooter_id (u16 LE)
+        - [3] = x
+        - [4] = y
+        """
+        if len(decoded) < 4:
+            return None
+        shooter_team = decoded[0]
+        shooter_id = decoded[1] | (decoded[2] << 8)
+        shot_x = decoded[3]
+        shot_y = decoded[4] if len(decoded) > 4 else 0
+
+        if shooter_team < len(TEAM_COLORS):
+            team_name = TEAM_COLORS[shooter_team]
+        else:
+            team_name = f"team{shooter_team}"
 
         # Get shooter name if known
         if shooter_id in self._tanks:
@@ -784,24 +808,23 @@ class TankTracker:
     def _parse_tank_info(self, decoded: bytearray) -> str | None:
         """Parse tank info message (0x21) - contains tank_id -> name mapping.
 
-        Format (from JS client analysis):
-        - [0] = 0x21 signature
-        - [1] = team (0=red, 1=purple, 2=blue, 3=orange)
-        - [2-3] = tank_id (u16 LE)
-        - [4-7] = decoration_state (4 bytes = 9 2-bit values)
-        - [8-10] = score (24-bit BE)
-        - [11+] = name (UTF-8)
+        decoded format (0x21 NOT included):
+        - [0] = team (0=red, 1=purple, 2=blue, 3=orange)
+        - [1-2] = tank_id (u16 LE)
+        - [3-6] = decoration_state (4 bytes = 9 2-bit values)
+        - [7-9] = score (24-bit BE)
+        - [10+] = name (UTF-8)
 
         NOTE: This message does NOT contain the tank's current rank!
         """
-        if len(decoded) < 12:
+        if len(decoded) < 11:
             return None
 
-        tank_id = decoded[2] | (decoded[3] << 8)
+        tank_id = decoded[1] | (decoded[2] << 8)
 
-        # Extract name from byte 11 onwards
+        # Extract name from byte 10 onwards
         name = ""
-        for b in decoded[11:]:
+        for b in decoded[10:]:
             if 32 <= b < 127:
                 name += chr(b)
             elif name:
@@ -818,28 +841,26 @@ class TankTracker:
     def _parse_player_list(self, decoded: bytearray) -> str:
         """Parse player list message (0x4D 'M').
 
-        Format: 6 bytes per entry
-        - [0] = 0x4D signature
-        - [1-2] = tank_id (u16 LE)
-        - [3-5] = position or rank data
+        decoded format (0x4D NOT included):
+        - [0-1] = tank_id (u16 LE)
+        - [2-4] = position or rank data
         """
-        tank_id = decoded[1] | (decoded[2] << 8)
+        tank_id = decoded[0] | (decoded[1] << 8)
         name = self.get_name(tank_id)
+        b2 = decoded[2]
         b3 = decoded[3]
         b4 = decoded[4]
-        b5 = decoded[5]
         name_str = f"'{name}'" if name else f"id={tank_id}"
-        return f"[PLAYERS] {name_str} data={b3:02x} {b4:02x} {b5:02x}"
+        return f"[PLAYERS] {name_str} data={b2:02x} {b3:02x} {b4:02x}"
 
     def _parse_player_update(self, decoded: bytearray) -> str:
         """Parse player update message (0x2F '/').
 
-        Format: variable length, 3 bytes per entry after signature
-        - [0] = 0x2F signature
-        - Then repeating: tank_id_lo, tank_id_hi, data_byte
+        decoded format (0x2F NOT included):
+        - Repeating entries: tank_id (u16 LE), data_byte
         """
         entries = []
-        i = 1
+        i = 0
         while i + 2 < len(decoded):
             tank_id = decoded[i] | (decoded[i + 1] << 8)
             data = decoded[i + 2]
@@ -852,40 +873,49 @@ class TankTracker:
     def _parse_statistics(self, decoded: bytearray) -> str:
         """Parse statistics message (0x56 'V').
 
-        Format verified against DOM scrape - 15 bytes:
-        - [0] = 0x56 signature
-        - [1-2] = hours (u16 LE)
-        - [3] = minutes
-        - [4] = seconds
-        - [5-7] = padding
-        - [8] = destroyed (single byte)
-        - [9] = deactivated (single byte)
-        - [10-12] = padding
-        - [13-14] = promotion points (u16 BE)
+        decoded format (0x56 NOT included) - 14 bytes:
+        - [0-1] = hours (u16 LE)
+        - [2] = minutes
+        - [3] = seconds
+        - [4-6] = padding
+        - [7] = destroyed (single byte)
+        - [8] = deactivated (single byte)
+        - [9-11] = padding
+        - [12-13] = promotion points (u16 BE)
         """
-        hours = decoded[1] | (decoded[2] << 8)
-        mins = decoded[3]
-        secs = decoded[4]
-        destroyed = decoded[8]
-        deactivated = decoded[9]
-        promo_pts = (decoded[13] << 8) | decoded[14] if len(decoded) > 14 else 0
-        return f"[STATS] {hours}h{mins}m{secs}s destroyed={destroyed} deactivated={deactivated} promo={promo_pts}"
+        hours = decoded[0] | (decoded[1] << 8)
+        mins = decoded[2]
+        secs = decoded[3]
+        destroyed = decoded[7]
+        deactivated = decoded[8]
+        promo_pts = (decoded[12] << 8) | decoded[13] if len(decoded) > 13 else 0
+        time_str = f"{hours}h{mins}m{secs}s"
+        stats_str = f"destroyed={destroyed} deactivated={deactivated} promo={promo_pts}"
+        return f"[STATS] {time_str} {stats_str}"
 
     def _parse_promotion(self, decoded: bytearray) -> str:
         """Parse promotion message (0x2B '+').
 
-        Format verified from JS (Rf class) - 3 bytes:
-        - [0] = 0x2B signature
-        - [1] = new rank level (0-8)
-        - [2] = promoted flag (1 = promoted, 0 = rank set)
+        decoded format (0x2B NOT included) - 2 bytes:
+        - [0] = new rank level (0-8)
+        - [1] = promoted flag (1 = promoted, 0 = rank set)
 
         Ranks: 0=recruit, 1=private, 2=corporal, 3=sergeant,
                4=lieutenant, 5=captain, 6=major, 7=colonel, 8=general
         """
-        ranks = ["recruit", "private", "corporal", "sergeant", "lieutenant",
-                 "captain", "major", "colonel", "general"]
-        rank_idx = decoded[1]
-        promoted = decoded[2] == 1
+        ranks = [
+            "recruit",
+            "private",
+            "corporal",
+            "sergeant",
+            "lieutenant",
+            "captain",
+            "major",
+            "colonel",
+            "general",
+        ]
+        rank_idx = decoded[0]
+        promoted = decoded[1] == 1
         rank_name = ranks[rank_idx] if rank_idx < len(ranks) else f"rank{rank_idx}"
         if promoted:
             return f"[PROMOTED] to {rank_name}!"
@@ -894,80 +924,46 @@ class TankTracker:
     def _parse_supervisor_msg(self, decoded: bytearray) -> str:
         """Parse supervisor message (0x52 'R').
 
-        Format: 4 bytes
-        - [0] = 0x52 signature
-        - [1] = always 0x01
-        - [2] = always 0x00
-        - [3] = status value (seen: 4, 7, 8)
+        decoded format (0x52 NOT included) - 3 bytes:
+        - [0] = always 0x01
+        - [1] = always 0x00
+        - [2] = status value (seen: 4, 7, 8)
 
         JS class: xg (supervisor message)
 
-        Testing observations:
-        - NOT a timer/heartbeat (5 min idle = zero messages)
-        - NOT triggered by movement, radar, equipment, or teamchat
-        - Inconsistent with combat (some sessions with combat have it, some don't)
-        - Sometimes appears near other tanks, sometimes doesn't
-        - Value changes: 8->4 after deactivation, 4->7 seen occasionally
-
-        Trigger is UNPREDICTABLE - may be server-side state we can't control.
-        Possibly: server load balancing, anti-cheat sampling, or random sync.
-
         Status values (4, 7, 8) meaning unknown.
         """
-        status = decoded[3]
+        status = decoded[2] if len(decoded) > 2 else 0
         return f"[SUPERVISOR] status={status}"
 
-    def _parse_status_sync(self, decoded: bytearray) -> str:
+    def _parse_status_sync(self, decoded: bytearray, raw_body: bytes) -> str:
         """Parse tank status sync message (0x2E '.').
 
-        Periodic state update from server (Og class in JS).
+        This catches 0x2E messages not handled by specialized trackers.
+        Shows decoded subtype and hex for analysis.
 
-        Format 13 bytes (subtype 0x03, about self):
-        - [0] = 0x2E signature
-        - [1] = 0x03 subtype
-        - [2-3] = tank_id (u16 LE)
-        - [4-6] = status flags
-        - [7-8] = leaderboard_rank (u16 BE) - position on leaderboard (1 = top)
-        - [9-10] = unknown
-        - [11-12] = fuel (u16 LE)
-
-        Note: Promotion points (toward next rank) come from 0x56 STATS message,
-        not from this message. The rank here is leaderboard position.
-
-        Format 9 bytes (subtype 0x01, about others):
-        - [0] = 0x2E signature
-        - [1] = 0x01 subtype
-        - [2-3] = tank_id (u16 LE)
-        - [4] = damage_state (0=full HP, 1=light, 2=medium, 3=critical)
-        - [5] = rank (0-7: recruit to general)
-        - [6] = flag (0 or 1)
-        - [7-8] = leaderboard_position (u16 LE)
-
-        The damage_state controls how dark the tank name appears in the UI.
+        Known decoded subtypes (handled elsewhere):
+        - 0x43 'C' = Container (ContainerTracker)
+        - 0x41 'A' = Deactivation (DeactivationTracker)
+        - 0x67 'g' = EquipmentGain (EquipmentGainTracker)
+        - 0x64 'd' = FuelDeposit (FuelDepositTracker)
+        - 0x74 't' = EquipmentToggle (EquipmentToggleTracker)
+        - 0x58 'X' = TankExit (TankExitTracker)
+        - 0x46 'F' = RadarAck (RadarAckTracker)
         """
-        rank_names = ["recruit", "private", "corporal", "sergeant",
-                      "lieutenant", "captain", "major", "general"]
-        damage_names = ["full", "light", "medium", "critical"]
-        subtype = decoded[1]
-        tank_id = decoded[2] | (decoded[3] << 8)
+        # XOR-decoded subtype
+        subtype = decoded[0] if len(decoded) > 0 else 0
+        tank_id = decoded[1] | (decoded[2] << 8) if len(decoded) > 2 else 0
         name = self.get_name(tank_id)
         name_str = f"'{name}'" if name else f"id={tank_id}"
 
-        if len(decoded) >= 13 and subtype == 0x03:
-            rank_pos = (decoded[7] << 8) | decoded[8]  # BE - leaderboard position
-            fuel = decoded[11] | (decoded[12] << 8)  # LE
-            return f"[STATUS] {name_str} rank=#{rank_pos} fuel={fuel}"
+        # Show subtype as char if printable ASCII
+        subtype_char = chr(subtype) if 32 <= subtype < 127 else ""
+        subtype_str = f"0x{subtype:02x}"
+        if subtype_char:
+            subtype_str += f" '{subtype_char}'"
 
-        # Short format (9 bytes, subtype 0x01) - used for other tanks in viewport
-        if len(decoded) == 9 and subtype == 0x01:
-            damage_state = decoded[4]  # HP level: 0=full, 3=critical
-            rank = decoded[5]
-            rank_str = rank_names[rank] if 0 <= rank < 8 else f"rank{rank}"
-            damage_str = damage_names[damage_state] if 0 <= damage_state < 4 else f"dmg{damage_state}"
-            return f"[STATUS] {name_str} {rank_str} HP={damage_str}"
-
-        # Unknown format - dump raw
-        return f"[STATUS] {name_str} data={decoded[4:].hex()}"
+        return f"[STATUS:{subtype_str}] {name_str} len={len(decoded)} hex={decoded.hex()}"
 
     def register_name(self, tank_id: int, name: str) -> None:
         """Manually register a tank name.
@@ -989,8 +985,11 @@ class TankTracker:
         Returns:
             The tank name, or None if not known.
         """
-        if tank_id in self._tanks:
-            return self._tanks[tank_id].get("name")
+        if tank_id not in self._tanks:
+            return None
+        name = self._tanks[tank_id].get("name")
+        if isinstance(name, str):
+            return name
         return None
 
     def get_all_names(self) -> dict[int, str]:
@@ -999,11 +998,12 @@ class TankTracker:
         Returns:
             Dictionary of tank_id -> name.
         """
-        return {
-            tid: info.get("name", "")
-            for tid, info in self._tanks.items()
-            if info.get("name")
-        }
+        result: dict[int, str] = {}
+        for tid, info in self._tanks.items():
+            name = info.get("name")
+            if isinstance(name, str) and name:
+                result[tid] = name
+        return result
 
 
 class MineTracker:
@@ -1063,9 +1063,9 @@ class MineTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in mine message")
             return None
 
         if len(data) < 4:
@@ -1103,12 +1103,15 @@ class MineTracker:
 
     def _process_mine_command(self, body: bytes) -> str | None:
         """Process sent mine drop command."""
+        if self._xor_table is None:
+            return None
         # Decrypt command
         decrypted = bytearray(len(body))
         decrypted[0] = body[0]  # '!'
+        xor_table = self._xor_table
         for i in range(1, len(body)):
-            if i - 1 < len(self._xor_table):
-                decrypted[i] = body[i] ^ self._xor_table[i - 1]
+            if i - 1 < len(xor_table):
+                decrypted[i] = body[i] ^ xor_table[i - 1]
             else:
                 decrypted[i] = body[i]
 
@@ -1180,7 +1183,7 @@ class EquipmentToggleTracker:
     - Each byte is 0 (OFF) or 1 (ON)
     """
 
-    EQUIPMENT_NAMES = ["armor", "dual", "missile", "homing", "radar"]
+    EQUIPMENT_NAMES: ClassVar[list[str]] = ["armor", "dual", "missile", "homing", "radar"]
 
     def __init__(self) -> None:
         """Initialize tracker."""
@@ -1211,6 +1214,58 @@ class EquipmentToggleTracker:
             table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
         self._xor_table = bytes(table)
 
+    def _decode_toggle(self, payload: str) -> list[bool] | None:
+        """Decode equipment toggle message.
+
+        Args:
+            payload: Base64 encoded message payload.
+
+        Returns:
+            List of 5 booleans for equipment state, or None if invalid.
+        """
+        if self._xor_table is None:
+            return None
+
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in equipment toggle message")
+            return None
+
+        if len(data) < 4:
+            return None
+
+        body = data[2:]
+        if len(body) != 7 or body[0] != 0x2E:
+            return None
+
+        decoded = bytearray(6)
+        for i in range(6):
+            decoded[i] = body[i + 1] ^ self._xor_table[i]
+
+        if decoded[0] != 0x74:
+            return None
+
+        return [bool(decoded[i + 1]) for i in range(5)]
+
+    def _detect_changes(self, new_state: list[bool]) -> list[str]:
+        """Detect equipment state changes.
+
+        Args:
+            new_state: New equipment state (5 booleans).
+
+        Returns:
+            List of change descriptions.
+        """
+        if self._prev_state is None:
+            return []
+
+        changes = []
+        for i, (old, new) in enumerate(zip(self._prev_state, new_state, strict=True)):
+            if old != new:
+                status = "ON" if new else "OFF"
+                changes.append(f"{self.EQUIPMENT_NAMES[i]}={status}")
+        return changes
+
     def process_message(self, payload: str) -> str | None:
         """Process a message and return equipment toggle status if relevant.
 
@@ -1220,50 +1275,17 @@ class EquipmentToggleTracker:
         Returns:
             Equipment toggle status string, or None if not a toggle message.
         """
-        if self._xor_table is None:
+        new_state = self._decode_toggle(payload)
+        if new_state is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
-            return None
-
-        if len(data) < 4:
-            return None
-
-        body = data[2:]
-
-        # Equipment toggle messages are 7 bytes: 0x2E + subtype + 5 flag bytes
-        if len(body) != 7 or body[0] != 0x2E:
-            return None
-
-        # XOR decode from byte 1
-        decoded = bytearray(6)
-        for i in range(6):
-            decoded[i] = body[i + 1] ^ self._xor_table[i]
-
-        # Check for 0x74 't' signature
-        if decoded[0] != 0x74:
-            return None
-
-        # Parse equipment flags
-        new_state = [bool(decoded[i + 1]) for i in range(5)]
-
-        # Find what changed
-        changes = []
-        if self._prev_state is not None:
-            for i, (old, new) in enumerate(zip(self._prev_state, new_state)):
-                if old != new:
-                    status = "ON" if new else "OFF"
-                    changes.append(f"{self.EQUIPMENT_NAMES[i]}={status}")
-
+        changes = self._detect_changes(new_state)
         self._prev_state = self._state
         self._state = new_state
 
         if changes:
             return f"[EQUIP:TOGGLE] {', '.join(changes)}"
 
-        # First message or no changes - show full state
         active = [self.EQUIPMENT_NAMES[i] for i, on in enumerate(new_state) if on]
         if active:
             return f"[EQUIP:STATE] active: {', '.join(active)}"
@@ -1325,9 +1347,9 @@ class ContainerTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in container message")
             return None
 
         if len(data) < 4:
@@ -1422,9 +1444,9 @@ class TankExitTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in exit message")
             return None
 
         if len(data) < 4:
@@ -1466,7 +1488,7 @@ class EquipmentGainTracker:
     - Represents equipment spawned/gained
     """
 
-    EQUIPMENT_NAMES = ["armor", "dual", "missile", "homing", "radar"]
+    EQUIPMENT_NAMES: ClassVar[list[str]] = ["armor", "dual", "missile", "homing", "radar"]
 
     def __init__(self) -> None:
         """Initialize tracker."""
@@ -1507,9 +1529,9 @@ class EquipmentGainTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in equipment gain message")
             return None
 
         if len(data) < 4:
@@ -1595,9 +1617,9 @@ class FuelDepositTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in fuel deposit message")
             return None
 
         if len(data) < 4:
@@ -1679,9 +1701,9 @@ class RadarAckTracker:
         if self._xor_table is None:
             return None
 
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError):
+        data = _decode_base64_safe(payload)
+        if data is None:
+            log.debug("Invalid base64 in radar ack message")
             return None
 
         if len(data) < 4:
@@ -1711,129 +1733,7 @@ class RadarAckTracker:
         return self._count
 
 
-class FuelTracker:
-    """Tracks fuel values from 14-byte state messages with XOR decoding.
-
-    Fuel Encoding (verified):
-    - 14-byte state messages (0x2e prefix) contain fuel as u16 at bytes 12-13
-    - XOR encoded: decoded = (body[12] ^ xor_table[12]) | ((body[13] ^ xor_table[13]) << 8)
-    - Subtype byte (body[1]) varies per session due to XOR encoding
-    - Entity ID in bytes 2-6 identifies tank/container
-
-    Verified Fuel Costs:
-    - Radar (S key): -10 fuel
-    - Movement: -1 fuel per tile
-    - Fuel deposit: -100 fuel
-    - Fuel pickup: +100 fuel
-    """
-
-    def __init__(self) -> None:
-        """Initialize tracker."""
-        self._xor_table: bytes | None = None
-        self._last_fuel: int | None = None
-        self._static_key: str | None = None
-
-    def _load_static_key(self) -> str | None:
-        """Load static XOR key from file."""
-        if self._static_key is not None:
-            return self._static_key
-
-        static_key_path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
-        if _test_hooks.path_exists(static_key_path):
-            self._static_key = _test_hooks.read_text(static_key_path).strip()
-            return self._static_key
-        return None
-
-    def set_magic(self, magic: str) -> None:
-        """Set magic key and build XOR table.
-
-        Args:
-            magic: Session magic string (typically 20 chars).
-        """
-        static_key = self._load_static_key()
-        if static_key is None:
-            log.warning("Fuel tracker: Static key not found")
-            return
-
-        # Build XOR table: table[i] = static_key[i] ^ magic[i % len(magic)]
-        table = bytearray(len(static_key))
-        for i in range(len(static_key)):
-            table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
-        self._xor_table = bytes(table)
-        log.info("Fuel tracker: XOR table built (%d bytes)", len(self._xor_table))
-
-    def decode_fuel(self, body: bytes) -> int | None:
-        """Decode fuel from a 14-byte state message.
-
-        Args:
-            body: Raw message body (after frame header, starts with 0x2e).
-
-        Returns:
-            Decoded fuel value (u16), or None if can't decode.
-        """
-        if len(body) != 14 or body[0] != 0x2e:
-            return None
-        if self._xor_table is None or len(self._xor_table) < 14:
-            return None
-
-        # XOR decode bytes 12-13 as u16 little-endian
-        low = body[12] ^ self._xor_table[12]
-        high = body[13] ^ self._xor_table[13]
-        return low | (high << 8)
-
-    def process_message(self, payload: str) -> str | None:
-        """Process a message and return fuel status if relevant.
-
-        Args:
-            payload: Base64 encoded message payload.
-
-        Returns:
-            Fuel status string, or None if not a fuel message.
-        """
-        try:
-            data = base64.b64decode(payload)
-        except (ValueError, TypeError) as e:
-            log.debug("Invalid base64 in fuel message: %s", e)
-            return None
-
-        if len(data) < 4:
-            return None
-
-        body = data[2:]
-
-        # Check for 14-byte state message (any subtype)
-        if len(body) != 14 or body[0] != 0x2e:
-            return None
-
-        fuel = self.decode_fuel(body)
-        if fuel is None:
-            return None
-
-        subtype = body[1]
-
-        # Calculate delta
-        delta_str = ""
-        status = ""
-        if self._last_fuel is not None:
-            diff = fuel - self._last_fuel
-            if diff != 0:
-                delta_str = f" ({diff:+d})"
-            # Detect specific events
-            if diff == -10:
-                status = " [radar]"
-            elif diff == -100:
-                status = " [deposit]"
-            elif diff == 100:
-                status = " [pickup]"
-            elif diff == -1:
-                status = " [move]"
-
-        self._last_fuel = fuel
-        return f"[FUEL:0x{subtype:02x}] {fuel}{delta_str}{status}"
-
-
 # Global tracker instances
-_fuel_tracker = FuelTracker()
 _position_tracker = PositionTracker()
 _deactivation_tracker = DeactivationTracker()
 _item_tracker = ItemPickupTracker()
@@ -1847,11 +1747,536 @@ _equip_gain_tracker = EquipmentGainTracker()
 _deposit_tracker = FuelDepositTracker()
 _radar_ack_tracker = RadarAckTracker()
 
+# All trackers for bulk initialization (all have set_magic and _xor_table)
+_ALL_TRACKERS = (
+    _position_tracker,
+    _deactivation_tracker,
+    _item_tracker,
+    _radar_tracker,
+    _tank_tracker,
+    _mine_tracker,
+    _equip_tracker,
+    _container_tracker,
+    _exit_tracker,
+    _equip_gain_tracker,
+    _deposit_tracker,
+    _radar_ack_tracker,
+)
+
+# Trackers for received messages (all except mine_tracker which needs direction)
+_RECEIVED_TRACKERS = (
+    _position_tracker,
+    _deactivation_tracker,
+    _item_tracker,
+    _radar_tracker,
+    _tank_tracker,
+    _equip_tracker,
+    _container_tracker,
+    _exit_tracker,
+    _equip_gain_tracker,
+    _deposit_tracker,
+    _radar_ack_tracker,
+)
+
+
+def _init_trackers_with_magic(magic: str) -> None:
+    """Initialize all trackers with magic key if not already set."""
+    for tracker in _ALL_TRACKERS:
+        if tracker._xor_table is None:
+            tracker.set_magic(magic)
+    # Also build global XOR table for unified decoder
+    _build_global_xor_table(magic)
+
+
+# Module-level XOR table for unified decoder
+_global_xor_table: bytes | None = None
+_global_static_key: str | None = None
+
+
+def _load_global_static_key() -> str | None:
+    """Load static XOR key from file."""
+    global _global_static_key
+    if _global_static_key is not None:
+        return _global_static_key
+    static_key_path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
+    if _test_hooks.path_exists(static_key_path):
+        _global_static_key = _test_hooks.read_text(static_key_path).strip()
+        return _global_static_key
+    return None
+
+
+def _build_global_xor_table(magic: str) -> None:
+    """Build global XOR table from magic key."""
+    global _global_xor_table
+    static_key = _load_global_static_key()
+    if static_key is None:
+        return
+    table = bytearray(len(static_key))
+    for i in range(len(static_key)):
+        table[i] = ord(static_key[i]) ^ ord(magic[i % len(magic)])
+    _global_xor_table = bytes(table)
+
+
+def _xor_decode(body: bytes) -> bytes:
+    """XOR decode message body (skip first byte which is msg_type)."""
+    if _global_xor_table is None or len(body) < 2:
+        return body[1:] if len(body) > 1 else b""
+    decoded = bytearray(len(body) - 1)
+    for i in range(len(decoded)):
+        if i < len(_global_xor_table):
+            decoded[i] = body[i + 1] ^ _global_xor_table[i]
+        else:
+            decoded[i] = body[i + 1]
+    return bytes(decoded)
+
+
+# Message type byte -> display name mapping
+_MSG_TYPE_NAMES: dict[int, str] = {
+    0x21: "TankInfo",
+    0x28: "TankJoin",
+    0x29: "TankLeave",
+    0x2E: "TankStatus",
+    0x3D: "MoveResponse",
+    0x3E: "TankStatus",
+    0x41: "Deactivation",
+    0x43: "Container",
+    0x44: "FuelDeposit",
+    0x45: "MineDetonate",
+    0x46: "RadarAck",
+    0x47: "Movement",
+    0x48: "MovementShort",
+    0x49: "ItemPickup",
+    0x4A: "TerrainUpdate",
+    0x4B: "MinePlace",
+    0x4C: "WorldEntry",
+    0x4D: "PlayerList",
+    0x4F: "RadarResult",
+    0x52: "Supervisor",
+    0x53: "Shooting",
+    0x54: "ActionDone",
+    0x56: "Statistics",
+    0x58: "TankExit",
+    0x5A: "ViewportUpdate",
+    0x64: "FuelDeposit",
+    0x67: "EquipGain",
+    0x74: "EquipToggle",
+}
+
+
+def _format_decoded_message(msg_type: int, decoded: protocol.BinaryMessage) -> str:
+    """Format a decoded protocol message as readable string.
+
+    Args:
+        msg_type: Message type byte.
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        Formatted string for logging.
+    """
+    # For container messages, use the string msg_type from container_decoder
+    actual_type = decoded["msg_type"]
+    if isinstance(actual_type, str):
+        # Container message - use specific type name
+        type_name = actual_type.replace("_", " ").title().replace(" ", "")
+    else:
+        # Protocol message - use int-based lookup
+        type_name = _MSG_TYPE_NAMES.get(msg_type, f"Msg0x{msg_type:02X}")
+    details = _format_message_details(decoded)
+    if details:
+        return f"[{type_name}] {details}"
+    return f"[{type_name}]"
+
+
+# Message type categories for formatting dispatch
+_COMBAT_MSG_TYPES: frozenset[int] = frozenset({0x53, 0x41})
+_TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x58, 0x2E, 0x3E, 0x21, 0x47, 0x3D, 0x48})
+_RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49, 0x43})
+_POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
+_RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
+_MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D})
+
+
+def _format_combat_details(d: protocol.BinaryMessage) -> str:
+    """Format combat-related message details."""
+    if d["msg_type"] == 0x53:
+        return f"shooter={d['shooter_id']} tgt=({d['target_x']},{d['target_y']})"
+    if d["msg_type"] == 0x41:
+        return f"victim={d['victim_id']} killer={d['killer_id']}"
+    return ""
+
+
+# Rank number -> name mapping
+_RANK_NAMES: tuple[str, ...] = (
+    "recruit",
+    "private",
+    "corporal",
+    "sergeant",
+    "lieutenant",
+    "captain",
+    "major",
+    "general",
+)
+
+# Damage state -> description
+_DAMAGE_NAMES: tuple[str, ...] = ("full", "light", "medium", "critical")
+
+# Team number -> name
+_TEAM_NAMES: tuple[str, ...] = ("red", "blue", "green", "purple")
+
+
+def _rank_name(rank: int) -> str:
+    """Get rank name from rank number."""
+    return _RANK_NAMES[rank] if 0 <= rank < len(_RANK_NAMES) else f"r{rank}"
+
+
+def _damage_name(damage: int) -> str:
+    """Get damage description from damage_state."""
+    return _DAMAGE_NAMES[damage] if 0 <= damage < len(_DAMAGE_NAMES) else f"d{damage}"
+
+
+def _team_name(team: int) -> str:
+    """Get team name from team number."""
+    return _TEAM_NAMES[team] if 0 <= team < len(_TEAM_NAMES) else f"t{team}"
+
+
+def _format_tank_details(d: protocol.BinaryMessage) -> str:
+    """Format tank status message details."""
+    if d["msg_type"] == 0x28:
+        # TankEntryDict: tank_id, x, y, name (no rank/team/damage)
+        return f"tank={d['tank_id']} at ({d['x']},{d['y']}) name={d['name']}"
+    if d["msg_type"] == 0x58:
+        return f"tank={d['tank_id']} left"
+    if d["msg_type"] == 0x2E:
+        # TankStatusSyncDict: has damage_state and rank
+        rank = _rank_name(d["rank"])
+        dmg = _damage_name(d["damage_state"])
+        return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['leaderboard_position']}"
+    if d["msg_type"] == 0x3E:
+        # TankStatusDict: has leaderboard_score not score
+        rank = _rank_name(d["rank"])
+        team = _team_name(d["team"])
+        return f"tank={d['tank_id']} {team} {rank} score={d['leaderboard_score']}"
+    if d["msg_type"] == 0x21:
+        # TankInfoDict: has team
+        team = _team_name(d["team"])
+        return f"tank={d['tank_id']} {team} name={d['name']}"
+    if d["msg_type"] == 0x47:
+        # MovementDict: no rank, has fuel
+        x, y, dr = d["start_x"], d["start_y"], d["direction"]
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} fuel={d['fuel']}"
+    if d["msg_type"] == 0x3D:
+        # MovementResponseDict: has rank and leaderboard_position
+        rank = _rank_name(d["rank"])
+        x, y, dr = d["x"], d["y"], d["direction"]
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} {rank} lb={d['leaderboard_position']}"
+    if d["msg_type"] == 0x48:
+        rank = _rank_name(d["rank"])
+        return f"tank={d['tank_id']} at ({d['x']},{d['y']}) {rank}"
+    return ""
+
+
+def _format_resource_details(d: protocol.BinaryMessage) -> str:
+    """Format resource-related message details."""
+    if d["msg_type"] == 0x44:
+        return f"amount={d['amount']} free={d['is_free']}"
+    if d["msg_type"] == 0x64:
+        return f"amount={d['amount']}"
+    if d["msg_type"] == 0x49:
+        return f"counts={d['counts']}"
+    if d["msg_type"] == 0x43:
+        return f"id={d['container_id']} fuel={d['fuel']}"
+    return ""
+
+
+def _format_position_details(d: protocol.BinaryMessage) -> str:
+    """Format position update message details."""
+    if d["msg_type"] == 0x4B:
+        return f"tank={d['tank_id']} count={len(d['positions'])}"
+    if d["msg_type"] == 0x45:
+        return f"count={len(d['positions'])}"
+    return ""
+
+
+def _format_radar_details(d: protocol.BinaryMessage) -> str:
+    """Format radar-related message details."""
+    if d["msg_type"] == 0x46:
+        return f"type={d['detection_type']} found={d['found']}"
+    if d["msg_type"] == 0x4F:
+        return f"entities={len(d['entities'])}"
+    if d["msg_type"] == 0x5A:
+        return f"dir={d['direction']} entities={len(d['entities'])}"
+    return ""
+
+
+def _format_misc_details(d: protocol.BinaryMessage) -> str:
+    """Format miscellaneous message details."""
+    if d["msg_type"] == 0x67:
+        return f"gained={d['gained']}"
+    if d["msg_type"] == 0x74:
+        return f"enabled={d['enabled']}"
+    if d["msg_type"] == 0x56:
+        return f"time={d['playtime_hours']}h{d['playtime_minutes']}m"
+    if d["msg_type"] == 0x52:
+        return f"status={d['status']} data={d['data']}"
+    if d["msg_type"] == 0x4D:
+        return f"sender={d['sender_id']} type={d['message_type']}"
+    return ""
+
+
+def _format_container_details(d: protocol.BinaryMessage) -> str:
+    """Format container message details (string msg_type from container_decoder).
+
+    Args:
+        d: Decoded binary protocol message.
+
+    Returns:
+        Formatted details string, or empty string if not a container message.
+    """
+    match d:
+        case {"msg_type": "combat_hit", "direction": int(direction), "attacker_id": int(aid)}:
+            dir_str = "out" if direction == 0x09 else "in"
+            return f"attacker={aid} dir={dir_str}"
+        case {"msg_type": "tank_registry", "tank_id": int(tid), "flags": int(flags)}:
+            return f"tank={tid} flags=0x{flags:02X}"
+        case {
+            "msg_type": "position_update",
+            "tank_id": int(tid),
+            "flags": int(f),
+            "status_bytes": bytes(sb),
+        }:
+            return f"tank={tid} flags=0x{f:02X} data={sb.hex()}"
+        case {"msg_type": "tank_status_sync", "sync_data": bytes(sd)}:
+            return f"data={sd.hex()}"
+        case {
+            "msg_type": "tank_status_short",
+            "tank_id": int(tid),
+            "damage_state": int(dmg),
+            "rank": int(rank),
+            "leaderboard_position": int(lb),
+        }:
+            rank_str = _rank_name(rank)
+            dmg_str = _damage_name(dmg)
+            return f"tank={tid} {rank_str} hp={dmg_str} lb={lb}"
+        case {
+            "msg_type": "tank_update_compact",
+            "tank_id": int(tid),
+            "flags": int(f),
+            "status_data": bytes(sd),
+        }:
+            return f"tank={tid} flags=0x{f:02X} data={sd.hex()}"
+        case {
+            "msg_type": "tank_update_extended",
+            "tank_id": int(tid),
+            "flags": int(f),
+            "status_data": bytes(sd),
+        }:
+            return f"tank={tid} flags=0x{f:02X} data={sd.hex()}"
+        case {
+            "msg_type": "tank_update_full",
+            "tank_id": int(tid),
+            "flags": int(f),
+            "status_data": bytes(sd),
+        }:
+            return f"tank={tid} flags=0x{f:02X} data={sd.hex()}"
+        case {"msg_type": "unknown_container", "length": int(length), "data": bytes(data)}:
+            return f"len={length} data={data.hex()[:40]}"
+        case _:
+            return ""
+
+
+def _format_message_details(d: protocol.BinaryMessage) -> str:
+    """Get formatted details for a decoded message using msg_type discriminant.
+
+    Args:
+        d: Decoded binary protocol message.
+
+    Returns:
+        Formatted details string, or empty string for simple types.
+    """
+    # Handle container messages (string msg_type from container_decoder)
+    if isinstance(d["msg_type"], str):
+        return _format_container_details(d)
+    mt = d["msg_type"]
+    # Handle int msg_types from protocol module
+    if mt in _COMBAT_MSG_TYPES:
+        return _format_combat_details(d)
+    if mt in _TANK_MSG_TYPES:
+        return _format_tank_details(d)
+    if mt in _RESOURCE_MSG_TYPES:
+        return _format_resource_details(d)
+    if mt in _POSITION_MSG_TYPES:
+        return _format_position_details(d)
+    if mt in _RADAR_MSG_TYPES:
+        return _format_radar_details(d)
+    if mt in _MISC_MSG_TYPES:
+        return _format_misc_details(d)
+    return ""
+
+
+# Text message type bytes (ASCII chars that indicate text, not binary)
+_TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
+
+
+def _decode_received_text_message(payload: str) -> None:
+    """Decode and log received text messages (JOIN_CONFIRM, ROOM_LIST, etc.).
+
+    Args:
+        payload: Base64-encoded message payload.
+    """
+    # Validate base64 - must be valid characters and proper length
+    if not payload or len(payload) % 4 != 0:
+        return
+    valid_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+    if not all(c in valid_chars for c in payload):
+        return
+
+    data = base64.b64decode(payload)
+    if len(data) < 2:
+        return
+
+    body = data[2:]
+    if len(body) == 0:
+        return
+
+    # Only process text message types
+    if body[0] not in _TEXT_MESSAGE_TYPES:
+        return
+
+    text = body.decode("utf-8", errors="replace")
+    decoded = _decode_text_message(text, len(body), "RECEIVED", body)
+    log.info(decoded)
+
+
+def _process_received_message(payload: str) -> None:
+    """Decode and log ALL received messages using protocol module."""
+    data = _decode_base64_safe(payload)
+    if data is None or len(data) < 3:
+        return
+
+    body = data[2:]
+    if len(body) == 0:
+        return
+
+    msg_type = body[0]
+
+    # Text messages (not XOR encoded)
+    if msg_type in _TEXT_MESSAGE_TYPES:
+        text = body.decode("utf-8", errors="replace")
+        decoded_str = _decode_text_message(text, len(body), "RECEIVED", body)
+        log.info(decoded_str)
+        return
+
+    # Binary messages - XOR decode and use protocol module
+    decoded_data = _xor_decode(body)
+    if len(decoded_data) == 0:
+        log.info(f"[RECEIVED] EMPTY: type=0x{msg_type:02X}")
+        return
+
+    # All messages go through protocol.decode_message (handles 0x2E routing internally)
+    msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
+    _decode_and_log_binary(msg_type, decoded_data, msg_char, body)
+
+
+# Message type -> minimum data length (from protocol.py _require_* calls)
+_MSG_MIN_LENGTHS: dict[int, int] = {
+    ord("S"): 12,  # ShootEvent
+    ord("A"): 5,  # Deactivation
+    ord("K"): 4,  # MinePlacement
+    ord("E"): 0,  # MineDetonation (no minimum)
+    ord("D"): 3,  # FuelGain
+    ord("d"): 2,  # FuelDeposit
+    ord("I"): 6,  # Inventory
+    ord("g"): 6,  # EquipmentGain
+    ord("t"): 5,  # EquipmentToggle
+    ord("F"): 2,  # RadarResult
+    ord("H"): 6,  # EnemyDetection
+    ord("O"): 2,  # RadarScanResult
+    ord("("): 10,  # TankEntry
+    ord("X"): 2,  # TankExit
+    ord("."): 1,  # 0x2E container (TankStatusSync or tunneled message)
+    ord(">"): 13,  # TankStatus
+    ord("!"): 10,  # TankInfo
+    ord("G"): 9,  # Movement
+    ord("="): 11,  # MovementResponse
+    ord("Z"): 2,  # ViewportUpdate
+    ord("J"): 0,  # TerrainUpdate (no minimum)
+    ord("?"): 0,  # Sync (no minimum)
+    ord("C"): 4,  # Container
+    ord("M"): 3,  # ChatMessage
+    ord("V"): 16,  # Statistics
+    ord("*"): 4,  # ActiveForces
+    ord("R"): 3,  # Supervisor
+    ord("T"): 0,  # ActionDone (no minimum)
+}
+
+
+def _decode_and_log_binary(msg_type: int, data: bytes, type_label: str, raw_body: bytes) -> None:
+    """Decode binary message using protocol module and log it.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR-decoded message data (without msg_type byte).
+        type_label: Label for logging.
+        raw_body: Original raw body for length reporting.
+    """
+    msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
+    hex_preview = data[:20].hex() + "..." if len(data) > 20 else data.hex()
+
+    # Check if type is known and data meets minimum length
+    min_len = _MSG_MIN_LENGTHS.get(msg_type)
+    if min_len is None:
+        # Unknown type - show debug info
+        log.info(
+            "[RECEIVED] UNKNOWN 0x%02X '%s' len=%d data=%s",
+            msg_type,
+            msg_char,
+            len(raw_body),
+            hex_preview,
+        )
+        return
+
+    if len(data) < min_len:
+        # Data too short for this type
+        log.info(
+            "[RECEIVED] SHORT 0x%02X '%s' need=%d got=%d data=%s",
+            msg_type,
+            msg_char,
+            min_len,
+            len(data),
+            hex_preview,
+        )
+        return
+
+    # Decode using protocol module - for binary messages only
+    # Text messages are handled separately in _decode_text_message
+    binary_decoded = protocol.try_decode_binary_message(msg_type, data)
+    if binary_decoded is None:
+        log.info(
+            "[RECEIVED] UNIMPL 0x%02X '%s' len=%d data=%s",
+            msg_type,
+            msg_char,
+            len(raw_body),
+            hex_preview,
+        )
+        return
+    formatted = _format_decoded_message(msg_type, binary_decoded)
+    log.info("[RECEIVED] %s", formatted)
+
 
 # Default configuration constants
 DEFAULT_TARGET_URL = "https://tankpit.com"
 DEFAULT_OUTPUT_PATH = "capture_session.json"
 DEFAULT_CAPTURE_DURATION_MS = 0  # 0 = indefinite (wait until browser closed)
+
+
+def _decode_8byte_state(body: bytes, tag: str) -> str:
+    """Decode 8-byte state message by subtype."""
+    subtype = body[1]
+    if subtype == 0x49:
+        return f"[{tag}] ITEM_PICKUP: {body.hex()}"
+    if subtype == 0x67:
+        return f"[{tag}] GAME_STATE: {body.hex()}"
+    return f"[{tag}] MSG_8B: sub=0x{subtype:02x} {body.hex()}"
 
 
 def _decode_state_message(body: bytes, tag: str) -> str:
@@ -1874,49 +2299,31 @@ def _decode_state_message(body: bytes, tag: str) -> str:
     """
     length = len(body)
 
-    # Very short - heartbeat/sync
     if length <= 3:
         return f"[{tag}] SYNC: {body.hex()}"
 
-    # Map data (very large)
     if length > 500:
         return f"[{tag}] MAP_DATA: len={length}"
 
-    # 12-byte messages - appear after shots (hit confirmation?)
     if length == 12:
         return f"[{tag}] HIT: {body.hex()}"
 
-    # 8-byte messages - multiple types based on subtype byte
     if length == 8:
-        subtype = body[1]
-        if subtype == 0x49:  # 'I' = Item pickup confirmation
-            return f"[{tag}] ITEM_PICKUP: {body.hex()}"
-        elif subtype == 0x67:  # 'g' = Game state
-            return f"[{tag}] GAME_STATE: {body.hex()}"
-        else:
-            return f"[{tag}] MSG_8B: sub=0x{subtype:02x} {body.hex()}"
+        return _decode_8byte_state(body, tag)
 
-    # 14-16 byte messages - various state updates
     if 14 <= length <= 16:
-        subtype = body[1]
-        return f"[{tag}] STATE: sub=0x{subtype:02x} len={length} hex={body.hex()}"
+        return f"[{tag}] STATE: sub=0x{body[1]:02x} len={length} hex={body.hex()}"
 
-    # 17-byte 0x10 messages - these contain fuel at position 15
     if length == 17 and body[1] == 0x10:
-        # Raw value at position 15-16 (XOR encoded)
         raw_p15 = int.from_bytes(body[15:17], "little")
         return f"[{tag}] FUEL_RAW: p15={raw_p15} hex={body.hex()}"
 
-    # Medium messages (17-30 bytes) - entity updates
     if 17 <= length <= 30:
-        subtype = body[1]
-        return f"[{tag}] ENTITY: sub=0x{subtype:02x} len={length} hex={body.hex()}"
+        return f"[{tag}] ENTITY: sub=0x{body[1]:02x} len={length} hex={body.hex()}"
 
-    # Short position refs (4-11 bytes)
     if 4 <= length <= 11:
         return f"[{tag}] POS: len={length} hex={body.hex()}"
 
-    # Longer entity updates (31-500 bytes)
     return f"[{tag}] UPDATE: len={length} hex={body[:20].hex()}..."
 
 
@@ -1965,9 +2372,8 @@ def _decode_message(payload: str, direction: str, magic: str | None = None) -> s
         Human-readable decoded message string.
     """
     tag = direction.upper()
-    try:
-        data = base64.b64decode(payload)
-    except (ValueError, TypeError):
+    data = _decode_base64_safe(payload)
+    if data is None:
         return f"[{tag}] (invalid base64)"
 
     if len(data) < 2:
@@ -1998,11 +2404,30 @@ def _decode_plus_message(text: str, tag: str) -> str:
 
 
 def _decode_join_confirm(text: str, tag: str) -> str:
-    """Decode a '=' prefixed JOIN_CONFIRM message."""
+    """Decode a '=' prefixed JOIN_CONFIRM message.
+
+    Format: =room|date|name|rank|eq1|eq2|eq3|eq4
+    Example: =2|Sep. 25, 2012|Yuppler|4|9|9|9|10
+
+    Rank values: 0=recruit, 1=private, 2=corporal, 3=sergeant,
+                 4=lieutenant, 5=captain, 6=major, 7=general
+    """
+    rank_names = [
+        "recruit",
+        "private",
+        "corporal",
+        "sergeant",
+        "lieutenant",
+        "captain",
+        "major",
+        "general",
+    ]
     parts = text.split("|")
     room_id = parts[0][1:] if len(parts) > 0 else "?"
     tank_name = parts[2] if len(parts) > 2 else "?"
-    return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name}"
+    rank_num = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
+    rank_str = rank_names[rank_num] if 0 <= rank_num < 8 else f"rank{rank_num}"
+    return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name} {rank_str}"
 
 
 def _decode_command(body: bytes, tag: str, magic: str | None = None) -> str:
@@ -2079,7 +2504,7 @@ class WebSocketSniffer(BrowserSession):
         self._live_decode = live_decode
         self._game_log_entries: list[dict[str, str | int]] = []
 
-    def _process_game_log_entry(self, entry: _test_hooks.GameLogEntry) -> None:
+    def _process_game_log_entry(self, entry: GameLogEntry) -> None:
         """Process a single game log entry and store it.
 
         Overrides BrowserSession._process_game_log_entry to also save entries.
@@ -2090,11 +2515,13 @@ class WebSocketSniffer(BrowserSession):
         # Store with timestamp
         from tankpit_bot.browser import get_current_time_ms
 
-        self._game_log_entries.append({
-            "timestamp_ms": get_current_time_ms(),
-            "text": entry["text"],
-            "category": entry["category"],
-        })
+        self._game_log_entries.append(
+            {
+                "timestamp_ms": get_current_time_ms(),
+                "text": entry["text"],
+                "category": entry["category"],
+            }
+        )
         # Call parent to log and process combat
         super()._process_game_log_entry(entry)
 
@@ -2106,88 +2533,28 @@ class WebSocketSniffer(BrowserSession):
         Args:
             message: The captured message.
         """
-        # Update trackers with magic key when available
-        if self._magic and _fuel_tracker._xor_table is None:
-            _fuel_tracker.set_magic(self._magic)
-        if self._magic and _position_tracker._xor_table is None:
-            _position_tracker.set_magic(self._magic)
-        if self._magic and _deactivation_tracker._xor_table is None:
-            _deactivation_tracker.set_magic(self._magic)
-        if self._magic and _item_tracker._xor_table is None:
-            _item_tracker.set_magic(self._magic)
-        if self._magic and _radar_tracker._xor_table is None:
-            _radar_tracker.set_magic(self._magic)
-        if self._magic and _tank_tracker._xor_table is None:
-            _tank_tracker.set_magic(self._magic)
-        if self._magic and _mine_tracker._xor_table is None:
-            _mine_tracker.set_magic(self._magic)
-        if self._magic and _equip_tracker._xor_table is None:
-            _equip_tracker.set_magic(self._magic)
-        if self._magic and _container_tracker._xor_table is None:
-            _container_tracker.set_magic(self._magic)
-        if self._magic and _exit_tracker._xor_table is None:
-            _exit_tracker.set_magic(self._magic)
-        if self._magic and _equip_gain_tracker._xor_table is None:
-            _equip_gain_tracker.set_magic(self._magic)
-        if self._magic and _deposit_tracker._xor_table is None:
-            _deposit_tracker.set_magic(self._magic)
-        if self._magic and _radar_ack_tracker._xor_table is None:
-            _radar_ack_tracker.set_magic(self._magic)
+        if self._magic:
+            _init_trackers_with_magic(self._magic)
 
-        if self._live_decode:
-            # Check for fuel and position updates first
-            if message["direction"] == "received":
-                fuel_status = _fuel_tracker.process_message(message["payload"])
-                if fuel_status:
-                    log.info(fuel_status)
-                pos_status = _position_tracker.process_message(message["payload"])
-                if pos_status:
-                    log.info(pos_status)
-                deact_status = _deactivation_tracker.process_message(message["payload"])
-                if deact_status:
-                    log.info(deact_status)
-                item_status = _item_tracker.process_message(message["payload"])
-                if item_status:
-                    log.info(item_status)
-                radar_status = _radar_tracker.process_message(message["payload"])
-                if radar_status:
-                    log.info(radar_status)
-                tank_status = _tank_tracker.process_message(message["payload"])
-                if tank_status:
-                    log.info(tank_status)
-                mine_status = _mine_tracker.process_message(message["payload"], "received")
-                if mine_status:
-                    log.info(mine_status)
-                equip_status = _equip_tracker.process_message(message["payload"])
-                if equip_status:
-                    log.info(equip_status)
-                container_status = _container_tracker.process_message(message["payload"])
-                if container_status:
-                    log.info(container_status)
-                exit_status = _exit_tracker.process_message(message["payload"])
-                if exit_status:
-                    log.info(exit_status)
-                equip_gain_status = _equip_gain_tracker.process_message(message["payload"])
-                if equip_gain_status:
-                    log.info(equip_gain_status)
-                deposit_status = _deposit_tracker.process_message(message["payload"])
-                if deposit_status:
-                    log.info(deposit_status)
-                radar_ack_status = _radar_ack_tracker.process_message(message["payload"])
-                if radar_ack_status:
-                    log.info(radar_ack_status)
+        if not self._live_decode:
+            return
 
-            # Check for sent mine commands
-            if message["direction"] == "sent":
-                mine_status = _mine_tracker.process_message(message["payload"], "sent")
-                if mine_status:
-                    log.info(mine_status)
+        payload = message["payload"]
+        direction = message["direction"]
 
-            decoded = _decode_message(message["payload"], message["direction"], self._magic)
+        if direction == "received":
+            # Use unified decoder for received messages
+            _process_received_message(payload)
+        else:
+            # Use simple decoder for sent messages
+            mine_status = _mine_tracker.process_message(payload, "sent")
+            if mine_status:
+                log.info(mine_status)
+            decoded = _decode_message(payload, direction, self._magic)
             log.info(decoded)
-            # Poll game log and inventory after each message for correlation
-            self._poll_game_log()
-            self._poll_inventory()
+
+        self._poll_game_log()
+        self._poll_inventory()
 
     def _probe_js_fuel(self, cdp: _test_hooks.CDPSessionProtocol) -> None:
         """Probe JavaScript for fuel/HP variables.
@@ -2233,21 +2600,24 @@ class WebSocketSniffer(BrowserSession):
             return results.slice(0, 50);  // Limit results
         })()
         """
-        try:
-            result = cdp.send("Runtime.evaluate", {
-                "expression": js_probe,
-                "returnByValue": True
-            })
-            if "result" in result and "value" in result["result"]:
-                findings = result["result"]["value"]
-                if findings:
-                    log.info("JS variables in fuel range (800-1600):")
-                    for f in findings:
-                        log.info("  %s = %s", f["path"], f["value"])
-                else:
-                    log.info("No JS variables found in fuel range 800-1600")
-        except Exception as e:
-            log.warning("Failed to probe JS: %s", e)
+        result = cdp.send("Runtime.evaluate", {"expression": js_probe, "returnByValue": True})
+        result_obj = result.get("result")
+        if not isinstance(result_obj, dict):
+            log.info("No JS variables found in fuel range 800-1600")
+            return
+        findings = result_obj.get("value")
+        if not isinstance(findings, list):
+            log.info("No JS variables found in fuel range 800-1600")
+            return
+        if not findings:
+            log.info("No JS variables found in fuel range 800-1600")
+            return
+        log.info("JS variables in fuel range (800-1600):")
+        for item in findings:
+            if isinstance(item, dict):
+                path = item.get("path", "?")
+                value = item.get("value", "?")
+                log.info("  %s = %s", path, value)
 
     def run(self, capture_duration_ms: int) -> CaptureSession:
         """Run the sniffer and capture WebSocket traffic.
@@ -2275,6 +2645,9 @@ class WebSocketSniffer(BrowserSession):
             context = browser.new_context()
             page = context.new_page()
             cdp = context.new_cdp_session(page)
+
+            # Reset CDP time offset for new session
+            reset_cdp_time_offset()
 
             # Set up console listener and CDP handlers
             self._setup_console_listener(cdp)
@@ -2337,8 +2710,202 @@ class WebSocketSniffer(BrowserSession):
         )
 
 
+# Known decoded signatures with understanding level
+# FULL = complete decoder, PARTIAL = key fields known, IDENTIFIED = type known
+DECODED_SIGS: dict[int, tuple[str, str]] = {
+    # Binary control messages (0x00-0x1F)
+    0x00: ("sync_state", "IDENTIFIED"),
+    0x01: ("heartbeat", "IDENTIFIED"),
+    0x04: ("position_update", "IDENTIFIED"),
+    0x08: ("entity_state", "IDENTIFIED"),
+    0x0E: ("tick_update", "IDENTIFIED"),
+    0x14: ("world_state", "IDENTIFIED"),
+    0x15: ("spawn_state", "IDENTIFIED"),
+    0x1D: ("combat_state", "IDENTIFIED"),
+    # ASCII message types (0x20+)
+    0x21: ("tank_info", "FULL"),
+    0x22: ("entity_position", "IDENTIFIED"),  # '"' 13-byte position update
+    0x28: ("tank_join", "IDENTIFIED"),
+    0x29: ("tank_leave", "IDENTIFIED"),
+    0x2B: ("promotion", "FULL"),
+    0x2D: ("world_entity", "IDENTIFIED"),  # '-' 16-byte entity state
+    0x2E: ("tank_status_sync", "PARTIAL"),
+    0x2F: ("player_update", "IDENTIFIED"),
+    0x31: ("top10_list", "IDENTIFIED"),  # '1' MSG_TOP10
+    0x32: ("top10_extended", "IDENTIFIED"),  # '2' similar to top10
+    0x33: ("score_update", "IDENTIFIED"),  # '3'
+    0x3D: ("movement", "FULL"),
+    0x3E: ("tank_status", "PARTIAL"),
+    0x3F: ("position", "FULL"),
+    0x40: ("mine_status", "IDENTIFIED"),  # '@' MSG_MINE_STATUS
+    0x41: ("kill", "FULL"),
+    0x43: ("container", "FULL"),
+    0x45: ("mine_detonate", "FULL"),
+    0x46: ("radar_ack", "FULL"),
+    0x47: ("shooting", "FULL"),
+    0x49: ("item_pickup", "FULL"),
+    0x4A: ("terrain_update", "IDENTIFIED"),  # 'J' MSG_TERRAIN_UPDATE
+    0x4B: ("mine_place", "FULL"),
+    0x4C: ("tank_entry", "PARTIAL"),
+    0x4D: ("player_list", "IDENTIFIED"),
+    0x4F: ("deactivation", "FULL"),
+    0x52: ("supervisor", "PARTIAL"),
+    0x53: ("tank_move", "FULL"),
+    0x54: ("tank_shoot", "FULL"),
+    0x56: ("statistics", "FULL"),
+    0x58: ("tank_exit", "FULL"),
+    0x5A: ("viewport_update", "PARTIAL"),
+    0x5F: ("action_event", "IDENTIFIED"),  # '_' 11-byte action/event
+    0x64: ("fuel_deposit", "FULL"),
+    0x66: ("fuel_state", "IDENTIFIED"),  # 'f' - lowercase variant
+    0x67: ("equip_gain", "FULL"),
+    0x69: ("inventory_state", "IDENTIFIED"),  # 'i' - lowercase variant
+    0x74: ("equip_toggle", "FULL"),
+    0x78: ("tank_disconnect", "IDENTIFIED"),  # 'x' - lowercase variant
+    0x79: ("entity_spawn", "IDENTIFIED"),  # 'y'
+    0x7A: ("zone_update", "IDENTIFIED"),  # 'z' - lowercase variant
+}
+
+
+def _empty_message_stats() -> MessageStats:
+    """Return empty MessageStats."""
+    return MessageStats(decoded={}, unknown={}, total_received=0, decode_coverage="0%")
+
+
+def _is_valid_base64(s: str) -> bool:
+    """Check if string is valid base64.
+
+    Args:
+        s: String to check.
+
+    Returns:
+        True if valid base64, False otherwise.
+    """
+    import re
+
+    if not s:
+        return False
+    # Base64 characters plus padding
+    pattern = r"^[A-Za-z0-9+/]*={0,2}$"
+    if not re.match(pattern, s):
+        return False
+    # Length must be multiple of 4 (with padding)
+    return len(s) % 4 == 0
+
+
+def _decode_base64_safe(payload: str) -> bytes | None:
+    """Validate and decode base64 payload without exceptions.
+
+    Args:
+        payload: Base64 encoded string.
+
+    Returns:
+        Decoded bytes or None if invalid.
+    """
+    if not _is_valid_base64(payload):
+        return None
+    return base64.b64decode(payload)
+
+
+def _extract_message_signature(payload_b64: str, xor_table: bytes) -> bytes | None:
+    """Extract and decode message signature from base64 payload.
+
+    Args:
+        payload_b64: Base64 encoded payload.
+        xor_table: XOR decryption table.
+
+    Returns:
+        Decoded bytes or None if invalid format.
+    """
+    if not _is_valid_base64(payload_b64):
+        return None
+
+    payload = base64.b64decode(payload_b64)
+
+    if b"." not in payload[:3]:
+        return None
+
+    dot_pos = payload.find(b".")
+    if dot_pos < 0 or dot_pos >= 3:
+        return None
+
+    start = dot_pos + 1
+    if len(payload) <= start:
+        return None
+
+    decode_len = min(len(payload) - start, len(xor_table))
+    decoded = bytes(payload[start + j] ^ xor_table[j] for j in range(decode_len))
+    return decoded if decoded else None
+
+
+def _format_sig_key(sig: int) -> str:
+    """Format signature as display key."""
+    char = chr(sig) if 32 <= sig < 127 else "?"
+    return f"0x{sig:02X} '{char}'"
+
+
+# Exact length -> (name, level) mappings for message identification
+_LENGTH_EXACT: dict[int, tuple[str, str]] = {
+    1: ("heartbeat", "IDENTIFIED"),
+    2: ("tank_status_sync", "FULL"),
+    3: ("tank_status_sync", "FULL"),
+    4: ("player_ack", "IDENTIFIED"),
+    5: ("entity_sync", "IDENTIFIED"),
+    6: ("control_msg", "IDENTIFIED"),
+    7: ("action_ack", "IDENTIFIED"),
+    9: ("tank_status_short", "FULL"),
+    10: ("tank_update_compact", "FULL"),
+    11: ("combat_hit", "FULL"),
+    13: ("position_update", "FULL"),
+    14: ("tank_update_extended", "FULL"),
+    15: ("tank_update_full", "FULL"),
+    16: ("tank_registry", "FULL"),
+    17: ("tank_registry", "FULL"),
+    18: ("tank_registry", "FULL"),
+    19: ("tank_registry", "FULL"),
+    20: ("tank_registry", "FULL"),
+}
+
+# Range-based length patterns: (min, max, name, level)
+_LENGTH_RANGES: tuple[tuple[int, int, str, str], ...] = (
+    (21, 28, "entity_extended", "IDENTIFIED"),
+    (29, 60, "tip_notification", "IDENTIFIED"),
+    (80, 130, "chunk_data", "IDENTIFIED"),
+    (500, 100000, "world_state", "IDENTIFIED"),
+)
+
+
+def _identify_by_length(data: bytes) -> tuple[str, str] | None:
+    """Identify message type by length (session-independent).
+
+    Uses the same length-based matching as container_decoder for consistency.
+    Length patterns are derived from captured session analysis.
+
+    Args:
+        data: XOR-decoded message bytes.
+
+    Returns:
+        Tuple of (name, level) if identified, None otherwise.
+    """
+    length = len(data)
+
+    # Check exact length matches first
+    if length in _LENGTH_EXACT:
+        return _LENGTH_EXACT[length]
+
+    # Check range-based patterns
+    for min_len, max_len, name, level in _LENGTH_RANGES:
+        if min_len <= length <= max_len:
+            return (name, level)
+
+    return None
+
+
 def _build_message_stats(session: CaptureSession) -> MessageStats:
     """Build message statistics from captured session.
+
+    Uses LENGTH-BASED identification for XOR-decoded messages, which is
+    session-independent (unlike byte-based matching that varies per session).
 
     Args:
         session: The capture session to analyze.
@@ -2350,114 +2917,53 @@ def _build_message_stats(session: CaptureSession) -> MessageStats:
 
     magic = session.get("magic")
     if not magic:
-        return MessageStats(
-            decoded={},
-            unknown={},
-            total_received=0,
-            decode_coverage="0%",
-        )
+        return _empty_message_stats()
 
-    # Load static key
     static_key_path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
     if not _test_hooks.path_exists(static_key_path):
-        return MessageStats(decoded={}, unknown={}, total_received=0, decode_coverage="0%")
+        return _empty_message_stats()
 
     static_key = _test_hooks.read_text(static_key_path).strip()
     magic_bytes = magic.encode("utf-8")
-    xor_table = bytes(ord(static_key[i]) ^ magic_bytes[i % len(magic_bytes)] for i in range(len(static_key)))
-
-    # Known decoded signatures with understanding level:
-    # - FULL: All fields understood and verified
-    # - PARTIAL: Signature known, some fields unknown or unverified
-    # - IDENTIFIED: Signature recognized, format not documented
-    DECODED_SIGS: dict[int, tuple[str, str]] = {
-        0x21: ("tank_info", "FULL"),
-        0x28: ("tank_join", "IDENTIFIED"),
-        0x29: ("tank_leave", "IDENTIFIED"),
-        0x2B: ("promotion", "FULL"),
-        0x2E: ("tank_status_sync", "PARTIAL"),  # bytes 9-10 unknown, flags unclear
-        0x2F: ("player_update", "IDENTIFIED"),
-        0x3D: ("movement", "FULL"),
-        0x3E: ("tank_status", "PARTIAL"),
-        0x3F: ("position", "FULL"),
-        0x41: ("kill", "FULL"),
-        0x43: ("container", "FULL"),
-        0x45: ("mine_detonate", "FULL"),
-        0x46: ("radar_ack", "FULL"),
-        0x47: ("shooting", "FULL"),
-        0x49: ("item_pickup", "FULL"),
-        0x4B: ("mine_place", "FULL"),
-        0x4C: ("tank_entry", "PARTIAL"),
-        0x4D: ("player_list", "IDENTIFIED"),
-        0x4F: ("deactivation", "FULL"),
-        0x52: ("supervisor", "PARTIAL"),  # trigger unknown, status values unclear
-        0x53: ("tank_move", "FULL"),
-        0x54: ("tank_shoot", "FULL"),
-        0x56: ("statistics", "FULL"),
-        0x58: ("tank_exit", "FULL"),
-        0x5A: ("viewport_update", "PARTIAL"),  # After spawn/teleport, shows zone entities
-        0x64: ("fuel_deposit", "FULL"),
-        0x67: ("equip_gain", "FULL"),  # 67 01 [armor][dual][missile][homing][radar]
-        0x74: ("equip_toggle", "FULL"),
-    }
+    xor_table = bytes(
+        ord(static_key[i]) ^ magic_bytes[i % len(magic_bytes)] for i in range(len(static_key))
+    )
 
     decoded_counts: Counter[str] = Counter()
     unknown_counts: Counter[str] = Counter()
     unknown_samples: dict[str, list[str]] = {}
-    level_counts: Counter[str] = Counter()  # Track FULL/PARTIAL/IDENTIFIED counts
+    level_counts: Counter[str] = Counter()
 
     for msg in session["messages"]:
         if msg["direction"] != "received":
             continue
 
-        try:
-            payload = base64.b64decode(msg["payload"])
-        except (ValueError, TypeError):
+        decoded = _extract_message_signature(msg["payload"], xor_table)
+        if decoded is None:
             continue
 
-        # Find 0x2E prefix
-        if b"." not in payload[:3]:
-            continue
-        dot_pos = payload.find(b".")
-        if dot_pos < 0 or dot_pos >= 3:
-            continue
-
-        start = dot_pos + 1
-        if len(payload) <= start:
-            continue
-
-        decoded = bytes(payload[start + j] ^ xor_table[j] for j in range(min(len(payload) - start, len(xor_table))))
-        if not decoded:
-            continue
-
-        sig = decoded[0]
-        if sig in DECODED_SIGS:
-            name, level = DECODED_SIGS[sig]
-            decoded_counts[f"0x{sig:02X} '{chr(sig) if 32<=sig<127 else '?'}' {name}"] += 1
+        # Use length-based identification (session-independent)
+        result = _identify_by_length(decoded)
+        if result is not None:
+            name, level = result
+            decoded_counts[f"len={len(decoded):02d} {name}"] += 1
             level_counts[level] += 1
         else:
-            sig_key = f"0x{sig:02X} '{chr(sig) if 32<=sig<127 else '?'}'"
-            unknown_counts[sig_key] += 1
-            if sig_key not in unknown_samples:
-                unknown_samples[sig_key] = []
-            if len(unknown_samples[sig_key]) < 3:
-                unknown_samples[sig_key].append(decoded[:20].hex())
+            len_key = f"len={len(decoded):02d}"
+            unknown_counts[len_key] += 1
+            if len_key not in unknown_samples:
+                unknown_samples[len_key] = []
+            if len(unknown_samples[len_key]) < 3:
+                unknown_samples[len_key].append(decoded[:20].hex())
 
     total = sum(decoded_counts.values()) + sum(unknown_counts.values())
     decoded_total = sum(decoded_counts.values())
 
-    # Calculate weighted understanding score:
-    # FULL=100%, PARTIAL=50%, IDENTIFIED=25%, UNKNOWN=0%
-    full_count = level_counts["FULL"]
-    partial_count = level_counts["PARTIAL"]
-    identified_count = level_counts["IDENTIFIED"]
-    unknown_total = sum(unknown_counts.values())
-
     if total > 0:
-        # Signature recognition (old metric)
         sig_coverage = 100 * decoded_total // total
-        # Weighted understanding
-        understanding = (full_count * 100 + partial_count * 50 + identified_count * 25) // total
+        weighted = level_counts["FULL"] * 100 + level_counts["PARTIAL"] * 50
+        weighted += level_counts["IDENTIFIED"] * 25
+        understanding = weighted // total
         coverage = f"{sig_coverage}% sig, {understanding}% understood"
     else:
         coverage = "0%"
@@ -2522,7 +3028,7 @@ def _build_session_summary(session: CaptureSession) -> SessionSummary:
         magic=session["magic"],
         tanks=session["tank_names"],
         combat=combat,
-        equipment_gains=[],  # TODO: populate from tracker
+        equipment_gains=[],
         game_log=combat_log,
         message_stats=_build_message_stats(session),
     )
