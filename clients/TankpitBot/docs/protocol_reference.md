@@ -110,25 +110,27 @@ byte 3+: data (varies by command)
 ### Currently Decoded & Verified
 
 #### Binary Messages (`.` / 0x2E subtypes)
-Note: Subtypes are XOR-encoded and vary by session. Use decoded signature to identify.
+Note: Subtypes are XOR-encoded and vary by session. Use length + first decoded byte to identify.
+See `container_decoder.py` for full implementation.
 
-| Signature | Name | Data | Status |
-|-----------|------|------|--------|
-| 3 bytes | SYNC | Heartbeat | ✅ VERIFIED |
-| 4 bytes, decoded 0x46 | RADAR_ACK | Radar acknowledgement | ✅ VERIFIED |
-| 4 bytes, decoded 0x58 | TANK_EXIT | tank_id (player left/disconnected) | ✅ VERIFIED |
-| 4 bytes, decoded 0x64 | FUEL_DEPOSIT | amount deposited (u16 LE) | ✅ VERIFIED |
-| 5 bytes | BLOCKED | Path blocked response | ✅ VERIFIED |
-| 6 bytes, decoded 0x43 | CONTAINER | container_id + fuel (u16 LE each) | ✅ VERIFIED |
-| 7 bytes, decoded 0x74 | EQUIP_TOGGLE | 5 on/off flags | ✅ VERIFIED |
-| 8 bytes, decoded 0x41 | DEACTIVATION | Kill/death event | ✅ VERIFIED |
-| 8 bytes, decoded 0x67 | EQUIP_GAIN | Equipment gained flags | ✅ VERIFIED |
-| 12 bytes | HIT | Hit confirmation | ✅ DETECTED |
-| 14 bytes | FUEL_STATE | bytes 12-13 = fuel u16 LE | ✅ VERIFIED |
-| 17-21 bytes | MOVE_RESPONSE | bytes 4-5 = FROM position | ✅ VERIFIED |
-| variable, decoded 0x4F | RADAR_RESULT | Fuel/entity positions | ✅ VERIFIED |
-| variable, decoded 0x4B | MINE_PLACED | owner_id + position | ✅ VERIFIED |
-| variable, decoded 0x45 | MINE_EXPLODE | count + position array | ✅ VERIFIED |
+| Length | First Byte | Name | Data | Status |
+|--------|------------|------|------|--------|
+| 2-3 | any | TANK_STATUS_SYNC | Heartbeat | ✅ VERIFIED |
+| 4 | any | PLAYER_LIST_SHORT | Response to '/' key | ✅ VERIFIED |
+| 5 | 0x41 | DEACTIVATION_KILL | victim_id + killer_id | ✅ VERIFIED |
+| 6 | any | TANK_LEAVE | tank_id (player left) | ✅ VERIFIED |
+| 7 | 0x43 | DEACTIVATION_DEATH | killer_id + extra | ✅ VERIFIED |
+| 7 | other | PLAYER_LIST_EXTENDED | Multi-player response | ✅ VERIFIED |
+| 9 | any | TANK_STATUS_SHORT | damage_state + rank + lb_pos | ✅ VERIFIED |
+| 10 | any | TANK_UPDATE_COMPACT | tank_id + status_data | ✅ VERIFIED |
+| 11 | any | COMBAT_HIT | direction + attacker_id + combat_data | ✅ VERIFIED |
+| 13 | any | POSITION_UPDATE | tank_id + status_bytes | ✅ VERIFIED |
+| 14 | any | TANK_UPDATE_EXTENDED | tank_id + status_data | ✅ VERIFIED |
+| 15 | any | TANK_UPDATE_FULL | tank_id + status_data | ✅ VERIFIED |
+| 16-20 | any | TANK_REGISTRY | tank_id + info_bytes (name) | ✅ VERIFIED |
+| variable | 0x4F | RADAR_RESULT | Fuel/entity positions | ✅ VERIFIED |
+| variable | 0x4B | MINE_PLACED | owner_id + position | ✅ VERIFIED |
+| variable | 0x45 | MINE_EXPLODE | count + position array | ✅ VERIFIED |
 
 #### Text Messages (pipe-delimited)
 | Char | Hex | Name | Format | Status |
@@ -138,17 +140,25 @@ Note: Subtypes are XOR-encoded and vary by session. Use decoded signature to ide
 | `%` | 0x25 | AUTH | `%AUTH !be session\|token\|id h` | ✅ DETECTED |
 | `*` | 0x2A | FORCES | `*count` | ✅ DETECTED |
 
-### Protocol Decoder Module
+### Protocol Decoder Modules
 
-A comprehensive decoder is available at `src/tankpit_bot/protocol.py` with:
-- 24 message type dataclasses
-- Automatic XOR decoding
-- Helper functions (x16, x24 for byte combining)
+Two decoder modules handle different message types:
+
+**`src/tankpit_bot/protocol.py`** - Top-level message decoders:
+- TypedDict structures with msg_type Literal fields
+- Decoders for 0x41, 0x43, 0x47, 0x53, etc.
+- Helper functions (_x16, _x24 for byte combining)
+
+**`src/tankpit_bot/container_decoder.py`** - 0x2E container subtypes:
+- Length-based message identification (session-independent)
+- First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
+- 13 container message types with TypedDict structures
 
 **Usage:**
 ```python
-from tankpit_bot.protocol import decode_message, TankPosition, FuelGain
-result = decode_message(msg_type, xor_decoded_data)
+from tankpit_bot.protocol import decode_deactivation, DeactivationDict
+from tankpit_bot.container_decoder import decode_container_message, identify_container_type
+result = decode_container_message(xor_decoded_body)  # For 0x2E messages
 ```
 
 ### Game Constants (from client JS)
@@ -278,29 +288,47 @@ Bytes 10-11: Additional data (flags?)
 
 ---
 
-## Deactivation Message Format (0x2E len=8)
+## Deactivation Message Formats (0x2E container subtypes)
 
-Wrapped inside 0x2E message, decoded first byte = `0x41` ('A').
-**Same format for kills and deaths** - check victim_id to determine if you died.
+Two distinct deactivation messages exist inside 0x2E containers, identified by first decoded byte:
+
+### Deactivation Kill (5 bytes, first byte 0x41 'A')
+
+Sent when YOU kill another tank. Decoded in `container_decoder.py`.
 
 ```
-Raw: 0x2E + subtype + 6 data bytes
-Decoded (from byte 1):
-  [0] 0x41 = 'A' (deactivation marker)
-  [1-2] victim_id (little-endian)
-  [3-4] killer_id (little-endian)
-  [5-6] rank/points data
+Raw: 0x2E + subtype + 4 data bytes (5 total after XOR decode)
+Decoded:
+  [0] 0x41 = 'A' (kill marker)
+  [1-2] victim_id (little-endian) - tank that was killed
+  [3-4] killer_id (little-endian) - your tank ID
 ```
 
-**Examples:**
-- You killed someone: `41001e02003c02` (victim=7680, killer=2)
-- You got killed: `41033c02003002` (victim=15363, killer=2)
+**Example:**
+- `41bb629c0e` → victim_id=25275, killer_id=3740 (you killed tank 25275)
+
+### Deactivation Death (7 bytes, first byte 0x43 'C')
+
+Sent when YOU are killed by another tank. Decoded in `container_decoder.py`.
+
+```
+Raw: 0x2E + subtype + 6 data bytes (7 total after XOR decode)
+Decoded:
+  [0] 0x43 = 'C' (death marker)
+  [1] flags
+  [2-3] killer_id (little-endian) - tank that killed you
+  [4-6] extra_data (3 bytes)
+```
+
+**Example:**
+- `430786160c7f1f` → killer_id=5639 (you were killed by tank 5639)
 
 **Death Indicators:**
-- 8-byte message with decoded `0x41` where victim_id = your tank
+- 7-byte message with decoded `0x43` as first byte
 - Fuel spikes to ~65508 (overflow)
 - Fuel resets ~20s later on respawn
-- 4-byte notification follows: `2e41533d` → `2b0100`
+
+**Note:** The old 8-byte format with 0x41 for both kills/deaths has been superseded by these two distinct formats.
 
 ---
 
@@ -676,13 +704,15 @@ When movement is blocked, the server:
 
 ```
 docs/
-├── protocol_reference.md    # This file - overview
-├── fuel_encoding.md         # Detailed fuel & position encoding
-└── protocol.md              # Original protocol notes
+├── protocol_reference.md    # This file - message byte layouts
+├── decoding_status.md       # Length-based identification tables
+└── protocol.md              # Protocol overview and discovery notes
 
 src/tankpit_bot/
-├── sniffer.py               # FuelTracker, PositionTracker
-├── decoder.py               # Command decoder
+├── sniffer.py               # WebSocket capture, FuelTracker, PositionTracker
+├── protocol.py              # TypedDict message structures + decoders
+├── container_decoder.py     # 0x2E container subtype decoder (length-based)
+├── decoder.py               # Session decoder for captured data
 └── commands.py              # Command constants
 ```
 
@@ -690,8 +720,8 @@ src/tankpit_bot/
 
 ## Next Steps (Priority Order)
 
-1. **Blocked movement detection** - What message indicates path blocked?
-2. **Current position (TO)** - Is there a message with destination position?
-3. **HP tracking** - Where is health stored?
-4. **Other entity positions** - Decode 0x13 entity messages
-5. **Combat messages** - Hit, kill, death, respawn
+1. ~~**Blocked movement detection**~~ ✓ - 5-byte response `2e6347320d`
+2. ~~**Current position (TO)**~~ ✓ - MOVE_RESPONSE bytes 4-5 = FROM position
+3. **HP tracking** - Where is health stored? (fuel=HP confirmed)
+4. ~~**Combat messages**~~ ✓ - deactivation_kill (0x41, 5 bytes), deactivation_death (0x43, 7 bytes)
+5. **Other entity positions** - Decode remaining 0x2E subtypes

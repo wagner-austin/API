@@ -793,8 +793,11 @@ Solution: Use a registered account with `TANKPIT_USERNAME` and `TANKPIT_PASSWORD
    - `decoder.py` - Session decoder for captured data
    - `parser.py` - Lobby message parser
    - `commands.py` - Command type definitions
-4. Complete command discovery using live decode mode
-5. Build WebSocket client with connection management (`client.py`)
-6. Implement high-level protocol layer (`protocol.py`)
+4. ~~Implement container message decoder~~ ✓
+   - `container_decoder.py` - Length-based 0x2E subtype identification
+   - `protocol.py` - TypedDict message structures with msg_type literals
+   - 13 container subtypes decoded (tank_registry, position_update, combat_hit, deactivation_kill, deactivation_death, etc.)
+5. Complete command discovery using live decode mode
+6. Build WebSocket client with connection management (`client.py`)
 7. Implement bot entry point with game loop
 8. Add AI strategy for movement and combat
