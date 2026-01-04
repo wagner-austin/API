@@ -29,6 +29,12 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Session decoder for captured data
 - Lobby message parser (room list, game record, status, etc.)
 
+**Phase 2.6: Container Message Decoding** (complete)
+- Length-based message identification (session-independent)
+- 0x2E container subtype decoder (`container_decoder.py`)
+- 13 container message types decoded: tank_registry, position_update, combat_hit, tank_status_short, deactivation_kill, deactivation_death, etc.
+- First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
+
 **Phase 3: Bot Implementation** (in progress)
 - Direct WebSocket client (no browser)
 - High-level protocol send/receive
@@ -162,42 +168,49 @@ poetry run pytest --cov-report=html
 ```
 TankpitBot/
 ├── src/tankpit_bot/
-│   ├── __init__.py       # Package exports
-│   ├── _test_hooks.py    # Dependency injection hooks
-│   ├── types.py          # TypedDict models
-│   ├── login.py          # Shared guest/account login logic
-│   ├── browser.py        # Shared browser session base class
-│   ├── sniffer.py        # WebSocket capture via Playwright
-│   ├── probe.py          # Input injection and command discovery
-│   ├── codec.py          # XOR encode/decode with static + session keys
-│   ├── framing.py        # 2-byte length framing encode/decode
-│   ├── decoder.py        # Session decoder for captured data
-│   ├── parser.py         # Lobby message parser (room list, etc.)
-│   ├── commands.py       # Command type definitions
-│   └── bot.py            # Bot client entry point
+│   ├── __init__.py           # Package exports
+│   ├── _test_hooks.py        # Dependency injection hooks
+│   ├── types.py              # TypedDict models + JSON encoders
+│   ├── login.py              # Shared guest/account login logic
+│   ├── browser.py            # Shared browser session base class
+│   ├── sniffer.py            # WebSocket capture via Playwright
+│   ├── probe.py              # Input injection and command discovery
+│   ├── codec.py              # XOR encode/decode with static + session keys
+│   ├── framing.py            # 2-byte length framing encode/decode
+│   ├── decoder.py            # Session decoder for captured data
+│   ├── parser.py             # Lobby message parser (room list, etc.)
+│   ├── protocol.py           # Protocol message TypedDicts + decoders
+│   ├── container_decoder.py  # 0x2E container subtype decoder (length-based)
+│   ├── commands.py           # Command type definitions
+│   ├── dom_scraper.py        # DOM scraping for game log
+│   ├── fuel_probe.py         # Fuel bar probing
+│   ├── inventory.py          # Inventory tracking
+│   └── bot.py                # Bot client entry point
 ├── tests/
-│   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
-│   ├── fakes.py              # Fake Playwright classes for testing
-│   ├── test_types.py         # Type encode/decode tests
-│   ├── test_login.py         # Login flow tests
-│   ├── test_browser.py       # BrowserSession tests
-│   ├── test_sniffer.py       # Sniffer tests with fake Playwright
-│   ├── test_probe.py         # Probe tests with fake CDP
-│   ├── test_codec.py         # XOR codec tests
-│   ├── test_framing.py       # Framing encode/decode tests
-│   ├── test_decoder.py       # Session decoder tests
-│   ├── test_parser.py        # Lobby message parser tests
-│   ├── test_commands.py      # Command type tests
-│   ├── test_bot.py           # Bot entry point tests
-│   ├── test_test_hooks.py    # Hook function tests
-│   ├── test_guard_checks.py  # Guard script tests
-│   └── test_verify_decode.py # Verify decode script tests
+│   ├── conftest.py               # Test fixtures (FakeEnv, FakeCDPSessionSimple)
+│   ├── fakes.py                  # Fake Playwright classes for testing
+│   ├── test_types.py             # Type encode/decode tests
+│   ├── test_login.py             # Login flow tests
+│   ├── test_browser.py           # BrowserSession + XOR key tests
+│   ├── test_sniffer.py           # Sniffer tests with fake Playwright
+│   ├── test_probe.py             # Probe tests with fake CDP
+│   ├── test_codec.py             # XOR codec tests
+│   ├── test_framing.py           # Framing encode/decode tests
+│   ├── test_decoder.py           # Session decoder tests
+│   ├── test_parser.py            # Lobby message parser tests
+│   ├── test_protocol.py          # Protocol message decoder tests
+│   ├── test_container_decoder.py # Container subtype decoder tests
+│   ├── test_commands.py          # Command type tests
+│   ├── test_fuel_probe.py        # Fuel probe tests
+│   ├── test_bot.py               # Bot entry point tests
+│   ├── test_test_hooks.py        # Hook function tests
+│   └── test_guard_checks.py      # Guard script tests
 ├── scripts/
 │   ├── guard.py          # Monorepo guard orchestrator
-│   ├── _test_hooks.py    # Guard test hooks
-│   └── verify_decode.py  # Session decoder CLI
+│   └── _test_hooks.py    # Guard test hooks
 ├── docs/
-│   └── protocol.md       # Protocol documentation
+│   ├── protocol.md           # Protocol documentation
+│   └── decoding_status.md    # Message decoding status + formats
 ├── pyproject.toml        # Poetry + tool config
 └── Makefile              # Development commands
 ```
