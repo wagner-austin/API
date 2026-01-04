@@ -187,6 +187,8 @@ def test_session_decoder_decodes_command() -> None:
             )
         ],
         magic="AAA",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -220,6 +222,8 @@ def test_session_decoder_decodes_lobby_message() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -252,6 +256,8 @@ def test_session_decoder_skips_state_messages() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -282,6 +288,8 @@ def test_session_decoder_skips_short_messages() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -311,6 +319,8 @@ def test_session_decoder_skips_incomplete_frame() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -340,6 +350,8 @@ def test_session_decoder_skips_empty_body() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -370,6 +382,8 @@ def test_session_decoder_skips_short_command() -> None:
             )
         ],
         magic="AA",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -400,6 +414,8 @@ def test_session_decoder_decodes_command_with_data() -> None:
             )
         ],
         magic="AAAAA",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -435,6 +451,8 @@ def test_session_decoder_handles_all_lobby_prefixes() -> None:
         base_url="https://test.com",
         messages=messages,
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)
@@ -536,6 +554,8 @@ def test_session_decoder_skips_unknown_prefix() -> None:
             )
         ],
         magic="A",
+        game_log=[],
+        tank_names={},
     )
 
     decoder = SessionDecoder(session, codec)

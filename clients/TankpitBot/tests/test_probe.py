@@ -9,7 +9,7 @@ from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_d
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import SyncPlaywrightFactoryProtocol
-from tankpit_bot.browser import BrowserError, cdp_timestamp_to_ms, get_current_time_ms
+from tankpit_bot.browser import BrowserError, get_current_time_ms
 from tankpit_bot.probe import (
     DEFAULT_MOUSE_POSITIONS,
     DEFAULT_PROBE_KEYS,
@@ -72,12 +72,6 @@ def test_get_current_time_ms_returns_int() -> None:
     result = get_current_time_ms()
     assert type(result) is int
     assert result > 0
-
-
-def test_cdp_timestamp_to_ms() -> None:
-    """Test cdp_timestamp_to_ms converts seconds to milliseconds."""
-    result = cdp_timestamp_to_ms(12345.678)
-    assert result == 12345678
 
 
 # =============================================================================
