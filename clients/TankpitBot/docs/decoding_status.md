@@ -14,9 +14,11 @@
 
 ## Length-Based Message Identification
 
-XOR encoding with per-session magic keys makes byte-based message identification unreliable across sessions. Instead, we use **message length** for session-independent identification:
+XOR encoding with per-session magic keys makes byte-based message identification unreliable across sessions. Instead, we use **message length** for session-independent identification.
 
-### Exact Length Matches
+### General Message Identification (sniffer.py)
+
+Used by `_identify_by_length()` for all received messages:
 
 | Length | Message Type | Decode Level |
 |--------|-------------|--------------|
@@ -24,8 +26,8 @@ XOR encoding with per-session magic keys makes byte-based message identification
 | 2-3 | tank_status_sync | FULL |
 | 4 | player_ack | IDENTIFIED |
 | 5 | entity_sync | IDENTIFIED |
-| 6 | tank_leave | FULL |
-| 7 | player_list_extended | FULL |
+| 6 | control_msg | IDENTIFIED |
+| 7 | action_ack | IDENTIFIED |
 | 9 | tank_status_short | FULL |
 | 10 | tank_update_compact | FULL |
 | 11 | combat_hit | FULL |
@@ -34,6 +36,26 @@ XOR encoding with per-session magic keys makes byte-based message identification
 | 15 | tank_update_full | FULL |
 | 16-20 | tank_registry | FULL |
 
+### Container Message Identification (container_decoder.py)
+
+For 0x2E container body decoding, some lengths require first-byte checks:
+
+| Length | First Byte | Message Type | Decode Level |
+|--------|------------|--------------|--------------|
+| 2-3 | any | tank_status_sync | FULL |
+| 4 | any | player_list_short | FULL |
+| 5 | 0x41 ('A') | deactivation_kill | FULL |
+| 6 | any | tank_leave | FULL |
+| 7 | 0x43 ('C') | deactivation_death | FULL |
+| 7 | other | player_list_extended | FULL |
+| 9 | any | tank_status_short | FULL |
+| 10 | any | tank_update_compact | FULL |
+| 11 | any | combat_hit | FULL |
+| 13 | any | position_update | FULL |
+| 14 | any | tank_update_extended | FULL |
+| 15 | any | tank_update_full | FULL |
+| 16-20 | any | tank_registry | FULL |
+
 ### Range-Based Matches
 
 | Length Range | Message Type | Decode Level |
@@ -41,28 +63,28 @@ XOR encoding with per-session magic keys makes byte-based message identification
 | 21-28 | entity_extended | IDENTIFIED |
 | 29-60 | tip_notification | IDENTIFIED |
 | 80-130 | chunk_data | IDENTIFIED |
-| 500+ | world_state | IDENTIFIED |
+| 500-100000 | world_state | IDENTIFIED |
 
 **Decode Levels:**
 - **FULL**: Complete field-by-field decoding with TypedDict structure
 - **IDENTIFIED**: Message type known, structure partially decoded
 
-**Implementation:** See `_identify_by_length()` in `sniffer.py` and `container_decoder.py`
+**Implementation:** See `_identify_by_length()` in `sniffer.py` and `identify_container_type()` in `container_decoder.py`
 
 ---
 
-## Fully Decoded (FULL) - 24 Messages
+## Fully Decoded (FULL) - Top-Level Messages
 
 | Sig | Name | Bytes | Format |
 |-----|------|-------|--------|
 | 0x21 | tank_info | 11+ | `team:u8 tank_id:u16 decoration:u32 score:u24 name:str` (NO rank!) |
 | 0x2B | promotion | TEXT | `+id\|name\|field\|flags\|team\|mode\|image\|year` |
-| 0x2E | tank_status_sync | 9,13 | Self(13B): fuel+rank. Other(9B): damage_state+rank |
+| 0x2E | container | var | Container wrapping various subtypes (see container_decoder.py) |
 | 0x3D | movement_response | 12 | `team:u8 tank_id:u16 x:u8 y:u8 dir:u8 [1B] rank:u8 score:u24BE [1B]` |
 | 0x3E | tank_status | 22 | See detailed format below |
 | 0x3F | sync | 3 | Heartbeat (no data) |
 | 0x41 | deactivation | 8 | `victim_id:u16 killer_id:u16 rank:u8 [2B] points:u16` |
-| 0x43 | container | 6 | `container_id:u16 fuel:u16` |
+| 0x43 | container_fuel | 6 | `container_id:u16 fuel:u16` |
 | 0x45 | mine_detonate | var | `count:u8 positions:[(x:u8,y:u8)]` |
 | 0x46 | radar_ack | 4 | `ack:u8 status:u8` |
 | 0x47 | movement | 17-37 | `tank_id:u16 x:u8 y:u8 dir:u8 flag:u8 fuel:u24 waypoints:str` |
@@ -79,6 +101,26 @@ XOR encoding with per-session magic keys makes byte-based message identification
 | 0x64 | fuel_deposit | 4 | `amount:u16` |
 | 0x67 | equip_gain | 8 | `type:u8 armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` |
 | 0x74 | equip_toggle | 7 | `armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` (0=OFF,1=ON) |
+
+## 0x2E Container Subtypes (container_decoder.py)
+
+Container messages (0x2E) wrap various subtypes. After XOR decode, identified by length and first byte:
+
+| Length | First Byte | Name | Format |
+|--------|------------|------|--------|
+| 2-3 | any | tank_status_sync | `[subtype:1] [sync_data:1-2]` |
+| 4 | any | player_list_short | `[subtype:1] [response_data:3]` |
+| 5 | 0x41 | deactivation_kill | `[0x41:1] [victim_id:2 LE] [killer_id:2 LE]` |
+| 6 | any | tank_leave | `[subtype:1] [flags:1] [tank_id:2 LE] [extra:2]` |
+| 7 | 0x43 | deactivation_death | `[0x43:1] [flags:1] [killer_id:2 LE] [extra:3]` |
+| 7 | other | player_list_extended | `[subtype:1] [response_data:3] [extended_data:3]` |
+| 9 | any | tank_status_short | `[subtype:1] [tank_id:2 LE] [damage:1] [rank:1] [flag:1] [lb_pos:2 LE]` |
+| 10 | any | tank_update_compact | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]` |
+| 11 | any | combat_hit | `[subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:7]` |
+| 13 | any | position_update | `[subtype:1] [flags:1] [tank_id:2 LE] [status_bytes:9]` |
+| 14 | any | tank_update_extended | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]` |
+| 15 | any | tank_update_full | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]` |
+| 16-20 | any | tank_registry | `[subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]` |
 
 ---
 
@@ -223,6 +265,37 @@ Response to pressing `/` key. Shows active players in room.
 **Example:**
 - `79990507` (4 bytes) → single player response
 - `79990507ce1144` (7 bytes) → multiple players response
+
+### 0x2E Deactivation Kill (5 bytes)
+
+Sent when you deactivate (kill) another tank. Decoded in `container_decoder.py`.
+
+```
+[0]    u8    subtype (0x41 'A' after XOR decode)
+[1-2]  u16   victim_id (LE) - tank that was killed
+[3-4]  u16   killer_id (LE) - your tank ID
+```
+
+**Trigger:** You deal the killing blow to another tank.
+
+**Example:**
+- `41bb629c0e` → victim_id=25275, killer_id=3740 (you killed tank 25275)
+
+### 0x2E Deactivation Death (7 bytes)
+
+Sent when you are deactivated (killed) by another tank. Decoded in `container_decoder.py`.
+
+```
+[0]    u8    subtype (0x43 'C' after XOR decode)
+[1]    u8    flags
+[2-3]  u16   killer_id (LE) - tank that killed you
+[4-6]  bytes extra_data (3 bytes of additional info)
+```
+
+**Trigger:** Another tank deals the killing blow to you.
+
+**Example:**
+- `430786160c7f1f` → killer_id=5639, you were killed by tank 5639
 
 ### 0x3E Tank Status (from JS client analysis)
 
