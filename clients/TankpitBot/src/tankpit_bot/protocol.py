@@ -2,12 +2,20 @@
 
 Based on analysis of tpclient JS handlers.
 All messages use XOR encoding with session-specific table.
+
+Container messages (0x2E) use structure-based decoding via container_decoder.py
+since XOR subtype bytes vary per session.
 """
 
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TypedDict
+from typing import Literal, TypedDict
+
+from tankpit_bot.container_decoder import (
+    ContainerMessage,
+    decode_container_message,
+)
 
 
 class Rank(IntEnum):
@@ -209,6 +217,7 @@ class JoinConfirmDict(TypedDict):
     Format: =<team>|<join_date>|<name>|<rank>|<eq1>|<eq2>|<eq3>|<eq4>
     """
 
+    msg_type: Literal[0x3D]
     team: int
     join_date: str
     name: str
@@ -233,6 +242,7 @@ def decode_join_confirm(data: bytes) -> JoinConfirmDict:
     parts = text[1:].split("|")
     _require_parts(parts, 4, "JoinConfirm")
     return JoinConfirmDict(
+        msg_type=0x3D,
         team=int(parts[0]),
         join_date=parts[1],
         name=parts[2],
@@ -247,6 +257,7 @@ class WorldInfoDict(TypedDict):
     Format: +<id>|<name>|<field>|<flags>|<team>|<mode>|<image>|<year>
     """
 
+    msg_type: Literal[0x2B]
     world_id: int
     name: str
     field_id: int
@@ -275,6 +286,7 @@ def decode_world_info(data: bytes) -> WorldInfoDict:
     _require_parts(parts, 8, "WorldInfo")
     flags_str = parts[3].split(",")
     return WorldInfoDict(
+        msg_type=0x2B,
         world_id=int(parts[0]),
         name=parts[1],
         field_id=int(parts[2]),
@@ -289,6 +301,7 @@ def decode_world_info(data: bytes) -> WorldInfoDict:
 class ShootEventDict(TypedDict):
     """Shooting/hit event (S message)."""
 
+    msg_type: Literal[0x53]
     shooter_id: int
     target_x: int
     target_y: int
@@ -314,6 +327,7 @@ def decode_shoot_event(data: bytes) -> ShootEventDict:
     """
     _require_min_length(data, 12, "ShootEvent")
     return ShootEventDict(
+        msg_type=0x53,
         shooter_id=_x16(data[0], data[1]),
         target_x=data[2],
         target_y=data[3],
@@ -329,6 +343,7 @@ def decode_shoot_event(data: bytes) -> ShootEventDict:
 class HitConfirmationDict(TypedDict):
     """Fire confirmation (0x2E len=12, subtype 0x7E)."""
 
+    msg_type: Literal[0x2E]
     target_y: int
     target_x: int
 
@@ -355,6 +370,7 @@ def decode_hit_confirmation(data: bytes, xor_table: bytes) -> HitConfirmationDic
         decoded[i] = data[i + 1] ^ xor_table[i]
 
     return HitConfirmationDict(
+        msg_type=0x2E,
         target_y=decoded[5],
         target_x=decoded[6],
     )
@@ -363,6 +379,7 @@ def decode_hit_confirmation(data: bytes, xor_table: bytes) -> HitConfirmationDic
 class DeactivationDict(TypedDict):
     """Kill/deactivation event (0x41 'A' message)."""
 
+    msg_type: Literal[0x41]
     victim_id: int
     killer_id: int
     rank: int
@@ -383,6 +400,7 @@ def decode_deactivation(data: bytes) -> DeactivationDict:
     """
     _require_min_length(data, 5, "Deactivation")
     return DeactivationDict(
+        msg_type=0x41,
         victim_id=_x16(data[0], data[1]),
         killer_id=_x16(data[2], data[3]),
         rank=data[4],
@@ -393,6 +411,7 @@ def decode_deactivation(data: bytes) -> DeactivationDict:
 class FuelGainDict(TypedDict):
     """Fuel gain event (D message)."""
 
+    msg_type: Literal[0x44]
     amount: int
     is_free: bool
 
@@ -411,6 +430,7 @@ def decode_fuel_gain(data: bytes) -> FuelGainDict:
     """
     _require_min_length(data, 3, "FuelGain")
     return FuelGainDict(
+        msg_type=0x44,
         amount=_x16(data[0], data[1]),
         is_free=data[2] == 0,
     )
@@ -419,6 +439,7 @@ def decode_fuel_gain(data: bytes) -> FuelGainDict:
 class FuelDepositDict(TypedDict):
     """Fuel deposit event (d message)."""
 
+    msg_type: Literal[0x64]
     amount: int
 
 
@@ -435,12 +456,13 @@ def decode_fuel_deposit(data: bytes) -> FuelDepositDict:
         DecodeError: If decoding fails.
     """
     _require_min_length(data, 2, "FuelDeposit")
-    return FuelDepositDict(amount=_x16(data[0], data[1]))
+    return FuelDepositDict(msg_type=0x64, amount=_x16(data[0], data[1]))
 
 
 class RadarResultDict(TypedDict):
     """Radar scan result (F message)."""
 
+    msg_type: Literal[0x46]
     detection_type: int
     found: bool
 
@@ -459,6 +481,7 @@ def decode_radar_result(data: bytes) -> RadarResultDict:
     """
     _require_min_length(data, 2, "RadarResult")
     return RadarResultDict(
+        msg_type=0x46,
         detection_type=data[0],
         found=data[1] == 1,
     )
@@ -467,6 +490,7 @@ def decode_radar_result(data: bytes) -> RadarResultDict:
 class EnemyDetectionDict(TypedDict):
     """Enemy detection (H message)."""
 
+    msg_type: Literal[0x48]
     tank_id: int
     x: int
     y: int
@@ -488,6 +512,7 @@ def decode_enemy_detection(data: bytes) -> EnemyDetectionDict:
     """
     _require_min_length(data, 6, "EnemyDetection")
     return EnemyDetectionDict(
+        msg_type=0x48,
         tank_id=_x16(data[0], data[1]),
         x=data[2],
         y=data[3],
@@ -499,6 +524,7 @@ def decode_enemy_detection(data: bytes) -> EnemyDetectionDict:
 class InventoryDict(TypedDict):
     """Inventory display (I message)."""
 
+    msg_type: Literal[0x49]
     show: bool
     alternate: bool
     counts: list[int]
@@ -525,6 +551,7 @@ def decode_inventory(data: bytes) -> InventoryDict:
         counts.append(byte & 127)
         enabled.append((byte & 128) == 0)
     return InventoryDict(
+        msg_type=0x49,
         show=data[0] == 1,
         alternate=data[0] == 2,
         counts=counts,
@@ -535,6 +562,7 @@ def decode_inventory(data: bytes) -> InventoryDict:
 class EquipmentGainDict(TypedDict):
     """Equipment gain (g message)."""
 
+    msg_type: Literal[0x67]
     show_message: bool
     gained: list[int]
 
@@ -553,6 +581,7 @@ def decode_equipment_gain(data: bytes) -> EquipmentGainDict:
     """
     _require_min_length(data, 6, "EquipmentGain")
     return EquipmentGainDict(
+        msg_type=0x67,
         show_message=data[0] == 1,
         gained=[data[i + 1] for i in range(5)],
     )
@@ -561,6 +590,7 @@ def decode_equipment_gain(data: bytes) -> EquipmentGainDict:
 class EquipmentToggleDict(TypedDict):
     """Equipment toggle (t message)."""
 
+    msg_type: Literal[0x74]
     enabled: list[bool]
 
 
@@ -577,12 +607,13 @@ def decode_equipment_toggle(data: bytes) -> EquipmentToggleDict:
         DecodeError: If decoding fails.
     """
     _require_min_length(data, 5, "EquipmentToggle")
-    return EquipmentToggleDict(enabled=[data[i] == 1 for i in range(5)])
+    return EquipmentToggleDict(msg_type=0x74, enabled=[data[i] == 1 for i in range(5)])
 
 
 class MinePlacementDict(TypedDict):
     """Mine placement (K message)."""
 
+    msg_type: Literal[0x4B]
     mine_type: int
     tank_id: int
     positions: list[tuple[int, int]]
@@ -611,12 +642,15 @@ def decode_mine_placement(data: bytes) -> MinePlacementDict:
             break
         positions.append((data[idx], data[idx + 1]))
         idx += 2
-    return MinePlacementDict(mine_type=mine_type, tank_id=tank_id, positions=positions)
+    return MinePlacementDict(
+        msg_type=0x4B, mine_type=mine_type, tank_id=tank_id, positions=positions
+    )
 
 
 class MineDetonationDict(TypedDict):
     """Mine detonation (E message)."""
 
+    msg_type: Literal[0x45]
     positions: list[tuple[int, int]]
 
 
@@ -632,12 +666,13 @@ def decode_mine_detonation(data: bytes) -> MineDetonationDict:
     positions: list[tuple[int, int]] = []
     for i in range(0, len(data) - 1, 2):
         positions.append((data[i], data[i + 1]))
-    return MineDetonationDict(positions=positions)
+    return MineDetonationDict(msg_type=0x45, positions=positions)
 
 
 class RadarScanResultDict(TypedDict):
     """Radar scan result (0x4F 'O' message)."""
 
+    msg_type: Literal[0x4F]
     entities: list[tuple[int, int, int]]
 
 
@@ -667,12 +702,13 @@ def decode_radar_scan_result(data: bytes) -> RadarScanResultDict:
             val -= 0x10000
         entities.append((x, y, val))
         idx += 4
-    return RadarScanResultDict(entities=entities)
+    return RadarScanResultDict(msg_type=0x4F, entities=entities)
 
 
 class MovementDict(TypedDict):
     """Movement path (0x47 'G' message)."""
 
+    msg_type: Literal[0x47]
     tank_id: int
     start_x: int
     start_y: int
@@ -696,6 +732,7 @@ def decode_movement(data: bytes) -> MovementDict:
     """
     _require_min_length(data, 9, "Movement")
     return MovementDict(
+        msg_type=0x47,
         tank_id=_x16(data[0], data[1]),
         start_x=data[2],
         start_y=data[3],
@@ -713,6 +750,7 @@ class TankInfoDict(TypedDict):
     Use 0x3E TankStatus for own rank, or 0x2E short for other tanks.
     """
 
+    msg_type: Literal[0x21]
     tank_id: int
     team: int
     decoration_state: bytes
@@ -739,6 +777,7 @@ def decode_tank_info(data: bytes) -> TankInfoDict:
     score = 256 * (256 * data[7] + data[8]) + data[9] if len(data) >= 10 else 0
     name = data[10:].decode("utf-8", errors="replace") if len(data) > 10 else ""
     return TankInfoDict(
+        msg_type=0x21,
         tank_id=tank_id,
         team=team,
         decoration_state=decoration_state,
@@ -750,6 +789,7 @@ def decode_tank_info(data: bytes) -> TankInfoDict:
 class MovementResponseDict(TypedDict):
     """Movement response (0x3D '=' binary message)."""
 
+    msg_type: Literal[0x3D]
     team: int
     tank_id: int
     x: int
@@ -773,6 +813,7 @@ def decode_movement_response(data: bytes) -> MovementResponseDict:
     """
     _require_min_length(data, 11, "MovementResponse")
     return MovementResponseDict(
+        msg_type=0x3D,
         team=data[0],
         tank_id=_x16(data[1], data[2]),
         x=data[3],
@@ -786,7 +827,7 @@ def decode_movement_response(data: bytes) -> MovementResponseDict:
 class SyncDict(TypedDict):
     """Sync/heartbeat (0x3F '?' message)."""
 
-    pass
+    msg_type: Literal[0x3F]
 
 
 def decode_sync(data: bytes) -> SyncDict:
@@ -798,12 +839,13 @@ def decode_sync(data: bytes) -> SyncDict:
     Returns:
         Empty sync dict.
     """
-    return SyncDict()
+    return SyncDict(msg_type=0x3F)
 
 
 class ContainerDict(TypedDict):
     """Container fuel update (0x43 'C' message)."""
 
+    msg_type: Literal[0x43]
     container_id: int
     fuel: int
 
@@ -822,6 +864,7 @@ def decode_container(data: bytes) -> ContainerDict:
     """
     _require_min_length(data, 4, "Container")
     return ContainerDict(
+        msg_type=0x43,
         container_id=_x16(data[0], data[1]),
         fuel=_x16(data[2], data[3]),
     )
@@ -830,6 +873,7 @@ def decode_container(data: bytes) -> ContainerDict:
 class TankEntryDict(TypedDict):
     """Tank entry (( message)."""
 
+    msg_type: Literal[0x28]
     tank_id: int
     x: int
     y: int
@@ -853,12 +897,13 @@ def decode_tank_entry(data: bytes) -> TankEntryDict:
     x = _x16(data[1], data[2])
     y = data[3]
     name = data[10:].decode("utf-8", errors="replace") if len(data) > 10 else ""
-    return TankEntryDict(tank_id=tank_id, x=x, y=y, name=name)
+    return TankEntryDict(msg_type=0x28, tank_id=tank_id, x=x, y=y, name=name)
 
 
 class TankExitDict(TypedDict):
     """Tank exit (0x58 'X' message)."""
 
+    msg_type: Literal[0x58]
     tank_id: int
 
 
@@ -875,13 +920,13 @@ def decode_tank_exit(data: bytes) -> TankExitDict:
         DecodeError: If decoding fails.
     """
     _require_min_length(data, 2, "TankExit")
-    return TankExitDict(tank_id=_x16(data[0], data[1]))
+    return TankExitDict(msg_type=0x58, tank_id=_x16(data[0], data[1]))
 
 
 class ActionDoneDict(TypedDict):
     """Action completion marker (0x54 'T' message)."""
 
-    pass
+    msg_type: Literal[0x54]
 
 
 def decode_action_done(data: bytes) -> ActionDoneDict:
@@ -893,12 +938,13 @@ def decode_action_done(data: bytes) -> ActionDoneDict:
     Returns:
         Empty action done dict.
     """
-    return ActionDoneDict()
+    return ActionDoneDict(msg_type=0x54)
 
 
 class ChatMessageDict(TypedDict):
     """Chat message (M message)."""
 
+    msg_type: Literal[0x4D]
     sender_id: int
     message_type: int
     x: int | None
@@ -919,6 +965,7 @@ def decode_chat_message(data: bytes) -> ChatMessageDict:
     """
     _require_min_length(data, 3, "ChatMessage")
     return ChatMessageDict(
+        msg_type=0x4D,
         sender_id=_x16(data[0], data[1]),
         message_type=data[2],
         x=data[3] if len(data) > 3 else None,
@@ -929,6 +976,7 @@ def decode_chat_message(data: bytes) -> ChatMessageDict:
 class StatisticsDict(TypedDict):
     """Statistics display (V message)."""
 
+    msg_type: Literal[0x56]
     playtime_hours: int
     playtime_minutes: int
     playtime_seconds: int
@@ -951,6 +999,7 @@ def decode_statistics(data: bytes) -> StatisticsDict:
     """
     _require_min_length(data, 16, "Statistics")
     return StatisticsDict(
+        msg_type=0x56,
         playtime_hours=_x16(data[0], data[1]),
         playtime_minutes=data[2],
         playtime_seconds=data[3],
@@ -963,6 +1012,7 @@ def decode_statistics(data: bytes) -> StatisticsDict:
 class ActiveForcesDict(TypedDict):
     """Active forces count (* message)."""
 
+    msg_type: Literal[0x2A]
     team_counts: list[int]
 
 
@@ -979,7 +1029,7 @@ def decode_active_forces(data: bytes) -> ActiveForcesDict:
         DecodeError: If decoding fails.
     """
     _require_min_length(data, 4, "ActiveForces")
-    return ActiveForcesDict(team_counts=[data[i] for i in range(4)])
+    return ActiveForcesDict(msg_type=0x2A, team_counts=[data[i] for i in range(4)])
 
 
 class TankStatusSyncDict(TypedDict):
@@ -990,6 +1040,7 @@ class TankStatusSyncDict(TypedDict):
     The damage_state controls how dark the enemy tank name appears.
     """
 
+    msg_type: Literal[0x2E]
     subtype: int
     tank_id: int
     damage_state: int
@@ -1026,6 +1077,7 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
         fuel = None
 
     return TankStatusSyncDict(
+        msg_type=0x2E,
         subtype=subtype,
         tank_id=tank_id,
         damage_state=damage_state,
@@ -1036,9 +1088,29 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
     )
 
 
+def decode_0x2e_message(data: bytes) -> ContainerMessage:
+    """Decode 0x2E container message using structure-based matching.
+
+    Uses container_decoder module which identifies messages by STRUCTURE
+    (length, field positions) rather than subtype bytes, since XOR encoding
+    with session-specific magic keys causes subtype values to vary.
+
+    Args:
+        data: XOR-decoded message body (without 0x2E prefix).
+
+    Returns:
+        Decoded container message as appropriate TypedDict.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    return decode_container_message(data)
+
+
 class TankStatusDict(TypedDict):
     """Full tank status (0x3E '>' message)."""
 
+    msg_type: Literal[0x3E]
     team: int
     rank: int
     tank_id: int
@@ -1070,6 +1142,7 @@ def decode_tank_status(data: bytes) -> TankStatusDict:
     lb_pos = 256 * (256 * data[10] + data[11]) + data[12] if len(data) >= 13 else 0
     name = data[13:].decode("utf-8", errors="replace") if len(data) > 13 else ""
     return TankStatusDict(
+        msg_type=0x3E,
         team=team,
         rank=rank,
         tank_id=tank_id,
@@ -1089,6 +1162,7 @@ SUPERVISOR_STATUS_TEXT_FOLLOWS = 128
 class SupervisorDict(TypedDict):
     """Supervisor/promotion eligibility message (0x52 'R' message)."""
 
+    msg_type: Literal[0x52]
     status: int
     reserved: int
     data: int
@@ -1108,6 +1182,7 @@ def decode_supervisor(data: bytes) -> SupervisorDict:
     """
     _require_min_length(data, 3, "Supervisor")
     return SupervisorDict(
+        msg_type=0x52,
         status=data[0],
         reserved=data[1],
         data=data[2],
@@ -1141,6 +1216,7 @@ def supervisor_has_promo_kill(supervisor: SupervisorDict) -> bool:
 class TerrainUpdateDict(TypedDict):
     """Terrain type update (0x4A 'J' message)."""
 
+    msg_type: Literal[0x4A]
     updates: list[tuple[int, int, int]]
 
 
@@ -1159,7 +1235,7 @@ def decode_terrain_update(data: bytes) -> TerrainUpdateDict:
         y = data[i + 1]
         terrain_type = data[i + 2]
         updates.append((x, y, terrain_type))
-    return TerrainUpdateDict(updates=updates)
+    return TerrainUpdateDict(msg_type=0x4A, updates=updates)
 
 
 class ViewportEntityDict(TypedDict):
@@ -1211,6 +1287,7 @@ def viewport_entity_is_empty(entity: ViewportEntityDict) -> bool:
 class ViewportUpdateDict(TypedDict):
     """Viewport/map update (0x5A 'Z' message)."""
 
+    msg_type: Literal[0x5A]
     direction: int
     flags: int
     entities: list[ViewportEntityDict]
@@ -1273,7 +1350,7 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
                 )
             )
 
-    return ViewportUpdateDict(direction=direction, flags=flags, entities=entities)
+    return ViewportUpdateDict(msg_type=0x5A, direction=direction, flags=flags, entities=entities)
 
 
 # Text message types (no XOR encoding)
@@ -1304,11 +1381,13 @@ def is_text_message(msg_type: int) -> bool:
     return msg_type in TEXT_MSG_TYPES
 
 
-# Union type for all decoded messages
-DecodedMessage = (
-    JoinConfirmDict
-    | WorldInfoDict
-    | ShootEventDict
+# Text message types (no XOR decoding, ASCII format)
+TextMessage = JoinConfirmDict | WorldInfoDict
+
+# Binary message types (XOR decoded)
+# Note: Container types (CombatHitDict, etc.) are imported from container_decoder
+BinaryMessage = (
+    ShootEventDict
     | DeactivationDict
     | FuelGainDict
     | FuelDepositDict
@@ -1336,7 +1415,11 @@ DecodedMessage = (
     | SupervisorDict
     | TerrainUpdateDict
     | ViewportUpdateDict
+    | ContainerMessage  # All container types from container_decoder
 )
+
+# Union type for all decoded messages
+DecodedMessage = TextMessage | BinaryMessage
 
 
 def decode_text_message(raw_body: bytes) -> JoinConfirmDict | WorldInfoDict:
@@ -1358,13 +1441,161 @@ def decode_text_message(raw_body: bytes) -> JoinConfirmDict | WorldInfoDict:
 
     if msg_type == MSG_TANK_POS:
         return decode_join_confirm(raw_body)
-    elif msg_type == MSG_PROMOTION:
+    if msg_type == MSG_PROMOTION:
         return decode_world_info(raw_body)
 
     raise DecodeError(f"decode_text_message: unknown type 0x{msg_type:02X}")
 
 
-def decode_message(msg_type: int, data: bytes) -> DecodedMessage:
+def _decode_combat_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode combat-related messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a combat message.
+    """
+    if msg_type == MSG_SHOOT:
+        return decode_shoot_event(data)
+    if msg_type == MSG_DEACTIVATE:
+        return decode_deactivation(data)
+    if msg_type == MSG_MINE_PLACE:
+        return decode_mine_placement(data)
+    if msg_type == MSG_MINE_DETONATE:
+        return decode_mine_detonation(data)
+    return None
+
+
+def _decode_resource_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode resource-related messages (fuel, equipment).
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a resource message.
+    """
+    if msg_type == MSG_FUEL_GAIN:
+        return decode_fuel_gain(data)
+    if msg_type == MSG_FUEL_DEPOSIT:
+        return decode_fuel_deposit(data)
+    if msg_type == MSG_INVENTORY:
+        return decode_inventory(data)
+    if msg_type == MSG_EQUIP_GAIN:
+        return decode_equipment_gain(data)
+    if msg_type == MSG_EQUIP_TOGGLE:
+        return decode_equipment_toggle(data)
+    return None
+
+
+def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode radar and detection messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a radar message.
+    """
+    if msg_type == MSG_RADAR_RESULT:
+        return decode_radar_result(data)
+    if msg_type == MSG_ENEMY_DETECT:
+        return decode_enemy_detection(data)
+    if msg_type == MSG_TILE_UPDATE:
+        return decode_radar_scan_result(data)
+    return None
+
+
+def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode tank status and info messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a tank message.
+    """
+    if msg_type == MSG_TANK_ENTRY:
+        return decode_tank_entry(data)
+    if msg_type == MSG_TANK_EXIT:
+        return decode_tank_exit(data)
+    if msg_type == MSG_TANK_STATS:
+        # Container decoder handles all structures including unknown
+        return decode_0x2e_message(data)
+    if msg_type == MSG_TANK_STATUS_FULL:
+        return decode_tank_status(data)
+    if msg_type == MSG_TANK_INFO:
+        return decode_tank_info(data)
+    return None
+
+
+def _decode_movement_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode movement-related messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a movement message.
+    """
+    if msg_type == MSG_MOVEMENT:
+        return decode_movement(data)
+    if msg_type == MSG_MOVE_RESPONSE:
+        return decode_movement_response(data)
+    return None
+
+
+def _decode_world_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode world/environment messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a world message.
+    """
+    if msg_type == MSG_VIEWPORT:
+        return decode_viewport_update(data)
+    if msg_type == MSG_TERRAIN_UPDATE:
+        return decode_terrain_update(data)
+    if msg_type == MSG_SYNC:
+        return decode_sync(data)
+    if msg_type == MSG_CONTAINER:
+        return decode_container(data)
+    return None
+
+
+def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode miscellaneous messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a misc message.
+    """
+    if msg_type == MSG_CHAT:
+        return decode_chat_message(data)
+    if msg_type == MSG_STATISTICS:
+        return decode_statistics(data)
+    if msg_type == MSG_ACTIVE_FORCES:
+        return decode_active_forces(data)
+    if msg_type == MSG_SUPERVISOR:
+        return decode_supervisor(data)
+    if msg_type == MSG_ACTION_DONE:
+        return decode_action_done(data)
+    return None
+
+
+def decode_message(msg_type: int, data: bytes) -> BinaryMessage:
     """Decode a BINARY message based on its type.
 
     NOTE: For text messages, use decode_text_message() instead.
@@ -1379,64 +1610,94 @@ def decode_message(msg_type: int, data: bytes) -> DecodedMessage:
     Raises:
         DecodeError: If message type is unknown or decoding fails.
     """
-    if msg_type == MSG_SHOOT:
-        return decode_shoot_event(data)
-    elif msg_type == MSG_DEACTIVATE:
-        return decode_deactivation(data)
-    elif msg_type == MSG_FUEL_GAIN:
-        return decode_fuel_gain(data)
-    elif msg_type == MSG_FUEL_DEPOSIT:
-        return decode_fuel_deposit(data)
-    elif msg_type == MSG_RADAR_RESULT:
-        return decode_radar_result(data)
-    elif msg_type == MSG_ENEMY_DETECT:
-        return decode_enemy_detection(data)
-    elif msg_type == MSG_INVENTORY:
-        return decode_inventory(data)
-    elif msg_type == MSG_EQUIP_GAIN:
-        return decode_equipment_gain(data)
-    elif msg_type == MSG_EQUIP_TOGGLE:
-        return decode_equipment_toggle(data)
-    elif msg_type == MSG_MINE_PLACE:
-        return decode_mine_placement(data)
-    elif msg_type == MSG_MINE_DETONATE:
-        return decode_mine_detonation(data)
-    elif msg_type == MSG_TILE_UPDATE:
-        return decode_radar_scan_result(data)
-    elif msg_type == MSG_MOVEMENT:
-        return decode_movement(data)
-    elif msg_type == MSG_TANK_ENTRY:
-        return decode_tank_entry(data)
-    elif msg_type == MSG_TANK_EXIT:
-        return decode_tank_exit(data)
-    elif msg_type == MSG_CHAT:
-        return decode_chat_message(data)
-    elif msg_type == MSG_STATISTICS:
-        return decode_statistics(data)
-    elif msg_type == MSG_ACTIVE_FORCES:
-        return decode_active_forces(data)
-    elif msg_type == MSG_TANK_STATS:
-        return decode_tank_status_sync(data)
-    elif msg_type == MSG_TANK_STATUS_FULL:
-        return decode_tank_status(data)
-    elif msg_type == MSG_SUPERVISOR:
-        return decode_supervisor(data)
-    elif msg_type == MSG_VIEWPORT:
-        return decode_viewport_update(data)
-    elif msg_type == MSG_TERRAIN_UPDATE:
-        return decode_terrain_update(data)
-    elif msg_type == MSG_TANK_INFO:
-        return decode_tank_info(data)
-    elif msg_type == MSG_MOVE_RESPONSE:
-        return decode_movement_response(data)
-    elif msg_type == MSG_SYNC:
-        return decode_sync(data)
-    elif msg_type == MSG_CONTAINER:
-        return decode_container(data)
-    elif msg_type == MSG_ACTION_DONE:
-        return decode_action_done(data)
+    result = _decode_combat_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_resource_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_radar_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_tank_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_movement_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_world_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_misc_message(msg_type, data)
+    if result is not None:
+        return result
 
     raise DecodeError(f"decode_message: unknown type 0x{msg_type:02X}")
+
+
+def try_decode_message(msg_type: int, data: bytes) -> DecodedMessage | None:
+    """Try to decode a message, returning None if unsupported.
+
+    Unlike decode_message(), this does not raise DecodeError for unknown types.
+    Use this when you want to handle unknown types gracefully without exceptions.
+
+    Args:
+        msg_type: First byte of message (NOT XOR encoded).
+        data: Remaining message bytes (XOR decoded).
+
+    Returns:
+        Decoded message object, or None if type is unknown/unsupported.
+    """
+    return try_decode_binary_message(msg_type, data)
+
+
+def try_decode_binary_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Try to decode a BINARY message, returning None if unsupported.
+
+    Same as try_decode_message but with narrower return type for binary-only contexts.
+
+    Args:
+        msg_type: First byte of message (NOT XOR encoded).
+        data: Remaining message bytes (XOR decoded).
+
+    Returns:
+        Decoded binary message, or None if type is unknown/unsupported.
+    """
+    result = _decode_combat_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_resource_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_radar_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_tank_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_movement_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_world_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_misc_message(msg_type, data)
+    if result is not None:
+        return result
+
+    return None
 
 
 # Legacy compatibility - dataclass-style wrappers that delegate to TypedDict decoders
