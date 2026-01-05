@@ -7,9 +7,11 @@ No conditionals needed - just call the hook directly.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from covenant_persistence import ConnectionProtocol
+from platform_core.data_bank_client import DataBankClient, HeadInfo
 from platform_workers.redis import RedisStrProto, redis_for_kv
 from platform_workers.rq_harness import (
     RQClientQueue,
@@ -94,6 +96,81 @@ def _psycopg_connect_autocommit(dsn: str) -> ConnectionProtocol:
     return conn
 
 
+# =============================================================================
+# Data Bank Downloader Hook
+# =============================================================================
+
+
+class DataBankDownloaderProtocol(Protocol):
+    """Protocol for data-bank file downloader interface.
+
+    Defines the methods needed for downloading models from data-bank-api.
+    Tests inject fakes that implement this protocol.
+    """
+
+    def download_to_path(
+        self,
+        file_id: str,
+        dest: Path,
+        *,
+        resume: bool = True,
+        request_id: str | None = None,
+        verify_etag: bool = True,
+        chunk_size: int = 1024 * 1024,
+    ) -> HeadInfo:
+        """Download file to local path.
+
+        Args:
+            file_id: ID of file in data-bank.
+            dest: Destination path for downloaded file.
+            resume: Resume partial download if dest exists.
+            request_id: Optional correlation ID.
+            verify_etag: Verify SHA256 hash matches ETag.
+            chunk_size: Chunk size for streaming download.
+
+        Returns:
+            HeadInfo with size, etag, and content_type.
+
+        Raises:
+            NotFoundError: If file_id does not exist.
+            DataBankClientError: On transport or validation errors.
+        """
+        ...
+
+
+class DataBankDownloaderFactoryProtocol(Protocol):
+    """Protocol for data-bank downloader factory function.
+
+    Creates downloader instances from URL and API key.
+    """
+
+    def __call__(self, base_url: str, api_key: str) -> DataBankDownloaderProtocol:
+        """Create data-bank downloader instance.
+
+        Args:
+            base_url: Base URL for data-bank-api.
+            api_key: API key for authentication.
+
+        Returns:
+            Downloader instance implementing DataBankDownloaderProtocol.
+        """
+        ...
+
+
+def _default_data_bank_client_factory(base_url: str, api_key: str) -> DataBankDownloaderProtocol:
+    """Production data-bank client factory.
+
+    Args:
+        base_url: Base URL for data-bank-api.
+        api_key: API key for authentication.
+
+    Returns:
+        Real DataBankClient instance (from platform_core).
+    """
+    client: DataBankDownloaderProtocol = DataBankClient(base_url, api_key)
+    return client
+
+
 # Factory hooks - initialized to production implementations.
 # Tests replace these with fakes before calling container code.
 # Production defaults call real external services (redis, postgres).
@@ -101,3 +178,4 @@ kv_factory: KvClientFactoryProtocol = redis_for_kv
 connection_factory: ConnectionFactoryProtocol = _psycopg_connect_autocommit
 rq_client_factory: RqClientFactoryProtocol = redis_raw_for_rq
 queue_factory: QueueFactoryProtocol = rq_queue
+data_bank_client_factory: DataBankDownloaderFactoryProtocol = _default_data_bank_client_factory

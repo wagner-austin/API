@@ -718,6 +718,28 @@ def run_external_training(
     return result
 
 
+def _upload_model_to_data_bank(
+    model_path: Path,
+    data_bank_url: str,
+    data_bank_key: str,
+) -> str:
+    """Upload trained model to data-bank-api.
+
+    Uses the data_bank_uploader hook from _test_hooks for dependency injection.
+
+    Args:
+        model_path: Path to the model file.
+        data_bank_url: URL for data-bank-api.
+        data_bank_key: API key for data-bank-api.
+
+    Returns:
+        file_id from data-bank-api.
+    """
+    from covenant_radar_api.worker import _test_hooks as hooks
+
+    return hooks.data_bank_uploader(model_path, data_bank_url, data_bank_key)
+
+
 def process_external_train_job(config_json: str) -> dict[str, JSONValue]:
     """RQ job entry point for external data training.
 
@@ -727,18 +749,48 @@ def process_external_train_job(config_json: str) -> dict[str, JSONValue]:
     Returns:
         Training result with model info and feature importances
     """
+    import tempfile
+
     from covenant_radar_api.core.config import settings_from_env
 
     settings = settings_from_env()
 
+    # Get data-bank config
+    data_bank_url = settings["app"]["data_bank_api_url"]
+    data_bank_key = settings["app"]["data_bank_api_key"]
+    use_data_bank = bool(data_bank_url and data_bank_key)
+
     # Get directories from settings
     data_root = Path(settings["app"]["data_root"])
     external_dir = data_root / "external"
-    output_dir = Path(settings["app"]["models_root"])
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Use temp directory if data-bank is configured, otherwise use models_root
+    if use_data_bank:
+        temp_dir = tempfile.mkdtemp(prefix="covenant_model_")
+        output_dir = Path(temp_dir)
+    else:
+        output_dir = Path(settings["app"]["models_root"])
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    return run_external_training(config_json, external_dir, output_dir)
+    result = run_external_training(config_json, external_dir, output_dir)
+
+    # Upload to data-bank if configured
+    if use_data_bank:
+        model_path_str = result.get("active_model_path")
+        if isinstance(model_path_str, str):
+            model_path = Path(model_path_str)
+            if model_path.exists():
+                file_id = _upload_model_to_data_bank(
+                    model_path,
+                    data_bank_url,
+                    data_bank_key,
+                )
+                result["model_file_id"] = file_id
+
+        # Clean up temp directory
+        shutil.rmtree(output_dir, ignore_errors=True)
+
+    return result
 
 
 __all__ = ["process_external_train_job", "run_external_training"]

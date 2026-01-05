@@ -27,6 +27,7 @@ WORKDIR /workspace
 COPY ${APP_DIR}/pyproject.toml ${APP_DIR}/poetry.lock ${APP_DIR}/README.md ./services/covenant-radar-api/
 COPY ${APP_DIR}/src ./services/covenant-radar-api/src
 COPY ${APP_DIR}/scripts ./services/covenant-radar-api/scripts
+COPY ${APP_DIR}/data/external ./services/covenant-radar-api/data/external
 COPY libs ./libs
 
 WORKDIR /workspace/services/covenant-radar-api
@@ -56,16 +57,19 @@ RUN pip install /workspace/dist/*.whl \
 
 WORKDIR /app
 
+COPY --from=builder /workspace/services/covenant-radar-api/data/external /app/data/external
+RUN chown -R app:app /app/data
+
 USER app
-
-# ---------- API target ----------
-FROM runtime-base AS api
-
-EXPOSE 8000
-
-CMD ["sh", "-c", "exec hypercorn 'covenant_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
 
 # ---------- Worker target ----------
 FROM runtime-base AS worker
 
 CMD ["sh", "-c", "exec covenant-rq-worker"]
+
+# ---------- API target (default) ----------
+FROM runtime-base AS api
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "exec hypercorn 'covenant_radar_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]

@@ -284,6 +284,47 @@ class TestRealGeminiClientEmptyResponse:
             client.generate_content("gemini-2.0-flash", "test")
 
 
+class TestRealGeminiClientCountTokensWithFake:
+    """Tests for RealGeminiClient.count_tokens using fake inner client."""
+
+    def test_count_tokens_returns_token_tuple(self) -> None:
+        """Test that count_tokens returns (input_tokens, 0) tuple."""
+        from covenant_radar_api.integrations.google_ai._test_hooks import (
+            RealGeminiClient,
+        )
+
+        class FakeCountTokensResponse:
+            @property
+            def total_tokens(self) -> int:
+                return 42
+
+        class FakeGenerateResponse:
+            @property
+            def text(self) -> str:
+                return "unused"
+
+        class FakeModels:
+            def generate_content(self, model: str, contents: str) -> FakeGenerateResponse:
+                raise AssertionError("Should not be called")
+
+            def count_tokens(self, model: str, contents: str) -> FakeCountTokensResponse:
+                return FakeCountTokensResponse()
+
+        class FakeInnerClient:
+            @property
+            def models(self) -> FakeModels:
+                return FakeModels()
+
+        client = RealGeminiClient("dummy-api-key-for-test")
+        client._client = FakeInnerClient()
+
+        result = client.count_tokens("gemini-2.0-flash", "test content")
+
+        assert result == (42, 0)
+        assert result[0] == 42  # Input tokens
+        assert result[1] == 0  # Output tokens always 0
+
+
 class TestRealGeminiClient:
     """Tests for RealGeminiClient instantiation (no API calls)."""
 

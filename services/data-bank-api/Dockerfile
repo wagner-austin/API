@@ -41,8 +41,6 @@ ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     DATA_ROOT=/data/files
 
-RUN addgroup --system app && adduser --system --home /home/app --ingroup app app
-
 WORKDIR /workspace
 
 COPY --from=builder /workspace/services/data-bank-api/dist/*.whl /workspace/dist/
@@ -52,16 +50,14 @@ RUN pip install /workspace/dist/*.whl /workspace/libs/platform_core /workspace/l
 
 WORKDIR /app
 
-USER app
+# ---------- Worker target ----------
+FROM runtime-base AS worker
 
-# ---------- API target ----------
+CMD ["sh", "-c", "exec databank-rq-worker"]
+
+# ---------- API target (default) ----------
 FROM runtime-base AS api
 
 EXPOSE 8000
 
 CMD ["sh", "-c", "exec hypercorn 'data_bank_api.api.main:create_app()' --bind [::]:${PORT:-8000}"]
-
-# ---------- Worker target ----------
-FROM runtime-base AS worker
-
-CMD ["sh", "-c", "exec databank-rq-worker"]
