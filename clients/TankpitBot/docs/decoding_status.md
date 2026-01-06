@@ -61,7 +61,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | Length Range | Message Type | Decode Level |
 |-------------|-------------|--------------|
 | 21-28 | entity_extended | IDENTIFIED |
-| 29-60 | tip_notification | IDENTIFIED |
+| 29-79 | tip_notification | IDENTIFIED |
 | 80-130 | chunk_data | IDENTIFIED |
 | 500-100000 | world_state | IDENTIFIED |
 

@@ -846,8 +846,11 @@ class TestIdentifyByLength:
 
     def test_unknown_length_returns_none(self) -> None:
         """Test unrecognized lengths return None."""
-        # Gaps in the length patterns (4 is player_ack, 29-60 is tip_notification)
-        unknown_lengths = [8, 12, 61, 79, 131, 200, 400]
+        # Gaps in the length patterns (4 is player_ack, 29-79 is tip_notification)
+        # 8 is between action_ack(7) and tank_status_short(9)
+        # 12 is between combat_hit(11) and position_update(13)
+        # 131-499 is between chunk_data(80-130) and world_state(500+)
+        unknown_lengths = [8, 12, 131, 200, 400]
         for length in unknown_lengths:
             result = _identify_by_length(bytes(length))
             assert result is None, f"Expected None for length {length}, got {result}"
@@ -2864,3 +2867,1451 @@ class TestBuildSessionSummary:
         )
         result = _build_session_summary(session)
         assert len(result["combat"]) == 0
+
+
+# =============================================================================
+# PositionTracker Edge Case Tests
+# =============================================================================
+
+
+class TestPositionTrackerEdgeCases:
+    """Tests for PositionTracker edge cases and uncovered branches."""
+
+    def test_load_static_key_returns_cached_value(self, fake_fs: FakeFileSystem) -> None:
+        """Test _load_static_key returns cached value on second call."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "CACHED_TEST" + "A" * 989
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+
+        # First call loads from file
+        result1 = tracker._load_static_key()
+        assert result1 == static_key
+
+        # Change file content
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "DIFFERENT" + "A" * 991)
+
+        # Second call returns cached value
+        result2 = tracker._load_static_key()
+        assert result2 == static_key  # Still the original
+
+    def test_load_static_key_returns_none_when_file_missing(self) -> None:
+        """Test _load_static_key returns None when file doesn't exist."""
+        # Use empty fake filesystem (no static key file)
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = PositionTracker()
+        result = tracker._load_static_key()
+        assert result is None
+
+    def test_set_magic_returns_early_when_no_static_key(self) -> None:
+        """Test set_magic returns early when static key file is missing."""
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+        # Should not have set xor_table since static key is missing
+        assert tracker._xor_table is None
+
+    def test_decode_position_returns_none_for_short_body(self, fake_fs: FakeFileSystem) -> None:
+        """Test decode_position returns None when body < 6 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+
+        # Body with < 6 bytes
+        result = tracker.decode_position(b"\x2e\x01\x02\x03")
+        assert result is None
+
+    def test_decode_position_returns_none_for_wrong_prefix(self, fake_fs: FakeFileSystem) -> None:
+        """Test decode_position returns None when body doesn't start with 0x2E."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+
+        # Body that doesn't start with 0x2E
+        body = b"\x21" + bytes(18)  # 19 bytes but wrong prefix
+        result = tracker.decode_position(body)
+        assert result is None
+
+    def test_decode_position_returns_none_for_coords_over_255(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """Test decode_position returns None when decoded coords > 255."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        # Build a static key where XOR produces coords > 255
+        # If body[4] XOR table[3] > 255, that's impossible with 8-bit XOR
+        # So we need the XOR to produce a result that triggers validation
+        # Actually, since XOR of two 8-bit values is 8-bit, this can't exceed 255
+        # The check "if x > 255 or y > 255" is dead code - but we can still test it
+        # by setting _xor_table to short length (< 5 bytes)
+        static_key = "ABC"  # Only 3 bytes
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("t")
+
+        # With only 3-byte table, len(self._xor_table) < 5 check will fail
+        body = b"\x2e" + bytes(18)
+        result = tracker.decode_position(body)
+        assert result is None  # Returns None due to short xor_table
+
+    def test_process_message_returns_none_for_invalid_base64(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None for invalid base64."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+
+        result = tracker.process_message("!!!invalid-base64!!!")
+        assert result is None
+
+    def test_process_message_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None when decoded data < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+
+        # Only 3 bytes of data (too short)
+        payload = base64.b64encode(b"\x01\x00\x2e").decode()
+        result = tracker.process_message(payload)
+        assert result is None
+
+    def test_process_message_returns_none_for_wrong_body_length(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """Test process_message returns None when body not 17-21 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("testmagic")
+
+        # Body of 10 bytes (not 17-21) - not blocked (not 5 bytes) and not movement
+        body = b"\x2e" + bytes(9)  # 10 byte body
+        payload = _make_payload(body)
+        result = tracker.process_message(payload)
+        assert result is None
+
+    def test_process_message_returns_none_when_decode_fails(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None when decode_position returns None."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+        # Use short static key so decode_position fails
+        static_key = "ABC"  # Only 3 bytes
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = PositionTracker()
+        tracker.set_magic("t")
+
+        # Valid 17-byte body but will fail decode due to short xor_table
+        body = b"\x2e" + bytes(16)  # 17 bytes
+        payload = _make_payload(body)
+        result = tracker.process_message(payload)
+        assert result is None
+
+
+# =============================================================================
+# RadarTracker Edge Case Tests
+# =============================================================================
+
+
+class TestRadarTrackerEdgeCases:
+    """Tests for RadarTracker edge cases and uncovered branches."""
+
+    def test_load_static_key_caches_result(self, fake_fs: FakeFileSystem) -> None:
+        """Test _load_static_key caches result."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        static_key = "RADAR_KEY" + "A" * 991
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = RadarTracker()
+        result1 = tracker._load_static_key()
+        assert result1 == static_key
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "DIFFERENT" + "A" * 991)
+        result2 = tracker._load_static_key()
+        assert result2 == static_key  # Cached
+
+    def test_load_static_key_returns_none_when_missing(self) -> None:
+        """Test _load_static_key returns None when file missing."""
+        from tankpit_bot.sniffer import RadarTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = RadarTracker()
+        result = tracker._load_static_key()
+        assert result is None
+
+    def test_set_magic_returns_early_when_no_static_key(self) -> None:
+        """Test set_magic does nothing when static key missing."""
+        from tankpit_bot.sniffer import RadarTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = RadarTracker()
+        tracker.set_magic("testmagic")
+        assert tracker._xor_table is None
+
+    def test_decode_radar_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
+        """Test _decode_radar returns None for data < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = RadarTracker()
+        tracker.set_magic("testmagic")
+
+        payload = base64.b64encode(b"\x01\x00\x2e").decode()  # 3 bytes
+        result = tracker._decode_radar(payload)
+        assert result is None
+
+    def test_decode_radar_returns_none_for_wrong_prefix(self, fake_fs: FakeFileSystem) -> None:
+        """Test _decode_radar returns None when body doesn't match radar format."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = RadarTracker()
+        tracker.set_magic("testmagic")
+
+        # Body with wrong prefix (not 0x2E 0x70)
+        body = b"\x2e\x00\x00\x00\x00"
+        payload = _make_payload(body)
+        result = tracker._decode_radar(payload)
+        assert result is None
+
+    def test_process_message_returns_empty_radar(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns no entities message when count is 0."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        # RadarTracker expects: body[1]=0x70 AND decoded[0]=0x4F after XOR
+        # This requires table[0] = 0x70 XOR 0x4F = 0x3F = 63
+        # With static_key[0]='A'(65), we need magic[0] = 65 XOR 63 = 126 = '~'
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "~estmagic123"  # First char '~' (126) makes table[0]=63
+
+        tracker = RadarTracker()
+        tracker.set_magic(magic)
+
+        xor_table = _build_test_xor_table(static_key, magic)
+
+        # Build radar body: 0x2E + 0x70 + XOR-encoded(count, padding, entities...)
+        # After XOR decode: decoded[0] = 0x70 XOR table[0] = 0x70 XOR 0x3F = 0x4F
+        # decoded[1] = count = 0
+        # decoded[2] = padding = 0
+        rest_decoded = bytes([0x00, 0x00])  # count=0, padding
+        rest_encoded = _xor_encode_bytes(rest_decoded, xor_table[1:])
+        body = bytes([0x2E, 0x70]) + rest_encoded
+
+        payload = _make_tracker_payload(body)
+        result = tracker.process_message(payload)
+        assert result == "[RADAR] No entities found"
+
+    def test_process_message_with_entities(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message formats entities correctly."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "~estmagic123"
+
+        tracker = RadarTracker()
+        tracker.set_magic(magic)
+
+        xor_table = _build_test_xor_table(static_key, magic)
+
+        # Radar with 2 entities:
+        # Entity 1: x=10, y=20, value=100 (fuel)
+        # Entity 2: x=30, y=40, value=0xFFFF (tank)
+        # decoded[0] will be 0x70 XOR table[0] = 0x4F (handled by 0x70 byte)
+        # decoded[1:] needs to be: count=2, pad=0, x1=10, y1=20, v1_lo=100, v1_hi=0, ...
+        rest_decoded = bytes([0x02, 0x00, 10, 20, 0x64, 0x00, 30, 40, 0xFF, 0xFF])
+        rest_encoded = _xor_encode_bytes(rest_decoded, xor_table[1:])
+        body = bytes([0x2E, 0x70]) + rest_encoded
+
+        payload = _make_tracker_payload(body)
+        result = tracker.process_message(payload)
+        assert result, "Expected non-None result"
+        assert "RADAR" in result
+        assert "2 found" in result
+
+    def test_classify_entity_equip(self, fake_fs: FakeFileSystem) -> None:
+        """Test _classify_entity returns equip for values >= 0x8000."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import RadarTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = RadarTracker()
+        category, formatted = tracker._classify_entity(5, 10, 0x8001)
+        assert category == "equip"
+        assert "(5,10)" in formatted
+
+
+# =============================================================================
+# TankTracker Edge Case Tests
+# =============================================================================
+
+
+class TestTankTrackerEdgeCases:
+    """Tests for TankTracker edge cases and uncovered branches."""
+
+    def test_load_static_key_caches_result(self, fake_fs: FakeFileSystem) -> None:
+        """Test _load_static_key caches result."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "TANK_KEY" + "A" * 992
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result1 = tracker._load_static_key()
+        assert result1 == static_key
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "DIFFERENT" + "A" * 991)
+        result2 = tracker._load_static_key()
+        assert result2 == static_key
+
+    def test_load_static_key_returns_none_when_missing(self) -> None:
+        """Test _load_static_key returns None when file missing."""
+        from tankpit_bot.sniffer import TankTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = TankTracker()
+        result = tracker._load_static_key()
+        assert result is None
+
+    def test_set_magic_returns_early_when_no_static_key(self) -> None:
+        """Test set_magic does nothing when static key missing."""
+        from tankpit_bot.sniffer import TankTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = TankTracker()
+        tracker.set_magic("testmagic")
+        assert tracker._xor_table is None
+
+    def test_decode_payload_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
+        """Test _decode_payload returns None for data < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        tracker.set_magic("testmagic")
+
+        payload = base64.b64encode(b"\x01\x00\x2e").decode()
+        result = tracker._decode_payload(payload)
+        assert result is None
+
+    def test_decode_payload_returns_none_for_short_body(self, fake_fs: FakeFileSystem) -> None:
+        """Test _decode_payload returns None for body < 2 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        tracker.set_magic("testmagic")
+
+        # Body of 1 byte
+        body = b"\x2e"
+        payload = _make_payload(body)
+        result = tracker._decode_payload(payload)
+        assert result is None
+
+    def test_process_message_returns_none_for_unknown_type(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None for unhandled message types."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = TankTracker()
+        tracker.set_magic(magic)
+
+        # Unknown message type 0x99
+        body = b"\x99" + bytes(10)
+        payload = _make_payload(body)
+        result = tracker.process_message(payload)
+        assert result is None
+
+    def test_parse_tank_join_returns_none_for_short_decoded(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_tank_join returns None when decoded < 3 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        tracker.set_magic("testmagic")
+
+        result = tracker._parse_tank_join(bytearray(b"\x01\x02"))
+        assert result is None
+
+    def test_parse_tank_leave_returns_none_for_short_decoded(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_tank_leave returns None when decoded < 3 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_tank_leave(bytearray(b"\x01\x02"))
+        assert result is None
+
+    def test_parse_tank_status_returns_none_for_short_decoded(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """Test _parse_tank_status returns None when decoded < 13 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_tank_status(bytearray(bytes(10)))
+        assert result is None
+
+    def test_parse_movement_response_returns_none_for_short_decoded(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """Test _parse_movement_response returns None when decoded < 11 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_movement_response(bytearray(bytes(8)))
+        assert result is None
+
+    def test_parse_movement_returns_none_for_short_decoded(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_movement returns None when decoded < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_movement(bytearray(b"\x01\x02\x03"))
+        assert result is None
+
+    def test_parse_movement_with_known_tank(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_movement includes tank name when known."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        tracker.register_name(100, "TestTank")
+
+        # tank_id=100 (0x64, 0x00), x=50, y=60, dir=1
+        decoded = bytearray([0x64, 0x00, 50, 60, 1])
+        result = tracker._parse_movement(decoded)
+        assert result, "Expected non-None result"
+        assert "TestTank" in result
+
+    def test_parse_shooting_returns_none_for_short_decoded(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_shooting returns None when decoded < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_shooting(bytearray(b"\x01\x02\x03"))
+        assert result is None
+
+    def test_parse_shooting_with_known_tank(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_shooting includes tank name when known."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        tracker.register_name(100, "Shooter")
+
+        # team=2, shooter_id=100 (0x64, 0x00), x=50, y=60
+        decoded = bytearray([2, 0x64, 0x00, 50, 60])
+        result = tracker._parse_shooting(decoded)
+        assert result, "Expected non-None result"
+        assert "Shooter" in result
+
+    def test_parse_shooting_unknown_team(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_shooting handles unknown team index."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+
+        # team=10 (out of range), shooter_id=1, x=50, y=60
+        decoded = bytearray([10, 0x01, 0x00, 50, 60])
+        result = tracker._parse_shooting(decoded)
+        assert result, "Expected non-None result"
+        assert "team10" in result
+
+    def test_parse_tank_info_returns_none_for_short_decoded(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_tank_info returns None when decoded < 11 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        result = tracker._parse_tank_info(bytearray(bytes(8)))
+        assert result is None
+
+    def test_parse_tank_info_returns_none_for_empty_name(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_tank_info returns None when name is empty."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = TankTracker()
+        # 11+ bytes but name bytes are all non-printable
+        decoded = bytearray(bytes(12))
+        result = tracker._parse_tank_info(decoded)
+        assert result is None
+
+    def test_process_message_status_sync_short(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None for 0x2E with short decoded."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import TankTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = TankTracker()
+        tracker.set_magic(magic)
+
+        # 0x2E message with only 3 bytes (decoded < 8)
+        body = b"\x2e\x01\x02\x03"
+        payload = _make_payload(body)
+        result = tracker.process_message(payload)
+        assert result is None
+
+
+# =============================================================================
+# MineTracker Edge Case Tests
+# =============================================================================
+
+
+class TestMineTrackerEdgeCases:
+    """Tests for MineTracker edge cases and uncovered branches."""
+
+    def test_load_static_key_caches_result(self, fake_fs: FakeFileSystem) -> None:
+        """Test _load_static_key caches result."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "MINE_KEY" + "A" * 992
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = MineTracker()
+        result1 = tracker._load_static_key()
+        assert result1 == static_key
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "DIFFERENT" + "A" * 991)
+        result2 = tracker._load_static_key()
+        assert result2 == static_key
+
+    def test_load_static_key_returns_none_when_missing(self) -> None:
+        """Test _load_static_key returns None when file missing."""
+        from tankpit_bot.sniffer import MineTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = MineTracker()
+        result = tracker._load_static_key()
+        assert result is None
+
+    def test_set_magic_returns_early_when_no_static_key(self) -> None:
+        """Test set_magic does nothing when static key missing."""
+        from tankpit_bot.sniffer import MineTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = MineTracker()
+        tracker.set_magic("testmagic")
+        assert tracker._xor_table is None
+
+    def test_process_message_mine_command_sent(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message handles sent mine drop command."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = MineTracker()
+        tracker.set_magic(magic)
+
+        xor_table = _build_test_xor_table(static_key, magic)
+
+        # Mine drop: ! type=4 id=98 x=50 y=60
+        decrypted = bytes([0x21, 4, 98, 50, 60])
+        # Encrypt back (skip first byte)
+        encrypted = bytearray(len(decrypted))
+        encrypted[0] = decrypted[0]
+        for i in range(1, len(decrypted)):
+            encrypted[i] = decrypted[i] ^ xor_table[i - 1]
+
+        body = bytes(encrypted)
+        payload = _make_payload(body)
+        result = tracker.process_message(payload, direction="sent")
+        assert result, "Expected non-None result"
+        assert "MINE:DROP" in result
+
+    def test_process_message_mine_placed(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message decodes mine placed message."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = MineTracker()
+        tracker.set_magic(magic)
+
+        xor_table = _build_test_xor_table(static_key, magic)
+
+        # Mine placed: 0x4B owner_id(2) x y
+        decoded_data = bytes([0x4B, 0x64, 0x00, 50, 60])
+        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        body = bytes([0x2E]) + encoded_data
+
+        payload = _make_tracker_payload(body)
+        result = tracker.process_message(payload)
+        assert result, "Expected non-None result"
+        assert "MINE:PLACED" in result
+        assert tracker.mines_placed == 1
+
+    def test_process_message_mine_detonation(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message decodes mine detonation message."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = MineTracker()
+        tracker.set_magic(magic)
+
+        xor_table = _build_test_xor_table(static_key, magic)
+
+        # Mine detonation: 0x45 count positions...
+        decoded_data = bytes([0x45, 2, 10, 20, 30, 40])  # 2 mines at (10,20) and (30,40)
+        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        body = bytes([0x2E]) + encoded_data
+
+        payload = _make_tracker_payload(body)
+        result = tracker.process_message(payload)
+        assert result, "Expected non-None result"
+        assert "MINE:EXPLODE" in result
+        assert "CHAIN" in result  # count > 1
+
+    def test_parse_mine_placed_short(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_mine_placed handles short decoded."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = MineTracker()
+        result = tracker._parse_mine_placed(bytearray([0x4B, 0x01, 0x02]))
+        assert "total:" in result
+
+    def test_parse_mine_detonation_short(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_mine_detonation handles short decoded."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = MineTracker()
+        result = tracker._parse_mine_detonation(bytearray([0x45]))
+        assert result == "[MINE:EXPLODE]"
+
+    def test_process_message_returns_none_for_wrong_body(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_message returns None for body not starting with 0x2E."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import MineTracker
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = MineTracker()
+        tracker.set_magic(magic)
+
+        # Body not starting with 0x2E and not a command
+        body = b"\x99" + bytes(10)
+        payload = _make_payload(body)
+        result = tracker.process_message(payload)
+        assert result is None
+
+
+# =============================================================================
+# ItemPickupTracker Edge Case Tests
+# =============================================================================
+
+
+class TestItemPickupTrackerEdgeCases:
+    """Tests for ItemPickupTracker edge cases."""
+
+    def test_load_static_key_caches_result(self, fake_fs: FakeFileSystem) -> None:
+        """Test _load_static_key caches result."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import ItemPickupTracker
+
+        static_key = "ITEM_KEY" + "A" * 992
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = ItemPickupTracker()
+        result1 = tracker._load_static_key()
+        assert result1 == static_key
+
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "DIFFERENT" + "A" * 991)
+        result2 = tracker._load_static_key()
+        assert result2 == static_key
+
+    def test_load_static_key_returns_none_when_missing(self) -> None:
+        """Test _load_static_key returns None when file missing."""
+        from tankpit_bot.sniffer import ItemPickupTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = ItemPickupTracker()
+        result = tracker._load_static_key()
+        assert result is None
+
+    def test_set_magic_returns_early_when_no_static_key(self) -> None:
+        """Test set_magic does nothing when static key missing."""
+        from tankpit_bot.sniffer import ItemPickupTracker
+
+        fs = FakeFileSystem()
+        _test_hooks.path_exists = fs.path_exists
+        _test_hooks.read_text = fs.read_text
+
+        tracker = ItemPickupTracker()
+        tracker.set_magic("testmagic")
+        assert tracker._xor_table is None
+
+    def test_decode_pickup_returns_none_for_short_data(self, fake_fs: FakeFileSystem) -> None:
+        """Test _decode_pickup returns None for data < 4 bytes."""
+        from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import ItemPickupTracker
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = ItemPickupTracker()
+        tracker.set_magic("testmagic")
+
+        payload = base64.b64encode(b"\x01\x00\x2e").decode()
+        result = tracker._decode_pickup(payload)
+        assert result is None
+
+
+# =============================================================================
+# Format Function Tests
+# =============================================================================
+
+
+class TestFormatFunctions:
+    """Tests for message format functions using proper TypedDict instances."""
+
+    def test_format_combat_details_shooting(self) -> None:
+        """Test _format_combat_details for shooting message (0x53)."""
+        from tankpit_bot.protocol import ShootEventDict
+        from tankpit_bot.sniffer import _format_combat_details
+
+        msg = ShootEventDict(
+            msg_type=0x53,
+            shooter_id=100,
+            target_x=50,
+            target_y=60,
+            projectile_x=0,
+            projectile_y=0,
+            fuel=0,
+            weapon=0,
+            ammo=0,
+            friendly_fire=False,
+        )
+        result = _format_combat_details(msg)
+        assert "shooter=100" in result
+        assert "tgt=(50,60)" in result
+
+    def test_format_combat_details_deactivation(self) -> None:
+        """Test _format_combat_details for deactivation message (0x41)."""
+        from tankpit_bot.protocol import DeactivationDict
+        from tankpit_bot.sniffer import _format_combat_details
+
+        msg = DeactivationDict(
+            msg_type=0x41,
+            victim_id=50,
+            killer_id=100,
+            rank=0,
+            points=0,
+        )
+        result = _format_combat_details(msg)
+        assert "victim=50" in result
+        assert "killer=100" in result
+
+    def test_format_combat_details_unknown(self) -> None:
+        """Test _format_combat_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_combat_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_combat_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_combat_details(msg)
+        assert result == ""
+
+    def test_format_tank_details_entry(self) -> None:
+        """Test _format_tank_details for tank entry (0x28)."""
+        from tankpit_bot.protocol import TankEntryDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = TankEntryDict(
+            msg_type=0x28,
+            tank_id=100,
+            x=50,
+            y=60,
+            name="TestTank",
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "(50,60)" in result
+        assert "TestTank" in result
+
+    def test_format_tank_details_exit(self) -> None:
+        """Test _format_tank_details for tank exit (0x58)."""
+        from tankpit_bot.protocol import TankExitDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = TankExitDict(msg_type=0x58, tank_id=100)
+        result = _format_tank_details(msg)
+        assert "tank=100 left" in result
+
+    def test_format_tank_details_status_sync(self) -> None:
+        """Test _format_tank_details for tank status sync (0x2E)."""
+        from tankpit_bot.protocol import TankStatusSyncDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = TankStatusSyncDict(
+            msg_type=0x2E,
+            subtype=1,
+            tank_id=100,
+            damage_state=1,
+            rank=3,
+            flags=b"\x00\x00\x00",
+            leaderboard_position=5,
+            fuel=None,
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "sergeant" in result  # rank 3
+        assert "light" in result  # damage_state 1
+        assert "lb=5" in result
+
+    def test_format_tank_details_status(self) -> None:
+        """Test _format_tank_details for tank status (0x3E)."""
+        from tankpit_bot.protocol import TankStatusDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = TankStatusDict(
+            msg_type=0x3E,
+            team=2,
+            rank=5,
+            tank_id=100,
+            decoration_state=b"\x00\x00\x00\x00",
+            leaderboard_score=1000,
+            leaderboard_position=0,
+            name="",
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "captain" in result  # rank 5
+        assert "green" in result  # team 2
+        assert "score=1000" in result
+
+    def test_format_tank_details_info(self) -> None:
+        """Test _format_tank_details for tank info (0x21)."""
+        from tankpit_bot.protocol import TankInfoDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = TankInfoDict(
+            msg_type=0x21,
+            tank_id=100,
+            team=1,
+            decoration_state=b"\x00\x00\x00\x00",
+            score=0,
+            name="InfoTank",
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "blue" in result  # team 1
+        assert "InfoTank" in result
+
+    def test_format_tank_details_movement(self) -> None:
+        """Test _format_tank_details for movement (0x47)."""
+        from tankpit_bot.protocol import MovementDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=100,
+            start_x=50,
+            start_y=60,
+            direction=2,
+            flag=0,
+            fuel=500,
+            waypoints=[],
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "(50,60)" in result
+        assert "dir=2" in result
+        assert "fuel=500" in result
+
+    def test_format_tank_details_movement_response(self) -> None:
+        """Test _format_tank_details for movement response (0x3D)."""
+        from tankpit_bot.protocol import MovementResponseDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=0,
+            tank_id=100,
+            x=50,
+            y=60,
+            direction=2,
+            rank=4,
+            leaderboard_position=10,
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "(50,60)" in result
+        assert "dir=2" in result
+        assert "lieutenant" in result  # rank 4
+        assert "lb=10" in result
+
+    def test_format_tank_details_0x48(self) -> None:
+        """Test _format_tank_details for 0x48 message (EnemyDetection)."""
+        from tankpit_bot.protocol import EnemyDetectionDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        msg = EnemyDetectionDict(
+            msg_type=0x48,
+            tank_id=100,
+            x=50,
+            y=60,
+            rank=6,
+            team=0,
+        )
+        result = _format_tank_details(msg)
+        assert "tank=100" in result
+        assert "(50,60)" in result
+        assert "major" in result  # rank 6
+
+    def test_format_tank_details_unknown(self) -> None:
+        """Test _format_tank_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_tank_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_tank_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_tank_details(msg)
+        assert result == ""
+
+    def test_format_resource_details_fuel_refill(self) -> None:
+        """Test _format_resource_details for fuel refill (0x44)."""
+        from tankpit_bot.protocol import FuelGainDict
+        from tankpit_bot.sniffer import _format_resource_details
+
+        msg = FuelGainDict(msg_type=0x44, amount=500, is_free=True)
+        result = _format_resource_details(msg)
+        assert "amount=500" in result
+        assert "free=True" in result
+
+    def test_format_resource_details_fuel_deposit(self) -> None:
+        """Test _format_resource_details for fuel deposit (0x64)."""
+        from tankpit_bot.protocol import FuelDepositDict
+        from tankpit_bot.sniffer import _format_resource_details
+
+        msg = FuelDepositDict(msg_type=0x64, amount=1000)
+        result = _format_resource_details(msg)
+        assert "amount=1000" in result
+
+    def test_format_resource_details_item_pickup(self) -> None:
+        """Test _format_resource_details for item pickup (0x49)."""
+        from tankpit_bot.protocol import InventoryDict
+        from tankpit_bot.sniffer import _format_resource_details
+
+        msg = InventoryDict(
+            msg_type=0x49,
+            show=True,
+            alternate=False,
+            counts=[1, 2, 3, 0, 1],
+            enabled=[True, True, True, True, True],
+        )
+        result = _format_resource_details(msg)
+        assert "counts=" in result
+
+    def test_format_resource_details_container(self) -> None:
+        """Test _format_resource_details for container (0x43)."""
+        from tankpit_bot.protocol import ContainerDict
+        from tankpit_bot.sniffer import _format_resource_details
+
+        msg = ContainerDict(msg_type=0x43, container_id=42, fuel=100)
+        result = _format_resource_details(msg)
+        assert "id=42" in result
+        assert "fuel=100" in result
+
+    def test_format_resource_details_unknown(self) -> None:
+        """Test _format_resource_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_resource_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_resource_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_resource_details(msg)
+        assert result == ""
+
+    def test_format_position_details_mine_placement(self) -> None:
+        """Test _format_position_details for mine placement (0x4B)."""
+        from tankpit_bot.protocol import MinePlacementDict
+        from tankpit_bot.sniffer import _format_position_details
+
+        msg = MinePlacementDict(
+            msg_type=0x4B,
+            mine_type=0,
+            tank_id=100,
+            positions=[(10, 20), (30, 40)],
+        )
+        result = _format_position_details(msg)
+        assert "tank=100" in result
+        assert "count=2" in result
+
+    def test_format_position_details_mine_detonation(self) -> None:
+        """Test _format_position_details for mine detonation (0x45)."""
+        from tankpit_bot.protocol import MineDetonationDict
+        from tankpit_bot.sniffer import _format_position_details
+
+        msg = MineDetonationDict(
+            msg_type=0x45,
+            positions=[(10, 20), (30, 40), (50, 60)],
+        )
+        result = _format_position_details(msg)
+        assert "count=3" in result
+
+    def test_format_position_details_unknown(self) -> None:
+        """Test _format_position_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_position_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_position_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_position_details(msg)
+        assert result == ""
+
+    def test_format_radar_details_radar_ack(self) -> None:
+        """Test _format_radar_details for radar ack (0x46)."""
+        from tankpit_bot.protocol import RadarResultDict
+        from tankpit_bot.sniffer import _format_radar_details
+
+        msg = RadarResultDict(msg_type=0x46, detection_type=1, found=True)
+        result = _format_radar_details(msg)
+        assert "type=1" in result
+        assert "found=True" in result
+
+    def test_format_radar_details_radar_result(self) -> None:
+        """Test _format_radar_details for radar result (0x4F)."""
+        from tankpit_bot.protocol import RadarScanResultDict
+        from tankpit_bot.sniffer import _format_radar_details
+
+        msg = RadarScanResultDict(
+            msg_type=0x4F,
+            entities=[(10, 20, 0)],  # (x, y, value) tuples
+        )
+        result = _format_radar_details(msg)
+        assert "entities=1" in result
+
+    def test_format_radar_details_viewport_update(self) -> None:
+        """Test _format_radar_details for viewport update (0x5A)."""
+        from tankpit_bot.protocol import ViewportEntityDict, ViewportUpdateDict
+        from tankpit_bot.sniffer import _format_radar_details
+
+        entity1 = ViewportEntityDict(col=10, row=20, entity_id=0, value=0, terrain_type=0)
+        entity2 = ViewportEntityDict(col=30, row=40, entity_id=0, value=0, terrain_type=0)
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=3,
+            flags=0,
+            entities=[entity1, entity2],
+        )
+        result = _format_radar_details(msg)
+        assert "dir=3" in result
+        assert "entities=2" in result
+
+    def test_format_radar_details_unknown(self) -> None:
+        """Test _format_radar_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_radar_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_radar_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_radar_details(msg)
+        assert result == ""
+
+    def test_format_misc_details_equip_gain(self) -> None:
+        """Test _format_misc_details for equipment gain (0x67)."""
+        from tankpit_bot.protocol import EquipmentGainDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        msg = EquipmentGainDict(msg_type=0x67, show_message=True, gained=[1, 0, 0, 0, 0])
+        result = _format_misc_details(msg)
+        assert "gained=" in result
+
+    def test_format_misc_details_equip_toggle(self) -> None:
+        """Test _format_misc_details for equipment toggle (0x74)."""
+        from tankpit_bot.protocol import EquipmentToggleDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        msg = EquipmentToggleDict(msg_type=0x74, enabled=[True, False, True, False, True])
+        result = _format_misc_details(msg)
+        assert "enabled=" in result
+
+    def test_format_misc_details_statistics(self) -> None:
+        """Test _format_misc_details for statistics (0x56)."""
+        from tankpit_bot.protocol import StatisticsDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        msg = StatisticsDict(
+            msg_type=0x56,
+            playtime_hours=5,
+            playtime_minutes=30,
+            playtime_seconds=0,
+            destroyed=0,
+            deactivated=0,
+            score=0,
+        )
+        result = _format_misc_details(msg)
+        assert "time=5h30m" in result
+
+    def test_format_misc_details_supervisor(self) -> None:
+        """Test _format_misc_details for supervisor (0x52)."""
+        from tankpit_bot.protocol import SupervisorDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        msg = SupervisorDict(msg_type=0x52, status=4, reserved=0, data=5)
+        result = _format_misc_details(msg)
+        assert "status=4" in result
+        assert "data=5" in result
+
+    def test_format_misc_details_player_msg(self) -> None:
+        """Test _format_misc_details for player message (0x4D)."""
+        from tankpit_bot.protocol import ChatMessageDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        msg = ChatMessageDict(msg_type=0x4D, sender_id=100, message_type=2, x=None, y=None)
+        result = _format_misc_details(msg)
+        assert "sender=100" in result
+        assert "type=2" in result
+
+    def test_format_misc_details_unknown(self) -> None:
+        """Test _format_misc_details returns empty for unknown type."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_misc_details
+
+        # SyncDict has msg_type=0x3F which is not handled by _format_misc_details
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_misc_details(msg)
+        assert result == ""
+
+    def test_format_decoded_message_container(self) -> None:
+        """Test _format_decoded_message for container message."""
+        from tankpit_bot.container_decoder import TankStatusSyncDict
+        from tankpit_bot.sniffer import _format_decoded_message
+
+        msg = TankStatusSyncDict(msg_type="tank_status_sync", sync_data=b"\x01\x02")
+        result = _format_decoded_message(0x2E, msg)
+        assert "TankStatusSync" in result
+        assert "0102" in result
+
+    def test_format_decoded_message_protocol(self) -> None:
+        """Test _format_decoded_message for protocol message."""
+        from tankpit_bot.protocol import ShootEventDict
+        from tankpit_bot.sniffer import _format_decoded_message
+
+        msg = ShootEventDict(
+            msg_type=0x53,
+            shooter_id=100,
+            target_x=50,
+            target_y=60,
+            projectile_x=0,
+            projectile_y=0,
+            fuel=0,
+            weapon=0,
+            ammo=0,
+            friendly_fire=False,
+        )
+        result = _format_decoded_message(0x53, msg)
+        assert "Shooting" in result or "Msg0x53" in result
+
+    def test_format_decoded_message_no_details(self) -> None:
+        """Test _format_decoded_message with no details."""
+        from tankpit_bot.protocol import SyncDict
+        from tankpit_bot.sniffer import _format_decoded_message
+
+        # SyncDict has msg_type=0x3F which has no specific details formatter
+        msg = SyncDict(msg_type=0x3F)
+        result = _format_decoded_message(0x3F, msg)
+        assert "[" in result  # Just has type name in brackets
+
+    def test_format_container_details_combat_hit_outgoing(self) -> None:
+        """Test _format_container_details for combat hit outgoing (direction 0x09)."""
+        from tankpit_bot.container_decoder import CombatHitDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = CombatHitDict(
+            msg_type="combat_hit",
+            direction=0x09,
+            attacker_id=100,
+            combat_data=b"\x00\x00\x00\x00\x00\x00",
+            is_outgoing=True,
+        )
+        result = _format_container_details(msg)
+        assert "attacker=100" in result
+        assert "dir=out" in result
+
+    def test_format_container_details_combat_hit_incoming(self) -> None:
+        """Test _format_container_details for combat hit incoming."""
+        from tankpit_bot.container_decoder import CombatHitDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = CombatHitDict(
+            msg_type="combat_hit",
+            direction=0x05,  # Not 0x09, so incoming
+            attacker_id=50,
+            combat_data=b"\x00\x00\x00\x00\x00\x00",
+            is_outgoing=False,
+        )
+        result = _format_container_details(msg)
+        assert "attacker=50" in result
+        assert "dir=in" in result
+
+    def test_format_container_details_tank_registry(self) -> None:
+        """Test _format_container_details for tank registry."""
+        from tankpit_bot.container_decoder import TankRegistryDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = TankRegistryDict(
+            msg_type="tank_registry",
+            flags=0x12,
+            tank_id=100,
+            info_bytes=b"\x01\x02\x03\x04",
+            team="blue",
+            tank_name="TestTank",
+            military_rank=2,
+            badge_count=3,
+            is_bot=False,
+        )
+        result = _format_container_details(msg)
+        assert "tank=100" in result
+        assert '"TestTank"' in result
+        assert "blue" in result
+        assert "corporal" in result
+        assert "badges=3" in result
+
+    def test_format_container_details_position_update(self) -> None:
+        """Test _format_container_details for position update."""
+        from tankpit_bot.container_decoder import PositionUpdateDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = PositionUpdateDict(
+            msg_type="position_update",
+            flags=0xAB,
+            tank_id=200,
+            status_bytes=b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a",
+        )
+        result = _format_container_details(msg)
+        assert "tank=200" in result
+        assert "flags=0xAB" in result
+        assert "data=0102030405060708090a" in result
+
+    def test_format_container_details_tank_status_short(self) -> None:
+        """Test _format_container_details for tank status short."""
+        from tankpit_bot.container_decoder import TankStatusShortDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = TankStatusShortDict(
+            msg_type="tank_status_short",
+            flags=0,
+            tank_id=150,
+            damage_state=2,
+            rank=4,
+            leaderboard_position=25,
+        )
+        result = _format_container_details(msg)
+        assert "tank=150" in result
+        assert "lieutenant" in result  # rank 4
+        assert "hp=medium" in result  # damage_state 2
+        assert "lb=25" in result
+
+    def test_format_container_details_tank_update_compact(self) -> None:
+        """Test _format_container_details for tank update compact."""
+        from tankpit_bot.container_decoder import TankUpdateCompactDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = TankUpdateCompactDict(
+            msg_type="tank_update_compact",
+            flags=0x05,
+            tank_id=75,
+            status_data=b"\xaa\xbb\xcc\xdd\xee\xff",
+        )
+        result = _format_container_details(msg)
+        assert "tank=75" in result
+        assert "flags=0x05" in result
+        assert "data=aabbccddeeff" in result
+
+    def test_format_container_details_tank_update_extended(self) -> None:
+        """Test _format_container_details for tank update extended."""
+        from tankpit_bot.container_decoder import TankUpdateExtendedDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = TankUpdateExtendedDict(
+            msg_type="tank_update_extended",
+            flags=0x07,
+            tank_id=80,
+            status_data=b"\x11\x22\x33\x44\x55\x66\x77\x88\x99\xaa",
+        )
+        result = _format_container_details(msg)
+        assert "tank=80" in result
+        assert "flags=0x07" in result
+        assert "data=112233445566778899aa" in result
+
+    def test_format_container_details_tank_update_full(self) -> None:
+        """Test _format_container_details for tank update full."""
+        from tankpit_bot.container_decoder import TankUpdateFullDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = TankUpdateFullDict(
+            msg_type="tank_update_full",
+            flags=0x0F,
+            tank_id=90,
+            status_data=b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b",
+        )
+        result = _format_container_details(msg)
+        assert "tank=90" in result
+        assert "flags=0x0F" in result
+        assert "data=0102030405060708090a0b" in result
+
+    def test_format_container_details_unknown_container(self) -> None:
+        """Test _format_container_details for unknown container."""
+        from tankpit_bot.container_decoder import UnknownContainerDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        msg = UnknownContainerDict(
+            msg_type="unknown_container",
+            subtype=0x99,
+            length=50,
+            data=b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a" * 5,
+        )
+        result = _format_container_details(msg)
+        assert "len=50" in result
+        assert "data=" in result
+
+    def test_format_container_details_unmatched_returns_empty(self) -> None:
+        """Test _format_container_details returns empty for unmatched pattern."""
+        from tankpit_bot.container_decoder import TankLeaveDict
+        from tankpit_bot.sniffer import _format_container_details
+
+        # TankLeaveDict is not handled by _format_container_details
+        msg = TankLeaveDict(
+            msg_type="tank_leave",
+            tank_id=100,
+            flags=0,
+            extra_data=b"\x00\x00",
+        )
+        result = _format_container_details(msg)
+        assert result == ""

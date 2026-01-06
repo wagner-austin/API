@@ -1788,6 +1788,41 @@ def _init_trackers_with_magic(magic: str) -> None:
     _build_global_xor_table(magic)
 
 
+def _extract_magic_from_auth(payload: str) -> str | None:
+    """Extract magic key from AUTH message payload.
+
+    AUTH message format: %AUTH !be <session_id>|<hash>|<magic>
+    The magic is the last space-separated token.
+
+    Args:
+        payload: Base64-encoded AUTH message payload.
+
+    Returns:
+        Magic key string, or None if not an AUTH message or extraction fails.
+    """
+    data = _decode_base64_safe(payload)
+    if data is None or len(data) < 10:
+        return None
+
+    # Skip 2-byte length prefix
+    body = data[2:]
+    text = body.decode("utf-8", errors="replace")
+
+    if "%AUTH" not in text and "AUTH" not in text:
+        return None
+
+    parts = text.split()
+    if len(parts) < 3:
+        return None
+
+    # Magic is the last space-separated token
+    magic = parts[-1]
+    if len(magic) < 10:
+        return None
+
+    return magic
+
+
 # Module-level XOR table for unified decoder
 _global_xor_table: bytes | None = None
 _global_static_key: str | None = None
@@ -2036,8 +2071,19 @@ def _format_container_details(d: protocol.BinaryMessage) -> str:
         case {"msg_type": "combat_hit", "direction": int(direction), "attacker_id": int(aid)}:
             dir_str = "out" if direction == 0x09 else "in"
             return f"attacker={aid} dir={dir_str}"
-        case {"msg_type": "tank_registry", "tank_id": int(tid), "flags": int(flags)}:
-            return f"tank={tid} flags=0x{flags:02X}"
+        case {
+            "msg_type": "tank_registry",
+            "tank_id": int(tid),
+            "tank_name": str(name),
+            "team": str(team),
+            "military_rank": int(rank),
+            "badge_count": int(badges),
+            "is_bot": bool(is_bot),
+        }:
+            rank_str = _rank_name(rank)
+            bot_str = " [BOT]" if is_bot else ""
+            badge_str = f" badges={badges}" if badges > 0 else ""
+            return f'tank={tid} "{name}" {team} {rank_str}{badge_str}{bot_str}'
         case {
             "msg_type": "position_update",
             "tank_id": int(tid),
@@ -2533,14 +2579,18 @@ class WebSocketSniffer(BrowserSession):
         Args:
             message: The captured message.
         """
-        if self._magic:
-            _init_trackers_with_magic(self._magic)
+        payload = message["payload"]
+        direction = message["direction"]
+
+        # Extract magic from AUTH messages (sent) - this is the actual session magic
+        if direction == "sent":
+            auth_magic = _extract_magic_from_auth(payload)
+            if auth_magic is not None:
+                self._magic = auth_magic
+                _init_trackers_with_magic(auth_magic)
 
         if not self._live_decode:
             return
-
-        payload = message["payload"]
-        direction = message["direction"]
 
         if direction == "received":
             # Use unified decoder for received messages
@@ -2869,7 +2919,7 @@ _LENGTH_EXACT: dict[int, tuple[str, str]] = {
 # Range-based length patterns: (min, max, name, level)
 _LENGTH_RANGES: tuple[tuple[int, int, str, str], ...] = (
     (21, 28, "entity_extended", "IDENTIFIED"),
-    (29, 60, "tip_notification", "IDENTIFIED"),
+    (29, 79, "tip_notification", "IDENTIFIED"),  # Extended to 79 for longer tips
     (80, 130, "chunk_data", "IDENTIFIED"),
     (500, 100000, "world_state", "IDENTIFIED"),
 )
