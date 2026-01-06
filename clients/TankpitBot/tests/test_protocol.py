@@ -1055,6 +1055,26 @@ class TestDecodeViewportUpdate:
         assert result["entities"][0]["col"] == 2
         assert result["entities"][0]["row"] == 1
 
+    def test_handles_column_wrap_multiple_entities(self) -> None:
+        """Handles column accumulation across entities requiring normalization."""
+        # First entity: delta=10 -> col=10, row=0
+        # Second entity: delta=10 -> col=20, triggers while loop: col=2, row=1
+        data = bytes([0, 0, 10, 0x00, 0x00, 0x00, 10, 0x00, 0x00, 0x00])
+        result = decode_viewport_update(data)
+        assert len(result["entities"]) == 2
+        assert result["entities"][0]["col"] == 10
+        assert result["entities"][0]["row"] == 0
+        assert result["entities"][1]["col"] == 2
+        assert result["entities"][1]["row"] == 1
+
+    def test_handles_truncated_entity_data(self) -> None:
+        """Handles truncated data gracefully by breaking early."""
+        # Non-255 delta but only 1 byte of entity data (need 3)
+        data = bytes([0, 0, 5, 0x00])
+        result = decode_viewport_update(data)
+        # Should break early, no entities parsed
+        assert result["entities"] == []
+
     def test_handles_tank_entity_id(self) -> None:
         """Handles special tank entity ID (65535 -> -1)."""
         # entity_id=65535 (0xFFFF) means tank
@@ -1378,6 +1398,48 @@ class TestTryDecodeBinaryMessage:
         """Returns None for unknown message types."""
         result = try_decode_binary_message(0xFF, b"data")
         assert result is None
+
+    def test_returns_combat_message(self) -> None:
+        """Returns decoded combat message (MSG_SHOOT)."""
+        shoot_data = bytes([0x02, 0x01, 10, 20, 15, 25, 0x03, 0x04, 0x05, 1, 5, 0])
+        result = try_decode_binary_message(MSG_SHOOT, shoot_data)
+        expected = decode_message(MSG_SHOOT, shoot_data)
+        assert result == expected
+
+    def test_returns_resource_message(self) -> None:
+        """Returns decoded resource message (MSG_FUEL_GAIN)."""
+        fuel_data = bytes([0x34, 0x12, 1])
+        result = try_decode_binary_message(MSG_FUEL_GAIN, fuel_data)
+        expected = decode_message(MSG_FUEL_GAIN, fuel_data)
+        assert result == expected
+
+    def test_returns_radar_message(self) -> None:
+        """Returns decoded radar message (MSG_RADAR_RESULT)."""
+        radar_data = bytes([3, 1])
+        result = try_decode_binary_message(MSG_RADAR_RESULT, radar_data)
+        expected = decode_message(MSG_RADAR_RESULT, radar_data)
+        assert result == expected
+
+    def test_returns_tank_message(self) -> None:
+        """Returns decoded tank message (MSG_TANK_ENTRY)."""
+        entry_data = bytes([5, 0x02, 0x01, 60, 0, 0, 0, 0, 0, 0])
+        result = try_decode_binary_message(MSG_TANK_ENTRY, entry_data)
+        expected = decode_message(MSG_TANK_ENTRY, entry_data)
+        assert result == expected
+
+    def test_returns_movement_message(self) -> None:
+        """Returns decoded movement message (MSG_MOVEMENT)."""
+        movement_data = bytes([0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05])
+        result = try_decode_binary_message(MSG_MOVEMENT, movement_data)
+        expected = decode_message(MSG_MOVEMENT, movement_data)
+        assert result == expected
+
+    def test_returns_misc_message(self) -> None:
+        """Returns decoded misc message (MSG_CHAT)."""
+        chat_data = bytes([0x02, 0x01, 1])
+        result = try_decode_binary_message(MSG_CHAT, chat_data)
+        expected = decode_message(MSG_CHAT, chat_data)
+        assert result == expected
 
 
 # =============================================================================
