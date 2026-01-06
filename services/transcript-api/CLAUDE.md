@@ -40,21 +40,40 @@ full_text = " ".join([s["text"] for s in segments])
 print(full_text)
 ```
 
-## When API is Running
+## Production API
+
+Base URL: `https://transcript-api-production-2753.up.railway.app`
 
 ```bash
 # Health check (liveness probe)
-curl http://localhost:8000/healthz
-
-# Transcribe a video (STT/Whisper)
-curl -X POST http://localhost:8000/stt \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
+curl https://transcript-api-production-2753.up.railway.app/healthz
 
 # Get captions (YouTube native, faster but may fail)
-curl -X POST http://localhost:8000/captions \
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/captions \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
+
+# Transcribe a video (STT/Whisper, requires OPENAI_API_KEY)
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/stt \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
+```
+
+## Local Development
+
+```bash
+# Health check
+curl http://localhost:8000/healthz
+
+# Captions
+curl -X POST http://localhost:8000/v1/captions \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
+
+# STT
+curl -X POST http://localhost:8000/v1/stt \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
 ```
 
 ## Architecture
