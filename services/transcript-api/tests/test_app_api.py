@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Generator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import BinaryIO
 
@@ -10,7 +8,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.errors import AppError, TranscriptErrorCode
 from platform_core.json_utils import load_json_str
-from platform_core.request_context import request_id_var
 
 from transcript_api.api.main import (
     AppDeps,
@@ -170,15 +167,6 @@ world
     return app, service
 
 
-@contextmanager
-def _request_id_context(request_id: str) -> Generator[str, None, None]:
-    token = request_id_var.set(request_id)
-    try:
-        yield request_id
-    finally:
-        request_id_var.reset(token)
-
-
 def test_captions_success(tmp_path: Path) -> None:
     _app, service = _mk_service(tmp_path)
     handler = build_captions_handler(service)
@@ -186,8 +174,7 @@ def test_captions_success(tmp_path: Path) -> None:
         "url": "https://youtu.be/dQw4w9WgXcQ",
         "preferred_langs": ["en"],
     }
-    with _request_id_context("req-captions-success"):
-        out = handler(payload)
+    out = handler(payload)
     assert out["video_id"] == "dQw4w9WgXcQ"
     assert out["text"] == "Hello world"
 
@@ -199,7 +186,7 @@ def test_captions_invalid_url(tmp_path: Path) -> None:
         "url": "https://example.com/x",
         "preferred_langs": None,
     }
-    with _request_id_context("req-captions-invalid"), pytest.raises(Exception) as excinfo:
+    with pytest.raises(Exception) as excinfo:
         _ = handler(payload)
     assert "Only YouTube URLs" in str(excinfo.value)
 
@@ -210,8 +197,7 @@ def test_stt_success(tmp_path: Path) -> None:
     payload: STTPayload = {
         "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     }
-    with _request_id_context("req-stt-success"):
-        out = handler(payload)
+    out = handler(payload)
     assert out["video_id"] == "dQw4w9WgXcQ"
     assert out["text"] == "Hello world"
 
@@ -220,23 +206,9 @@ def test_stt_user_error_invalid_url(tmp_path: Path) -> None:
     _, service = _mk_service(tmp_path)
     handler = build_stt_handler(service)
     bad: STTPayload = {"url": "https://example.com/x"}
-    with _request_id_context("req-stt-bad"), pytest.raises(Exception) as excinfo:
+    with pytest.raises(Exception) as excinfo:
         _ = handler(bad)
     assert "Only YouTube URLs" in str(excinfo.value)
-
-
-def test_handlers_fail_without_request_id_context(tmp_path: Path) -> None:
-    _, service = _mk_service(tmp_path)
-    captions = build_captions_handler(service)
-    stt = build_stt_handler(service)
-    token = request_id_var.set("")
-    try:
-        with pytest.raises(RuntimeError):
-            _ = captions({"url": "https://youtu.be/dQw4w9WgXcQ", "preferred_langs": ["en"]})
-        with pytest.raises(RuntimeError):
-            _ = stt({"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"})
-    finally:
-        request_id_var.reset(token)
 
 
 def test_healthz_endpoint(tmp_path: Path) -> None:
