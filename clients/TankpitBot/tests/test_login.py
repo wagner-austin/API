@@ -805,3 +805,70 @@ def test_handle_account_login_timeout() -> None:
 
     assert result["success"] is False
     assert "timeout" in result["error_message"].lower()
+
+
+class FakePageLoginIntermediateUrl:
+    """Fake page that goes through intermediate URL during login."""
+
+    def __init__(self) -> None:
+        """Initialize fake page."""
+        self._url = "https://tankpit.com/before-playing"
+        self._wait_count = 0
+
+    @property
+    def url(self) -> str:
+        """Get current URL - returns intermediate URL then timeout."""
+        # After a few waits, switch to an intermediate URL (not /play, not before-playing)
+        if self._wait_count >= 5:
+            return "https://tankpit.com/loading"  # Intermediate URL
+        return self._url
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> ResponseProtocol | None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+        return None
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for timeout."""
+        _ = timeout
+        self._wait_count += 1
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for a JavaScript function."""
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression."""
+        _ = expression
+        return []
+
+
+def test_handle_account_login_intermediate_url_then_timeout() -> None:
+    """Account login goes through intermediate URL before timing out.
+
+    This exercises the branch partial at line 289->279 where URL is
+    neither /play nor before-playing.
+    """
+    page = FakePageLoginIntermediateUrl()
+    cdp = FakeCDPLoginNoErrors()
+
+    result = handle_account_login(page, cdp, "testuser", "testpass")
+
+    assert result["success"] is False
+    assert "timeout" in result["error_message"].lower()
