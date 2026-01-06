@@ -9,11 +9,14 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.container_decoder import (
+    ChunkDataDict,
     CombatHitDict,
     ContainerDecodeError,
     ContainerMessageType,
     DeactivationDeathDict,
     DeactivationKillDict,
+    EntityExtendedDict,
+    EntitySyncDict,
     PlayerListExtendedDict,
     PlayerListShortDict,
     PositionUpdateDict,
@@ -24,11 +27,17 @@ from tankpit_bot.container_decoder import (
     TankUpdateCompactDict,
     TankUpdateExtendedDict,
     TankUpdateFullDict,
+    TeleportLandedDict,
+    TipNotificationDict,
     UnknownContainerDict,
+    WorldStateDict,
+    decode_chunk_data,
     decode_combat_hit,
     decode_container_message,
     decode_deactivation_death,
     decode_deactivation_kill,
+    decode_entity_extended,
+    decode_entity_sync,
     decode_player_list_extended,
     decode_player_list_short,
     decode_position_update,
@@ -39,12 +48,18 @@ from tankpit_bot.container_decoder import (
     decode_tank_update_compact,
     decode_tank_update_extended,
     decode_tank_update_full,
+    decode_teleport_landed,
+    decode_tip_notification,
     decode_unknown_container,
+    decode_world_state,
     extract_uint16_le,
     identify_container_type,
+    is_chunk_data_structure,
     is_combat_hit_structure,
     is_deactivation_death_structure,
     is_deactivation_kill_structure,
+    is_entity_extended_structure,
+    is_entity_sync_structure,
     is_player_list_extended_structure,
     is_player_list_short_structure,
     is_position_update_structure,
@@ -55,6 +70,9 @@ from tankpit_bot.container_decoder import (
     is_tank_update_compact_structure,
     is_tank_update_extended_structure,
     is_tank_update_full_structure,
+    is_teleport_landed_structure,
+    is_tip_notification_structure,
+    is_world_state_structure,
     require_exact_length,
     require_length_range,
     require_min_length,
@@ -95,8 +113,54 @@ TANK_STATUS_SYNC_3 = bytes.fromhex("030102")
 # Unknown: 8 bytes (doesn't match any pattern - gap between 7 and 9)
 UNKNOWN_8_BYTES = bytes.fromhex("7e51460516112233")
 
-# Unknown: 5 bytes (doesn't match any pattern - gap between 4 and 6)
-UNKNOWN_5_BYTES = bytes.fromhex("0102030405")
+# Unknown: 12 bytes (doesn't match any known pattern)
+# 12 bytes is between combat_hit (11) and position_update (13)
+UNKNOWN_12_BYTES = bytes.fromhex("010203040506070809101112")
+
+# Teleport landed: 1 byte (0x0C subtype)
+# From capture: single byte confirmation after teleport completes
+TELEPORT_LANDED_1 = bytes.fromhex("0c")
+
+# Entity sync: 5 bytes (NOT starting with 0x41 to distinguish from deactivation_kill)
+# From session capture - entity state synchronization
+ENTITY_SYNC_5 = bytes.fromhex("1b01020304")
+
+# Entity extended: 21 bytes (minimum of range 21-28)
+# From session capture - extended entity information
+ENTITY_EXTENDED_21 = bytes.fromhex("1a" + "00" * 20)
+
+# Entity extended: 28 bytes (maximum of range 21-28)
+ENTITY_EXTENDED_28 = bytes.fromhex("1a" + "01" * 27)
+
+# Entity extended: 25 bytes (middle of range)
+ENTITY_EXTENDED_25 = bytes.fromhex("1a" + "02" * 24)
+
+# Tip notification: 29 bytes (minimum of range 29-79)
+# From session capture - game tips and notifications
+TIP_NOTIFICATION_29 = bytes.fromhex("68" + "00" * 28)
+
+# Tip notification: 79 bytes (maximum of range 29-79)
+TIP_NOTIFICATION_79 = bytes.fromhex("68" + "01" * 78)
+
+# Tip notification: 55 bytes (middle of range)
+TIP_NOTIFICATION_55 = bytes.fromhex("68" + "02" * 54)
+
+# Chunk data: 80 bytes (minimum of range 80-130)
+# From session capture - terrain/map chunk data
+CHUNK_DATA_80 = bytes.fromhex("14" + "00" * 79)
+
+# Chunk data: 130 bytes (maximum of range 80-130)
+CHUNK_DATA_130 = bytes.fromhex("14" + "01" * 129)
+
+# Chunk data: 95 bytes (middle of range - from session summary)
+CHUNK_DATA_95 = bytes.fromhex("14" + "02" * 94)
+
+# World state: 500 bytes (minimum)
+# From session capture - full world/map state
+WORLD_STATE_500 = bytes.fromhex("14" + "00" * 499)
+
+# World state: 650 bytes (common size from session summary)
+WORLD_STATE_650 = bytes.fromhex("14" + "01" * 649)
 
 # Tank leave: 6 bytes with tank_id pattern (byte[3] == 0 for tank IDs < 256)
 # From capture: "7f138b004213" - Arterial (tank 139) left the game
@@ -459,12 +523,14 @@ class TestDecodeTankStatusShort:
 
     def test_decodes_9_byte_status(self) -> None:
         """Decodes 9-byte tank status short correctly."""
+        # Data: 01 82 57 02 04 00 15 00 00
+        # [0]=subtype [1]=flags [2-3]=tank_id [4]=dmg [5]=rank [6-7]=lb_pos [8]=extra
         result = decode_tank_status_short(TANK_STATUS_SHORT_9)
         assert result["msg_type"] == "tank_status_short"
-        assert result["tank_id"] == 0x5782  # 82 57 little-endian
-        assert result["damage_state"] == 2  # medium damage
-        assert result["rank"] == 4  # lieutenant
-        assert result["flag"] == 0
+        assert result["flags"] == 0x82
+        assert result["tank_id"] == 0x0257  # 57 02 little-endian = 599
+        assert result["damage_state"] == 4
+        assert result["rank"] == 0  # recruit
         assert result["leaderboard_position"] == 0x0015  # 15 00 little-endian
 
     def test_raises_on_wrong_length(self) -> None:
@@ -840,7 +906,7 @@ class TestIdentifyContainerType:
     def test_identifies_unknown(self) -> None:
         """Correctly identifies unknown structure."""
         assert identify_container_type(UNKNOWN_8_BYTES) == ContainerMessageType.UNKNOWN
-        assert identify_container_type(UNKNOWN_5_BYTES) == ContainerMessageType.UNKNOWN
+        assert identify_container_type(UNKNOWN_12_BYTES) == ContainerMessageType.UNKNOWN
 
     def test_empty_data_is_unknown(self) -> None:
         """Empty data is identified as unknown."""
@@ -950,6 +1016,11 @@ class TestTypedDictStructure:
         assert "flags" in result
         assert "tank_id" in result
         assert "info_bytes" in result
+        assert "team" in result
+        assert "tank_name" in result
+        assert "military_rank" in result
+        assert "badge_count" in result
+        assert "is_bot" in result
 
     def test_position_update_dict_keys(self) -> None:
         """PositionUpdateDict has expected keys."""
@@ -969,10 +1040,10 @@ class TestTypedDictStructure:
         """TankStatusShortDict has expected keys."""
         result: TankStatusShortDict = decode_tank_status_short(TANK_STATUS_SHORT_9)
         assert "msg_type" in result
+        assert "flags" in result
         assert "tank_id" in result
         assert "damage_state" in result
         assert "rank" in result
-        assert "flag" in result
         assert "leaderboard_position" in result
 
     def test_tank_update_compact_dict_keys(self) -> None:
@@ -1042,6 +1113,409 @@ class TestTypedDictStructure:
         assert "flags" in result
         assert "killer_id" in result
         assert "extra_data" in result
+
+    def test_teleport_landed_dict_keys(self) -> None:
+        """TeleportLandedDict has expected keys."""
+        result: TeleportLandedDict = decode_teleport_landed(TELEPORT_LANDED_1)
+        assert "msg_type" in result
+        assert "subtype" in result
+
+    def test_entity_sync_dict_keys(self) -> None:
+        """EntitySyncDict has expected keys."""
+        result: EntitySyncDict = decode_entity_sync(ENTITY_SYNC_5)
+        assert "msg_type" in result
+        assert "subtype" in result
+        assert "sync_data" in result
+
+    def test_entity_extended_dict_keys(self) -> None:
+        """EntityExtendedDict has expected keys."""
+        result: EntityExtendedDict = decode_entity_extended(ENTITY_EXTENDED_21)
+        assert "msg_type" in result
+        assert "subtype" in result
+        assert "length" in result
+        assert "entity_data" in result
+
+    def test_tip_notification_dict_keys(self) -> None:
+        """TipNotificationDict has expected keys."""
+        result: TipNotificationDict = decode_tip_notification(TIP_NOTIFICATION_29)
+        assert "msg_type" in result
+        assert "subtype" in result
+        assert "length" in result
+        assert "notification_data" in result
+
+    def test_chunk_data_dict_keys(self) -> None:
+        """ChunkDataDict has expected keys."""
+        result: ChunkDataDict = decode_chunk_data(CHUNK_DATA_80)
+        assert "msg_type" in result
+        assert "subtype" in result
+        assert "length" in result
+        assert "chunk_data" in result
+
+    def test_world_state_dict_keys(self) -> None:
+        """WorldStateDict has expected keys."""
+        result: WorldStateDict = decode_world_state(WORLD_STATE_500)
+        assert "msg_type" in result
+        assert "subtype" in result
+        assert "length" in result
+        assert "world_data" in result
+
+
+# =============================================================================
+# Teleport Landed Tests
+# =============================================================================
+
+
+class TestIsTeleportLandedStructure:
+    """Tests for teleport landed structure detection."""
+
+    def test_matches_1_byte(self) -> None:
+        """Matches exactly 1 byte."""
+        assert is_teleport_landed_structure(TELEPORT_LANDED_1) is True
+
+    def test_rejects_other_lengths(self) -> None:
+        """Rejects messages not exactly 1 byte."""
+        assert is_teleport_landed_structure(bytes([0x0C, 0x00])) is False
+        assert is_teleport_landed_structure(b"") is False
+
+
+class TestDecodeTeleportLanded:
+    """Tests for teleport landed decoding."""
+
+    def test_decodes_1_byte_message(self) -> None:
+        """Decodes 1-byte teleport landed message correctly."""
+        result = decode_teleport_landed(TELEPORT_LANDED_1)
+        assert result["msg_type"] == "teleport_landed"
+        assert result["subtype"] == 0x0C
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_teleport_landed(bytes([0x0C, 0x00]))
+        with pytest.raises(ContainerDecodeError):
+            decode_teleport_landed(b"")
+
+
+# =============================================================================
+# Entity Sync Tests
+# =============================================================================
+
+
+class TestIsEntitySyncStructure:
+    """Tests for entity sync structure detection."""
+
+    def test_matches_5_bytes(self) -> None:
+        """Matches exactly 5 bytes."""
+        assert is_entity_sync_structure(ENTITY_SYNC_5) is True
+
+    def test_rejects_other_lengths(self) -> None:
+        """Rejects messages not exactly 5 bytes."""
+        assert is_entity_sync_structure(bytes([0x01] * 4)) is False
+        assert is_entity_sync_structure(bytes([0x01] * 6)) is False
+
+
+class TestDecodeEntitySync:
+    """Tests for entity sync decoding."""
+
+    def test_decodes_5_byte_message(self) -> None:
+        """Decodes 5-byte entity sync message correctly."""
+        result = decode_entity_sync(ENTITY_SYNC_5)
+        assert result["msg_type"] == "entity_sync"
+        assert result["subtype"] == 0x1B
+        assert result["sync_data"] == bytes.fromhex("01020304")
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_entity_sync(bytes([0x01] * 4))
+        with pytest.raises(ContainerDecodeError):
+            decode_entity_sync(bytes([0x01] * 6))
+
+
+# =============================================================================
+# Entity Extended Tests
+# =============================================================================
+
+
+class TestIsEntityExtendedStructure:
+    """Tests for entity extended structure detection."""
+
+    def test_matches_21_bytes(self) -> None:
+        """Matches 21 bytes (minimum of range)."""
+        assert is_entity_extended_structure(ENTITY_EXTENDED_21) is True
+
+    def test_matches_28_bytes(self) -> None:
+        """Matches 28 bytes (maximum of range)."""
+        assert is_entity_extended_structure(ENTITY_EXTENDED_28) is True
+
+    def test_matches_25_bytes(self) -> None:
+        """Matches 25 bytes (middle of range)."""
+        assert is_entity_extended_structure(ENTITY_EXTENDED_25) is True
+
+    def test_rejects_outside_range(self) -> None:
+        """Rejects messages outside 21-28 range."""
+        assert is_entity_extended_structure(bytes([0x01] * 20)) is False
+        assert is_entity_extended_structure(bytes([0x01] * 29)) is False
+
+
+class TestDecodeEntityExtended:
+    """Tests for entity extended decoding."""
+
+    def test_decodes_21_byte_message(self) -> None:
+        """Decodes 21-byte entity extended message correctly."""
+        result = decode_entity_extended(ENTITY_EXTENDED_21)
+        assert result["msg_type"] == "entity_extended"
+        assert result["subtype"] == 0x1A
+        assert result["length"] == 21
+        assert len(result["entity_data"]) == 20
+
+    def test_decodes_28_byte_message(self) -> None:
+        """Decodes 28-byte entity extended message correctly."""
+        result = decode_entity_extended(ENTITY_EXTENDED_28)
+        assert result["msg_type"] == "entity_extended"
+        assert result["subtype"] == 0x1A
+        assert result["length"] == 28
+        assert len(result["entity_data"]) == 27
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_entity_extended(bytes([0x01] * 20))
+        with pytest.raises(ContainerDecodeError):
+            decode_entity_extended(bytes([0x01] * 29))
+
+
+# =============================================================================
+# Tip Notification Tests
+# =============================================================================
+
+
+class TestIsTipNotificationStructure:
+    """Tests for tip notification structure detection."""
+
+    def test_matches_29_bytes(self) -> None:
+        """Matches 29 bytes (minimum of range)."""
+        assert is_tip_notification_structure(TIP_NOTIFICATION_29) is True
+
+    def test_matches_79_bytes(self) -> None:
+        """Matches 79 bytes (maximum of range)."""
+        assert is_tip_notification_structure(TIP_NOTIFICATION_79) is True
+
+    def test_matches_55_bytes(self) -> None:
+        """Matches 55 bytes (middle of range)."""
+        assert is_tip_notification_structure(TIP_NOTIFICATION_55) is True
+
+    def test_rejects_outside_range(self) -> None:
+        """Rejects messages outside 29-79 range."""
+        assert is_tip_notification_structure(bytes([0x01] * 28)) is False
+        assert is_tip_notification_structure(bytes([0x01] * 80)) is False
+
+
+class TestDecodeTipNotification:
+    """Tests for tip notification decoding."""
+
+    def test_decodes_29_byte_message(self) -> None:
+        """Decodes 29-byte tip notification message correctly."""
+        result = decode_tip_notification(TIP_NOTIFICATION_29)
+        assert result["msg_type"] == "tip_notification"
+        assert result["subtype"] == 0x68
+        assert result["length"] == 29
+        assert len(result["notification_data"]) == 28
+
+    def test_decodes_79_byte_message(self) -> None:
+        """Decodes 79-byte tip notification message correctly."""
+        result = decode_tip_notification(TIP_NOTIFICATION_79)
+        assert result["msg_type"] == "tip_notification"
+        assert result["subtype"] == 0x68
+        assert result["length"] == 79
+        assert len(result["notification_data"]) == 78
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_tip_notification(bytes([0x01] * 28))
+        with pytest.raises(ContainerDecodeError):
+            decode_tip_notification(bytes([0x01] * 80))
+
+
+# =============================================================================
+# Chunk Data Tests
+# =============================================================================
+
+
+class TestIsChunkDataStructure:
+    """Tests for chunk data structure detection."""
+
+    def test_matches_80_bytes(self) -> None:
+        """Matches 80 bytes (minimum of range)."""
+        assert is_chunk_data_structure(CHUNK_DATA_80) is True
+
+    def test_matches_130_bytes(self) -> None:
+        """Matches 130 bytes (maximum of range)."""
+        assert is_chunk_data_structure(CHUNK_DATA_130) is True
+
+    def test_matches_95_bytes(self) -> None:
+        """Matches 95 bytes (middle of range)."""
+        assert is_chunk_data_structure(CHUNK_DATA_95) is True
+
+    def test_rejects_outside_range(self) -> None:
+        """Rejects messages outside 80-130 range."""
+        assert is_chunk_data_structure(bytes([0x01] * 79)) is False
+        assert is_chunk_data_structure(bytes([0x01] * 131)) is False
+
+
+class TestDecodeChunkData:
+    """Tests for chunk data decoding."""
+
+    def test_decodes_80_byte_message(self) -> None:
+        """Decodes 80-byte chunk data message correctly."""
+        result = decode_chunk_data(CHUNK_DATA_80)
+        assert result["msg_type"] == "chunk_data"
+        assert result["subtype"] == 0x14
+        assert result["length"] == 80
+        assert len(result["chunk_data"]) == 79
+
+    def test_decodes_130_byte_message(self) -> None:
+        """Decodes 130-byte chunk data message correctly."""
+        result = decode_chunk_data(CHUNK_DATA_130)
+        assert result["msg_type"] == "chunk_data"
+        assert result["subtype"] == 0x14
+        assert result["length"] == 130
+        assert len(result["chunk_data"]) == 129
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_chunk_data(bytes([0x01] * 79))
+        with pytest.raises(ContainerDecodeError):
+            decode_chunk_data(bytes([0x01] * 131))
+
+
+# =============================================================================
+# World State Tests
+# =============================================================================
+
+
+class TestIsWorldStateStructure:
+    """Tests for world state structure detection."""
+
+    def test_matches_500_bytes(self) -> None:
+        """Matches 500 bytes (minimum)."""
+        assert is_world_state_structure(WORLD_STATE_500) is True
+
+    def test_matches_650_bytes(self) -> None:
+        """Matches 650 bytes (common size)."""
+        assert is_world_state_structure(WORLD_STATE_650) is True
+
+    def test_rejects_below_minimum(self) -> None:
+        """Rejects messages below 500 bytes."""
+        assert is_world_state_structure(bytes([0x01] * 499)) is False
+        assert is_world_state_structure(bytes([0x01] * 131)) is False
+
+
+class TestDecodeWorldState:
+    """Tests for world state decoding."""
+
+    def test_decodes_500_byte_message(self) -> None:
+        """Decodes 500-byte world state message correctly."""
+        result = decode_world_state(WORLD_STATE_500)
+        assert result["msg_type"] == "world_state"
+        assert result["subtype"] == 0x14
+        assert result["length"] == 500
+        assert len(result["world_data"]) == 499
+
+    def test_decodes_650_byte_message(self) -> None:
+        """Decodes 650-byte world state message correctly."""
+        result = decode_world_state(WORLD_STATE_650)
+        assert result["msg_type"] == "world_state"
+        assert result["subtype"] == 0x14
+        assert result["length"] == 650
+        assert len(result["world_data"]) == 649
+
+    def test_raises_on_wrong_length(self) -> None:
+        """Raises on invalid length."""
+        with pytest.raises(ContainerDecodeError):
+            decode_world_state(bytes([0x01] * 499))
+
+
+# =============================================================================
+# New Container Type Identification Tests
+# =============================================================================
+
+
+class TestIdentifyNewContainerTypes:
+    """Tests for identification of new container types."""
+
+    def test_identifies_teleport_landed(self) -> None:
+        """Correctly identifies teleport landed structure (1 byte)."""
+        result = identify_container_type(TELEPORT_LANDED_1)
+        assert result == ContainerMessageType.TELEPORT_LANDED
+
+    def test_identifies_entity_sync(self) -> None:
+        """Correctly identifies entity sync structure (5 bytes without 0x41)."""
+        result = identify_container_type(ENTITY_SYNC_5)
+        assert result == ContainerMessageType.ENTITY_SYNC
+
+    def test_identifies_entity_extended(self) -> None:
+        """Correctly identifies entity extended structure (21-28 bytes)."""
+        assert identify_container_type(ENTITY_EXTENDED_21) == ContainerMessageType.ENTITY_EXTENDED
+        assert identify_container_type(ENTITY_EXTENDED_28) == ContainerMessageType.ENTITY_EXTENDED
+        assert identify_container_type(ENTITY_EXTENDED_25) == ContainerMessageType.ENTITY_EXTENDED
+
+    def test_identifies_tip_notification(self) -> None:
+        """Correctly identifies tip notification structure (29-79 bytes)."""
+        assert identify_container_type(TIP_NOTIFICATION_29) == ContainerMessageType.TIP_NOTIFICATION
+        assert identify_container_type(TIP_NOTIFICATION_79) == ContainerMessageType.TIP_NOTIFICATION
+        assert identify_container_type(TIP_NOTIFICATION_55) == ContainerMessageType.TIP_NOTIFICATION
+
+    def test_identifies_chunk_data(self) -> None:
+        """Correctly identifies chunk data structure (80-130 bytes)."""
+        assert identify_container_type(CHUNK_DATA_80) == ContainerMessageType.CHUNK_DATA
+        assert identify_container_type(CHUNK_DATA_130) == ContainerMessageType.CHUNK_DATA
+        assert identify_container_type(CHUNK_DATA_95) == ContainerMessageType.CHUNK_DATA
+
+    def test_identifies_world_state(self) -> None:
+        """Correctly identifies world state structure (500+ bytes)."""
+        assert identify_container_type(WORLD_STATE_500) == ContainerMessageType.WORLD_STATE
+        assert identify_container_type(WORLD_STATE_650) == ContainerMessageType.WORLD_STATE
+
+
+# =============================================================================
+# New Container Type Dispatch Tests
+# =============================================================================
+
+
+class TestDecodeNewContainerTypes:
+    """Tests for main decode_container_message dispatcher with new types."""
+
+    def test_dispatches_teleport_landed(self) -> None:
+        """Dispatches to teleport landed decoder (1 byte)."""
+        result = decode_container_message(TELEPORT_LANDED_1)
+        assert result["msg_type"] == "teleport_landed"
+
+    def test_dispatches_entity_sync(self) -> None:
+        """Dispatches to entity sync decoder (5 bytes without 0x41)."""
+        result = decode_container_message(ENTITY_SYNC_5)
+        assert result["msg_type"] == "entity_sync"
+
+    def test_dispatches_entity_extended(self) -> None:
+        """Dispatches to entity extended decoder (21-28 bytes)."""
+        result = decode_container_message(ENTITY_EXTENDED_21)
+        assert result["msg_type"] == "entity_extended"
+
+    def test_dispatches_tip_notification(self) -> None:
+        """Dispatches to tip notification decoder (29-79 bytes)."""
+        result = decode_container_message(TIP_NOTIFICATION_29)
+        assert result["msg_type"] == "tip_notification"
+
+    def test_dispatches_chunk_data(self) -> None:
+        """Dispatches to chunk data decoder (80-130 bytes)."""
+        result = decode_container_message(CHUNK_DATA_80)
+        assert result["msg_type"] == "chunk_data"
+
+    def test_dispatches_world_state(self) -> None:
+        """Dispatches to world state decoder (500+ bytes)."""
+        result = decode_container_message(WORLD_STATE_500)
+        assert result["msg_type"] == "world_state"
 
 
 # =============================================================================

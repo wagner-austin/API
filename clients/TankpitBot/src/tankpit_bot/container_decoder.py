@@ -40,6 +40,12 @@ class ContainerMessageType(IntEnum):
     PLAYER_LIST_EXTENDED = auto()
     DEACTIVATION_KILL = auto()
     DEACTIVATION_DEATH = auto()
+    TELEPORT_LANDED = auto()
+    ENTITY_SYNC = auto()
+    ENTITY_EXTENDED = auto()
+    TIP_NOTIFICATION = auto()
+    CHUNK_DATA = auto()
+    WORLD_STATE = auto()
 
 
 class ContainerDecodeError(Exception):
@@ -215,14 +221,27 @@ class TankRegistryDict(TypedDict):
     Structure (16-20 bytes, verified from captures):
       [subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]
 
-    Broadcast when tanks join/update, maps session ID to tank info.
-    Info bytes contain team, rank, and name data (encoding varies).
+    info_bytes structure:
+      Standard (12 bytes): [rank_badges:1][zeros:4][unk1:1][unk2:1][name:5+]
+      Extended (15 bytes): [rank_badges:1][zeros:4][pos:2][unk:3][name:5+]
+
+    rank_badges byte encoding:
+      bits 0-2: military rank (0=recruit...7=colonel, overflow for general)
+      bits 3-7: badge/award count
+
+    Team encoded in flags lower 2 bits: 0=red, 1=purple, 2=blue, 3=orange.
+    Extended format indicated by (flags & 0x2C) != 0.
     """
 
     msg_type: Literal["tank_registry"]
     flags: int
     tank_id: int
     info_bytes: bytes
+    team: str
+    tank_name: str
+    military_rank: int
+    badge_count: int
+    is_bot: bool
 
 
 def is_tank_registry_structure(data: bytes) -> bool:
@@ -240,17 +259,42 @@ def is_tank_registry_structure(data: bytes) -> bool:
     return 16 <= len(data) <= 20
 
 
+_TEAM_NAMES: list[str] = ["red", "purple", "blue", "orange"]
+
+
+def _parse_tank_name(info_bytes: bytes, is_extended: bool) -> str:
+    """Extract ASCII tank name from info_bytes.
+
+    Args:
+        info_bytes: Raw info bytes from TankRegistry message.
+        is_extended: True if extended format (3 extra metadata bytes).
+
+    Returns:
+        Tank name as ASCII string, non-printable chars replaced with '?'.
+    """
+    # Name starts at byte 7 (STD) or byte 10 (EXT)
+    name_offset = 10 if is_extended else 7
+    if len(info_bytes) <= name_offset:
+        return ""
+    name_bytes = info_bytes[name_offset:]
+    return "".join(chr(b) if 32 <= b < 127 else "?" for b in name_bytes)
+
+
 def decode_tank_registry(data: bytes) -> TankRegistryDict:
     """Decode tank registry message from container body.
 
     Structure (16-20 bytes):
       [subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]
 
+    info_bytes structure:
+      [rank_badges:1] [zeros:4] [unk1:1] [unk2:1] [name:variable]
+      Extended format adds 3 bytes before name.
+
     Args:
         data: Decoded container body bytes (must be 16-20 bytes).
 
     Returns:
-        Decoded tank registry data.
+        Decoded tank registry data with parsed fields.
 
     Raises:
         ContainerDecodeError: If structure validation fails.
@@ -261,11 +305,38 @@ def decode_tank_registry(data: bytes) -> TankRegistryDict:
     tank_id = extract_uint16_le(data, 2, "TankRegistry.tank_id")
     info_bytes = bytes(data[4:])
 
+    # Team from lower 2 bits of flags
+    team_idx = flags & 0x03
+    team = _TEAM_NAMES[team_idx]
+
+    # Parse rank and badges from first info byte
+    rank_badges = info_bytes[0] if len(info_bytes) > 0 else 0
+    military_rank = rank_badges & 0x07
+    badge_count = rank_badges >> 3
+
+    # Bot detection: first 6 bytes of info are all zeros for bots
+    # Bots: [zeros:6][bot_num:1][name:variable]
+    is_bot = len(info_bytes) >= 6 and all(b == 0 for b in info_bytes[:6])
+
+    # Extended format indicated by flags bits 0x2C being set
+    # Standard: flags like 0x02, 0x03 -> name at byte 7
+    # Extended: flags like 0x2E, 0x2F (0x2C bits set) -> name at byte 10
+    # Bots always use standard format regardless of flags
+    is_extended = not is_bot and (flags & 0x2C) != 0
+
+    # Extract tank name
+    tank_name = _parse_tank_name(info_bytes, is_extended)
+
     return TankRegistryDict(
         msg_type="tank_registry",
         flags=flags,
         tank_id=tank_id,
         info_bytes=info_bytes,
+        team=team,
+        tank_name=tank_name,
+        military_rank=military_rank,
+        badge_count=badge_count,
+        is_bot=is_bot,
     )
 
 
@@ -341,18 +412,18 @@ def decode_position_update(data: bytes) -> PositionUpdateDict:
 class TankStatusShortDict(TypedDict):
     """Enemy tank status with HP and rank from 0x2E container.
 
-    Structure (9 bytes, from decoding_status.md):
-      [subtype:1] [tank_id:2 LE] [damage_state:1] [rank:1] [flag:1] [lb_pos:2 LE] [extra:1]
+    Structure (9 bytes, verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [damage_state:1] [rank:1] [lb_pos:2 LE] [extra:1]
 
     The damage_state controls how dark the enemy tank name appears (0=full to 3=critical).
     The rank is 0-7 (recruit to general).
     """
 
     msg_type: Literal["tank_status_short"]
+    flags: int
     tank_id: int
     damage_state: int
     rank: int
-    flag: int
     leaderboard_position: int
 
 
@@ -372,11 +443,11 @@ def decode_tank_status_short(data: bytes) -> TankStatusShortDict:
     """Decode tank status short message from container body.
 
     Structure (9 bytes):
-      [0]    subtype (ignored)
-      [1-2]  tank_id (LE)
-      [3]    damage_state (0-3)
-      [4]    rank (0-7)
-      [5]    flag
+      [0]    subtype (ignored, XOR encoded)
+      [1]    flags
+      [2-3]  tank_id (LE)
+      [4]    damage_state (0-3)
+      [5]    rank (0-7: recruit to general)
       [6-7]  leaderboard_position (LE)
       [8]    extra byte (ignored)
 
@@ -391,18 +462,18 @@ def decode_tank_status_short(data: bytes) -> TankStatusShortDict:
     """
     require_exact_length(data, 9, "TankStatusShort")
 
-    tank_id = extract_uint16_le(data, 1, "TankStatusShort.tank_id")
-    damage_state = data[3]
-    rank = data[4]
-    flag = data[5]
+    flags = data[1]
+    tank_id = extract_uint16_le(data, 2, "TankStatusShort.tank_id")
+    damage_state = data[4]
+    rank = data[5]
     lb_pos = extract_uint16_le(data, 6, "TankStatusShort.leaderboard_position")
 
     return TankStatusShortDict(
         msg_type="tank_status_short",
+        flags=flags,
         tank_id=tank_id,
         damage_state=damage_state,
         rank=rank,
-        flag=flag,
         leaderboard_position=lb_pos,
     )
 
@@ -952,6 +1023,343 @@ def decode_deactivation_death(data: bytes) -> DeactivationDeathDict:
 
 
 # =============================================================================
+# Teleport Landed Container Message (len=1)
+# =============================================================================
+
+
+class TeleportLandedDict(TypedDict):
+    """Teleport landed confirmation container message.
+
+    Structure (1 byte):
+      [subtype:1] (0x0C = 12)
+
+    Sent by server after teleport completes and tank has landed at new location.
+    Arrives 150-2000ms after teleport initiated, just before UI updates position.
+    """
+
+    msg_type: Literal["teleport_landed"]
+    subtype: int
+
+
+def is_teleport_landed_structure(data: bytes) -> bool:
+    """Check if data matches teleport landed structure.
+
+    Teleport landed criteria:
+    - Exactly 1 byte
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches teleport landed pattern.
+    """
+    return len(data) == 1
+
+
+def decode_teleport_landed(data: bytes) -> TeleportLandedDict:
+    """Decode teleport landed container message.
+
+    Args:
+        data: Decoded container body bytes (must be 1 byte).
+
+    Returns:
+        Decoded teleport landed data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_exact_length(data, 1, "TeleportLanded")
+
+    return TeleportLandedDict(
+        msg_type="teleport_landed",
+        subtype=data[0],
+    )
+
+
+# =============================================================================
+# Entity Sync Container Message (len=5)
+# =============================================================================
+
+
+class EntitySyncDict(TypedDict):
+    """Entity sync container message.
+
+    Structure (5 bytes):
+      [subtype:1] [sync_data:4]
+
+    Broadcasts entity state synchronization updates.
+    """
+
+    msg_type: Literal["entity_sync"]
+    subtype: int
+    sync_data: bytes
+
+
+def is_entity_sync_structure(data: bytes) -> bool:
+    """Check if data matches entity sync structure.
+
+    Entity sync criteria:
+    - Exactly 5 bytes
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches entity sync pattern.
+    """
+    return len(data) == 5
+
+
+def decode_entity_sync(data: bytes) -> EntitySyncDict:
+    """Decode entity sync container message.
+
+    Args:
+        data: Decoded container body bytes (must be 5 bytes).
+
+    Returns:
+        Decoded entity sync data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_exact_length(data, 5, "EntitySync")
+
+    return EntitySyncDict(
+        msg_type="entity_sync",
+        subtype=data[0],
+        sync_data=bytes(data[1:5]),
+    )
+
+
+# =============================================================================
+# Entity Extended Container Message (len=21-28)
+# =============================================================================
+
+
+class EntityExtendedDict(TypedDict):
+    """Entity extended information container message.
+
+    Structure (21-28 bytes):
+      [subtype:1] [entity_data:20-27]
+
+    Contains extended entity state information (position, status, etc.).
+    """
+
+    msg_type: Literal["entity_extended"]
+    subtype: int
+    length: int
+    entity_data: bytes
+
+
+def is_entity_extended_structure(data: bytes) -> bool:
+    """Check if data matches entity extended structure.
+
+    Entity extended criteria:
+    - Length 21-28 bytes
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches entity extended pattern.
+    """
+    return 21 <= len(data) <= 28
+
+
+def decode_entity_extended(data: bytes) -> EntityExtendedDict:
+    """Decode entity extended container message.
+
+    Args:
+        data: Decoded container body bytes (must be 21-28 bytes).
+
+    Returns:
+        Decoded entity extended data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_length_range(data, 21, 28, "EntityExtended")
+
+    return EntityExtendedDict(
+        msg_type="entity_extended",
+        subtype=data[0],
+        length=len(data),
+        entity_data=bytes(data[1:]),
+    )
+
+
+# =============================================================================
+# Tip Notification Container Message (len=29-79)
+# =============================================================================
+
+
+class TipNotificationDict(TypedDict):
+    """Tip/notification container message.
+
+    Structure (29-79 bytes):
+      [subtype:1] [notification_data:28-78]
+
+    Contains UI tips and game notifications.
+    """
+
+    msg_type: Literal["tip_notification"]
+    subtype: int
+    length: int
+    notification_data: bytes
+
+
+def is_tip_notification_structure(data: bytes) -> bool:
+    """Check if data matches tip notification structure.
+
+    Tip notification criteria:
+    - Length 29-79 bytes
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches tip notification pattern.
+    """
+    return 29 <= len(data) <= 79
+
+
+def decode_tip_notification(data: bytes) -> TipNotificationDict:
+    """Decode tip notification container message.
+
+    Args:
+        data: Decoded container body bytes (must be 29-79 bytes).
+
+    Returns:
+        Decoded tip notification data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_length_range(data, 29, 79, "TipNotification")
+
+    return TipNotificationDict(
+        msg_type="tip_notification",
+        subtype=data[0],
+        length=len(data),
+        notification_data=bytes(data[1:]),
+    )
+
+
+# =============================================================================
+# Chunk Data Container Message (len=80-130)
+# =============================================================================
+
+
+class ChunkDataDict(TypedDict):
+    """Chunk data container message.
+
+    Structure (80-130 bytes):
+      [subtype:1] [chunk_data:79-129]
+
+    Contains map/terrain chunk data.
+    """
+
+    msg_type: Literal["chunk_data"]
+    subtype: int
+    length: int
+    chunk_data: bytes
+
+
+def is_chunk_data_structure(data: bytes) -> bool:
+    """Check if data matches chunk data structure.
+
+    Chunk data criteria:
+    - Length 80-130 bytes
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches chunk data pattern.
+    """
+    return 80 <= len(data) <= 130
+
+
+def decode_chunk_data(data: bytes) -> ChunkDataDict:
+    """Decode chunk data container message.
+
+    Args:
+        data: Decoded container body bytes (must be 80-130 bytes).
+
+    Returns:
+        Decoded chunk data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_length_range(data, 80, 130, "ChunkData")
+
+    return ChunkDataDict(
+        msg_type="chunk_data",
+        subtype=data[0],
+        length=len(data),
+        chunk_data=bytes(data[1:]),
+    )
+
+
+# =============================================================================
+# World State Container Message (len=500+)
+# =============================================================================
+
+
+class WorldStateDict(TypedDict):
+    """World state container message.
+
+    Structure (500+ bytes):
+      [subtype:1] [world_data:499+]
+
+    Contains full world/map state data.
+    """
+
+    msg_type: Literal["world_state"]
+    subtype: int
+    length: int
+    world_data: bytes
+
+
+def is_world_state_structure(data: bytes) -> bool:
+    """Check if data matches world state structure.
+
+    World state criteria:
+    - Length >= 500 bytes
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches world state pattern.
+    """
+    return len(data) >= 500
+
+
+def decode_world_state(data: bytes) -> WorldStateDict:
+    """Decode world state container message.
+
+    Args:
+        data: Decoded container body bytes (must be >= 500 bytes).
+
+    Returns:
+        Decoded world state data.
+
+    Raises:
+        ContainerDecodeError: If structure validation fails.
+    """
+    require_min_length(data, 500, "WorldState")
+
+    return WorldStateDict(
+        msg_type="world_state",
+        subtype=data[0],
+        length=len(data),
+        world_data=bytes(data[1:]),
+    )
+
+
+# =============================================================================
 # Unknown Container Message
 # =============================================================================
 
@@ -1006,6 +1414,12 @@ ContainerMessage = (
     | PlayerListExtendedDict
     | DeactivationKillDict
     | DeactivationDeathDict
+    | TeleportLandedDict
+    | EntitySyncDict
+    | EntityExtendedDict
+    | TipNotificationDict
+    | ChunkDataDict
+    | WorldStateDict
     | UnknownContainerDict
 )
 
@@ -1077,21 +1491,24 @@ def _identify_single_length_type(data: bytes) -> ContainerMessageType:
     Returns:
         Identified type, or UNKNOWN if not matched.
     """
-    # Combat hit: exactly 11 bytes
-    if is_combat_hit_structure(data):
-        return ContainerMessageType.COMBAT_HIT
-    # Position update: exactly 13 bytes
-    if is_position_update_structure(data):
-        return ContainerMessageType.POSITION_UPDATE
-    # Tank status short: exactly 9 bytes
-    if is_tank_status_short_structure(data):
-        return ContainerMessageType.TANK_STATUS_SHORT
+    # Teleport landed: exactly 1 byte
+    if is_teleport_landed_structure(data):
+        return ContainerMessageType.TELEPORT_LANDED
     # Tank status sync: 2-3 bytes
     if is_tank_status_sync_structure(data):
         return ContainerMessageType.TANK_STATUS_SYNC
     # Tank leave: 6 bytes
     if is_tank_leave_structure(data):
         return ContainerMessageType.TANK_LEAVE
+    # Tank status short: exactly 9 bytes
+    if is_tank_status_short_structure(data):
+        return ContainerMessageType.TANK_STATUS_SHORT
+    # Combat hit: exactly 11 bytes
+    if is_combat_hit_structure(data):
+        return ContainerMessageType.COMBAT_HIT
+    # Position update: exactly 13 bytes
+    if is_position_update_structure(data):
+        return ContainerMessageType.POSITION_UPDATE
     return ContainerMessageType.UNKNOWN
 
 
@@ -1124,11 +1541,42 @@ def identify_container_type(data: bytes) -> ContainerMessageType:
     deactivation = _identify_deactivation_type(data)
     if deactivation != ContainerMessageType.UNKNOWN:
         return deactivation
+    # Entity sync: exactly 5 bytes (after deactivation to avoid conflict with deactivation_kill)
+    if is_entity_sync_structure(data):
+        return ContainerMessageType.ENTITY_SYNC
     # Player list types (4 bytes only - 7 bytes handled by deactivation_death)
     player_list = _identify_player_list_type(data)
     if player_list != ContainerMessageType.UNKNOWN:
         return player_list
+    # Range-based types (21+, 29+, 80+, 500+ bytes)
+    range_type = _identify_range_type(data)
+    if range_type != ContainerMessageType.UNKNOWN:
+        return range_type
 
+    return ContainerMessageType.UNKNOWN
+
+
+def _identify_range_type(data: bytes) -> ContainerMessageType:
+    """Identify message types by length ranges.
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        Identified range type, or UNKNOWN if not matched.
+    """
+    # Entity extended: 21-28 bytes
+    if is_entity_extended_structure(data):
+        return ContainerMessageType.ENTITY_EXTENDED
+    # Tip notification: 29-79 bytes
+    if is_tip_notification_structure(data):
+        return ContainerMessageType.TIP_NOTIFICATION
+    # Chunk data: 80-130 bytes
+    if is_chunk_data_structure(data):
+        return ContainerMessageType.CHUNK_DATA
+    # World state: 500+ bytes
+    if is_world_state_structure(data):
+        return ContainerMessageType.WORLD_STATE
     return ContainerMessageType.UNKNOWN
 
 
@@ -1185,6 +1633,31 @@ def _decode_deactivation(msg_type: ContainerMessageType, data: bytes) -> Contain
     return None
 
 
+def _decode_single_type(msg_type: ContainerMessageType, data: bytes) -> ContainerMessage | None:
+    """Decode single-length container types.
+
+    Args:
+        msg_type: Identified message type.
+        data: Decoded container body bytes.
+
+    Returns:
+        Decoded message, or None if not a single-length type.
+    """
+    if msg_type == ContainerMessageType.COMBAT_HIT:
+        return decode_combat_hit(data)
+    if msg_type == ContainerMessageType.TANK_REGISTRY:
+        return decode_tank_registry(data)
+    if msg_type == ContainerMessageType.POSITION_UPDATE:
+        return decode_position_update(data)
+    if msg_type == ContainerMessageType.TANK_STATUS_SHORT:
+        return decode_tank_status_short(data)
+    if msg_type == ContainerMessageType.TANK_STATUS_SYNC:
+        return decode_tank_status_sync(data)
+    if msg_type == ContainerMessageType.TANK_LEAVE:
+        return decode_tank_leave(data)
+    return None
+
+
 def decode_container_message(data: bytes) -> ContainerMessage:
     """Decode a 0x2E container message by structure.
 
@@ -1202,41 +1675,65 @@ def decode_container_message(data: bytes) -> ContainerMessage:
     """
     msg_type = identify_container_type(data)
 
-    if msg_type == ContainerMessageType.COMBAT_HIT:
-        return decode_combat_hit(data)
-    if msg_type == ContainerMessageType.TANK_REGISTRY:
-        return decode_tank_registry(data)
-    if msg_type == ContainerMessageType.POSITION_UPDATE:
-        return decode_position_update(data)
-    if msg_type == ContainerMessageType.TANK_STATUS_SHORT:
-        return decode_tank_status_short(data)
-    # Tank update types
+    # Single-length types (1, 2-3, 5, 6, 9, 11, 13, 16-20 bytes)
+    single_msg = _decode_single_type(msg_type, data)
+    if single_msg is not None:
+        return single_msg
+    # Tank update types (10, 14, 15 bytes)
     tank_update = _decode_tank_update(msg_type, data)
     if tank_update is not None:
         return tank_update
-    if msg_type == ContainerMessageType.TANK_STATUS_SYNC:
-        return decode_tank_status_sync(data)
-    # Deactivation types
+    # Deactivation types (5, 7 bytes)
     deactivation = _decode_deactivation(msg_type, data)
     if deactivation is not None:
         return deactivation
-    if msg_type == ContainerMessageType.TANK_LEAVE:
-        return decode_tank_leave(data)
-    # Player list types
+    # Player list types (4, 7 bytes)
     player_list = _decode_player_list(msg_type, data)
     if player_list is not None:
         return player_list
+    # Range-based and misc types (21+, 29+, 80+, 500+ bytes)
+    range_msg = _decode_range_type(msg_type, data)
+    if range_msg is not None:
+        return range_msg
 
     return decode_unknown_container(data)
 
 
+def _decode_range_type(msg_type: ContainerMessageType, data: bytes) -> ContainerMessage | None:
+    """Decode range-based and miscellaneous container types.
+
+    Args:
+        msg_type: Identified message type.
+        data: Decoded container body bytes.
+
+    Returns:
+        Decoded message, or None if not a range/misc type.
+    """
+    if msg_type == ContainerMessageType.TELEPORT_LANDED:
+        return decode_teleport_landed(data)
+    if msg_type == ContainerMessageType.ENTITY_SYNC:
+        return decode_entity_sync(data)
+    if msg_type == ContainerMessageType.ENTITY_EXTENDED:
+        return decode_entity_extended(data)
+    if msg_type == ContainerMessageType.TIP_NOTIFICATION:
+        return decode_tip_notification(data)
+    if msg_type == ContainerMessageType.CHUNK_DATA:
+        return decode_chunk_data(data)
+    if msg_type == ContainerMessageType.WORLD_STATE:
+        return decode_world_state(data)
+    return None
+
+
 __all__ = [
+    "ChunkDataDict",
     "CombatHitDict",
     "ContainerDecodeError",
     "ContainerMessage",
     "ContainerMessageType",
     "DeactivationDeathDict",
     "DeactivationKillDict",
+    "EntityExtendedDict",
+    "EntitySyncDict",
     "PlayerListExtendedDict",
     "PlayerListShortDict",
     "PositionUpdateDict",
@@ -1247,11 +1744,17 @@ __all__ = [
     "TankUpdateCompactDict",
     "TankUpdateExtendedDict",
     "TankUpdateFullDict",
+    "TeleportLandedDict",
+    "TipNotificationDict",
     "UnknownContainerDict",
+    "WorldStateDict",
+    "decode_chunk_data",
     "decode_combat_hit",
     "decode_container_message",
     "decode_deactivation_death",
     "decode_deactivation_kill",
+    "decode_entity_extended",
+    "decode_entity_sync",
     "decode_player_list_extended",
     "decode_player_list_short",
     "decode_position_update",
@@ -1262,12 +1765,18 @@ __all__ = [
     "decode_tank_update_compact",
     "decode_tank_update_extended",
     "decode_tank_update_full",
+    "decode_teleport_landed",
+    "decode_tip_notification",
     "decode_unknown_container",
+    "decode_world_state",
     "extract_uint16_le",
     "identify_container_type",
+    "is_chunk_data_structure",
     "is_combat_hit_structure",
     "is_deactivation_death_structure",
     "is_deactivation_kill_structure",
+    "is_entity_extended_structure",
+    "is_entity_sync_structure",
     "is_player_list_extended_structure",
     "is_player_list_short_structure",
     "is_position_update_structure",
@@ -1278,6 +1787,9 @@ __all__ = [
     "is_tank_update_compact_structure",
     "is_tank_update_extended_structure",
     "is_tank_update_full_structure",
+    "is_teleport_landed_structure",
+    "is_tip_notification_structure",
+    "is_world_state_structure",
     "require_exact_length",
     "require_length_range",
     "require_min_length",
