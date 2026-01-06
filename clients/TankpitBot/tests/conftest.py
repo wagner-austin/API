@@ -6,9 +6,78 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+from platform_core.json_utils import JSONObject
 from scripts import _test_hooks as scripts_test_hooks
 
 from tankpit_bot import _test_hooks
+
+
+class FakeCDPSessionSimple:
+    """Simple fake CDP session for testing with configurable responses.
+
+    Used for testing code that only needs send() without event handlers.
+    """
+
+    def __init__(self) -> None:
+        """Initialize with empty response queue."""
+        self._responses: list[JSONObject] = []
+        self._response_index: int = 0
+        self._calls: list[tuple[str, JSONObject | None]] = []
+
+    def add_response(self, response: JSONObject) -> None:
+        """Add a response to return on next send() call.
+
+        Args:
+            response: The response to return.
+        """
+        self._responses.append(response)
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Send a CDP command and return configured response.
+
+        Args:
+            method: CDP method name.
+            params: Optional parameters.
+
+        Returns:
+            Next configured response, or empty dict if none configured.
+        """
+        self._calls.append((method, params))
+
+        if self._response_index < len(self._responses):
+            response = self._responses[self._response_index]
+            self._response_index += 1
+            return response
+        return {}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Register event handler (no-op for testing).
+
+        Args:
+            event: Event name.
+            handler: Event handler.
+        """
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Detach session (no-op for testing)."""
+
+    def get_calls(self) -> list[tuple[str, JSONObject | None]]:
+        """Get all recorded send() calls.
+
+        Returns:
+            List of (method, params) tuples.
+        """
+        return list(self._calls)
+
+    @property
+    def call_count(self) -> int:
+        """Get number of send() calls made.
+
+        Returns:
+            Number of calls.
+        """
+        return len(self._calls)
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +90,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_path_exists = _test_hooks.path_exists
     original_sync_playwright = _test_hooks.sync_playwright
     original_get_sync_playwright = _test_hooks.get_sync_playwright
+    original_get_argv = _test_hooks.get_argv
 
     yield
 
@@ -31,6 +101,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.path_exists = original_path_exists
     _test_hooks.sync_playwright = original_sync_playwright
     _test_hooks.get_sync_playwright = original_get_sync_playwright
+    _test_hooks.get_argv = original_get_argv
 
 
 @pytest.fixture(autouse=True)
@@ -153,13 +224,25 @@ class FakeFileSystem:
 def fake_fs() -> FakeFileSystem:
     """Create a FakeFileSystem and install it as hooks.
 
+    Pre-populates the static XOR key file used by the codec and probe modules.
+
     Returns:
         FakeFileSystem instance.
     """
+    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+
+    # Create a 1000-character fake static key for testing
+    # This matches the expected format of the real key
+    fake_static_key = "Y" + "A" * 999
+
     fs = FakeFileSystem()
     _test_hooks.write_text = fs.write_text
     _test_hooks.read_text = fs.read_text
     _test_hooks.path_exists = fs.path_exists
+
+    # Pre-populate the static key file
+    fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
+
     return fs
 
 
@@ -177,3 +260,13 @@ def make_fake_get_env(env_vars: dict[str, str]) -> Callable[[str], str | None]:
         return env_vars.get(key)
 
     return _get
+
+
+@pytest.fixture()
+def fake_cdp() -> FakeCDPSessionSimple:
+    """Create a FakeCDPSessionSimple for testing.
+
+    Returns:
+        FakeCDPSessionSimple instance.
+    """
+    return FakeCDPSessionSimple()

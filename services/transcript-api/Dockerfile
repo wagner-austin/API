@@ -53,14 +53,9 @@ WORKDIR /app
 
 USER app
 
-# ---------- API target ----------
+# ---------- API target (default) ----------
 FROM runtime-base AS api
 
 EXPOSE 8000
 
 CMD ["sh", "-c", "exec hypercorn 'transcript_api.asgi:app' --bind [::]:${PORT:-8000}"]
-
-# ---------- Worker target ----------
-FROM runtime-base AS worker
-
-CMD ["sh", "-c", "exec transcript-rq-worker"]

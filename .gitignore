@@ -123,5 +123,8 @@ node_modules/
 services/grandma-api/web/assets/js/
 services/grandma-api/web/coverage/
 
-# TankpitBot captured sessions (regeneratable)
+# TankpitBot captured sessions and runtime data (regeneratable)
 clients/TankpitBot/capture_session.json
+clients/TankpitBot/raw_capture.json
+clients/TankpitBot/messages_dump.txt
+clients/TankpitBot/session_summary.json

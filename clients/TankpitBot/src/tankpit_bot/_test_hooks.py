@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from platform_core.config import _optional_env_str
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 
 # =============================================================================
 # Environment Variable Hook
@@ -230,12 +230,41 @@ class PageProtocol(Protocol):
         """
         ...
 
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event to be fired.
+
+        Args:
+            event: Event name to wait for (e.g., "close").
+            timeout: Maximum wait time in milliseconds.
+        """
+        ...
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for a JavaScript function to return truthy value.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        ...
+
     def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
         """Close the page.
 
         Args:
             reason: Reason to be reported to operations interrupted by page closure.
             run_before_unload: Whether to run the before unload page handlers.
+        """
+        ...
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression in the page context.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+
+        Returns:
+            Result of the expression evaluation.
         """
         ...
 
@@ -411,6 +440,25 @@ class SyncPlaywrightFactoryProtocol(Protocol):
 sync_playwright: SyncPlaywrightFactoryProtocol | None = None
 
 
+# =============================================================================
+# CLI Argument Hook
+# =============================================================================
+
+
+def _real_get_argv() -> list[str]:
+    """Real implementation - returns sys.argv.
+
+    Returns:
+        The command line arguments.
+    """
+    import sys
+
+    return sys.argv
+
+
+get_argv: Callable[[], list[str]] = _real_get_argv
+
+
 def _real_get_sync_playwright() -> SyncPlaywrightFactoryProtocol:
     """Real implementation - imports playwright.
 
@@ -440,6 +488,7 @@ __all__ = [
     "SyncPlaywrightContextManagerProtocol",
     "SyncPlaywrightFactoryProtocol",
     "WriteTextProtocol",
+    "get_argv",
     "get_env",
     "get_sync_playwright",
     "path_exists",

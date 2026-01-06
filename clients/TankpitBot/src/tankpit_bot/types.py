@@ -12,12 +12,59 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     optional_int,
+    optional_str,
     require_bool,
     require_float,
     require_int,
     require_list,
     require_str,
 )
+
+
+def _str_dict_to_json(source: dict[str, str]) -> JSONObject:
+    """Convert dict[str, str] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
+
+def _int_dict_to_json(source: dict[str, int]) -> JSONObject:
+    """Convert dict[str, int] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and int values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
+
+def _mixed_dict_to_json(source: dict[str, int | str]) -> JSONObject:
+    """Convert dict[str, int | str] to JSONObject for type safety.
+
+    Args:
+        source: Dict with string keys and int or str values.
+
+    Returns:
+        JSONObject with same contents.
+    """
+    result: JSONObject = {}
+    for key, value in source.items():
+        result[key] = value
+    return result
+
 
 # =============================================================================
 # Literal Types
@@ -162,6 +209,20 @@ def decode_captured_message(data: JSONObject) -> CapturedMessage:
 # =============================================================================
 
 
+class GameLogEntryWithTimestamp(TypedDict):
+    """A game log entry with timestamp for capture session.
+
+    Attributes:
+        timestamp_ms: Unix timestamp when entry was captured.
+        text: The log message text.
+        category: Category of the log entry.
+    """
+
+    timestamp_ms: int
+    text: str
+    category: str
+
+
 class CaptureSession(TypedDict):
     """A complete WebSocket capture session.
 
@@ -171,6 +232,9 @@ class CaptureSession(TypedDict):
         end_timestamp_ms: Unix timestamp when capture ended (None if ongoing).
         base_url: Base URL of the site being captured.
         messages: List of captured messages.
+        magic: XOR magic key from tankpit.magic (None if not captured).
+        game_log: List of game log entries with timestamps.
+        tank_names: Dictionary mapping tank IDs to names.
     """
 
     session_id: str
@@ -178,6 +242,9 @@ class CaptureSession(TypedDict):
     end_timestamp_ms: int | None
     base_url: str
     messages: list[CapturedMessage]
+    magic: str | None
+    game_log: list[GameLogEntryWithTimestamp]
+    tank_names: dict[str, str]  # str keys for JSON compatibility
 
 
 def encode_capture_session(session: CaptureSession) -> JSONObject:
@@ -190,12 +257,25 @@ def encode_capture_session(session: CaptureSession) -> JSONObject:
         JSON-serializable dict representation.
     """
     encoded_messages: list[JSONValue] = [encode_captured_message(m) for m in session["messages"]]
+    encoded_game_log: list[JSONValue] = [
+        {
+            "timestamp_ms": entry["timestamp_ms"],
+            "text": entry["text"],
+            "category": entry["category"],
+        }
+        for entry in session["game_log"]
+    ]
+    # Convert tank_names dict (dict[str, str] -> JSONObject)
+    tank_names_json: JSONObject = _str_dict_to_json(session["tank_names"])
     result: JSONObject = {
         "session_id": session["session_id"],
         "start_timestamp_ms": session["start_timestamp_ms"],
         "end_timestamp_ms": session["end_timestamp_ms"],
         "base_url": session["base_url"],
         "messages": encoded_messages,
+        "magic": session["magic"],
+        "game_log": encoded_game_log,
+        "tank_names": tank_names_json,
     }
     return result
 
@@ -219,13 +299,173 @@ def decode_capture_session(data: JSONObject) -> CaptureSession:
             raise JSONTypeError(f"messages[{idx}] must be an object")
         messages.append(decode_captured_message(raw_msg))
 
+    # Decode game log (with backwards compatibility for old sessions)
+    game_log: list[GameLogEntryWithTimestamp] = []
+    raw_game_log = data.get("game_log")
+    if raw_game_log is not None and isinstance(raw_game_log, list):
+        for raw_entry in raw_game_log:
+            if isinstance(raw_entry, dict):
+                game_log.append(
+                    GameLogEntryWithTimestamp(
+                        timestamp_ms=require_int(raw_entry, "timestamp_ms"),
+                        text=require_str(raw_entry, "text"),
+                        category=require_str(raw_entry, "category"),
+                    )
+                )
+
+    # Decode tank names (with backwards compatibility)
+    tank_names: dict[str, str] = {}
+    raw_tank_names = data.get("tank_names")
+    if raw_tank_names is not None and isinstance(raw_tank_names, dict):
+        for key, value in raw_tank_names.items():
+            if isinstance(key, str) and isinstance(value, str):
+                tank_names[key] = value
+
     return CaptureSession(
         session_id=require_str(data, "session_id"),
         start_timestamp_ms=require_int(data, "start_timestamp_ms"),
         end_timestamp_ms=optional_int(data, "end_timestamp_ms"),
         base_url=require_str(data, "base_url"),
         messages=messages,
+        magic=optional_str(data, "magic"),
+        game_log=game_log,
+        tank_names=tank_names,
     )
+
+
+# =============================================================================
+# Session Summary (processed/decoded data)
+# =============================================================================
+
+
+class MessageStats(TypedDict):
+    """Statistics about decoded vs unknown message types.
+
+    Attributes:
+        decoded: Dict of signature -> count for decoded messages.
+        unknown: Dict of signature -> {count, samples} for unknown messages.
+        total_received: Total number of received messages.
+        decode_coverage: Percentage of messages successfully decoded.
+    """
+
+    decoded: dict[str, int]
+    unknown: dict[str, dict[str, int | list[str]]]
+    total_received: int
+    decode_coverage: str
+
+
+class CombatEvent(TypedDict):
+    """A combat event extracted from game log or WebSocket.
+
+    Attributes:
+        timestamp_ms: When the event occurred.
+        event_type: Type of event (hit, hit_by, kill, killed_by, etc).
+        target: Name of target (for outgoing) or attacker (for incoming).
+        tank_id: Tank ID if correlated, None otherwise.
+    """
+
+    timestamp_ms: int
+    event_type: str
+    target: str
+    tank_id: int | None
+
+
+def encode_combat_event(event: CombatEvent) -> JSONObject:
+    """Encode CombatEvent to JSON-serializable dict."""
+    return {
+        "timestamp_ms": event["timestamp_ms"],
+        "event_type": event["event_type"],
+        "target": event["target"],
+        "tank_id": event["tank_id"],
+    }
+
+
+def encode_message_stats(stats: MessageStats) -> JSONObject:
+    """Encode MessageStats to JSON-serializable dict.
+
+    Args:
+        stats: MessageStats to encode.
+
+    Returns:
+        JSON-serializable dict.
+    """
+    # Convert decoded dict (dict[str, int] -> dict[str, JSONValue])
+    decoded_json: JSONObject = _int_dict_to_json(stats["decoded"])
+
+    # Convert unknown dict (nested structure)
+    unknown_json: JSONObject = {}
+    for sig, data in stats["unknown"].items():
+        entry: JSONObject = {}
+        for key, val in data.items():
+            if isinstance(val, list):
+                # Convert list[str] to list[JSONValue]
+                json_list: list[JSONValue] = []
+                for item in val:
+                    json_list.append(item)
+                entry[key] = json_list
+            else:
+                entry[key] = val
+        unknown_json[sig] = entry
+
+    return {
+        "decoded": decoded_json,
+        "unknown": unknown_json,
+        "total_received": stats["total_received"],
+        "decode_coverage": stats["decode_coverage"],
+    }
+
+
+class SessionSummary(TypedDict):
+    """Processed/decoded session data for easy analysis.
+
+    Attributes:
+        session_id: Unique identifier matching raw capture.
+        start_timestamp_ms: When capture started.
+        end_timestamp_ms: When capture ended.
+        magic: XOR magic key used for decoding.
+        tanks: Tank ID to name mappings.
+        combat: List of combat events.
+        equipment_gains: List of equipment gain events.
+        game_log: Filtered game log entries (combat only).
+        message_stats: Decoded vs unknown message statistics.
+    """
+
+    session_id: str
+    start_timestamp_ms: int
+    end_timestamp_ms: int | None
+    magic: str | None
+    tanks: dict[str, str]
+    combat: list[CombatEvent]
+    equipment_gains: list[dict[str, int | str]]
+    game_log: list[GameLogEntryWithTimestamp]
+    message_stats: MessageStats
+
+
+def encode_session_summary(summary: SessionSummary) -> JSONObject:
+    """Encode SessionSummary to JSON-serializable dict."""
+    # Convert tanks dict (dict[str, str] -> JSONObject)
+    tanks_json: JSONObject = _str_dict_to_json(summary["tanks"])
+
+    # Convert equipment_gains list (list[dict[str, int | str]] -> list[JSONValue])
+    equipment_json: list[JSONValue] = []
+    for gain in summary["equipment_gains"]:
+        entry: JSONObject = _mixed_dict_to_json(gain)
+        equipment_json.append(entry)
+
+    return {
+        "session_id": summary["session_id"],
+        "start_timestamp_ms": summary["start_timestamp_ms"],
+        "end_timestamp_ms": summary["end_timestamp_ms"],
+        "magic": summary["magic"],
+        "tanks": tanks_json,
+        "combat": [encode_combat_event(e) for e in summary["combat"]],
+        "equipment_gains": equipment_json,
+        "game_log": [
+            {"timestamp_ms": e["timestamp_ms"], "text": e["text"], "category": e["category"]}
+            for e in summary["game_log"]
+        ],
+        "message_stats": encode_message_stats(summary["message_stats"]),
+    }
 
 
 # =============================================================================

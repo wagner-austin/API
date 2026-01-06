@@ -11,10 +11,10 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Outputs structured JSON for analysis
 
 **Phase 1.5: Automated Protocol Probe** (complete)
-- Programmatic input injection via CDP
-- Tests keyboard and mouse inputs
-- Correlates inputs with server messages
-- Discovers which inputs generate protocol commands
+- WebSocket injection of known commands (not synthetic JS events)
+- Toggle key support (first press opens via WS, second closes via JS)
+- Correlates inputs with server responses
+- Default sequence: map open/close, radar, mine, quit
 
 **Phase 2: Protocol Analysis** (complete)
 - WebSocket endpoint: `wss://dorothy.tankpit.com/ws/`
@@ -23,13 +23,29 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - Both guest and authenticated flows captured
 - See `docs/protocol.md` for details
 
-**Phase 3: Bot Implementation** (next)
-- WebSocket client speaking the discovered protocol
+**Phase 2.5: Protocol Decoding** (complete)
+- XOR codec with static + session magic keys
+- 2-byte framing encode/decode
+- Session decoder for captured data
+- Lobby message parser (room list, game record, status, etc.)
+
+**Phase 2.6: Container Message Decoding** (complete)
+- Length-based message identification (session-independent)
+- 0x2E container subtype decoder (`container_decoder.py`)
+- 13 container message types decoded: tank_registry, position_update, combat_hit, tank_status_short, deactivation_kill, deactivation_death, etc.
+- First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
+
+**Phase 3: Bot Implementation** (in progress)
+- Direct WebSocket client (no browser)
+- High-level protocol send/receive
 - Game logic and AI strategy
 
 ## Features
 
 - **Protocol Discovery**: Captures WebSocket traffic via Playwright CDP integration
+- **WebSocket Injection**: Sends commands via captured WebSocket (synthetic JS events don't work)
+- **Intel Gathering**: Console listener, WebSocket URLs, JS debug info, script URLs
+- **Shared Architecture**: BrowserSession base class for sniffer and probe
 - **Type Safety**: mypy strict mode, zero `Any` types, TypedDict models
 - **100% Test Coverage**: Statements and branches
 - **Monorepo Integration**: Guard rules, platform_core utilities
@@ -69,11 +85,18 @@ make probe
 ```
 
 This will:
-1. Join a game as guest
-2. Inject keyboard inputs (WASD, arrows, numbers)
-3. Inject mouse clicks at various positions
-4. Record which inputs generate server messages
+1. Join a game using account credentials
+2. Capture the game's WebSocket via prototype hook
+3. Send known commands via WebSocket injection:
+   - `f` - Map open (XOR command via WebSocket)
+   - `f` - Map close (JavaScript keypress toggle)
+   - `s` - Radar (XOR command)
+   - `d` - Mine (XOR command)
+   - `q` - Quit (plain command)
+4. Record WebSocket responses from the server
 5. Save results to `probe_session.json`
+
+**Note**: Synthetic JavaScript KeyboardEvents don't work because browsers set `isTrusted: false` on programmatically created events. The probe uses WebSocket injection instead.
 
 ### Run the Bot
 
@@ -95,6 +118,8 @@ cp .env.example .env
 | `TANKPIT_OUTPUT` | `capture_session.json` | Output file path |
 | `TANKPIT_HEADLESS` | `true` | Run browser headlessly |
 | `TANKPIT_DURATION_MS` | `60000` | Capture duration in ms |
+| `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
+| `TANKPIT_PREFER_ACCOUNT` | `false` | Skip guest login, use account directly |
 | `TANKPIT_USERNAME` | (none) | Account username for login |
 | `TANKPIT_PASSWORD` | (none) | Account password for login |
 | `PYTHONUTF8` | `1` | Windows console UTF-8 support |
@@ -112,6 +137,7 @@ make test     # Run pytest with coverage
 make check    # Run lint + test
 make sniff    # Run WebSocket sniffer
 make probe    # Run input probe
+make decode   # Decode captured session
 make bot      # Run bot client
 ```
 
@@ -142,33 +168,68 @@ poetry run pytest --cov-report=html
 ```
 TankpitBot/
 ├── src/tankpit_bot/
-│   ├── __init__.py       # Package exports
-│   ├── _test_hooks.py    # Dependency injection hooks
-│   ├── types.py          # TypedDict models
-│   ├── login.py          # Shared guest/account login logic
-│   ├── sniffer.py        # WebSocket capture via Playwright
-│   ├── probe.py          # Input injection and command discovery
-│   └── bot.py            # Bot client entry point
+│   ├── __init__.py           # Package exports
+│   ├── _test_hooks.py        # Dependency injection hooks
+│   ├── types.py              # TypedDict models + JSON encoders
+│   ├── login.py              # Shared guest/account login logic
+│   ├── browser.py            # Shared browser session base class
+│   ├── sniffer.py            # WebSocket capture via Playwright
+│   ├── probe.py              # Input injection and command discovery
+│   ├── codec.py              # XOR encode/decode with static + session keys
+│   ├── framing.py            # 2-byte length framing encode/decode
+│   ├── decoder.py            # Session decoder for captured data
+│   ├── parser.py             # Lobby message parser (room list, etc.)
+│   ├── protocol.py           # Protocol message TypedDicts + decoders
+│   ├── container_decoder.py  # 0x2E container subtype decoder (length-based)
+│   ├── commands.py           # Command type definitions
+│   ├── dom_scraper.py        # DOM scraping for game log
+│   ├── fuel_probe.py         # Fuel bar probing
+│   ├── inventory.py          # Inventory tracking
+│   └── bot.py                # Bot client entry point
 ├── tests/
-│   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
-│   ├── fakes.py              # Fake Playwright classes for testing
-│   ├── test_types.py         # Type encode/decode tests
-│   ├── test_login.py         # Login flow tests
-│   ├── test_sniffer.py       # Sniffer tests with fake Playwright
-│   ├── test_probe.py         # Probe tests with fake CDP
-│   ├── test_bot.py           # Bot entry point tests
-│   ├── test_test_hooks.py    # Hook function tests
-│   └── test_guard_checks.py  # Guard script tests
+│   ├── conftest.py               # Test fixtures (FakeEnv, FakeCDPSessionSimple)
+│   ├── fakes.py                  # Fake Playwright classes for testing
+│   ├── test_types.py             # Type encode/decode tests
+│   ├── test_login.py             # Login flow tests
+│   ├── test_browser.py           # BrowserSession + XOR key tests
+│   ├── test_sniffer.py           # Sniffer tests with fake Playwright
+│   ├── test_probe.py             # Probe tests with fake CDP
+│   ├── test_codec.py             # XOR codec tests
+│   ├── test_framing.py           # Framing encode/decode tests
+│   ├── test_decoder.py           # Session decoder tests
+│   ├── test_parser.py            # Lobby message parser tests
+│   ├── test_protocol.py          # Protocol message decoder tests
+│   ├── test_container_decoder.py # Container subtype decoder tests
+│   ├── test_commands.py          # Command type tests
+│   ├── test_fuel_probe.py        # Fuel probe tests
+│   ├── test_bot.py               # Bot entry point tests
+│   ├── test_test_hooks.py        # Hook function tests
+│   └── test_guard_checks.py      # Guard script tests
 ├── scripts/
 │   ├── guard.py          # Monorepo guard orchestrator
 │   └── _test_hooks.py    # Guard test hooks
 ├── docs/
-│   └── protocol.md       # Protocol documentation
+│   ├── protocol.md           # Protocol documentation
+│   └── decoding_status.md    # Message decoding status + formats
 ├── pyproject.toml        # Poetry + tool config
 └── Makefile              # Development commands
 ```
 
 ## Architecture
+
+### Shared BrowserSession Base Class
+
+Both sniffer and probe inherit from `BrowserSession` which provides:
+
+- **CDP Setup**: WebSocket event handlers for frame capture
+- **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
+- **Intel Gathering**:
+  - Console listener (filters for WS/Hook/WebSocket keywords)
+  - WebSocket URL logging
+  - JavaScript WebSocket debug check
+  - Script URL logging
+- **Magic Key Capture**: Reads `tankpit.magic` for XOR encoding
+- **Login Integration**: Guest or account authentication
 
 ### Sniffer Flow
 
@@ -180,6 +241,12 @@ TankpitBot/
          │
          ▼
 ┌─────────────────┐
+│  BrowserSession │  Console listener
+│  CDP Handlers   │  Intel gathering
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
 │  CDP Session    │  Network.enable
 │  Event Handlers │  webSocketCreated
 └────────┬────────┘  webSocketFrameSent
@@ -187,6 +254,39 @@ TankpitBot/
          ▼
 ┌─────────────────┐
 │  CaptureSession │
+│  JSON output    │
+└─────────────────┘
+```
+
+### Probe Flow
+
+```
+┌─────────────────┐
+│  BrowserSession │  WebSocket prototype hook
+│  CDP Handlers   │  Console + intel gathering
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  XOR Encoding   │  Static key + session magic
+│  Command Build  │  encode_frame(XOR'd bytes)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  WebSocket      │  window.__capturedWS.send()
+│  Injection      │  (or fallback to tankpit.ws)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Toggle Keys    │  First press: WS open
+│  State Machine  │  Second press: JS close
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  ProbeSession   │
 │  JSON output    │
 └─────────────────┘
 ```
@@ -208,6 +308,7 @@ class CaptureSession(TypedDict):
     end_timestamp_ms: int | None
     base_url: str
     messages: list[CapturedMessage]
+    magic: str | None  # XOR key from tankpit.magic
 
 # CDP WebSocket frame event
 class CDPWebSocketFrameEvent(TypedDict):
