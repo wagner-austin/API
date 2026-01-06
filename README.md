@@ -24,6 +24,7 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | Client | Description |
 |--------|-------------|
 | [DiscordBot](clients/DiscordBot) | Discord bot integrating all platform services |
+| [TankpitBot](clients/TankpitBot) | Tankpit.com WebSocket protocol reverse-engineering and game bot |
 
 ## Shared Libraries
 
@@ -96,9 +97,9 @@ make status
 
 All services share:
 - `platform-network` (Docker bridge)
-- `platform-redis` (job queue + pub/sub)
+- `platform-redis` (job queue + pub/sub for async services)
 - Structured JSON logging
-- Health endpoints (`/healthz`, `/readyz`)
+- Health endpoint (`/healthz`)
 
 ## Development
 
