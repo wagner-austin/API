@@ -176,6 +176,39 @@ class ProtocolCodec:
         return xor_bytes(self._table, data, offset)
 
 
+def extract_magic_from_auth_payload(payload_bytes: bytes) -> str | None:
+    """Extract magic key from AUTH message payload.
+
+    AUTH message format: %AUTH !be <session_id>|<hash>|<timestamp> <magic>
+    The magic is the last space-separated token.
+
+    Args:
+        payload_bytes: Raw AUTH message bytes (including 2-byte length prefix).
+
+    Returns:
+        Magic key string, or None if not an AUTH message or extraction fails.
+    """
+    if len(payload_bytes) < 10:
+        return None
+
+    # Skip 2-byte length prefix
+    body = payload_bytes[2:]
+    text = body.decode("utf-8", errors="replace")
+
+    if "%AUTH" not in text and "AUTH" not in text:
+        return None
+
+    parts = text.split()
+    if len(parts) < 3:
+        return None
+
+    magic = parts[-1]
+    if len(magic) < 10:
+        return None
+
+    return magic
+
+
 def create_codec(static_key_path: Path, magic: str) -> ProtocolCodec:
     """Create a protocol codec by loading static key from file.
 
@@ -203,6 +236,7 @@ __all__ = [
     "ProtocolCodec",
     "build_xor_table",
     "create_codec",
+    "extract_magic_from_auth_payload",
     "load_static_key",
     "xor_bytes",
 ]
