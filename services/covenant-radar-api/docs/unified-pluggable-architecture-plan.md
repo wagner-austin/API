@@ -75,6 +75,7 @@ Worker Layer (5x DUPLICATED - src/worker/optimize_*_job.py)
 |-------|-------------|--------|
 | 1 | Unified Progress Types | PENDING |
 | 2 | Unified Optimize Job | PENDING |
+| 2.5 | Search Space Protocol Extension | PENDING |
 | 3 | Optimizer Strategy Integration | PENDING |
 | 4 | Validation Strategy Integration | PENDING |
 | 5 | Fine-Tuning CLI and Worker | PENDING |
@@ -502,6 +503,137 @@ def run_optimization(
 
 ---
 
+## Phase 2.5: Search Space Protocol Extension
+
+### Design Decision: Pluggable Search Spaces
+
+**Problem**: Each backend has different hyperparameters (XGBoost has `max_depth`, MLP has `hidden_size`, etc.). Without a pluggable approach, the unified job would need a switch statement:
+
+```python
+# BAD - not pluggable, hidden dispatch
+def _get_search_space(backend_name: BackendName) -> SearchSpace:
+    if backend_name == "xgboost":
+        return make_xgboost_default_space()
+    elif backend_name == "mlp":
+        return make_mlp_default_space()
+    # ... more elif branches for each backend
+```
+
+This violates the Open-Closed Principle: adding a new backend requires modifying the unified job.
+
+**Solution**: Extend `ClassifierBackend` protocol to include search space methods:
+
+### Update: `covenant_ml/backends/protocol.py`
+
+```python
+from covenant_ml.optimizer.types import SearchSpace
+
+class ClassifierBackend(Protocol):
+    """Protocol for pluggable classifier backends (e.g., XGBoost, MLP)."""
+
+    def backend_name(self) -> BackendName: ...
+
+    def capabilities(self) -> BackendCapabilities: ...
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return the default hyperparameter search space for this backend.
+
+        Each backend defines its own hyperparameters and sensible default
+        ranges. The unified optimizer calls this method instead of
+        dispatching by backend name.
+
+        Returns:
+            SearchSpace TypedDict with parameter specifications.
+        """
+        ...
+
+    def get_focused_search_space(
+        self,
+        *,
+        prior_best_params: SampledParams,
+    ) -> SearchSpace:
+        """Return a narrowed search space around known good values.
+
+        Used for fine-tuning after initial optimization. Each backend
+        narrows ranges based on which parameters it supports.
+
+        Args:
+            prior_best_params: Best parameters from prior optimization.
+
+        Returns:
+            SearchSpace with narrowed ranges around best values.
+        """
+        ...
+
+    # ... existing methods (prepare, train, evaluate, save, load, etc.)
+```
+
+### How the Unified Job Uses It
+
+```python
+# GOOD - truly pluggable, no switch statement
+def run_optimization(config: OptimizeParseResult, ...) -> OptimizationResult:
+    # Get backend from registry (already pluggable)
+    backend: ClassifierBackend = backend_registry.get(config["backend"])
+
+    # Get search space FROM the backend itself (now pluggable)
+    search_space = backend.get_default_search_space()
+
+    # Run optimization with backend-specific space
+    summary = optimizer.optimize(
+        search_space=search_space,
+        ...
+    )
+```
+
+### Implementation in Each Backend
+
+Each backend module implements the protocol method:
+
+```python
+# covenant_ml/backends/xgboost/backend.py
+class XGBoostBackend:
+    def get_default_search_space(self) -> XGBoostSearchSpace:
+        return make_xgboost_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        prior_best_params: SampledParams,
+    ) -> XGBoostSearchSpace:
+        return make_xgboost_focused_space(
+            best_max_depth=prior_best_params["int_params"]["max_depth"],
+            best_learning_rate=prior_best_params["float_params"]["learning_rate"],
+        )
+
+# covenant_ml/backends/mlp/backend.py
+class MLPBackend:
+    def get_default_search_space(self) -> MLPSearchSpace:
+        return make_mlp_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        prior_best_params: SampledParams,
+    ) -> MLPSearchSpace:
+        return make_mlp_focused_space(
+            best_n_layers=prior_best_params["int_params"]["n_layers"],
+            best_hidden_size=prior_best_params["int_params"]["hidden_size"],
+            best_learning_rate=prior_best_params["float_params"]["learning_rate"],
+        )
+```
+
+### Benefits
+
+| Aspect | Before (Switch) | After (Protocol) |
+|--------|-----------------|------------------|
+| Adding new backend | Modify unified job | Just implement protocol |
+| Search space location | Scattered in job code | Co-located with backend |
+| Testing | Mock switch branches | Test each backend independently |
+| Type safety | Runtime dispatch | Compile-time protocol check |
+
+---
+
 ## Phase 3: Optimizer Strategy Integration
 
 Add hooks for optimizer strategy selection.
@@ -596,6 +728,20 @@ cv_registry_factory: CVRegistryFactoryProtocol = _real_cv_registry
 
 Wire up the existing fine-tuning infrastructure.
 
+### Design Decision: Artifact IDs vs File Paths
+
+**Problem**: Using raw file paths (`prior_result_path: str`) is fragile:
+- Paths break when files move
+- No validation that the artifact exists
+- No metadata about what the artifact contains
+- Inconsistent with how we store other artifacts
+
+**Solution**: Use artifact IDs from the artifact store:
+- Artifact store manages lifecycle and location
+- IDs are stable references
+- Metadata available (backend, dataset, timestamp)
+- Consistent with model artifacts
+
 ### New File: `worker/finetune_job.py`
 
 ```python
@@ -627,14 +773,15 @@ class FineTuneParseResult(TypedDict, total=True):
         backend: ML backend to fine-tune.
         dataset: Dataset name from registry.
         strategy: Fine-tuning strategy name.
-        prior_result_path: Path to prior optimization result (for warm start).
+        prior_artifact_id: Artifact ID of prior optimization result (for warm start).
+                          Retrieved via artifact store, not raw file path.
         random_state: Random seed for reproducibility.
     """
 
     backend: Literal["xgboost", "mlp", "lstm", "lightgbm", "cleargbm"]
     dataset: str
     strategy: Literal["staged", "warm_start", "iterative_refinement"]
-    prior_result_path: str | None
+    prior_artifact_id: str | None
     random_state: int
 
 
@@ -655,7 +802,7 @@ def run_fine_tuning(
 
     Raises:
         KeyError: If strategy not found in registry.
-        FileNotFoundError: If prior result path doesn't exist.
+        ArtifactNotFoundError: If prior artifact ID doesn't exist in store.
     """
     from covenant_radar_api.worker import _test_hooks as hooks
 
@@ -666,10 +813,14 @@ def run_fine_tuning(
     # Load dataset and build objective (similar to optimize_job)
     # ...
 
-    # Load warm-start config if prior result provided
+    # Load warm-start config from artifact store if prior artifact provided
     warm_start: WarmStartConfig | None = None
-    if config["prior_result_path"] is not None:
-        warm_start = _load_warm_start(config["prior_result_path"])
+    if config["prior_artifact_id"] is not None:
+        artifact_store = hooks.artifact_store_factory()
+        warm_start = _load_warm_start_from_artifact(
+            artifact_store,
+            config["prior_artifact_id"],
+        )
 
     # Run fine-tuning
     result = strategy.fine_tune(
@@ -683,6 +834,39 @@ def run_fine_tuning(
     )
 
     return result
+
+
+def _load_warm_start_from_artifact(
+    artifact_store: ArtifactStoreProtocol,
+    artifact_id: str,
+) -> WarmStartConfig:
+    """Load warm start configuration from artifact store.
+
+    Args:
+        artifact_store: Artifact store instance.
+        artifact_id: ID of the optimization result artifact.
+
+    Returns:
+        WarmStartConfig with best parameters from prior run.
+
+    Raises:
+        ArtifactNotFoundError: If artifact doesn't exist.
+        ArtifactValidationError: If artifact is not an optimization result.
+    """
+    artifact = artifact_store.get(artifact_id)
+
+    # Validate artifact type
+    if artifact["type"] != "optimization_result":
+        raise ArtifactValidationError(
+            f"Expected optimization_result, got {artifact['type']}"
+        )
+
+    # Extract best parameters for warm start
+    return WarmStartConfig(
+        best_int_params=artifact["summary"]["best_int_params"],
+        best_float_params=artifact["summary"]["best_float_params"],
+        best_string_params=artifact["summary"]["best_string_params"],
+    )
 ```
 
 ### New File: `scripts/finetune/__main__.py`
@@ -880,6 +1064,9 @@ tests/
 - [ ] All registries wired through `_test_hooks.py`
 - [ ] Fine-tuning CLI and worker implemented
 - [ ] No hardcoded backend-specific logic in unified jobs
+- [ ] `ClassifierBackend` protocol extended with `get_default_search_space()` and `get_focused_search_space()`
+- [ ] All backends implement search space protocol methods
+- [ ] Fine-tuning uses artifact IDs, not raw file paths
 
 ### Testing
 - [ ] No mocks - only fakes implementing protocols
@@ -910,7 +1097,9 @@ tests/
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `worker/_test_hooks.py` | Add optimizer, validation, fine-tuning registry hooks |
+| `covenant_ml/backends/protocol.py` | Add `get_default_search_space()` and `get_focused_search_space()` methods |
+| `covenant_ml/backends/*/backend.py` | Implement search space methods in each backend |
+| `worker/_test_hooks.py` | Add optimizer, validation, fine-tuning, artifact store registry hooks |
 | `worker/_optimize_common.py` | Refactor for unified job |
 | `scripts/optimize/__main__.py` | Replace subcommands with unified flags |
 
@@ -933,15 +1122,16 @@ tests/
 
 1. **Phase 1**: Create `worker/types.py` with unified TypedDicts
 2. **Phase 2**: Create `worker/optimize_job.py` (unified job)
-3. **Phase 3**: Add optimizer strategy hooks to `_test_hooks.py`
-4. **Phase 4**: Add validation strategy hooks to `_test_hooks.py`
-5. **Phase 5**: Create fine-tuning job and CLI
-6. **Phase 6**: Refactor optimize CLI to use unified job
-7. **Phase 7**: Migrate tests to unified structure
-8. **Phase 8**: Delete deprecated files
+3. **Phase 2.5**: Extend `ClassifierBackend` protocol with `get_default_search_space()` and `get_focused_search_space()` methods; implement in all backends
+4. **Phase 3**: Add optimizer strategy hooks to `_test_hooks.py`
+5. **Phase 4**: Add validation strategy hooks to `_test_hooks.py`
+6. **Phase 5**: Create fine-tuning job and CLI (using artifact IDs, not paths)
+7. **Phase 6**: Refactor optimize CLI to use unified job
+8. **Phase 7**: Migrate tests to unified structure
+9. **Phase 8**: Delete deprecated files
 
 Each phase must pass `make check` before proceeding.
 
 ---
 
-*Last updated: December 2025*
+*Last updated: January 2026*
