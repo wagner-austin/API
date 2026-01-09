@@ -900,6 +900,7 @@ def test_container_get_model_file_id_xgboost(
         sector_encoder={},
         region_encoder={},
         ml_backend="xgboost",
+        data_bank_model_file_id="active_xgb.ubj",
     )
     assert container._get_model_file_id() == "active_xgb.ubj"
     container.close()
@@ -923,6 +924,7 @@ def test_container_get_model_file_id_mlp(
         sector_encoder={},
         region_encoder={},
         ml_backend="mlp",
+        data_bank_model_file_id="active_mlp.pt",
     )
     assert container._get_model_file_id() == "active_mlp.pt"
     container.close()
@@ -946,6 +948,7 @@ def test_container_get_model_file_id_lstm(
         sector_encoder={},
         region_encoder={},
         ml_backend="lstm",
+        data_bank_model_file_id="active_lstm.pt",
     )
     assert container._get_model_file_id() == "active_lstm.pt"
     container.close()
@@ -969,6 +972,7 @@ def test_container_get_model_file_id_lightgbm(
         sector_encoder={},
         region_encoder={},
         ml_backend="lightgbm",
+        data_bank_model_file_id="active_lgbm.txt",
     )
     assert container._get_model_file_id() == "active_lgbm.txt"
     container.close()
@@ -1050,6 +1054,7 @@ def test_container_download_model_from_data_bank_success(
         ml_backend="xgboost",
         data_bank_url="https://data-bank.example.com",
         data_bank_key="test-api-key",
+        data_bank_model_file_id="active_xgb.ubj",
     )
 
     dest_path = tmp_path / "models" / "active_xgb.ubj"

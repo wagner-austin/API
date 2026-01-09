@@ -93,6 +93,7 @@ def _make_test_settings() -> Settings:
             "active_model_path_mlp": "/data/models/active_mlp.pt",
             "data_bank_api_url": "",
             "data_bank_api_key": "",
+            "data_bank_model_file_id": "",
         },
         "datadog": {
             "enabled": False,
