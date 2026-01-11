@@ -1,0 +1,75 @@
+[package]
+name = "cleargbm_rs"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance Rust core for ClearGBM gradient boosting"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/wagner-austin/API"
+keywords = ["machine-learning", "gradient-boosting", "gbm", "python-bindings"]
+categories = ["science", "algorithms"]
+
+[lib]
+name = "cleargbm_rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.27", features = ["extension-module"] }
+numpy = "0.27"
+ndarray = "0.17"
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+proptest = "1.5"
+
+# =============================================================================
+# Strict Lints (Equivalent to our Python mypy strict + ruff)
+# =============================================================================
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+
+[lints.clippy]
+# All lints denied
+all = "deny"
+cargo = "deny"
+
+# No escape hatches (equivalent to no type: ignore, no noqa)
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+
+# No silent failures (equivalent to no try/except recovery)
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+# No unsafe conversions (equivalent to no cast())
+as_conversions = "deny"
+cast_possible_truncation = "deny"
+cast_sign_loss = "deny"
+cast_precision_loss = "deny"
+cast_possible_wrap = "deny"
+
+# No implicit behavior
+default_numeric_fallback = "deny"
+implicit_clone = "deny"
+
+# Explicit error handling
+result_unit_err = "deny"
+map_err_ignore = "deny"
+
+# Code quality
+clone_on_ref_ptr = "deny"
+redundant_closure_for_method_calls = "deny"
+manual_let_else = "deny"
+needless_pass_by_value = "deny"
+
+# Documentation
+missing_docs_in_private_items = "deny"
+missing_errors_doc = "deny"
