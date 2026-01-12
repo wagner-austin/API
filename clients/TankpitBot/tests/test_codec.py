@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot.codec import (
+from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     CodecError,
     InvalidKeyError,
