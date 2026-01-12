@@ -33,20 +33,21 @@ from tankpit_bot.browser import (
     PlaywrightNotInstalledError,
     get_current_time_ms,
 )
-from tankpit_bot.codec import (
+from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     build_xor_table,
+    extract_magic_from_auth_payload,
     load_static_key,
     xor_bytes,
 )
-from tankpit_bot.commands import (
+from tankpit_bot.protocol.commands import (
     CMD_MAP_OPEN,
     CMD_MINE,
     CMD_RADAR,
     PLAIN_QUIT,
 )
-from tankpit_bot.framing import encode_frame
-from tankpit_bot.sniffer import _decode_message
+from tankpit_bot.protocol.framing import encode_frame
+from tankpit_bot.sniffer import decode_message
 from tankpit_bot.types import (
     CapturedMessage,
     KeyInput,
@@ -58,6 +59,45 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
+
+
+def _is_valid_base64(s: str) -> bool:
+    """Check if string is valid base64.
+
+    Args:
+        s: String to check.
+
+    Returns:
+        True if valid base64, False otherwise.
+    """
+    import re
+
+    if not s:
+        return False
+    # Base64 characters plus padding
+    pattern = r"^[A-Za-z0-9+/]*={0,2}$"
+    if not re.match(pattern, s):
+        return False
+    # Must be multiple of 4 in length (with padding)
+    return len(s) % 4 == 0
+
+
+def _extract_magic_from_payload(payload_b64: str) -> str | None:
+    """Extract magic key from AUTH message payload.
+
+    Args:
+        payload_b64: Base64-encoded AUTH message payload.
+
+    Returns:
+        Magic key string, or None if not an AUTH message or extraction fails.
+    """
+    import base64
+
+    if not _is_valid_base64(payload_b64):
+        return None
+
+    data = base64.b64decode(payload_b64)
+    return extract_magic_from_auth_payload(data)
 
 
 class ProbeError(Exception):
@@ -167,11 +207,18 @@ class ProtocolProbe(BrowserSession):
         self._open_toggles: set[str] = set()
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Signal when a received message arrives.
+        """Signal when a received message arrives and extract magic from AUTH.
 
         Args:
             message: The captured message.
         """
+        # Extract magic from AUTH message (sent messages)
+        if message["direction"] == "sent" and self._magic is None:
+            magic = _extract_magic_from_payload(message["payload"])
+            if magic is not None:
+                self._magic = magic
+                log.info("Captured magic from AUTH: %s...", magic[:20])
+
         if message["direction"] == "received":
             self._received_event.set()
 
@@ -392,7 +439,7 @@ class ProtocolProbe(BrowserSession):
 
         log.info("  -> sent %d, recv %d", len(sent_after), len(recv_after))
         for msg in all_after:
-            decoded = _decode_message(msg["payload"], msg["direction"], self._magic)
+            decoded = decode_message(msg["payload"], msg["direction"], self._magic)
             log.info("    %s", decoded)
 
         key_input = KeyInput(key=key)
@@ -434,7 +481,7 @@ class ProtocolProbe(BrowserSession):
 
         log.info("  -> sent %d, recv %d", len(sent_after), len(recv_after))
         for msg in all_after:
-            decoded = _decode_message(msg["payload"], msg["direction"], self._magic)
+            decoded = decode_message(msg["payload"], msg["direction"], self._magic)
             log.info("    %s", decoded)
 
         mouse_input = MouseInput(x=x, y=y, button="left")
