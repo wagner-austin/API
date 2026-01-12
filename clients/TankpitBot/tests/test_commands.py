@@ -5,10 +5,29 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
-from tankpit_bot.commands import (
+from tankpit_bot.protocol.commands import (
+    CMD_MAP_TELEPORT,
+    CMD_MOVE,
+    CMD_PICKUP_MOVE,
+    CMD_RADAR,
+    CMD_SCOPE,
+    CMD_SHOOT,
+    CMD_TOGGLE_EQUIPMENT,
     COMMAND_PREFIX,
+    SCOPE_NORTH,
+    TYPE_COMBAT,
+    TYPE_MOVEMENT,
+    TYPE_QUERY,
+    TYPE_UI,
     ActionCommand,
     QueryCommand,
+    build_move_command,
+    build_pickup_command,
+    build_query_command,
+    build_scope_command,
+    build_shoot_command,
+    build_teleport_command,
+    build_toggle_equipment_command,
     decode_action_command,
     decode_query_command,
     deserialize_command,
@@ -288,3 +307,225 @@ def test_action_command_roundtrip_serialize_deserialize() -> None:
     assert deserialized["kind"] == original["kind"]
     assert deserialized["cmd_id"] == original["cmd_id"]
     assert deserialized["data"] == original["data"]
+
+
+# =============================================================================
+# Type Constants Tests
+# =============================================================================
+
+
+def test_type_query_value() -> None:
+    """Test TYPE_QUERY is 0x22 (0x20 | 2)."""
+    assert TYPE_QUERY == 0x22
+    assert TYPE_QUERY == 0x20 | 2
+
+
+def test_type_ui_value() -> None:
+    """Test TYPE_UI is 0x23 (0x20 | 3)."""
+    assert TYPE_UI == 0x23
+    assert TYPE_UI == 0x20 | 3
+
+
+def test_type_movement_value() -> None:
+    """Test TYPE_MOVEMENT is 0x24 (0x20 | 4)."""
+    assert TYPE_MOVEMENT == 0x24
+    assert TYPE_MOVEMENT == 0x20 | 4
+
+
+def test_type_combat_value() -> None:
+    """Test TYPE_COMBAT is 0x26 (0x20 | 6)."""
+    assert TYPE_COMBAT == 0x26
+    assert TYPE_COMBAT == 0x20 | 6
+
+
+# =============================================================================
+# Wire Format Command Builder Tests
+# =============================================================================
+
+
+class TestBuildQueryCommand:
+    """Tests for build_query_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test query command has correct wire format."""
+        result = build_query_command(CMD_RADAR)
+
+        # Format: [len_lo, len_hi] + ! + 0x22 + cmd_id
+        assert result[0] == 3  # body length
+        assert result[1] == 0  # high byte of length
+        assert result[2] == COMMAND_PREFIX  # '!'
+        assert result[3] == TYPE_QUERY  # 0x22
+        assert result[4] == CMD_RADAR  # 0x66
+
+    def test_total_length_is_5(self) -> None:
+        """Test query command is 5 bytes total."""
+        result = build_query_command(0x42)
+        assert len(result) == 5
+
+    def test_body_length_is_3(self) -> None:
+        """Test body length header is 3."""
+        result = build_query_command(0x01)
+        body_length = result[0] | (result[1] << 8)
+        assert body_length == 3
+
+
+class TestBuildMoveCommand:
+    """Tests for build_move_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test move command has correct wire format."""
+        result = build_move_command(92, 91)
+
+        # Format: [len_lo, len_hi] + ! + 0x24 + 0x70 + X + Y
+        assert result[0] == 5  # body length
+        assert result[1] == 0  # high byte
+        assert result[2] == COMMAND_PREFIX  # '!'
+        assert result[3] == TYPE_MOVEMENT  # 0x24
+        assert result[4] == CMD_MOVE  # 0x70
+        assert result[5] == 92  # X
+        assert result[6] == 91  # Y
+
+    def test_total_length_is_7(self) -> None:
+        """Test move command is 7 bytes total."""
+        result = build_move_command(0, 0)
+        assert len(result) == 7
+
+    def test_matches_captured_format(self) -> None:
+        """Test output matches captured wire format from gameplay."""
+        # Captured: 05002124705c5b (move to 92, 91)
+        result = build_move_command(92, 91)
+        assert result.hex() == "05002124705c5b"
+
+    def test_coordinates_masked_to_byte(self) -> None:
+        """Test coordinates are masked to single byte."""
+        result = build_move_command(256, 257)
+        assert result[5] == 0  # 256 & 0xFF
+        assert result[6] == 1  # 257 & 0xFF
+
+
+class TestBuildPickupCommand:
+    """Tests for build_pickup_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test pickup command has correct wire format."""
+        result = build_pickup_command(50, 60)
+
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_MOVEMENT
+        assert result[4] == CMD_PICKUP_MOVE
+        assert result[5] == 50
+        assert result[6] == 60
+
+    def test_total_length_is_7(self) -> None:
+        """Test pickup command is 7 bytes total."""
+        result = build_pickup_command(0, 0)
+        assert len(result) == 7
+
+
+class TestBuildTeleportCommand:
+    """Tests for build_teleport_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test teleport command has correct wire format."""
+        result = build_teleport_command(100, 200)
+
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_MOVEMENT
+        assert result[4] == CMD_MAP_TELEPORT
+        assert result[5] == 100
+        assert result[6] == 200
+
+    def test_total_length_is_7(self) -> None:
+        """Test teleport command is 7 bytes total."""
+        result = build_teleport_command(0, 0)
+        assert len(result) == 7
+
+
+class TestBuildShootCommand:
+    """Tests for build_shoot_command."""
+
+    def test_builds_correct_format_no_target(self) -> None:
+        """Test shoot command with no target has correct wire format."""
+        result = build_shoot_command(80, 90)
+
+        # Format: [len_lo, len_hi] + ! + 0x26 + 0x73 + X + Y + id_lo + id_hi
+        assert result[0] == 7  # body length
+        assert result[1] == 0  # high byte
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_COMBAT
+        assert result[4] == CMD_SHOOT
+        assert result[5] == 80  # X
+        assert result[6] == 90  # Y
+        assert result[7] == 0  # target_id low
+        assert result[8] == 0  # target_id high
+
+    def test_builds_correct_format_with_target(self) -> None:
+        """Test shoot command with target ID has correct wire format."""
+        result = build_shoot_command(10, 20, target_id=0x1234)
+
+        assert result[5] == 10  # X
+        assert result[6] == 20  # Y
+        assert result[7] == 0x34  # target_id low byte
+        assert result[8] == 0x12  # target_id high byte
+
+    def test_total_length_is_9(self) -> None:
+        """Test shoot command is 9 bytes total."""
+        result = build_shoot_command(0, 0)
+        assert len(result) == 9
+
+    def test_target_id_little_endian(self) -> None:
+        """Test target ID is encoded as little-endian uint16."""
+        result = build_shoot_command(0, 0, target_id=0xABCD)
+        assert result[7] == 0xCD  # low byte first
+        assert result[8] == 0xAB  # high byte second
+
+
+class TestBuildScopeCommand:
+    """Tests for build_scope_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test scope command has correct wire format."""
+        result = build_scope_command(SCOPE_NORTH)
+
+        # Format: [len_lo, len_hi] + ! + 0x23 + 0x5a + direction
+        assert result[0] == 4  # body length
+        assert result[1] == 0
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_UI
+        assert result[4] == CMD_SCOPE
+        assert result[5] == SCOPE_NORTH
+
+    def test_total_length_is_6(self) -> None:
+        """Test scope command is 6 bytes total."""
+        result = build_scope_command(0x00)
+        assert len(result) == 6
+
+
+class TestBuildToggleEquipmentCommand:
+    """Tests for build_toggle_equipment_command."""
+
+    def test_builds_correct_format_slot_1(self) -> None:
+        """Test toggle equipment command for slot 1 (armor)."""
+        result = build_toggle_equipment_command(1)
+
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_UI
+        assert result[4] == CMD_TOGGLE_EQUIPMENT
+        assert result[5] == 0x31  # '1' ASCII
+
+    def test_builds_correct_format_slot_5(self) -> None:
+        """Test toggle equipment command for slot 5 (radar)."""
+        result = build_toggle_equipment_command(5)
+
+        assert result[5] == 0x35  # '5' ASCII
+
+    def test_total_length_is_6(self) -> None:
+        """Test toggle equipment command is 6 bytes total."""
+        result = build_toggle_equipment_command(1)
+        assert len(result) == 6
+
+    def test_slot_converted_to_ascii_digit(self) -> None:
+        """Test slot number is converted to ASCII digit character."""
+        for slot in range(1, 6):
+            result = build_toggle_equipment_command(slot)
+            assert result[5] == 0x30 + slot  # '0' + slot

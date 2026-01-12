@@ -977,11 +977,11 @@ def test_encode_message_stats() -> None:
 
 
 def test_encode_message_stats_with_int_in_unknown() -> None:
-    """Test encoding MessageStats handles non-list values in unknown."""
+    """Test encoding MessageStats handles count as int."""
     stats = MessageStats(
         decoded={},
         unknown={
-            "len=5": {"count": 7},  # count is int, not list
+            "len=5": {"count": 7, "samples": []},
         },
         total_received=10,
         decode_coverage="70%",
@@ -992,6 +992,7 @@ def test_encode_message_stats_with_int_in_unknown() -> None:
     len5_entry = unknown["len=5"]
     assert type(len5_entry) is dict
     assert len5_entry["count"] == 7
+    assert len5_entry["samples"] == []
 
 
 # =============================================================================

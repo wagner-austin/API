@@ -7,6 +7,7 @@ No mocks, no weak assertions, 100% coverage target.
 from __future__ import annotations
 
 import pytest
+from platform_core.json_utils import JSONObject
 
 from tankpit_bot.protocol import (
     MSG_ACTION_DONE,
@@ -50,12 +51,6 @@ from tankpit_bot.protocol import (
     Team,
     TerrainType,
     ViewportEntityDict,
-    _require_exact_length,
-    _require_min_length,
-    _require_parts,
-    _require_prefix,
-    _x16,
-    _x24,
     decode_0x2e_message,
     decode_action_done,
     decode_active_forces,
@@ -91,6 +86,10 @@ from tankpit_bot.protocol import (
     decode_viewport_update,
     decode_world_info,
     is_text_message,
+    require_exact_length,
+    require_min_length,
+    require_parts,
+    require_prefix,
     supervisor_has_promo_kill,
     supervisor_is_promo_eligible,
     try_decode_binary_message,
@@ -98,6 +97,8 @@ from tankpit_bot.protocol import (
     viewport_entity_is_container,
     viewport_entity_is_empty,
     viewport_entity_is_tank,
+    x16,
+    x24,
 )
 
 # =============================================================================
@@ -177,15 +178,15 @@ class TestX16:
 
     def test_combines_bytes_little_endian(self) -> None:
         """Combines two bytes into uint16 little-endian."""
-        assert _x16(0x34, 0x12) == 0x1234
-        assert _x16(0x00, 0x00) == 0x0000
-        assert _x16(0xFF, 0xFF) == 0xFFFF
-        assert _x16(0x01, 0x00) == 0x0001
-        assert _x16(0x00, 0x01) == 0x0100
+        assert x16(0x34, 0x12) == 0x1234
+        assert x16(0x00, 0x00) == 0x0000
+        assert x16(0xFF, 0xFF) == 0xFFFF
+        assert x16(0x01, 0x00) == 0x0001
+        assert x16(0x00, 0x01) == 0x0100
 
     def test_masks_to_byte_range(self) -> None:
         """Masks input values to byte range."""
-        assert _x16(0x134, 0x112) == _x16(0x34, 0x12)
+        assert x16(0x134, 0x112) == x16(0x34, 0x12)
 
 
 class TestX24:
@@ -193,11 +194,11 @@ class TestX24:
 
     def test_combines_bytes_big_endian(self) -> None:
         """Combines three bytes into uint24 big-endian."""
-        assert _x24(0x12, 0x34, 0x56) == 0x123456
-        assert _x24(0x00, 0x00, 0x00) == 0x000000
-        assert _x24(0xFF, 0xFF, 0xFF) == 0xFFFFFF
-        assert _x24(0x01, 0x00, 0x00) == 0x010000
-        assert _x24(0x00, 0x01, 0x00) == 0x000100
+        assert x24(0x12, 0x34, 0x56) == 0x123456
+        assert x24(0x00, 0x00, 0x00) == 0x000000
+        assert x24(0xFF, 0xFF, 0xFF) == 0xFFFFFF
+        assert x24(0x01, 0x00, 0x00) == 0x010000
+        assert x24(0x00, 0x01, 0x00) == 0x000100
 
 
 # =============================================================================
@@ -210,13 +211,13 @@ class TestRequireMinLength:
 
     def test_passes_when_sufficient(self) -> None:
         """Validation passes when length is sufficient."""
-        _require_min_length(bytes([1, 2, 3]), 3, "Test")  # Should not raise
-        _require_min_length(bytes([1, 2, 3, 4]), 3, "Test")  # Should not raise
+        require_min_length(bytes([1, 2, 3]), 3, "Test")  # Should not raise
+        require_min_length(bytes([1, 2, 3, 4]), 3, "Test")  # Should not raise
 
     def test_raises_when_insufficient(self) -> None:
         """Validation raises DecodeError when length is insufficient."""
         with pytest.raises(DecodeError) as exc:
-            _require_min_length(bytes([1, 2]), 5, "TestContext")
+            require_min_length(bytes([1, 2]), 5, "TestContext")
         assert "TestContext" in str(exc.value)
         assert ">= 5 bytes" in str(exc.value)
         assert "got 2" in str(exc.value)
@@ -227,12 +228,12 @@ class TestRequireExactLength:
 
     def test_passes_when_exact(self) -> None:
         """Validation passes when length matches exactly."""
-        _require_exact_length(bytes([1, 2, 3]), 3, "Test")  # Should not raise
+        require_exact_length(bytes([1, 2, 3]), 3, "Test")  # Should not raise
 
     def test_raises_when_wrong_length(self) -> None:
         """Validation raises DecodeError when length is wrong."""
         with pytest.raises(DecodeError) as exc:
-            _require_exact_length(bytes([1, 2]), 5, "TestContext")
+            require_exact_length(bytes([1, 2]), 5, "TestContext")
         assert "TestContext" in str(exc.value)
         assert "expected 5 bytes" in str(exc.value)
 
@@ -242,13 +243,13 @@ class TestRequirePrefix:
 
     def test_passes_with_correct_prefix(self) -> None:
         """Validation passes with correct prefix."""
-        _require_prefix("=team|data", "=", "Test")  # Should not raise
-        _require_prefix("+info|data", "+", "Test")  # Should not raise
+        require_prefix("=team|data", "=", "Test")  # Should not raise
+        require_prefix("+info|data", "+", "Test")  # Should not raise
 
     def test_raises_without_prefix(self) -> None:
         """Validation raises DecodeError without expected prefix."""
         with pytest.raises(DecodeError) as exc:
-            _require_prefix("team|data", "=", "TestContext")
+            require_prefix("team|data", "=", "TestContext")
         assert "TestContext" in str(exc.value)
         assert "expected prefix '='" in str(exc.value)
 
@@ -258,13 +259,13 @@ class TestRequireParts:
 
     def test_passes_with_enough_parts(self) -> None:
         """Validation passes with sufficient parts."""
-        _require_parts(["a", "b", "c"], 3, "Test")  # Should not raise
-        _require_parts(["a", "b", "c", "d"], 3, "Test")  # Should not raise
+        require_parts(["a", "b", "c"], 3, "Test")  # Should not raise
+        require_parts(["a", "b", "c", "d"], 3, "Test")  # Should not raise
 
     def test_raises_with_insufficient_parts(self) -> None:
         """Validation raises DecodeError with too few parts."""
         with pytest.raises(DecodeError) as exc:
-            _require_parts(["a", "b"], 5, "TestContext")
+            require_parts(["a", "b"], 5, "TestContext")
         assert "TestContext" in str(exc.value)
         assert ">= 5 parts" in str(exc.value)
 
@@ -386,7 +387,7 @@ class TestDecodeShootEvent:
         assert result["target_y"] == 20
         assert result["projectile_x"] == 15
         assert result["projectile_y"] == 25
-        assert result["fuel"] == _x24(0x03, 0x04, 0x05)
+        assert result["fuel"] == x24(0x03, 0x04, 0x05)
         assert result["weapon"] == 1
         assert result["ammo"] == 5
         assert result["friendly_fire"] is False
@@ -648,33 +649,354 @@ class TestDecodeMineDetonation:
 class TestDecodeRadarScanResult:
     """Tests for decode_radar_scan_result function."""
 
-    def test_decodes_radar_scan(self) -> None:
-        """Decodes radar scan with entities."""
-        # count=2, skip 1 byte, then 4-byte entities (x, y, value_lo, value_hi)
+    def test_decodes_radar_scan_containers(self) -> None:
+        """Decodes radar scan with container entries."""
+        # count=2, flags=0, then 4-byte containers (x, y, value_lo, value_hi)
         data = bytes([2, 0, 10, 20, 0x34, 0x12, 30, 40, 0xFF, 0x7F])
         result = decode_radar_scan_result(data)
         assert result["msg_type"] == 0x4F
-        assert len(result["entities"]) == 2
-        assert result["entities"][0] == (10, 20, 0x1234)
-        assert result["entities"][1] == (30, 40, 0x7FFF)
+        assert len(result["containers"]) == 2
+        assert result["containers"][0] == {"x": 10, "y": 20, "volume": 0x1234}
+        assert result["containers"][1] == {"x": 30, "y": 40, "volume": 0x7FFF}
+        assert result["mines"] == []
 
-    def test_handles_negative_values(self) -> None:
-        """Handles negative signed values correctly."""
-        # value with high bit set becomes negative
-        data = bytes([1, 0, 10, 20, 0x00, 0x80])  # 0x8000 -> -32768
+    def test_decodes_equipment_container(self) -> None:
+        """Decodes equipment container (0xFFFF value)."""
+        data = bytes([1, 0, 10, 20, 0xFF, 0xFF])  # 0xFFFF -> equipment (-1)
         result = decode_radar_scan_result(data)
-        assert result["entities"][0][2] == -32768
+        assert result["containers"][0]["volume"] == -1
 
-    def test_handles_truncated_entities(self) -> None:
-        """Handles truncated entity data."""
+    def test_decodes_radar_scan_with_mines(self) -> None:
+        """Decodes radar scan with containers and mines."""
+        # 1 container, then 2 mines (3 bytes each: x, y, team)
+        data = bytes([1, 0, 10, 20, 0x00, 0x00, 45, 203, 0, 46, 203, 0])
+        result = decode_radar_scan_result(data)
+        assert result["msg_type"] == 0x4F
+        assert len(result["containers"]) == 1
+        assert result["containers"][0] == {"x": 10, "y": 20, "volume": 0}
+        assert len(result["mines"]) == 2
+        assert result["mines"][0] == {"x": 45, "y": 203, "team": 0}
+        assert result["mines"][1] == {"x": 46, "y": 203, "team": 0}
+
+    def test_decodes_mines_all_teams(self) -> None:
+        """Decodes mines from all teams."""
+        # 0 containers, 4 mines (one of each team)
+        data = bytes([0, 0, 10, 10, 0, 20, 20, 1, 30, 30, 2, 40, 40, 3])
+        result = decode_radar_scan_result(data)
+        assert result["containers"] == []
+        assert len(result["mines"]) == 4
+        assert result["mines"][0] == {"x": 10, "y": 10, "team": 0}  # red
+        assert result["mines"][1] == {"x": 20, "y": 20, "team": 1}  # purple
+        assert result["mines"][2] == {"x": 30, "y": 30, "team": 2}  # blue
+        assert result["mines"][3] == {"x": 40, "y": 40, "team": 3}  # orange
+
+    def test_raises_on_truncated_container(self) -> None:
+        """Raises DecodeError on truncated container data."""
         data = bytes([2, 0, 10, 20, 0x34])  # Claims 2 but only partial first
-        result = decode_radar_scan_result(data)
-        assert result["entities"] == []
+        with pytest.raises(DecodeError):
+            decode_radar_scan_result(data)
+
+    def test_raises_on_invalid_mine_bytes(self) -> None:
+        """Raises DecodeError when remaining bytes not divisible by 3."""
+        # 1 container (correct), then 2 bytes (not divisible by 3)
+        data = bytes([1, 0, 10, 20, 0x00, 0x00, 45, 203])
+        with pytest.raises(DecodeError):
+            decode_radar_scan_result(data)
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
         with pytest.raises(DecodeError):
             decode_radar_scan_result(bytes([1]))
+
+    def test_encode_decode_roundtrip(self) -> None:
+        """Encode and decode produces equivalent result."""
+        from tankpit_bot.protocol import (
+            RadarContainerDict,
+            RadarMineDict,
+            RadarScanResultDict,
+            encode_radar_scan_result,
+        )
+
+        original = RadarScanResultDict(
+            msg_type=0x4F,
+            containers=[
+                RadarContainerDict(x=44, y=208, volume=-1),  # equipment
+                RadarContainerDict(x=53, y=215, volume=501),  # fuel
+            ],
+            mines=[
+                RadarMineDict(x=45, y=203, team=0),  # red
+                RadarMineDict(x=46, y=203, team=0),  # red
+                RadarMineDict(x=47, y=203, team=0),  # red
+            ],
+        )
+        encoded = encode_radar_scan_result(original)
+        decoded = decode_radar_scan_result(encoded)
+
+        assert decoded["msg_type"] == original["msg_type"]
+        assert len(decoded["containers"]) == 2
+        assert decoded["containers"][0]["x"] == 44
+        assert decoded["containers"][0]["y"] == 208
+        assert decoded["containers"][0]["volume"] == -1
+        assert decoded["containers"][1]["volume"] == 501
+        assert len(decoded["mines"]) == 3
+        assert decoded["mines"][0] == {"x": 45, "y": 203, "team": 0}
+        assert decoded["mines"][1] == {"x": 46, "y": 203, "team": 0}
+        assert decoded["mines"][2] == {"x": 47, "y": 203, "team": 0}
+
+    def test_encode_empty_result(self) -> None:
+        """Encodes empty radar result."""
+        from tankpit_bot.protocol import RadarScanResultDict, encode_radar_scan_result
+
+        result = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[])
+        encoded = encode_radar_scan_result(result)
+        assert encoded == bytes([0, 0])
+
+
+class TestRequireRadarContainer:
+    """Tests for require_radar_container validation."""
+
+    def test_validates_valid_container(self) -> None:
+        """Validates valid container."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 100, "y": 150, "volume": 500}
+        result = require_radar_container(container)
+        assert result["x"] == 100
+        assert result["y"] == 150
+        assert result["volume"] == 500
+
+    def test_validates_equipment_container(self) -> None:
+        """Validates equipment container with -1 volume."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 44, "y": 208, "volume": -1}
+        result = require_radar_container(container)
+        assert result["volume"] == -1
+
+    def test_raises_on_invalid_x(self) -> None:
+        """Raises ValueError for x out of range."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 256, "y": 100, "volume": 0}
+        with pytest.raises(ValueError, match="x out of range"):
+            require_radar_container(container)
+
+    def test_raises_on_invalid_volume(self) -> None:
+        """Raises ValueError for volume out of range."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 0, "y": 0, "volume": -2}
+        with pytest.raises(ValueError, match="volume out of range"):
+            require_radar_container(container)
+
+    def test_raises_on_y_out_of_range(self) -> None:
+        """Raises ValueError for y out of range."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 0, "y": 256, "volume": 0}
+        with pytest.raises(ValueError, match="y out of range"):
+            require_radar_container(container)
+
+    def test_raises_on_missing_x(self) -> None:
+        """Raises ValueError when x is missing."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"y": 0, "volume": 0}
+        with pytest.raises(ValueError, match="x must be int"):
+            require_radar_container(container)
+
+    def test_raises_on_missing_y(self) -> None:
+        """Raises ValueError when y is missing."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 0, "volume": 0}
+        with pytest.raises(ValueError, match="y must be int"):
+            require_radar_container(container)
+
+    def test_raises_on_missing_volume(self) -> None:
+        """Raises ValueError when volume is missing."""
+        from tankpit_bot.protocol import require_radar_container
+
+        container: JSONObject = {"x": 0, "y": 0}
+        with pytest.raises(ValueError, match="volume must be int"):
+            require_radar_container(container)
+
+
+class TestRequireRadarMine:
+    """Tests for require_radar_mine validation."""
+
+    def test_validates_valid_mine(self) -> None:
+        """Validates valid mine."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 45, "y": 203, "team": 0}
+        result = require_radar_mine(mine)
+        assert result["x"] == 45
+        assert result["y"] == 203
+        assert result["team"] == 0
+
+    def test_validates_all_teams(self) -> None:
+        """Validates mines from all teams."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        for team in range(4):
+            mine: JSONObject = {"x": 0, "y": 0, "team": team}
+            result = require_radar_mine(mine)
+            assert result["team"] == team
+
+    def test_raises_on_invalid_team(self) -> None:
+        """Raises ValueError for team out of range."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 0, "y": 0, "team": 4}
+        with pytest.raises(ValueError, match="team out of range"):
+            require_radar_mine(mine)
+
+    def test_raises_on_invalid_coordinates(self) -> None:
+        """Raises ValueError for coordinates out of range."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 256, "y": 0, "team": 0}
+        with pytest.raises(ValueError, match="x out of range"):
+            require_radar_mine(mine)
+
+    def test_raises_on_y_out_of_range(self) -> None:
+        """Raises ValueError for y out of range."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 0, "y": 256, "team": 0}
+        with pytest.raises(ValueError, match="y out of range"):
+            require_radar_mine(mine)
+
+    def test_raises_on_missing_x(self) -> None:
+        """Raises ValueError when x is missing."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"y": 0, "team": 0}
+        with pytest.raises(ValueError, match="x must be int"):
+            require_radar_mine(mine)
+
+    def test_raises_on_missing_y(self) -> None:
+        """Raises ValueError when y is missing."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 0, "team": 0}
+        with pytest.raises(ValueError, match="y must be int"):
+            require_radar_mine(mine)
+
+    def test_raises_on_missing_team(self) -> None:
+        """Raises ValueError when team is missing."""
+        from tankpit_bot.protocol import require_radar_mine
+
+        mine: JSONObject = {"x": 0, "y": 0}
+        with pytest.raises(ValueError, match="team must be int"):
+            require_radar_mine(mine)
+
+
+class TestRequireRadarScanResult:
+    """Tests for require_radar_scan_result validation."""
+
+    def test_validates_valid_result(self) -> None:
+        """Validates valid radar scan result."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [{"x": 10, "y": 20, "volume": 100}],
+            "mines": [{"x": 45, "y": 203, "team": 0}],
+        }
+        validated = require_radar_scan_result(result)
+        assert validated["msg_type"] == 0x4F
+        assert len(validated["containers"]) == 1
+        assert len(validated["mines"]) == 1
+
+    def test_raises_on_invalid_container(self) -> None:
+        """Raises ValueError for invalid container in result."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [{"x": 256, "y": 0, "volume": 0}],
+            "mines": [],
+        }
+        with pytest.raises(ValueError, match="container"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_invalid_mine(self) -> None:
+        """Raises ValueError for invalid mine in result."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": [{"x": 0, "y": 0, "team": 5}],
+        }
+        with pytest.raises(ValueError, match="mine"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_wrong_msg_type(self) -> None:
+        """Raises ValueError for wrong msg_type."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {"msg_type": 0x00, "containers": [], "mines": []}
+        with pytest.raises(ValueError, match="msg_type must be 0x4F"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_containers_not_list(self) -> None:
+        """Raises ValueError when containers is not a list."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {"msg_type": 0x4F, "containers": None, "mines": []}
+        with pytest.raises(ValueError, match="containers must be list"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_mines_not_list(self) -> None:
+        """Raises ValueError when mines is not a list."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {"msg_type": 0x4F, "containers": [], "mines": "not a list"}
+        with pytest.raises(ValueError, match="mines must be list"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_container_not_dict(self) -> None:
+        """Raises ValueError when container item is not a dict."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {"msg_type": 0x4F, "containers": ["not a dict"], "mines": []}
+        with pytest.raises(ValueError, match=r"container\[0\] must be dict"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_mine_not_dict(self) -> None:
+        """Raises ValueError when mine item is not a dict."""
+        from tankpit_bot.protocol import require_radar_scan_result
+
+        result: JSONObject = {"msg_type": 0x4F, "containers": [], "mines": [123]}
+        with pytest.raises(ValueError, match=r"mine\[0\] must be dict"):
+            require_radar_scan_result(result)
+
+
+class TestDecodeRadarContainerNotEnoughBytes:
+    """Tests for decode_radar_container error handling."""
+
+    def test_raises_on_not_enough_bytes(self) -> None:
+        """Raises DecodeError when not enough bytes."""
+        from tankpit_bot.protocol import DecodeError, decode_radar_container
+
+        data = bytes([0x00, 0x00, 0x00])  # Only 3 bytes, need 4
+        with pytest.raises(DecodeError, match="not enough bytes"):
+            decode_radar_container(data, 0)
+
+
+class TestDecodeRadarMineNotEnoughBytes:
+    """Tests for decode_radar_mine error handling."""
+
+    def test_raises_on_not_enough_bytes(self) -> None:
+        """Raises DecodeError when not enough bytes."""
+        from tankpit_bot.protocol import DecodeError, decode_radar_mine
+
+        data = bytes([0x00, 0x00])  # Only 2 bytes, need 3
+        with pytest.raises(DecodeError, match="not enough bytes"):
+            decode_radar_mine(data, 0)
 
 
 class TestDecodeMovement:
@@ -691,7 +1013,7 @@ class TestDecodeMovement:
         assert result["start_y"] == 60
         assert result["direction"] == 3
         assert result["flag"] == 1
-        assert result["fuel"] == _x24(0x03, 0x04, 0x05)
+        assert result["fuel"] == x24(0x03, 0x04, 0x05)
         assert result["waypoints"] == []
 
     def test_raises_on_short_data(self) -> None:
@@ -712,7 +1034,7 @@ class TestDecodeTankInfo:
         assert result["team"] == 2
         assert result["tank_id"] == 0x0102
         assert result["decoration_state"] == bytes([0xDE, 0xAD, 0xBE, 0xEF])
-        assert result["score"] == _x24(0x03, 0x04, 0x05)
+        assert result["score"] == x24(0x03, 0x04, 0x05)
         assert result["name"] == "Test"
 
     def test_decodes_tank_info_without_name(self) -> None:
@@ -742,7 +1064,7 @@ class TestDecodeMovementResponse:
         assert result["y"] == 60
         assert result["direction"] == 3
         assert result["rank"] == 4
-        assert result["leaderboard_position"] == _x24(0x05, 0x06, 0x07)
+        assert result["leaderboard_position"] == x24(0x05, 0x06, 0x07)
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""

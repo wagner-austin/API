@@ -81,3 +81,29 @@ def test_real_get_sync_playwright_returns_callable() -> None:
     """Test _real_get_sync_playwright returns a callable."""
     result = _test_hooks._real_get_sync_playwright()
     assert callable(result)
+
+
+def test_real_load_terrain_map_returns_terrain_map() -> None:
+    """Test _real_load_terrain_map loads a TerrainMap from GIF."""
+    # Find a terrain GIF file in the project
+    gif_path = Path(__file__).parent.parent / "field42.gif"
+    if not gif_path.exists():
+        gif_path = Path(__file__).parent.parent / "field42-r.gif"
+    if not gif_path.exists():
+        gif_path = Path(__file__).parent.parent / "field01_r.gif"
+
+    if not gif_path.exists():
+        pytest.skip("No terrain GIF file found for testing")
+
+    result = _test_hooks._real_load_terrain_map(gif_path)
+
+    # Verify it implements TerrainMapProtocol by calling methods
+    terrain = result.get_terrain(128, 128)
+    assert terrain in (result.ROCK, result.GROUND, result.WATER)
+
+    passable = result.is_passable(128, 128)
+    assert passable in (True, False)
+
+    viewport = result.render_viewport(128, 128, 4, 4)
+    assert len(viewport) == 4
+    assert len(viewport[0]) == 4
