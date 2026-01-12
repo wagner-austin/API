@@ -55,7 +55,8 @@ class TranscriptService:
             probe_client=self._clients["probe"],
             cookies_text=cookies_text,
         )
-        segments = provider.fetch(vid, opts)
+        # Pass canonical URL, not video_id - providers need the actual URL for direct/Vimeo
+        segments = provider.fetch(canonical, opts)
         text = clean_segments(segments)
         return TranscriptResult(url=canonical, video_id=vid, text=text)
 
@@ -80,6 +81,7 @@ class TranscriptService:
             dl_mib_per_sec=float(self._cfg["TRANSCRIPT_DL_MIB_PER_SEC"]),
             cookies_text=cookies_text,
         )
-        segments = stt.fetch(vid, TranscriptOptions(preferred_langs=DEFAULT_TRANSCRIPT_LANGS))
+        # Pass canonical URL, not video_id - providers need the actual URL for direct/Vimeo
+        segments = stt.fetch(canonical, TranscriptOptions(preferred_langs=DEFAULT_TRANSCRIPT_LANGS))
         text = clean_segments(segments)
         return TranscriptResult(url=canonical, video_id=vid, text=text)

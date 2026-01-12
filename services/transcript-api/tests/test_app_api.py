@@ -236,3 +236,248 @@ def test_app_error_handled_by_adapter(tmp_path: Path) -> None:
         pytest.fail("expected dict response")
     assert raw["code"] == "TRANSCRIPT_UNAVAILABLE"
     assert raw["message"] == "boom"
+
+
+class _UrlCapturingProbe(ProbeDownloadClient):
+    """Fake probe client that captures the URL passed to it for verification."""
+
+    def __init__(
+        self,
+        info: YtInfoTD,
+        path: str,
+        subtitle_path: str | None = None,
+    ) -> None:
+        self._info = info
+        self._path = path
+        self._subtitle_path = subtitle_path
+        self.captured_probe_url: str | None = None
+        self.captured_download_url: str | None = None
+        self.captured_subtitle_url: str | None = None
+
+    def probe(self, url: str) -> YtInfoTD:
+        self.captured_probe_url = url
+        return self._info
+
+    def download_audio(self, url: str, *, cookies_path: str | None) -> str:
+        self.captured_download_url = url
+        return self._path
+
+    def download_subtitles(
+        self,
+        url: str,
+        *,
+        cookies_path: str | None,
+        preferred_langs: list[str],
+    ) -> SubtitleResultTD | None:
+        self.captured_subtitle_url = url
+        if self._subtitle_path is None:
+            return None
+        return {"path": self._subtitle_path, "lang": "en", "is_auto": False}
+
+
+def test_captions_direct_url_passes_canonical_url(tmp_path: Path) -> None:
+    """Verify that direct/download URLs pass the canonical URL to probe client."""
+    yt = _FakeYTClient(
+        [
+            {"text": "Hello", "start": 0.0, "duration": 0.5},
+            {"text": "world", "start": 0.5, "duration": 0.5},
+        ]
+    )
+    stt = _FakeSTTClient(
+        [
+            {"text": "Hello", "start": 0.0, "end": 0.5},
+            {"text": "world", "start": 0.5, "end": 1.0},
+        ]
+    )
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"fake")
+    vtt_content = """WEBVTT
+
+00:00:00.000 --> 00:00:00.500
+Hello
+
+00:00:00.500 --> 00:00:01.000
+world
+"""
+    vtt_path = tmp_path / "subs.vtt"
+    vtt_path.write_text(vtt_content, encoding="utf-8")
+
+    probe = _UrlCapturingProbe({"duration": 5}, str(audio), str(vtt_path))
+
+    deps = AppDeps(
+        config=Config(
+            TRANSCRIPT_MAX_VIDEO_SECONDS=60,
+            TRANSCRIPT_MAX_FILE_MB=25,
+            TRANSCRIPT_ENABLE_CHUNKING=False,
+            TRANSCRIPT_CHUNK_THRESHOLD_MB=20.0,
+            TRANSCRIPT_TARGET_CHUNK_MB=20.0,
+            TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS=600.0,
+            TRANSCRIPT_MAX_CONCURRENT_CHUNKS=3,
+            TRANSCRIPT_SILENCE_THRESHOLD_DB=-40.0,
+            TRANSCRIPT_SILENCE_DURATION_SECONDS=0.5,
+            TRANSCRIPT_STT_RTF=0.5,
+            TRANSCRIPT_DL_MIB_PER_SEC=4.0,
+            TRANSCRIPT_PREFERRED_LANGS=None,
+        ),
+        clients=Clients(youtube=yt, stt=stt, probe=probe),
+    )
+    from transcript_api.service import TranscriptService as _Svc
+
+    service = _Svc(deps["config"], deps["clients"])
+    handler = build_captions_handler(service)
+
+    # Canvas-style download URL
+    canvas_url = "https://canvas.edu/files/123/download?verifier=abc123"
+    payload: CaptionsPayload = {"url": canvas_url, "preferred_langs": ["en"]}
+    out = handler(payload)
+
+    # Verify the canonical URL was passed through, not an MD5 hash
+    assert probe.captured_subtitle_url == canvas_url
+    assert out["url"] == canvas_url
+    assert len(out["video_id"]) == 32  # MD5 hash
+    assert out["text"] == "Hello world"
+
+
+def test_stt_direct_url_passes_canonical_url(tmp_path: Path) -> None:
+    """Verify that direct/download URLs pass the canonical URL to STT provider."""
+    yt = _FakeYTClient([])
+    stt = _FakeSTTClient(
+        [
+            {"text": "Hello", "start": 0.0, "end": 0.5},
+            {"text": "world", "start": 0.5, "end": 1.0},
+        ]
+    )
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"fake")
+
+    probe = _UrlCapturingProbe({"duration": 5}, str(audio), None)
+
+    deps = AppDeps(
+        config=Config(
+            TRANSCRIPT_MAX_VIDEO_SECONDS=60,
+            TRANSCRIPT_MAX_FILE_MB=25,
+            TRANSCRIPT_ENABLE_CHUNKING=False,
+            TRANSCRIPT_CHUNK_THRESHOLD_MB=20.0,
+            TRANSCRIPT_TARGET_CHUNK_MB=20.0,
+            TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS=600.0,
+            TRANSCRIPT_MAX_CONCURRENT_CHUNKS=3,
+            TRANSCRIPT_SILENCE_THRESHOLD_DB=-40.0,
+            TRANSCRIPT_SILENCE_DURATION_SECONDS=0.5,
+            TRANSCRIPT_STT_RTF=0.5,
+            TRANSCRIPT_DL_MIB_PER_SEC=4.0,
+            TRANSCRIPT_PREFERRED_LANGS=None,
+        ),
+        clients=Clients(youtube=yt, stt=stt, probe=probe),
+    )
+    from transcript_api.service import TranscriptService as _Svc
+
+    service = _Svc(deps["config"], deps["clients"])
+    handler = build_stt_handler(service)
+
+    # Canvas-style download URL
+    canvas_url = "https://canvas.edu/files/456/download?download_frd=1&verifier=xyz"
+    payload: STTPayload = {"url": canvas_url}
+    out = handler(payload)
+
+    # Verify the canonical URL was passed to probe and download
+    assert probe.captured_probe_url == canvas_url
+    assert probe.captured_download_url == canvas_url
+    assert out["url"] == canvas_url
+    assert len(out["video_id"]) == 32  # MD5 hash
+    assert out["text"] == "Hello world"
+
+
+def test_captions_direct_mp4_url(tmp_path: Path) -> None:
+    """Verify that direct .mp4 URLs work for captions."""
+    yt = _FakeYTClient([])
+    stt = _FakeSTTClient([])
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"fake")
+    vtt_content = """WEBVTT
+
+00:00:00.000 --> 00:00:00.500
+Direct
+
+00:00:00.500 --> 00:00:01.000
+video
+"""
+    vtt_path = tmp_path / "subs.vtt"
+    vtt_path.write_text(vtt_content, encoding="utf-8")
+
+    probe = _UrlCapturingProbe({"duration": 5}, str(audio), str(vtt_path))
+
+    deps = AppDeps(
+        config=Config(
+            TRANSCRIPT_MAX_VIDEO_SECONDS=60,
+            TRANSCRIPT_MAX_FILE_MB=25,
+            TRANSCRIPT_ENABLE_CHUNKING=False,
+            TRANSCRIPT_CHUNK_THRESHOLD_MB=20.0,
+            TRANSCRIPT_TARGET_CHUNK_MB=20.0,
+            TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS=600.0,
+            TRANSCRIPT_MAX_CONCURRENT_CHUNKS=3,
+            TRANSCRIPT_SILENCE_THRESHOLD_DB=-40.0,
+            TRANSCRIPT_SILENCE_DURATION_SECONDS=0.5,
+            TRANSCRIPT_STT_RTF=0.5,
+            TRANSCRIPT_DL_MIB_PER_SEC=4.0,
+            TRANSCRIPT_PREFERRED_LANGS=None,
+        ),
+        clients=Clients(youtube=yt, stt=stt, probe=probe),
+    )
+    from transcript_api.service import TranscriptService as _Svc
+
+    service = _Svc(deps["config"], deps["clients"])
+    handler = build_captions_handler(service)
+
+    direct_url = "https://cdn.example.com/video.mp4"
+    payload: CaptionsPayload = {"url": direct_url, "preferred_langs": ["en"]}
+    out = handler(payload)
+
+    assert probe.captured_subtitle_url == direct_url
+    assert out["url"] == direct_url
+    assert out["text"] == "Direct video"
+
+
+def test_stt_direct_mp4_url(tmp_path: Path) -> None:
+    """Verify that direct .mp4 URLs work for STT."""
+    yt = _FakeYTClient([])
+    stt = _FakeSTTClient(
+        [
+            {"text": "Transcribed", "start": 0.0, "end": 0.5},
+            {"text": "audio", "start": 0.5, "end": 1.0},
+        ]
+    )
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"fake")
+
+    probe = _UrlCapturingProbe({"duration": 5}, str(audio), None)
+
+    deps = AppDeps(
+        config=Config(
+            TRANSCRIPT_MAX_VIDEO_SECONDS=60,
+            TRANSCRIPT_MAX_FILE_MB=25,
+            TRANSCRIPT_ENABLE_CHUNKING=False,
+            TRANSCRIPT_CHUNK_THRESHOLD_MB=20.0,
+            TRANSCRIPT_TARGET_CHUNK_MB=20.0,
+            TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS=600.0,
+            TRANSCRIPT_MAX_CONCURRENT_CHUNKS=3,
+            TRANSCRIPT_SILENCE_THRESHOLD_DB=-40.0,
+            TRANSCRIPT_SILENCE_DURATION_SECONDS=0.5,
+            TRANSCRIPT_STT_RTF=0.5,
+            TRANSCRIPT_DL_MIB_PER_SEC=4.0,
+            TRANSCRIPT_PREFERRED_LANGS=None,
+        ),
+        clients=Clients(youtube=yt, stt=stt, probe=probe),
+    )
+    from transcript_api.service import TranscriptService as _Svc
+
+    service = _Svc(deps["config"], deps["clients"])
+    handler = build_stt_handler(service)
+
+    direct_url = "https://cdn.example.com/lecture.mp4"
+    payload: STTPayload = {"url": direct_url}
+    out = handler(payload)
+
+    assert probe.captured_probe_url == direct_url
+    assert probe.captured_download_url == direct_url
+    assert out["url"] == direct_url
+    assert out["text"] == "Transcribed audio"

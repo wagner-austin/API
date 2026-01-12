@@ -162,9 +162,9 @@ class STTTranscriptProvider:
         if isinstance(path, str) and path:
             Path(path).unlink(missing_ok=True)
 
-    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        duration = self._probe_or_error(video_id, url)
+    def fetch(self, url: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        # url parameter is the canonical URL (YouTube watch URL, Vimeo URL, or direct URL)
+        duration = self._probe_or_error(url, url)
         self._logger.info("Probe complete: duration=%ss", duration)
 
         audio_path: str | None = None
@@ -454,15 +454,13 @@ class YtDlpCaptionProvider:
         if isinstance(path, str) and path:
             Path(path).unlink(missing_ok=True)
 
-    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
-        """Fetch captions for a YouTube video using yt-dlp subtitle download."""
-        url = f"https://www.youtube.com/watch?v={video_id}"
+    def fetch(self, url: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        """Fetch captions for a video using yt-dlp subtitle download."""
+        # url parameter is the canonical URL (YouTube watch URL, Vimeo URL, or direct URL)
         preferred_langs = opts.get("preferred_langs", ["en", "en-US", "en-GB"])
         cookies_path = self.cookies_path or self._temp_cookies_file
 
-        self._logger.info(
-            "Fetching captions via yt-dlp: vid=%s langs=%s", video_id, preferred_langs
-        )
+        self._logger.info("Fetching captions via yt-dlp: url=%s langs=%s", url, preferred_langs)
 
         result = self.probe_client.download_subtitles(
             url,
@@ -473,7 +471,7 @@ class YtDlpCaptionProvider:
         if result is None:
             raise AppError(
                 TranscriptErrorCode.TRANSCRIPT_UNAVAILABLE,
-                f"No captions available for video {video_id}",
+                f"No captions available for video: {url}",
                 404,
             )
 
