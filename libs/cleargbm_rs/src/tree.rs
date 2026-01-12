@@ -14,7 +14,8 @@
 //!    e. Otherwise create leaf node
 //! 3. Return completed tree with all nodes
 
-use serde::{Deserialize, Serialize};
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::ClearGbmError;
 use crate::histogram::subtract_histogram;
@@ -28,7 +29,7 @@ const EPSILON: f64 = 1e-10_f64;
 /// Configuration for tree building.
 ///
 /// Controls tree growth constraints like maximum depth and leaf limits.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TreeBuildConfig {
     /// Maximum depth of tree (0 = unlimited).
     max_depth: usize,
@@ -44,6 +45,203 @@ pub struct TreeBuildConfig {
 
     /// Split configuration.
     split_config: SplitConfig,
+}
+
+impl Serialize for TreeBuildConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = match serializer.serialize_struct("TreeBuildConfig", 5) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+        match state.serialize_field("max_depth", &self.max_depth) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("max_leaves", &self.max_leaves) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("reg_alpha", &self.reg_alpha) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("reg_lambda", &self.reg_lambda) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("split_config", &self.split_config) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        state.end()
+    }
+}
+
+/// Field identifiers for `TreeBuildConfig` deserialization.
+enum TreeBuildConfigField {
+    /// The max depth field.
+    MaxDepth,
+    /// The max leaves field.
+    MaxLeaves,
+    /// The regularization alpha field.
+    RegAlpha,
+    /// The regularization lambda field.
+    RegLambda,
+    /// The split configuration field.
+    SplitConfig,
+}
+
+/// Visitor for deserializing `TreeBuildConfigField` from string.
+struct TreeBuildConfigFieldVisitor;
+
+impl<'de> Visitor<'de> for TreeBuildConfigFieldVisitor {
+    type Value = TreeBuildConfigField;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("field identifier")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value {
+            "max_depth" => Ok(TreeBuildConfigField::MaxDepth),
+            "max_leaves" => Ok(TreeBuildConfigField::MaxLeaves),
+            "reg_alpha" => Ok(TreeBuildConfigField::RegAlpha),
+            "reg_lambda" => Ok(TreeBuildConfigField::RegLambda),
+            "split_config" => Ok(TreeBuildConfigField::SplitConfig),
+            _ => Err(E::unknown_field(value, TREE_BUILD_CONFIG_FIELDS)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TreeBuildConfigField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_identifier(TreeBuildConfigFieldVisitor)
+    }
+}
+
+/// Field names for `TreeBuildConfig` serialization.
+const TREE_BUILD_CONFIG_FIELDS: &[&str] = &[
+    "max_depth",
+    "max_leaves",
+    "reg_alpha",
+    "reg_lambda",
+    "split_config",
+];
+
+impl<'de> Deserialize<'de> for TreeBuildConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct TreeBuildConfigVisitor;
+
+        impl<'de> Visitor<'de> for TreeBuildConfigVisitor {
+            type Value = TreeBuildConfig;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                formatter.write_str("struct TreeBuildConfig")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<TreeBuildConfig, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut max_depth = None;
+                let mut max_leaves = None;
+                let mut reg_alpha = None;
+                let mut reg_lambda = None;
+                let mut split_config = None;
+
+                loop {
+                    let key: Option<TreeBuildConfigField> = match map.next_key() {
+                        Ok(k) => k,
+                        Err(e) => return Err(e),
+                    };
+                    let key = match key {
+                        Some(k) => k,
+                        None => break,
+                    };
+                    match key {
+                        TreeBuildConfigField::MaxDepth => {
+                            max_depth = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeBuildConfigField::MaxLeaves => {
+                            max_leaves = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeBuildConfigField::RegAlpha => {
+                            reg_alpha = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeBuildConfigField::RegLambda => {
+                            reg_lambda = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeBuildConfigField::SplitConfig => {
+                            split_config = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                    }
+                }
+
+                let max_depth = match max_depth {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("max_depth")),
+                };
+                let max_leaves = match max_leaves {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("max_leaves")),
+                };
+                let reg_alpha = match reg_alpha {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("reg_alpha")),
+                };
+                let reg_lambda = match reg_lambda {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("reg_lambda")),
+                };
+                let split_config = match split_config {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("split_config")),
+                };
+
+                Ok(TreeBuildConfig {
+                    max_depth,
+                    max_leaves,
+                    reg_alpha,
+                    reg_lambda,
+                    split_config,
+                })
+            }
+        }
+
+        deserializer.deserialize_struct(
+            "TreeBuildConfig",
+            TREE_BUILD_CONFIG_FIELDS,
+            TreeBuildConfigVisitor,
+        )
+    }
 }
 
 impl TreeBuildConfig {
@@ -68,7 +266,7 @@ impl TreeBuildConfig {
         reg_alpha: f64,
         reg_lambda: f64,
         split_config: SplitConfig,
-    ) -> std::result::Result<Self, ClearGbmError> {
+    ) -> Result<Self, ClearGbmError> {
         if reg_alpha < 0.0_f64 {
             return Err(ClearGbmError::InvalidParameter {
                 name: "reg_alpha".to_string(),
@@ -125,7 +323,7 @@ impl TreeBuildConfig {
 /// A complete decision tree.
 ///
 /// Contains all nodes and metadata about the tree structure.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Tree {
     /// All nodes in the tree (index = node_id).
     nodes: Vec<TreeNode>,
@@ -135,6 +333,155 @@ pub struct Tree {
 
     /// Number of leaf nodes.
     n_leaves: usize,
+}
+
+impl Serialize for Tree {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = match serializer.serialize_struct("Tree", 3) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+        match state.serialize_field("nodes", &self.nodes) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("max_depth", &self.max_depth) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("n_leaves", &self.n_leaves) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        state.end()
+    }
+}
+
+/// Field identifiers for `Tree` deserialization.
+enum TreeField {
+    /// The nodes field.
+    Nodes,
+    /// The max depth field.
+    MaxDepth,
+    /// The n_leaves field.
+    NLeaves,
+}
+
+/// Visitor for deserializing `TreeField` from string.
+struct TreeFieldVisitor;
+
+impl<'de> Visitor<'de> for TreeFieldVisitor {
+    type Value = TreeField;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("field identifier")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value {
+            "nodes" => Ok(TreeField::Nodes),
+            "max_depth" => Ok(TreeField::MaxDepth),
+            "n_leaves" => Ok(TreeField::NLeaves),
+            _ => Err(E::unknown_field(value, TREE_FIELDS)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TreeField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_identifier(TreeFieldVisitor)
+    }
+}
+
+/// Field names for `Tree` serialization.
+const TREE_FIELDS: &[&str] = &["nodes", "max_depth", "n_leaves"];
+
+impl<'de> Deserialize<'de> for Tree {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct TreeVisitor;
+
+        impl<'de> Visitor<'de> for TreeVisitor {
+            type Value = Tree;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                formatter.write_str("struct Tree")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Tree, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut nodes = None;
+                let mut max_depth = None;
+                let mut n_leaves = None;
+
+                loop {
+                    let key: Option<TreeField> = match map.next_key() {
+                        Ok(k) => k,
+                        Err(e) => return Err(e),
+                    };
+                    let key = match key {
+                        Some(k) => k,
+                        None => break,
+                    };
+                    match key {
+                        TreeField::Nodes => {
+                            nodes = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeField::MaxDepth => {
+                            max_depth = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        TreeField::NLeaves => {
+                            n_leaves = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                    }
+                }
+
+                let nodes = match nodes {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("nodes")),
+                };
+                let max_depth = match max_depth {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("max_depth")),
+                };
+                let n_leaves = match n_leaves {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("n_leaves")),
+                };
+
+                Ok(Tree {
+                    nodes,
+                    max_depth,
+                    n_leaves,
+                })
+            }
+        }
+
+        deserializer.deserialize_struct("Tree", TREE_FIELDS, TreeVisitor)
+    }
 }
 
 impl Tree {
@@ -165,7 +512,7 @@ impl Tree {
     /// # Errors
     ///
     /// Returns `ClearGbmError::NodeNotFound` if node_id is out of bounds.
-    pub fn node(&self, node_id: usize) -> std::result::Result<&TreeNode, ClearGbmError> {
+    pub fn node(&self, node_id: usize) -> Result<&TreeNode, ClearGbmError> {
         self.nodes
             .get(node_id)
             .ok_or(ClearGbmError::NodeNotFound { node_id })
@@ -176,7 +523,7 @@ impl Tree {
     /// # Errors
     ///
     /// Returns `ClearGbmError::NodeNotFound` if tree is empty.
-    pub fn root(&self) -> std::result::Result<&TreeNode, ClearGbmError> {
+    pub fn root(&self) -> Result<&TreeNode, ClearGbmError> {
         self.node(0_usize)
     }
 
@@ -340,10 +687,7 @@ pub struct BuildTreeInput<'a> {
 /// - Input validation fails
 /// - Histogram building fails
 /// - Split finding fails
-pub fn build_tree(
-    input: &BuildTreeInput<'_>,
-    hooks: &Hooks,
-) -> std::result::Result<Tree, ClearGbmError> {
+pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, ClearGbmError> {
     let n_samples = input.sample_indices.len();
 
     // Handle empty input
@@ -471,15 +815,21 @@ pub fn build_tree(
             hooks,
             cached_histograms: pending.cached_histograms.as_deref(),
         };
-        let histograms = build_feature_histograms(&hist_config)?;
+        let histograms = match build_feature_histograms(&hist_config) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
 
         // Find best split across all features
-        let best_split = find_best_split_across_features_internal(
+        let best_split = match find_best_split_across_features_internal(
             &histograms,
             split_config,
             input.n_regular_bins,
             input.monotonic_constraints,
-        )?;
+        ) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
 
         // If no valid split, create leaf
         let Some(split) = best_split else {
@@ -537,7 +887,11 @@ pub fn build_tree(
             parent_histograms: &histograms,
             hooks,
         };
-        let (left_histograms, right_histograms) = compute_child_histograms(&child_hist_config)?;
+        let (left_histograms, right_histograms) = match compute_child_histograms(&child_hist_config)
+        {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
 
         // Push children to stack (right first so left is processed first)
         stack.push(PendingNode {
@@ -557,7 +911,10 @@ pub fn build_tree(
     }
 
     // Finalize nodes with child pointers and convert to TreeNode
-    let final_nodes = finalize_nodes(&nodes, &child_pointers, input.bin_thresholds)?;
+    let final_nodes = match finalize_nodes(&nodes, &child_pointers, input.bin_thresholds) {
+        Ok(n) => n,
+        Err(e) => return Err(e),
+    };
 
     Ok(Tree::new(final_nodes, max_depth_found, n_leaves))
 }
@@ -639,7 +996,7 @@ struct BuildHistogramConfig<'a> {
 /// otherwise builds histograms from scratch.
 fn build_feature_histograms(
     config: &BuildHistogramConfig<'_>,
-) -> std::result::Result<Vec<HistogramBuffer>, ClearGbmError> {
+) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
     // Use cached histograms if available (from parent's sibling subtraction)
     if let Some(cached) = config.cached_histograms {
         if cached.len() == config.n_features {
@@ -671,13 +1028,16 @@ fn build_feature_histograms(
             .filter_map(|&idx| config.hessians.get(idx).copied())
             .collect();
 
-        let hist = (config.hooks.build_histogram)(
+        let hist = match (config.hooks.build_histogram)(
             &sample_idx_vec,
             &feat_gradients,
             &feat_hessians,
             &feat_bins,
             config.n_bins,
-        )?;
+        ) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
         histograms.push(hist);
     }
 
@@ -690,7 +1050,7 @@ fn find_best_split_across_features_internal(
     config: &SplitConfig,
     n_regular_bins: usize,
     monotonic_constraints: Option<&[MonotonicConstraint]>,
-) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+) -> Result<Option<SplitResult>, ClearGbmError> {
     let mut best_split: Option<SplitResult> = None;
 
     for (feature_idx, histogram) in histograms.iter().enumerate() {
@@ -698,13 +1058,18 @@ fn find_best_split_across_features_internal(
             .and_then(|constraints| constraints.get(feature_idx).copied())
             .unwrap_or(MonotonicConstraint::None);
 
-        if let Some(split) = find_best_split_from_histogram(
+        let maybe_split = match find_best_split_from_histogram(
             histogram,
             feature_idx,
             config,
             n_regular_bins,
             constraint,
-        )? {
+        ) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+
+        if let Some(split) = maybe_split {
             let is_better = best_split
                 .as_ref()
                 .is_none_or(|current| split.gain() > current.gain());
@@ -781,7 +1146,7 @@ struct ChildHistogramConfig<'a> {
 /// Builds histogram for smaller child, derives larger child via subtraction.
 fn compute_child_histograms(
     config: &ChildHistogramConfig<'_>,
-) -> std::result::Result<(Vec<HistogramBuffer>, Vec<HistogramBuffer>), ClearGbmError> {
+) -> Result<(Vec<HistogramBuffer>, Vec<HistogramBuffer>), ClearGbmError> {
     let n_left = config.left_indices.len();
     let n_right = config.right_indices.len();
     let left_is_smaller = n_left <= n_right;
@@ -812,23 +1177,32 @@ fn compute_child_histograms(
             .filter_map(|&idx| config.hessians.get(idx).copied())
             .collect();
 
-        let smaller_hist = (config.hooks.build_histogram)(
+        let smaller_hist = match (config.hooks.build_histogram)(
             &sample_idx_vec,
             &feat_gradients,
             &feat_hessians,
             &feat_bins,
             config.n_bins,
-        )?;
+        ) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
 
         // Derive larger child via subtraction
-        let parent_hist = config.parent_histograms.get(feat_idx).ok_or(
-            ClearGbmError::FeatureIndexOutOfBounds {
-                index: feat_idx,
-                n_features: config.n_features,
-            },
-        )?;
+        let parent_hist = match config.parent_histograms.get(feat_idx) {
+            Some(h) => h,
+            None => {
+                return Err(ClearGbmError::FeatureIndexOutOfBounds {
+                    index: feat_idx,
+                    n_features: config.n_features,
+                })
+            }
+        };
 
-        let larger_hist = subtract_histogram(parent_hist, &smaller_hist)?;
+        let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
 
         if left_is_smaller {
             left_histograms.push(smaller_hist);
@@ -847,7 +1221,7 @@ fn finalize_nodes(
     build_nodes: &[BuildNode],
     child_pointers: &[(Option<usize>, Option<usize>)],
     bin_thresholds: &[Vec<f64>],
-) -> std::result::Result<Vec<TreeNode>, ClearGbmError> {
+) -> Result<Vec<TreeNode>, ClearGbmError> {
     let mut final_nodes = Vec::with_capacity(build_nodes.len());
 
     for node in build_nodes {
@@ -860,16 +1234,22 @@ fn finalize_nodes(
             final_nodes.push(TreeNode::new_leaf(node.node_id, node.value, node.n_samples));
         } else {
             // Convert split_bin to threshold
-            let feature_index =
-                node.feature_index
-                    .ok_or_else(|| ClearGbmError::TreeConstructionFailed {
+            let feature_index = match node.feature_index {
+                Some(f) => f,
+                None => {
+                    return Err(ClearGbmError::TreeConstructionFailed {
                         reason: "internal node missing feature_index".to_string(),
-                    })?;
-            let split_bin =
-                node.split_bin
-                    .ok_or_else(|| ClearGbmError::TreeConstructionFailed {
+                    })
+                }
+            };
+            let split_bin = match node.split_bin {
+                Some(s) => s,
+                None => {
+                    return Err(ClearGbmError::TreeConstructionFailed {
                         reason: "internal node missing split_bin".to_string(),
-                    })?;
+                    })
+                }
+            };
 
             // Get threshold from bin_thresholds
             // Threshold is the upper bound of the split_bin
@@ -878,12 +1258,22 @@ fn finalize_nodes(
                 .and_then(|thresholds| thresholds.get(split_bin).copied())
                 .unwrap_or(0.0_f64);
 
-            let left_id = left_child.ok_or_else(|| ClearGbmError::TreeConstructionFailed {
-                reason: format!("internal node {} missing left_child", node.node_id),
-            })?;
-            let right_id = right_child.ok_or_else(|| ClearGbmError::TreeConstructionFailed {
-                reason: format!("internal node {} missing right_child", node.node_id),
-            })?;
+            let left_id = match left_child {
+                Some(l) => l,
+                None => {
+                    return Err(ClearGbmError::TreeConstructionFailed {
+                        reason: format!("internal node {} missing left_child", node.node_id),
+                    })
+                }
+            };
+            let right_id = match right_child {
+                Some(r) => r,
+                None => {
+                    return Err(ClearGbmError::TreeConstructionFailed {
+                        reason: format!("internal node {} missing right_child", node.node_id),
+                    })
+                }
+            };
 
             final_nodes.push(TreeNode::new_internal(TreeNodeConfig {
                 node_id: node.node_id,
@@ -904,124 +1294,545 @@ fn finalize_nodes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use proptest::prop_assert;
+    use proptest::prop_assert_eq;
+
+    /// Failing serializer for testing error propagation paths.
+    mod failing_serializer {
+        use core::fmt::{self, Display};
+        use serde::ser::{self, Serialize};
+
+        #[derive(Debug)]
+        pub struct FailError {
+            pub message: String,
+        }
+
+        impl Display for FailError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.message)
+            }
+        }
+
+        impl std::error::Error for FailError {}
+
+        impl ser::Error for FailError {
+            fn custom<T: Display>(msg: T) -> Self {
+                FailError {
+                    message: msg.to_string(),
+                }
+            }
+        }
+
+        pub struct FailAfterN {
+            count: usize,
+            fail_after: usize,
+            fail_on_struct: bool,
+        }
+
+        impl FailAfterN {
+            pub fn new(fail_after: usize) -> Self {
+                FailAfterN {
+                    count: 0,
+                    fail_after,
+                    fail_on_struct: false,
+                }
+            }
+
+            pub fn fail_on_struct() -> Self {
+                FailAfterN {
+                    count: 0,
+                    fail_after: usize::MAX,
+                    fail_on_struct: true,
+                }
+            }
+        }
+
+        pub struct FailAfterNStruct<'a> {
+            ser: &'a mut FailAfterN,
+        }
+
+        impl<'a> ser::SerializeStruct for FailAfterNStruct<'a> {
+            type Ok = ();
+            type Error = FailError;
+
+            fn serialize_field<T>(
+                &mut self,
+                _key: &'static str,
+                _value: &T,
+            ) -> Result<(), Self::Error>
+            where
+                T: ?Sized + Serialize,
+            {
+                self.ser.count += 1;
+                if self.ser.count > self.ser.fail_after {
+                    Err(FailError {
+                        message: "intentional failure".to_string(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+
+            fn end(self) -> Result<Self::Ok, Self::Error> {
+                Ok(())
+            }
+        }
+
+        impl<'a> ser::Serializer for &'a mut FailAfterN {
+            type Ok = ();
+            type Error = FailError;
+            type SerializeSeq = ser::Impossible<(), FailError>;
+            type SerializeTuple = ser::Impossible<(), FailError>;
+            type SerializeTupleStruct = ser::Impossible<(), FailError>;
+            type SerializeTupleVariant = ser::Impossible<(), FailError>;
+            type SerializeMap = ser::Impossible<(), FailError>;
+            type SerializeStruct = FailAfterNStruct<'a>;
+            type SerializeStructVariant = ser::Impossible<(), FailError>;
+
+            fn serialize_bool(self, _v: bool) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i8(self, _v: i8) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i16(self, _v: i16) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i32(self, _v: i32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i64(self, _v: i64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u8(self, _v: u8) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u16(self, _v: u16) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u32(self, _v: u32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u64(self, _v: u64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_f32(self, _v: f32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_f64(self, _v: f64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_char(self, _v: char) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_str(self, _v: &str) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_bytes(self, _v: &[u8]) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_none(self) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_some<T: ?Sized + Serialize>(self, _value: &T) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit(self) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit_struct(self, _name: &'static str) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_newtype_struct<T: ?Sized + Serialize>(
+                self,
+                _name: &'static str,
+                _value: &T,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_newtype_variant<T: ?Sized + Serialize>(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _value: &T,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, FailError> {
+                Err(FailError {
+                    message: "seq not supported".to_string(),
+                })
+            }
+            fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, FailError> {
+                Err(FailError {
+                    message: "tuple not supported".to_string(),
+                })
+            }
+            fn serialize_tuple_struct(
+                self,
+                _name: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeTupleStruct, FailError> {
+                Err(FailError {
+                    message: "tuple_struct not supported".to_string(),
+                })
+            }
+            fn serialize_tuple_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeTupleVariant, FailError> {
+                Err(FailError {
+                    message: "tuple_variant not supported".to_string(),
+                })
+            }
+            fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, FailError> {
+                Err(FailError {
+                    message: "map not supported".to_string(),
+                })
+            }
+            fn serialize_struct(
+                self,
+                _name: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeStruct, FailError> {
+                if self.fail_on_struct {
+                    Err(FailError {
+                        message: "intentional failure on serialize_struct".to_string(),
+                    })
+                } else {
+                    Ok(FailAfterNStruct { ser: self })
+                }
+            }
+            fn serialize_struct_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeStructVariant, FailError> {
+                Err(FailError {
+                    message: "struct_variant not supported".to_string(),
+                })
+            }
+        }
+    }
+
+    /// Failing deserializer for testing error propagation paths.
+    mod failing_deserializer {
+        use core::fmt::{self, Display};
+        use serde::de::{self, Visitor};
+
+        #[derive(Debug)]
+        pub struct DeError {
+            pub message: String,
+        }
+
+        impl Display for DeError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.message)
+            }
+        }
+
+        impl std::error::Error for DeError {}
+
+        impl de::Error for DeError {
+            fn custom<T: Display>(msg: T) -> Self {
+                DeError {
+                    message: msg.to_string(),
+                }
+            }
+        }
+
+        pub struct IntegerDeserializer;
+
+        impl<'de> de::Deserializer<'de> for IntegerDeserializer {
+            type Error = DeError;
+
+            fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+            where
+                V: Visitor<'de>,
+            {
+                visitor.visit_i64(42_i64)
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string
+                bytes byte_buf option unit unit_struct newtype_struct seq
+                tuple tuple_struct map struct enum identifier ignored_any
+            }
+        }
+
+        pub struct MapWithIntegerKeyDeserializer;
+
+        pub struct IntegerKeyMapAccess {
+            pub done: bool,
+        }
+
+        impl<'de> de::MapAccess<'de> for IntegerKeyMapAccess {
+            type Error = DeError;
+
+            fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+            where
+                K: de::DeserializeSeed<'de>,
+            {
+                if self.done {
+                    return Ok(None);
+                }
+                self.done = true;
+                seed.deserialize(IntegerDeserializer).map(Some)
+            }
+
+            fn next_value_seed<V>(&mut self, _seed: V) -> Result<V::Value, Self::Error>
+            where
+                V: de::DeserializeSeed<'de>,
+            {
+                Err(DeError {
+                    message: "should not reach value".to_string(),
+                })
+            }
+        }
+
+        impl<'de> de::Deserializer<'de> for MapWithIntegerKeyDeserializer {
+            type Error = DeError;
+
+            fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+            where
+                V: Visitor<'de>,
+            {
+                visitor.visit_map(IntegerKeyMapAccess { done: false })
+            }
+
+            serde::forward_to_deserialize_any! {
+                bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string
+                bytes byte_buf option unit unit_struct newtype_struct seq
+                tuple tuple_struct map struct enum identifier ignored_any
+            }
+        }
+    }
 
     // =========================================================================
     // Property-based tests with proptest
     // =========================================================================
 
-    proptest! {
-        #[test]
-        fn prop_compute_leaf_value_zero_hessian_returns_zero(
-            gradient in -1000.0_f64..1000.0_f64,
-            reg_alpha in 0.0_f64..10.0_f64,
-            reg_lambda in 0.0_f64..10.0_f64,
-        ) {
-            // When hessian + lambda is near zero, should return 0
-            let hessian = 0.0_f64;
-            if reg_lambda < EPSILON {
-                let value = compute_leaf_value(gradient, hessian, reg_alpha, reg_lambda);
-                prop_assert!(value.abs() < EPSILON, "Expected 0, got {}", value);
-            }
-        }
+    #[test]
+    fn prop_compute_leaf_value_zero_hessian_returns_zero() -> Result<(), ClearGbmError> {
+        let config = proptest::test_runner::Config::with_cases(100);
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner
+            .run(
+                &(
+                    -1000.0_f64..1000.0_f64,
+                    0.0_f64..10.0_f64,
+                    0.0_f64..10.0_f64,
+                ),
+                |(gradient, reg_alpha, reg_lambda)| {
+                    // When hessian + lambda is near zero, should return 0
+                    let hessian = 0.0_f64;
+                    if reg_lambda < EPSILON {
+                        let value = compute_leaf_value(gradient, hessian, reg_alpha, reg_lambda);
+                        prop_assert!(value.abs() < EPSILON, "Expected 0, got {}", value);
+                    }
+                    Ok(())
+                },
+            )
+            .map_err(|e| ClearGbmError::InvalidParameter {
+                name: "proptest".to_string(),
+                reason: format!("{}", e),
+            })
+    }
 
-        #[test]
-        fn prop_compute_leaf_value_l1_soft_threshold(
-            gradient in -100.0_f64..100.0_f64,
-            hessian in 1.0_f64..100.0_f64,
-            reg_alpha in 0.0_f64..50.0_f64,
-            reg_lambda in 0.0_f64..10.0_f64,
-        ) {
-            let value = compute_leaf_value(gradient, hessian, reg_alpha, reg_lambda);
+    #[test]
+    fn prop_compute_leaf_value_l1_soft_threshold() -> Result<(), ClearGbmError> {
+        let config = proptest::test_runner::Config::with_cases(100);
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner
+            .run(
+                &(
+                    -100.0_f64..100.0_f64,
+                    1.0_f64..100.0_f64,
+                    0.0_f64..50.0_f64,
+                    0.0_f64..10.0_f64,
+                ),
+                |(gradient, hessian, reg_alpha, reg_lambda)| {
+                    let value = compute_leaf_value(gradient, hessian, reg_alpha, reg_lambda);
 
-            // L1 soft threshold: if |G| <= alpha, value should be 0
-            if gradient.abs() <= reg_alpha {
-                prop_assert!(value.abs() < EPSILON, "Expected 0 when |G| <= alpha, got {}", value);
-            }
+                    // L1 soft threshold: if |G| <= alpha, value should be 0
+                    if gradient.abs() <= reg_alpha {
+                        prop_assert!(
+                            value.abs() < EPSILON,
+                            "Expected 0 when |G| <= alpha, got {}",
+                            value
+                        );
+                    }
 
-            // Value should be finite
-            prop_assert!(value.is_finite(), "Value should be finite, got {}", value);
-        }
+                    // Value should be finite
+                    prop_assert!(value.is_finite(), "Value should be finite, got {}", value);
+                    Ok(())
+                },
+            )
+            .map_err(|e| ClearGbmError::InvalidParameter {
+                name: "proptest".to_string(),
+                reason: format!("{}", e),
+            })
+    }
 
-        #[test]
-        fn prop_compute_leaf_value_sign_correct(
-            gradient in -100.0_f64..100.0_f64,
-            hessian in 1.0_f64..100.0_f64,
-        ) {
-            // Without regularization: -G/H
-            let value = compute_leaf_value(gradient, hessian, 0.0_f64, 0.0_f64);
+    #[test]
+    fn prop_compute_leaf_value_sign_correct() -> Result<(), ClearGbmError> {
+        let config = proptest::test_runner::Config::with_cases(100);
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner
+            .run(
+                &(-100.0_f64..100.0_f64, 1.0_f64..100.0_f64),
+                |(gradient, hessian)| {
+                    // Without regularization: -G/H
+                    let value = compute_leaf_value(gradient, hessian, 0.0_f64, 0.0_f64);
 
-            // Sign should be opposite of gradient (when hessian > 0)
-            if gradient.abs() > EPSILON {
-                let expected_sign = if gradient > 0.0_f64 { -1.0_f64 } else { 1.0_f64 };
-                let actual_sign = if value > 0.0_f64 { 1.0_f64 } else { -1.0_f64 };
-                prop_assert_eq!(expected_sign, actual_sign, "Sign mismatch: G={}, value={}", gradient, value);
-            }
-        }
+                    // Sign should be opposite of gradient (when hessian > 0)
+                    if gradient.abs() > EPSILON {
+                        let expected_sign = if gradient > 0.0_f64 {
+                            -1.0_f64
+                        } else {
+                            1.0_f64
+                        };
+                        let actual_sign = if value > 0.0_f64 { 1.0_f64 } else { -1.0_f64 };
+                        prop_assert_eq!(
+                            expected_sign,
+                            actual_sign,
+                            "Sign mismatch: G={}, value={}",
+                            gradient,
+                            value
+                        );
+                    }
+                    Ok(())
+                },
+            )
+            .map_err(|e| ClearGbmError::InvalidParameter {
+                name: "proptest".to_string(),
+                reason: format!("{}", e),
+            })
+    }
 
-        #[test]
-        fn prop_should_stop_respects_constraints(
-            depth in 0_usize..20_usize,
-            n_samples in 1_usize..1000_usize,
-            n_leaves in 0_usize..100_usize,
-            max_depth in 0_usize..15_usize,
-            max_leaves in 0_usize..50_usize,
-            min_samples_split in 2_usize..50_usize,
-            min_samples_leaf in 1_usize..25_usize,
-        ) {
-            let result = should_stop(depth, n_samples, n_leaves, max_depth, max_leaves, min_samples_split, min_samples_leaf);
+    #[test]
+    fn prop_should_stop_respects_constraints() -> Result<(), ClearGbmError> {
+        let config = proptest::test_runner::Config::with_cases(100);
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner
+            .run(
+                &(
+                    0_usize..20_usize,
+                    1_usize..1000_usize,
+                    0_usize..100_usize,
+                    0_usize..15_usize,
+                    0_usize..50_usize,
+                    2_usize..50_usize,
+                    1_usize..25_usize,
+                ),
+                |(
+                    depth,
+                    n_samples,
+                    n_leaves,
+                    max_depth,
+                    max_leaves,
+                    min_samples_split,
+                    min_samples_leaf,
+                )| {
+                    let result = should_stop(
+                        depth,
+                        n_samples,
+                        n_leaves,
+                        max_depth,
+                        max_leaves,
+                        min_samples_split,
+                        min_samples_leaf,
+                    );
 
-            // If max_depth > 0 and depth >= max_depth, must stop
-            if max_depth > 0_usize && depth >= max_depth {
-                prop_assert!(result, "Should stop when depth >= max_depth");
-            }
+                    // If max_depth > 0 and depth >= max_depth, must stop
+                    if max_depth > 0_usize && depth >= max_depth {
+                        prop_assert!(result, "Should stop when depth >= max_depth");
+                    }
 
-            // If max_leaves > 0 and n_leaves + 1 >= max_leaves, must stop
-            if max_leaves > 0_usize && n_leaves + 1_usize >= max_leaves {
-                prop_assert!(result, "Should stop when approaching max_leaves");
-            }
+                    // If max_leaves > 0 and n_leaves + 1 >= max_leaves, must stop
+                    if max_leaves > 0_usize && n_leaves + 1_usize >= max_leaves {
+                        prop_assert!(result, "Should stop when approaching max_leaves");
+                    }
 
-            // If n_samples < min_samples_split, must stop
-            if n_samples < min_samples_split {
-                prop_assert!(result, "Should stop when n_samples < min_samples_split");
-            }
+                    // If n_samples < min_samples_split, must stop
+                    if n_samples < min_samples_split {
+                        prop_assert!(result, "Should stop when n_samples < min_samples_split");
+                    }
 
-            // If n_samples < 2 * min_samples_leaf, must stop
-            if n_samples < 2_usize * min_samples_leaf {
-                prop_assert!(result, "Should stop when n_samples < 2 * min_samples_leaf");
-            }
-        }
+                    // If n_samples < 2 * min_samples_leaf, must stop
+                    if n_samples < 2_usize * min_samples_leaf {
+                        prop_assert!(result, "Should stop when n_samples < 2 * min_samples_leaf");
+                    }
+                    Ok(())
+                },
+            )
+            .map_err(|e| ClearGbmError::InvalidParameter {
+                name: "proptest".to_string(),
+                reason: format!("{}", e),
+            })
+    }
 
-        #[test]
-        fn prop_split_samples_preserves_count(
-            n_samples in 2_usize..20_usize,
-            split_bin in 0_usize..5_usize,
-            nan_goes_left in proptest::bool::ANY,
-        ) {
-            let n_regular_bins = 6_usize;
-            let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
+    #[test]
+    fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
+        let config = proptest::test_runner::Config::with_cases(100);
+        let mut runner = proptest::test_runner::TestRunner::new(config);
+        runner
+            .run(
+                &(2_usize..20_usize, 0_usize..5_usize, proptest::bool::ANY),
+                |(n_samples, split_bin, nan_goes_left)| {
+                    let n_regular_bins = 6_usize;
+                    let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
 
-            // Create bins that distribute samples across bins
-            let bins: Vec<Vec<usize>> = (0_usize..n_samples)
-                .map(|i| vec![i % n_regular_bins])
-                .collect();
+                    // Create bins that distribute samples across bins
+                    let bins: Vec<Vec<usize>> = (0_usize..n_samples)
+                        .map(|i| vec![i % n_regular_bins])
+                        .collect();
 
-            let (left, right) = split_samples(&sample_indices, &bins, 0_usize, split_bin, nan_goes_left, n_regular_bins);
+                    let (left, right) = split_samples(
+                        &sample_indices,
+                        &bins,
+                        0_usize,
+                        split_bin,
+                        nan_goes_left,
+                        n_regular_bins,
+                    );
 
-            // Total samples should be preserved
-            prop_assert_eq!(
-                left.len() + right.len(),
-                n_samples,
-                "Sample count not preserved: left={}, right={}, total={}",
-                left.len(), right.len(), n_samples
-            );
+                    // Total samples should be preserved
+                    prop_assert_eq!(
+                        left.len() + right.len(),
+                        n_samples,
+                        "Sample count not preserved: left={}, right={}, total={}",
+                        left.len(),
+                        right.len(),
+                        n_samples
+                    );
 
-            // No duplicates
-            let mut all: Vec<usize> = left.iter().chain(right.iter()).copied().collect();
-            all.sort();
-            all.dedup();
-            prop_assert_eq!(all.len(), n_samples, "Duplicate samples found");
-        }
+                    // No duplicates
+                    let mut all: Vec<usize> = left.iter().chain(right.iter()).copied().collect();
+                    all.sort();
+                    all.dedup();
+                    prop_assert_eq!(all.len(), n_samples, "Duplicate samples found");
+                    Ok(())
+                },
+            )
+            .map_err(|e| ClearGbmError::InvalidParameter {
+                name: "proptest".to_string(),
+                reason: format!("{}", e),
+            })
     }
 
     // =========================================================================
@@ -1029,9 +1840,15 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_tree_build_config_new_valid() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let c = TreeBuildConfig::new(5_usize, 10_usize, 0.0_f64, 1.0_f64, sc)?;
+    fn test_tree_build_config_new_valid() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let c = match TreeBuildConfig::new(5_usize, 10_usize, 0.0_f64, 1.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         assert_eq!(c.max_depth(), 5_usize);
         assert_eq!(c.max_leaves(), 10_usize);
@@ -1041,8 +1858,11 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_build_config_negative_reg_alpha() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+    fn test_tree_build_config_negative_reg_alpha() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         let config = TreeBuildConfig::new(5_usize, 10_usize, -0.1_f64, 1.0_f64, sc);
 
         assert!(config.is_err());
@@ -1054,8 +1874,11 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_build_config_negative_reg_lambda() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+    fn test_tree_build_config_negative_reg_lambda() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         let config = TreeBuildConfig::new(5_usize, 10_usize, 0.0_f64, -1.0_f64, sc);
 
         assert!(config.is_err());
@@ -1071,17 +1894,18 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_tree_new() {
+    fn test_tree_new() -> Result<(), ClearGbmError> {
         let leaf = TreeNode::new_leaf(0_usize, 0.5_f64, 100_usize);
         let tree = Tree::new(vec![leaf], 0_usize, 1_usize);
 
         assert_eq!(tree.n_nodes(), 1_usize);
         assert_eq!(tree.n_leaves(), 1_usize);
         assert_eq!(tree.max_depth(), 0_usize);
+        Ok(())
     }
 
     #[test]
-    fn test_tree_nodes_accessor() {
+    fn test_tree_nodes_accessor() -> Result<(), ClearGbmError> {
         let leaf1 = TreeNode::new_leaf(0_usize, 0.5_f64, 50_usize);
         let leaf2 = TreeNode::new_leaf(1_usize, -0.5_f64, 50_usize);
         let tree = Tree::new(vec![leaf1, leaf2], 0_usize, 2_usize);
@@ -1090,18 +1914,25 @@ mod tests {
         assert_eq!(nodes.len(), 2_usize);
         assert_eq!(nodes[0_usize].node_id(), 0_usize);
         assert_eq!(nodes[1_usize].node_id(), 1_usize);
+        Ok(())
     }
 
     #[test]
-    fn test_tree_node_access() -> std::result::Result<(), ClearGbmError> {
+    fn test_tree_node_access() -> Result<(), ClearGbmError> {
         let leaf = TreeNode::new_leaf(0_usize, 0.5_f64, 100_usize);
         let tree = Tree::new(vec![leaf.clone()], 0_usize, 1_usize);
 
-        let node = tree.root()?;
+        let node = match tree.root() {
+            Ok(n) => n,
+            Err(e) => return Err(e),
+        };
         assert_eq!(node.node_id(), 0_usize);
         assert!(node.is_leaf());
 
-        let node0 = tree.node(0_usize)?;
+        let node0 = match tree.node(0_usize) {
+            Ok(n) => n,
+            Err(e) => return Err(e),
+        };
         assert_eq!(node0.node_id(), 0_usize);
 
         let missing = tree.node(99_usize);
@@ -1114,7 +1945,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_empty_root_error() {
+    fn test_tree_empty_root_error() -> Result<(), ClearGbmError> {
         let tree = Tree::new(vec![], 0_usize, 0_usize);
         let root = tree.root();
         assert!(root.is_err());
@@ -1122,15 +1953,30 @@ mod tests {
             root.err(),
             Some(ClearGbmError::NodeNotFound { node_id: 0_usize })
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_tree_serialize_deserialize() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn test_tree_serialize_deserialize() -> Result<(), ClearGbmError> {
         let leaf = TreeNode::new_leaf(0_usize, 0.5_f64, 100_usize);
         let tree = Tree::new(vec![leaf], 1_usize, 1_usize);
 
-        let json_str = serde_json::to_string(&tree)?;
-        let p: Tree = serde_json::from_str(&json_str)?;
+        let json_str = match serde_json::to_string(&tree) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let p: Tree = match serde_json::from_str(&json_str) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
 
         assert_eq!(p.n_nodes(), 1_usize);
         assert_eq!(p.max_depth(), 1_usize);
@@ -1139,9 +1985,15 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_build_config_getters() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.5_f64, 0.01_f64)?;
-        let c = TreeBuildConfig::new(5_usize, 10_usize, 0.1_f64, 0.5_f64, sc)?;
+    fn test_tree_build_config_getters() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.5_f64, 0.01_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let c = match TreeBuildConfig::new(5_usize, 10_usize, 0.1_f64, 0.5_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         assert_eq!(c.max_depth(), 5_usize);
         assert_eq!(c.max_leaves(), 10_usize);
@@ -1152,13 +2004,32 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_build_config_serialize_deserialize(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let c = TreeBuildConfig::new(5_usize, 10_usize, 0.1_f64, 0.5_f64, sc)?;
+    fn test_tree_build_config_serialize_deserialize() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let c = match TreeBuildConfig::new(5_usize, 10_usize, 0.1_f64, 0.5_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
-        let json_str = serde_json::to_string(&c)?;
-        let p: TreeBuildConfig = serde_json::from_str(&json_str)?;
+        let json_str = match serde_json::to_string(&c) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let p: TreeBuildConfig = match serde_json::from_str(&json_str) {
+            Ok(c) => c,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
 
         assert_eq!(p.max_depth(), 5_usize);
         assert_eq!(p.max_leaves(), 10_usize);
@@ -1170,22 +2041,24 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_compute_leaf_value_basic() {
+    fn test_compute_leaf_value_basic() -> Result<(), ClearGbmError> {
         // Simple case: -G/H = -2.0/10.0 = -0.2
         let value = compute_leaf_value(2.0_f64, 10.0_f64, 0.0_f64, 0.0_f64);
         assert!((value - (-0.2_f64)).abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_with_l2() {
+    fn test_compute_leaf_value_with_l2() -> Result<(), ClearGbmError> {
         // With L2: -G/(H + lambda) = -2.0/(10.0 + 1.0) = -2.0/11.0
         let value = compute_leaf_value(2.0_f64, 10.0_f64, 0.0_f64, 1.0_f64);
         let expected = -2.0_f64 / 11.0_f64;
         assert!((value - expected).abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_with_l1() {
+    fn test_compute_leaf_value_with_l1() -> Result<(), ClearGbmError> {
         // With L1: soft threshold
         // G = 2.0, alpha = 0.5
         // sign(G) = 1, |G| = 2.0 > alpha
@@ -1193,31 +2066,35 @@ mod tests {
         let value = compute_leaf_value(2.0_f64, 10.0_f64, 0.5_f64, 0.0_f64);
         let expected = -1.5_f64 / 10.0_f64;
         assert!((value - expected).abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_l1_below_threshold() {
+    fn test_compute_leaf_value_l1_below_threshold() -> Result<(), ClearGbmError> {
         // With L1: |G| <= alpha, value = 0
         let value = compute_leaf_value(0.3_f64, 10.0_f64, 0.5_f64, 0.0_f64);
         assert!(value.abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_zero_hessian() {
+    fn test_compute_leaf_value_zero_hessian() -> Result<(), ClearGbmError> {
         // Zero hessian should return 0
         let value = compute_leaf_value(2.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
         assert!(value.abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_negative_gradient() {
+    fn test_compute_leaf_value_negative_gradient() -> Result<(), ClearGbmError> {
         // Negative gradient: -(-2.0)/10.0 = 0.2
         let value = compute_leaf_value(-2.0_f64, 10.0_f64, 0.0_f64, 0.0_f64);
         assert!((value - 0.2_f64).abs() < EPSILON);
+        Ok(())
     }
 
     #[test]
-    fn test_compute_leaf_value_negative_gradient_with_l1() {
+    fn test_compute_leaf_value_negative_gradient_with_l1() -> Result<(), ClearGbmError> {
         // Negative gradient with L1: soft threshold
         // G = -2.0, alpha = 0.5
         // sign(G) = -1, |G| = 2.0 > alpha
@@ -1225,6 +2102,7 @@ mod tests {
         let value = compute_leaf_value(-2.0_f64, 10.0_f64, 0.5_f64, 0.0_f64);
         let expected = 1.5_f64 / 10.0_f64;
         assert!((value - expected).abs() < EPSILON);
+        Ok(())
     }
 
     // =========================================================================
@@ -1232,25 +2110,27 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_should_stop_max_depth() {
+    fn test_should_stop_max_depth() -> Result<(), ClearGbmError> {
         assert!(should_stop(
             5_usize, 100_usize, 0_usize, 5_usize, 0_usize, 2_usize, 1_usize
         ));
         assert!(!should_stop(
             4_usize, 100_usize, 0_usize, 5_usize, 0_usize, 2_usize, 1_usize
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_should_stop_unlimited_depth() {
+    fn test_should_stop_unlimited_depth() -> Result<(), ClearGbmError> {
         // max_depth = 0 means unlimited
         assert!(!should_stop(
             100_usize, 100_usize, 0_usize, 0_usize, 0_usize, 2_usize, 1_usize
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_should_stop_max_leaves() {
+    fn test_should_stop_max_leaves() -> Result<(), ClearGbmError> {
         // max_leaves = 10, n_leaves = 9, would add 1 more -> stop
         assert!(should_stop(
             2_usize, 100_usize, 9_usize, 0_usize, 10_usize, 2_usize, 1_usize
@@ -1258,20 +2138,22 @@ mod tests {
         assert!(!should_stop(
             2_usize, 100_usize, 8_usize, 0_usize, 10_usize, 2_usize, 1_usize
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_should_stop_min_samples_split() {
+    fn test_should_stop_min_samples_split() -> Result<(), ClearGbmError> {
         assert!(should_stop(
             2_usize, 5_usize, 0_usize, 0_usize, 0_usize, 10_usize, 1_usize
         ));
         assert!(!should_stop(
             2_usize, 15_usize, 0_usize, 0_usize, 0_usize, 10_usize, 1_usize
         ));
+        Ok(())
     }
 
     #[test]
-    fn test_should_stop_min_samples_leaf() {
+    fn test_should_stop_min_samples_leaf() -> Result<(), ClearGbmError> {
         // n_samples = 5, min_samples_leaf = 3, need 6 samples minimum
         assert!(should_stop(
             2_usize, 5_usize, 0_usize, 0_usize, 0_usize, 2_usize, 3_usize
@@ -1279,6 +2161,7 @@ mod tests {
         assert!(!should_stop(
             2_usize, 10_usize, 0_usize, 0_usize, 0_usize, 2_usize, 3_usize
         ));
+        Ok(())
     }
 
     // =========================================================================
@@ -1286,7 +2169,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_split_samples_basic() {
+    fn test_split_samples_basic() -> Result<(), ClearGbmError> {
         // 5 samples, bins for feature 0
         let bins = vec![
             vec![0_usize], // sample 0, feature 0 -> bin 0
@@ -1310,10 +2193,11 @@ mod tests {
         assert!(right.contains(&1_usize));
         assert!(right.contains(&2_usize));
         assert!(right.contains(&4_usize));
+        Ok(())
     }
 
     #[test]
-    fn test_split_samples_nan_handling() {
+    fn test_split_samples_nan_handling() -> Result<(), ClearGbmError> {
         // Sample with NaN bin (= n_regular_bins)
         let bins = vec![
             vec![0_usize], // sample 0 -> bin 0
@@ -1332,6 +2216,7 @@ mod tests {
             split_samples(&sample_indices, &bins, 0_usize, 0_usize, false, 3_usize);
         assert!(left2.contains(&0_usize)); // bin 0
         assert!(right2.contains(&1_usize)); // NaN goes right
+        Ok(())
     }
 
     // =========================================================================
@@ -1339,10 +2224,16 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_build_tree_single_leaf() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
         // Create simple data that results in a single leaf
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(1_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(1_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![0.1_f64, 0.1_f64, 0.1_f64];
@@ -1361,19 +2252,31 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
 
         // Should be a single leaf (max_depth = 1, samples in same bin)
         assert_eq!(tree.n_leaves(), 1_usize);
-        let _ = tree.root()?;
+        let _ = match tree.root() {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_with_split() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
         // Create data with clear split
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         // Left samples (bins 0,1) have positive gradients
@@ -1394,22 +2297,34 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
 
         // Should have split
         assert!(tree.n_nodes() >= 3_usize);
         assert!(tree.n_leaves() >= 2_usize);
 
         // Root should not be a leaf
-        let root = tree.root()?;
+        let root = match tree.root() {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
         assert!(!root.is_leaf());
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_empty_input() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+    fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices: Vec<usize> = vec![];
         let gradients: Vec<f64> = vec![];
@@ -1438,10 +2353,16 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_max_depth_constraint() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
         // max_depth = 1 should create root + 2 leaves max
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(1_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(1_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -1460,7 +2381,10 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
 
         // Max depth = 1, so max 3 nodes (root + 2 leaves)
         assert!(tree.n_nodes() <= 3_usize);
@@ -1469,10 +2393,16 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_max_leaves_constraint() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
         // max_leaves = 2
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(10_usize, 2_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(10_usize, 2_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -1491,15 +2421,24 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
         assert!(tree.n_leaves() <= 2_usize);
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_gradients_too_short() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+    fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![1.0_f64]; // Too short!
@@ -1528,9 +2467,15 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_hessians_too_short() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+    fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
@@ -1559,9 +2504,15 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_no_features() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+    fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
@@ -1591,10 +2542,16 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_empty_bins_vec() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_empty_bins_vec() -> Result<(), ClearGbmError> {
         // Test where bins vec itself is empty (different from empty inner vecs)
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
@@ -1624,9 +2581,15 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_with_monotonic_constraints() -> std::result::Result<(), ClearGbmError> {
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+    fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -1647,15 +2610,24 @@ mod tests {
         };
 
         // Should succeed (constraint may or may not affect the split)
-        let _ = build_tree(&input, &Hooks::default())?;
+        let _ = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_with_l1_regularization() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
         // Use L1 regularization
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.5_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.5_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -1674,16 +2646,25 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let _ = build_tree(&input, &Hooks::default())?;
+        let _ = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_left_larger_than_right() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
         // Test where left child has more samples than right
         // This exercises the else branch in compute_child_histograms
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         // 6 samples: 4 in low bins (left), 2 in high bins (right)
         // This makes left child larger than right child
@@ -1712,7 +2693,10 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
 
         // Should have split into left (4 samples) and right (2 samples)
         assert!(tree.n_nodes() >= 3_usize);
@@ -1720,11 +2704,17 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tree_deep_tree() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
         // Test building a deeper tree to exercise more code paths
         // Allow deep tree
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(10_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(10_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         // 8 samples with varying gradients
         let sample_indices = vec![
@@ -1761,7 +2751,10 @@ mod tests {
             monotonic_constraints: None,
         };
 
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
 
         // Should have multiple nodes
         assert!(tree.n_nodes() > 1_usize);
@@ -1778,8 +2771,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_finalize_nodes_internal_node_missing_feature_index(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_finalize_nodes_internal_node_missing_feature_index() -> Result<(), ClearGbmError> {
         // Create an internal node (is_leaf=false) without feature_index
         let build_nodes = vec![BuildNode {
             node_id: 0_usize,
@@ -1802,8 +2794,7 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_nodes_internal_node_missing_split_bin(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_finalize_nodes_internal_node_missing_split_bin() -> Result<(), ClearGbmError> {
         // Create an internal node without split_bin
         let build_nodes = vec![BuildNode {
             node_id: 0_usize,
@@ -1826,8 +2817,7 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_nodes_internal_node_missing_left_child(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_finalize_nodes_internal_node_missing_left_child() -> Result<(), ClearGbmError> {
         // Create an internal node with missing left child in child_pointers
         let build_nodes = vec![BuildNode {
             node_id: 0_usize,
@@ -1850,8 +2840,7 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_nodes_internal_node_missing_right_child(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_finalize_nodes_internal_node_missing_right_child() -> Result<(), ClearGbmError> {
         // Create an internal node with missing right child in child_pointers
         let build_nodes = vec![BuildNode {
             node_id: 0_usize,
@@ -1874,7 +2863,7 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_nodes_leaf_node_success() -> std::result::Result<(), ClearGbmError> {
+    fn test_finalize_nodes_leaf_node_success() -> Result<(), ClearGbmError> {
         // Leaf nodes should finalize without needing feature_index, split_bin, or children
         let build_nodes = vec![BuildNode {
             node_id: 0_usize,
@@ -1888,7 +2877,10 @@ mod tests {
         let child_pointers = vec![(None, None)];
         let bin_thresholds: Vec<Vec<f64>> = vec![];
 
-        let nodes = finalize_nodes(&build_nodes, &child_pointers, &bin_thresholds)?;
+        let nodes = match finalize_nodes(&build_nodes, &child_pointers, &bin_thresholds) {
+            Ok(n) => n,
+            Err(e) => return Err(e),
+        };
         assert_eq!(nodes.len(), 1_usize);
         assert!(nodes[0_usize].is_leaf());
         assert!((nodes[0_usize].value() - 1.5_f64).abs() < 1e-10_f64);
@@ -1900,7 +2892,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_build_feature_histograms_empty_features() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
         // Test with n_features = 0
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 1.0_f64];
@@ -1926,13 +2918,15 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_across_features_internal_error(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_find_best_split_across_features_internal_error() -> Result<(), ClearGbmError> {
         // Create a histogram and config that will trigger an error
         // n_regular_bins > n_bins should cause an error
         let histogram = HistogramBuffer::new(3_usize);
         let histograms = vec![histogram];
-        let config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+        let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let result = find_best_split_across_features_internal(
             &histograms,
@@ -1946,29 +2940,48 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_across_features_internal_multiple_features(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_find_best_split_across_features_internal_multiple_features() -> Result<(), ClearGbmError>
+    {
         // Test with 2 features that both have valid splits to cover the comparison closure
         let mut hist0 = HistogramBuffer::new(4_usize);
         for _ in 0_usize..10_usize {
-            hist0.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+            match hist0.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
         for _ in 0_usize..10_usize {
-            hist0.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+            match hist0.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
 
         let mut hist1 = HistogramBuffer::new(4_usize);
         for _ in 0_usize..10_usize {
-            hist1.accumulate(0_usize, 0.3_f64, 1.0_f64)?;
+            match hist1.accumulate(0_usize, 0.3_f64, 1.0_f64) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
         for _ in 0_usize..10_usize {
-            hist1.accumulate(1_usize, -0.3_f64, 1.0_f64)?;
+            match hist1.accumulate(1_usize, -0.3_f64, 1.0_f64) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
 
         let histograms = vec![hist0, hist1];
-        let config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+        let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
-        let result = find_best_split_across_features_internal(&histograms, &config, 3_usize, None)?;
+        let result =
+            match find_best_split_across_features_internal(&histograms, &config, 3_usize, None) {
+                Ok(r) => r,
+                Err(e) => return Err(e),
+            };
 
         // Should find the best split (feature 0 has higher gain due to larger gradient magnitude)
         assert!(matches!(result, Some(ref s) if s.feature_index() == 0_usize));
@@ -1976,8 +2989,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_child_histograms_parent_histograms_too_short(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), ClearGbmError> {
         // Test error when parent_histograms has fewer entries than n_features
         let left_indices = vec![0_usize, 1_usize];
         let right_indices = vec![2_usize, 3_usize];
@@ -2015,7 +3027,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_child_histograms_success() -> std::result::Result<(), ClearGbmError> {
+    fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         // Test successful child histogram computation
         let left_indices = vec![0_usize, 1_usize];
         let right_indices = vec![2_usize, 3_usize];
@@ -2025,8 +3037,14 @@ mod tests {
 
         // Create parent histogram with proper values
         let mut parent_hist = HistogramBuffer::new(3_usize);
-        parent_hist.accumulate(0_usize, 3.0_f64, 2.0_f64)?;
-        parent_hist.accumulate(1_usize, -3.0_f64, 2.0_f64)?;
+        match parent_hist.accumulate(0_usize, 3.0_f64, 2.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
+        match parent_hist.accumulate(1_usize, -3.0_f64, 2.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
 
         let parent_histograms = vec![parent_hist];
 
@@ -2043,18 +3061,27 @@ mod tests {
             hooks: &hooks,
         };
 
-        let (left_hists, right_hists) = compute_child_histograms(&config)?;
+        let (left_hists, right_hists) = match compute_child_histograms(&config) {
+            Ok(h) => h,
+            Err(e) => return Err(e),
+        };
         assert_eq!(left_hists.len(), 1_usize);
         assert_eq!(right_hists.len(), 1_usize);
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_with_large_n_regular_bins() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         // Test with n_regular_bins much larger than actual bins used
         // This succeeds because histogram is built with n_bins = n_regular_bins + 1
-        let sc = SplitConfig::new(2_usize, 1_usize, 4_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 4_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -2074,16 +3101,25 @@ mod tests {
         };
 
         // This succeeds because histogram.n_bins() = n_regular_bins + 1 = 101 > 100
-        let tree = build_tree(&input, &Hooks::default())?;
+        let tree = match build_tree(&input, &Hooks::default()) {
+            Ok(t) => t,
+            Err(e) => return Err(e),
+        };
         assert!(tree.n_nodes() >= 1_usize);
         Ok(())
     }
 
     #[test]
-    fn test_build_tree_bins_out_of_bounds() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
         // Test with bin values that exceed n_bins to trigger error in build_feature_histograms
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -2110,7 +3146,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_increasing_is_decreasing_methods() -> std::result::Result<(), ClearGbmError> {
+    fn test_is_increasing_is_decreasing_methods() -> Result<(), ClearGbmError> {
         // Test the is_increasing and is_decreasing methods
         let inc = MonotonicConstraint::Increasing;
         let dec = MonotonicConstraint::Decreasing;
@@ -2142,18 +3178,23 @@ mod tests {
         _: &[f64],
         _: &[usize],
         _: usize,
-    ) -> std::result::Result<HistogramBuffer, ClearGbmError> {
+    ) -> Result<HistogramBuffer, ClearGbmError> {
         Err(ClearGbmError::EmptyInput {
             context: "injected error from hook".to_string(),
         })
     }
 
     #[test]
-    fn test_build_tree_hooks_error_in_histogram_building() -> std::result::Result<(), ClearGbmError>
-    {
+    fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmError> {
         // Use hooks to inject error during histogram building (exercises line 474's `?`)
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -2185,8 +3226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_feature_histograms_with_cached_histograms(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbmError> {
         // Test that cached histograms are used when available
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
@@ -2195,8 +3235,14 @@ mod tests {
 
         // Create cached histograms
         let mut cached = HistogramBuffer::new(3_usize);
-        cached.accumulate(0_usize, 1.0_f64, 1.0_f64)?;
-        cached.accumulate(1_usize, 2.0_f64, 1.0_f64)?;
+        match cached.accumulate(0_usize, 1.0_f64, 1.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
+        match cached.accumulate(1_usize, 2.0_f64, 1.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
         let cached_histograms = vec![cached];
 
         let hooks = Hooks::default();
@@ -2211,7 +3257,10 @@ mod tests {
             cached_histograms: Some(&cached_histograms),
         };
 
-        let result = build_feature_histograms(&config)?;
+        let result = match build_feature_histograms(&config) {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
 
         // Should return the cached histograms
         assert_eq!(result.len(), 1_usize);
@@ -2219,8 +3268,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_feature_histograms_with_wrong_size_cache(
-    ) -> std::result::Result<(), ClearGbmError> {
+    fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmError> {
         // Test that wrong-size cache is ignored and histograms are built fresh
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
@@ -2244,13 +3292,16 @@ mod tests {
         };
 
         // Should build from scratch since cache size doesn't match
-        let result = build_feature_histograms(&config)?;
+        let result = match build_feature_histograms(&config) {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
         assert_eq!(result.len(), 2_usize);
         Ok(())
     }
 
     #[test]
-    fn test_compute_child_histograms_hooks_error() -> std::result::Result<(), ClearGbmError> {
+    fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
         // Test error propagation from hooks in compute_child_histograms
         let left_indices = vec![0_usize, 1_usize];
         let right_indices = vec![2_usize, 3_usize];
@@ -2259,8 +3310,14 @@ mod tests {
         let bins = vec![vec![0_usize], vec![0_usize], vec![1_usize], vec![1_usize]];
 
         let mut parent_hist = HistogramBuffer::new(3_usize);
-        parent_hist.accumulate(0_usize, 3.0_f64, 2.0_f64)?;
-        parent_hist.accumulate(1_usize, -3.0_f64, 2.0_f64)?;
+        match parent_hist.accumulate(0_usize, 3.0_f64, 2.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
+        match parent_hist.accumulate(1_usize, -3.0_f64, 2.0_f64) {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
         let parent_histograms = vec![parent_hist];
 
         // Inject error via hook
@@ -2293,18 +3350,24 @@ mod tests {
         _: &[f64],
         _: &[usize],
         _: usize,
-    ) -> std::result::Result<HistogramBuffer, ClearGbmError> {
+    ) -> Result<HistogramBuffer, ClearGbmError> {
         // Return a histogram with only 2 bins, regardless of requested size
         // This will cause find_best_split_from_histogram to fail when n_regular_bins > 2
         Ok(HistogramBuffer::new(2_usize))
     }
 
     #[test]
-    fn test_build_tree_hooks_error_in_split_finding() -> std::result::Result<(), ClearGbmError> {
+    fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         // Use hooks to inject undersized histogram, causing split finding to fail
         // This exercises the `?` at line 482 in build_tree
-        let sc = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-        let cfg = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc)?;
+        let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let cfg = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, sc) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
         let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
         let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
@@ -2329,6 +3392,590 @@ mod tests {
 
         // Should fail because n_regular_bins (4) > histogram.n_bins() (2)
         assert!(result.is_err());
+        Ok(())
+    }
+
+    // ==================== SERDE ERROR PATH TESTS ====================
+
+    // TreeBuildConfig serde tests
+
+    #[test]
+    fn test_tree_build_config_deserialize_missing_max_depth() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_leaves":8,"reg_alpha":0.0,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("max_depth"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_missing_max_leaves() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"reg_alpha":0.0,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("max_leaves"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_missing_reg_alpha() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"max_leaves":8,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("reg_alpha"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_missing_reg_lambda() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"max_leaves":8,"reg_alpha":0.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("reg_lambda"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_missing_split_config() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"max_leaves":8,"reg_alpha":0.0,"reg_lambda":1.0}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("split_config"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_unknown_field() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"max_leaves":8,"reg_alpha":0.0,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0},"unknown_field":"value"}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("unknown field"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_wrong_type() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":"six","max_leaves":8,"reg_alpha":0.0,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_all_fields() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":6,"max_leaves":8,"reg_alpha":0.1,"reg_lambda":1.0,"split_config":{"min_samples_split":2,"min_samples_leaf":1,"max_bins":256,"reg_lambda":0.0,"min_gain":0.0}}"#;
+        let config: TreeBuildConfig = match serde_json::from_str(json) {
+            Ok(c) => c,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(config.max_depth(), 6_usize);
+        assert_eq!(config.max_leaves(), 8_usize);
+        assert!((config.reg_alpha() - 0.1_f64).abs() < 1e-10_f64);
+        assert!((config.reg_lambda() - 1.0_f64).abs() < 1e-10_f64);
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_serialize_roundtrip() -> Result<(), ClearGbmError> {
+        let split_config = match SplitConfig::new(2_usize, 1_usize, 256_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let config = match TreeBuildConfig::new(6_usize, 8_usize, 0.1_f64, 1.0_f64, split_config) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let json = match serde_json::to_string(&config) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let deserialized: TreeBuildConfig = match serde_json::from_str(&json) {
+            Ok(c) => c,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(config, deserialized);
+        Ok(())
+    }
+
+    // Tree serde tests
+
+    #[test]
+    fn test_tree_deserialize_missing_nodes() -> Result<(), ClearGbmError> {
+        let json = r#"{"max_depth":3,"n_leaves":4}"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("nodes"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_missing_max_depth() -> Result<(), ClearGbmError> {
+        let json = r#"{"nodes":[],"n_leaves":0}"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("max_depth"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_missing_n_leaves() -> Result<(), ClearGbmError> {
+        let json = r#"{"nodes":[],"max_depth":0}"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("n_leaves"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_unknown_field() -> Result<(), ClearGbmError> {
+        let json = r#"{"nodes":[],"max_depth":0,"n_leaves":0,"unknown":"value"}"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        assert!(err_msg.contains("unknown field"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_wrong_type() -> Result<(), ClearGbmError> {
+        let json = r#"{"nodes":"not_an_array","max_depth":0,"n_leaves":0}"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_all_fields_empty() -> Result<(), ClearGbmError> {
+        let json = r#"{"nodes":[],"max_depth":0,"n_leaves":0}"#;
+        let tree: Tree = match serde_json::from_str(json) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(tree.n_nodes(), 0_usize);
+        assert_eq!(tree.max_depth(), 0_usize);
+        assert_eq!(tree.n_leaves(), 0_usize);
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_serialize_roundtrip() -> Result<(), ClearGbmError> {
+        let leaf_node = TreeNode::new_leaf(0_usize, 0.5_f64, 10_usize);
+        let tree = Tree::new(vec![leaf_node], 0_usize, 1_usize);
+        let json = match serde_json::to_string(&tree) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let deserialized: Tree = match serde_json::from_str(&json) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(tree.n_nodes(), deserialized.n_nodes());
+        assert_eq!(tree.max_depth(), deserialized.max_depth());
+        assert_eq!(tree.n_leaves(), deserialized.n_leaves());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_with_nodes() -> Result<(), ClearGbmError> {
+        // Create a proper JSON with a leaf node
+        let json = r#"{"nodes":[{"node_id":0,"is_leaf":true,"feature_index":null,"threshold":null,"value":0.5,"n_samples":10,"left_child":null,"right_child":null,"nan_goes_left":true}],"max_depth":0,"n_leaves":1}"#;
+        let tree: Tree = match serde_json::from_str(json) {
+            Ok(t) => t,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(tree.n_nodes(), 1_usize);
+        assert_eq!(tree.max_depth(), 0_usize);
+        assert_eq!(tree.n_leaves(), 1_usize);
+        Ok(())
+    }
+
+    // Type mismatch tests to trigger expecting() methods
+
+    #[test]
+    fn test_tree_build_config_deserialize_from_array() -> Result<(), ClearGbmError> {
+        let json = r#"[1, 2, 3]"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_from_string() -> Result<(), ClearGbmError> {
+        let json = r#""not a struct""#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_deserialize_from_number() -> Result<(), ClearGbmError> {
+        let json = r#"42"#;
+        let result: Result<TreeBuildConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_from_array() -> Result<(), ClearGbmError> {
+        let json = r#"[1, 2, 3]"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_from_string() -> Result<(), ClearGbmError> {
+        let json = r#""not a struct""#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_deserialize_from_number() -> Result<(), ClearGbmError> {
+        let json = r#"42"#;
+        let result: Result<Tree, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    // Serialization error path tests using failing serializer
+
+    #[test]
+    fn test_tree_build_config_serialize_fail_each_field() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let split_config = match SplitConfig::new(2_usize, 1_usize, 256_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let config = match TreeBuildConfig::new(6_usize, 8_usize, 0.1_f64, 1.0_f64, split_config) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        // TreeBuildConfig has 5 fields
+        for fail_at in 0_usize..5_usize {
+            let mut ser = FailAfterN::new(fail_at);
+            let result = config.serialize(&mut ser);
+            assert!(result.is_err());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_serialize_fail_each_field() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let leaf_node = TreeNode::new_leaf(0_usize, 0.5_f64, 10_usize);
+        let tree = Tree::new(vec![leaf_node], 0_usize, 1_usize);
+        // Tree has 3 fields
+        for fail_at in 0_usize..3_usize {
+            let mut ser = FailAfterN::new(fail_at);
+            let result = tree.serialize(&mut ser);
+            assert!(result.is_err());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_build_config_serialize_fail_on_struct() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let split_config = match SplitConfig::new(2_usize, 1_usize, 256_usize, 0.0_f64, 0.0_f64) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let config = match TreeBuildConfig::new(6_usize, 8_usize, 0.0_f64, 1.0_f64, split_config) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+        let mut ser = FailAfterN::fail_on_struct();
+        let result = config.serialize(&mut ser);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_serialize_fail_on_struct() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let leaf_node = TreeNode::new_leaf(0_usize, 0.5_f64, 10_usize);
+        let tree = Tree::new(vec![leaf_node], 0_usize, 1_usize);
+        let mut ser = FailAfterN::fail_on_struct();
+        let result = tree.serialize(&mut ser);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_failing_serializer_coverage() -> Result<(), ClearGbmError> {
+        use failing_serializer::{FailAfterN, FailError};
+        use serde::ser::{Error, SerializeStruct, Serializer};
+
+        // Test FailError Display
+        let err = FailError {
+            message: "test".to_string(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("test"));
+
+        // Test FailError custom
+        let custom_err = FailError::custom("custom error");
+        assert!(custom_err.message.contains("custom"));
+
+        // Test all serializer primitive methods
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_bool(true).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i8(1_i8).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i16(1_i16).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i32(1_i32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i64(1_i64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u8(1_u8).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u16(1_u16).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u32(1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u64(1_u64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_f32(1.0_f32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_f64(1.0_f64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_char('a').is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_str("test").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_bytes(&[1_u8, 2_u8]).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_none().is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_some(&1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit().is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit_struct("Unit").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit_variant("E", 0, "V").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_newtype_struct("N", &1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser)
+            .serialize_newtype_variant("E", 0, "V", &1_u32)
+            .is_ok());
+
+        // Test error methods
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_seq(Some(1)).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple(1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple_struct("T", 1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple_variant("E", 0, "V", 1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_map(Some(1)).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_struct_variant("E", 0, "V", 1).is_err());
+
+        // Test serialize_struct
+        let mut ser = FailAfterN::new(100);
+        let struct_ser = (&mut ser).serialize_struct("S", 1);
+        assert!(struct_ser.is_ok());
+
+        // Test struct end
+        let mut ser = FailAfterN::new(100);
+        let struct_ser = match (&mut ser).serialize_struct("Test", 0) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "failed".to_string(),
+                })
+            }
+        };
+        assert!(struct_ser.end().is_ok());
+
+        // Test struct serialize_field Ok then Err
+        let mut ser = FailAfterN::new(1);
+        let mut struct_ser = match (&mut ser).serialize_struct("Test", 2) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "failed".to_string(),
+                })
+            }
+        };
+        assert!(struct_ser.serialize_field("f1", &1_u32).is_ok());
+        assert!(struct_ser.serialize_field("f2", &2_u32).is_err());
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Failing deserializer tests
+    // =========================================================================
+
+    #[test]
+    fn test_tree_build_config_field_expecting() -> Result<(), ClearGbmError> {
+        use failing_deserializer::MapWithIntegerKeyDeserializer;
+        use serde::Deserialize;
+        let result = TreeBuildConfig::deserialize(MapWithIntegerKeyDeserializer);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_field_expecting() -> Result<(), ClearGbmError> {
+        use failing_deserializer::MapWithIntegerKeyDeserializer;
+        use serde::Deserialize;
+        let result = Tree::deserialize(MapWithIntegerKeyDeserializer);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_failing_deserializer_coverage() -> Result<(), ClearGbmError> {
+        use failing_deserializer::{DeError, IntegerDeserializer, IntegerKeyMapAccess};
+        use serde::de::{Deserializer, Error, MapAccess};
+
+        // Test DeError Display
+        let err = DeError {
+            message: "test".to_string(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("test"));
+
+        // Test DeError custom
+        let custom_err = DeError::custom("custom");
+        assert!(custom_err.message.contains("custom"));
+
+        // Test IntegerDeserializer
+        struct I64Visitor;
+        impl<'de> serde::de::Visitor<'de> for I64Visitor {
+            type Value = i64;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                write!(f, "i64")
+            }
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {
+                Ok(v)
+            }
+        }
+        let de = IntegerDeserializer;
+        let result = de.deserialize_any(I64Visitor);
+        assert!(result.is_ok());
+
+        // Test IntegerKeyMapAccess done state
+        let mut map_access = IntegerKeyMapAccess { done: true };
+        let key_result: Result<Option<String>, _> = map_access.next_key();
+        assert!(matches!(key_result, Ok(None)));
+
+        // Test IntegerKeyMapAccess next_value
+        let mut map_access2 = IntegerKeyMapAccess { done: false };
+        let value_result: Result<i64, _> = map_access2.next_value();
+        assert!(value_result.is_err());
+
         Ok(())
     }
 }

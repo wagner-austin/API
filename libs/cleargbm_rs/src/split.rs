@@ -15,7 +15,8 @@
 //! NaN values are handled by evaluating both NaN-goes-left and NaN-goes-right
 //! scenarios for each split point.
 
-use serde::{Deserialize, Serialize};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::ClearGbmError;
 use crate::types::{HistogramBuffer, SplitConfig};
@@ -23,12 +24,55 @@ use crate::types::{HistogramBuffer, SplitConfig};
 /// Direction for NaN values during tree traversal.
 ///
 /// When a feature value is NaN, this determines which child node to visit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NanDirection {
     /// NaN values go to the left child.
     Left,
     /// NaN values go to the right child.
     Right,
+}
+
+impl Serialize for NanDirection {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Left => serializer.serialize_str("Left"),
+            Self::Right => serializer.serialize_str("Right"),
+        }
+    }
+}
+
+/// Visitor for deserializing `NanDirection` from string.
+struct NanDirectionVisitor;
+
+impl<'de> Visitor<'de> for NanDirectionVisitor {
+    type Value = NanDirection;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("\"Left\" or \"Right\"")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value {
+            "Left" => Ok(NanDirection::Left),
+            "Right" => Ok(NanDirection::Right),
+            _ => Err(E::custom(format!("unknown NanDirection variant: {value}"))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for NanDirection {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(NanDirectionVisitor)
+    }
 }
 
 impl NanDirection {
@@ -77,7 +121,7 @@ pub struct SplitResultConfig {
 ///
 /// Contains all information needed to perform the split and create child nodes.
 /// This is immutable after construction.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SplitResult {
     /// Feature index for the split.
     feature_index: usize,
@@ -99,6 +143,299 @@ pub struct SplitResult {
     right_count: usize,
     /// Direction for NaN values.
     nan_direction: NanDirection,
+}
+
+impl Serialize for SplitResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = match serializer.serialize_struct("SplitResult", 10) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+        match state.serialize_field("feature_index", &self.feature_index) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("split_bin", &self.split_bin) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("gain", &self.gain) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("left_gradient_sum", &self.left_gradient_sum) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("left_hessian_sum", &self.left_hessian_sum) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("left_count", &self.left_count) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("right_gradient_sum", &self.right_gradient_sum) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("right_hessian_sum", &self.right_hessian_sum) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("right_count", &self.right_count) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        match state.serialize_field("nan_direction", &self.nan_direction) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+        state.end()
+    }
+}
+
+/// Field identifiers for `SplitResult` deserialization.
+enum SplitResultField {
+    /// The feature index field.
+    FeatureIndex,
+    /// The split bin field.
+    SplitBin,
+    /// The gain field.
+    Gain,
+    /// The left gradient sum field.
+    LeftGradientSum,
+    /// The left hessian sum field.
+    LeftHessianSum,
+    /// The left count field.
+    LeftCount,
+    /// The right gradient sum field.
+    RightGradientSum,
+    /// The right hessian sum field.
+    RightHessianSum,
+    /// The right count field.
+    RightCount,
+    /// The NaN direction field.
+    NanDirection,
+}
+
+/// Visitor for deserializing `SplitResultField` from string.
+struct SplitResultFieldVisitor;
+
+impl<'de> Visitor<'de> for SplitResultFieldVisitor {
+    type Value = SplitResultField;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("field identifier")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value {
+            "feature_index" => Ok(SplitResultField::FeatureIndex),
+            "split_bin" => Ok(SplitResultField::SplitBin),
+            "gain" => Ok(SplitResultField::Gain),
+            "left_gradient_sum" => Ok(SplitResultField::LeftGradientSum),
+            "left_hessian_sum" => Ok(SplitResultField::LeftHessianSum),
+            "left_count" => Ok(SplitResultField::LeftCount),
+            "right_gradient_sum" => Ok(SplitResultField::RightGradientSum),
+            "right_hessian_sum" => Ok(SplitResultField::RightHessianSum),
+            "right_count" => Ok(SplitResultField::RightCount),
+            "nan_direction" => Ok(SplitResultField::NanDirection),
+            _ => Err(E::unknown_field(value, SPLIT_RESULT_FIELDS)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SplitResultField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_identifier(SplitResultFieldVisitor)
+    }
+}
+
+/// Field names for `SplitResult` serialization.
+const SPLIT_RESULT_FIELDS: &[&str] = &[
+    "feature_index",
+    "split_bin",
+    "gain",
+    "left_gradient_sum",
+    "left_hessian_sum",
+    "left_count",
+    "right_gradient_sum",
+    "right_hessian_sum",
+    "right_count",
+    "nan_direction",
+];
+
+impl<'de> Deserialize<'de> for SplitResult {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SplitResultVisitor;
+
+        impl<'de> Visitor<'de> for SplitResultVisitor {
+            type Value = SplitResult;
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                formatter.write_str("struct SplitResult")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<SplitResult, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let mut feature_index = None;
+                let mut split_bin = None;
+                let mut gain = None;
+                let mut left_gradient_sum = None;
+                let mut left_hessian_sum = None;
+                let mut left_count = None;
+                let mut right_gradient_sum = None;
+                let mut right_hessian_sum = None;
+                let mut right_count = None;
+                let mut nan_direction = None;
+
+                loop {
+                    let key: Option<SplitResultField> = match map.next_key() {
+                        Ok(k) => k,
+                        Err(e) => return Err(e),
+                    };
+                    let key = match key {
+                        Some(k) => k,
+                        None => break,
+                    };
+                    match key {
+                        SplitResultField::FeatureIndex => {
+                            feature_index = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::SplitBin => {
+                            split_bin = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::Gain => {
+                            gain = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::LeftGradientSum => {
+                            left_gradient_sum = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::LeftHessianSum => {
+                            left_hessian_sum = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::LeftCount => {
+                            left_count = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::RightGradientSum => {
+                            right_gradient_sum = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::RightHessianSum => {
+                            right_hessian_sum = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::RightCount => {
+                            right_count = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                        SplitResultField::NanDirection => {
+                            nan_direction = Some(match map.next_value() {
+                                Ok(v) => v,
+                                Err(e) => return Err(e),
+                            });
+                        }
+                    }
+                }
+
+                let feature_index = match feature_index {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("feature_index")),
+                };
+                let split_bin = match split_bin {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("split_bin")),
+                };
+                let gain = match gain {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("gain")),
+                };
+                let left_gradient_sum = match left_gradient_sum {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("left_gradient_sum")),
+                };
+                let left_hessian_sum = match left_hessian_sum {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("left_hessian_sum")),
+                };
+                let left_count = match left_count {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("left_count")),
+                };
+                let right_gradient_sum = match right_gradient_sum {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("right_gradient_sum")),
+                };
+                let right_hessian_sum = match right_hessian_sum {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("right_hessian_sum")),
+                };
+                let right_count = match right_count {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("right_count")),
+                };
+                let nan_direction = match nan_direction {
+                    Some(v) => v,
+                    None => return Err(de::Error::missing_field("nan_direction")),
+                };
+
+                Ok(SplitResult {
+                    feature_index,
+                    split_bin,
+                    gain,
+                    left_gradient_sum,
+                    left_hessian_sum,
+                    left_count,
+                    right_gradient_sum,
+                    right_hessian_sum,
+                    right_count,
+                    nan_direction,
+                })
+            }
+        }
+
+        deserializer.deserialize_struct("SplitResult", SPLIT_RESULT_FIELDS, SplitResultVisitor)
+    }
 }
 
 impl SplitResult {
@@ -222,7 +559,7 @@ impl MonotonicConstraint {
     /// # Errors
     ///
     /// Returns `ClearGbmError::InvalidParameter` if value is not -1, 0, or 1.
-    pub fn from_int(value: i32) -> std::result::Result<Self, ClearGbmError> {
+    pub fn from_int(value: i32) -> Result<Self, ClearGbmError> {
         match value {
             -1_i32 => Ok(Self::Decreasing),
             0_i32 => Ok(Self::None),
@@ -412,7 +749,7 @@ pub fn find_best_split_from_histogram(
     config: &SplitConfig,
     n_regular_bins: usize,
     monotonic_constraint: MonotonicConstraint,
-) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+) -> Result<Option<SplitResult>, ClearGbmError> {
     let n_bins = histogram.n_bins();
 
     // Validate n_regular_bins
@@ -434,11 +771,19 @@ pub fn find_best_split_from_histogram(
 
     // Extract NaN bin statistics
     let (g_nan, h_nan, n_nan) = if has_nan_bin {
-        (
-            histogram.gradient_sum(nan_bin_idx)?,
-            histogram.hessian_sum(nan_bin_idx)?,
-            histogram.count(nan_bin_idx)?,
-        )
+        let g = match histogram.gradient_sum(nan_bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let h = match histogram.hessian_sum(nan_bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let n = match histogram.count(nan_bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        (g, h, n)
     } else {
         (0.0_f64, 0.0_f64, 0_usize)
     };
@@ -449,9 +794,21 @@ pub fn find_best_split_from_histogram(
     let mut n_regular = 0_usize;
 
     for i in 0_usize..n_regular_bins {
-        g_regular += histogram.gradient_sum(i)?;
-        h_regular += histogram.hessian_sum(i)?;
-        n_regular += histogram.count(i)?;
+        let g = match histogram.gradient_sum(i) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let h = match histogram.hessian_sum(i) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let n = match histogram.count(i) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        g_regular += g;
+        h_regular += h;
+        n_regular += n;
     }
 
     // Total including NaN
@@ -479,9 +836,21 @@ pub fn find_best_split_from_histogram(
     // Scan regular bins (split after each bin except the last)
     // After bin i, samples in bins 0..=i go left, bins i+1..n_regular_bins go right
     for bin_idx in 0_usize..(n_regular_bins.saturating_sub(1_usize)) {
-        g_left_base += histogram.gradient_sum(bin_idx)?;
-        h_left_base += histogram.hessian_sum(bin_idx)?;
-        n_left_base += histogram.count(bin_idx)?;
+        let g = match histogram.gradient_sum(bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let h = match histogram.hessian_sum(bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let n = match histogram.count(bin_idx) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        g_left_base += g;
+        h_left_base += h;
+        n_left_base += n;
 
         // Try both NaN directions
         for nan_dir in [NanDirection::Left, NanDirection::Right] {
@@ -595,7 +964,7 @@ pub fn find_best_split_across_features(
     config: &SplitConfig,
     n_regular_bins: usize,
     monotonic_constraints: Option<&[MonotonicConstraint]>,
-) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+) -> Result<Option<SplitResult>, ClearGbmError> {
     let mut best_split: Option<SplitResult> = None;
 
     for (feature_idx, histogram) in histograms.iter().enumerate() {
@@ -603,13 +972,18 @@ pub fn find_best_split_across_features(
             .and_then(|constraints| constraints.get(feature_idx).copied())
             .unwrap_or(MonotonicConstraint::None);
 
-        if let Some(split) = find_best_split_from_histogram(
+        let maybe_split = match find_best_split_from_histogram(
             histogram,
             feature_idx,
             config,
             n_regular_bins,
             constraint,
-        )? {
+        ) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+
+        if let Some(split) = maybe_split {
             let is_better = if let Some(ref current_best) = best_split {
                 split.gain() > current_best.gain()
             } else {
@@ -629,8 +1003,241 @@ pub fn find_best_split_across_features(
 mod tests {
     use super::*;
 
-    /// Boxed error type for tests with multiple error sources.
-    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+    /// Failing serializer for testing error propagation paths.
+    mod failing_serializer {
+        use core::fmt::{self, Display};
+        use serde::ser::{self, Serialize};
+
+        /// Error type for failing serializer.
+        #[derive(Debug)]
+        pub struct FailError {
+            /// Error message.
+            pub message: String,
+        }
+
+        impl Display for FailError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", self.message)
+            }
+        }
+
+        impl std::error::Error for FailError {}
+
+        impl ser::Error for FailError {
+            fn custom<T: Display>(msg: T) -> Self {
+                FailError {
+                    message: msg.to_string(),
+                }
+            }
+        }
+
+        /// Serializer that fails after N fields.
+        pub struct FailAfterN {
+            count: usize,
+            fail_after: usize,
+            fail_on_struct: bool,
+        }
+
+        impl FailAfterN {
+            pub fn new(fail_after: usize) -> Self {
+                FailAfterN {
+                    count: 0,
+                    fail_after,
+                    fail_on_struct: false,
+                }
+            }
+
+            pub fn fail_on_struct() -> Self {
+                FailAfterN {
+                    count: 0,
+                    fail_after: usize::MAX,
+                    fail_on_struct: true,
+                }
+            }
+        }
+
+        /// Struct serializer state.
+        pub struct FailAfterNStruct<'a> {
+            ser: &'a mut FailAfterN,
+        }
+
+        impl<'a> ser::SerializeStruct for FailAfterNStruct<'a> {
+            type Ok = ();
+            type Error = FailError;
+
+            fn serialize_field<T>(
+                &mut self,
+                _key: &'static str,
+                _value: &T,
+            ) -> Result<(), Self::Error>
+            where
+                T: ?Sized + Serialize,
+            {
+                self.ser.count += 1;
+                if self.ser.count > self.ser.fail_after {
+                    Err(FailError {
+                        message: "intentional failure".to_string(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+
+            fn end(self) -> Result<Self::Ok, Self::Error> {
+                Ok(())
+            }
+        }
+
+        impl<'a> ser::Serializer for &'a mut FailAfterN {
+            type Ok = ();
+            type Error = FailError;
+            type SerializeSeq = ser::Impossible<(), FailError>;
+            type SerializeTuple = ser::Impossible<(), FailError>;
+            type SerializeTupleStruct = ser::Impossible<(), FailError>;
+            type SerializeTupleVariant = ser::Impossible<(), FailError>;
+            type SerializeMap = ser::Impossible<(), FailError>;
+            type SerializeStruct = FailAfterNStruct<'a>;
+            type SerializeStructVariant = ser::Impossible<(), FailError>;
+
+            fn serialize_bool(self, _v: bool) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i8(self, _v: i8) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i16(self, _v: i16) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i32(self, _v: i32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_i64(self, _v: i64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u8(self, _v: u8) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u16(self, _v: u16) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u32(self, _v: u32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_u64(self, _v: u64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_f32(self, _v: f32) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_f64(self, _v: f64) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_char(self, _v: char) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_str(self, _v: &str) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_bytes(self, _v: &[u8]) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_none(self) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_some<T: ?Sized + Serialize>(self, _value: &T) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit(self) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit_struct(self, _name: &'static str) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_unit_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_newtype_struct<T: ?Sized + Serialize>(
+                self,
+                _name: &'static str,
+                _value: &T,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_newtype_variant<T: ?Sized + Serialize>(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _value: &T,
+            ) -> Result<(), FailError> {
+                Ok(())
+            }
+            fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, FailError> {
+                Err(FailError {
+                    message: "seq not supported".to_string(),
+                })
+            }
+            fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, FailError> {
+                Err(FailError {
+                    message: "tuple not supported".to_string(),
+                })
+            }
+            fn serialize_tuple_struct(
+                self,
+                _name: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeTupleStruct, FailError> {
+                Err(FailError {
+                    message: "tuple_struct not supported".to_string(),
+                })
+            }
+            fn serialize_tuple_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeTupleVariant, FailError> {
+                Err(FailError {
+                    message: "tuple_variant not supported".to_string(),
+                })
+            }
+            fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, FailError> {
+                Err(FailError {
+                    message: "map not supported".to_string(),
+                })
+            }
+            fn serialize_struct(
+                self,
+                _name: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeStruct, FailError> {
+                if self.fail_on_struct {
+                    Err(FailError {
+                        message: "intentional failure on serialize_struct".to_string(),
+                    })
+                } else {
+                    Ok(FailAfterNStruct { ser: self })
+                }
+            }
+            fn serialize_struct_variant(
+                self,
+                _name: &'static str,
+                _idx: u32,
+                _variant: &'static str,
+                _len: usize,
+            ) -> Result<Self::SerializeStructVariant, FailError> {
+                Err(FailError {
+                    message: "struct_variant not supported".to_string(),
+                })
+            }
+        }
+    }
 
     // =========================================================================
     // Shared test helpers - called by both success and error tests
@@ -656,7 +1263,7 @@ mod tests {
 
     impl TestSplitParams {
         /// Creates a `SplitConfig` from these parameters.
-        fn to_config(self) -> std::result::Result<SplitConfig, ClearGbmError> {
+        fn to_config(self) -> Result<SplitConfig, ClearGbmError> {
             SplitConfig::new(
                 self.min_samples_split,
                 self.min_samples_leaf,
@@ -675,8 +1282,11 @@ mod tests {
         n_regular_bins: usize,
         constraint: MonotonicConstraint,
         params: TestSplitParams,
-    ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
-        let config = params.to_config()?;
+    ) -> Result<Option<SplitResult>, ClearGbmError> {
+        let config = match params.to_config() {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         find_best_split_from_histogram(
             histogram,
             feature_index,
@@ -692,8 +1302,11 @@ mod tests {
         n_regular_bins: usize,
         constraints: Option<&[MonotonicConstraint]>,
         params: TestSplitParams,
-    ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
-        let config = params.to_config()?;
+    ) -> Result<Option<SplitResult>, ClearGbmError> {
+        let config = match params.to_config() {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         find_best_split_across_features(histograms, &config, n_regular_bins, constraints)
     }
 
@@ -702,7 +1315,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_nan_direction_left() -> TestResult {
+    fn test_nan_direction_left() -> Result<(), ClearGbmError> {
         let dir = NanDirection::Left;
         assert!(dir.goes_left());
         assert!(!dir.goes_right());
@@ -710,7 +1323,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nan_direction_right() -> TestResult {
+    fn test_nan_direction_right() -> Result<(), ClearGbmError> {
         let dir = NanDirection::Right;
         assert!(!dir.goes_left());
         assert!(dir.goes_right());
@@ -718,7 +1331,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nan_direction_clone() -> TestResult {
+    fn test_nan_direction_clone() -> Result<(), ClearGbmError> {
         let dir = NanDirection::Left;
         let cloned = dir;
         assert_eq!(dir, cloned);
@@ -726,10 +1339,24 @@ mod tests {
     }
 
     #[test]
-    fn test_nan_direction_serialize_deserialize() -> TestResult {
+    fn test_nan_direction_serialize_deserialize() -> Result<(), ClearGbmError> {
         let dir = NanDirection::Left;
-        let json_str = serde_json::to_string(&dir)?;
-        let parsed: NanDirection = serde_json::from_str(&json_str)?;
+        let json_str = match serde_json::to_string(&dir) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let parsed: NanDirection = match serde_json::from_str(&json_str) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
         assert_eq!(parsed, dir);
         Ok(())
     }
@@ -739,31 +1366,40 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_monotonic_constraint_from_int_none() -> std::result::Result<(), ClearGbmError> {
-        let constraint = MonotonicConstraint::from_int(0_i32)?;
+    fn test_monotonic_constraint_from_int_none() -> Result<(), ClearGbmError> {
+        let constraint = match MonotonicConstraint::from_int(0_i32) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         assert!(constraint.is_none());
         assert_eq!(constraint, MonotonicConstraint::None);
         Ok(())
     }
 
     #[test]
-    fn test_monotonic_constraint_from_int_increasing() -> std::result::Result<(), ClearGbmError> {
-        let constraint = MonotonicConstraint::from_int(1_i32)?;
+    fn test_monotonic_constraint_from_int_increasing() -> Result<(), ClearGbmError> {
+        let constraint = match MonotonicConstraint::from_int(1_i32) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         assert!(!constraint.is_none());
         assert_eq!(constraint, MonotonicConstraint::Increasing);
         Ok(())
     }
 
     #[test]
-    fn test_monotonic_constraint_from_int_decreasing() -> std::result::Result<(), ClearGbmError> {
-        let constraint = MonotonicConstraint::from_int(-1_i32)?;
+    fn test_monotonic_constraint_from_int_decreasing() -> Result<(), ClearGbmError> {
+        let constraint = match MonotonicConstraint::from_int(-1_i32) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
         assert!(!constraint.is_none());
         assert_eq!(constraint, MonotonicConstraint::Decreasing);
         Ok(())
     }
 
     #[test]
-    fn test_monotonic_constraint_from_int_invalid() -> TestResult {
+    fn test_monotonic_constraint_from_int_invalid() -> Result<(), ClearGbmError> {
         let result = MonotonicConstraint::from_int(2_i32);
         assert!(result.is_err());
         assert!(matches!(
@@ -778,7 +1414,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_split_result_new() -> TestResult {
+    fn test_split_result_new() -> Result<(), ClearGbmError> {
         let config = SplitResultConfig {
             feature_index: 2_usize,
             split_bin: 5_usize,
@@ -808,7 +1444,7 @@ mod tests {
     }
 
     #[test]
-    fn test_split_result_serialize_deserialize() -> TestResult {
+    fn test_split_result_serialize_deserialize() -> Result<(), ClearGbmError> {
         let config = SplitResultConfig {
             feature_index: 1_usize,
             split_bin: 3_usize,
@@ -823,8 +1459,22 @@ mod tests {
         };
         let result = SplitResult::new(config);
 
-        let json_str = serde_json::to_string(&result)?;
-        let parsed: SplitResult = serde_json::from_str(&json_str)?;
+        let json_str = match serde_json::to_string(&result) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        let parsed: SplitResult = match serde_json::from_str(&json_str) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
         assert_eq!(parsed, result);
         Ok(())
     }
@@ -834,7 +1484,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_compute_split_gain_basic() -> TestResult {
+    fn test_compute_split_gain_basic() -> Result<(), ClearGbmError> {
         // Simple case: equal split, should have positive gain
         let gain = compute_split_gain(
             1.0_f64,  // g_left
@@ -851,7 +1501,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_split_gain_asymmetric() -> TestResult {
+    fn test_compute_split_gain_asymmetric() -> Result<(), ClearGbmError> {
         // Asymmetric split with clear gain
         let gain = compute_split_gain(
             2.0_f64,  // g_left
@@ -868,7 +1518,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_split_gain_with_regularization() -> TestResult {
+    fn test_compute_split_gain_with_regularization() -> Result<(), ClearGbmError> {
         // With L2 regularization
         let gain = compute_split_gain(
             2.0_f64,  // g_left
@@ -886,7 +1536,7 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_split_gain_zero_hessian() -> TestResult {
+    fn test_compute_split_gain_zero_hessian() -> Result<(), ClearGbmError> {
         // Zero hessian should return 0 gain
         let gain = compute_split_gain(
             1.0_f64, // g_left
@@ -906,7 +1556,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_check_monotonicity_none() -> TestResult {
+    fn test_check_monotonicity_none() -> Result<(), ClearGbmError> {
         let result = check_monotonicity_constraint(
             MonotonicConstraint::None,
             1.0_f64,  // g_left
@@ -919,7 +1569,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_increasing_satisfied() -> TestResult {
+    fn test_check_monotonicity_increasing_satisfied() -> Result<(), ClearGbmError> {
         // Left value = -g_left/h_left = -1/10 = -0.1
         // Right value = -g_right/h_right = -(-1)/10 = 0.1
         // -0.1 <= 0.1, so increasing constraint is satisfied
@@ -935,7 +1585,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_increasing_violated() -> TestResult {
+    fn test_check_monotonicity_increasing_violated() -> Result<(), ClearGbmError> {
         // Left value = -g_left/h_left = -(-1)/10 = 0.1
         // Right value = -g_right/h_right = -(1)/10 = -0.1
         // 0.1 > -0.1, so increasing constraint is violated
@@ -951,7 +1601,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_decreasing_satisfied() -> TestResult {
+    fn test_check_monotonicity_decreasing_satisfied() -> Result<(), ClearGbmError> {
         // Left value = -g_left/h_left = -(-1)/10 = 0.1
         // Right value = -g_right/h_right = -(1)/10 = -0.1
         // 0.1 >= -0.1, so decreasing constraint is satisfied
@@ -967,7 +1617,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_decreasing_violated() -> TestResult {
+    fn test_check_monotonicity_decreasing_violated() -> Result<(), ClearGbmError> {
         // Left value = -g_left/h_left = -(1)/10 = -0.1
         // Right value = -g_right/h_right = -(-1)/10 = 0.1
         // -0.1 < 0.1, so decreasing constraint is violated
@@ -983,7 +1633,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_near_zero_hessian_left() -> TestResult {
+    fn test_check_monotonicity_near_zero_hessian_left() -> Result<(), ClearGbmError> {
         // When h_left is very small (< EPSILON), use EPSILON as safe value
         // Left value = -1.0 / EPSILON (large negative)
         // Right value = -(-1.0) / 10.0 = 0.1
@@ -1000,7 +1650,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_near_zero_hessian_right() -> TestResult {
+    fn test_check_monotonicity_near_zero_hessian_right() -> Result<(), ClearGbmError> {
         // When h_right is very small (< EPSILON), use EPSILON as safe value
         // Left value = -1.0 / 10.0 = -0.1
         // Right value = -1.0 / EPSILON (large negative)
@@ -1017,7 +1667,7 @@ mod tests {
     }
 
     #[test]
-    fn test_check_monotonicity_both_hessians_near_zero() -> TestResult {
+    fn test_check_monotonicity_both_hessians_near_zero() -> Result<(), ClearGbmError> {
         // When both hessians are near zero, both use EPSILON
         // Left value = -1.0 / EPSILON, Right value = -(-1.0) / EPSILON
         // With decreasing: -1/EPSILON >= 1/EPSILON should be false
@@ -1041,20 +1691,27 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_find_best_split_simple() -> TestResult {
-        // Inner function for full branch coverage of ?
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_simple() -> Result<(), ClearGbmError> {
+        // Inner function for full branch coverage
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(4_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, 0.05_f64, 0.1_f64)?;
+                match histogram.accumulate(0_usize, 0.05_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, 0.03_f64, 0.1_f64)?;
+                match histogram.accumulate(1_usize, 0.03_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(2_usize, -0.08_f64, 0.1_f64)?;
+                match histogram.accumulate(2_usize, -0.08_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_with_config(
                 &histogram,
@@ -1071,8 +1728,18 @@ mod tests {
             )
         }
         // Cover Ok path
-        let maybe_split = inner(2_usize)?;
-        let split = maybe_split.ok_or("expected split")?;
+        let maybe_split = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let split = match maybe_split {
+            Some(s) => s,
+            None => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected split".to_string(),
+                })
+            }
+        };
         assert_eq!(split.feature_index(), 0_usize);
         assert!(split.gain() > 0.0_f64);
         assert_eq!(split.split_bin(), 1_usize);
@@ -1082,22 +1749,32 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_with_nan_bin() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_with_nan_bin() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(4_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, 0.1_f64, 0.1_f64)?;
+                match histogram.accumulate(0_usize, 0.1_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, 0.1_f64, 0.1_f64)?;
+                match histogram.accumulate(1_usize, 0.1_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(2_usize, -0.2_f64, 0.1_f64)?;
+                match histogram.accumulate(2_usize, -0.2_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..5_usize {
-                histogram.accumulate(3_usize, 0.05_f64, 0.1_f64)?;
+                match histogram.accumulate(3_usize, 0.05_f64, 0.1_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_with_config(
                 &histogram,
@@ -1113,23 +1790,43 @@ mod tests {
                 },
             )
         }
-        let maybe_split = inner(2_usize)?;
-        let split = maybe_split.ok_or("expected split")?;
+        let maybe_split = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let split = match maybe_split {
+            Some(s) => s,
+            None => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected split".to_string(),
+                })
+            }
+        };
         assert_eq!(split.left_count() + split.right_count(), 35_usize);
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_min_samples_leaf() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_min_samples_leaf() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(3_usize);
-            histogram.accumulate(0_usize, 0.1_f64, 0.1_f64)?;
-            histogram.accumulate(0_usize, 0.1_f64, 0.1_f64)?;
-            histogram.accumulate(1_usize, -0.1_f64, 0.1_f64)?;
-            histogram.accumulate(1_usize, -0.1_f64, 0.1_f64)?;
+            match histogram.accumulate(0_usize, 0.1_f64, 0.1_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
+            match histogram.accumulate(0_usize, 0.1_f64, 0.1_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
+            match histogram.accumulate(1_usize, -0.1_f64, 0.1_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
+            match histogram.accumulate(1_usize, -0.1_f64, 0.1_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
             helper_find_split_with_config(
                 &histogram,
                 0_usize,
@@ -1144,22 +1841,30 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_min_gain_threshold() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_min_gain_threshold() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, 0.01_f64, 1.0_f64)?;
+                match histogram.accumulate(0_usize, 0.01_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, 0.01_f64, 1.0_f64)?;
+                match histogram.accumulate(1_usize, 0.01_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_with_config(
                 &histogram,
@@ -1175,22 +1880,30 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_monotonicity_constraint() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_monotonicity_constraint() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, -0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(0_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, 0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(1_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_with_config(
                 &histogram,
@@ -1206,16 +1919,18 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_empty_histogram() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_empty_histogram() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let histogram = HistogramBuffer::new(3_usize);
             helper_find_split_with_config(
                 &histogram,
@@ -1231,13 +1946,17 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_n_regular_bins_exceeds_n_bins() -> TestResult {
+    fn test_find_best_split_n_regular_bins_exceeds_n_bins() -> Result<(), ClearGbmError> {
         let histogram = HistogramBuffer::new(3_usize);
         let result = helper_find_split_with_config(
             &histogram,
@@ -1261,10 +1980,8 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_zero_regular_bins() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_zero_regular_bins() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let histogram = HistogramBuffer::new(3_usize);
             helper_find_split_with_config(
                 &histogram,
@@ -1280,7 +1997,11 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
@@ -1290,16 +2011,20 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_find_best_split_across_features_single() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_across_features_single() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_across_with_config(
                 &[histogram],
@@ -1314,31 +2039,51 @@ mod tests {
                 },
             )
         }
-        let maybe_split = inner(2_usize)?;
-        let split = maybe_split.ok_or("expected split")?;
+        let maybe_split = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let split = match maybe_split {
+            Some(s) => s,
+            None => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected split".to_string(),
+                })
+            }
+        };
         assert_eq!(split.feature_index(), 0_usize);
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_across_features_multiple() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_across_features_multiple() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut hist0 = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                hist0.accumulate(0_usize, 0.1_f64, 1.0_f64)?;
+                match hist0.accumulate(0_usize, 0.1_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist0.accumulate(1_usize, -0.1_f64, 1.0_f64)?;
+                match hist0.accumulate(1_usize, -0.1_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             let mut hist1 = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                hist1.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match hist1.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist1.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match hist1.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_across_with_config(
                 &[hist0, hist1],
@@ -1353,30 +2098,51 @@ mod tests {
                 },
             )
         }
-        let split = inner(2_usize)?.ok_or("expected split")?;
+        let maybe_split = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let split = match maybe_split {
+            Some(s) => s,
+            None => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected split".to_string(),
+                })
+            }
+        };
         assert_eq!(split.feature_index(), 1_usize);
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_across_features_with_constraints() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_across_features_with_constraints() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut hist0 = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                hist0.accumulate(0_usize, -0.5_f64, 1.0_f64)?;
+                match hist0.accumulate(0_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist0.accumulate(1_usize, 0.5_f64, 1.0_f64)?;
+                match hist0.accumulate(1_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             let mut hist1 = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                hist1.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match hist1.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist1.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match hist1.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             let constraints = vec![
                 MonotonicConstraint::Increasing,
@@ -1395,23 +2161,44 @@ mod tests {
                 },
             )
         }
-        let split = inner(2_usize)?.ok_or("expected split")?;
+        let maybe_split = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        let split = match maybe_split {
+            Some(s) => s,
+            None => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected split".to_string(),
+                })
+            }
+        };
         assert_eq!(split.feature_index(), 1_usize);
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_across_features_no_valid_split() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_across_features_no_valid_split() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut hist0 = HistogramBuffer::new(3_usize);
-            hist0.accumulate(0_usize, 0.1_f64, 1.0_f64)?;
-            hist0.accumulate(1_usize, -0.1_f64, 1.0_f64)?;
+            match hist0.accumulate(0_usize, 0.1_f64, 1.0_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
+            match hist0.accumulate(1_usize, -0.1_f64, 1.0_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
             let mut hist1 = HistogramBuffer::new(3_usize);
-            hist1.accumulate(0_usize, 0.1_f64, 1.0_f64)?;
-            hist1.accumulate(1_usize, -0.1_f64, 1.0_f64)?;
+            match hist1.accumulate(0_usize, 0.1_f64, 1.0_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
+            match hist1.accumulate(1_usize, -0.1_f64, 1.0_f64) {
+                Ok(()) => {}
+                Err(e) => return Err(e),
+            }
             helper_find_split_across_with_config(
                 &[hist0, hist1],
                 2_usize,
@@ -1425,16 +2212,18 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_across_features_empty() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_across_features_empty() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let histograms: Vec<HistogramBuffer> = vec![];
             helper_find_split_across_with_config(
                 &histograms,
@@ -1449,7 +2238,11 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_none());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_none());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
@@ -1459,7 +2252,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_check_monotonicity_zero_hessian() -> TestResult {
+    fn test_check_monotonicity_zero_hessian() -> Result<(), ClearGbmError> {
         // Test zero hessian handling in monotonicity check
         // With h_left = 0 (triggers EPSILON case), left_value becomes very large negative
         // right_value = -(-1.0) / 10.0 = 0.1
@@ -1476,19 +2269,26 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_no_nan_bin() -> TestResult {
-        fn inner(
-            min_samples_split: usize,
-        ) -> std::result::Result<Option<SplitResult>, ClearGbmError> {
+    fn test_find_best_split_no_nan_bin() -> Result<(), ClearGbmError> {
+        fn inner(min_samples_split: usize) -> Result<Option<SplitResult>, ClearGbmError> {
             let mut histogram = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                histogram.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                histogram.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match histogram.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..5_usize {
-                histogram.accumulate(2_usize, 0.1_f64, 1.0_f64)?;
+                match histogram.accumulate(2_usize, 0.1_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             helper_find_split_with_config(
                 &histogram,
@@ -1504,13 +2304,17 @@ mod tests {
                 },
             )
         }
-        assert!(inner(2_usize)?.is_some());
+        let result = match inner(2_usize) {
+            Ok(v) => v,
+            Err(e) => return Err(e),
+        };
+        assert!(result.is_some());
         assert!(inner(0_usize).is_err());
         Ok(())
     }
 
     #[test]
-    fn test_find_best_split_from_histogram_n_regular_bins_too_large() -> TestResult {
+    fn test_find_best_split_from_histogram_n_regular_bins_too_large() -> Result<(), ClearGbmError> {
         // Error test - no inner function needed since we expect error
         let histogram = HistogramBuffer::new(3_usize);
         let result = helper_find_split_with_config(
@@ -1534,7 +2338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_best_split_across_features_error_propagation() -> TestResult {
+    fn test_find_best_split_across_features_error_propagation() -> Result<(), ClearGbmError> {
         // Error test - no inner function needed since we expect error
         let histogram = HistogramBuffer::new(3_usize);
         let result = helper_find_split_across_with_config(
@@ -1560,23 +2364,35 @@ mod tests {
 
     /// Covers error propagation for find_best_split_from_histogram calls.
     #[test]
-    fn test_coverage_find_split_error_propagation() -> TestResult {
-        fn inner(n_bins: usize, n_regular_bins: usize) -> std::result::Result<(), ClearGbmError> {
+    fn test_coverage_find_split_error_propagation() -> Result<(), ClearGbmError> {
+        fn inner(n_bins: usize, n_regular_bins: usize) -> Result<(), ClearGbmError> {
             let mut hist = HistogramBuffer::new(n_bins);
             for _ in 0_usize..10_usize {
-                hist.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match hist.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match hist.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
-            let cfg = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-            let _ = find_best_split_from_histogram(
+            let cfg = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+                Ok(c) => c,
+                Err(e) => return Err(e),
+            };
+            let _ = match find_best_split_from_histogram(
                 &hist,
                 0_usize,
                 &cfg,
                 n_regular_bins,
                 MonotonicConstraint::None,
-            )?;
+            ) {
+                Ok(v) => v,
+                Err(e) => return Err(e),
+            };
             Ok(())
         }
         assert!(inner(4_usize, 3_usize).is_ok());
@@ -1586,17 +2402,29 @@ mod tests {
 
     /// Covers error propagation for find_best_split_across_features calls.
     #[test]
-    fn test_coverage_find_split_across_error_propagation() -> TestResult {
-        fn inner(n_regular_bins: usize) -> std::result::Result<(), ClearGbmError> {
+    fn test_coverage_find_split_across_error_propagation() -> Result<(), ClearGbmError> {
+        fn inner(n_regular_bins: usize) -> Result<(), ClearGbmError> {
             let mut hist = HistogramBuffer::new(3_usize);
             for _ in 0_usize..10_usize {
-                hist.accumulate(0_usize, 0.5_f64, 1.0_f64)?;
+                match hist.accumulate(0_usize, 0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
             for _ in 0_usize..10_usize {
-                hist.accumulate(1_usize, -0.5_f64, 1.0_f64)?;
+                match hist.accumulate(1_usize, -0.5_f64, 1.0_f64) {
+                    Ok(()) => {}
+                    Err(e) => return Err(e),
+                }
             }
-            let cfg = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-            let _ = find_best_split_across_features(&[hist], &cfg, n_regular_bins, None)?;
+            let cfg = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+                Ok(c) => c,
+                Err(e) => return Err(e),
+            };
+            let _ = match find_best_split_across_features(&[hist], &cfg, n_regular_bins, None) {
+                Ok(v) => v,
+                Err(e) => return Err(e),
+            };
             Ok(())
         }
         assert!(inner(2_usize).is_ok());
@@ -1606,9 +2434,12 @@ mod tests {
 
     /// Covers SplitConfig validation error paths.
     #[test]
-    fn test_coverage_split_config_errors() -> TestResult {
-        fn inner(min_split: usize) -> std::result::Result<(), ClearGbmError> {
-            let _ = SplitConfig::new(min_split, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+    fn test_coverage_split_config_errors() -> Result<(), ClearGbmError> {
+        fn inner(min_split: usize) -> Result<(), ClearGbmError> {
+            let _ = match SplitConfig::new(min_split, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+                Ok(c) => c,
+                Err(e) => return Err(e),
+            };
             Ok(())
         }
         assert!(inner(2_usize).is_ok());
@@ -1618,8 +2449,8 @@ mod tests {
 
     /// Covers ok_or error paths for Option to Result conversion.
     #[test]
-    fn test_coverage_option_to_result_conversion() -> TestResult {
-        fn inner(find_split: bool) -> std::result::Result<SplitResult, ClearGbmError> {
+    fn test_coverage_option_to_result_conversion() -> Result<(), ClearGbmError> {
+        fn inner(find_split: bool) -> Result<SplitResult, ClearGbmError> {
             let maybe: Option<SplitResult> = if find_split {
                 Some(SplitResult::new(SplitResultConfig {
                     feature_index: 0_usize,
@@ -1636,40 +2467,447 @@ mod tests {
             } else {
                 None
             };
-            maybe.ok_or(ClearGbmError::TreeConstructionFailed {
-                reason: "no split".to_string(),
-            })
+            match maybe {
+                Some(s) => Ok(s),
+                None => Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "no split".to_string(),
+                }),
+            }
         }
         assert!(inner(true).is_ok());
         assert!(inner(false).is_err());
         Ok(())
     }
 
-    /// Covers ? operator propagation on Result types.
+    /// Covers explicit match propagation on Result types.
     #[test]
-    fn test_coverage_question_mark_propagation() -> TestResult {
-        /// Inner function that uses ? operator for error propagation.
-        fn check_result(
-            result: std::result::Result<i32, ClearGbmError>,
-        ) -> std::result::Result<i32, ClearGbmError> {
-            result?;
+    fn test_coverage_explicit_match_propagation() -> Result<(), ClearGbmError> {
+        /// Inner function that uses explicit match for error propagation.
+        fn check_result(result: Result<i32, ClearGbmError>) -> Result<i32, ClearGbmError> {
+            match result {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
             Ok(42_i32)
         }
 
-        // Cover Ok path - ? doesn't trigger, returns Ok(42)
-        let ok_input: std::result::Result<i32, ClearGbmError> = Ok(1_i32);
+        // Cover Ok path - match doesn't trigger, returns Ok(42)
+        let ok_input: Result<i32, ClearGbmError> = Ok(1_i32);
         assert!(check_result(ok_input).is_ok());
 
-        // Cover Err path - ? propagates the error
-        let err_input: std::result::Result<i32, ClearGbmError> =
-            Err(ClearGbmError::InvalidParameter {
-                name: "test".to_string(),
-                reason: "test".to_string(),
-            });
+        // Cover Err path - match propagates the error
+        let err_input: Result<i32, ClearGbmError> = Err(ClearGbmError::InvalidParameter {
+            name: "test".to_string(),
+            reason: "test".to_string(),
+        });
         assert!(matches!(
             check_result(err_input),
             Err(ClearGbmError::InvalidParameter { .. })
         ));
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // Serde error path tests - NanDirection
+    // =========================================================================
+
+    #[test]
+    fn test_nan_direction_deserialize_invalid_value() -> Result<(), ClearGbmError> {
+        // Invalid string value
+        let json = r#""Invalid""#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_wrong_type() -> Result<(), ClearGbmError> {
+        // Number instead of string
+        let json = r#"123"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_left() -> Result<(), ClearGbmError> {
+        let json = r#""Left""#;
+        let dir: NanDirection = match serde_json::from_str(json) {
+            Ok(d) => d,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert!(matches!(dir, NanDirection::Left));
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_right() -> Result<(), ClearGbmError> {
+        let json = r#""Right""#;
+        let dir: NanDirection = match serde_json::from_str(json) {
+            Ok(d) => d,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert!(matches!(dir, NanDirection::Right));
+        Ok(())
+    }
+
+    // =========================================================================
+    // Serde error path tests - SplitResult
+    // =========================================================================
+
+    #[test]
+    fn test_split_result_deserialize_missing_field() -> Result<(), ClearGbmError> {
+        // Missing nan_direction field
+        let json = r#"{"feature_index":1,"split_bin":3,"gain":0.5,"left_gradient_sum":1.0,"left_hessian_sum":2.0,"left_count":10,"right_gradient_sum":0.5,"right_hessian_sum":1.0,"right_count":5}"#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_unknown_field() -> Result<(), ClearGbmError> {
+        let json = r#"{"feature_index":1,"split_bin":3,"gain":0.5,"left_gradient_sum":1.0,"left_hessian_sum":2.0,"left_count":10,"right_gradient_sum":0.5,"right_hessian_sum":1.0,"right_count":5,"nan_direction":"Left","extra":123}"#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_wrong_type() -> Result<(), ClearGbmError> {
+        // feature_index should be usize, not string
+        let json = r#"{"feature_index":"wrong","split_bin":3,"gain":0.5,"left_gradient_sum":1.0,"left_hessian_sum":2.0,"left_count":10,"right_gradient_sum":0.5,"right_hessian_sum":1.0,"right_count":5,"nan_direction":"Left"}"#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_all_fields() -> Result<(), ClearGbmError> {
+        let json = r#"{"feature_index":1,"split_bin":3,"gain":0.5,"left_gradient_sum":1.0,"left_hessian_sum":2.0,"left_count":10,"right_gradient_sum":0.5,"right_hessian_sum":1.0,"right_count":5,"nan_direction":"Left"}"#;
+        let sr: SplitResult = match serde_json::from_str(json) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert_eq!(sr.feature_index(), 1_usize);
+        assert_eq!(sr.split_bin(), 3_usize);
+        assert!((sr.gain() - 0.5_f64).abs() < 1e-10_f64);
+        assert_eq!(sr.left_count(), 10_usize);
+        assert_eq!(sr.right_count(), 5_usize);
+        assert!(matches!(sr.nan_direction(), NanDirection::Left));
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_with_right_nan() -> Result<(), ClearGbmError> {
+        let json = r#"{"feature_index":2,"split_bin":5,"gain":1.0,"left_gradient_sum":2.0,"left_hessian_sum":3.0,"left_count":20,"right_gradient_sum":1.0,"right_hessian_sum":2.0,"right_count":10,"nan_direction":"Right"}"#;
+        let sr: SplitResult = match serde_json::from_str(json) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+        assert!(matches!(sr.nan_direction(), NanDirection::Right));
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_serialize_roundtrip() -> Result<(), ClearGbmError> {
+        let config = SplitResultConfig {
+            feature_index: 3_usize,
+            split_bin: 7_usize,
+            gain: 2.5_f64,
+            left_gradient_sum: 10.0_f64,
+            left_hessian_sum: 5.0_f64,
+            left_count: 100_usize,
+            right_gradient_sum: -10.0_f64,
+            right_hessian_sum: 5.0_f64,
+            right_count: 50_usize,
+            nan_direction: NanDirection::Right,
+        };
+        let sr = SplitResult::new(config);
+
+        let json_str = match serde_json::to_string(&sr) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::SerializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+
+        let parsed: SplitResult = match serde_json::from_str(&json_str) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: e.to_string(),
+                })
+            }
+        };
+
+        assert_eq!(parsed.feature_index(), sr.feature_index());
+        assert_eq!(parsed.split_bin(), sr.split_bin());
+        assert!((parsed.gain() - sr.gain()).abs() < 1e-10_f64);
+        assert_eq!(parsed.left_count(), sr.left_count());
+        assert_eq!(parsed.right_count(), sr.right_count());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_from_number() -> Result<(), ClearGbmError> {
+        // Try deserializing NanDirection from a number (triggers expecting method)
+        let json = r#"123"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let err_msg = match result {
+            Ok(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "expected error".to_string(),
+                })
+            }
+            Err(e) => e.to_string(),
+        };
+        // The error should mention expected format
+        assert!(
+            err_msg.contains("Left") || err_msg.contains("Right") || err_msg.contains("string")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_from_object() -> Result<(), ClearGbmError> {
+        // Try deserializing NanDirection from an object
+        let json = r#"{"value": "Left"}"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_from_array() -> Result<(), ClearGbmError> {
+        // Try deserializing NanDirection from an array
+        let json = r#"["Left"]"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_from_bool() -> Result<(), ClearGbmError> {
+        // Try deserializing NanDirection from a boolean
+        let json = r#"true"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_nan_direction_deserialize_from_null() -> Result<(), ClearGbmError> {
+        // Try deserializing NanDirection from null
+        let json = r#"null"#;
+        let result: Result<NanDirection, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_from_array() -> Result<(), ClearGbmError> {
+        // Try deserializing SplitResult from an array (triggers expecting)
+        let json = r#"[1, 2, 3]"#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_from_string() -> Result<(), ClearGbmError> {
+        // Try deserializing SplitResult from a string
+        let json = r#""not a struct""#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_deserialize_from_number() -> Result<(), ClearGbmError> {
+        // Try deserializing SplitResult from a number
+        let json = r#"42"#;
+        let result: Result<SplitResult, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    // Serialization error path tests using failing serializer
+
+    #[test]
+    fn test_split_result_serialize_fail_each_field() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let config = SplitResultConfig {
+            feature_index: 0_usize,
+            split_bin: 5_usize,
+            gain: 0.5_f64,
+            left_gradient_sum: -1.0_f64,
+            left_hessian_sum: 2.0_f64,
+            left_count: 50_usize,
+            right_gradient_sum: 1.0_f64,
+            right_hessian_sum: 2.0_f64,
+            right_count: 50_usize,
+            nan_direction: NanDirection::Left,
+        };
+        let sr = SplitResult::new(config);
+        // SplitResult has 10 fields
+        for fail_at in 0_usize..10_usize {
+            let mut ser = FailAfterN::new(fail_at);
+            let result = sr.serialize(&mut ser);
+            assert!(result.is_err());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_result_serialize_fail_on_struct() -> Result<(), ClearGbmError> {
+        use failing_serializer::FailAfterN;
+        use serde::Serialize;
+        let config = SplitResultConfig {
+            feature_index: 0_usize,
+            split_bin: 5_usize,
+            gain: 0.5_f64,
+            left_gradient_sum: -1.0_f64,
+            left_hessian_sum: 2.0_f64,
+            left_count: 50_usize,
+            right_gradient_sum: 1.0_f64,
+            right_hessian_sum: 2.0_f64,
+            right_count: 50_usize,
+            nan_direction: NanDirection::Left,
+        };
+        let sr = SplitResult::new(config);
+        let mut ser = FailAfterN::fail_on_struct();
+        let result = sr.serialize(&mut ser);
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_failing_serializer_coverage() -> Result<(), ClearGbmError> {
+        use failing_serializer::{FailAfterN, FailError};
+        use serde::ser::{Error, SerializeStruct, Serializer};
+
+        // Test FailError Display
+        let err = FailError {
+            message: "test".to_string(),
+        };
+        let display = format!("{}", err);
+        assert!(display.contains("test"));
+
+        // Test FailError custom
+        let custom_err = FailError::custom("custom error");
+        assert!(custom_err.message.contains("custom"));
+
+        // Test all serializer primitive methods
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_bool(true).is_ok());
+
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i8(1_i8).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i16(1_i16).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i32(1_i32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_i64(1_i64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u8(1_u8).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u16(1_u16).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u32(1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_u64(1_u64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_f32(1.0_f32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_f64(1.0_f64).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_char('a').is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_str("test").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_bytes(&[1_u8, 2_u8]).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_none().is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_some(&1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit().is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit_struct("Unit").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_unit_variant("E", 0, "V").is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_newtype_struct("N", &1_u32).is_ok());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser)
+            .serialize_newtype_variant("E", 0, "V", &1_u32)
+            .is_ok());
+
+        // Test error methods
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_seq(Some(1)).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple(1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple_struct("T", 1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_tuple_variant("E", 0, "V", 1).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_map(Some(1)).is_err());
+        let mut ser = FailAfterN::new(100);
+        assert!((&mut ser).serialize_struct_variant("E", 0, "V", 1).is_err());
+
+        // Test serialize_struct
+        let mut ser = FailAfterN::new(100);
+        let struct_ser = (&mut ser).serialize_struct("S", 1);
+        assert!(struct_ser.is_ok());
+
+        // Test struct end
+        let mut ser = FailAfterN::new(100);
+        let struct_ser = match (&mut ser).serialize_struct("Test", 0) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "failed".to_string(),
+                })
+            }
+        };
+        assert!(struct_ser.end().is_ok());
+
+        // Test struct serialize_field Ok then Err
+        let mut ser = FailAfterN::new(1);
+        let mut struct_ser = match (&mut ser).serialize_struct("Test", 2) {
+            Ok(s) => s,
+            Err(_) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: "failed".to_string(),
+                })
+            }
+        };
+        assert!(struct_ser.serialize_field("f1", &1_u32).is_ok());
+        assert!(struct_ser.serialize_field("f2", &2_u32).is_err());
 
         Ok(())
     }
