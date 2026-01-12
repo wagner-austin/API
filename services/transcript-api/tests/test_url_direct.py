@@ -193,6 +193,103 @@ class TestParseDirectURLEdgeCases:
         assert result1["video_id"] != result2["video_id"]
 
 
+class TestIsDirectURLDownloadPatterns:
+    """Tests for is_direct_url with download URL patterns."""
+
+    def test_canvas_files_download(self) -> None:
+        url = "https://canvas.eee.uci.edu/files/33764330/download"
+        assert is_direct_url(url) is True
+
+    def test_canvas_files_download_with_params(self) -> None:
+        url = "https://canvas.eee.uci.edu/files/33764330/download?download_frd=1&verifier=abc123"
+        assert is_direct_url(url) is True
+
+    def test_generic_download_endpoint(self) -> None:
+        url = "https://cdn.example.com/download/12345"
+        assert is_direct_url(url) is True
+
+    def test_media_endpoint(self) -> None:
+        url = "https://media.example.com/media/98765"
+        assert is_direct_url(url) is True
+
+    def test_attachments_endpoint(self) -> None:
+        url = "https://api.example.com/attachments/54321"
+        assert is_direct_url(url) is True
+
+    def test_blob_storage(self) -> None:
+        url = "https://storage.azure.com/container/blob/video-file"
+        assert is_direct_url(url) is True
+
+    def test_s3_objects(self) -> None:
+        url = "https://bucket.s3.amazonaws.com/objects/media-file"
+        assert is_direct_url(url) is True
+
+    def test_verifier_param_makes_url_valid(self) -> None:
+        url = "https://example.com/content?verifier=abc123"
+        assert is_direct_url(url) is True
+
+    def test_download_frd_param_makes_url_valid(self) -> None:
+        url = "https://example.com/content?download_frd=1"
+        assert is_direct_url(url) is True
+
+    def test_token_param_makes_url_valid(self) -> None:
+        url = "https://cdn.example.com/protected?token=xyz789"
+        assert is_direct_url(url) is True
+
+    def test_html_with_download_param_returns_false(self) -> None:
+        url = "https://example.com/page.html?download=1"
+        assert is_direct_url(url) is False
+
+    def test_php_with_download_param_returns_false(self) -> None:
+        url = "https://example.com/script.php?download=1"
+        assert is_direct_url(url) is False
+
+    def test_case_insensitive_pattern_matching(self) -> None:
+        url = "https://canvas.example.edu/FILES/123/DOWNLOAD"
+        assert is_direct_url(url) is True
+
+
+class TestParseDirectURLDownloadPatterns:
+    """Tests for parsing download pattern URLs."""
+
+    def test_canvas_download_url(self) -> None:
+        url = "https://canvas.eee.uci.edu/files/33764330/download?download_frd=1&verifier=NfOSyfJrG2gVND3KgvhQWK5YG30xF8byZSkdzbtI"
+        result = parse_direct_url(url)
+        assert result["source"] == "direct"
+        assert result["canonical_url"] == url
+        assert result["extension"] == ""  # Unknown until download
+        assert len(result["video_id"]) == 32  # MD5 hash
+
+    def test_download_url_extension_empty(self) -> None:
+        url = "https://cdn.example.com/download/12345"
+        result = parse_direct_url(url)
+        assert result["extension"] == ""
+
+    def test_media_endpoint_url(self) -> None:
+        url = "https://media.example.com/media/98765"
+        result = parse_direct_url(url)
+        assert result["source"] == "direct"
+        assert result["extension"] == ""
+
+    def test_blob_storage_url(self) -> None:
+        url = "https://storage.azure.com/container/blob/video-file"
+        result = parse_direct_url(url)
+        assert result["source"] == "direct"
+        assert result["extension"] == ""
+
+    def test_verifier_param_url(self) -> None:
+        url = "https://example.com/content?verifier=abc123"
+        result = parse_direct_url(url)
+        assert result["source"] == "direct"
+        assert result["extension"] == ""
+
+    def test_deterministic_id_for_download_url(self) -> None:
+        url = "https://canvas.edu/files/123/download?verifier=abc"
+        result1 = parse_direct_url(url)
+        result2 = parse_direct_url(url)
+        assert result1["video_id"] == result2["video_id"]
+
+
 class TestParseDirectURLErrors:
     """Tests for direct URL parsing error cases."""
 
@@ -207,7 +304,7 @@ class TestParseDirectURLErrors:
             parse_direct_url("   ")
         assert exc_info.value.code is TranscriptErrorCode.DIRECT_URL_INVALID
 
-    def test_no_extension_raises(self) -> None:
+    def test_no_extension_no_pattern_raises(self) -> None:
         with pytest.raises(AppError) as exc_info:
             parse_direct_url("https://example.com/video")
         assert exc_info.value.code is TranscriptErrorCode.DIRECT_URL_EXTENSION_INVALID
@@ -223,6 +320,17 @@ class TestParseDirectURLErrors:
     def test_html_file_raises(self) -> None:
         with pytest.raises(AppError) as exc_info:
             parse_direct_url("https://example.com/page.html")
+        assert exc_info.value.code is TranscriptErrorCode.DIRECT_URL_EXTENSION_INVALID
+
+    def test_html_download_pattern_raises(self) -> None:
+        with pytest.raises(AppError) as exc_info:
+            parse_direct_url("https://example.com/files/123/download.html")
+        assert exc_info.value.code is TranscriptErrorCode.DIRECT_URL_EXTENSION_INVALID
+        assert "webpage" in exc_info.value.message.lower()
+
+    def test_php_with_verifier_raises(self) -> None:
+        with pytest.raises(AppError) as exc_info:
+            parse_direct_url("https://example.com/page.php?verifier=abc")
         assert exc_info.value.code is TranscriptErrorCode.DIRECT_URL_EXTENSION_INVALID
 
     def test_pdf_file_raises(self) -> None:
