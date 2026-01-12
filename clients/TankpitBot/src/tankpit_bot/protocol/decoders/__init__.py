@@ -1,0 +1,479 @@
+"""Protocol message decoders.
+
+This module provides the main decode_message dispatcher and re-exports
+all decoder functions from submodules.
+"""
+
+from __future__ import annotations
+
+from tankpit_bot.container import ContainerMessage
+from tankpit_bot.protocol.constants import (
+    MSG_ACTION_DONE,
+    MSG_ACTIVE_FORCES,
+    MSG_CHAT,
+    MSG_CONTAINER,
+    MSG_DEACTIVATE,
+    MSG_ENEMY_DETECT,
+    MSG_EQUIP_GAIN,
+    MSG_EQUIP_TOGGLE,
+    MSG_FUEL_DEPOSIT,
+    MSG_FUEL_GAIN,
+    MSG_INVENTORY,
+    MSG_MINE_DETONATE,
+    MSG_MINE_PLACE,
+    MSG_MOVE_RESPONSE,
+    MSG_MOVEMENT,
+    MSG_RADAR_RESULT,
+    MSG_SHOOT,
+    MSG_STATISTICS,
+    MSG_SUPERVISOR,
+    MSG_SYNC,
+    MSG_TANK_ENTRY,
+    MSG_TANK_EXIT,
+    MSG_TANK_INFO,
+    MSG_TANK_STATS,
+    MSG_TANK_STATUS_FULL,
+    MSG_TERRAIN_UPDATE,
+    MSG_TILE_UPDATE,
+    MSG_VIEWPORT,
+)
+from tankpit_bot.protocol.decoders.combat import (
+    decode_deactivation,
+    decode_hit_confirmation,
+    decode_mine_detonation,
+    decode_mine_placement,
+    decode_shoot_event,
+)
+from tankpit_bot.protocol.decoders.misc import (
+    decode_action_done,
+    decode_active_forces,
+    decode_chat_message,
+    decode_statistics,
+)
+from tankpit_bot.protocol.decoders.movement import (
+    decode_movement,
+    decode_movement_response,
+)
+from tankpit_bot.protocol.decoders.radar import (
+    decode_enemy_detection,
+    decode_radar_container,
+    decode_radar_mine,
+    decode_radar_result,
+    decode_radar_scan_result,
+    encode_radar_container,
+    encode_radar_mine,
+    encode_radar_scan_result,
+    require_radar_container,
+    require_radar_mine,
+    require_radar_scan_result,
+)
+from tankpit_bot.protocol.decoders.resources import (
+    decode_equipment_gain,
+    decode_equipment_toggle,
+    decode_fuel_deposit,
+    decode_fuel_gain,
+    decode_inventory,
+)
+from tankpit_bot.protocol.decoders.tank import (
+    decode_0x2e_message,
+    decode_tank_entry,
+    decode_tank_exit,
+    decode_tank_info,
+    decode_tank_status,
+    decode_tank_status_sync,
+)
+from tankpit_bot.protocol.decoders.text import (
+    decode_join_confirm,
+    decode_text_message,
+    decode_world_info,
+)
+from tankpit_bot.protocol.decoders.world import (
+    decode_container,
+    decode_supervisor,
+    decode_sync,
+    decode_terrain_update,
+    decode_viewport_update,
+    supervisor_has_promo_kill,
+    supervisor_is_promo_eligible,
+    viewport_entity_is_container,
+    viewport_entity_is_empty,
+    viewport_entity_is_tank,
+)
+from tankpit_bot.protocol.helpers import DecodeError
+from tankpit_bot.protocol.types import (
+    ActionDoneDict,
+    ActiveForcesDict,
+    ChatMessageDict,
+    ContainerDict,
+    DeactivationDict,
+    EnemyDetectionDict,
+    EquipmentGainDict,
+    EquipmentToggleDict,
+    FuelDepositDict,
+    FuelGainDict,
+    InventoryDict,
+    JoinConfirmDict,
+    MineDetonationDict,
+    MinePlacementDict,
+    MovementDict,
+    MovementResponseDict,
+    RadarResultDict,
+    RadarScanResultDict,
+    ShootEventDict,
+    StatisticsDict,
+    SupervisorDict,
+    SyncDict,
+    TankEntryDict,
+    TankExitDict,
+    TankInfoDict,
+    TankStatusDict,
+    TankStatusSyncDict,
+    TerrainUpdateDict,
+    ViewportUpdateDict,
+    WorldInfoDict,
+)
+
+# Text message types (no XOR decoding, ASCII format)
+TextMessage = JoinConfirmDict | WorldInfoDict
+
+# Binary message types (XOR decoded)
+BinaryMessage = (
+    ShootEventDict
+    | DeactivationDict
+    | FuelGainDict
+    | FuelDepositDict
+    | RadarResultDict
+    | EnemyDetectionDict
+    | InventoryDict
+    | EquipmentGainDict
+    | EquipmentToggleDict
+    | MinePlacementDict
+    | MineDetonationDict
+    | RadarScanResultDict
+    | MovementDict
+    | TankInfoDict
+    | MovementResponseDict
+    | SyncDict
+    | ContainerDict
+    | TankEntryDict
+    | TankExitDict
+    | ActionDoneDict
+    | ChatMessageDict
+    | StatisticsDict
+    | ActiveForcesDict
+    | TankStatusSyncDict
+    | TankStatusDict
+    | SupervisorDict
+    | TerrainUpdateDict
+    | ViewportUpdateDict
+    | ContainerMessage
+)
+
+# Union type for all decoded messages
+DecodedMessage = TextMessage | BinaryMessage
+
+
+def _decode_combat_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode combat-related messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a combat message.
+    """
+    if msg_type == MSG_SHOOT:
+        return decode_shoot_event(data)
+    if msg_type == MSG_DEACTIVATE:
+        return decode_deactivation(data)
+    if msg_type == MSG_MINE_PLACE:
+        return decode_mine_placement(data)
+    if msg_type == MSG_MINE_DETONATE:
+        return decode_mine_detonation(data)
+    return None
+
+
+def _decode_resource_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode resource-related messages (fuel, equipment).
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a resource message.
+    """
+    if msg_type == MSG_FUEL_GAIN:
+        return decode_fuel_gain(data)
+    if msg_type == MSG_FUEL_DEPOSIT:
+        return decode_fuel_deposit(data)
+    if msg_type == MSG_INVENTORY:
+        return decode_inventory(data)
+    if msg_type == MSG_EQUIP_GAIN:
+        return decode_equipment_gain(data)
+    if msg_type == MSG_EQUIP_TOGGLE:
+        return decode_equipment_toggle(data)
+    return None
+
+
+def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode radar and detection messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a radar message.
+    """
+    if msg_type == MSG_RADAR_RESULT:
+        return decode_radar_result(data)
+    if msg_type == MSG_ENEMY_DETECT:
+        return decode_enemy_detection(data)
+    if msg_type == MSG_TILE_UPDATE:
+        return decode_radar_scan_result(data)
+    return None
+
+
+def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode tank status and info messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a tank message.
+    """
+    if msg_type == MSG_TANK_ENTRY:
+        return decode_tank_entry(data)
+    if msg_type == MSG_TANK_EXIT:
+        return decode_tank_exit(data)
+    if msg_type == MSG_TANK_STATS:
+        return decode_0x2e_message(data)
+    if msg_type == MSG_TANK_STATUS_FULL:
+        return decode_tank_status(data)
+    if msg_type == MSG_TANK_INFO:
+        return decode_tank_info(data)
+    return None
+
+
+def _decode_movement_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode movement-related messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a movement message.
+    """
+    if msg_type == MSG_MOVEMENT:
+        return decode_movement(data)
+    if msg_type == MSG_MOVE_RESPONSE:
+        return decode_movement_response(data)
+    return None
+
+
+def _decode_world_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode world/environment messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a world message.
+    """
+    if msg_type == MSG_VIEWPORT:
+        return decode_viewport_update(data)
+    if msg_type == MSG_TERRAIN_UPDATE:
+        return decode_terrain_update(data)
+    if msg_type == MSG_SYNC:
+        return decode_sync(data)
+    if msg_type == MSG_CONTAINER:
+        return decode_container(data)
+    return None
+
+
+def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode miscellaneous messages.
+
+    Args:
+        msg_type: Message type byte.
+        data: XOR decoded message bytes.
+
+    Returns:
+        Decoded message, or None if not a misc message.
+    """
+    if msg_type == MSG_CHAT:
+        return decode_chat_message(data)
+    if msg_type == MSG_STATISTICS:
+        return decode_statistics(data)
+    if msg_type == MSG_ACTIVE_FORCES:
+        return decode_active_forces(data)
+    if msg_type == MSG_SUPERVISOR:
+        return decode_supervisor(data)
+    if msg_type == MSG_ACTION_DONE:
+        return decode_action_done(data)
+    return None
+
+
+def decode_message(msg_type: int, data: bytes) -> BinaryMessage:
+    """Decode a BINARY message based on its type.
+
+    NOTE: For text messages, use decode_text_message() instead.
+
+    Args:
+        msg_type: First byte of message (NOT XOR encoded).
+        data: Remaining message bytes (XOR decoded).
+
+    Returns:
+        Decoded message object.
+
+    Raises:
+        DecodeError: If message type is unknown or decoding fails.
+    """
+    result = _decode_combat_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_resource_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_radar_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_tank_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_movement_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_world_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_misc_message(msg_type, data)
+    if result is not None:
+        return result
+
+    raise DecodeError(f"decode_message: unknown type 0x{msg_type:02X}")
+
+
+def try_decode_message(msg_type: int, data: bytes) -> DecodedMessage | None:
+    """Try to decode a message, returning None if unsupported.
+
+    Unlike decode_message(), this does not raise DecodeError for unknown types.
+    Use this when you want to handle unknown types gracefully without exceptions.
+
+    Args:
+        msg_type: First byte of message (NOT XOR encoded).
+        data: Remaining message bytes (XOR decoded).
+
+    Returns:
+        Decoded message object, or None if type is unknown/unsupported.
+    """
+    return try_decode_binary_message(msg_type, data)
+
+
+def try_decode_binary_message(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Try to decode a binary message, returning None if unsupported.
+
+    Args:
+        msg_type: First byte of message (NOT XOR encoded).
+        data: Remaining message bytes (XOR decoded).
+
+    Returns:
+        Decoded message object, or None if type is unknown/unsupported.
+    """
+    result = _decode_combat_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_resource_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_radar_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_tank_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_movement_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_world_message(msg_type, data)
+    if result is not None:
+        return result
+
+    result = _decode_misc_message(msg_type, data)
+    if result is not None:
+        return result
+
+    return None
+
+
+__all__ = [
+    "BinaryMessage",
+    "DecodedMessage",
+    "TextMessage",
+    "decode_0x2e_message",
+    "decode_action_done",
+    "decode_active_forces",
+    "decode_chat_message",
+    "decode_container",
+    "decode_deactivation",
+    "decode_enemy_detection",
+    "decode_equipment_gain",
+    "decode_equipment_toggle",
+    "decode_fuel_deposit",
+    "decode_fuel_gain",
+    "decode_hit_confirmation",
+    "decode_inventory",
+    "decode_join_confirm",
+    "decode_message",
+    "decode_mine_detonation",
+    "decode_mine_placement",
+    "decode_movement",
+    "decode_movement_response",
+    "decode_radar_container",
+    "decode_radar_mine",
+    "decode_radar_result",
+    "decode_radar_scan_result",
+    "decode_shoot_event",
+    "decode_statistics",
+    "decode_supervisor",
+    "decode_sync",
+    "decode_tank_entry",
+    "decode_tank_exit",
+    "decode_tank_info",
+    "decode_tank_status",
+    "decode_tank_status_sync",
+    "decode_terrain_update",
+    "decode_text_message",
+    "decode_viewport_update",
+    "decode_world_info",
+    "encode_radar_container",
+    "encode_radar_mine",
+    "encode_radar_scan_result",
+    "require_radar_container",
+    "require_radar_mine",
+    "require_radar_scan_result",
+    "supervisor_has_promo_kill",
+    "supervisor_is_promo_eligible",
+    "try_decode_binary_message",
+    "try_decode_message",
+    "viewport_entity_is_container",
+    "viewport_entity_is_empty",
+    "viewport_entity_is_tank",
+]

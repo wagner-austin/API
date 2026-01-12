@@ -17,7 +17,7 @@ from pathlib import Path
 from tankpit_bot import _test_hooks
 
 # Default path to static XOR key file (relative to project root)
-DEFAULT_STATIC_KEY_PATH = Path(__file__).parent.parent.parent / "xor_static_key.txt"
+DEFAULT_STATIC_KEY_PATH = Path(__file__).parent.parent.parent.parent / "xor_static_key.txt"
 
 
 class CodecError(Exception):

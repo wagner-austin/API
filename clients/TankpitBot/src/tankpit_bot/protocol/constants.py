@@ -1,0 +1,192 @@
+"""Protocol constants and enumerations.
+
+This module contains all protocol-level constants including message type codes,
+enumerations for game concepts (rank, team, equipment), and shared values.
+"""
+
+from __future__ import annotations
+
+from enum import IntEnum
+
+
+class Rank(IntEnum):
+    """Tank rank levels (0-7)."""
+
+    RECRUIT = 0
+    PRIVATE = 1
+    CORPORAL = 2
+    SERGEANT = 3
+    LIEUTENANT = 4
+    CAPTAIN = 5
+    MAJOR = 6
+    GENERAL = 7
+
+
+# Starting fuel by rank (resets on death/respawn)
+RANK_FUEL: dict[Rank, int] = {
+    Rank.RECRUIT: 1000,
+    Rank.PRIVATE: 1100,
+    Rank.CORPORAL: 1200,
+    Rank.SERGEANT: 1300,
+    Rank.LIEUTENANT: 1400,
+    Rank.CAPTAIN: 1500,
+    Rank.MAJOR: 1600,
+    Rank.GENERAL: 1700,
+}
+
+
+class Team(IntEnum):
+    """Team colors (0-3)."""
+
+    RED = 0
+    PURPLE = 1
+    BLUE = 2
+    ORANGE = 3
+
+
+class Equipment(IntEnum):
+    """Equipment types (0-4)."""
+
+    ARMOR_SHIELD = 0
+    DUAL_SHOT = 1
+    MISSILE_SHOT = 2
+    HOMING_SHOT = 3
+    EXTRA_RADAR = 4
+
+
+class TerrainType(IntEnum):
+    """Terrain types from JS rendering code."""
+
+    GROUND = 0
+    ROCK_A = 1
+    ROCK_B = 2
+    ROCK_AB = 3
+    FERRY = 5
+    FERRY_ROCK = 7
+
+
+# Message type characters
+MSG_TANK_STATS = ord(".")
+MSG_TANK_INFO = ord("!")
+MSG_TANK_POS = ord("=")
+MSG_MOVEMENT = ord("G")
+MSG_SHOOT = ord("S")
+MSG_DEACTIVATE = ord("A")
+MSG_FUEL_GAIN = ord("D")
+MSG_FUEL_DEPOSIT = ord("d")
+MSG_RADAR_RESULT = ord("F")
+MSG_ENEMY_DETECT = ord("H")
+MSG_INVENTORY = ord("I")
+MSG_EQUIP_GAIN = ord("g")
+MSG_EQUIP_TOGGLE = ord("t")
+MSG_MINE_PLACE = ord("K")
+MSG_MINE_DETONATE = ord("E")
+MSG_CHAT = ord("M")
+MSG_TANK_REMOVE = ord("X")
+MSG_MAP_UPDATE = ord("Z")
+MSG_TANK_ENTRY = ord("(")
+MSG_TANK_EXIT = ord(")")
+MSG_TANK_STATUS = ord(">")
+MSG_PROMOTION = ord("+")
+MSG_DECORATION = ord("N")
+MSG_STATISTICS = ord("V")
+MSG_ACTIVE_FORCES = ord("*")
+MSG_ACTIVE_PLAYERS = ord("/")
+MSG_TOP10 = ord("1")
+MSG_TILE_UPDATE = ord("O")
+MSG_BUILD_PICKUP = ord("B")
+MSG_ACTION_DONE = ord("T")
+MSG_MINE_STATUS = ord("@")
+MSG_TERRAIN_UPDATE = ord("J")
+MSG_PING = ord("`")
+MSG_DISCONNECT = ord("~")
+MSG_SUPERVISOR = ord("R")
+MSG_TANK_STATUS_FULL = ord(">")
+MSG_VIEWPORT = ord("Z")
+MSG_SYNC = ord("?")
+MSG_CONTAINER = ord("C")
+MSG_MOVE_RESPONSE = ord("=")
+
+# Supervisor status values
+SUPERVISOR_STATUS_PROMO_ELIGIBLE = 1
+SUPERVISOR_STATUS_PROMO_KILL = 8
+
+# Text message types that don't use XOR encoding
+TEXT_MSG_TYPES = frozenset(
+    {
+        ord("="),
+        ord("+"),
+        ord("%"),
+        ord("*"),
+        ord("$"),
+        ord("-"),
+        ord("~"),
+        ord("`"),
+        ord("R"),
+    }
+)
+
+
+def is_text_message(msg_type: int) -> bool:
+    """Check if a message type uses text format (not XOR encoded).
+
+    Args:
+        msg_type: Message type byte.
+
+    Returns:
+        True if message uses text format.
+    """
+    return msg_type in TEXT_MSG_TYPES
+
+
+__all__ = [
+    "MSG_ACTION_DONE",
+    "MSG_ACTIVE_FORCES",
+    "MSG_ACTIVE_PLAYERS",
+    "MSG_BUILD_PICKUP",
+    "MSG_CHAT",
+    "MSG_CONTAINER",
+    "MSG_DEACTIVATE",
+    "MSG_DECORATION",
+    "MSG_DISCONNECT",
+    "MSG_ENEMY_DETECT",
+    "MSG_EQUIP_GAIN",
+    "MSG_EQUIP_TOGGLE",
+    "MSG_FUEL_DEPOSIT",
+    "MSG_FUEL_GAIN",
+    "MSG_INVENTORY",
+    "MSG_MAP_UPDATE",
+    "MSG_MINE_DETONATE",
+    "MSG_MINE_PLACE",
+    "MSG_MINE_STATUS",
+    "MSG_MOVEMENT",
+    "MSG_MOVE_RESPONSE",
+    "MSG_PING",
+    "MSG_PROMOTION",
+    "MSG_RADAR_RESULT",
+    "MSG_SHOOT",
+    "MSG_STATISTICS",
+    "MSG_SUPERVISOR",
+    "MSG_SYNC",
+    "MSG_TANK_ENTRY",
+    "MSG_TANK_EXIT",
+    "MSG_TANK_INFO",
+    "MSG_TANK_POS",
+    "MSG_TANK_REMOVE",
+    "MSG_TANK_STATS",
+    "MSG_TANK_STATUS",
+    "MSG_TANK_STATUS_FULL",
+    "MSG_TERRAIN_UPDATE",
+    "MSG_TILE_UPDATE",
+    "MSG_TOP10",
+    "MSG_VIEWPORT",
+    "RANK_FUEL",
+    "SUPERVISOR_STATUS_PROMO_ELIGIBLE",
+    "SUPERVISOR_STATUS_PROMO_KILL",
+    "TEXT_MSG_TYPES",
+    "Equipment",
+    "Rank",
+    "Team",
+    "TerrainType",
+    "is_text_message",
+]
