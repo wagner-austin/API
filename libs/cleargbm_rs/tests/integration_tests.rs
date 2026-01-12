@@ -127,31 +127,55 @@ fn test_histogram_accumulation_correctness() -> std::result::Result<(), ClearGbm
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins = vec![0_usize, 1_usize, 2_usize, 0_usize, 1_usize, 2_usize];
 
-    let hist = build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize)?;
+    let hist = match build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize) {
+        Ok(h) => h,
+        Err(e) => return Err(e),
+    };
 
     // Verify bin 0: sum([0.1, 0.4]) = 0.5, count = 2
-    let g0 = hist.gradient_sum(0_usize)?;
+    let g0 = match hist.gradient_sum(0_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g0 - 0.5_f64).abs() < EPSILON,
         "Bin 0 gradient: expected 0.5, got {g0}"
     );
-    assert_eq!(hist.count(0_usize)?, 2_usize, "Bin 0 count should be 2");
+    let count0 = match hist.count(0_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(count0, 2_usize, "Bin 0 count should be 2");
 
     // Verify bin 1: sum([0.2, 0.5]) = 0.7, count = 2
-    let g1 = hist.gradient_sum(1_usize)?;
+    let g1 = match hist.gradient_sum(1_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g1 - 0.7_f64).abs() < EPSILON,
         "Bin 1 gradient: expected 0.7, got {g1}"
     );
-    assert_eq!(hist.count(1_usize)?, 2_usize, "Bin 1 count should be 2");
+    let count1 = match hist.count(1_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(count1, 2_usize, "Bin 1 count should be 2");
 
     // Verify bin 2: sum([0.3, 0.6]) = 0.9, count = 2
-    let g2 = hist.gradient_sum(2_usize)?;
+    let g2 = match hist.gradient_sum(2_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g2 - 0.9_f64).abs() < EPSILON,
         "Bin 2 gradient: expected 0.9, got {g2}"
     );
-    assert_eq!(hist.count(2_usize)?, 2_usize, "Bin 2 count should be 2");
+    let count2 = match hist.count(2_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(count2, 2_usize, "Bin 2 count should be 2");
 
     // Total should equal sum of all gradients
     let total_g: f64 = hist.gradient_sums().iter().sum();
@@ -181,37 +205,74 @@ fn test_find_best_split_finds_optimal() -> std::result::Result<(), ClearGbmError
     //   gain = 0.5 * (9/4 + 9/2) = 0.5 * (2.25 + 4.5) = 3.375
 
     let mut histogram = HistogramBuffer::new(4_usize); // 3 regular + 1 NaN
-    histogram.accumulate(0_usize, 2.0_f64, 2.0_f64)?;
-    histogram.accumulate(0_usize, 0.0_f64, 0.0_f64)?; // extra to get count
-    histogram.accumulate(1_usize, 1.0_f64, 2.0_f64)?;
-    histogram.accumulate(1_usize, 0.0_f64, 0.0_f64)?;
-    histogram.accumulate(2_usize, -3.0_f64, 2.0_f64)?;
-    histogram.accumulate(2_usize, 0.0_f64, 0.0_f64)?;
+    match histogram.accumulate(0_usize, 2.0_f64, 2.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match histogram.accumulate(0_usize, 0.0_f64, 0.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match histogram.accumulate(1_usize, 1.0_f64, 2.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match histogram.accumulate(1_usize, 0.0_f64, 0.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match histogram.accumulate(2_usize, -3.0_f64, 2.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match histogram.accumulate(2_usize, 0.0_f64, 0.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
 
     // Need proper counts
     let mut histogram = HistogramBuffer::new(4_usize);
     for _ in 0_usize..2_usize {
-        histogram.accumulate(0_usize, 1.0_f64, 1.0_f64)?;
+        match histogram.accumulate(0_usize, 1.0_f64, 1.0_f64) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
     }
     for _ in 0_usize..2_usize {
-        histogram.accumulate(1_usize, 0.5_f64, 1.0_f64)?;
+        match histogram.accumulate(1_usize, 0.5_f64, 1.0_f64) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
     }
     for _ in 0_usize..2_usize {
-        histogram.accumulate(2_usize, -1.5_f64, 1.0_f64)?;
+        match histogram.accumulate(2_usize, -1.5_f64, 1.0_f64) {
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
     }
 
-    let config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-    let maybe_split = find_best_split_from_histogram(
+    let config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let maybe_split = match find_best_split_from_histogram(
         &histogram,
         0_usize,
         &config,
         3_usize,
         MonotonicConstraint::None,
-    )?;
+    ) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
 
     let split = maybe_split.ok_or_else(|| ClearGbmError::EmptyInput {
         context: "expected split".to_string(),
-    })?;
+    });
+    let split = match split {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
 
     // The split should be at bin 1 (split_bin=1 means left gets bins 0,1)
     // because that gives the highest gain
@@ -255,8 +316,14 @@ fn test_tree_binary_classification_correctness() -> std::result::Result<(), Clea
         0.15_f64, 0.25_f64, 0.35_f64, 0.45_f64, 0.55_f64, 0.65_f64, 0.75_f64, 0.85_f64,
     ]];
 
-    let split_config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-    let tree_config = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config)?;
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let tree_config = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
 
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
@@ -269,7 +336,10 @@ fn test_tree_binary_classification_correctness() -> std::result::Result<(), Clea
         monotonic_constraints: None,
     };
 
-    let tree = build_tree(&input, &Hooks::default())?;
+    let tree = match build_tree(&input, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // Tree should have found a split
     assert!(
@@ -282,14 +352,21 @@ fn test_tree_binary_classification_correctness() -> std::result::Result<(), Clea
     );
 
     // Root should not be a leaf (we have a clear split point)
-    let root = tree.root()?;
+    let root = match tree.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
     assert!(!root.is_leaf(), "Root should be an internal node");
 
     // The split should be around the middle (between samples 3 and 4)
     // where the label changes from 1 to 0
     let threshold = root.threshold().ok_or_else(|| ClearGbmError::EmptyInput {
         context: "missing threshold".to_string(),
-    })?;
+    });
+    let threshold = match threshold {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
     assert!(
         threshold > 0.3_f64 && threshold < 0.6_f64,
         "Split threshold should be between 0.3 and 0.6, got {threshold}"
@@ -324,8 +401,14 @@ fn test_tree_minimizes_squared_error() -> std::result::Result<(), ClearGbmError>
     ];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
-    let split_config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-    let tree_config = TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, split_config)?;
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let tree_config = match TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
 
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
@@ -338,7 +421,10 @@ fn test_tree_minimizes_squared_error() -> std::result::Result<(), ClearGbmError>
         monotonic_constraints: None,
     };
 
-    let tree = build_tree(&input, &Hooks::default())?;
+    let tree = match build_tree(&input, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // Should split into two leaves
     assert_eq!(tree.n_leaves(), 2_usize, "Should have exactly 2 leaves");
@@ -348,19 +434,34 @@ fn test_tree_minimizes_squared_error() -> std::result::Result<(), ClearGbmError>
     // Right leaf (bin 1): G_sum = 3, H_sum = 3, value = -3/3 = -1.0
 
     // The root should point to two children
-    let root = tree.root()?;
+    let root = match tree.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
     assert!(!root.is_leaf(), "Root should be internal node");
 
     let left_id = root.left_child().ok_or_else(|| ClearGbmError::EmptyInput {
         context: "missing left child".to_string(),
-    })?;
-    let right_id = root
-        .right_child()
-        .ok_or_else(|| ClearGbmError::EmptyInput {
-            context: "missing right child".to_string(),
-        })?;
-    let left_child = tree.node(left_id)?;
-    let right_child = tree.node(right_id)?;
+    });
+    let left_id = match left_id {
+        Ok(id) => id,
+        Err(e) => return Err(e),
+    };
+    let right_id = root.right_child().ok_or_else(|| ClearGbmError::EmptyInput {
+        context: "missing right child".to_string(),
+    });
+    let right_id = match right_id {
+        Ok(id) => id,
+        Err(e) => return Err(e),
+    };
+    let left_child = match tree.node(left_id) {
+        Ok(n) => n,
+        Err(e) => return Err(e),
+    };
+    let right_child = match tree.node(right_id) {
+        Ok(n) => n,
+        Err(e) => return Err(e),
+    };
 
     // Verify leaf values are correct
     // Left leaf should predict +1 (to correct negative gradients from targets=1)
@@ -407,8 +508,14 @@ fn test_monotonic_constraint_enforcement() -> std::result::Result<(), ClearGbmEr
     ];
     let bin_thresholds = vec![vec![0.33_f64, 0.66_f64, 1.0_f64]];
 
-    let split_config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-    let tree_config = TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, split_config)?;
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let tree_config = match TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
 
     let constraints = vec![MonotonicConstraint::Increasing];
 
@@ -423,15 +530,27 @@ fn test_monotonic_constraint_enforcement() -> std::result::Result<(), ClearGbmEr
         monotonic_constraints: Some(&constraints),
     };
 
-    let tree = build_tree(&input, &Hooks::default())?;
+    let tree = match build_tree(&input, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // If tree has split, verify monotonicity is maintained
     if tree.n_leaves() >= 2_usize {
-        let root = tree.root()?;
+        let root = match tree.root() {
+            Ok(r) => r,
+            Err(e) => return Err(e),
+        };
         if !root.is_leaf() {
             if let (Some(left_id), Some(right_id)) = (root.left_child(), root.right_child()) {
-                let left = tree.node(left_id)?;
-                let right = tree.node(right_id)?;
+                let left = match tree.node(left_id) {
+                    Ok(n) => n,
+                    Err(e) => return Err(e),
+                };
+                let right = match tree.node(right_id) {
+                    Ok(n) => n,
+                    Err(e) => return Err(e),
+                };
 
                 if left.is_leaf() && right.is_leaf() {
                     // For increasing constraint: left_value <= right_value
@@ -466,9 +585,15 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
     ]];
 
     // Build tree without regularization
-    let split_config_no_reg = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
+    let split_config_no_reg = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
     let tree_config_no_reg =
-        TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config_no_reg)?;
+        match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config_no_reg) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
     let input_no_reg = BuildTreeInput {
         sample_indices: &sample_indices,
@@ -481,12 +606,21 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         monotonic_constraints: None,
     };
 
-    let tree_no_reg = build_tree(&input_no_reg, &Hooks::default())?;
+    let tree_no_reg = match build_tree(&input_no_reg, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // Build tree with strong L2 regularization
-    let split_config_l2 = SplitConfig::new(2_usize, 1_usize, 64_usize, 10.0_f64, 0.0_f64)?;
+    let split_config_l2 = match SplitConfig::new(2_usize, 1_usize, 64_usize, 10.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
     let tree_config_l2 =
-        TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 10.0_f64, split_config_l2)?;
+        match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 10.0_f64, split_config_l2) {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
 
     let input_l2 = BuildTreeInput {
         sample_indices: &sample_indices,
@@ -499,12 +633,21 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         monotonic_constraints: None,
     };
 
-    let tree_l2 = build_tree(&input_l2, &Hooks::default())?;
+    let tree_l2 = match build_tree(&input_l2, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // With regularization, leaf values should be shrunk toward zero
     // Compare leaf values
-    let root_no_reg = tree_no_reg.root()?;
-    let root_l2 = tree_l2.root()?;
+    let root_no_reg = match tree_no_reg.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
+    let root_l2 = match tree_l2.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
 
     // Both should have similar structure but different leaf values
     // The regularized tree might have fewer splits or smaller leaf values
@@ -512,8 +655,14 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         if let (Some(left_id_no_reg), Some(left_id_l2)) =
             (root_no_reg.left_child(), root_l2.left_child())
         {
-            let left_no_reg = tree_no_reg.node(left_id_no_reg)?;
-            let left_l2 = tree_l2.node(left_id_l2)?;
+            let left_no_reg = match tree_no_reg.node(left_id_no_reg) {
+                Ok(n) => n,
+                Err(e) => return Err(e),
+            };
+            let left_l2 = match tree_l2.node(left_id_l2) {
+                Ok(n) => n,
+                Err(e) => return Err(e),
+            };
 
             if left_no_reg.is_leaf() && left_l2.is_leaf() {
                 // Regularized values should be smaller in absolute value
@@ -543,8 +692,14 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
     let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
-    let split_config = SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64)?;
-    let tree_config = TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config)?;
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let tree_config = match TreeBuildConfig::new(3_usize, 0_usize, 0.0_f64, 0.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
 
     let input = BuildTreeInput {
         sample_indices: &sample_indices,
@@ -557,7 +712,10 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
         monotonic_constraints: None,
     };
 
-    let tree = build_tree(&input, &Hooks::default())?;
+    let tree = match build_tree(&input, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
 
     // With all same gradients, there's no gain from splitting
     // Tree should be a single leaf
@@ -567,7 +725,10 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
         "Tree should be single leaf when all gradients are same"
     );
 
-    let root = tree.root()?;
+    let root = match tree.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
     assert!(root.is_leaf(), "Root should be a leaf");
 
     // Leaf value should be -sum(G)/sum(H) = -4/4 = -1
@@ -588,40 +749,73 @@ fn test_sibling_subtraction_correctness() -> std::result::Result<(), ClearGbmErr
 
     // Parent histogram
     let mut parent = HistogramBuffer::new(3_usize);
-    parent.accumulate(0_usize, 1.0_f64, 2.0_f64)?;
-    parent.accumulate(1_usize, 3.0_f64, 4.0_f64)?;
-    parent.accumulate(2_usize, 5.0_f64, 6.0_f64)?;
+    match parent.accumulate(0_usize, 1.0_f64, 2.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match parent.accumulate(1_usize, 3.0_f64, 4.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match parent.accumulate(2_usize, 5.0_f64, 6.0_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
 
     // Child histogram (subset of parent)
     let mut child = HistogramBuffer::new(3_usize);
-    child.accumulate(0_usize, 0.3_f64, 0.5_f64)?;
-    child.accumulate(1_usize, 1.0_f64, 1.5_f64)?;
-    child.accumulate(2_usize, 2.0_f64, 2.5_f64)?;
+    match child.accumulate(0_usize, 0.3_f64, 0.5_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match child.accumulate(1_usize, 1.0_f64, 1.5_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
+    match child.accumulate(2_usize, 2.0_f64, 2.5_f64) {
+        Ok(()) => {}
+        Err(e) => return Err(e),
+    }
 
     // Sibling = Parent - Child
-    let sibling = subtract_histogram(&parent, &child)?;
+    let sibling = match subtract_histogram(&parent, &child) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
 
     // Verify each bin
-    let g0 = sibling.gradient_sum(0_usize)?;
+    let g0 = match sibling.gradient_sum(0_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g0 - 0.7_f64).abs() < EPSILON,
         "Bin 0 gradient: expected 0.7, got {g0}"
     );
 
-    let g1 = sibling.gradient_sum(1_usize)?;
+    let g1 = match sibling.gradient_sum(1_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g1 - 2.0_f64).abs() < EPSILON,
         "Bin 1 gradient: expected 2.0, got {g1}"
     );
 
-    let g2 = sibling.gradient_sum(2_usize)?;
+    let g2 = match sibling.gradient_sum(2_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (g2 - 3.0_f64).abs() < EPSILON,
         "Bin 2 gradient: expected 3.0, got {g2}"
     );
 
     // Verify hessians too
-    let h0 = sibling.hessian_sum(0_usize)?;
+    let h0 = match sibling.hessian_sum(0_usize) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
     assert!(
         (h0 - 1.5_f64).abs() < EPSILON,
         "Bin 0 hessian: expected 1.5, got {h0}"
