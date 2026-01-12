@@ -188,7 +188,7 @@ def test_captions_invalid_url(tmp_path: Path) -> None:
     }
     with pytest.raises(Exception) as excinfo:
         _ = handler(payload)
-    assert "Only YouTube URLs" in str(excinfo.value)
+    assert "YouTube, Vimeo, or a direct video file" in str(excinfo.value)
 
 
 def test_stt_success(tmp_path: Path) -> None:
@@ -208,7 +208,7 @@ def test_stt_user_error_invalid_url(tmp_path: Path) -> None:
     bad: STTPayload = {"url": "https://example.com/x"}
     with pytest.raises(Exception) as excinfo:
         _ = handler(bad)
-    assert "Only YouTube URLs" in str(excinfo.value)
+    assert "YouTube, Vimeo, or a direct video file" in str(excinfo.value)
 
 
 def test_healthz_endpoint(tmp_path: Path) -> None:
