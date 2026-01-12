@@ -44,7 +44,7 @@ pub type BuildHistogramFn = fn(
     hessians: &[f64],
     bins: &[usize],
     n_bins: usize,
-) -> std::result::Result<HistogramBuffer, ClearGbmError>;
+) -> Result<HistogramBuffer, ClearGbmError>;
 
 /// Dependency injection hooks for tree building.
 ///
@@ -96,7 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hooks_default() -> std::result::Result<(), ClearGbmError> {
+    fn test_hooks_default() -> Result<(), ClearGbmError> {
         let hooks = Hooks::default();
         // Verify default hooks work with valid input
         let sample_indices = vec![0_usize, 1_usize];
@@ -110,14 +110,14 @@ mod tests {
     }
 
     #[test]
-    fn test_hooks_with_custom_histogram_builder() -> std::result::Result<(), ClearGbmError> {
+    fn test_hooks_with_custom_histogram_builder() -> Result<(), ClearGbmError> {
         fn error_histogram(
             _: &[usize],
             _: &[f64],
             _: &[f64],
             _: &[usize],
             _: usize,
-        ) -> std::result::Result<HistogramBuffer, ClearGbmError> {
+        ) -> Result<HistogramBuffer, ClearGbmError> {
             Err(ClearGbmError::EmptyInput {
                 context: "test injected error".to_string(),
             })
@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hooks_copy() -> std::result::Result<(), ClearGbmError> {
+    fn test_hooks_copy() -> Result<(), ClearGbmError> {
         let hooks1 = Hooks::default();
         let hooks2 = hooks1;
         // Both should work independently - verify by calling both
