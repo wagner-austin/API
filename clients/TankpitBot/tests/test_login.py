@@ -8,7 +8,7 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import ResponseProtocol
-from tankpit_bot.login import (
+from tankpit_bot.browser.login import (
     ensure_on_play_page,
     handle_account_login,
     handle_guest_login,
