@@ -1,7 +1,7 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: lint test check rust-lint rust-test rust-cov python-lint python-test setup
+.PHONY: lint test check rust-lint rust-test rust-cov python-lint python-test setup guard
 
 # Setup: create venv and install dev dependencies with uv
 setup:
@@ -17,9 +17,9 @@ rust-lint:
 rust-test:
 	cargo test --all-features
 
-# Rust coverage (requires cargo-llvm-cov)
+# Rust coverage (requires cargo-llvm-cov) - 100% lines AND regions
 rust-cov:
-	cargo llvm-cov --all-features --fail-under-lines 100
+	cargo llvm-cov --all-features --fail-under-lines 100 --fail-under-regions 100
 
 # Python linting: ruff + mypy + guard
 python-lint:
@@ -34,11 +34,15 @@ python-test:
 	@if (-not (Test-Path ".venv")) { uv venv; uv pip install -e ".[dev]" }
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("python","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; .venv\Scripts\pytest -n auto -v @covArgs
 
+# Run monorepo guards for this crate
+guard:
+	@python -c "import sys; sys.path.insert(0, '../../libs/monorepo_guards/src'); from monorepo_guards.orchestrator import run_for_project; from pathlib import Path; sys.exit(run_for_project(Path('../..').resolve(), Path('.').resolve()))"
+
 # Lint (Rust only for this crate)
 lint: rust-lint
 
 # Test (Rust only for this crate)
 test: rust-test
 
-# Full check: lint, test, then coverage
-check: lint test rust-cov
+# Full check: guard, lint, test, then coverage
+check: guard lint test rust-cov
