@@ -7,7 +7,7 @@ from collections.abc import Callable
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
-from tankpit_bot.dom_scraper import (
+from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
     GameLogState,
