@@ -8,9 +8,8 @@ import pytest
 from cleargbm_rs import __version__, build_histogram_rs
 
 
-def test_version_is_string() -> None:
-    """Version should be a string."""
-    assert isinstance(__version__, str)
+def test_version_value() -> None:
+    """Version should be the expected value."""
     assert __version__ == "0.1.0"
 
 
