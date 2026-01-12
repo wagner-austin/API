@@ -1,0 +1,593 @@
+"""Container message types and enumerations.
+
+This module contains all TypedDict definitions for container messages and
+enumerations for message types and decode levels.
+"""
+
+from __future__ import annotations
+
+from enum import IntEnum, auto
+from typing import Literal, TypedDict
+
+
+class ContainerMessageType(IntEnum):
+    """Types of messages found inside 0x2E containers.
+
+    Identified by structure, not subtype byte value.
+    """
+
+    UNKNOWN = 0
+    COMBAT_HIT = auto()
+    TANK_REGISTRY = auto()
+    MOVEMENT = auto()
+    POSITION_UPDATE = auto()
+    TANK_STATUS_SHORT = auto()
+    TANK_UPDATE_COMPACT = auto()
+    TANK_UPDATE_EXTENDED = auto()
+    TANK_UPDATE_FULL = auto()
+    TANK_STATUS_SYNC = auto()
+    TANK_LEAVE = auto()
+    PLAYER_LIST_SHORT = auto()
+    PLAYER_LIST_EXTENDED = auto()
+    DEACTIVATION_KILL = auto()
+    DEACTIVATION_DEATH = auto()
+    TELEPORT_LANDED = auto()
+    CONTAINER_PICKUP = auto()
+    RADAR_RESPONSE = auto()
+    TIP_NOTIFICATION = auto()
+    CHUNK_DATA = auto()
+    WORLD_STATE = auto()
+
+
+class DecodeLevel(IntEnum):
+    """Decode understanding level for message types.
+
+    Used to calculate decode coverage percentage in stats.
+    The integer value represents the weight for coverage calculation.
+
+    Levels:
+        UNKNOWN: Message type not recognized (0 points).
+        IDENTIFIED: Type known but fields not decoded (25 points).
+        PARTIAL: Key fields decoded but some unknown (50 points).
+        FULL: All fields fully decoded and understood (100 points).
+    """
+
+    UNKNOWN = 0
+    IDENTIFIED = 25
+    PARTIAL = 50
+    FULL = 100
+
+
+# =============================================================================
+# Decode Level Registry
+# =============================================================================
+# Maps each message type to its decode understanding level.
+# This is the single source of truth for stats coverage calculation.
+
+MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
+    ContainerMessageType.UNKNOWN: DecodeLevel.UNKNOWN,
+    # Fully decoded message types (all fields understood)
+    ContainerMessageType.COMBAT_HIT: DecodeLevel.FULL,
+    ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
+    ContainerMessageType.MOVEMENT: DecodeLevel.FULL,
+    ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
+    ContainerMessageType.TANK_STATUS_SHORT: DecodeLevel.FULL,
+    ContainerMessageType.TANK_UPDATE_COMPACT: DecodeLevel.FULL,
+    ContainerMessageType.TANK_UPDATE_EXTENDED: DecodeLevel.FULL,
+    ContainerMessageType.TANK_UPDATE_FULL: DecodeLevel.FULL,
+    ContainerMessageType.TANK_STATUS_SYNC: DecodeLevel.FULL,
+    ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
+    ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
+    ContainerMessageType.PLAYER_LIST_EXTENDED: DecodeLevel.FULL,
+    ContainerMessageType.DEACTIVATION_KILL: DecodeLevel.FULL,
+    ContainerMessageType.DEACTIVATION_DEATH: DecodeLevel.FULL,
+    ContainerMessageType.TELEPORT_LANDED: DecodeLevel.FULL,
+    ContainerMessageType.CONTAINER_PICKUP: DecodeLevel.FULL,
+    ContainerMessageType.RADAR_RESPONSE: DecodeLevel.FULL,
+    # Identified but not fully decoded (type known, structure partial)
+    ContainerMessageType.TIP_NOTIFICATION: DecodeLevel.IDENTIFIED,
+    ContainerMessageType.CHUNK_DATA: DecodeLevel.IDENTIFIED,
+    ContainerMessageType.WORLD_STATE: DecodeLevel.IDENTIFIED,
+}
+
+
+def get_decode_level(msg_type: ContainerMessageType) -> DecodeLevel:
+    """Get the decode understanding level for a message type.
+
+    Returns the level from MESSAGE_TYPE_LEVELS registry.
+    This is used by stats calculation to determine coverage percentage.
+
+    Args:
+        msg_type: The container message type to look up.
+
+    Returns:
+        The decode level for the message type.
+        Returns DecodeLevel.UNKNOWN if type not in registry.
+    """
+    return MESSAGE_TYPE_LEVELS.get(msg_type, DecodeLevel.UNKNOWN)
+
+
+# =============================================================================
+# Combat Messages
+# =============================================================================
+
+
+class CombatHitDict(TypedDict):
+    """Combat hit event decoded from 0x2E container.
+
+    Structure (verified from captures):
+      [subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:6-7] [terminator:1]
+
+    The subtype and terminator bytes are the same value (XOR-dependent).
+    Direction 0x09 indicates outgoing hit (you attacked), other values indicate incoming.
+    """
+
+    msg_type: Literal["combat_hit"]
+    direction: int
+    attacker_id: int
+    combat_data: bytes
+    is_outgoing: bool
+
+
+class DeactivationKillDict(TypedDict):
+    """Deactivation event when you killed another tank.
+
+    Structure (5 bytes, verified from captures):
+      [subtype:1] [victim_id:2 LE] [killer_id:2 LE]
+
+    Subtype is 0x41 ('A') after XOR decode.
+    Sent when another tank is deactivated by you.
+    """
+
+    msg_type: Literal["deactivation_kill"]
+    victim_id: int
+    killer_id: int
+
+
+class DeactivationDeathDict(TypedDict):
+    """Deactivation event when you were killed by another tank.
+
+    Structure (7 bytes, verified from captures):
+      [subtype:1] [flags:1] [killer_id:2 LE] [extra:3]
+
+    Subtype is 0x43 ('C') after XOR decode.
+    Sent when you are deactivated by another tank.
+    """
+
+    msg_type: Literal["deactivation_death"]
+    flags: int
+    killer_id: int
+    extra_data: bytes
+
+
+# =============================================================================
+# Tank Messages
+# =============================================================================
+
+
+class TankRegistryDict(TypedDict):
+    """Tank registry entry decoded from 0x2E container.
+
+    Structure (16-20 bytes, verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]
+
+    For tanks (tank_id < 1000):
+      info_bytes structure:
+        Standard (flags & 0x2C == 0): [rank_badges:1][zeros:4][unk:2][name]
+        Extended (flags & 0x2C != 0): [rank_badges:1][zeros:4][pos:2][unk:3][name]
+
+      rank_badges byte encoding:
+        bits 0-2: military rank (0=recruit...7=colonel, overflow for general)
+        bits 3-7: badge/award count
+
+    For containers (tank_id >= 1000):
+      Equipment/fuel containers on the map are encoded as "tanks".
+      info_bytes structure: [y:1][viewport_x:1][type_data:10-14]
+      - y is absolute map coordinate
+      - viewport_x is relative to player position (player at center ~3)
+      - To get absolute x: map_x = player_x + (viewport_x - 3)
+
+    Team encoded in flags lower 2 bits: 0=red, 1=purple, 2=blue, 3=orange.
+    """
+
+    msg_type: Literal["tank_registry"]
+    flags: int
+    tank_id: int
+    info_bytes: bytes
+    team: str
+    tank_name: str
+    military_rank: int
+    badge_count: int
+    is_bot: bool
+    is_container: bool
+    container_x: int | None  # Absolute x - requires player position to calculate
+    container_y: int | None  # Absolute y coordinate
+    container_viewport_x: int | None  # Viewport-relative x (player at center ~3)
+
+
+class TankStatusShortDict(TypedDict):
+    """Enemy tank status with HP and rank from 0x2E container.
+
+    Structure (9 bytes, verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [damage_state:1] [rank:1] [lb_pos:2 LE] [extra:1]
+
+    The damage_state controls how dark the enemy tank name appears (0=full to 3=critical).
+    The rank is 0-7 (recruit to general).
+    """
+
+    msg_type: Literal["tank_status_short"]
+    flags: int
+    tank_id: int
+    damage_state: int
+    rank: int
+    leaderboard_position: int
+
+
+class TankUpdateCompactDict(TypedDict):
+    """Compact tank update from 0x2E container (10 bytes).
+
+    Structure (verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]
+
+    Compact status update for tanks, possibly viewport entry notification.
+    """
+
+    msg_type: Literal["tank_update_compact"]
+    flags: int
+    tank_id: int
+    status_data: bytes
+
+
+class TankUpdateExtendedDict(TypedDict):
+    """Extended tank update from 0x2E container (14 bytes).
+
+    Structure (verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]
+
+    Extended status update with additional tank information.
+    """
+
+    msg_type: Literal["tank_update_extended"]
+    flags: int
+    tank_id: int
+    status_data: bytes
+
+
+class TankUpdateFullDict(TypedDict):
+    """Full tank update from 0x2E container (15 bytes).
+
+    Structure (verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]
+
+    Full status update with complete tank information.
+    """
+
+    msg_type: Literal["tank_update_full"]
+    flags: int
+    tank_id: int
+    status_data: bytes
+
+
+class TankStatusSyncDict(TypedDict):
+    """Tank status sync/heartbeat decoded from 0x2E container.
+
+    Structure:
+      [subtype:1] [sync_data:1-2]
+
+    Short sync messages for keepalive or state confirmation.
+    """
+
+    msg_type: Literal["tank_status_sync"]
+    sync_data: bytes
+
+
+class TankLeaveDict(TypedDict):
+    """Tank leave event decoded from 0x2E container.
+
+    Structure (6 bytes, verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [extra:2]
+
+    Sent when a player leaves/disconnects from the game.
+    Tank ID at bytes[2:4] as little-endian u16.
+    """
+
+    msg_type: Literal["tank_leave"]
+    tank_id: int
+    flags: int
+    extra_data: bytes
+
+
+# =============================================================================
+# Position/Movement Messages
+# =============================================================================
+
+
+class PositionUpdateDict(TypedDict):
+    """Position/status update decoded from 0x2E container.
+
+    Structure (verified from captures):
+      [subtype:1] [flags:1] [tank_id:2 LE] [x:1] [y:1] [extra:7]
+
+    Periodic position and status updates for tanks.
+    x,y are map grid coordinates (0-127 range).
+    """
+
+    msg_type: Literal["position_update"]
+    flags: int
+    tank_id: int
+    x: int
+    y: int
+    extra_data: bytes
+
+
+class MovementDict(TypedDict):
+    """Movement/waypoint path decoded from 0x2E container.
+
+    Structure (variable length, 14-50+ bytes):
+      [0]     subtype (0x47 'G')
+      [1]     flags (0x7E=self, 0x1E=enemy - bits 5-6 differ)
+      [2-3]   packed_position: (start_x << 8) | low_byte
+      [4]     start_y: Y coordinate
+      [5-7]   unknown (often 0x08 0x01 0x00)
+      [8-11]  player_id: LE uint32 (session-specific, correlates with tank_id)
+      [12+]   waypoints: direction characters (w/s/n/e)
+
+    The waypoints are direction characters indicating the path:
+      - 'w' (0x77) = west
+      - 's' (0x73) = south
+      - 'n' (0x6e) = north
+      - 'e' (0x65) = east
+
+    Example: "eeenn" = move east, east, east, north, north (5 tiles).
+
+    Note: player_id is NOT the same as tank_id from TankRegistry/MovementResponse,
+    but correlates consistently per session. Use PlayerIdMapper to resolve tank_id.
+    """
+
+    msg_type: Literal["movement"]
+    flags: int
+    start_x: int
+    start_y: int
+    player_id: int
+    tank_id: int | None  # Resolved via PlayerIdMapper, None if unknown
+    waypoints: str
+    is_self: bool
+
+
+# =============================================================================
+# Radar Messages
+# =============================================================================
+
+
+class RadarContainerDict(TypedDict):
+    """Single container entry in radar response.
+
+    volume: -1 for equipment, >=0 for fuel amount.
+    """
+
+    x: int
+    y: int
+    volume: int
+
+
+class RadarMineDict(TypedDict):
+    """Single mine entry in radar response.
+
+    team: 0=red, 1=purple, 2=blue, 3=orange.
+    """
+
+    x: int
+    y: int
+    team: int
+
+
+class RadarResponseDict(TypedDict):
+    """Radar response showing nearby containers and mines.
+
+    Structure:
+      [0x4F:1] [container_count:1] [flags:1]
+      [containers: count * 4 bytes] [mines: remaining / 3 bytes]
+
+    Container entry (4 bytes):
+      [x:1] [y:1] [volume:2 LE]
+      - volume = 0xFFFF: Equipment container (stored as -1)
+      - volume = other: Fuel container with that volume
+
+    Mine entry (3 bytes):
+      [x:1] [y:1] [team:1]
+      - team: 0=red, 1=purple, 2=blue, 3=orange
+    """
+
+    msg_type: Literal["radar_response"]
+    container_count: int
+    containers: list[RadarContainerDict]
+    mines: list[RadarMineDict]
+
+
+# =============================================================================
+# Player List Messages
+# =============================================================================
+
+
+class PlayerListShortDict(TypedDict):
+    """Short player list response decoded from 0x2E container.
+
+    Structure (4 bytes, verified from captures):
+      [subtype:1] [data:3]
+
+    Sent in response to pressing '/' key (active players query).
+    Contains count or summary of active players.
+    """
+
+    msg_type: Literal["player_list_short"]
+    response_data: bytes
+
+
+class PlayerListExtendedDict(TypedDict):
+    """Extended player list response decoded from 0x2E container.
+
+    Structure (7 bytes, verified from captures):
+      [subtype:1] [base_data:3] [extended_data:3]
+
+    Sent when multiple players are active.
+    First 4 bytes match short format, with 3 additional bytes.
+    """
+
+    msg_type: Literal["player_list_extended"]
+    response_data: bytes
+    extended_data: bytes
+
+
+# =============================================================================
+# Miscellaneous Messages
+# =============================================================================
+
+
+class TeleportLandedDict(TypedDict):
+    """Teleport landed confirmation container message.
+
+    Structure (1 byte):
+      [subtype:1] (0x0C = 12)
+
+    Sent by server after teleport completes and tank has landed at new location.
+    Arrives 150-2000ms after teleport initiated, just before UI updates position.
+    """
+
+    msg_type: Literal["teleport_landed"]
+    subtype: int
+
+
+class ContainerPickupDict(TypedDict):
+    """Container pickup event.
+
+    Structure (5 bytes):
+      [subtype:1] [x:1] [y:1] [volume:2 LE]
+
+    Sent when a container is picked up.
+    - volume = 0: Equipment container
+    - volume > 0: Fuel container (volume = fuel received)
+    """
+
+    msg_type: Literal["container_pickup"]
+    x: int
+    y: int
+    volume: int
+    is_fuel: bool
+
+
+class TipNotificationDict(TypedDict):
+    """Tip/notification container message.
+
+    Structure (29-79 bytes):
+      [subtype:1] [notification_data:28-78]
+
+    Contains UI tips and game notifications.
+    """
+
+    msg_type: Literal["tip_notification"]
+    subtype: int
+    length: int
+    notification_data: bytes
+
+
+class ChunkDataDict(TypedDict):
+    """Chunk data container message.
+
+    Structure (80-130 bytes):
+      [subtype:1] [chunk_data:79-129]
+
+    Contains map/terrain chunk data.
+    """
+
+    msg_type: Literal["chunk_data"]
+    subtype: int
+    length: int
+    chunk_data: bytes
+
+
+class WorldStateDict(TypedDict):
+    """World state container message.
+
+    Structure (500+ bytes):
+      [subtype:1] [world_data:499+]
+
+    Contains full world/map state data.
+    """
+
+    msg_type: Literal["world_state"]
+    subtype: int
+    length: int
+    world_data: bytes
+
+
+class UnknownContainerDict(TypedDict):
+    """Unknown container message that didn't match any known structure.
+
+    Preserved for debugging and future analysis.
+    """
+
+    msg_type: Literal["unknown_container"]
+    subtype: int
+    length: int
+    data: bytes
+
+
+# =============================================================================
+# Union Types
+# =============================================================================
+
+ContainerMessage = (
+    CombatHitDict
+    | TankRegistryDict
+    | MovementDict
+    | PositionUpdateDict
+    | TankStatusShortDict
+    | TankUpdateCompactDict
+    | TankUpdateExtendedDict
+    | TankUpdateFullDict
+    | TankStatusSyncDict
+    | TankLeaveDict
+    | PlayerListShortDict
+    | PlayerListExtendedDict
+    | DeactivationKillDict
+    | DeactivationDeathDict
+    | TeleportLandedDict
+    | ContainerPickupDict
+    | RadarResponseDict
+    | TipNotificationDict
+    | ChunkDataDict
+    | WorldStateDict
+    | UnknownContainerDict
+)
+
+
+__all__ = [
+    "MESSAGE_TYPE_LEVELS",
+    "ChunkDataDict",
+    "CombatHitDict",
+    "ContainerMessage",
+    "ContainerMessageType",
+    "ContainerPickupDict",
+    "DeactivationDeathDict",
+    "DeactivationKillDict",
+    "DecodeLevel",
+    "MovementDict",
+    "PlayerListExtendedDict",
+    "PlayerListShortDict",
+    "PositionUpdateDict",
+    "RadarContainerDict",
+    "RadarMineDict",
+    "RadarResponseDict",
+    "TankLeaveDict",
+    "TankRegistryDict",
+    "TankStatusShortDict",
+    "TankStatusSyncDict",
+    "TankUpdateCompactDict",
+    "TankUpdateExtendedDict",
+    "TankUpdateFullDict",
+    "TeleportLandedDict",
+    "TipNotificationDict",
+    "UnknownContainerDict",
+    "WorldStateDict",
+    "get_decode_level",
+]
