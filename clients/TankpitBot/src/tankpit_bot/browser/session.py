@@ -1,17 +1,14 @@
-"""Shared browser session management for WebSocket capture.
+"""Browser session management for WebSocket capture.
 
 Provides a base class that handles:
 - Playwright browser launch and CDP setup
 - WebSocket event handlers and message capture
 - Magic key capture for XOR decoding
 - Login flow integration
-
-Both sniffer.py and probe.py inherit from this to avoid code duplication.
 """
 
 from __future__ import annotations
 
-import base64
 import time
 import uuid
 from pathlib import Path
@@ -26,20 +23,25 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
     PageProtocol,
 )
-from tankpit_bot.combat import CombatEvent, CombatTracker
-from tankpit_bot.dom_scraper import (
+from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
 )
-from tankpit_bot.fuel_probe import (
-    FuelProber,
-    FuelProbeResult,
+from tankpit_bot.browser.fuel_probe import FuelProber, FuelProbeResult
+from tankpit_bot.browser.key_discovery import (
+    extract_xor_first_bytes,
+    find_best_static_byte,
+    load_static_key,
+    save_static_key,
 )
-from tankpit_bot.inventory import (
-    InventoryChange,
-    InventoryScraper,
+from tankpit_bot.browser.login import handle_login_flow
+from tankpit_bot.browser.types import (
+    STATIC_KEY_PATH,
+    GameNotJoinedError,
+    PlaywrightNotInstalledError,
 )
-from tankpit_bot.login import handle_login_flow
+from tankpit_bot.combat import CombatEvent, CombatTracker
+from tankpit_bot.inventory import InventoryChange, InventoryScraper
 from tankpit_bot.types import (
     CapturedMessage,
     MessageDirection,
@@ -48,159 +50,6 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
-
-# Known binary message signatures from TankPit protocol.
-# These are the first decoded byte of binary messages after XOR decoding.
-KNOWN_PROTOCOL_SIGNATURES: frozenset[int] = frozenset(
-    {
-        0x21,
-        0x28,
-        0x29,
-        0x2B,
-        0x2E,
-        0x2F,
-        0x3D,
-        0x3E,
-        0x3F,
-        0x41,
-        0x43,
-        0x45,
-        0x46,
-        0x47,
-        0x49,
-        0x4A,
-        0x4B,
-        0x4C,
-        0x4D,
-        0x4F,
-        0x52,
-        0x53,
-        0x54,
-        0x56,
-        0x58,
-        0x5A,
-        0x64,
-        0x67,
-        0x74,
-    }
-)
-
-# Text message type bytes that should be skipped during XOR analysis.
-TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x2B, 0x2D, 0x3D, 0x25, 0x2A, 0x7E})
-
-# Path to the static XOR key file.
-STATIC_KEY_PATH: Path = Path(__file__).parent.parent.parent / "xor_static_key.txt"
-
-# Expected length of the static XOR key.
-STATIC_KEY_LENGTH: int = 1000
-
-
-def extract_xor_first_bytes(messages: list[CapturedMessage]) -> list[int]:
-    """Extract first XOR-encoded bytes from binary messages.
-
-    Parses received messages, skips text messages, and extracts the first
-    XOR-encoded data byte from each binary message.
-
-    Args:
-        messages: List of captured WebSocket messages.
-
-    Returns:
-        List of first XOR-encoded bytes from binary messages.
-    """
-    raw_first_bytes: list[int] = []
-
-    for msg in messages:
-        if msg["direction"] != "received":
-            continue
-
-        payload_b64 = msg["payload"]
-        payload = base64.b64decode(payload_b64)
-
-        if len(payload) < 4:
-            continue
-
-        # First 2 bytes are length header, byte[2] is message type
-        msg_type = payload[2]
-
-        # Skip text messages
-        if msg_type in TEXT_MESSAGE_TYPES:
-            continue
-
-        # Binary messages have XOR-encoded data starting at byte[3]
-        raw_first_bytes.append(payload[3])
-
-    return raw_first_bytes
-
-
-def find_best_static_byte(raw_first_bytes: list[int], magic_first_byte: int) -> tuple[int, int]:
-    """Find the static key's first byte that maximizes known signature matches.
-
-    Brute-forces all 256 possible values to find which static[0] produces
-    the most known protocol signatures when XOR'd with captured data.
-
-    Args:
-        raw_first_bytes: First XOR-encoded bytes from binary messages.
-        magic_first_byte: ASCII value of magic key's first character.
-
-    Returns:
-        Tuple of (best_static_byte, match_count).
-    """
-    best_static_0 = 0
-    best_coverage = 0
-
-    for static_0 in range(256):
-        table_0 = static_0 ^ magic_first_byte
-        known_count = sum(
-            1 for raw_0 in raw_first_bytes if (raw_0 ^ table_0) in KNOWN_PROTOCOL_SIGNATURES
-        )
-        if known_count > best_coverage:
-            best_coverage = known_count
-            best_static_0 = static_0
-
-    return best_static_0, best_coverage
-
-
-def load_static_key() -> str:
-    """Load the static XOR key from file.
-
-    Returns:
-        The 1000-character static key.
-
-    Raises:
-        FileNotFoundError: If key file does not exist.
-        ValueError: If key is not exactly 1000 characters.
-    """
-    content = _test_hooks.read_text(STATIC_KEY_PATH)
-    key = content.strip()
-    if len(key) != STATIC_KEY_LENGTH:
-        raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
-    return key
-
-
-def save_static_key(key: str) -> None:
-    """Save the static XOR key to file.
-
-    Args:
-        key: The 1000-character static key.
-
-    Raises:
-        ValueError: If key is not exactly 1000 characters.
-    """
-    if len(key) != STATIC_KEY_LENGTH:
-        raise ValueError(f"Static key has {len(key)} chars, expected {STATIC_KEY_LENGTH}")
-    _test_hooks.write_text(STATIC_KEY_PATH, key + "\n")
-
-
-class BrowserError(Exception):
-    """Base error for browser operations."""
-
-
-class PlaywrightNotInstalledError(BrowserError):
-    """Raised when Playwright hook is not installed."""
-
-
-class GameNotJoinedError(BrowserError):
-    """Raised when game doesn't load properly."""
 
 
 def get_current_time_ms() -> int:
@@ -601,17 +450,6 @@ class BrowserSession:
         self._log_script_urls(page)
         self._capture_static_key(page)
 
-    def _capture_magic_key(self, page: PageProtocol) -> None:
-        """Capture tankpit.magic XOR key from page.
-
-        Args:
-            page: Playwright page.
-        """
-        magic_value = page.evaluate("tankpit.magic")
-        if isinstance(magic_value, str) and len(magic_value) > 0:
-            self._magic = magic_value
-            log.info("Captured magic key: %s...", magic_value[:20])
-
     def _capture_static_key(self, page: PageProtocol) -> None:
         """Extract static XOR key from tpclient JS source.
 
@@ -643,6 +481,11 @@ class BrowserSession:
             log.warning("Could not fetch tpclient JS content")
             return
 
+        # Save full JS file for protocol analysis
+        js_path = Path("tpclient.js")
+        js_path.write_text(js_content, encoding="utf-8")
+        log.info("Saved tpclient JS to %s (%d bytes)", js_path, len(js_content))
+
         # Extract 1000-char static key: any 1000-char quoted string
         match = re.search(r'"([^"]{1000})"', js_content)
         if not match:
@@ -673,7 +516,8 @@ class BrowserSession:
             return
 
         magic_0 = ord(self._magic[0])
-        best_static_0, best_coverage = find_best_static_byte(raw_first_bytes, magic_0)
+        finder = _test_hooks.find_best_static_byte or find_best_static_byte
+        best_static_0, best_coverage = finder(raw_first_bytes, magic_0)
 
         if best_coverage == 0:
             log.warning("Could not derive static key - no known signatures matched")
@@ -842,8 +686,6 @@ class BrowserSession:
             auto_join_room=auto_join_room,
         )
 
-        self._capture_magic_key(page)
-
     def _cleanup(
         self,
         cdp: CDPSessionProtocol,
@@ -866,15 +708,8 @@ class BrowserSession:
 
 
 __all__ = [
-    "BrowserError",
     "BrowserSession",
-    "GameNotJoinedError",
-    "PlaywrightNotInstalledError",
     "cdp_timestamp_to_ms",
-    "extract_xor_first_bytes",
-    "find_best_static_byte",
     "get_current_time_ms",
-    "load_static_key",
     "reset_cdp_time_offset",
-    "save_static_key",
 ]
