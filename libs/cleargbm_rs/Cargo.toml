@@ -30,46 +30,49 @@ proptest = "1.5"
 
 [lints.rust]
 unsafe_code = "forbid"
-missing_docs = "deny"
+missing_docs = "forbid"
 
 [lints.clippy]
-# All lints denied
-all = "deny"
-cargo = "deny"
+# All lints forbidden
+all = "forbid"
+cargo = "forbid"
 
 # No escape hatches (equivalent to no type: ignore, no noqa)
-allow_attributes = "deny"
-allow_attributes_without_reason = "deny"
+allow_attributes = "forbid"
+allow_attributes_without_reason = "forbid"
 
 # No silent failures (equivalent to no try/except recovery)
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-unreachable = "deny"
-todo = "deny"
-unimplemented = "deny"
+unwrap_used = "forbid"
+expect_used = "forbid"
+panic = "forbid"
+unreachable = "forbid"
+todo = "forbid"
+unimplemented = "forbid"
+
+# No lazy error propagation - forces explicit error handling
+question_mark_used = "forbid"
 
 # No unsafe conversions (equivalent to no cast())
-as_conversions = "deny"
-cast_possible_truncation = "deny"
-cast_sign_loss = "deny"
-cast_precision_loss = "deny"
-cast_possible_wrap = "deny"
+as_conversions = "forbid"
+cast_possible_truncation = "forbid"
+cast_sign_loss = "forbid"
+cast_precision_loss = "forbid"
+cast_possible_wrap = "forbid"
 
 # No implicit behavior
-default_numeric_fallback = "deny"
-implicit_clone = "deny"
+default_numeric_fallback = "forbid"
+implicit_clone = "forbid"
 
 # Explicit error handling
-result_unit_err = "deny"
-map_err_ignore = "deny"
+result_unit_err = "forbid"
+map_err_ignore = "forbid"
 
 # Code quality
-clone_on_ref_ptr = "deny"
-redundant_closure_for_method_calls = "deny"
-manual_let_else = "deny"
-needless_pass_by_value = "deny"
+clone_on_ref_ptr = "forbid"
+redundant_closure_for_method_calls = "forbid"
+manual_let_else = "forbid"
+needless_pass_by_value = "forbid"
 
 # Documentation
-missing_docs_in_private_items = "deny"
-missing_errors_doc = "deny"
+missing_docs_in_private_items = "forbid"
+missing_errors_doc = "forbid"
