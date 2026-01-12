@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
+from tankpit_bot.browser import GameLogEntry, GameLogScraper
 from tankpit_bot.combat import CombatEvent, CombatStats, CombatTracker, EntityPairStats
-from tankpit_bot.dom_scraper import GameLogEntry, GameLogScraper
 from tankpit_bot.game_state import (
     GameStateManager,
     GameStateSnapshot,
