@@ -42,7 +42,52 @@ def _real_is_dir(path: Path) -> bool:
 is_dir: IsDirProtocol = _real_is_dir
 
 
+class GetScriptPathProtocol(Protocol):
+    """Protocol for getting the script path."""
+
+    def __call__(self) -> Path:
+        """Get the script path.
+
+        Returns:
+            Path to the guard script.
+        """
+        ...
+
+
+_SCRIPT_PATH: Path | None = None
+
+
+def _real_get_script_path() -> Path:
+    """Real implementation returning the actual guard.py path.
+
+    Returns:
+        Path to the guard script.
+
+    Raises:
+        RuntimeError: If script path not set.
+    """
+    if _SCRIPT_PATH is None:
+        raise RuntimeError("Script path not set - call set_script_path first")
+    return _SCRIPT_PATH
+
+
+def set_script_path(path: Path) -> None:
+    """Set the script path for production use.
+
+    Args:
+        path: Path to the guard script.
+    """
+    global _SCRIPT_PATH
+    _SCRIPT_PATH = path
+
+
+get_script_path: GetScriptPathProtocol = _real_get_script_path
+
+
 __all__ = [
+    "GetScriptPathProtocol",
     "IsDirProtocol",
+    "get_script_path",
     "is_dir",
+    "set_script_path",
 ]

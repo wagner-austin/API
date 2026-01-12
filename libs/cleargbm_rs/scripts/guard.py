@@ -13,6 +13,9 @@ from typing import Protocol
 
 from scripts import _test_hooks
 
+# Set script path at module load time for production
+_test_hooks.set_script_path(Path(__file__).resolve())
+
 
 class _RunForProject(Protocol):
     """Protocol for the orchestrator's run_for_project function."""
@@ -78,7 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Exit code (0 for success).
     """
-    script_path = Path(__file__).resolve()
+    script_path = _test_hooks.get_script_path()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root(project_root)
     run_for_project = _load_orchestrator(monorepo_root)
