@@ -108,9 +108,9 @@ cp .env.example .env
 
 **94% signature coverage, 92% fully decoded**
 
-- 31+ message types documented in `protocol.py`
+- 31+ message types documented in `protocol/types.py`
 - Length-based identification for session-independent decoding
-- Container decoder (`container_decoder.py`) for 0x2E subtypes
+- Container decoder (`container/`) for 0x2E subtypes
 - See `docs/decoding_status.md` for detailed message formats
 
 ### Fully Decoded Messages
@@ -193,51 +193,115 @@ TankpitBot/
 ├── src/tankpit_bot/
 │   ├── __init__.py           # Package exports
 │   ├── _test_hooks.py        # Dependency injection hooks
-│   ├── types.py              # TypedDict models + JSON encoders
-│   ├── login.py              # Shared guest/account login logic
-│   ├── browser.py            # Shared browser session base class
-│   ├── sniffer.py            # WebSocket capture via Playwright
-│   ├── probe.py              # Input injection and command discovery
-│   ├── codec.py              # XOR encode/decode with static + session keys
-│   ├── framing.py            # 2-byte length framing encode/decode
-│   ├── decoder.py            # Session decoder for captured data
-│   ├── state_decoder.py      # Game state message decoder
-│   ├── parser.py             # Lobby message parser (room list, etc.)
-│   ├── protocol.py           # Protocol message TypedDicts + decoders
-│   ├── container_decoder.py  # 0x2E container subtype decoder (length-based)
-│   ├── commands.py           # Command type definitions
-│   ├── dom_scraper.py        # DOM scraping for game log
-│   ├── fuel_probe.py         # Fuel bar probing
-│   ├── inventory.py          # Inventory tracking
+│   ├── bot.py                # Bot client entry point
 │   ├── combat.py             # Combat event tracking
+│   ├── decoder.py            # Session decoder for captured data
 │   ├── game_state.py         # Game state management
-│   └── bot.py                # Bot client entry point
+│   ├── inventory.py          # Inventory tracking
+│   ├── parser.py             # Lobby message parser (room list, etc.)
+│   ├── probe.py              # Input injection and command discovery
+│   ├── state_decoder.py      # Game state message decoder
+│   ├── terrain.py            # Terrain/map decoding
+│   │
+│   ├── browser/              # Browser automation package
+│   │   ├── __init__.py
+│   │   ├── dom_scraper.py    # DOM scraping for game log
+│   │   ├── fuel_probe.py     # Fuel bar probing
+│   │   ├── key_discovery.py  # Key binding discovery
+│   │   ├── login.py          # Guest/account login logic
+│   │   ├── session.py        # BrowserSession base class
+│   │   └── types.py          # Browser-specific types
+│   │
+│   ├── capture/              # WebSocket capture package
+│   │   ├── __init__.py
+│   │   ├── signature.py      # Message signature extraction
+│   │   ├── stats.py          # Capture statistics
+│   │   ├── summary.py        # Session summary generation
+│   │   ├── xor.py            # XOR utilities for capture
+│   │   └── trackers/         # Message trackers
+│   │       ├── combat.py     # Combat event tracker
+│   │       ├── container.py  # Container message tracker
+│   │       ├── equipment.py  # Equipment tracker
+│   │       ├── fuel.py       # Fuel deposit tracker
+│   │       ├── items.py      # Item pickup tracker
+│   │       ├── mine.py       # Mine event tracker
+│   │       ├── position.py   # Position tracker
+│   │       ├── radar.py      # Radar result tracker
+│   │       └── tank.py       # Tank info tracker
+│   │
+│   ├── container/            # Container decoder package
+│   │   ├── __init__.py
+│   │   ├── helpers.py        # Container decoding helpers
+│   │   ├── identification.py # Length-based identification
+│   │   ├── mapper.py         # Container type mapping
+│   │   ├── types.py          # Container TypedDicts
+│   │   └── decoders/         # Subtype decoders
+│   │       ├── combat.py     # Combat container decoder
+│   │       ├── misc.py       # Misc container decoders
+│   │       ├── position.py   # Position container decoder
+│   │       ├── radar.py      # Radar container decoder
+│   │       └── tank.py       # Tank container decoder
+│   │
+│   ├── protocol/             # Protocol encoding package
+│   │   ├── __init__.py
+│   │   ├── codec.py          # XOR encode/decode with static + session keys
+│   │   ├── commands.py       # Command type definitions
+│   │   ├── constants.py      # Protocol constants
+│   │   ├── framing.py        # 2-byte length framing encode/decode
+│   │   ├── helpers.py        # Protocol helpers
+│   │   ├── types.py          # Protocol TypedDicts
+│   │   └── decoders/         # Message decoders
+│   │       ├── combat.py     # Combat message decoder
+│   │       ├── misc.py       # Misc message decoders
+│   │       ├── movement.py   # Movement message decoder
+│   │       ├── radar.py      # Radar message decoder
+│   │       ├── resources.py  # Resource message decoder
+│   │       ├── tank.py       # Tank message decoder
+│   │       ├── text.py       # Text message decoder
+│   │       └── world.py      # World/viewport decoder
+│   │
+│   ├── sniffer/              # WebSocket sniffer package
+│   │   ├── __init__.py
+│   │   ├── constants.py      # Sniffer constants
+│   │   ├── core.py           # Core sniffer logic
+│   │   ├── decoders.py       # Sniffer message decoders
+│   │   ├── formatters.py     # Output formatters
+│   │   ├── player_tracking.py # Player tracking
+│   │   ├── trackers.py       # Tracker coordination
+│   │   ├── viewport.py       # Viewport handling
+│   │   ├── world_state.py    # World state management
+│   │   └── xor.py            # XOR utilities for sniffer
+│   │
+│   ├── state/                # Game state package
+│   │   ├── __init__.py
+│   │   ├── mutations.py      # State mutations
+│   │   ├── renderer.py       # State rendering
+│   │   └── types.py          # State TypedDicts
+│   │
+│   └── types/                # Shared types package
+│       ├── __init__.py       # Re-exports all types
+│       ├── cdp.py            # CDP WebSocket frame types
+│       ├── config.py         # SnifferConfig, BotConfig
+│       ├── literals.py       # Literal types + validation helpers
+│       ├── message.py        # CapturedMessage, WebSocketInfo
+│       ├── probe.py          # Probe input/result types
+│       └── session.py        # CaptureSession, SessionSummary
+│
 ├── tests/
-│   ├── conftest.py               # Test fixtures (FakeEnv, FakeCDPSessionSimple)
-│   ├── fakes.py                  # Fake Playwright classes for testing
-│   ├── test_types.py             # Type encode/decode tests
-│   ├── test_login.py             # Login flow tests
-│   ├── test_browser.py           # BrowserSession + XOR key tests
-│   ├── test_sniffer.py           # Sniffer tests with fake Playwright
-│   ├── test_probe.py             # Probe tests with fake CDP
-│   ├── test_codec.py             # XOR codec tests
-│   ├── test_framing.py           # Framing encode/decode tests
-│   ├── test_decoder.py           # Session decoder tests
-│   ├── test_state_decoder.py     # State decoder tests
-│   ├── test_parser.py            # Lobby message parser tests
-│   ├── test_protocol.py          # Protocol message decoder tests
-│   ├── test_container_decoder.py # Container subtype decoder tests
-│   ├── test_commands.py          # Command type tests
-│   ├── test_fuel_probe.py        # Fuel probe tests
-│   ├── test_bot.py               # Bot entry point tests
-│   ├── test_test_hooks.py        # Hook function tests
-│   └── test_guard_checks.py      # Guard script tests
+│   ├── conftest.py           # Test fixtures
+│   ├── fakes.py              # Fake Playwright classes
+│   ├── capture/              # Capture tracker tests
+│   ├── sniffer/              # Sniffer tests
+│   └── ...                   # Module tests
+│
 ├── scripts/
 │   ├── guard.py              # Monorepo guard orchestrator
 │   └── _test_hooks.py        # Guard test hooks
+│
 ├── docs/
 │   ├── protocol.md           # Protocol documentation
 │   └── decoding_status.md    # Message decoding status + formats
+│
 ├── pyproject.toml            # Poetry + tool config
 └── Makefile                  # Development commands
 ```
@@ -246,9 +310,23 @@ TankpitBot/
 
 ## Architecture
 
+### Modular Package Design
+
+The codebase is organized into focused packages:
+
+| Package | Purpose |
+|---------|---------|
+| `browser/` | Playwright automation, CDP setup, login flows |
+| `protocol/` | XOR codec, framing, command encoding |
+| `capture/` | Message capture, trackers, statistics |
+| `container/` | 0x2E container subtype decoding |
+| `sniffer/` | Live WebSocket analysis and formatting |
+| `state/` | Game state management and rendering |
+| `types/` | Shared TypedDict models and validation |
+
 ### Shared BrowserSession Base Class
 
-Both sniffer and probe inherit from `BrowserSession` which provides:
+Both sniffer and probe inherit from `browser.BrowserSession` which provides:
 
 - **CDP Setup**: WebSocket event handlers for frame capture
 - **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
@@ -338,17 +416,17 @@ def read_text(path: Path) -> str:
 # Tests can patch these functions directly
 ```
 
-### Type Models
+### Type Models (`types/` package)
 
 ```python
-# Captured WebSocket message
+# types/message.py - Captured WebSocket message
 class CapturedMessage(TypedDict):
     timestamp_ms: int
     direction: MessageDirection  # Literal["sent", "received"]
     payload: str
     ws_url: str
 
-# Complete capture session
+# types/session.py - Complete capture session
 class CaptureSession(TypedDict):
     session_id: str
     start_timestamp_ms: int
