@@ -8,7 +8,7 @@ Tankpit uses WebSocket connections for real-time game communication. Since no pu
 
 ## Shared Architecture
 
-Both sniffer and probe inherit from `BrowserSession` (in `browser.py`) which provides:
+Both sniffer and probe inherit from `BrowserSession` (in `browser/session.py`) which provides:
 
 - **CDP Setup**: WebSocket event handlers for frame capture
 - **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
@@ -207,12 +207,12 @@ The `magic` field contains the session-specific XOR key captured from `tankpit.m
 
 ## Type Definitions
 
-All protocol types are defined in `src/tankpit_bot/types.py`:
+All protocol types are defined in `src/tankpit_bot/types/`:
 
-- `CapturedMessage`: Single WebSocket frame
-- `CaptureSession`: Complete capture with metadata
-- `CDPWebSocketCreatedEvent`: CDP event for new connections
-- `CDPWebSocketFrameEvent`: CDP event for frame data
+- `CapturedMessage`: Single WebSocket frame (`types/message.py`)
+- `CaptureSession`: Complete capture with metadata (`types/session.py`)
+- `CDPWebSocketCreatedEvent`: CDP event for new connections (`types/cdp.py`)
+- `CDPWebSocketFrameEvent`: CDP event for frame data (`types/cdp.py`)
 
 ## Discovered Protocol Format
 
@@ -788,14 +788,14 @@ Solution: Use a registered account with `TANKPIT_USERNAME` and `TANKPIT_PASSWORD
 1. ~~Add live decode to sniffer~~ ✓
 2. ~~Capture XOR magic key from tankpit.magic~~ ✓
 3. ~~Implement protocol encoder/decoder module~~ ✓
-   - `codec.py` - XOR encode/decode with static + session keys
-   - `framing.py` - 2-byte length framing
+   - `protocol/codec.py` - XOR encode/decode with static + session keys
+   - `protocol/framing.py` - 2-byte length framing
    - `decoder.py` - Session decoder for captured data
    - `parser.py` - Lobby message parser
-   - `commands.py` - Command type definitions
+   - `protocol/commands.py` - Command type definitions
 4. ~~Implement container message decoder~~ ✓
-   - `container_decoder.py` - Length-based 0x2E subtype identification
-   - `protocol.py` - TypedDict message structures with msg_type literals
+   - `container/` - Length-based 0x2E subtype identification
+   - `protocol/types.py` - TypedDict message structures with msg_type literals
    - 13 container subtypes decoded (tank_registry, position_update, combat_hit, deactivation_kill, deactivation_death, etc.)
 5. Complete command discovery using live decode mode
 6. Build WebSocket client with connection management (`client.py`)

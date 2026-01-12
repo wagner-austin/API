@@ -4,9 +4,9 @@
 
 **94% signature coverage, 92% fully decoded**
 
-- 31+ message types in protocol.py
+- 31+ message types in `protocol/types.py`
 - Length-based identification for session-independent decoding
-- Container decoder (container_decoder.py) for 0x2E subtypes
+- Container decoder (`container/`) for 0x2E subtypes
 - Recent session: 54 messages, 92% signature matched, 82% fully understood
 - 3 messages recently captured (need full decoding: 0x28, 0x4C, 0x4D)
 
@@ -16,7 +16,7 @@
 
 XOR encoding with per-session magic keys makes byte-based message identification unreliable across sessions. Instead, we use **message length** for session-independent identification.
 
-### General Message Identification (sniffer.py)
+### General Message Identification (sniffer/)
 
 Used by `_identify_by_length()` for all received messages:
 
@@ -36,7 +36,7 @@ Used by `_identify_by_length()` for all received messages:
 | 15 | tank_update_full | FULL |
 | 16-20 | tank_registry | FULL |
 
-### Container Message Identification (container_decoder.py)
+### Container Message Identification (container/)
 
 For 0x2E container body decoding, some lengths require first-byte checks:
 
@@ -69,7 +69,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 - **FULL**: Complete field-by-field decoding with TypedDict structure
 - **IDENTIFIED**: Message type known, structure partially decoded
 
-**Implementation:** See `_identify_by_length()` in `sniffer.py` and `identify_container_type()` in `container_decoder.py`
+**Implementation:** See `_identify_by_length()` in `sniffer/` and `identify_container_type()` in `container/identification.py`
 
 ---
 
@@ -79,7 +79,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 |-----|------|-------|--------|
 | 0x21 | tank_info | 11+ | `team:u8 tank_id:u16 decoration:u32 score:u24 name:str` (NO rank!) |
 | 0x2B | promotion | TEXT | `+id\|name\|field\|flags\|team\|mode\|image\|year` |
-| 0x2E | container | var | Container wrapping various subtypes (see container_decoder.py) |
+| 0x2E | container | var | Container wrapping various subtypes (see `container/`) |
 | 0x3D | movement_response | 12 | `team:u8 tank_id:u16 x:u8 y:u8 dir:u8 [1B] rank:u8 score:u24BE [1B]` |
 | 0x3E | tank_status | 22 | See detailed format below |
 | 0x3F | sync | 3 | Heartbeat (no data) |
@@ -102,7 +102,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | 0x67 | equip_gain | 8 | `type:u8 armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` |
 | 0x74 | equip_toggle | 7 | `armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` (0=OFF,1=ON) |
 
-## 0x2E Container Subtypes (container_decoder.py)
+## 0x2E Container Subtypes (container/)
 
 Container messages (0x2E) wrap various subtypes. After XOR decode, identified by length and first byte:
 
@@ -228,7 +228,7 @@ Container messages (0x2E) wrap various subtypes. After XOR decode, identified by
 
 ### 0x2E Tank Leave (6 bytes)
 
-Sent when a tank leaves the game. Decoded in `container_decoder.py`.
+Sent when a tank leaves the game. Decoded in `container/`.
 
 ```
 [0]    u8    subtype (varies by session)
@@ -268,7 +268,7 @@ Response to pressing `/` key. Shows active players in room.
 
 ### 0x2E Deactivation Kill (5 bytes)
 
-Sent when you deactivate (kill) another tank. Decoded in `container_decoder.py`.
+Sent when you deactivate (kill) another tank. Decoded in `container/`.
 
 ```
 [0]    u8    subtype (0x41 'A' after XOR decode)
@@ -283,7 +283,7 @@ Sent when you deactivate (kill) another tank. Decoded in `container_decoder.py`.
 
 ### 0x2E Deactivation Death (7 bytes)
 
-Sent when you are deactivated (killed) by another tank. Decoded in `container_decoder.py`.
+Sent when you are deactivated (killed) by another tank. Decoded in `container/`.
 
 ```
 [0]    u8    subtype (0x43 'C' after XOR decode)
@@ -483,3 +483,119 @@ Server: 0x2E FUEL_STATE fuel=21843
 Server: 0x46 RADAR_ACK
 Server: 0x4F RADAR_RESULT 4 entities found
 ```
+
+---
+
+## Static Terrain from Minimap GIF (VERIFIED)
+
+**Problem:** 0x5A viewport updates only contain dynamic entities (tanks, containers), not static terrain (rocks, water).
+
+**Solution:** Static terrain data comes from minimap GIF files (`field##_r.gif`).
+
+### Terrain Detection from GIF
+
+The minimap GIF files are 256x256 pixels representing the full map. Each pixel's RGB value indicates terrain type:
+
+| Terrain | Color | Detection Rule |
+|---------|-------|----------------|
+| Rock (impassable) | Light green | `g > 140` |
+| Ground (passable) | Dark green | `g <= 140 and not water` |
+| Water | Dark blue | `b > 50 and r < 30 and g < 50` |
+
+**Coordinate mapping:** Game coordinates map DIRECTLY to image pixel coordinates (no transformation needed).
+- Game X (0-255) = Image X (0-255)
+- Game Y (0-255) = Image Y (0-255)
+
+### field42-r.gif Color Palette
+
+| RGB | Count | Terrain |
+|-----|-------|---------|
+| (60, 129, 85) | 50652 | Ground (dark green) |
+| (76, 161, 105) | 10934 | Rock (light green) |
+| (1, 10, 78) | 3950 | Water (dark blue) |
+
+### Implementation
+
+```python
+from tankpit_bot.terrain import TerrainMap, format_viewport
+
+tm = TerrainMap("field42-r.gif")
+terrain = tm.get_terrain(x, y)  # Returns "#", ".", or "W"
+grid = tm.render_viewport(player_x, player_y, 16, 16)
+```
+
+### Verified Rock Positions (field42)
+
+These positions were manually verified against the game client:
+- (133, 125), (133, 124), (134, 124), (134, 123), (135, 123), (135, 126), (136, 126)
+
+All correctly identified as rocks (`#`) by TerrainMap.
+
+**Status:** VERIFIED, implemented in `terrain.py`
+
+---
+
+## Active Investigations
+
+### Container Position Extraction (VERIFIED)
+
+**Problem:** Container position extraction needed correct formulas.
+
+**Solution implemented in `container/`:**
+- `info[0]` = y (ABSOLUTE map coordinate)
+- `info[1]` = viewport-relative x offset
+
+**TankRegistryDict fields:**
+- `container_y: int | None` - Absolute y coordinate (directly from info[0])
+- `container_viewport_x: int | None` - Viewport-relative x offset (from info[1])
+- `container_x: int | None` - Reserved for absolute x (requires viewport_left)
+
+**Formula for absolute container x:**
+```
+container_x = viewport_left + container_viewport_x
+```
+
+**How to get viewport_left:**
+From PositionUpdate messages for your tank:
+- `extra_data[0]` = player's viewport-relative x position
+- `pos.x` = player's absolute x position (first PositionUpdate has absolute coords)
+- `viewport_left = player_absolute_x - player_viewport_x`
+
+**Verified example (session 2026-01-06):**
+```
+PositionUpdate: tank=638 pos=(144,137) data=080303002e8700
+                                            ^^--- extra_data[0]=8 (player_viewport_x)
+
+player_absolute_x = 144
+player_viewport_x = 8
+viewport_left = 144 - 8 = 136
+
+TankRegistry: container y=143 vx=8
+container_x = 136 + 8 = 144 ✓ (matches known container at (144,143))
+```
+
+**Sniffer output format:** `container id={id} y={y} vx={viewport_x}`
+
+**Status:** VERIFIED
+
+### Self-Tank Position in PositionUpdate (CONFIRMED)
+
+**Finding:** Self-tank receives TWO PositionUpdate messages:
+1. First message: `pos=(absolute_x, absolute_y)` with `extra_data[0]` = viewport_x
+2. Second message: `pos=(3,3)` - always viewport-relative center position
+
+**Verified (2026-01-06):**
+```
+[PositionUpdate] tank=638 pos=(144,137) flags=0x02 data=080303002e8700  <- ABSOLUTE
+[PositionUpdate] tank=638 pos=(3,3) flags=0x02 data=002e8708000404      <- RELATIVE
+```
+
+**Key insight:** The viewport is FIXED (moves with arrow keys, not player).
+The player can be anywhere within the 16x16 viewport.
+
+**For self-tank absolute position, use:**
+1. First PositionUpdate message after join/teleport (has absolute coords)
+2. `GAME:LOCATION` text messages (e.g., "LOCATION: 144,137")
+3. `0x3D MovementResponse` has absolute coords
+
+**Status:** CONFIRMED
