@@ -13,6 +13,11 @@ def test_config_rule_detects_missing_mypy_files(tmp_path: Path) -> None:
     (repo / "tests").mkdir()
     (repo / "scripts").mkdir()
 
+    # Add Python files so directories are expected in config
+    (repo / "src" / "mod.py").write_text("x = 1", encoding="utf-8")
+    (repo / "tests" / "test_mod.py").write_text("y = 2", encoding="utf-8")
+    (repo / "scripts" / "run.py").write_text("z = 3", encoding="utf-8")
+
     pyproject = repo / "pyproject.toml"
     pyproject.write_text(
         """
@@ -27,10 +32,8 @@ disallow_any_unimported = true
     )
 
     rule = ConfigRule()
-    test_file = repo / "src" / "test.py"
-    test_file.write_text("x = 1", encoding="utf-8")
 
-    violations = rule.run([test_file])
+    violations = rule.run([repo / "src" / "mod.py"])
 
     mypy_violations = [v for v in violations if v.kind == "mypy-files-missing-dirs"]
     assert len(mypy_violations) == 1
@@ -45,6 +48,11 @@ def test_config_rule_detects_missing_ruff_src(tmp_path: Path) -> None:
     (repo / "tests").mkdir()
     (repo / "scripts").mkdir()
 
+    # Add Python files so directories are expected in config
+    (repo / "src" / "mod.py").write_text("x = 1", encoding="utf-8")
+    (repo / "tests" / "test_mod.py").write_text("y = 2", encoding="utf-8")
+    (repo / "scripts" / "run.py").write_text("z = 3", encoding="utf-8")
+
     pyproject = repo / "pyproject.toml"
     pyproject.write_text(
         """
@@ -55,10 +63,8 @@ src = ["src"]
     )
 
     rule = ConfigRule()
-    test_file = repo / "src" / "test.py"
-    test_file.write_text("x = 1", encoding="utf-8")
 
-    violations = rule.run([test_file])
+    violations = rule.run([repo / "src" / "mod.py"])
 
     ruff_violations = [v for v in violations if v.kind == "ruff-src-missing-dirs"]
     assert len(ruff_violations) == 1
