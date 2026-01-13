@@ -195,7 +195,9 @@ class AudioChunker:
         created: list[AudioChunk] = []
         for idx, seg in enumerate(segments):
             out_path = os.path.join(outdir, f"chunk_{idx:03d}.{ext}")
-            copy_cmd = [
+            # Always re-encode to ensure OpenAI compatibility (stream copy can produce
+            # malformed headers that OpenAI rejects as invalid format)
+            reencode_cmd = [
                 self._ffmpeg,
                 "-ss",
                 f"{seg['start']:.3f}",
@@ -203,51 +205,27 @@ class AudioChunker:
                 f"{seg['end']:.3f}",
                 "-i",
                 audio_path,
-                "-c",
-                "copy",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
                 "-y",
                 out_path,
             ]
-            self._logger.debug("Creating chunk (copy): %s", " ".join(copy_cmd))
+            self._logger.debug("Creating chunk (reencode): %s", " ".join(reencode_cmd))
             try:
-                proc_copy = _test_hooks.subprocess_run(
-                    copy_cmd, capture_output=True, text=True, timeout=180, check=True
+                proc_reencode = _test_hooks.subprocess_run(
+                    reencode_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    check=True,
                 )
-                _ = proc_copy  # Mark as used
-            except subprocess.CalledProcessError:
-                reencode_cmd = [
-                    self._ffmpeg,
-                    "-ss",
-                    f"{seg['start']:.3f}",
-                    "-to",
-                    f"{seg['end']:.3f}",
-                    "-i",
-                    audio_path,
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "128k",
-                    "-movflags",
-                    "+faststart",
-                    "-y",
-                    out_path,
-                ]
-                self._logger.debug("Creating chunk (reencode): %s", " ".join(reencode_cmd))
-                try:
-                    proc_reencode = _test_hooks.subprocess_run(
-                        reencode_cmd,
-                        capture_output=True,
-                        text=True,
-                        timeout=300,
-                        check=True,
-                    )
-                    _ = proc_reencode  # Mark as used
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-                    self._logger.exception("ffmpeg re-encode split failed: %s", e)
-                    self._cleanup_dir(outdir)
-                    raise
-            except (subprocess.TimeoutExpired, OSError, subprocess.SubprocessError) as e:
-                self._logger.exception("ffmpeg split error: %s", e)
+                _ = proc_reencode  # Mark as used
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+                self._logger.exception("ffmpeg re-encode split failed: %s", e)
                 self._cleanup_dir(outdir)
                 raise
             if os.path.exists(out_path):
