@@ -24,6 +24,7 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | Client | Description |
 |--------|-------------|
 | [DiscordBot](clients/DiscordBot) | Discord bot integrating all platform services |
+| [TankpitBot](clients/TankpitBot) | Tankpit.com game bot with WebSocket protocol reverse-engineering |
 
 ## Shared Libraries
 
@@ -40,6 +41,7 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [covenant_ml](libs/covenant_ml) | XGBoost training and prediction for covenants |
 | [covenant_persistence](libs/covenant_persistence) | PostgreSQL repositories for covenant data |
 | [cleargbm](libs/cleargbm) | From-scratch interpretable gradient boosting (pure stdlib) |
+| [cleargbm_rs](libs/cleargbm_rs) | High-performance Rust core for ClearGBM with PyO3 bindings |
 | [platform_calendar](libs/platform_calendar) | Google Calendar API for competition deadlines |
 | [platform_codebase](libs/platform_codebase) | Codebase capability detection and profiling |
 | [platform_devpost](libs/platform_devpost) | Devpost hackathon discovery + capability matching |
@@ -54,11 +56,18 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 make infra
 
 # Start a specific service
-make up-trainer       # Model-Trainer (GPU)
 make up-databank      # data-bank-api
+make up-trainer       # Model-Trainer (GPU)
 make up-handwriting   # handwriting-ai
+make up-qr            # qr-api
+make up-transcript    # transcript-api
+make up-turkic        # turkic-api
+make up-music         # music-wrapped-api
+make up-covenant      # covenant-radar-api
+make up-grandma       # grandma-api
 make up-github-stats  # github-stats-api
 make up-opportunity   # opportunity-radar-api
+make up-discord       # DiscordBot
 
 # Start all services
 make up-all
