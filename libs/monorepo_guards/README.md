@@ -90,6 +90,17 @@ make lint
 | `WeakAssertionRule` | Detects weak assertions (`is not None`, `isinstance`, `hasattr`, `len > 0`) |
 | `MLTestQualityRule` | ML test quality (loss comparisons, forward pass checks, weight verification) |
 
+### Rust Rules
+
+| Rule | Description |
+|------|-------------|
+| `RustTestRule` | Requires `Result<(), ...>` return types in tests, forbids `.unwrap()` and `.expect()` |
+| `RustCargoLintRule` | Enforces strict lints in `Cargo.toml` (`[lints.rust]` and `[lints.clippy]` sections) |
+| `RustManualSerializeRule` | Forbids `derive(Serialize, Deserialize)`, requires manual implementation |
+| `RustCoverageRule` | Enforces 100% region coverage threshold in Makefile |
+| `RustProptestRule` | Requires `proptest` in dev-dependencies for property-based testing |
+| `RustExplicitMatchRule` | Forbids `?` operator, requires explicit `match` expressions for full coverage |
+
 ## API
 
 ```python
