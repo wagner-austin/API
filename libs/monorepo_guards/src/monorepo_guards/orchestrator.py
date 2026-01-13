@@ -21,6 +21,14 @@ from monorepo_guards.mock_rules import MockBanRule
 from monorepo_guards.pattern_rules import PatternRule
 from monorepo_guards.redis_rules import RedisRule
 from monorepo_guards.request_context_rules import RequestContextRule
+from monorepo_guards.rust_rules import (
+    RustCargoLintRule,
+    RustCoverageRule,
+    RustExplicitMatchRule,
+    RustManualSerializeRule,
+    RustProptestRule,
+    RustTestRule,
+)
 from monorepo_guards.security_rules import SecurityRule
 from monorepo_guards.standardization_rules import StandardizationRule
 from monorepo_guards.suppress_rules import SuppressRule
@@ -59,6 +67,12 @@ def _run_with_config(config: GuardConfig) -> int:
         MLTestQualityRule(),
         FakeRedisRule(),
         MockBanRule(),
+        RustTestRule(config),
+        RustCargoLintRule(config),
+        RustManualSerializeRule(config),
+        RustCoverageRule(config),
+        RustProptestRule(config),
+        RustExplicitMatchRule(config),
     ]
     if config.dataclass_ban_segments:
         rules.append(DataclassRule(config))
