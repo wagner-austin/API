@@ -106,19 +106,18 @@ def test_split_audio_reencode_timeout_raises() -> None:
                 '"streams": [{"codec_type": "audio", "codec_name": "aac"}]}'
             )
             return _FakeProc(stdout=aac_info)
+        # Always reencode now, no copy fallback
         if "-c:a" in args:
             calls["n"] += 1
             raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=120)
-        calls["n"] += 1
-        if check:
-            raise subprocess.CalledProcessError(1, args)
         return _FakeProc(returncode=1)
 
     _test_hooks.subprocess_run = _fake_subprocess
 
     with pytest.raises(subprocess.TimeoutExpired):
         _ = ch._split_audio(in_path, [1.0], total_duration=2.0)
-    assert calls["n"] >= 2
+    # Only one reencode call before timeout (no copy attempt first)
+    assert calls["n"] >= 1
 
 
 def test_probe_stream_info_timeout_returns_empty() -> None:

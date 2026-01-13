@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import tempfile
 
 import pytest
@@ -69,8 +68,8 @@ def test_detect_silence_parses_ffmpeg_output() -> None:
     assert points == [2.5, 4.0]
 
 
-def test_split_audio_copy_then_reencode() -> None:
-    """Test that split falls back to reencode when copy fails."""
+def test_split_audio_always_reencodes() -> None:
+    """Test that split always uses reencode for OpenAI compatibility."""
     ch = AudioChunker()
 
     fd, in_path = tempfile.mkstemp(prefix="aud_", suffix=".webm")
@@ -98,23 +97,23 @@ def test_split_audio_copy_then_reencode() -> None:
                 '"streams": [{"codec_type": "audio", "codec_name": "opus"}]}'
             )
             return _ProcRes(stdout=opus_info)
-        # Handle ffmpeg split operations
+        # Handle ffmpeg split operations - should always be reencode
         if "-c:a" in args:
             calls.append("reencode")
             out_path = args[-1]
             _touch(out_path, size=512)
             return _ProcRes()
-        calls.append("copy")
-        if check:
-            raise subprocess.CalledProcessError(1, args)
+        # No copy calls expected
+        calls.append("unexpected")
         return _ProcRes(returncode=1)
 
     _test_hooks.subprocess_run = _fake_subprocess
 
     created = ch._split_audio(in_path, [1.0], total_duration=2.0)
     assert len(created) == 2
-    assert calls and calls[0] == "copy"
-    assert calls[1] == "reencode"
+    # Should only have reencode calls, no copy attempts
+    assert all(c == "reencode" for c in calls)
+    assert len(calls) == 2  # One reencode per segment
     try:
         os.remove(in_path)
     except OSError:
