@@ -18,10 +18,15 @@ class ConfigRule:
     name = "config"
 
     def _get_expected_dirs(self, repo_root: Path) -> set[str]:
-        """Determine which directories should be checked based on what exists."""
+        """Determine which directories should be checked based on what exists.
+
+        Only includes directories that contain Python files. This correctly
+        handles mixed-language projects (e.g., Rust src/ with Python bindings).
+        """
         expected = set()
         for dirname in ("src", "scripts", "tests"):
-            if (repo_root / dirname).is_dir():
+            dir_path = repo_root / dirname
+            if dir_path.is_dir() and any(dir_path.rglob("*.py")):
                 expected.add(dirname)
         return expected
 
