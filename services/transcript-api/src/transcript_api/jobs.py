@@ -63,8 +63,8 @@ class STTConfig(TypedDict):
 def _load_stt_config() -> STTConfig:
     """Load STT configuration from environment variables."""
     return {
-        "max_video_seconds": _parse_int("TRANSCRIPT_MAX_VIDEO_SECONDS", 0),
-        "max_file_mb": _parse_int("TRANSCRIPT_MAX_FILE_MB", 0),
+        "max_video_seconds": _parse_int("TRANSCRIPT_MAX_VIDEO_SECONDS", 3600),
+        "max_file_mb": _parse_int("TRANSCRIPT_MAX_FILE_MB", 100),
         "enable_chunking": _parse_bool("TRANSCRIPT_ENABLE_CHUNKING", False),
         "chunk_threshold_mb": _parse_float("TRANSCRIPT_CHUNK_THRESHOLD_MB", 25.0),
         "target_chunk_mb": _parse_float("TRANSCRIPT_TARGET_CHUNK_MB", 20.0),
