@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.framing import (
+from tankpit_bot.protocol.framing import (
     FramingError,
     decode_frame,
     decode_frame_header,

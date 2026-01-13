@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
-from tankpit_bot.codec import ProtocolCodec
 from tankpit_bot.decoder import (
     DecodedCommand,
     DecodedLobbyMessage,
@@ -21,7 +20,8 @@ from tankpit_bot.decoder import (
     encode_decoded_lobby_message,
     load_and_decode_session,
 )
-from tankpit_bot.framing import encode_frame
+from tankpit_bot.protocol.codec import ProtocolCodec
+from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tests.conftest import FakeEnv, FakeFileSystem
 
@@ -568,7 +568,7 @@ def test_session_decoder_skips_unknown_prefix() -> None:
 
 def test_load_and_decode_session_default_static_key(fake_fs: FakeFileSystem) -> None:
     """Test load_and_decode_session with default static_key_path."""
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     # Create static key at the default path
     fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCD")
@@ -610,8 +610,8 @@ def test_main_with_commands(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test main() prints command summary."""
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
     from tankpit_bot.decoder import main
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     # Create static key
     fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDE")
@@ -651,8 +651,8 @@ def test_main_no_commands(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test main() with empty session."""
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
     from tankpit_bot.decoder import main
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     # Create static key
     fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCD")
@@ -682,8 +682,8 @@ def test_main_with_custom_output_path(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test main() reads TANKPIT_OUTPUT env var."""
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
     from tankpit_bot.decoder import main
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     fake_env.set("TANKPIT_OUTPUT", "custom_session.json")
 
@@ -715,8 +715,8 @@ def test_main_multiple_command_types(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Test main() groups commands by type_byte and cmd_byte."""
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
     from tankpit_bot.decoder import main
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     # Create static key
     fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, "ABCDEFGH")

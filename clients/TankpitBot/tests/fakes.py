@@ -7,6 +7,7 @@ tankpit_bot._test_hooks.
 
 from __future__ import annotations
 
+import base64
 import types
 from collections.abc import Callable
 
@@ -22,6 +23,25 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+
+
+def _make_auth_payload(magic: str) -> str:
+    """Create a base64-encoded AUTH payload containing the magic key.
+
+    The AUTH message format is:
+    - 2-byte length prefix (little-endian)
+    - Text body: %AUTH !be <session>|<hash>|<ts> <magic>
+
+    Args:
+        magic: The magic key to include in the AUTH payload.
+
+    Returns:
+        Base64-encoded AUTH payload string.
+    """
+    body = f"%AUTH !be test_session|test_hash|12345 {magic}"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    return base64.b64encode(length_prefix + body_bytes).decode("ascii")
 
 
 class FakeResponse:
@@ -46,6 +66,80 @@ class FakeResponse:
     def url(self) -> str:
         """Get URL."""
         return self._url
+
+
+class FakeTerrainMap:
+    """Fake TerrainMap for testing sniffer world state integration.
+
+    Returns ground for all coordinates by default.
+    """
+
+    ROCK: str = "#"
+    GROUND: str = "."
+    WATER: str = "W"
+
+    def __init__(self, terrain_data: dict[tuple[int, int], str] | None = None) -> None:
+        """Initialize fake terrain map.
+
+        Args:
+            terrain_data: Optional dict mapping (x, y) to terrain character.
+        """
+        self._terrain_data = terrain_data or {}
+
+    def get_terrain(self, x: int, y: int) -> str:
+        """Get terrain at coordinates.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+
+        Returns:
+            Terrain character.
+        """
+        return self._terrain_data.get((x, y), self.GROUND)
+
+    def is_passable(self, x: int, y: int) -> bool:
+        """Check if terrain is passable.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+
+        Returns:
+            True if passable.
+        """
+        terrain = self.get_terrain(x, y)
+        return terrain not in (self.ROCK, self.WATER)
+
+    def render_viewport(
+        self,
+        center_x: int,
+        center_y: int,
+        width: int = 16,
+        height: int = 16,
+    ) -> list[list[str]]:
+        """Render viewport grid.
+
+        Args:
+            center_x: Center X.
+            center_y: Center Y.
+            width: Viewport width.
+            height: Viewport height.
+
+        Returns:
+            2D list of terrain characters.
+        """
+        left = center_x - width // 2
+        top = center_y - height // 2
+        grid: list[list[str]] = []
+        for row in range(height):
+            row_data: list[str] = []
+            for col in range(width):
+                x = left + col
+                y = top + row
+                row_data.append(self.get_terrain(x, y))
+            grid.append(row_data)
+        return grid
 
 
 class FakeCDPSession:
@@ -142,7 +236,7 @@ class FakePage:
         Args:
             cdp_session: CDP session to use for events.
             script_urls: Optional list of script URLs to return from evaluate.
-            magic: Optional magic value to return for tankpit.magic evaluate.
+            magic: Optional magic key to embed in AUTH messages.
         """
         self._cdp_session = cdp_session
         self._goto_url: str | None = None
@@ -178,12 +272,16 @@ class FakePage:
             "Network.webSocketCreated",
             {"requestId": "1.1", "url": "wss://example.com/ws"},
         )
+        # Emit AUTH message with magic if configured
+        sent_payload = "sent message"
+        if self._magic:
+            sent_payload = _make_auth_payload(self._magic)
         self._cdp_session.emit_event(
             "Network.webSocketFrameSent",
             {
                 "requestId": "1.1",
                 "timestamp": 100.0,
-                "response": {"opcode": 1, "mask": True, "payloadData": "sent message"},
+                "response": {"opcode": 1, "mask": True, "payloadData": sent_payload},
             },
         )
         self._cdp_session.emit_event(
@@ -203,12 +301,16 @@ class FakePage:
             "Network.webSocketCreated",
             {"requestId": "1.1", "url": "wss://example.com/ws"},
         )
+        # Emit AUTH message with magic if configured
+        sent_payload = "sent message"
+        if self._magic:
+            sent_payload = _make_auth_payload(self._magic)
         self._cdp_session.emit_event(
             "Network.webSocketFrameSent",
             {
                 "requestId": "1.1",
                 "timestamp": 100.0,
-                "response": {"opcode": 1, "mask": True, "payloadData": "sent message"},
+                "response": {"opcode": 1, "mask": True, "payloadData": sent_payload},
             },
         )
         self._cdp_session.emit_event(
@@ -238,10 +340,9 @@ class FakePage:
         """Evaluate JavaScript expression.
 
         Returns:
-            Magic value if expression is 'tankpit.magic', otherwise script_urls.
+            Script URLs list for script queries, empty list otherwise.
         """
-        if expression == "tankpit.magic":
-            return self._magic
+        _ = expression
         return self._script_urls
 
 
@@ -319,7 +420,7 @@ class FakeBrowserContext:
             rate_limited: Whether to simulate rate limiting.
             login_fails: Whether login should fail.
             script_urls: Script URLs to return from page.evaluate().
-            magic: Magic value to return for tankpit.magic evaluate.
+            magic: Magic key to embed in AUTH messages.
         """
         cdp: FakeCDPSession | FakeCDPSessionRateLimited = (
             FakeCDPSessionRateLimited(login_fails=login_fails) if rate_limited else FakeCDPSession()
@@ -372,7 +473,7 @@ class FakeBrowser:
             rate_limited: Whether to simulate rate limiting.
             login_fails: Whether login should fail.
             script_urls: Script URLs to return from page.evaluate().
-            magic: Magic value to return for tankpit.magic evaluate.
+            magic: Magic key to embed in AUTH messages.
         """
         self._contexts: list[FakeBrowserContext] = []
         self._closed = False
@@ -419,7 +520,7 @@ class FakeBrowserType:
             rate_limited: Whether to simulate rate limiting.
             login_fails: Whether login should fail.
             script_urls: Script URLs to return from page.evaluate().
-            magic: Magic value to return for tankpit.magic evaluate.
+            magic: Magic key to embed in AUTH messages.
         """
         self._browsers: list[FakeBrowser] = []
         self._emit_messages = emit_messages
@@ -467,7 +568,7 @@ class FakePlaywright:
             rate_limited: Whether to simulate rate limiting.
             login_fails: Whether login should fail.
             script_urls: Script URLs to return from page.evaluate().
-            magic: Magic value to return for tankpit.magic evaluate.
+            magic: Magic key to embed in AUTH messages.
         """
         self._chromium = FakeBrowserType(
             emit_messages=emit_messages,
@@ -507,7 +608,7 @@ class FakeSyncPlaywrightContextManager:
             rate_limited: Whether to simulate rate limiting.
             login_fails: Whether login should fail.
             script_urls: Script URLs to return from page.evaluate().
-            magic: Magic value to return for tankpit.magic evaluate.
+            magic: Magic key to embed in AUTH messages.
         """
         self._playwright: FakePlaywright | None = None
         self._emit_messages = emit_messages
@@ -598,10 +699,13 @@ def fake_sync_playwright_with_mixed_scripts() -> SyncPlaywrightContextManagerPro
 
 
 def fake_sync_playwright_with_magic() -> SyncPlaywrightContextManagerProtocol:
-    """Create fake sync_playwright that returns a magic value for tankpit.magic.
+    """Create fake sync_playwright that emits AUTH messages with magic key.
+
+    The magic key is embedded in AUTH messages emitted during WebSocket events,
+    allowing tests to verify magic extraction from AUTH message payloads.
 
     Returns:
-        Context manager that produces pages returning magic value.
+        Context manager that produces pages emitting AUTH messages with magic.
     """
     return FakeSyncPlaywrightContextManager(
         emit_messages=True,
@@ -812,12 +916,14 @@ class FakePageProbe:
                 "Network.webSocketCreated",
                 {"requestId": "1.1", "url": "wss://tankpit.com/ws/"},
             )
+            # Emit AUTH message with magic for XOR table construction
+            auth_payload = _make_auth_payload(self.DEFAULT_MAGIC)
             self._cdp_session.emit_event(
                 "Network.webSocketFrameSent",
                 {
                     "requestId": "1.1",
                     "timestamp": 1.0,
-                    "response": {"opcode": 1, "mask": True, "payloadData": "auth"},
+                    "response": {"opcode": 1, "mask": True, "payloadData": auth_payload},
                 },
             )
             self._cdp_session.emit_event(
@@ -861,18 +967,15 @@ class FakePageProbe:
     def evaluate(self, expression: str) -> JSONValue:
         """Evaluate JavaScript expression.
 
-        Returns magic value for tankpit.magic, empty list otherwise.
+        Returns:
+            Empty list for all expressions (magic comes from AUTH messages).
         """
-        if expression == "tankpit.magic":
-            return self.DEFAULT_MAGIC
+        _ = expression
         return []
 
 
 class FakePageProbeNoMessages:
     """Fake Page for probe testing that doesn't emit any messages."""
-
-    # Default magic value for XOR table construction
-    DEFAULT_MAGIC = "test_magic_12345678"
 
     def __init__(self, cdp_session: FakeCDPSessionProbe) -> None:
         """Initialize fake page."""
@@ -923,10 +1026,10 @@ class FakePageProbeNoMessages:
     def evaluate(self, expression: str) -> JSONValue:
         """Evaluate JavaScript expression.
 
-        Returns magic value for tankpit.magic, empty list otherwise.
+        Returns:
+            Empty list for all expressions (magic comes from AUTH messages).
         """
-        if expression == "tankpit.magic":
-            return self.DEFAULT_MAGIC
+        _ = expression
         return []
 
 
@@ -1290,6 +1393,7 @@ __all__ = [
     "FakeResponse",
     "FakeSyncPlaywrightContextManager",
     "FakeSyncPlaywrightContextManagerProbe",
+    "FakeTerrainMap",
     "fake_sync_playwright",
     "fake_sync_playwright_login_fails",
     "fake_sync_playwright_no_messages",

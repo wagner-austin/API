@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, JSONValue
 
-from tankpit_bot.fuel_probe import (
+from tankpit_bot.browser.fuel_probe import (
     FuelProber,
     probe_all,
     probe_common_paths,

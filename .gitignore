@@ -128,9 +128,11 @@ clients/TankpitBot/capture_session.json
 clients/TankpitBot/raw_capture.json
 clients/TankpitBot/messages_dump.txt
 clients/TankpitBot/session_summary.json
-
 # Rust
 target/
 Cargo.lock
 *.lcov
 coverage.lcov
+
+# Claude temp directories
+tmpclaude-*

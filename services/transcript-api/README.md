@@ -65,11 +65,8 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
-| `/readyz` | GET | Readiness probe (checks Redis) |
 | `/v1/captions` | POST | Extract YouTube native captions |
-| `/v1/stt` | POST | Transcribe video audio via Whisper (sync) |
-| `/v1/stt/jobs` | POST | Enqueue async STT job |
-| `/v1/stt/jobs/{job_id}` | GET | Get async STT job status |
+| `/v1/stt` | POST | Transcribe video audio via Whisper |
 
 ---
 
@@ -93,14 +90,12 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `TRANSCRIPT_STT_RTF` | float | `0.5` | Real-time factor for STT timeout estimation |
 | `TRANSCRIPT_DL_MIB_PER_SEC` | float | `4.0` | Estimated download speed (MiB/s) for timeout |
 | `TRANSCRIPT_PREFERRED_LANGS` | string | - | Comma-separated default languages |
-| `REDIS_URL` | string | **Required** | Redis URL for /readyz health check and events |
 
 ### Example Configurations
 
 **Development (with chunking):**
 ```bash
 export OPENAI_API_KEY=sk-...
-export REDIS_URL=redis://localhost:6379/0
 export TRANSCRIPT_ENABLE_CHUNKING=1
 export TRANSCRIPT_CHUNK_THRESHOLD_MB=10
 export TRANSCRIPT_MAX_CONCURRENT_CHUNKS=5
@@ -109,7 +104,6 @@ export TRANSCRIPT_MAX_CONCURRENT_CHUNKS=5
 **Production (strict limits):**
 ```bash
 export OPENAI_API_KEY=sk-...
-export REDIS_URL=redis://redis:6379/0
 export TRANSCRIPT_MAX_VIDEO_SECONDS=3600
 export TRANSCRIPT_MAX_FILE_MB=100
 export TRANSCRIPT_ENABLE_CHUNKING=1
@@ -333,19 +327,14 @@ transcript-api/
 │   ├── vtt_parser.py       # VTT subtitle parsing
 │   ├── youtube.py          # URL validation
 │   ├── cleaner.py          # Text cleaning
-│   ├── events.py           # Redis event publishing
 │   ├── health.py           # Health check logic
-│   ├── jobs.py             # Async job processing
-│   ├── job_store.py        # Redis job state storage
 │   ├── json_util.py        # JSON serialization helpers
 │   ├── dependencies.py     # FastAPI dependencies
-│   ├── worker_entry.py     # RQ worker entry point
 │   ├── api/
 │   │   ├── main.py         # FastAPI app factory
 │   │   └── routes/
 │   │       ├── health.py       # Health endpoints
-│   │       ├── transcripts.py  # Captions/STT endpoints
-│   │       └── jobs.py         # Async job endpoints
+│   │       └── transcripts.py  # Captions/STT endpoints
 │   └── adapters/
 │       ├── youtube_client.py   # youtube_transcript_api wrapper
 │       ├── openai_client.py    # OpenAI Whisper client
@@ -367,6 +356,20 @@ transcript-api/
 
 ## Deployment
 
+### Production
+
+**Live URL:** `https://transcript-api-production-2753.up.railway.app`
+
+```bash
+# Health check
+curl https://transcript-api-production-2753.up.railway.app/healthz
+
+# Get captions
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/captions \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
+```
+
 ### Docker
 
 ```bash
@@ -376,20 +379,15 @@ docker build -t transcript-api:latest .
 # Run
 docker run -p 8000:8000 \
   -e OPENAI_API_KEY=sk-... \
-  -e REDIS_URL=redis://host.docker.internal:6379/0 \
   -e TRANSCRIPT_ENABLE_CHUNKING=1 \
   transcript-api:latest
 ```
 
 ### Railway
 
-```bash
-# Set environment variables in Railway dashboard
-# - OPENAI_API_KEY (required)
-# - TRANSCRIPT_* variables as needed
-
-railway up
-```
+Set environment variables in Railway dashboard:
+- `OPENAI_API_KEY` (required for STT)
+- `TRANSCRIPT_*` variables as needed
 
 **Health Check Path:** `/healthz`
 
@@ -429,20 +427,13 @@ railway up
 
 ## Discord Bot Integration
 
-The Discord bot (`clients/DiscordBot`) integrates via:
+The Discord bot (`clients/DiscordBot`) integrates via direct HTTP:
 
-1. **Direct HTTP**: `/transcript url:<YouTube URL>` calls `/v1/captions` or `/v1/stt`
-2. **Redis Events**: Async job progress published to `transcript:events` channel
+```
+/transcript url:<YouTube URL>
+```
 
-**Channel:** `transcript:events` (via `platform_core.job_events`)
-
-**Events (generic job schema):**
-- `transcript.job.started.v1` — `{type, domain, job_id, user_id, queue}`
-- `transcript.job.progress.v1` — `{type, domain, job_id, user_id, progress, message?, payload?}`
-- `transcript.job.completed.v1` — `{type, domain, job_id, user_id, result_id, result_bytes}`
-- `transcript.job.failed.v1` — `{type, domain, job_id, user_id, error_kind, message}`
-
-`result_id` is the canonical video ID (STT) or request URL (captions); `result_bytes` is the size of the transcript text in bytes. Progress messages are simple strings; no transcript-specific event variants remain.
+Calls `/v1/captions` for fast caption extraction or `/v1/stt` for Whisper transcription.
 
 ---
 

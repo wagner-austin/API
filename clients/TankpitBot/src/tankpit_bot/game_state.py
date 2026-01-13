@@ -24,6 +24,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
+from tankpit_bot.browser import GameLogEntry, GameLogScraper
 from tankpit_bot.combat import (
     CombatStats,
     CombatTracker,
@@ -33,7 +34,6 @@ from tankpit_bot.combat import (
     encode_combat_stats,
     encode_entity_pair_stats,
 )
-from tankpit_bot.dom_scraper import GameLogEntry, GameLogScraper
 from tankpit_bot.inventory import (
     InventoryScraper,
     InventoryState,

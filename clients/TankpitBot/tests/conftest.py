@@ -211,6 +211,16 @@ class FakeFileSystem:
         """
         return str(path) in self._files
 
+    def remove(self, path: Path) -> None:
+        """Remove a file from the fake file system.
+
+        Args:
+            path: Path to remove.
+        """
+        key = str(path)
+        if key in self._files:
+            del self._files[key]
+
     def get_written_files(self) -> dict[str, str]:
         """Get all written files.
 
@@ -229,7 +239,7 @@ def fake_fs() -> FakeFileSystem:
     Returns:
         FakeFileSystem instance.
     """
-    from tankpit_bot.codec import DEFAULT_STATIC_KEY_PATH
+    from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
     # Create a 1000-character fake static key for testing
     # This matches the expected format of the real key

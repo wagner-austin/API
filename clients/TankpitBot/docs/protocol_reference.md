@@ -111,7 +111,7 @@ byte 3+: data (varies by command)
 
 #### Binary Messages (`.` / 0x2E subtypes)
 Note: Subtypes are XOR-encoded and vary by session. Use length + first decoded byte to identify.
-See `container_decoder.py` for full implementation.
+See `container/` for full implementation.
 
 | Length | First Byte | Name | Data | Status |
 |--------|------------|------|------|--------|
@@ -142,22 +142,22 @@ See `container_decoder.py` for full implementation.
 
 ### Protocol Decoder Modules
 
-Two decoder modules handle different message types:
+Two decoder packages handle different message types:
 
-**`src/tankpit_bot/protocol.py`** - Top-level message decoders:
-- TypedDict structures with msg_type Literal fields
-- Decoders for 0x41, 0x43, 0x47, 0x53, etc.
-- Helper functions (_x16, _x24 for byte combining)
+**`src/tankpit_bot/protocol/`** - Top-level message decoders:
+- `types.py` - TypedDict structures with msg_type Literal fields
+- `decoders/` - Decoders for 0x41, 0x43, 0x47, 0x53, etc.
+- `helpers.py` - Helper functions (_x16, _x24 for byte combining)
 
-**`src/tankpit_bot/container_decoder.py`** - 0x2E container subtypes:
-- Length-based message identification (session-independent)
-- First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
-- 13 container message types with TypedDict structures
+**`src/tankpit_bot/container/`** - 0x2E container subtypes:
+- `identification.py` - Length-based message identification (session-independent)
+- `decoders/` - First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
+- `types.py` - 13 container message types with TypedDict structures
 
 **Usage:**
 ```python
-from tankpit_bot.protocol import decode_deactivation, DeactivationDict
-from tankpit_bot.container_decoder import decode_container_message, identify_container_type
+from tankpit_bot.protocol.types import DeactivationDict
+from tankpit_bot.container import decode_container_message, identify_container_type
 result = decode_container_message(xor_decoded_body)  # For 0x2E messages
 ```
 
@@ -709,11 +709,21 @@ docs/
 └── protocol.md              # Protocol overview and discovery notes
 
 src/tankpit_bot/
-├── sniffer.py               # WebSocket capture, FuelTracker, PositionTracker
-├── protocol.py              # TypedDict message structures + decoders
-├── container_decoder.py     # 0x2E container subtype decoder (length-based)
-├── decoder.py               # Session decoder for captured data
-└── commands.py              # Command constants
+├── sniffer/                 # WebSocket capture, trackers
+│   ├── core.py              # Core sniffer logic
+│   ├── decoders.py          # Message decoders
+│   └── formatters.py        # Output formatters
+├── protocol/                # Protocol encoding
+│   ├── types.py             # TypedDict message structures
+│   ├── codec.py             # XOR encode/decode
+│   ├── framing.py           # 2-byte length framing
+│   ├── commands.py          # Command constants
+│   └── decoders/            # Message decoders
+├── container/               # 0x2E container subtypes
+│   ├── types.py             # Container TypedDicts
+│   ├── identification.py    # Length-based identification
+│   └── decoders/            # Subtype decoders
+└── decoder.py               # Session decoder for captured data
 ```
 
 ---

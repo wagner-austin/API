@@ -13,7 +13,7 @@ from .stt_provider import (
     YtDlpCaptionProvider,
 )
 from .types import DEFAULT_TRANSCRIPT_LANGS, TranscriptOptions, TranscriptResult
-from .youtube import canonicalize_youtube_url, extract_video_id
+from .url import parse_video_url
 
 
 class Config(TypedDict, total=False):
@@ -44,8 +44,9 @@ class TranscriptService:
         self._logger = get_logger(__name__)
 
     def captions(self, url: str, preferred_langs: list[str] | None) -> TranscriptResult:
-        canonical = canonicalize_youtube_url(url)
-        vid = extract_video_id(canonical)
+        parsed = parse_video_url(url)
+        vid = parsed["video_id"]
+        canonical = parsed["canonical_url"]
         cfg_langs = self._cfg.get("TRANSCRIPT_PREFERRED_LANGS")
         langs = preferred_langs or cfg_langs or DEFAULT_TRANSCRIPT_LANGS
         opts = TranscriptOptions(preferred_langs=langs)
@@ -54,13 +55,15 @@ class TranscriptService:
             probe_client=self._clients["probe"],
             cookies_text=cookies_text,
         )
-        segments = provider.fetch(vid, opts)
+        # Pass canonical URL, not video_id - providers need the actual URL for direct/Vimeo
+        segments = provider.fetch(canonical, opts)
         text = clean_segments(segments)
         return TranscriptResult(url=canonical, video_id=vid, text=text)
 
     def stt(self, url: str) -> TranscriptResult:
-        canonical = canonicalize_youtube_url(url)
-        vid = extract_video_id(canonical)
+        parsed = parse_video_url(url)
+        vid = parsed["video_id"]
+        canonical = parsed["canonical_url"]
         cookies_text = _optional_env_str("TRANSCRIPT_COOKIES_TEXT")
         stt = STTTranscriptProvider(
             stt_client=self._clients["stt"],
@@ -78,6 +81,7 @@ class TranscriptService:
             dl_mib_per_sec=float(self._cfg["TRANSCRIPT_DL_MIB_PER_SEC"]),
             cookies_text=cookies_text,
         )
-        segments = stt.fetch(vid, TranscriptOptions(preferred_langs=DEFAULT_TRANSCRIPT_LANGS))
+        # Pass canonical URL, not video_id - providers need the actual URL for direct/Vimeo
+        segments = stt.fetch(canonical, TranscriptOptions(preferred_langs=DEFAULT_TRANSCRIPT_LANGS))
         text = clean_segments(segments)
         return TranscriptResult(url=canonical, video_id=vid, text=text)

@@ -2,7 +2,7 @@
 
 ## What This Service Does
 
-- Transcribes YouTube videos using OpenAI Whisper (STT)
+- Transcribes videos from YouTube, Vimeo, and direct URLs using OpenAI Whisper (STT)
 - Falls back to YouTube captions when available
 - Downloads audio via yt-dlp with cookie support
 - Chunks large audio files for processing
@@ -40,21 +40,40 @@ full_text = " ".join([s["text"] for s in segments])
 print(full_text)
 ```
 
-## When API is Running
+## Production API
+
+Base URL: `https://transcript-api-production-2753.up.railway.app`
 
 ```bash
 # Health check (liveness probe)
-curl http://localhost:8000/healthz
-
-# Transcribe a video (STT/Whisper)
-curl -X POST http://localhost:8000/stt \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
+curl https://transcript-api-production-2753.up.railway.app/healthz
 
 # Get captions (YouTube native, faster but may fail)
-curl -X POST http://localhost:8000/captions \
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/captions \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
+
+# Transcribe a video (STT/Whisper, requires OPENAI_API_KEY)
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/stt \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
+```
+
+## Local Development
+
+```bash
+# Health check
+curl http://localhost:8000/healthz
+
+# Captions
+curl -X POST http://localhost:8000/v1/captions \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
+
+# STT
+curl -X POST http://localhost:8000/v1/stt \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
 ```
 
 ## Architecture
@@ -66,6 +85,12 @@ transcript-api/
 │   │   ├── openai_client.py   # Whisper API client
 │   │   ├── yt_dlp_client.py   # Audio/subtitle download
 │   │   └── youtube_client.py  # YouTube captions API
+│   ├── url/                   # URL parsing module
+│   │   ├── types.py           # ParsedURL TypedDicts
+│   │   ├── youtube.py         # YouTube URL parser
+│   │   ├── vimeo.py           # Vimeo URL parser
+│   │   ├── direct.py          # Direct file URL parser
+│   │   └── parse.py           # Unified parse_video_url()
 │   ├── stt_provider.py        # Main STT orchestration
 │   ├── provider.py            # Caption provider
 │   ├── chunker.py             # Audio chunking (ffmpeg)
@@ -112,10 +137,36 @@ _test_hooks.openai_client_factory = lambda **kw: FakeOpenAIClient()
 _test_hooks.yt_dlp_factory = lambda opts: FakeYtDlp()
 ```
 
+## URL Parsing
+
+The `url/` module provides unified URL parsing for multiple video sources:
+
+```python
+from transcript_api.url import parse_video_url
+
+# YouTube (watch, shorts, live, youtu.be)
+parsed = parse_video_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+# {"source": "youtube", "video_id": "dQw4w9WgXcQ", "canonical_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
+
+# Vimeo (standard, player.vimeo.com)
+parsed = parse_video_url("https://vimeo.com/123456789")
+# {"source": "vimeo", "video_id": "123456789", "canonical_url": "https://vimeo.com/123456789"}
+
+# Direct video/audio URLs (.mp4, .webm, .mp3, etc.)
+parsed = parse_video_url("https://example.com/video.mp4")
+# {"source": "direct", "video_id": "<md5>", "canonical_url": "https://example.com/video.mp4", "extension": "mp4"}
+```
+
+Supported formats:
+- **YouTube**: watch, shorts, live, youtu.be
+- **Vimeo**: vimeo.com, player.vimeo.com
+- **Direct**: mp4, webm, mkv, avi, mov, mp3, wav, flac, m4a, ogg
+
 ## Common Issues
 
 | Issue | Solution |
 |-------|----------|
+| `VIDEO_URL_UNSUPPORTED` | URL must be YouTube, Vimeo, or direct video file |
 | `ParseError: no element found` | YouTube captions malformed, use STT instead |
 | `Video unavailable` | Check cookies, video may be private/age-restricted |
 | `STT_TOO_LONG` | Video exceeds `max_video_seconds` limit |

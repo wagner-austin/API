@@ -21,6 +21,7 @@ from .types import (
     VerboseResponseTD,
     YtInfoTD,
 )
+from .url.direct import is_direct_url
 from .vtt_parser import parse_vtt_file
 from .whisper_parse import convert_verbose_to_segments
 
@@ -162,14 +163,74 @@ class STTTranscriptProvider:
         if isinstance(path, str) and path:
             Path(path).unlink(missing_ok=True)
 
-    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        duration = self._probe_or_error(video_id, url)
+    def _get_duration_from_file(self, file_path: str) -> float | None:
+        """Get duration from audio file using ffprobe."""
+        import subprocess
+
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            file_path,
+        ]
+        try:
+            proc = _test_hooks.subprocess_run(cmd, capture_output=True, text=True, timeout=30)
+            if proc.returncode == 0 and proc.stdout:
+                return float(proc.stdout.strip())
+        except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+            self._logger.warning("ffprobe duration failed: %s", e)
+        return None
+
+    def fetch(self, url: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        # url parameter is the canonical URL (YouTube watch URL, Vimeo URL, or direct URL)
+        # For direct URLs, yt-dlp probe won't work - download first then check duration
+        if is_direct_url(url):
+            return self._fetch_direct_url(url, opts)
+
+        duration = self._probe_or_error(url, url)
         self._logger.info("Probe complete: duration=%ss", duration)
 
         audio_path: str | None = None
         try:
             audio_path, size_bytes = self._download_or_error(url)
+            if self._is_over_limit(size_bytes):
+                return self._handle_over_limit(audio_path, size_bytes)
+            return self._transcribe_with_strategy(audio_path)
+        finally:
+            if audio_path and self._should_cleanup(audio_path):
+                try:
+                    _test_hooks.os_remove(audio_path)
+                except OSError:
+                    self._logger.exception("Failed to remove temporary audio file: %s", audio_path)
+                    raise
+
+    def _fetch_direct_url(self, url: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        """Handle direct URL - download first, then check duration with ffprobe."""
+        self._logger.info("Downloading direct URL for STT: %s", url)
+        audio_path: str | None = None
+        try:
+            audio_path, size_bytes = self._download_or_error(url)
+
+            # Get duration from downloaded file using ffprobe
+            duration = self._get_duration_from_file(audio_path)
+            if duration is None or duration <= 0:
+                raise AppError(
+                    TranscriptErrorCode.STT_DURATION_UNKNOWN,
+                    "Unable to determine video duration for transcription.",
+                    400,
+                )
+            if duration > self.max_video_seconds:
+                raise AppError(
+                    TranscriptErrorCode.STT_TOO_LONG,
+                    f"Video is too long for STT (>{self.max_video_seconds} seconds).",
+                    400,
+                )
+            self._logger.info("Direct URL duration: %ss", duration)
+
             if self._is_over_limit(size_bytes):
                 return self._handle_over_limit(audio_path, size_bytes)
             return self._transcribe_with_strategy(audio_path)
@@ -454,15 +515,13 @@ class YtDlpCaptionProvider:
         if isinstance(path, str) and path:
             Path(path).unlink(missing_ok=True)
 
-    def fetch(self, video_id: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
-        """Fetch captions for a YouTube video using yt-dlp subtitle download."""
-        url = f"https://www.youtube.com/watch?v={video_id}"
+    def fetch(self, url: str, opts: TranscriptOptions) -> list[TranscriptSegment]:
+        """Fetch captions for a video using yt-dlp subtitle download."""
+        # url parameter is the canonical URL (YouTube watch URL, Vimeo URL, or direct URL)
         preferred_langs = opts.get("preferred_langs", ["en", "en-US", "en-GB"])
         cookies_path = self.cookies_path or self._temp_cookies_file
 
-        self._logger.info(
-            "Fetching captions via yt-dlp: vid=%s langs=%s", video_id, preferred_langs
-        )
+        self._logger.info("Fetching captions via yt-dlp: url=%s langs=%s", url, preferred_langs)
 
         result = self.probe_client.download_subtitles(
             url,
@@ -473,7 +532,7 @@ class YtDlpCaptionProvider:
         if result is None:
             raise AppError(
                 TranscriptErrorCode.TRANSCRIPT_UNAVAILABLE,
-                f"No captions available for video {video_id}",
+                f"No captions available for video: {url}",
                 404,
             )
 

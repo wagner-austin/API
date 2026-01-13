@@ -131,6 +131,34 @@ path_exists: PathExistsProtocol = _real_path_exists
 
 
 # =============================================================================
+# Browser Static Key Hook
+# =============================================================================
+
+
+class FindBestStaticByteProtocol(Protocol):
+    """Protocol for finding the best static key byte.
+
+    Matches browser.find_best_static_byte signature.
+    """
+
+    def __call__(self, raw_first_bytes: list[int], magic_first_byte: int) -> tuple[int, int]:
+        """Find the static key's first byte that maximizes known signature matches.
+
+        Args:
+            raw_first_bytes: First XOR-encoded bytes from binary messages.
+            magic_first_byte: ASCII value of magic key's first character.
+
+        Returns:
+            Tuple of (best_static_byte, match_count).
+        """
+        ...
+
+
+# Default is None - browser.py uses its own implementation when None
+find_best_static_byte: FindBestStaticByteProtocol | None = None
+
+
+# =============================================================================
 # Playwright Protocols - matching real Playwright sync API signatures
 # =============================================================================
 
@@ -441,6 +469,103 @@ sync_playwright: SyncPlaywrightFactoryProtocol | None = None
 
 
 # =============================================================================
+# Terrain Map Loading Hook
+# =============================================================================
+
+
+class TerrainMapProtocol(Protocol):
+    """Protocol for TerrainMap interface."""
+
+    ROCK: str
+    GROUND: str
+    WATER: str
+
+    def get_terrain(self, x: int, y: int) -> str:
+        """Get terrain type at game coordinates.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            Terrain character: '#' for rock, '.' for ground, 'W' for water.
+        """
+        ...
+
+    def is_passable(self, x: int, y: int) -> bool:
+        """Check if tile is passable (not rock or water).
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if passable, False if rock or water.
+        """
+        ...
+
+    def render_viewport(
+        self,
+        center_x: int,
+        center_y: int,
+        width: int = 16,
+        height: int = 16,
+    ) -> list[list[str]]:
+        """Render a viewport grid centered on position.
+
+        Args:
+            center_x: Center X coordinate.
+            center_y: Center Y coordinate.
+            width: Viewport width.
+            height: Viewport height.
+
+        Returns:
+            2D list of terrain characters.
+        """
+        ...
+
+
+class LoadTerrainMapProtocol(Protocol):
+    """Protocol for loading a terrain map."""
+
+    def __call__(self, gif_path: Path) -> TerrainMapProtocol:
+        """Load terrain map from GIF file.
+
+        Args:
+            gif_path: Path to field##_r.gif minimap file.
+
+        Returns:
+            TerrainMap instance.
+
+        Raises:
+            FileNotFoundError: If file does not exist.
+            ValueError: If image is not 256x256.
+        """
+        ...
+
+
+def _real_load_terrain_map(gif_path: Path) -> TerrainMapProtocol:
+    """Real implementation - loads TerrainMap from GIF.
+
+    Args:
+        gif_path: Path to field##_r.gif minimap file.
+
+    Returns:
+        TerrainMap instance.
+
+    Raises:
+        FileNotFoundError: If file does not exist.
+        ValueError: If image is not 256x256.
+    """
+    terrain_mod = __import__("tankpit_bot.terrain", fromlist=["TerrainMap"])
+    terrain_map: TerrainMapProtocol = terrain_mod.TerrainMap(gif_path)
+    return terrain_map
+
+
+load_terrain_map: LoadTerrainMapProtocol = _real_load_terrain_map
+
+
+# =============================================================================
 # CLI Argument Hook
 # =============================================================================
 
@@ -480,6 +605,8 @@ __all__ = [
     "BrowserTypeLaunchProtocol",
     "BrowserTypeProtocol",
     "CDPSessionProtocol",
+    "FindBestStaticByteProtocol",
+    "LoadTerrainMapProtocol",
     "PageProtocol",
     "PathExistsProtocol",
     "PlaywrightProtocol",
@@ -487,10 +614,13 @@ __all__ = [
     "ResponseProtocol",
     "SyncPlaywrightContextManagerProtocol",
     "SyncPlaywrightFactoryProtocol",
+    "TerrainMapProtocol",
     "WriteTextProtocol",
+    "find_best_static_byte",
     "get_argv",
     "get_env",
     "get_sync_playwright",
+    "load_terrain_map",
     "path_exists",
     "read_text",
     "sync_playwright",

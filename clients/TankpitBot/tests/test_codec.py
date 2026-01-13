@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from tankpit_bot.codec import (
+from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     CodecError,
     InvalidKeyError,
     ProtocolCodec,
     build_xor_table,
     create_codec,
+    extract_magic_from_auth_payload,
     load_static_key,
     xor_bytes,
 )
@@ -326,3 +327,73 @@ def test_default_static_key_path_is_path_type() -> None:
     """Test DEFAULT_STATIC_KEY_PATH is a Path."""
     # Verify by calling a Path method - this will fail if not a Path
     assert DEFAULT_STATIC_KEY_PATH.suffix == ".txt"
+
+
+# =============================================================================
+# extract_magic_from_auth_payload Tests
+# =============================================================================
+
+
+def test_extract_magic_from_auth_payload_success() -> None:
+    """Test extracting magic from valid AUTH message."""
+    # AUTH format: 2-byte length prefix + "%AUTH !be <session>|<hash>|<ts> <magic>"
+    auth_body = "%AUTH !be abc123|def456|789 test_magic_key_12345"
+    # Add 2-byte length prefix (doesn't matter what value for this test)
+    payload = bytes([0x00, 0x30]) + auth_body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result == "test_magic_key_12345"
+
+
+def test_extract_magic_from_auth_payload_short_payload() -> None:
+    """Test returns None for payload too short."""
+    payload = bytes([0x00, 0x05, 0x41, 0x42])  # Only 4 bytes
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result is None
+
+
+def test_extract_magic_from_auth_payload_not_auth() -> None:
+    """Test returns None when payload is not AUTH message."""
+    # A message without AUTH keyword
+    body = "HELLO !be abc123|def456|789 test_magic_key_12345"
+    payload = bytes([0x00, 0x30]) + body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result is None
+
+
+def test_extract_magic_from_auth_payload_too_few_parts() -> None:
+    """Test returns None when AUTH message has too few parts."""
+    # Only 2 space-separated parts
+    body = "%AUTH something"
+    payload = bytes([0x00, 0x10]) + body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result is None
+
+
+def test_extract_magic_from_auth_payload_magic_too_short() -> None:
+    """Test returns None when magic is too short."""
+    # Magic is only 5 chars (needs at least 10)
+    body = "%AUTH !be abc123|def456|789 short"
+    payload = bytes([0x00, 0x25]) + body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result is None
+
+
+def test_extract_magic_from_auth_payload_with_auth_variant() -> None:
+    """Test extracting magic when AUTH (not %AUTH) is present."""
+    # Some messages may have AUTH without % prefix
+    body = "AUTH !be abc123|def456|789 another_magic_key"
+    payload = bytes([0x00, 0x30]) + body.encode("utf-8")
+
+    result = extract_magic_from_auth_payload(payload)
+
+    assert result == "another_magic_key"

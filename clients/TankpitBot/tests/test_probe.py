@@ -17,12 +17,14 @@ from tankpit_bot.probe import (
     PlaywrightNotInstalledError,
     ProbeError,
     ProtocolProbe,
+    _extract_magic_from_payload,
+    _is_valid_base64,
     _log_discovered_commands,
     extract_cdp_evaluate_value,
     main,
     run_probe,
 )
-from tankpit_bot.types import ProbeInput, ProbeResult, decode_probe_session
+from tankpit_bot.types import CapturedMessage, ProbeInput, ProbeResult, decode_probe_session
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import (
     fake_sync_playwright_probe,
@@ -490,6 +492,57 @@ def test_protocol_probe_run_non_dict_viewport(fake_fs: FakeFileSystem) -> None:
 # =============================================================================
 
 
+def test_is_valid_base64_empty_string() -> None:
+    """Test _is_valid_base64 returns False for empty string."""
+    assert _is_valid_base64("") is False
+
+
+def test_is_valid_base64_invalid_chars() -> None:
+    """Test _is_valid_base64 returns False for invalid characters."""
+    assert _is_valid_base64("not!valid@base64") is False
+
+
+def test_is_valid_base64_wrong_length() -> None:
+    """Test _is_valid_base64 returns False for wrong length."""
+    # Valid chars but not multiple of 4
+    assert _is_valid_base64("abc") is False
+
+
+def test_is_valid_base64_valid() -> None:
+    """Test _is_valid_base64 returns True for valid base64."""
+    assert _is_valid_base64("YWJj") is True
+    assert _is_valid_base64("YWJjZA==") is True
+
+
+def test_extract_magic_from_payload_invalid_base64() -> None:
+    """Test _extract_magic_from_payload returns None for invalid base64."""
+    assert _extract_magic_from_payload("not!valid") is None
+
+
+def test_extract_magic_from_payload_not_auth() -> None:
+    """Test _extract_magic_from_payload returns None for non-AUTH message."""
+    import base64
+
+    body = "HELLO test message"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    assert _extract_magic_from_payload(payload) is None
+
+
+def test_extract_magic_from_payload_valid_auth() -> None:
+    """Test _extract_magic_from_payload extracts magic from valid AUTH."""
+    import base64
+
+    body = "%AUTH !be session|hash|ts test_magic_key_12345"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    assert _extract_magic_from_payload(payload) == "test_magic_key_12345"
+
+
 def test_probe_error_is_exception() -> None:
     """Test ProbeError is an Exception."""
     assert issubclass(ProbeError, Exception)
@@ -588,6 +641,23 @@ def test_protocol_probe_run_stabilization_reset(fake_fs: FakeFileSystem) -> None
     assert len(session["results"]) == 1
     # Should have captured the extra message during stabilization
     assert len(probe._messages) > 2  # More than just initial auth + room_list
+
+
+def test_protocol_probe_on_message_captured_non_auth_sent() -> None:
+    """Test _on_message_captured handles sent message without AUTH magic."""
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+
+    # Send a message that's not a valid AUTH payload (just random text)
+    message: CapturedMessage = {
+        "ws_url": "wss://tankpit.com/ws/",
+        "timestamp_ms": 1000,
+        "direction": "sent",
+        "payload": "not_valid_base64!!",
+    }
+
+    # Should not raise, magic stays None
+    probe._on_message_captured(message)
+    assert probe._magic is None
 
 
 def test_protocol_probe_build_xor_table_raises_without_magic(fake_fs: FakeFileSystem) -> None:

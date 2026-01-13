@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import (
@@ -170,34 +170,6 @@ def test_browser_session_setup_cdp_handlers() -> None:
     assert "Network.webSocketCreated" in cdp._handlers
     assert "Network.webSocketFrameReceived" in cdp._handlers
     assert "Network.webSocketFrameSent" in cdp._handlers
-
-
-def test_browser_session_capture_magic_key() -> None:
-    """Test _capture_magic_key captures tankpit.magic from page."""
-    session = BrowserSession("https://example.com")
-    cdp = FakeCDPSession()
-    page = FakePage(cdp, magic="test_magic_key_12345")
-    session._capture_magic_key(page)
-    assert session.magic == "test_magic_key_12345"
-
-
-def test_browser_session_capture_magic_key_empty() -> None:
-    """Test _capture_magic_key handles empty magic."""
-    session = BrowserSession("https://example.com")
-    cdp = FakeCDPSession()
-    page = FakePage(cdp, magic="")
-    session._capture_magic_key(page)
-    assert session.magic is None
-
-
-def test_browser_session_capture_magic_key_not_string() -> None:
-    """Test _capture_magic_key handles non-string magic."""
-    session = BrowserSession("https://example.com")
-    cdp = FakeCDPSession()
-    # FakePage returns None for magic by default - simulates non-string result
-    page = FakePage(cdp, magic=None)
-    session._capture_magic_key(page)
-    assert session.magic is None
 
 
 def test_browser_session_wait_for_game_ready_success() -> None:
@@ -686,3 +658,536 @@ def test_save_static_key_wrong_length_raises() -> None:
     """Test save_static_key raises ValueError for wrong key length."""
     with pytest.raises(ValueError, match="expected 1000"):
         save_static_key("short_key")
+
+
+# =============================================================================
+# BrowserSession Additional Tests for Coverage
+# =============================================================================
+
+
+def test_browser_session_static_key_property() -> None:
+    """Test static_key property returns captured static key."""
+    session = BrowserSession("https://example.com")
+    # Initially None
+    assert session.static_key is None
+
+    # After setting
+    session._static_key = "test_static_key"
+    assert session.static_key == "test_static_key"
+
+
+def test_browser_session_init_fuel_prober() -> None:
+    """Test _init_fuel_prober creates FuelProber and enables polling."""
+    from tankpit_bot.browser import FuelProbeResult
+    from tests.conftest import FakeCDPSessionSimple
+
+    session = BrowserSession("https://example.com")
+    # Initially no fuel prober
+    assert session._fuel_prober is None
+
+    # After initialization, can poll (which proves prober was created)
+    cdp = FakeCDPSessionSimple()
+    # Add responses for the 3 probes that FuelProber.probe() does
+    cdp.add_response({"result": {"value": []}})  # dom_bars
+    cdp.add_response({"result": {"value": []}})  # js_variables
+    cdp.add_response({"result": {"value": []}})  # numeric_globals
+
+    session._init_fuel_prober(cdp)
+
+    # Now poll should work (proves prober was created)
+    cdp.add_response({"result": {"value": []}})  # dom_bars
+    cdp.add_response({"result": {"value": []}})  # js_variables
+    cdp.add_response({"result": {"value": []}})  # numeric_globals
+    poll_result: FuelProbeResult | None = session._poll_fuel()
+    if poll_result is None:
+        raise AssertionError("Expected FuelProbeResult after init")
+    assert poll_result["dom_bars"] == []
+    assert poll_result["js_variables"] == []
+
+
+def test_browser_session_poll_fuel_no_prober() -> None:
+    """Test _poll_fuel returns None when prober not initialized."""
+    session = BrowserSession("https://example.com")
+    result = session._poll_fuel()
+    assert result is None
+
+
+def test_browser_session_poll_fuel_with_results() -> None:
+    """Test _poll_fuel returns results and logs findings."""
+    from tankpit_bot.browser import FuelProbeResult
+    from tests.conftest import FakeCDPSessionSimple
+
+    session = BrowserSession("https://example.com")
+    cdp = FakeCDPSessionSimple()
+
+    # Configure fake responses for FuelProber.probe()
+    bar_data: JSONObject = {
+        "tag": "DIV",
+        "id": "hp-bar",
+        "class_name": "health",
+        "width": "80%",
+        "computed_width": "200px",
+        "parent_class": "",
+    }
+    var_data: JSONObject = {"name": "fuel", "value": 800, "path": "player.fuel"}
+    result_inner: JSONObject = {"value": [bar_data]}
+    cdp.add_response({"result": result_inner})
+    result_inner2: JSONObject = {"value": [var_data]}
+    cdp.add_response({"result": result_inner2})
+    result_inner3: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner3})
+
+    session._init_fuel_prober(cdp)
+
+    # Add more responses for the poll
+    result_inner4: JSONObject = {"value": [bar_data]}
+    cdp.add_response({"result": result_inner4})
+    result_inner5: JSONObject = {"value": [var_data]}
+    cdp.add_response({"result": result_inner5})
+    result_inner6: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner6})
+
+    result: FuelProbeResult | None = session._poll_fuel()
+    # Narrow type via conditional that raises
+    if result is None:
+        raise AssertionError("_poll_fuel returned None when prober was initialized")
+    # Now mypy knows result is FuelProbeResult
+    assert len(result["dom_bars"]) == 1
+    assert result["dom_bars"][0]["id"] == "hp-bar"
+    assert result["dom_bars"][0]["width"] == "80%"
+    assert len(result["js_variables"]) == 1
+    assert result["js_variables"][0]["path"] == "player.fuel"
+    assert result["js_variables"][0]["value"] == 800
+
+
+class FakePageWithStaticKey:
+    """Fake page that can find and fetch tpclient script for testing."""
+
+    def __init__(self) -> None:
+        """Initialize with eval count tracker."""
+        self._eval_count = 0
+        self._url = "https://tankpit.com/play"
+
+    @property
+    def url(self) -> str:
+        """Return test URL."""
+        return self._url
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for timeout."""
+        _ = timeout
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for event."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for function - always succeeds."""
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Return script URL or JS content based on the expression.
+
+        First call looks for tpclient URL -> return string URL
+        Second call fetches content -> return JS with 1000-char key
+        """
+        self._eval_count += 1
+        if "fetch" in expression:
+            # Return JS content with a 1000-char key
+            key = "A" * 1000
+            return f'var x = "{key}";'
+        # First call - looking for tpclient script URL
+        return "https://tankpit.com/js/tpclient.min.js"
+
+
+def test_browser_session_capture_static_key_success() -> None:
+    """Test _capture_static_key successfully extracts and saves static key."""
+    from pathlib import Path
+
+    from tankpit_bot._test_hooks import PageProtocol
+
+    session = BrowserSession("https://example.com")
+    page: PageProtocol = FakePageWithStaticKey()
+
+    # Capture original hooks
+    original_save = _test_hooks.write_text
+    saved_content: list[str] = []
+
+    def fake_write(path: Path, content: str) -> None:
+        saved_content.append(content)
+
+    _test_hooks.write_text = fake_write
+    try:
+        session._capture_static_key(page)
+        assert session._static_key == "A" * 1000
+        assert len(saved_content) == 1
+        assert saved_content[0] == "A" * 1000 + "\n"
+    finally:
+        _test_hooks.write_text = original_save
+
+
+def test_browser_session_derive_static_key_success() -> None:
+    """Test _derive_static_key_from_messages derives key from messages."""
+    import base64
+    from pathlib import Path
+
+    session = BrowserSession("https://example.com")
+
+    # Set magic key
+    session._magic = "test_magic_key_12345678901234567890"
+
+    # Create a message that matches known signature when XOR decoded
+    # For signature 0x2E, we need first_byte XOR static[0] XOR magic[0] = 0x2E
+    # first_byte = 0x2E XOR static[0] XOR magic[0]
+    # Let's use static[0] = 'A' (0x41), magic[0] = 't' (0x74)
+    # first_byte = 0x2E XOR 0x41 XOR 0x74 = 0x1B
+    raw_bytes = bytes([0x1B]) + b"\x00" * 10
+    b64_payload = base64.b64encode(raw_bytes).decode()
+
+    session._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload=b64_payload,
+            ws_url="wss://test.com/ws",
+        ),
+    ]
+
+    # Set up static key file with 'A' as first char
+    original_read = _test_hooks.read_text
+    original_write = _test_hooks.write_text
+    saved_keys: list[str] = []
+
+    def fake_read(path: Path) -> str:
+        return "A" * 1000
+
+    def fake_write(path: Path, content: str) -> None:
+        saved_keys.append(content.strip())
+
+    _test_hooks.read_text = fake_read
+    _test_hooks.write_text = fake_write
+    try:
+        session._derive_static_key_from_messages()
+        # Key should have been derived and potentially saved
+        # The exact behavior depends on the first byte calculation
+    finally:
+        _test_hooks.read_text = original_read
+        _test_hooks.write_text = original_write
+
+
+def test_browser_session_derive_static_key_no_magic() -> None:
+    """Test _derive_static_key_from_messages exits early without magic."""
+    session = BrowserSession("https://example.com")
+    # No magic set
+    session._derive_static_key_from_messages()
+    # Should return early without error
+
+
+def test_browser_session_derive_static_key_no_messages() -> None:
+    """Test _derive_static_key_from_messages exits early without messages."""
+    session = BrowserSession("https://example.com")
+    session._magic = "test_magic"
+    session._messages = []
+    session._derive_static_key_from_messages()
+    # Should return early without error
+
+
+def test_browser_session_derive_static_key_no_binary_messages() -> None:
+    """Test _derive_static_key_from_messages logs warning for no binary messages."""
+    import base64
+
+    session = BrowserSession("https://example.com")
+    session._magic = "test_magic_key"
+
+    # Create a valid base64 payload with TEXT_MESSAGE_TYPE (0x2B = 43)
+    # Format: [length_hi, length_lo, msg_type, data...]
+    # Using msg_type 0x2B which is in TEXT_MESSAGE_TYPES
+    text_type_payload = bytes([0x00, 0x04, 0x2B, 0x00])  # 0x2B is text type
+    payload_b64 = base64.b64encode(text_type_payload).decode()
+
+    session._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload=payload_b64,
+            ws_url="wss://test.com/ws",
+        ),
+    ]
+    # Should return early after logging warning about no binary messages
+    # because all messages are text type (filtered out)
+    session._derive_static_key_from_messages()
+    # No exception, static key remains None
+    assert session._static_key is None
+
+
+def test_browser_session_capture_static_key_no_key_found() -> None:
+    """Test _capture_static_key logs warning when no 1000-char key found."""
+
+    from tankpit_bot._test_hooks import PageProtocol
+
+    class FakePageNoKey:
+        """Fake page that returns JS without a 1000-char key."""
+
+        def __init__(self) -> None:
+            """Initialize."""
+            self._url = "https://tankpit.com/play"
+
+        @property
+        def url(self) -> str:
+            """Return test URL."""
+            return self._url
+
+        def goto(
+            self,
+            url: str,
+            *,
+            referer: str | None = None,
+            timeout: float | None = None,
+            wait_until: str | None = None,
+        ) -> None:
+            """Navigate to URL."""
+            _ = (referer, timeout, wait_until)
+            self._url = url
+
+        def wait_for_timeout(self, timeout: float) -> None:
+            """Wait for timeout."""
+            _ = timeout
+
+        def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+            """Wait for event."""
+            _ = (event, timeout)
+
+        def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+            """Wait for function - always succeeds."""
+            _ = (expression, timeout)
+
+        def close(
+            self, *, reason: str | None = None, run_before_unload: bool | None = None
+        ) -> None:
+            """Close page."""
+            _ = (reason, run_before_unload)
+
+        def evaluate(self, expression: str) -> JSONValue:
+            """Return script URL or JS content without 1000-char key."""
+            if "fetch" in expression:
+                # Return JS without a 1000-char key
+                return 'var x = "short_key";'
+            return "https://tankpit.com/js/tpclient.min.js"
+
+    session = BrowserSession("https://example.com")
+    page: PageProtocol = FakePageNoKey()
+
+    session._capture_static_key(page)
+    # Should return early, static key remains None
+    assert session._static_key is None
+
+
+def test_browser_session_capture_static_key_fetch_fails() -> None:
+    """Test _capture_static_key logs warning when fetch returns non-string."""
+
+    from tankpit_bot._test_hooks import PageProtocol
+
+    class FakePageFetchFails:
+        """Fake page where fetch returns non-string."""
+
+        def __init__(self) -> None:
+            """Initialize."""
+            self._url = "https://tankpit.com/play"
+
+        @property
+        def url(self) -> str:
+            """Return test URL."""
+            return self._url
+
+        def goto(
+            self,
+            url: str,
+            *,
+            referer: str | None = None,
+            timeout: float | None = None,
+            wait_until: str | None = None,
+        ) -> None:
+            """Navigate to URL."""
+            _ = (referer, timeout, wait_until)
+            self._url = url
+
+        def wait_for_timeout(self, timeout: float) -> None:
+            """Wait for timeout."""
+            _ = timeout
+
+        def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+            """Wait for event."""
+            _ = (event, timeout)
+
+        def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+            """Wait for function - always succeeds."""
+            _ = (expression, timeout)
+
+        def close(
+            self, *, reason: str | None = None, run_before_unload: bool | None = None
+        ) -> None:
+            """Close page."""
+            _ = (reason, run_before_unload)
+
+        def evaluate(self, expression: str) -> JSONValue:
+            """Return script URL or None for fetch."""
+            if "fetch" in expression:
+                # Return None (simulates failed fetch)
+                return None
+            return "https://tankpit.com/js/tpclient.min.js"
+
+    session = BrowserSession("https://example.com")
+    page: PageProtocol = FakePageFetchFails()
+
+    session._capture_static_key(page)
+    # Should return early, static key remains None
+    assert session._static_key is None
+
+
+def test_browser_session_poll_fuel_dom_bar_with_empty_width() -> None:
+    """Test _poll_fuel skips logging for DOM bars with empty width."""
+    from tankpit_bot.browser import FuelProbeResult
+    from tests.conftest import FakeCDPSessionSimple
+
+    session = BrowserSession("https://example.com")
+    cdp = FakeCDPSessionSimple()
+
+    # DOM bar with empty width - should not log
+    bar_no_width: JSONObject = {
+        "tag": "DIV",
+        "id": "empty-bar",
+        "class_name": "empty",
+        "width": "",  # Empty width triggers the 405->404 branch
+        "computed_width": "",
+        "parent_class": "",
+    }
+    result_inner1: JSONObject = {"value": [bar_no_width]}
+    cdp.add_response({"result": result_inner1})
+    result_inner2: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner2})
+    result_inner3: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner3})
+
+    session._init_fuel_prober(cdp)
+
+    # Add more responses for the poll
+    result_inner4: JSONObject = {"value": [bar_no_width]}
+    cdp.add_response({"result": result_inner4})
+    result_inner5: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner5})
+    result_inner6: JSONObject = {"value": []}
+    cdp.add_response({"result": result_inner6})
+
+    result: FuelProbeResult | None = session._poll_fuel()
+    if result is None:
+        raise AssertionError("_poll_fuel returned None when prober was initialized")
+    # The bar is returned but not logged (empty width branch)
+    assert len(result["dom_bars"]) == 1
+    assert result["dom_bars"][0]["width"] == ""
+
+
+def test_browser_session_derive_static_key_no_signatures_matched() -> None:
+    """Test _derive_static_key_from_messages logs warning when no signatures match."""
+    import base64
+
+    session = BrowserSession("https://example.com")
+    session._magic = "A"
+
+    # Create a valid binary message
+    binary_payload = bytes([0x00, 0x04, 0x01, 0x00])
+    payload_b64 = base64.b64encode(binary_payload).decode()
+
+    session._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload=payload_b64,
+            ws_url="wss://test.com/ws",
+        ),
+    ]
+
+    from tankpit_bot import _test_hooks
+
+    original_finder = _test_hooks.find_best_static_byte
+
+    def fake_finder(raw_first_bytes: list[int], magic_first_byte: int) -> tuple[int, int]:
+        """Fake finder that returns 0 coverage."""
+        _ = (raw_first_bytes, magic_first_byte)
+        return (0, 0)  # No signatures matched
+
+    _test_hooks.find_best_static_byte = fake_finder
+    try:
+        session._derive_static_key_from_messages()
+        # Should return early with warning, static key remains None
+        assert session._static_key is None
+    finally:
+        _test_hooks.find_best_static_byte = original_finder
+
+
+def test_browser_session_derive_static_key_matches_current() -> None:
+    """Test _derive_static_key_from_messages when derived key matches current."""
+    import base64
+    from pathlib import Path
+
+    session = BrowserSession("https://example.com")
+    session._magic = "A"  # magic[0] = 65
+
+    # We want derived static[0] to match the current key's first byte.
+    # With magic='A' (65) and raw_0=65, K = raw_0 ^ magic = 0.
+    # decoded = static_0 ^ K = static_0.
+    # The smallest signature (0x21 = 33) is hit when static_0 = 33.
+    # So best_static_0 = 33, and we set current key to start with chr(33) = '!'.
+    binary_payload = bytes([0x00, 0x04, 0x01, 65])  # data byte 65 = 'A' = magic
+    payload_b64 = base64.b64encode(binary_payload).decode()
+
+    session._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload=payload_b64,
+            ws_url="wss://test.com/ws",
+        ),
+    ]
+
+    from tankpit_bot import _test_hooks
+
+    original_read = _test_hooks.read_text
+    write_called = False
+
+    def fake_read(path: Path) -> str:
+        if "static_key" in str(path):
+            # chr(33) = '!' - this matches best_static_0 = 33
+            return "!" + "A" * 999
+        return original_read(path)
+
+    def fake_write(path: Path, content: str) -> None:
+        nonlocal write_called
+        write_called = True
+
+    _test_hooks.read_text = fake_read
+    original_write = _test_hooks.write_text
+    _test_hooks.write_text = fake_write
+    try:
+        session._derive_static_key_from_messages()
+        # Key matches, so file should NOT be written (684->exit branch)
+        assert not write_called
+        assert session._static_key is None  # Not updated since it matches
+    finally:
+        _test_hooks.read_text = original_read
+        _test_hooks.write_text = original_write

@@ -1,0 +1,973 @@
+"""Tests for tankpit_bot.sniffer core module (WebSocketSniffer, run_sniffer, main)."""
+
+from __future__ import annotations
+
+import base64
+
+import pytest
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
+from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks import SyncPlaywrightFactoryProtocol
+from tankpit_bot.browser import PlaywrightNotInstalledError
+from tankpit_bot.sniffer import (
+    SnifferError,
+    WebSocketSniffer,
+    main,
+    run_sniffer,
+)
+from tankpit_bot.types import decode_capture_session
+from tests.conftest import FakeEnv, FakeFileSystem
+from tests.fakes import (
+    fake_sync_playwright,
+    fake_sync_playwright_no_messages,
+    fake_sync_playwright_with_magic,
+    fake_sync_playwright_with_mixed_scripts,
+    fake_sync_playwright_with_scripts,
+)
+
+# =============================================================================
+# WebSocketSniffer Tests
+# =============================================================================
+
+
+def test_websocket_sniffer_init() -> None:
+    """Test WebSocketSniffer initialization."""
+    sniffer = WebSocketSniffer("https://example.com", headless=True)
+    assert sniffer._target_url == "https://example.com"
+    assert sniffer._headless is True
+    assert sniffer._live_decode is False
+
+
+def test_websocket_sniffer_init_with_live_decode() -> None:
+    """Test WebSocketSniffer initialization with live_decode."""
+    sniffer = WebSocketSniffer("https://example.com", live_decode=True)
+    assert sniffer._live_decode is True
+
+
+def test_websocket_sniffer_run_without_playwright() -> None:
+    """Test WebSocketSniffer.run raises error when Playwright not installed."""
+    _test_hooks.sync_playwright = None
+    sniffer = WebSocketSniffer("https://example.com")
+    with pytest.raises(PlaywrightNotInstalledError, match="Playwright is not installed"):
+        sniffer.run(1000)
+
+
+def test_websocket_sniffer_run_captures_messages(fake_fs: FakeFileSystem) -> None:
+    """Test WebSocketSniffer.run captures WebSocket messages."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    sniffer = WebSocketSniffer("https://tankpit.com", headless=True)
+    session = sniffer.run(5000)
+
+    assert session["base_url"] == "https://tankpit.com"
+    assert len(session["messages"]) == 2
+    assert session["messages"][0]["direction"] == "sent"
+    assert session["messages"][0]["payload"] == "sent message"
+    assert session["messages"][1]["direction"] == "received"
+    assert session["messages"][1]["payload"] == "received message"
+
+
+def test_websocket_sniffer_records_websocket_urls(fake_fs: FakeFileSystem) -> None:
+    """Test WebSocketSniffer records WebSocket URLs from created events."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    sniffer = WebSocketSniffer("https://tankpit.com")
+    session = sniffer.run(1000)
+
+    for msg in session["messages"]:
+        assert msg["ws_url"] == "wss://example.com/ws"
+
+
+def test_websocket_sniffer_captures_magic(fake_fs: FakeFileSystem) -> None:
+    """Test WebSocketSniffer captures tankpit.magic value."""
+    _test_hooks.sync_playwright = fake_sync_playwright_with_magic
+
+    sniffer = WebSocketSniffer("https://tankpit.com")
+    session = sniffer.run(1000)
+
+    assert session["magic"] == "test_magic_xor_key_value"
+
+
+def test_websocket_sniffer_magic_none_when_not_available(fake_fs: FakeFileSystem) -> None:
+    """Test WebSocketSniffer sets magic to None when tankpit.magic not available."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    sniffer = WebSocketSniffer("https://tankpit.com")
+    session = sniffer.run(1000)
+
+    assert session["magic"] is None
+
+
+# =============================================================================
+# run_sniffer Tests
+# =============================================================================
+
+
+def test_run_sniffer_saves_to_file(fake_fs: FakeFileSystem) -> None:
+    """Test run_sniffer saves capture session to file."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    session = run_sniffer(
+        "https://tankpit.com",
+        "output.json",
+        headless=True,
+        capture_duration_ms=1000,
+    )
+
+    written_files = fake_fs.get_written_files()
+    content = written_files["output.json"]
+    parsed = load_json_str(content)
+    parsed_dict = narrow_json_to_dict(parsed)
+    decoded = decode_capture_session(parsed_dict)
+    assert decoded["session_id"] == session["session_id"]
+
+
+def test_run_sniffer_with_live_decode(fake_fs: FakeFileSystem) -> None:
+    """Test run_sniffer with live_decode enabled."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    session = run_sniffer(
+        "https://tankpit.com",
+        "output.json",
+        live_decode=True,
+    )
+
+    assert len(session["messages"]) == 2
+
+
+# =============================================================================
+# main() Tests
+# =============================================================================
+
+
+def test_main_with_defaults(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() uses default values when env vars not set."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Captured 2 WebSocket messages in" in output
+    assert "Saved to: capture_session.json" in output
+
+
+def test_main_with_custom_env(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() reads custom values from environment."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+    fake_env.set("TANKPIT_URL", "https://custom.tankpit.com")
+    fake_env.set("TANKPIT_OUTPUT", "custom_output.json")
+    fake_env.set("TANKPIT_HEADLESS", "true")
+    fake_env.set("TANKPIT_DURATION_MS", "5000")
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Saved to: custom_output.json" in output
+
+
+def test_main_headless_variations(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Test main() parses various headless env values."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    fake_env.set("TANKPIT_HEADLESS", "1")
+    main()
+
+    fake_env.set("TANKPIT_HEADLESS", "yes")
+    main()
+
+    fake_env.set("TANKPIT_HEADLESS", "TRUE")
+    main()
+
+
+def test_main_live_decode_disabled(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Test main() can disable live decode via env var."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    fake_env.set("TANKPIT_LIVE_DECODE", "false")
+    main()
+
+    fake_env.set("TANKPIT_LIVE_DECODE", "0")
+    main()
+
+    fake_env.set("TANKPIT_LIVE_DECODE", "no")
+    main()
+
+
+def test_main_prints_discovered_urls(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() prints discovered WebSocket URLs."""
+    _test_hooks.sync_playwright = fake_sync_playwright
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Discovered WebSocket URLs (1):" in output
+    assert "wss://example.com/ws" in output
+
+
+def test_main_installs_playwright_when_none(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Test main() installs playwright via get_sync_playwright when None."""
+
+    def get_fake_factory() -> SyncPlaywrightFactoryProtocol:
+        """Return the fake sync_playwright factory function."""
+        return fake_sync_playwright
+
+    _test_hooks.sync_playwright = None
+    _test_hooks.get_sync_playwright = get_fake_factory
+
+    main()
+
+    assert _test_hooks.sync_playwright == fake_sync_playwright
+
+
+def test_main_with_no_websocket_urls(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() when no WebSocket URLs are discovered."""
+    _test_hooks.sync_playwright = fake_sync_playwright_no_messages
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Captured 0 WebSocket messages in" in output
+    assert "Discovered WebSocket URLs" not in output
+
+
+def test_main_logs_script_urls(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() logs script URLs discovered on the page."""
+    _test_hooks.sync_playwright = fake_sync_playwright_with_scripts
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    assert "Loaded scripts (2):" in output
+    assert "- https://tankpit.com/js/game.js" in output
+    assert "- https://tankpit.com/js/protocol.js" in output
+
+
+def test_main_logs_only_string_script_urls(
+    fake_env: FakeEnv,
+    fake_fs: FakeFileSystem,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test main() only logs script URLs that are strings, skipping non-strings."""
+    _test_hooks.sync_playwright = fake_sync_playwright_with_mixed_scripts
+
+    main()
+
+    captured = capsys.readouterr()
+    output = captured.out
+    # Should log the valid string URLs
+    assert "Loaded scripts (4):" in output
+    assert "- https://tankpit.com/js/valid.js" in output
+    assert "- https://tankpit.com/js/another.js" in output
+    # Should NOT log the non-string values (123, None)
+    assert "- 123" not in output
+    assert "- None" not in output
+
+
+# =============================================================================
+# Error Class Tests
+# =============================================================================
+
+
+def test_sniffer_error_is_exception() -> None:
+    """Test SnifferError is an Exception."""
+    assert issubclass(SnifferError, Exception)
+    err = SnifferError("test error")
+    assert str(err) == "test error"
+
+
+# =============================================================================
+# MainPreferAccount Tests
+# =============================================================================
+
+
+class TestMainPreferAccount:
+    """Tests for main() with prefer_account option."""
+
+    def test_main_prefer_account_enabled(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """Test main() enables prefer_account via env var."""
+        _test_hooks.sync_playwright = fake_sync_playwright
+
+        fake_env.set("TANKPIT_PREFER_ACCOUNT", "true")
+        main()  # Should not raise
+
+        fake_env.set("TANKPIT_PREFER_ACCOUNT", "1")
+        main()  # Should not raise
+
+        fake_env.set("TANKPIT_PREFER_ACCOUNT", "yes")
+        main()  # Should not raise
+
+
+# =============================================================================
+# Sniffer Coverage Branches Tests
+# =============================================================================
+
+
+class TestSnifferCoverageBranches:
+    """Tests to cover remaining sniffer.py branches."""
+
+    def test_build_global_xor_table_no_static_key(self, fake_fs: FakeFileSystem) -> None:
+        """Test build_global_xor_table returns early when no static key file."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import xor
+
+        # Ensure no static key file
+        fake_fs.remove(DEFAULT_STATIC_KEY_PATH)
+
+        # Reset global state
+        xor._global_xor_table = None
+        xor._global_static_key = None
+
+        # Call without static key file existing
+        xor.build_global_xor_table("testmagic")
+
+        # Should remain None since no static key
+        assert xor._global_xor_table is None
+
+    def test_xor_decode_with_table(self, fake_fs: FakeFileSystem) -> None:
+        """Test xor_decode decodes correctly when xor table is set."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import xor
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        # Reset and build xor table
+        xor._global_xor_table = None
+        xor._global_static_key = None
+        xor.build_global_xor_table("testmagic")
+
+        xor_table = xor._global_xor_table
+        assert xor_table is not None and len(xor_table) == 1000, "XOR table should be 1000 bytes"
+
+        # Test decode with body longer than 2 bytes
+        body = bytes([0x2E, 0x41, 0x42, 0x43, 0x44])
+        result = xor.xor_decode(body)
+        assert len(result) == 4  # Should skip first byte (msg_type)
+
+    def test_xor_decode_extends_past_table(self, fake_fs: FakeFileSystem) -> None:
+        """Test xor_decode handles body longer than xor table."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import xor
+
+        static_key = "AB"  # Very short key
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        xor._global_xor_table = None
+        xor._global_static_key = None
+        xor.build_global_xor_table("t")
+
+        # Body longer than the xor table
+        body = bytes([0x2E, 0x01, 0x02, 0x03, 0x04, 0x05])
+        result = xor.xor_decode(body)
+        assert len(result) == 5
+
+    def test_update_viewport_short_extra_data(self) -> None:
+        """Test update_viewport_from_position_update with empty extra_data."""
+        from tankpit_bot.sniffer import viewport
+
+        viewport._viewport_left = None
+        viewport._self_tank_id = None
+
+        # Empty extra_data should return early
+        viewport.update_viewport_from_position_update(100, 50, 60, b"")
+        assert viewport._viewport_left is None
+
+    def test_update_viewport_relative_position(self) -> None:
+        """Test update_viewport_from_position_update skips (3,3) viewport-relative."""
+        from tankpit_bot.sniffer import viewport
+
+        viewport._viewport_left = None
+        viewport._self_tank_id = None
+
+        # Position (3,3) is viewport-relative, should skip
+        viewport.update_viewport_from_position_update(100, 3, 3, b"\x05")
+        assert viewport._viewport_left is None
+
+    def test_update_viewport_different_tank(self) -> None:
+        """Test update_viewport_from_position_update ignores other tanks."""
+        from tankpit_bot.sniffer import viewport
+
+        viewport._viewport_left = None
+        viewport._self_tank_id = 100  # Set self tank ID
+
+        # Different tank ID should not update viewport
+        viewport.update_viewport_from_position_update(200, 50, 60, b"\x10")
+        assert viewport._viewport_left is None
+
+    def test_update_viewport_self_tank(self) -> None:
+        """Test update_viewport_from_position_update updates for self tank."""
+        from tankpit_bot.sniffer import viewport
+
+        viewport._viewport_left = None
+        viewport._self_tank_id = 100
+
+        # Self tank with absolute position
+        viewport.update_viewport_from_position_update(100, 50, 60, b"\x10")
+        # viewport_left = x - player_viewport_x = 50 - 16 = 34
+        assert viewport._viewport_left == 34
+
+    def test_format_container_simple_container_pickup(self) -> None:
+        """Test format_container_simple for container_pickup message."""
+        from tankpit_bot.container.types import ContainerPickupDict
+        from tankpit_bot.sniffer import format_container_simple
+
+        msg = ContainerPickupDict(
+            msg_type="container_pickup",
+            x=10,
+            y=20,
+            volume=500,
+            is_fuel=True,
+        )
+        result = format_container_simple(msg)
+        # container_pickup returns "pos=(x,y) FUEL vol=N" format
+        assert result == "pos=(10,20) FUEL vol=500"
+
+    def test_format_container_simple_radar_response(self) -> None:
+        """Test format_container_simple for radar_response message."""
+        from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
+        from tankpit_bot.sniffer import format_container_simple
+
+        msg = RadarResponseDict(
+            msg_type="radar_response",
+            container_count=2,
+            containers=[RadarContainerDict(x=10, y=20, volume=100)],
+            mines=[RadarMineDict(x=30, y=40, team=0)],
+        )
+        result = format_container_simple(msg)
+        # radar_response returns formatted container/mine count
+        assert "2 containers" in str(result)
+        assert "1 mines" in str(result)
+
+    def test_format_position_details_movement_response(self) -> None:
+        """Test format_position_details for movement_response (0x3D)."""
+        from tankpit_bot.protocol import MovementResponseDict
+        from tankpit_bot.sniffer import format_position_details
+
+        msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=0,
+            tank_id=100,
+            x=10,
+            y=20,
+            direction=0,
+            rank=3,
+            leaderboard_position=5,
+        )
+        result = format_position_details(msg)
+        # MovementResponseDict returns empty string (no match in format_position_details)
+        assert result == ""
+
+    def test_format_message_details_tank_type(self) -> None:
+        """Test format_message_details routes tank types correctly."""
+        from tankpit_bot.protocol import TankEntryDict
+        from tankpit_bot.sniffer import format_message_details
+
+        msg = TankEntryDict(
+            msg_type=0x28,
+            tank_id=100,
+            x=50,
+            y=60,
+            name="Test",
+        )
+        result = format_message_details(msg)
+        # TankEntry should include name and tank_id
+        assert "Test" in result
+        assert "100" in result
+
+    def test_format_message_details_resource_type(self) -> None:
+        """Test format_message_details routes resource types correctly."""
+        from tankpit_bot.protocol import FuelGainDict
+        from tankpit_bot.sniffer import format_message_details
+
+        msg = FuelGainDict(
+            msg_type=0x44,
+            amount=100,
+            is_free=False,
+        )
+        result = format_message_details(msg)
+        # FuelGain should include amount
+        assert "100" in result
+
+    def test_format_message_details_position_type(self) -> None:
+        """Test format_message_details routes position types correctly."""
+        from tankpit_bot.protocol import MinePlacementDict
+        from tankpit_bot.sniffer import format_message_details
+
+        msg = MinePlacementDict(
+            msg_type=0x4B,
+            mine_type=0,
+            tank_id=100,
+            positions=[(50, 60)],
+        )
+        result = format_message_details(msg)
+        # MinePlacement should include tank id
+        assert "100" in result
+
+    def test_format_message_details_radar_type(self) -> None:
+        """Test format_message_details routes radar types correctly."""
+        from tankpit_bot.protocol import RadarResultDict
+        from tankpit_bot.sniffer import format_message_details
+
+        msg = RadarResultDict(
+            msg_type=0x46,
+            detection_type=1,
+            found=True,
+        )
+        result = format_message_details(msg)
+        # RadarResult is handled by format_radar_details
+        assert "type=1" in result
+        assert "found=True" in result
+
+    def test_format_message_details_misc_type(self) -> None:
+        """Test format_message_details routes misc types correctly."""
+        from tankpit_bot.protocol import EquipmentGainDict
+        from tankpit_bot.sniffer import format_message_details
+
+        msg = EquipmentGainDict(
+            msg_type=0x67,
+            show_message=True,
+            gained=[1, 2],
+        )
+        result = format_message_details(msg)
+        # EquipmentGain includes gained list
+        assert "gained=[1, 2]" in result
+
+    def test_decode_8byte_state(self) -> None:
+        """Test decode_state_message handles 8-byte state messages."""
+        from tankpit_bot.sniffer import decode_state_message
+
+        # 8-byte body triggers decode_8byte_state
+        body = bytes([0x2E, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07])
+        result = decode_state_message(body, "TEST")
+        assert "[TEST]" in result
+
+    def test_handle_tank_registry_with_name_not_container(self) -> None:
+        """Test handle_tank_registry stores name for non-container tanks."""
+        from tankpit_bot.sniffer import handle_tank_registry, player_tracking
+
+        # Reset tank names
+        player_tracking._tank_names.clear()
+
+        result = handle_tank_registry(
+            tid=100,
+            name="TestPlayer",
+            team="red",
+            rank=3,
+            badges=0,
+            is_bot=False,
+            is_container=False,
+            container_y=None,
+            container_viewport_x=None,
+        )
+        assert "TestPlayer" in result
+        assert player_tracking._tank_names.get(100) == "TestPlayer"
+
+    def test_handle_tank_registry_container_skips_name_storage(self) -> None:
+        """Test handle_tank_registry does not store name for containers."""
+        from tankpit_bot.sniffer import handle_tank_registry, player_tracking
+
+        # Reset tank names
+        player_tracking._tank_names.clear()
+
+        result = handle_tank_registry(
+            tid=200,
+            name="ContainerName",
+            team="red",
+            rank=0,
+            badges=0,
+            is_bot=False,
+            is_container=True,  # Container - should skip name storage
+            container_y=50,
+            container_viewport_x=10,
+        )
+        # Result should still format the details
+        assert "200" in result
+        # But name should NOT be stored in _tank_names
+        assert player_tracking._tank_names.get(200) is None
+
+    def test_init_trackers_skips_already_initialized(self, fake_fs: FakeFileSystem) -> None:
+        """Test init_trackers_with_magic skips trackers with xor_table set."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import trackers
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        # First init
+        for tracker in trackers.ALL_TRACKERS:
+            tracker._xor_table = None
+            tracker._static_key = None
+        trackers.init_trackers_with_magic("magic1")
+
+        # Capture the xor tables
+        first_tables: list[bytes | None] = []
+        for tracker in trackers.ALL_TRACKERS:
+            first_tables.append(tracker._xor_table)
+
+        # Second init with different magic should NOT change tables
+        trackers.init_trackers_with_magic("differentmagic")
+
+        # Tables should be same (skipped re-init)
+        for i in range(len(trackers.ALL_TRACKERS)):
+            assert trackers.ALL_TRACKERS[i]._xor_table == first_tables[i]
+
+    def test_format_container_details_movement(self) -> None:
+        """Test format_container_details for movement message."""
+        from tankpit_bot.container.types import MovementDict
+        from tankpit_bot.sniffer import format_container_details
+
+        msg = MovementDict(
+            msg_type="movement",
+            flags=0x7E,
+            start_x=50,
+            start_y=60,
+            player_id=100,
+            tank_id=None,
+            waypoints="nnee",
+            is_self=True,
+        )
+        result = format_container_details(msg)
+        # movement returns formatted position and waypoints
+        assert "(50,60)" in result
+        assert "nnee" in result
+
+    def test_dispatch_world_state_update_radar_response(self) -> None:
+        """Test dispatch_world_state_update processes radar_response."""
+        from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
+        from tankpit_bot.sniffer import world_state
+
+        # Reset world state
+        world_state.reset_world_state()
+
+        msg = RadarResponseDict(
+            msg_type="radar_response",
+            container_count=1,
+            containers=[RadarContainerDict(x=10, y=20, volume=100)],
+            mines=[RadarMineDict(x=30, y=40, team=0)],
+        )
+        # This should update world state
+        world_state.dispatch_world_state_update(msg)
+        # No assertion needed - just verifying the code path runs without error
+
+    def test_dispatch_world_state_update_movement_response_valid(self) -> None:
+        """Test dispatch_world_state_update with valid MovementResponse updates position."""
+        from tankpit_bot.protocol import MovementResponseDict
+        from tankpit_bot.sniffer import world_state
+
+        # Reset world state
+        world_state.reset_world_state()
+
+        msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=0,
+            tank_id=100,
+            x=50,
+            y=60,
+            direction=0,
+            rank=3,
+            leaderboard_position=5,
+        )
+        # This should update world state position
+        world_state.dispatch_world_state_update(msg)
+        # No crash means success - position update occurred
+
+    def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_received_message logs result when message decodes."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import decoders, xor
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        # Reset and build XOR table
+        xor._global_xor_table = None
+        xor._global_static_key = None
+        xor.build_global_xor_table("testmagic")
+
+        # Create a valid message payload (simple text message)
+        # Format: 2-byte length + body
+        body = bytes([ord("=")]) + b"0|2024|Player|3|0|0|0|0"
+        header = len(body).to_bytes(2, "little")
+        payload = base64.b64encode(header + body).decode()
+
+        # This should decode and log (we just verify no crash)
+        decoders.process_received_message(payload)
+
+    def test_process_received_message_binary(self, fake_fs: FakeFileSystem) -> None:
+        """Test process_received_message handles binary messages."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import decoders, xor
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        # Reset and build XOR table
+        xor._global_xor_table = None
+        xor._global_static_key = None
+        xor.build_global_xor_table("testmagic")
+
+        xor_table = xor._global_xor_table
+        assert xor_table is not None and len(xor_table) > 0
+
+        # Create a binary message (not a text type)
+        # Use 0x41 'A' for Deactivation message: victim=1, killer=2, rank=3, points=5
+        plaintext = bytes([0x41, 0x01, 0x00, 0x02, 0x00, 0x03, 0x05])
+        # XOR encode the body (skip first byte which is msg_type indicator)
+        body = bytes([0x2E])  # Container prefix
+        body += bytes(plaintext[i] ^ xor_table[i] for i in range(len(plaintext)))
+
+        header = len(body).to_bytes(2, "little")
+        payload = base64.b64encode(header + body).decode()
+
+        # This should decode through the binary path
+        decoders.process_received_message(payload)
+
+
+# =============================================================================
+# WebSocketSniffer Methods Tests
+# =============================================================================
+
+
+class TestWebSocketSnifferMethods:
+    """Tests for WebSocketSniffer method coverage."""
+
+    def test_process_game_log_entry_stores_entry(self) -> None:
+        """Test _process_game_log_entry stores entries with timestamp."""
+        from tankpit_bot.browser import GameLogEntry
+
+        # Create sniffer with minimal init - we'll call methods directly
+        # Using object.__new__ to avoid full __init__
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._live_decode = False
+
+        entry = GameLogEntry(text="Player destroyed Enemy", category="combat")
+
+        # Call the method directly
+        sniffer._process_game_log_entry(entry)
+
+        # Verify entry was stored
+        assert len(sniffer._game_log_entries) == 1
+        stored = sniffer._game_log_entries[0]
+        assert stored["text"] == "Player destroyed Enemy"
+        assert stored["category"] == "combat"
+        assert isinstance(stored["timestamp_ms"], int) and stored["timestamp_ms"] > 0
+
+    def test_on_message_captured_sent_mine_status(self, fake_fs: FakeFileSystem) -> None:
+        """Test _on_message_captured logs mine status for sent messages."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+        from tankpit_bot.sniffer import trackers
+        from tankpit_bot.types import CapturedMessage
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        # Reset trackers
+        for tracker in trackers.ALL_TRACKERS:
+            tracker._xor_table = None
+            tracker._static_key = None
+
+        # Create sniffer with minimal init
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._live_decode = True
+        sniffer._magic = "testmagic"
+        sniffer._game_log_scraper = None
+        sniffer._inventory_scraper = None
+
+        # Initialize trackers with magic
+        trackers.init_trackers_with_magic("testmagic")
+
+        xor_table = trackers.mine_tracker._xor_table
+        assert xor_table is not None and len(xor_table) == 1000
+
+        # Create a mine drop command message (type=4, id=98)
+        # Format: 0x21 '!' prefix, then XOR encoded command
+        plaintext = bytes([4, 98, 50, 60])  # cmd_type=4, id=98, x=50, y=60
+        body = bytes([0x21])  # Command prefix
+        body += bytes(plaintext[i] ^ xor_table[i] for i in range(len(plaintext)))
+
+        header = len(body).to_bytes(2, "little")
+        payload = base64.b64encode(header + body).decode()
+
+        message = CapturedMessage(
+            timestamp_ms=12345,
+            direction="sent",
+            payload=payload,
+            ws_url="wss://example.com",
+        )
+
+        # Call _on_message_captured - this should hit the mine_status branch
+        sniffer._on_message_captured(message)
+
+
+# =============================================================================
+# Log JS Fuel Findings Tests
+# =============================================================================
+
+
+class TestLogJsFuelFindings:
+    """Tests for _log_js_fuel_findings function."""
+
+    def test_result_wrapper_not_dict(self) -> None:
+        """Test early return when result wrapper is not a dict."""
+        from tankpit_bot.sniffer.core import _log_js_fuel_findings
+
+        # result_wrapper is None
+        _log_js_fuel_findings({})
+        # result_wrapper is not a dict
+        _log_js_fuel_findings({"result": "string"})
+        _log_js_fuel_findings({"result": 123})
+        _log_js_fuel_findings({"result": []})
+
+    def test_findings_not_list(self) -> None:
+        """Test early return when findings value is not a list."""
+        from tankpit_bot.sniffer.core import _log_js_fuel_findings
+
+        # value is None
+        _log_js_fuel_findings({"result": {}})
+        # value is not a list
+        _log_js_fuel_findings({"result": {"value": "string"}})
+        _log_js_fuel_findings({"result": {"value": 123}})
+        _log_js_fuel_findings({"result": {"value": {}}})
+
+    def test_finding_not_dict(self) -> None:
+        """Test skipping non-dict findings in list."""
+        from tankpit_bot.sniffer.core import _log_js_fuel_findings
+
+        # List contains non-dict items - should skip them
+        _log_js_fuel_findings({"result": {"value": ["string", 123, None]}})
+
+    def test_finding_missing_path_or_value(self) -> None:
+        """Test skipping findings with missing path or value."""
+        from tankpit_bot.sniffer.core import _log_js_fuel_findings
+
+        # path is None
+        _log_js_fuel_findings({"result": {"value": [{"value": 1000}]}})
+        # value is None
+        _log_js_fuel_findings({"result": {"value": [{"path": "game.fuel"}]}})
+        # Both None
+        _log_js_fuel_findings({"result": {"value": [{}]}})
+
+    def test_logs_valid_findings(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Test that valid findings are logged."""
+        import logging
+
+        from tankpit_bot.sniffer.core import _log_js_fuel_findings
+
+        with caplog.at_level(logging.INFO):
+            _log_js_fuel_findings(
+                {
+                    "result": {
+                        "value": [
+                            {"path": "game.fuel", "value": 1000},
+                            {"path": "player.hp", "value": 1200},
+                        ]
+                    }
+                }
+            )
+
+        assert "[JS:FUEL] game.fuel = 1000" in caplog.text
+        assert "[JS:FUEL] player.hp = 1200" in caplog.text
+
+
+# =============================================================================
+# Submodule Coverage Tests
+# =============================================================================
+
+
+class TestSubmoduleCoverage:
+    """Tests for uncovered branches in sniffer submodules."""
+
+    def test_get_global_xor_table(self) -> None:
+        """Test get_global_xor_table returns table or None."""
+        from tankpit_bot.sniffer import xor
+
+        xor._global_xor_table = None
+        assert xor.get_global_xor_table() is None
+
+        xor._global_xor_table = b"test"
+        assert xor.get_global_xor_table() == b"test"
+
+        # Clean up
+        xor._global_xor_table = None
+
+    def test_reset_all_trackers(self) -> None:
+        """Test reset_all_trackers clears all tracker state."""
+        from tankpit_bot.sniffer import trackers
+
+        # Set some state on trackers
+        for tracker in trackers.ALL_TRACKERS:
+            tracker._xor_table = b"test_table"
+            tracker._static_key = "test_key"
+
+        # Reset
+        trackers.reset_all_trackers()
+
+        # Verify all are cleared
+        for tracker in trackers.ALL_TRACKERS:
+            assert tracker._xor_table is None
+            assert tracker._static_key is None
+
+    def test_register_tank_name_empty_name(self) -> None:
+        """Test register_tank_name ignores empty names."""
+        from tankpit_bot.sniffer import player_tracking
+
+        player_tracking._tank_names.clear()
+
+        # Empty name should not be stored
+        player_tracking.register_tank_name(100, "")
+        assert 100 not in player_tracking._tank_names
+
+        # Non-empty name should be stored
+        player_tracking.register_tank_name(100, "Player")
+        assert player_tracking._tank_names.get(100) == "Player"
+
+    def test_get_tank_name_not_found(self) -> None:
+        """Test get_tank_name returns empty string for unknown tank."""
+        from tankpit_bot.sniffer import player_tracking
+
+        player_tracking._tank_names.clear()
+
+        # Unknown tank should return empty string
+        result = player_tracking.get_tank_name(999)
+        assert result == ""

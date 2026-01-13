@@ -308,6 +308,159 @@ def deserialize_command(data: bytes, type_byte: int) -> QueryCommand | ActionCom
     return ActionCommand(kind="action", cmd_id=cmd_id, data=payload.hex())
 
 
+# =============================================================================
+# Wire Format Command Builders (NO XOR encoding for sent commands)
+# =============================================================================
+#
+# Based on protocol analysis of captured traffic, sent commands use:
+#   Type byte = 0x20 | type_number (NOT XOR encoded)
+#   Format: ! + type_byte + cmd_id + [payload]
+#
+# Type numbers:
+#   2 = Query (hotkeys like radar, inventory)
+#   3 = UI (scope, leaderboard, equipment toggle)
+#   4 = Movement (move, pickup, teleport)
+#   6 = Combat (shoot)
+
+TYPE_QUERY = 0x22  # 0x20 | 2
+TYPE_UI = 0x23  # 0x20 | 3
+TYPE_MOVEMENT = 0x24  # 0x20 | 4
+TYPE_COMBAT = 0x26  # 0x20 | 6
+
+
+def build_query_command(cmd_id: int) -> bytes:
+    """Build a query command ready to send (with length header).
+
+    Query commands: radar, mine, map open, inventory, etc.
+    Format: [len_lo, len_hi] + ! + 0x22 + cmd_id (5 bytes total)
+
+    Args:
+        cmd_id: Command ID (e.g., CMD_RADAR=102, CMD_MINE=107).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_QUERY, cmd_id])
+    # Add 2-byte little-endian length header
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_move_command(x: int, y: int) -> bytes:
+    """Build a MOVE command ready to send (with length header).
+
+    Format: [len_lo, len_hi] + ! + 0x24 + 0x70 + X + Y (7 bytes total)
+
+    Args:
+        x: Target X coordinate (0-255).
+        y: Target Y coordinate (0-255).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_MOVE, x & 0xFF, y & 0xFF])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_pickup_command(x: int, y: int) -> bytes:
+    """Build a PICKUP_MOVE command ready to send (with length header).
+
+    Used for moving to pick up fuel/equipment containers.
+    Format: [len_lo, len_hi] + ! + 0x24 + 0x6a + X + Y (7 bytes total)
+
+    Args:
+        x: Target X coordinate (0-255).
+        y: Target Y coordinate (0-255).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_PICKUP_MOVE, x & 0xFF, y & 0xFF])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_teleport_command(x: int, y: int) -> bytes:
+    """Build a MAP_TELEPORT command ready to send (with length header).
+
+    Requires map to be open first (send CMD_MAP_OPEN).
+    Format: [len_lo, len_hi] + ! + 0x24 + 0x74 + X + Y (7 bytes total)
+
+    Args:
+        x: Destination X coordinate (0-255).
+        y: Destination Y coordinate (0-255).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_MAP_TELEPORT, x & 0xFF, y & 0xFF])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_shoot_command(x: int, y: int, target_id: int = 0) -> bytes:
+    """Build a SHOOT command ready to send (with length header).
+
+    Format: [len_lo, len_hi] + ! + 0x26 + 0x73 + X + Y + id_lo + id_hi (9 bytes total)
+
+    Args:
+        x: Target X coordinate (0-255).
+        y: Target Y coordinate (0-255).
+        target_id: Target entity ID (0 if no specific target).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes(
+        [
+            COMMAND_PREFIX,
+            TYPE_COMBAT,
+            CMD_SHOOT,
+            x & 0xFF,
+            y & 0xFF,
+            target_id & 0xFF,
+            (target_id >> 8) & 0xFF,
+        ]
+    )
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_scope_command(direction: int) -> bytes:
+    """Build a SCOPE (pan camera) command ready to send.
+
+    Format: [len_lo, len_hi] + ! + 0x23 + 0x5a + direction (6 bytes total)
+
+    Args:
+        direction: Scope direction (SCOPE_NORTH, SCOPE_EAST, etc.).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_UI, CMD_SCOPE, direction])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_toggle_equipment_command(slot: int) -> bytes:
+    """Build a TOGGLE_EQUIPMENT command ready to send.
+
+    Format: [len_lo, len_hi] + ! + 0x23 + 0x72 + slot_char (6 bytes total)
+
+    Args:
+        slot: Equipment slot (1-5): 1=armor, 2=dual, 3=missile, 4=homing, 5=radar.
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    # Slot is sent as ASCII digit: '1'=0x31, '2'=0x32, etc.
+    slot_char = 0x30 + slot
+    body = bytes([COMMAND_PREFIX, TYPE_UI, CMD_TOGGLE_EQUIPMENT, slot_char])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
 __all__ = [
     "CMD_ACTIVE_FORCES",
     "CMD_ACTIVE_PLAYERS",
@@ -339,9 +492,20 @@ __all__ = [
     "SCOPE_SOUTHWEST",
     "SCOPE_WEST",
     "TICK_RATE_MS",
+    "TYPE_COMBAT",
+    "TYPE_MOVEMENT",
+    "TYPE_QUERY",
+    "TYPE_UI",
     "ActionCommand",
     "CommandType",
     "QueryCommand",
+    "build_move_command",
+    "build_pickup_command",
+    "build_query_command",
+    "build_scope_command",
+    "build_shoot_command",
+    "build_teleport_command",
+    "build_toggle_equipment_command",
     "decode_action_command",
     "decode_query_command",
     "deserialize_command",
