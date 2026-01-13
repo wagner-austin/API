@@ -33,10 +33,10 @@ poetry install --with dev
 # Required
 export OPENAI_API_KEY=sk-...
 
-# Optional
-export TRANSCRIPT_MAX_VIDEO_SECONDS=3600  # Max video duration (0 = unlimited)
-export TRANSCRIPT_MAX_FILE_MB=100         # Max file size (0 = unlimited)
-export TRANSCRIPT_ENABLE_CHUNKING=1       # Enable audio chunking
+# Optional (defaults shown - usually no need to override)
+export TRANSCRIPT_MAX_VIDEO_SECONDS=3600  # Max video duration (default: 1 hour)
+export TRANSCRIPT_MAX_FILE_MB=100         # Max file size (default: 100MB)
+export TRANSCRIPT_ENABLE_CHUNKING=true    # Enable audio chunking (default: true)
 ```
 
 ### Run the Service
@@ -78,9 +78,9 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 |----------|------|---------|-------------|
 | `OPENAI_API_KEY` | string | **Required** | OpenAI API key for Whisper |
 | `PORT` | int | `8000` | Server port |
-| `TRANSCRIPT_MAX_VIDEO_SECONDS` | int | `0` | Max video duration (0 = unlimited) |
-| `TRANSCRIPT_MAX_FILE_MB` | int | `0` | Max audio file size (0 = unlimited) |
-| `TRANSCRIPT_ENABLE_CHUNKING` | bool | `false` | Enable audio chunking for large files |
+| `TRANSCRIPT_MAX_VIDEO_SECONDS` | int | `3600` | Max video duration (1 hour) |
+| `TRANSCRIPT_MAX_FILE_MB` | int | `100` | Max audio file size |
+| `TRANSCRIPT_ENABLE_CHUNKING` | bool | `true` | Enable audio chunking for large files |
 | `TRANSCRIPT_CHUNK_THRESHOLD_MB` | float | `20.0` | File size threshold to trigger chunking |
 | `TRANSCRIPT_TARGET_CHUNK_MB` | float | `20.0` | Target size for each audio chunk |
 | `TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS` | float | `600.0` | Max duration per chunk (10 min) |
@@ -144,10 +144,11 @@ All errors return JSON with consistent format:
 
 ---
 
-## Supported YouTube URL Formats
+## Supported URL Formats
 
-The service accepts various YouTube URL formats:
+The service accepts YouTube, Vimeo, and direct video/audio URLs:
 
+### YouTube
 ```
 https://www.youtube.com/watch?v=VIDEO_ID
 https://youtube.com/watch?v=VIDEO_ID
@@ -157,9 +158,23 @@ https://www.youtube.com/shorts/VIDEO_ID
 https://www.youtube.com/live/VIDEO_ID
 ```
 
-**Video ID Requirements:**
-- Exactly 11 characters
-- Alphanumeric plus `-` and `_`
+### Vimeo
+```
+https://vimeo.com/123456789
+https://player.vimeo.com/video/123456789
+```
+
+### Direct URLs
+```
+https://example.com/video.mp4
+https://example.com/audio.mp3
+https://cdn.example.com/media.webm
+https://canvas.example.edu/files/123/download?verifier=abc
+```
+
+**Supported extensions:** mp4, webm, mkv, avi, mov, mp3, wav, flac, m4a, ogg
+
+**LMS/CDN patterns:** `/files/*/download`, `/media/*`, `/attachments/*`
 
 ---
 
@@ -248,7 +263,7 @@ When enabled, the service automatically splits large audio files for better reli
 1. **Threshold Check**: If file size > `TRANSCRIPT_CHUNK_THRESHOLD_MB` or duration > `TRANSCRIPT_MAX_CHUNK_DURATION_SECONDS`
 2. **Silence Detection**: Run `ffmpeg -af silencedetect` to find quiet sections
 3. **Optimal Splits**: Calculate split points snapped to silence (within 30% tolerance)
-4. **Stream Copy**: Use `ffmpeg -c copy` for fast, lossless splitting
+4. **Re-encode to MP3**: Convert chunks to MP3 format for maximum OpenAI API compatibility
 5. **Parallel Transcription**: Process chunks concurrently with `ThreadPoolExecutor`
 6. **Merge**: Adjust timestamps and concatenate segments
 
