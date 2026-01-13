@@ -867,3 +867,165 @@ class TestModelLearning:
             f"Model predictions too similar: difference={difference:.3f} "
             f"(risky={risky_breach_prob:.3f}, safe={safe_breach_prob:.3f})"
         )
+
+
+class TestUploadModelToDataBank:
+    """Tests for _upload_model_to_data_bank function."""
+
+    def test_success(self, tmp_path: Path) -> None:
+        """Test successful model upload to data-bank via hook."""
+        from covenant_radar_api.worker import _test_hooks as worker_hooks
+        from covenant_radar_api.worker.train_job import _upload_model_to_data_bank
+
+        model_path = tmp_path / "test_model.ubj"
+        model_path.write_bytes(b"fake model bytes")
+
+        upload_calls: list[tuple[Path, str, str]] = []
+
+        class FakeUploader:
+            """Fake uploader implementing DataBankUploaderProtocol."""
+
+            def __call__(
+                self,
+                model_path: Path,
+                data_bank_url: str,
+                data_bank_key: str,
+            ) -> str:
+                upload_calls.append((model_path, data_bank_url, data_bank_key))
+                return model_path.name
+
+        orig_uploader = worker_hooks.data_bank_uploader
+        worker_hooks.data_bank_uploader = FakeUploader()
+
+        try:
+            result = _upload_model_to_data_bank(
+                model_path,
+                "https://data-bank.example.com",
+                "test-api-key",
+            )
+
+            assert result == "test_model.ubj"
+            assert len(upload_calls) == 1
+            assert upload_calls[0][0] == model_path
+            assert upload_calls[0][1] == "https://data-bank.example.com"
+            assert upload_calls[0][2] == "test-api-key"
+        finally:
+            worker_hooks.data_bank_uploader = orig_uploader
+
+
+class TestProcessTrainJobWithDataBank:
+    """Tests for process_train_job with data-bank integration."""
+
+    def test_uploads_model_when_configured(self, tmp_path: Path) -> None:
+        """Test that process job uploads model when data-bank is configured."""
+        from platform_core.config import _test_hooks as config_hooks
+        from platform_core.testing import FakeEnv
+        from platform_workers.redis import RedisStrProto
+        from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
+        from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
+
+        from covenant_radar_api.worker import _test_hooks as worker_hooks
+
+        store = InMemoryStore()
+
+        # Add training data - need at least 10 samples
+        sectors = ["Technology", "Finance", "Healthcare"]
+        regions = ["North America", "Europe", "Asia"]
+
+        for i in range(12):
+            deal_id = f"d{i + 1}"
+            sector = sectors[i % 3]
+            region = regions[i % 3]
+            _add_deal(store, deal_id, sector, region)
+            _add_measurements_for_deal(store, deal_id)
+            has_breach = i % 2 == 0
+            _add_covenant_results_for_deal(store, deal_id, f"c{i + 1}", has_breach=has_breach)
+
+        upload_calls: list[str] = []
+
+        class FakeUploader:
+            """Fake uploader that tracks calls."""
+
+            def __call__(
+                self,
+                model_path: Path,
+                data_bank_url: str,
+                data_bank_key: str,
+            ) -> str:
+                upload_calls.append(model_path.name)
+                return model_path.name
+
+        orig_uploader = worker_hooks.data_bank_uploader
+        worker_hooks.data_bank_uploader = FakeUploader()
+
+        # Create FakeEnv with data-bank configured
+        fake_env = FakeEnv(
+            {
+                "REDIS_URL": "redis://test:6379/0",
+                "DATABASE_URL": "postgresql://test@localhost/test",
+                "MODEL_OUTPUT_DIR": str(tmp_path),
+                "DATA_BANK_API_URL": "https://data-bank.example.com",
+                "DATA_BANK_API_KEY": "test-key",
+            }
+        )
+
+        # Override config hooks to use fake env
+        orig_get_env = config_hooks.get_env
+        config_hooks.get_env = fake_env
+
+        # Override container hooks to use fakes
+        fake_kv: FakeRedis = FakeRedis()
+        fake_kv.sadd("rq:workers", "worker-1")
+        fake_rq: FakeRedisBytesClient = FakeRedisBytesClient()
+        fake_queue: FakeQueue = FakeQueue()
+
+        def kv_factory(url: str) -> RedisStrProto:
+            return fake_kv
+
+        def connection_factory(dsn: str) -> ConnectionProtocol:
+            return InMemoryConnection(store)
+
+        def rq_client_factory(url: str) -> _RedisBytesClient:
+            return fake_rq
+
+        def queue_factory(name: str, connection: _RedisBytesClient) -> RQClientQueue:
+            return fake_queue
+
+        orig_kv = _test_hooks.kv_factory
+        orig_conn = _test_hooks.connection_factory
+        orig_rq = _test_hooks.rq_client_factory
+        orig_queue = _test_hooks.queue_factory
+
+        _test_hooks.kv_factory = kv_factory
+        _test_hooks.connection_factory = connection_factory
+        _test_hooks.rq_client_factory = rq_client_factory
+        _test_hooks.queue_factory = queue_factory
+
+        try:
+            config_json = dump_json_str(
+                {
+                    "learning_rate": 0.1,
+                    "max_depth": 3,
+                    "n_estimators": 10,
+                    "subsample": 1.0,
+                    "colsample_bytree": 1.0,
+                    "random_state": 42,
+                }
+            )
+
+            result = process_train_job(config_json)
+
+            assert result["status"] == "complete"
+            assert result["samples_total"] == 12
+            assert "model_file_id" in result
+            assert result["model_file_id"] == "active_xgb.ubj"
+            assert len(upload_calls) == 1
+            assert upload_calls[0] == "active_xgb.ubj"
+        finally:
+            # Restore all hooks
+            config_hooks.get_env = orig_get_env
+            _test_hooks.kv_factory = orig_kv
+            _test_hooks.connection_factory = orig_conn
+            _test_hooks.rq_client_factory = orig_rq
+            _test_hooks.queue_factory = orig_queue
+            worker_hooks.data_bank_uploader = orig_uploader
