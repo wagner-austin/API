@@ -24,7 +24,24 @@ curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/predict" \
 
 Response includes `probability` (0.0-1.0) and `risk_tier` (LOW/MEDIUM/HIGH/CRITICAL).
 
-### 2. Train a Model on External Data
+### 2. Train a Model on Internal Data
+
+```bash
+curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/train" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "learning_rate": 0.1,
+    "max_depth": 6,
+    "n_estimators": 100,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42
+  }'
+```
+
+Trains XGBoost on internal deal/measurement data. Optional: `device`, `train_ratio`, `val_ratio`, `test_ratio`, `early_stopping_rounds`, `reg_alpha`, `reg_lambda`, `scale_pos_weight`.
+
+### 3. Train a Model on External Data
 
 ```bash
 curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/train-external" \
@@ -49,7 +66,7 @@ curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/train-exte
 
 Returns `job_id` - poll `/ml/jobs/{job_id}` for status.
 
-### 3. Optimize Hyperparameters
+### 4. Optimize Hyperparameters
 
 ```bash
 curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/optimize" \
@@ -62,7 +79,26 @@ curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/optimize" 
   }'
 ```
 
-### 4. Check Job Status
+### 5. Explain Feature Importance
+
+```bash
+curl -X POST "https://covenant-radar-api-production.up.railway.app/ml/explain" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset": "taiwan",
+    "backend": "xgboost",
+    "model_path": "/path/to/model.ubj",
+    "explainer": "shap_tree"
+  }'
+```
+
+Explainers by backend:
+- **XGBoost/LightGBM**: `permutation`, `shap_tree`
+- **MLP/LSTM**: `gradient`, `integrated_gradients`, `permutation`
+
+Optional: `target_class` (default 1), `n_samples` (default 1000), `random_state` (default 42).
+
+### 6. Check Job Status
 
 ```bash
 curl "https://covenant-radar-api-production.up.railway.app/ml/jobs/{job_id}"
@@ -70,13 +106,13 @@ curl "https://covenant-radar-api-production.up.railway.app/ml/jobs/{job_id}"
 
 Status values: `queued`, `started`, `finished`, `failed`, `not_found`.
 
-### 5. Get Active Model Info
+### 7. Get Active Model Info
 
 ```bash
 curl "https://covenant-radar-api-production.up.railway.app/ml/models/active"
 ```
 
-### 6. View Dashboard
+### 8. View Dashboard
 
 Open in browser: `https://covenant-radar-api-production.up.railway.app/dashboard`
 
@@ -84,10 +120,10 @@ Open in browser: `https://covenant-radar-api-production.up.railway.app/dashboard
 
 | Backend | Format | GPU | Feature Importance | Best For |
 |---------|--------|-----|-------------------|----------|
-| `xgboost` | `.ubj` | CUDA | Yes (ranked) | Tabular data |
-| `lightgbm` | `.txt` | CUDA | Yes (ranked) | Large datasets |
-| `mlp` | `.pt` | CUDA (fp16/bf16) | No | Non-linear patterns |
-| `lstm` | `.pt` | CUDA (fp16/bf16) | No | Temporal sequences |
+| `xgboost` | `.ubj` | CUDA | Yes (ranked, shap_tree, permutation) | Tabular data |
+| `lightgbm` | `.txt` | CUDA | Yes (ranked, shap_tree, permutation) | Large datasets |
+| `mlp` | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Non-linear patterns |
+| `lstm` | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Temporal sequences |
 
 ## Datasets
 
@@ -155,7 +191,12 @@ curl -X POST "https://covenant-radar-api-production.up.railway.app/evaluate" \
    curl -X POST .../ml/train-external -d '{...recommended_config...}'
    ```
 
-4. **Predict** - Use trained model:
+4. **Explain** - Get feature importance (optional):
+   ```bash
+   curl -X POST .../ml/explain -d '{"dataset": "taiwan", "backend": "xgboost", "model_path": "...", "explainer": "shap_tree"}'
+   ```
+
+5. **Predict** - Use trained model:
    ```bash
    curl -X POST .../ml/predict -d '{"deal_id": "..."}'
    ```

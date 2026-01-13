@@ -17,9 +17,9 @@ Loan covenant monitoring and breach prediction API service. Features determinist
   - DART boosting support for XGBoost and LightGBM (dropout regularization)
   - Categorical and continuous parameter spaces
   - Early stopping with validation AUC tracking
-- **Model Explainability**: Feature importance extraction
-  - XGBoost: Gain-based importance ranking
-  - LightGBM: Split-based importance ranking
+- **Model Explainability**: Feature importance via `/ml/explain` endpoint
+  - XGBoost/LightGBM: Gain-based ranking, SHAP TreeExplainer, permutation
+  - MLP/LSTM: Input gradients, integrated gradients, permutation
 - **Background Training**: Redis + RQ worker for model training jobs
 - **Kafka Streaming**: Confluent Cloud integration for real-time inference pipeline
   - Measurement event consumption from `covenant.measurements.v1`
@@ -99,6 +99,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/ml/train` | POST | Enqueue model training |
 | `/ml/train-external` | POST | Train on external CSV datasets |
 | `/ml/optimize` | POST | Optimize hyperparameters with Optuna TPE |
+| `/ml/explain` | POST | Compute feature importance explanations |
 | `/ml/jobs/{job_id}` | GET | Get training job status |
 | `/ml/models/active` | GET | Get active model info |
 
@@ -575,10 +576,10 @@ The API supports four ML backends for breach risk prediction:
 
 | Backend | Format | Best For | Feature Importance |
 |---------|--------|----------|-------------------|
-| `xgboost` | `.ubj` | Tabular data, interpretability | Yes (ranked list) |
-| `mlp` | `.pt` | Non-linear patterns, deep learning | No |
-| `lstm` | `.pt` | Temporal sequences, time-series | No |
-| `lightgbm` | `.txt` | Large datasets, fast training | Yes (ranked list) |
+| `xgboost` | `.ubj` | Tabular data, interpretability | Yes (ranked, shap_tree, permutation) |
+| `mlp` | `.pt` | Non-linear patterns, deep learning | Yes (gradient, integrated_gradients, permutation) |
+| `lstm` | `.pt` | Temporal sequences, time-series | Yes (gradient, integrated_gradients, permutation) |
+| `lightgbm` | `.txt` | Large datasets, fast training | Yes (ranked, shap_tree, permutation) |
 
 ### Device Configuration
 
@@ -721,14 +722,13 @@ curl -X POST http://localhost:8007/ml/train-external \
     "early_stopping_patience": 10
   }'
 
-# Poll for results (no feature importances for MLP)
+# Poll for results (use /ml/explain for feature importances)
 curl http://localhost:8007/ml/jobs/{job_id}
 # {
 #   "result": {
 #     "backend": "mlp",
 #     "model_format": "pt",
-#     "test_metrics": {"auc": 0.91, ...},
-#     "feature_importances": []
+#     "test_metrics": {"auc": 0.91, ...}
 #   }
 # }
 ```
@@ -805,14 +805,13 @@ curl -X POST http://localhost:8007/ml/train-external \
     "early_stopping_patience": 10
   }'
 
-# Poll for results (no feature importances for LSTM)
+# Poll for results (use /ml/explain for feature importances)
 curl http://localhost:8007/ml/jobs/{job_id}
 # {
 #   "result": {
 #     "backend": "lstm",
 #     "model_format": "pt",
-#     "test_metrics": {"auc": 0.90, ...},
-#     "feature_importances": []
+#     "test_metrics": {"auc": 0.90, ...}
 #   }
 # }
 ```
