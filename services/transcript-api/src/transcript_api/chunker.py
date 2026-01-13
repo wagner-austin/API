@@ -163,7 +163,8 @@ class AudioChunker:
         self, audio_path: str, split_points: list[float], total_duration: float
     ) -> list[AudioChunk]:
         container, codec = self._probe_stream_info(audio_path)
-        ext = "webm" if codec == "opus" else "m4a"
+        # Always use MP3 for maximum OpenAI compatibility
+        ext = "mp3"
         if not split_points:
             return [
                 AudioChunk(
@@ -195,8 +196,7 @@ class AudioChunker:
         created: list[AudioChunk] = []
         for idx, seg in enumerate(segments):
             out_path = os.path.join(outdir, f"chunk_{idx:03d}.{ext}")
-            # Always re-encode to ensure OpenAI compatibility (stream copy can produce
-            # malformed headers that OpenAI rejects as invalid format)
+            # Always re-encode to MP3 for maximum OpenAI compatibility
             reencode_cmd = [
                 self._ffmpeg,
                 "-ss",
@@ -206,11 +206,9 @@ class AudioChunker:
                 "-i",
                 audio_path,
                 "-c:a",
-                "aac",
+                "libmp3lame",
                 "-b:a",
                 "128k",
-                "-movflags",
-                "+faststart",
                 "-y",
                 out_path,
             ]

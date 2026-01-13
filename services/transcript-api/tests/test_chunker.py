@@ -23,8 +23,8 @@ class _FakeProc:
         self.stderr: bytes | str | None = stderr
 
 
-def test_chunker_selects_webm_for_opus() -> None:
-    """Test that opus audio uses webm container for chunks."""
+def test_chunker_outputs_mp3_for_opus_input() -> None:
+    """Test that opus audio is re-encoded to mp3 for OpenAI compatibility."""
     ch = AudioChunker()
 
     # Create fake subprocess that returns opus codec info for ffprobe
@@ -67,11 +67,12 @@ def test_chunker_selects_webm_for_opus() -> None:
             logging.getLogger(__name__).exception("cleanup failed for %s", audio_path)
             raise
     assert len(chunks) == 5
-    assert all(c["path"].endswith(".webm") for c in chunks)
+    # Always outputs MP3 for maximum OpenAI compatibility
+    assert all(c["path"].endswith(".mp3") for c in chunks)
 
 
-def test_chunker_selects_m4a_for_aac() -> None:
-    """Test that aac audio uses m4a container for chunks."""
+def test_chunker_outputs_mp3_for_aac_input() -> None:
+    """Test that aac audio is re-encoded to mp3 for OpenAI compatibility."""
     ch = AudioChunker()
 
     # Create fake subprocess that returns aac codec info for ffprobe
@@ -113,4 +114,5 @@ def test_chunker_selects_m4a_for_aac() -> None:
             logging.getLogger(__name__).exception("cleanup failed for %s", audio_path)
             raise
     assert len(chunks) == 3
-    assert all(c["path"].endswith(".m4a") for c in chunks)
+    # Always outputs MP3 for maximum OpenAI compatibility
+    assert all(c["path"].endswith(".mp3") for c in chunks)
