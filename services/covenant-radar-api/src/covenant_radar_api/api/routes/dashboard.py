@@ -182,7 +182,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         <h1>Covenant Radar Dashboard</h1>
         <div>
             <span id="status-badge" class="status-badge status-offline">Checking...</span>
-            <button class="refresh-btn" onclick="refreshAll()">Refresh</button>
+            <button class="refresh-btn" onclick="refreshWithPredictions()">Refresh</button>
         </div>
     </header>
 
@@ -251,6 +251,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         let trendChart = null;
         let riskChart = null;
         let trackedJobs = [];
+        let deals = [];
 
         // Initialize charts
         function initCharts() {
@@ -399,11 +400,13 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             container.innerHTML = predictions.slice(0, 20).map(p => {
                 const tier = p.risk_tier.toLowerCase();
                 const pct = (p.probability * 100).toFixed(1);
+                const displayName = p.deal_name || p.deal_id.slice(0, 8) + '...';
+                const displayBorrower = p.borrower || '';
                 return `
                 <div class="prediction-item ${tier}">
                     <div>
-                        <div class="prediction-deal">${p.deal_id.slice(0, 8)}...</div>
-                        <div class="prediction-time">${p.timestamp}</div>
+                        <div class="prediction-deal">${displayName}</div>
+                        <div class="prediction-time">${displayBorrower}</div>
                     </div>
                     <div class="prediction-prob risk-${tier}">${pct}%</div>
                 </div>
@@ -449,6 +452,70 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             `}).join('');
         }
 
+        // Fetch all deals from the API
+        async function fetchDeals() {
+            try {
+                const response = await fetch('/deals');
+                if (!response.ok) {
+                    console.error('Failed to fetch deals:', response.status);
+                    return [];
+                }
+                const data = await response.json();
+                deals = data;
+                return data;
+            } catch (e) {
+                console.error('Error fetching deals:', e);
+                return [];
+            }
+        }
+
+        // Predict breach risk for a single deal
+        async function predictDeal(dealId) {
+            try {
+                const response = await fetch('/ml/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deal_id: dealId })
+                });
+                if (!response.ok) {
+                    console.error('Failed to predict deal:', dealId, response.status);
+                    return null;
+                }
+                return await response.json();
+            } catch (e) {
+                console.error('Error predicting deal:', dealId, e);
+                return null;
+            }
+        }
+
+        // Fetch all deals and predict each one
+        async function fetchAndPredictAllDeals() {
+            const dealList = await fetchDeals();
+            if (dealList.length === 0) {
+                console.log('No deals to predict');
+                return;
+            }
+
+            // Clear existing predictions
+            predictions = [];
+
+            // Predict each deal sequentially to avoid overwhelming the API
+            for (const deal of dealList) {
+                const dealId = deal.id.value;
+                const result = await predictDeal(dealId);
+                if (result) {
+                    addPrediction({
+                        deal_id: dealId,
+                        deal_name: deal.name,
+                        borrower: deal.borrower,
+                        probability: result.probability,
+                        risk_tier: result.risk_tier,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                }
+            }
+        }
+
         // Simulate streaming predictions for demo
         function simulatePrediction() {
             const tiers = ['LOW', 'LOW', 'LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -476,13 +543,19 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             await renderJobs();
         }
 
+        // Full refresh including predictions
+        async function refreshWithPredictions() {
+            await refreshAll();
+            await fetchAndPredictAllDeals();
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
-            refreshAll();
+            refreshWithPredictions();
 
-            // Refresh health and jobs every 10 seconds
-            setInterval(refreshAll, 10000);
+            // Refresh health and jobs every 30 seconds
+            setInterval(refreshAll, 30000);
         });
 
         // Add a job to track (can be called from console)
