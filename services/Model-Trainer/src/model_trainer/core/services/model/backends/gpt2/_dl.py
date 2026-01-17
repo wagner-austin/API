@@ -49,6 +49,12 @@ class DataLoader:
         self._nw = int(num_workers)
         self._pm = bool(pin_memory)
 
+    def __len__(self: DataLoader) -> int:
+        """Return the number of batches in the loader."""
+        ds_len = len(self._ds)
+        # Ceiling division: (ds_len + batch_size - 1) // batch_size
+        return (ds_len + self._bs - 1) // self._bs
+
     def __iter__(self: DataLoader) -> Generator[torch.Tensor, None, None]:
         tud = __import__("torch.utils.data", fromlist=["DataLoader"])
         torch_dataloader: _TorchDLCtor = tud.DataLoader
