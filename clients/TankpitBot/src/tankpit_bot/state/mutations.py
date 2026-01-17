@@ -252,13 +252,18 @@ def update_container_from_radar(
         state: Current world state.
         x: Container X coordinate.
         y: Container Y coordinate.
-        volume: Fuel volume (-1 for equipment, 0+ for fuel).
+        volume: Fuel volume (-1 for equipment, 0 for empty fuel, >0 for fuel with contents).
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with updated container.
+        New WorldStateDict with updated container, or unchanged state if empty fuel.
     """
     is_fuel = volume >= 0
+
+    # Skip empty fuel containers (volume=0), they have no contents to collect
+    if is_fuel and volume == 0:
+        return state
+
     actual_volume = volume if is_fuel else 0
 
     new_container = make_container_state(

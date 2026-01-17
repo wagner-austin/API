@@ -1064,14 +1064,13 @@ class TestUpdateContainerFromRadar:
         assert container["is_fuel"] is False
         assert container["volume"] == 0
 
-    def test_adds_zero_fuel_container(self) -> None:
-        """Treats 0 volume as empty fuel container."""
+    def test_skips_empty_fuel_container(self) -> None:
+        """Skips empty fuel containers (volume=0) since they have no contents."""
         state = make_empty_world_state()
         updated = update_container_from_radar(state, x=50, y=75, volume=0, timestamp_ms=1000)
 
-        container = updated["containers"]["50,75"]
-        assert container["is_fuel"] is True
-        assert container["volume"] == 0
+        # Empty fuel containers are skipped, not added
+        assert "50,75" not in updated["containers"]
 
 
 class TestRemoveContainer:
