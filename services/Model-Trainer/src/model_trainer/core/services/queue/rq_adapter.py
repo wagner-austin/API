@@ -16,6 +16,7 @@ from ...contracts.queue import (
     TokenizerTrainPayload,
     TrainJobPayload,
 )
+from ...contracts.queue_encoding import encode_train_job_payload
 
 
 class RQSettings:
@@ -53,42 +54,23 @@ class RQEnqueuer:
         return _test_hooks.rq_connection_factory(self.redis_url)
 
     def enqueue_train(self: RQEnqueuer, payload: TrainJobPayload) -> str:
+        """Enqueue a training job to the RQ queue.
+
+        Args:
+            payload: Training job payload containing run_id, user_id, and request.
+
+        Returns:
+            Job ID string for tracking the enqueued job.
+        """
         conn = self._connection()
         q: RQClientQueue = _test_hooks.rq_queue_factory(self.queue_name, conn)
         retry = _test_hooks.rq_retry_factory(
             max_retries=self.settings.retry_max, intervals=self.settings.retry_intervals
         )
-        req = payload["request"]
-        payload_dict: dict[str, JSONValue] = {
-            "run_id": payload["run_id"],
-            "user_id": payload["user_id"],
-            "request": {
-                "model_family": req["model_family"],
-                "model_size": req["model_size"],
-                "max_seq_len": req["max_seq_len"],
-                "num_epochs": req["num_epochs"],
-                "batch_size": req["batch_size"],
-                "learning_rate": req["learning_rate"],
-                "corpus_file_id": req["corpus_file_id"],
-                "tokenizer_id": req["tokenizer_id"],
-                "holdout_fraction": req["holdout_fraction"],
-                "seed": req["seed"],
-                "pretrained_run_id": req["pretrained_run_id"],
-                "freeze_embed": req["freeze_embed"],
-                "gradient_clipping": req["gradient_clipping"],
-                "optimizer": req["optimizer"],
-                "device": req["device"],
-                "precision": req["precision"],
-                "data_num_workers": req["data_num_workers"],
-                "data_pin_memory": req["data_pin_memory"],
-                "early_stopping_patience": req["early_stopping_patience"],
-                "test_split_ratio": req["test_split_ratio"],
-                "finetune_lr_cap": req["finetune_lr_cap"],
-            },
-        }
+        payload_json = encode_train_job_payload(payload)
         job: RQJobLike = q.enqueue(
             "model_trainer.worker.train_job.process_train_job",
-            payload_dict,
+            payload_json,
             job_timeout=self.settings.job_timeout_sec,
             result_ttl=self.settings.result_ttl_sec,
             failure_ttl=self.settings.failure_ttl_sec,
