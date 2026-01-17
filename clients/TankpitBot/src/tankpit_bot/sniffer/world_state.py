@@ -13,6 +13,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.container import RadarContainerDict, RadarMineDict
+from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.state import (
     WorldStateDict,
     add_mine_from_radar,
@@ -38,6 +39,15 @@ def reset_world_state() -> None:
     _terrain_map = None
 
 
+def get_world_state() -> WorldStateDict:
+    """Get the current world state.
+
+    Returns:
+        Current WorldStateDict with containers, mines, self_state, etc.
+    """
+    return _world_state
+
+
 def _load_terrain_map_if_needed() -> _test_hooks.TerrainMapProtocol | None:
     """Load terrain map from default GIF if not already loaded.
 
@@ -48,10 +58,10 @@ def _load_terrain_map_if_needed() -> _test_hooks.TerrainMapProtocol | None:
     if _terrain_map is not None:
         return _terrain_map
 
-    # Try to load from known GIF paths
+    # Try to load from known GIF paths (field01 = Practice, field42 = Meltdown)
     gif_paths = [
-        Path("field42-r.gif"),
         Path("field01_r.gif"),
+        Path("field42-r.gif"),
     ]
     for gif_path in gif_paths:
         if _test_hooks.path_exists(gif_path):
@@ -93,6 +103,33 @@ def update_world_state_from_radar(
     # Add mines
     for m in mines:
         _world_state = add_mine_from_radar(_world_state, m["x"], m["y"], m["team"], ts)
+
+
+def update_world_state_from_tank_registry_container(
+    container_y: int,
+    container_viewport_x: int,
+) -> None:
+    """Update world state with container from tank_registry message.
+
+    Tank registry containers have viewport-relative x coordinate.
+    Absolute x = viewport_left + container_viewport_x.
+
+    Args:
+        container_y: Absolute Y coordinate.
+        container_viewport_x: Viewport-relative X coordinate.
+    """
+    global _world_state
+    # Use sniffer's viewport tracking which is updated from position_update messages
+    viewport_left = get_viewport_left()
+    if viewport_left is None:
+        log.info("Cannot add container: viewport_left not yet known (y=%d, vx=%d)",
+                 container_y, container_viewport_x)
+        return
+    container_x = viewport_left + container_viewport_x
+    ts = get_current_time_ms()
+    # Volume unknown from tank_registry, use 1 as placeholder (is_fuel=True)
+    _world_state = update_container_from_radar(_world_state, container_x, container_y, 1, ts)
+    log.debug("Added container from tank_registry: (%d, %d)", container_x, container_y)
 
 
 def render_world_state_ascii() -> str | None:
@@ -199,12 +236,22 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
         case {"msg_type": 0x3D, "x": int(x), "y": int(y)}:
             update_world_state_from_position(x, y)
             _render_ascii_if_available("MovementResponse")
+        case {
+            "msg_type": "tank_registry",
+            "is_container": True,
+            "container_y": int(cy),
+            "container_viewport_x": int(cvx),
+        }:
+            update_world_state_from_tank_registry_container(cy, cvx)
+            log.info("Container from tank_registry: y=%d vx=%d", cy, cvx)
 
 
 __all__ = [
     "dispatch_world_state_update",
+    "get_world_state",
     "render_world_state_ascii",
     "reset_world_state",
     "update_world_state_from_position",
     "update_world_state_from_radar",
+    "update_world_state_from_tank_registry_container",
 ]
