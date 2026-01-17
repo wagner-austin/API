@@ -447,4 +447,4 @@ def test_training_cancel_race_avoids_upload(
     assert status_data["status"] == "failed"
     assert status_data["message"] == "Training cancelled"
     assert len(upload_calls) == 0
-    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
