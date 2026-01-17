@@ -10,6 +10,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.worker import train_job
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
@@ -114,9 +115,9 @@ def test_training_worker_failed_event_publish_branch(
     }
 
     with pytest.raises(RuntimeError, match="boom during container creation"):
-        train_job.process_train_job(payload)
+        train_job.process_train_job(encode_train_job_payload(payload))
     # Status is failed and message is set
     status = TrainerJobStore(fake).load("run-err")
     assert status is not None and status["status"] == "failed"
     assert status["message"] is not None and "boom during container creation" in status["message"]
-    fake.assert_only_called({"set", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "hset", "hgetall", "publish", "expire"})
