@@ -1,9 +1,16 @@
 """Terrain lookup from minimap GIF files.
 
-The minimap GIF files (field##_r.gif) contain terrain data encoded by exact RGB colors:
+The minimap GIF files (field##_r.gif) contain terrain data encoded by exact RGB colors.
+
+Field42 (Meltdown) - desert theme:
 - ROCK: (214, 140, 57) - mountains, border, impassable
 - WATER: (213, 164, 65) - water tiles
 - GROUND: (239, 189, 90) or (239, 188, 90) - walkable terrain
+
+Field01 (Practice) - forest theme:
+- ROCK: (102, 51, 0) - brown mountains/border
+- WATER: (51, 153, 255) - blue water
+- GROUND: (51, 102, 51) - green walkable terrain
 
 Game coordinates map directly to image pixel coordinates:
 - X: 0-255 left to right
@@ -22,11 +29,21 @@ class TerrainMap:
     GROUND = "."
     WATER = "W"
 
-    # Exact RGB colors for terrain types
-    COLOR_ROCK = (214, 140, 57)
-    COLOR_WATER = (213, 164, 65)
-    COLOR_GROUND_A = (239, 189, 90)
-    COLOR_GROUND_B = (239, 188, 90)
+    # Field42 (Meltdown) colors - desert theme
+    COLOR_ROCK_42 = (214, 140, 57)
+    COLOR_WATER_42 = (213, 164, 65)
+    COLOR_GROUND_42A = (239, 189, 90)
+    COLOR_GROUND_42B = (239, 188, 90)
+
+    # Field01 (Practice) colors - forest theme
+    COLOR_ROCK_01 = (102, 51, 0)
+    COLOR_WATER_01 = (51, 153, 255)
+    COLOR_GROUND_01 = (51, 102, 51)
+
+    # Combined color sets for matching
+    ROCK_COLORS = {COLOR_ROCK_42, COLOR_ROCK_01}
+    WATER_COLORS = {COLOR_WATER_42, COLOR_WATER_01}
+    GROUND_COLORS = {COLOR_GROUND_42A, COLOR_GROUND_42B, COLOR_GROUND_01}
 
     def __init__(self, gif_path: str | Path) -> None:
         """Load terrain from GIF file.
@@ -59,15 +76,14 @@ class TerrainMap:
 
         pixel = self._pixels[y * 256 + x]
 
-        # Exact color matching for terrain types
-        if pixel == self.COLOR_WATER:
+        # Exact color matching for terrain types (supports both field01 and field42)
+        if pixel in self.WATER_COLORS:
             return self.WATER
 
-        if pixel == self.COLOR_GROUND_A or pixel == self.COLOR_GROUND_B:
+        if pixel in self.GROUND_COLORS:
             return self.GROUND
 
-        # Rock color covers both border and mountains (impassable)
-        if pixel == self.COLOR_ROCK:
+        if pixel in self.ROCK_COLORS:
             return self.ROCK
 
         # Unknown color - treat as impassable for safety
