@@ -10,6 +10,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.core import _test_hooks
 from model_trainer.core._test_hooks import CorpusFetcherProto
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.worker import train_job
 
 
@@ -72,11 +73,11 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
     }
 
     with pytest.raises(AppError, match="Tokenizer artifact not found"):
-        train_job.process_train_job(payload)  # raises due to missing tokenizer artifact
+        train_job.process_train_job(encode_train_job_payload(payload))
 
     # Status and message set in job store
     status_data = fake.hgetall(job_key("trainer", "run-x"))
     assert status_data["status"] == "failed"
     msg = status_data.get("error", "")
     assert "Tokenizer artifact not found" in msg
-    fake.assert_only_called({"set", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "hset", "hgetall", "publish", "expire"})
