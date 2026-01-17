@@ -1,9 +1,9 @@
 """Terrain lookup from minimap GIF files.
 
-The minimap GIF files (field##_r.gif) contain terrain data:
-- Light green (g > 140) = passable ground
-- Dark green (g <= 140) = rocks/impassable (mountains)
-- Dark blue (r < 30, g < 50, b > 50) = water
+The minimap GIF files (field##_r.gif) contain terrain data encoded by exact RGB colors:
+- ROCK: (214, 140, 57) - mountains, border, impassable
+- WATER: (213, 164, 65) - water tiles
+- GROUND: (239, 189, 90) or (239, 188, 90) - walkable terrain
 
 Game coordinates map directly to image pixel coordinates:
 - X: 0-255 left to right
@@ -21,6 +21,12 @@ class TerrainMap:
     ROCK = "#"
     GROUND = "."
     WATER = "W"
+
+    # Exact RGB colors for terrain types
+    COLOR_ROCK = (214, 140, 57)
+    COLOR_WATER = (213, 164, 65)
+    COLOR_GROUND_A = (239, 189, 90)
+    COLOR_GROUND_B = (239, 188, 90)
 
     def __init__(self, gif_path: str | Path) -> None:
         """Load terrain from GIF file.
@@ -51,17 +57,20 @@ class TerrainMap:
         if not (0 <= x < 256 and 0 <= y < 256):
             return " "
 
-        r, g, b = self._pixels[y * 256 + x]
+        pixel = self._pixels[y * 256 + x]
 
-        # Water (dark blue)
-        if b > 50 and r < 30 and g < 50:
+        # Exact color matching for terrain types
+        if pixel == self.COLOR_WATER:
             return self.WATER
 
-        # Light green = passable ground (g > 140)
-        if g > 140:
+        if pixel == self.COLOR_GROUND_A or pixel == self.COLOR_GROUND_B:
             return self.GROUND
 
-        # Dark green = rocks/mountains (impassable)
+        # Rock color covers both border and mountains (impassable)
+        if pixel == self.COLOR_ROCK:
+            return self.ROCK
+
+        # Unknown color - treat as impassable for safety
         return self.ROCK
 
     def is_passable(self, x: int, y: int) -> bool:
