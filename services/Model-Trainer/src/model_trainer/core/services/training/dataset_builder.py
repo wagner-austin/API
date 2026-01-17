@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import Final
+
 import torch
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
+from platform_core.logging import get_logger
 
 from ...contracts.dataset import DatasetConfig
 from ...encoding import Encoded, Encoder
 from ..data.corpus import list_text_files
+
+_logger: Final = get_logger(__name__)
 
 
 def split_corpus_files(cfg: DatasetConfig) -> tuple[list[str], list[str], list[str]]:
@@ -65,8 +70,26 @@ class CausalLMDataset:
         eos_id: int,
         pad_id: int,
     ) -> None:
+        total_files = len(files)
+        _logger.info(
+            "Tokenization started files=%d",
+            total_files,
+            extra={
+                "category": "dataset",
+                "event": "tokenization_started",
+                "total_files": total_files,
+            },
+        )
+
         self._ids: list[int] = []
+        total_lines = 0
+        files_processed = 0
+
+        # Log progress every 10% of files or at least every 10 files
+        log_interval = max(1, min(10, total_files // 10))
+
         for fp in files:
+            file_lines = 0
             with open(fp, encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     s = line.strip()
@@ -74,8 +97,51 @@ class CausalLMDataset:
                         continue
                     enc: Encoded = tokenizer.encode(s)
                     self._ids.extend([*enc.ids, eos_id])
+                    file_lines += 1
+            total_lines += file_lines
+            files_processed += 1
+
+            # Log progress periodically
+            if files_processed % log_interval == 0:
+                progress_pct = int((files_processed * 100) / total_files)
+                _logger.info(
+                    "Tokenization progress files=%d/%d (%.0f%%) tokens=%d lines=%d",
+                    files_processed,
+                    total_files,
+                    progress_pct,
+                    len(self._ids),
+                    total_lines,
+                    extra={
+                        "category": "dataset",
+                        "event": "tokenization_progress",
+                        "files_processed": files_processed,
+                        "total_files": total_files,
+                        "progress_pct": progress_pct,
+                        "tokens": len(self._ids),
+                        "lines": total_lines,
+                    },
+                )
+
         self._max_len = max_len
         self._pad_id = pad_id
+        num_chunks = max(1, (len(self._ids) + max_len - 1) // max_len) if self._ids else 0
+
+        _logger.info(
+            "Tokenization completed files=%d lines=%d tokens=%d chunks=%d",
+            total_files,
+            total_lines,
+            len(self._ids),
+            num_chunks,
+            extra={
+                "category": "dataset",
+                "event": "tokenization_completed",
+                "files": total_files,
+                "lines": total_lines,
+                "tokens": len(self._ids),
+                "chunks": num_chunks,
+                "max_len": max_len,
+            },
+        )
 
     def __len__(self: CausalLMDataset) -> int:
         if not self._ids:
