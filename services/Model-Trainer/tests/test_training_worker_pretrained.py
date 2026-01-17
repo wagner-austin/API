@@ -31,6 +31,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
 )
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle, TokenizerTrainConfig
 from model_trainer.core.encoding import Encoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -488,7 +489,7 @@ def test_training_worker_loads_pretrained_model(
         },
     }
 
-    train_job.process_train_job(payload)
+    train_job.process_train_job(encode_train_job_payload(payload))
 
     # Verify backend.load() was called instead of backend.prepare()
     backend_instance = backend_instance_holder[0]
@@ -505,7 +506,7 @@ def test_training_worker_loads_pretrained_model(
     # Verify status is completed
     status = TrainerJobStore(fake).load("run-finetune")
     assert status is not None and status["status"] == "completed"
-    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
 
 
 # ============================================================================
@@ -702,7 +703,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
         },
     }
 
-    train_job.process_train_job(payload)
+    train_job.process_train_job(encode_train_job_payload(payload))
 
     # Verify backend.prepare() was called with tokenizer=None
     assert len(backend_instance_holder) == 1
