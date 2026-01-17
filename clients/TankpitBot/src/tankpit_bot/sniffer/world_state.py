@@ -152,13 +152,24 @@ def _is_absolute_position(x: int, y: int) -> bool:
     return x >= viewport_size or y >= viewport_size
 
 
+def _render_ascii_if_available(event: str) -> None:
+    """Render ASCII viewport if terrain map is available.
+
+    Args:
+        event: Event name for logging (e.g., "Enter", "Teleport", "Move").
+    """
+    ascii_view = render_world_state_ascii()
+    if ascii_view is not None:
+        log.info("[WorldState %s]\n%s", event, ascii_view)
+
+
 def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
     """Dispatch decoded message to update world state and render ASCII.
 
     Handles:
     - radar_response: Update containers and mines, render ASCII
-    - position_update: Update self position from absolute coords only
-    - movement: Update self position from start coords (always absolute)
+    - position_update: Update self position from absolute coords (enter/teleport)
+    - movement: Update self position after applying waypoints
     - MovementResponse (0x3D): Update self position
 
     Args:
@@ -167,14 +178,13 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
     match decoded:
         case {"msg_type": "radar_response", "containers": list(containers), "mines": list(mines)}:
             update_world_state_from_radar(containers, mines)
-            ascii_view = render_world_state_ascii()
-            if ascii_view is not None:
-                log.info("[WorldState ASCII]\n%s", ascii_view)
+            _render_ascii_if_available("Radar")
         case {"msg_type": "position_update", "flags": int(flags), "x": int(x), "y": int(y)}:
             # flags=0x02 indicates self, flags=0x00 is other tanks
             is_self = (flags & 0x02) != 0
             if is_self and _is_absolute_position(x, y):
                 update_world_state_from_position(x, y)
+                _render_ascii_if_available("Enter/Teleport")
         case {
             "msg_type": "movement",
             "start_x": int(sx),
@@ -185,8 +195,10 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
             # Calculate final position by applying waypoints to start position
             final_x, final_y = _apply_waypoints(sx, sy, waypoints)
             update_world_state_from_position(final_x, final_y)
+            _render_ascii_if_available("Move")
         case {"msg_type": 0x3D, "x": int(x), "y": int(y)}:
             update_world_state_from_position(x, y)
+            _render_ascii_if_available("MovementResponse")
 
 
 __all__ = [
