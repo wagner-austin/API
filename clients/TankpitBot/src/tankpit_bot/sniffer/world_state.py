@@ -107,11 +107,34 @@ def render_world_state_ascii() -> str | None:
     return render_world_ascii(_world_state, terrain)
 
 
+def _is_absolute_position(x: int, y: int) -> bool:
+    """Check if position_update coordinates are absolute world coordinates.
+
+    Position updates contain either:
+    - Absolute world coordinates (after join/teleport): x,y >= 18
+    - Viewport-relative coordinates (during movement): x,y < 18
+
+    The viewport is 18x18, so coordinates within that range are viewport-relative
+    and don't represent actual world position.
+
+    Args:
+        x: X coordinate from position_update.
+        y: Y coordinate from position_update.
+
+    Returns:
+        True if coordinates are absolute world coordinates.
+    """
+    viewport_size = 18
+    return x >= viewport_size or y >= viewport_size
+
+
 def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
     """Dispatch decoded message to update world state and render ASCII.
 
     Handles:
-    - radar_response (0x4F via container_decoder): Update containers and mines
+    - radar_response: Update containers and mines, render ASCII
+    - position_update: Update self position from absolute coords only
+    - movement: Update self position from start coords (always absolute)
     - MovementResponse (0x3D): Update self position
 
     Args:
@@ -123,6 +146,14 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
             ascii_view = render_world_state_ascii()
             if ascii_view is not None:
                 log.info("[WorldState ASCII]\n%s", ascii_view)
+        case {"msg_type": "position_update", "flags": int(flags), "x": int(x), "y": int(y)}:
+            # flags=0x02 indicates self, flags=0x00 is other tanks
+            is_self = (flags & 0x02) != 0
+            if is_self and _is_absolute_position(x, y):
+                update_world_state_from_position(x, y)
+        case {"msg_type": "movement", "start_x": int(x), "start_y": int(y), "is_self": True}:
+            # Movement messages have absolute start coordinates
+            update_world_state_from_position(x, y)
         case {"msg_type": 0x3D, "x": int(x), "y": int(y)}:
             update_world_state_from_position(x, y)
 

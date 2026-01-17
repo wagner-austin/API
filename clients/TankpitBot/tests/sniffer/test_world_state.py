@@ -201,6 +201,175 @@ class TestWorldStateIntegration:
         assert self_state["x"] == 150
         assert self_state["y"] == 160
 
+    def test_dispatch_position_update_absolute_coords_self(self) -> None:
+        """Test dispatch handles position_update with absolute coords for self.
+
+        When x or y >= 18 and flags indicate self (0x02 bit set),
+        should update the self position.
+        """
+        from tankpit_bot.container import PositionUpdateDict
+
+        msg = PositionUpdateDict(
+            msg_type="position_update",
+            flags=0x02,  # Self flag
+            tank_id=638,
+            x=202,
+            y=149,
+            extra_data=b"\x08\x03\x03\x00\x2e\x84\x00",
+        )
+
+        dispatch_world_state_update(msg)
+
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None after dispatch")
+        assert self_state["x"] == 202
+        assert self_state["y"] == 149
+
+    def test_dispatch_position_update_other_tank_ignored(self) -> None:
+        """Test dispatch ignores position_update for other tanks.
+
+        Position updates with flags=0x00 are for other tanks (bots, enemies)
+        and should NOT update self position.
+        """
+        from tankpit_bot.container import PositionUpdateDict
+
+        # First set a known position
+        update_world_state_from_position(100, 100)
+
+        msg = PositionUpdateDict(
+            msg_type="position_update",
+            flags=0x00,  # Other tank flag
+            tank_id=539,
+            x=193,
+            y=150,
+            extra_data=b"\x08\x03\x01\x00\x48\xe2\x00",
+        )
+
+        dispatch_world_state_update(msg)
+
+        # Position should remain unchanged
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+
+    def test_dispatch_position_update_viewport_relative_ignored(self) -> None:
+        """Test dispatch ignores position_update with viewport-relative coords.
+
+        When both x < 18 and y < 18, they are viewport-relative coordinates
+        and should NOT update the self position even with self flag.
+        """
+        from tankpit_bot.container import PositionUpdateDict
+
+        # First set a known position
+        update_world_state_from_position(100, 100)
+
+        msg = PositionUpdateDict(
+            msg_type="position_update",
+            flags=0x02,  # Self flag
+            tank_id=638,
+            x=3,
+            y=3,
+            extra_data=b"\x00\x2e\x85\x0a\x00\x0c\x05",
+        )
+
+        dispatch_world_state_update(msg)
+
+        # Position should remain unchanged
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+
+    def test_dispatch_position_update_viewport_relative_other_coords_ignored(self) -> None:
+        """Test dispatch ignores position_update with any small viewport coords.
+
+        Any coords where both x < 18 and y < 18 are viewport-relative,
+        not just (3,3). For example, (2,3) at the left edge of viewport.
+        """
+        from tankpit_bot.container import PositionUpdateDict
+
+        # First set a known position
+        update_world_state_from_position(100, 100)
+
+        msg = PositionUpdateDict(
+            msg_type="position_update",
+            flags=0x02,  # Self flag
+            tank_id=638,
+            x=2,
+            y=3,
+            extra_data=b"\x00" * 7,
+        )
+
+        dispatch_world_state_update(msg)
+
+        # Position should remain unchanged
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+
+    def test_dispatch_movement_updates_self_position(self) -> None:
+        """Test dispatch handles movement message for self.
+
+        Movement messages have absolute start_x, start_y coordinates
+        and should update self position when is_self=True.
+        """
+        from tankpit_bot.container import MovementDict
+
+        msg = MovementDict(
+            msg_type="movement",
+            flags=0x7E,
+            start_x=162,
+            start_y=111,
+            player_id=230446,
+            tank_id=None,
+            waypoints="eeeessssssseeeeeeeeennnnnnn",
+            is_self=True,
+        )
+
+        dispatch_world_state_update(msg)
+
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None after dispatch")
+        assert self_state["x"] == 162
+        assert self_state["y"] == 111
+
+    def test_dispatch_movement_ignores_enemy(self) -> None:
+        """Test dispatch ignores movement message for enemies.
+
+        Movement messages with is_self=False should not update self position.
+        """
+        from tankpit_bot.container import MovementDict
+
+        # First set a known position
+        update_world_state_from_position(100, 100)
+
+        msg = MovementDict(
+            msg_type="movement",
+            flags=0x1E,
+            start_x=200,
+            start_y=200,
+            player_id=12345,
+            tank_id=None,
+            waypoints="nnnn",
+            is_self=False,
+        )
+
+        dispatch_world_state_update(msg)
+
+        # Position should remain unchanged
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+
     def test_dispatch_ignores_other_messages(self) -> None:
         """Test dispatch ignores non-radar/movement messages."""
         from tankpit_bot.protocol import SyncDict
