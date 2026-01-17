@@ -16,6 +16,7 @@ from ..api.schemas.pointers import ArtifactPointer
 from ..api.schemas.runs import (
     EvaluateRequest,
     EvaluateResponse,
+    ProgressResponse,
     RunStatusResponse,
     TrainRequest,
     TrainResponse,
@@ -302,4 +303,72 @@ class TrainingOrchestrator:
             loss=float(loss_v) if isinstance(loss_v, int | float) else None,
             perplexity=float(ppl_v) if isinstance(ppl_v, int | float) else None,
             artifact_path=str(art_v) if isinstance(art_v, str) else None,
+        )
+
+    def get_progress(self: TrainingOrchestrator, run_id: str) -> ProgressResponse:
+        """Get detailed training progress for a run.
+
+        Args:
+            run_id: Training run identifier.
+
+        Returns:
+            ProgressResponse with current training metrics and phase.
+
+        Raises:
+            AppError: If run or progress not found.
+        """
+        from ..worker.progress_store import ProgressStore
+
+        progress_store = ProgressStore(self._redis)
+        progress = progress_store.load(run_id)
+        if progress is None:
+            # Check if job exists at all
+            status_obj = self._job_store.load(run_id)
+            if status_obj is None:
+                _logger.info(
+                    "progress not found",
+                    extra={
+                        "category": "orchestrator",
+                        "service": "training",
+                        "run_id": run_id,
+                        "event": "progress_not_found",
+                    },
+                )
+                raise AppError(
+                    ModelTrainerErrorCode.RUN_NOT_FOUND,
+                    "run not found",
+                    model_trainer_status_for(ModelTrainerErrorCode.RUN_NOT_FOUND),
+                )
+            # Job exists but no progress yet - return initial state
+            from datetime import datetime
+
+            return ProgressResponse(
+                run_id=run_id,
+                phase="queued",
+                epoch=0,
+                total_epochs=0,
+                step=0,
+                total_steps=0,
+                train_loss=0.0,
+                train_ppl=0.0,
+                grad_norm=0.0,
+                samples_per_sec=0.0,
+                val_loss=None,
+                val_ppl=None,
+                updated_at=datetime.utcnow().isoformat(),
+            )
+        return ProgressResponse(
+            run_id=progress["run_id"],
+            phase=progress["phase"],
+            epoch=progress["epoch"],
+            total_epochs=progress["total_epochs"],
+            step=progress["step"],
+            total_steps=progress["total_steps"],
+            train_loss=progress["train_loss"],
+            train_ppl=progress["train_ppl"],
+            grad_norm=progress["grad_norm"],
+            samples_per_sec=progress["samples_per_sec"],
+            val_loss=progress["val_loss"],
+            val_ppl=progress["val_ppl"],
+            updated_at=progress["updated_at"],
         )
