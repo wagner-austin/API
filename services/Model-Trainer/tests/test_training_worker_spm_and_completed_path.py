@@ -29,6 +29,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
 )
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -400,7 +401,7 @@ def test_training_worker_spm_artifact_and_completed(
         },
     }
 
-    train_job.process_train_job(payload)
+    train_job.process_train_job(encode_train_job_payload(payload))
 
     status = TrainerJobStore(fake).load("run-complete")
     assert status is not None and status["status"] == "completed"
@@ -412,4 +413,4 @@ def test_training_worker_spm_artifact_and_completed(
     assert artifact_id == "deadbeef"
     # Cleanup enabled by default: local artifact directory should be removed
     assert not out_dir.exists()
-    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
