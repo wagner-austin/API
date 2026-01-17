@@ -107,6 +107,30 @@ def render_world_state_ascii() -> str | None:
     return render_world_ascii(_world_state, terrain)
 
 
+def _apply_waypoints(start_x: int, start_y: int, waypoints: str) -> tuple[int, int]:
+    """Apply waypoints to calculate final position.
+
+    Args:
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        waypoints: Path string (e.g., "wsss" = west, south, south, south).
+
+    Returns:
+        Tuple of (final_x, final_y) after applying all waypoints.
+    """
+    x, y = start_x, start_y
+    for wp in waypoints:
+        if wp == "n":
+            y -= 1
+        elif wp == "s":
+            y += 1
+        elif wp == "e":
+            x += 1
+        elif wp == "w":
+            x -= 1
+    return x, y
+
+
 def _is_absolute_position(x: int, y: int) -> bool:
     """Check if position_update coordinates are absolute world coordinates.
 
@@ -151,9 +175,16 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
             is_self = (flags & 0x02) != 0
             if is_self and _is_absolute_position(x, y):
                 update_world_state_from_position(x, y)
-        case {"msg_type": "movement", "start_x": int(x), "start_y": int(y), "is_self": True}:
-            # Movement messages have absolute start coordinates
-            update_world_state_from_position(x, y)
+        case {
+            "msg_type": "movement",
+            "start_x": int(sx),
+            "start_y": int(sy),
+            "waypoints": str(waypoints),
+            "is_self": True,
+        }:
+            # Calculate final position by applying waypoints to start position
+            final_x, final_y = _apply_waypoints(sx, sy, waypoints)
+            update_world_state_from_position(final_x, final_y)
         case {"msg_type": 0x3D, "x": int(x), "y": int(y)}:
             update_world_state_from_position(x, y)
 
