@@ -11,6 +11,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.worker import job_utils, train_job
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
@@ -182,8 +183,8 @@ def test_process_train_job_sets_status_message_on_exception(
     _test_hooks.service_container_from_settings = _fail_container
 
     with pytest.raises(RuntimeError):
-        train_job.process_train_job(payload)
+        train_job.process_train_job(encode_train_job_payload(payload))
     status = TrainerJobStore(client).load("run-exc")
     assert status is not None and status["status"] == "failed"
     assert status["error"] is not None and "container creation failed" in status["error"]
-    client.assert_only_called({"set", "hset", "hgetall", "publish"})
+    client.assert_only_called({"set", "hset", "hgetall", "publish", "expire"})

@@ -15,6 +15,7 @@ from platform_workers.testing import (
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.worker import train_job
 
 
@@ -132,9 +133,9 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
 
     # The non-Redis error during error handling should be re-raised (line 421)
     with pytest.raises(RuntimeError, match="simulated hset failure"):
-        train_job.process_train_job(payload)
+        train_job.process_train_job(encode_train_job_payload(payload))
 
-    client.assert_only_called({"hset", "publish", "set"})
+    client.assert_only_called({"hset", "publish", "set", "expire"})
 
 
 def test_process_train_job_logs_redis_error_on_handle_error(
@@ -223,6 +224,6 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     # The original training error should be re-raised (not the Redis error)
     # The Redis error is logged as a warning (line 678)
     with pytest.raises(RuntimeError, match="training failed"):
-        train_job.process_train_job(payload)
+        train_job.process_train_job(encode_train_job_payload(payload))
 
-    client.assert_only_called({"hset", "publish", "set"})
+    client.assert_only_called({"hset", "publish", "set", "expire"})
