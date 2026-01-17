@@ -28,6 +28,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
 )
 from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import encode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle, TokenizerTrainConfig
 from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -361,11 +362,11 @@ def test_process_train_job_cancelled_block(
 
     # Execute
     loss_initial = 0.0
-    train_job.process_train_job(payload)
+    train_job.process_train_job(encode_train_job_payload(payload))
     loss_final = 0.0
     # Assert status and message set by the cancelled block
     status_data = fake.hgetall(job_key("trainer", "run-cancelled-block"))
     assert status_data["status"] == "failed"
     assert status_data["message"] == "Training cancelled"
     assert loss_final <= loss_initial
-    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish"})
+    fake.assert_only_called({"set", "get", "hset", "hgetall", "publish", "expire"})
