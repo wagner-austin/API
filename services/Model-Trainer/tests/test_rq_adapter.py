@@ -149,6 +149,11 @@ def test_rq_enqueuer_methods() -> None:
         assert req["early_stopping_patience"] == 0
         assert req["test_split_ratio"] == 0.0
         assert req["finetune_lr_cap"] == 0.0
+        assert req["hub_model_id"] is None
+        assert req["finetuning_strategy"] == "full"
+        assert req["lora"] is None
+        assert req["quantization"] is None
+        assert req["unsloth"] is None
         assert kwargs["job_timeout"] == 60
 
         # Eval job
