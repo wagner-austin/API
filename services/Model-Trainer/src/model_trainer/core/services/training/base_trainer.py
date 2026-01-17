@@ -259,24 +259,33 @@ class BaseTrainer:
 
         # 6. Save checkpoint if not cancelled and no best was saved
         if not was_cancelled and self._best_checkpoint_path is None:
+            _logger.info(
+                "Saving final model checkpoint",
+                extra={
+                    "category": "training",
+                    "event": "model_save_started",
+                    "out_dir": out_dir,
+                    "run_id": self._run_id,
+                },
+            )
             self._prepared.model.save_pretrained(out_dir)
+            _logger.info(
+                "Final model checkpoint saved",
+                extra={
+                    "category": "training",
+                    "event": "model_save_completed",
+                    "out_dir": out_dir,
+                    "run_id": self._run_id,
+                },
+            )
 
         # 7. Run test evaluation (NEW)
         test_loss: float | None = None
         test_ppl: float | None = None
         if not was_cancelled and self._test_loader is not None:
-            test_metrics = self._run_evaluation(self._test_loader)
+            test_metrics = self._run_evaluation(self._test_loader, eval_type="test")
             test_loss = test_metrics["val_loss"]
             test_ppl = test_metrics["val_ppl"]
-            _logger.info(
-                "Test evaluation completed",
-                extra={
-                    "category": "training",
-                    "event": "test_evaluation",
-                    "test_loss": test_loss,
-                    "test_ppl": test_ppl,
-                },
-            )
 
         # Get best val loss (may be inf if no validation was done)
         best_val_loss: float | None = None
@@ -398,6 +407,12 @@ class BaseTrainer:
         if train_loader is None:
             raise RuntimeError("No training data available")
 
+        # Calculate total batches for progress tracking
+        train_batches = len(train_loader)
+        val_batches = len(val_loader) if val_loader is not None else 0
+        test_batches = len(test_loader) if test_loader is not None else 0
+        total_train_steps = train_batches * self._cfg["num_epochs"]
+
         _logger.info(
             "Data loaders built",
             extra={
@@ -406,22 +421,44 @@ class BaseTrainer:
                 "train_files": len(train_files),
                 "val_files": len(val_files),
                 "test_files": len(test_files),
+                "train_batches": train_batches,
+                "val_batches": val_batches,
+                "test_batches": test_batches,
+                "total_train_steps": total_train_steps,
             },
         )
 
         return train_loader, val_loader, test_loader
 
-    def _run_evaluation(self: BaseTrainer, loader: DataLoader) -> ValidationMetrics:
-        """Run evaluation on given loader.
+    def _run_evaluation(
+        self: BaseTrainer,
+        loader: DataLoader,
+        *,
+        eval_type: Literal["validation", "test"] = "validation",
+    ) -> ValidationMetrics:
+        """Run evaluation on given loader with progress logging.
 
         Uses the same precision as training for consistent metrics.
 
         Args:
             loader: DataLoader to evaluate on.
+            eval_type: Type of evaluation for logging ("validation" or "test").
 
         Returns:
             ValidationMetrics with loss and perplexity.
         """
+        total_batches = len(loader)
+        _logger.info(
+            "%s started",
+            eval_type.capitalize(),
+            extra={
+                "category": "training",
+                "event": f"{eval_type}_started",
+                "total_batches": total_batches,
+                "run_id": self._run_id,
+            },
+        )
+
         model = self._prepared.model
         model.eval()
 
@@ -433,17 +470,76 @@ class BaseTrainer:
         precision = self._cfg["precision"]
         autocast_ctx = _get_autocast_context(precision, self._device)
 
+        # Log progress every 10% or at least every 100 batches
+        log_interval = max(1, min(100, total_batches // 10))
+
         with torch.no_grad():
             for batch in loader:
+                # Check cancellation during evaluation
+                if self._cancelled():
+                    _logger.info(
+                        "%s cancelled at batch %d/%d",
+                        eval_type.capitalize(),
+                        num_batches,
+                        total_batches,
+                        extra={
+                            "category": "training",
+                            "event": f"{eval_type}_cancelled",
+                            "batch": num_batches,
+                            "total_batches": total_batches,
+                        },
+                    )
+                    model.train()
+                    # Return partial results
+                    avg_loss = total_loss / max(1, num_batches)
+                    avg_ppl = float(math.exp(avg_loss)) if avg_loss < 20 else float("inf")
+                    return ValidationMetrics(val_loss=avg_loss, val_ppl=avg_ppl)
+
                 inputs = batch.to(device_str)
                 with autocast_ctx:
                     outputs = model.forward(input_ids=inputs, labels=inputs)
                 total_loss += float(outputs.loss.item())
                 num_batches += 1
 
+                # Log progress periodically
+                if num_batches % log_interval == 0:
+                    progress_pct = int((num_batches * 100) / total_batches)
+                    running_avg_loss = total_loss / num_batches
+                    _logger.info(
+                        "%s progress batch=%d/%d (%.0f%%) running_loss=%.4f",
+                        eval_type.capitalize(),
+                        num_batches,
+                        total_batches,
+                        progress_pct,
+                        running_avg_loss,
+                        extra={
+                            "category": "training",
+                            "event": f"{eval_type}_progress",
+                            "batch": num_batches,
+                            "total_batches": total_batches,
+                            "progress_pct": progress_pct,
+                            "running_loss": running_avg_loss,
+                        },
+                    )
+
         model.train()
         avg_loss = total_loss / max(1, num_batches)
         avg_ppl = float(math.exp(avg_loss)) if avg_loss < 20 else float("inf")
+
+        _logger.info(
+            "%s completed batches=%d loss=%.4f ppl=%.2f",
+            eval_type.capitalize(),
+            num_batches,
+            avg_loss,
+            avg_ppl,
+            extra={
+                "category": "training",
+                "event": f"{eval_type}_completed",
+                "batches": num_batches,
+                "loss": avg_loss,
+                "ppl": avg_ppl,
+            },
+        )
 
         return ValidationMetrics(val_loss=avg_loss, val_ppl=avg_ppl)
 
@@ -486,8 +582,25 @@ class BaseTrainer:
         early_stopped = False
         device_str = str(self._device)
 
-        for epoch in range(self._cfg["num_epochs"]):
+        total_epochs = self._cfg["num_epochs"]
+        batches_per_epoch = len(dataloader)
+
+        for epoch in range(total_epochs):
             epoch_step_start = step
+            _logger.info(
+                "Epoch %d/%d started batches=%d",
+                epoch + 1,
+                total_epochs,
+                batches_per_epoch,
+                extra={
+                    "category": "training",
+                    "event": "epoch_started",
+                    "epoch": epoch,
+                    "total_epochs": total_epochs,
+                    "batches": batches_per_epoch,
+                    "run_id": self._run_id,
+                },
+            )
             last_loss, step, was_cancelled, avg_grad_norm = self._train_one_epoch(
                 model=model,
                 dataloader=dataloader,
@@ -495,6 +608,23 @@ class BaseTrainer:
                 epoch=epoch,
                 device=device_str,
                 start_step=step,
+            )
+            epoch_steps = step - epoch_step_start
+            _logger.info(
+                "Epoch %d/%d completed steps=%d loss=%.4f",
+                epoch + 1,
+                total_epochs,
+                epoch_steps,
+                last_loss,
+                extra={
+                    "category": "training",
+                    "event": "epoch_completed",
+                    "epoch": epoch,
+                    "total_epochs": total_epochs,
+                    "steps": epoch_steps,
+                    "loss": last_loss,
+                    "run_id": self._run_id,
+                },
             )
             if was_cancelled:
                 break
@@ -506,18 +636,7 @@ class BaseTrainer:
 
             # Run validation after each epoch
             if self._val_loader is not None:
-                val_metrics = self._run_evaluation(self._val_loader)
-                _logger.info(
-                    "Validation completed",
-                    extra={
-                        "category": "training",
-                        "event": "validation",
-                        "epoch": epoch,
-                        "val_loss": val_metrics["val_loss"],
-                        "val_ppl": val_metrics["val_ppl"],
-                        "avg_grad_norm": avg_grad_norm,
-                    },
-                )
+                val_metrics = self._run_evaluation(self._val_loader, eval_type="validation")
 
                 # Calculate train_ppl for progress and wandb logging
                 train_ppl = float(math.exp(last_loss)) if last_loss < 20 else float("inf")
