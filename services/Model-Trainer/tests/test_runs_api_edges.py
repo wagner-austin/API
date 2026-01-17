@@ -148,6 +148,56 @@ def test_runs_eval_result_cache_corrupt(tmp_path: Path, settings_factory: _Setti
     fake.assert_only_called({"set", "get"})
 
 
+def test_runs_progress_with_data(tmp_path: Path, settings_factory: _SettingsFactory) -> None:
+    """Test GET /runs/{run_id}/progress with progress data in Redis."""
+    client, _, fake = _mk_app(tmp_path, settings_factory)
+
+    # Save progress to Redis via ProgressStore
+    from model_trainer.core.contracts.progress import TrainingProgress
+    from model_trainer.worker.progress_store import ProgressStore
+
+    progress_store = ProgressStore(fake)
+    progress: TrainingProgress = {
+        "run_id": "run-api-progress",
+        "phase": "training",
+        "epoch": 3,
+        "total_epochs": 10,
+        "step": 150,
+        "total_steps": 500,
+        "train_loss": 1.25,
+        "train_ppl": 3.5,
+        "grad_norm": 0.15,
+        "samples_per_sec": 48.0,
+        "val_loss": 1.1,
+        "val_ppl": 3.0,
+        "updated_at": "2024-01-15T14:30:00",
+    }
+    progress_store.save(progress)
+
+    # Call the progress API endpoint
+    res = client.get("/runs/run-api-progress/progress")
+    assert res.status_code == 200
+
+    from platform_core.json_utils import load_json_str
+
+    body = load_json_str(res.text)
+    assert isinstance(body, dict)
+    assert body["run_id"] == "run-api-progress"
+    assert body["phase"] == "training"
+    assert body["epoch"] == 3
+    assert body["total_epochs"] == 10
+    assert body["step"] == 150
+    assert body["total_steps"] == 500
+    assert body["train_loss"] == 1.25
+    assert body["train_ppl"] == 3.5
+    assert body["grad_norm"] == 0.15
+    assert body["samples_per_sec"] == 48.0
+    assert body["val_loss"] == 1.1
+    assert body["val_ppl"] == 3.0
+    assert body["updated_at"] == "2024-01-15T14:30:00"
+    fake.assert_only_called({"set", "expire", "get"})
+
+
 def test_runs_train_unsupported_backend_maps_400(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
