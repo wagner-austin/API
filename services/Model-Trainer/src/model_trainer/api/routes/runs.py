@@ -27,6 +27,7 @@ from ..schemas.runs import (
     EvaluateResponse,
     GenerateRequest,
     GenerateResponse,
+    ProgressResponse,
     RunStatusResponse,
     ScoreRequest,
     ScoreResponse,
@@ -144,6 +145,40 @@ class _RunsRoutes:
             "status": res["status"],
             "last_heartbeat_ts": res["last_heartbeat_ts"],
             "message": res["message"],
+        }
+
+    def run_progress(self: _RunsRoutes, run_id: str) -> ProgressResponse:
+        """Get detailed training progress for a run.
+
+        Args:
+            run_id: Training run identifier.
+
+        Returns:
+            ProgressResponse with current training metrics and phase.
+        """
+        orchestrator = self.c.training_orchestrator
+        extra: LoggingExtra = {
+            "category": "api",
+            "service": "runs",
+            "run_id": run_id,
+            "event": "runs_progress",
+        }
+        _logger.info("runs progress", extra=extra)
+        res = orchestrator.get_progress(run_id)
+        return {
+            "run_id": res["run_id"],
+            "phase": res["phase"],
+            "epoch": res["epoch"],
+            "total_epochs": res["total_epochs"],
+            "step": res["step"],
+            "total_steps": res["total_steps"],
+            "train_loss": res["train_loss"],
+            "train_ppl": res["train_ppl"],
+            "grad_norm": res["grad_norm"],
+            "samples_per_sec": res["samples_per_sec"],
+            "val_loss": res["val_loss"],
+            "val_ppl": res["val_ppl"],
+            "updated_at": res["updated_at"],
         }
 
     def run_evaluate(self: _RunsRoutes, run_id: str, req: EvaluateRequest) -> EvaluateResponse:
@@ -422,6 +457,7 @@ def build_router(container: ServiceContainer) -> APIRouter:
     h = _RunsRoutes(container)
     router.add_api_route("/train", h.start_training, methods=["POST"])
     router.add_api_route("/{run_id}", h.run_status, methods=["GET"])
+    router.add_api_route("/{run_id}/progress", h.run_progress, methods=["GET"])
     router.add_api_route("/{run_id}/evaluate", h.run_evaluate, methods=["POST"])
     router.add_api_route("/{run_id}/eval", h.run_eval_result, methods=["GET"])
     router.add_api_route("/{run_id}/artifact", h.run_artifact_pointer, methods=["GET"])

@@ -224,3 +224,48 @@ class ChatHistoryResponse(TypedDict, total=True):
     run_id: str
     messages: list[ChatMessage]
     created_at: str
+
+
+class ProgressResponse(TypedDict, total=True):
+    """Detailed training progress for real-time monitoring.
+
+    Attributes:
+        run_id: Unique identifier for the training run.
+        phase: Current phase (queued, tokenization, training, validation, etc.).
+        epoch: Current epoch number (0-indexed during training).
+        total_epochs: Total number of epochs configured.
+        step: Current step number within the epoch.
+        total_steps: Total steps per epoch (0 if unknown).
+        train_loss: Current training loss value.
+        train_ppl: Current training perplexity.
+        grad_norm: Current gradient norm value.
+        samples_per_sec: Training throughput in samples per second.
+        val_loss: Validation loss from last validation (None if not run yet).
+        val_ppl: Validation perplexity from last validation (None if not run yet).
+        updated_at: ISO 8601 timestamp of last update.
+    """
+
+    run_id: str
+    phase: Literal[
+        "queued",
+        "tokenization",
+        "training",
+        "validation",
+        "test",
+        "saving",
+        "uploading",
+        "completed",
+        "failed",
+        "cancelled",
+    ]
+    epoch: int
+    total_epochs: int
+    step: int
+    total_steps: int
+    train_loss: float
+    train_ppl: float
+    grad_norm: float
+    samples_per_sec: float
+    val_loss: float | None
+    val_ppl: float | None
+    updated_at: str
