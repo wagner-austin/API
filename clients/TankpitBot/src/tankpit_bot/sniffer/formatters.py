@@ -98,7 +98,10 @@ def format_combat_details(d: protocol.BinaryMessage) -> str:
         Formatted combat details string.
     """
     if d["msg_type"] == 0x53:
-        return f"shooter={d['shooter_id']} tgt=({d['target_x']},{d['target_y']})"
+        tgt = f"tgt=({d['target_x']},{d['target_y']})"
+        proj = f"proj=({d['projectile_x']},{d['projectile_y']})"
+        wpn = f"wpn={d['weapon']} ammo={d['ammo']}"
+        return f"shooter={d['shooter_id']} {tgt} {proj} {wpn}"
     if d["msg_type"] == 0x41:
         return f"victim={d['victim_id']} killer={d['killer_id']}"
     return ""
