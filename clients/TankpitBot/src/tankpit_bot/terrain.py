@@ -1,8 +1,8 @@
 """Terrain lookup from minimap GIF files.
 
 The minimap GIF files (field##_r.gif) contain terrain data:
-- Light green (g > 140) = rocks/impassable
-- Dark green (g <= 140) = passable ground
+- Light green (g > 140) = passable ground
+- Dark green (g <= 140) = rocks/impassable (mountains)
 - Dark blue (r < 30, g < 50, b > 50) = water
 
 Game coordinates map directly to image pixel coordinates:
@@ -57,12 +57,12 @@ class TerrainMap:
         if b > 50 and r < 30 and g < 50:
             return self.WATER
 
-        # Light green = rocks (g > 140)
+        # Light green = passable ground (g > 140)
         if g > 140:
-            return self.ROCK
+            return self.GROUND
 
-        # Dark green = passable ground
-        return self.GROUND
+        # Dark green = rocks/mountains (impassable)
+        return self.ROCK
 
     def is_passable(self, x: int, y: int) -> bool:
         """Check if tile is passable (not rock or water).
