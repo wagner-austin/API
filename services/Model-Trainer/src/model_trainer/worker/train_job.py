@@ -6,9 +6,11 @@ import time as _time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import JobDomain, default_events_channel
+from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.queues import TRAINER_QUEUE
 from platform_core.trainer_keys import artifact_file_id_key, cancel_key, heartbeat_key
@@ -19,7 +21,7 @@ from platform_workers.redis import RedisStrProto, is_redis_error
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig, TrainOutcome
-from model_trainer.core.contracts.queue import TrainJobPayload
+from model_trainer.core.contracts.queue_encoding import decode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import model_dir
 from model_trainer.worker.job_utils import (
@@ -32,6 +34,7 @@ from model_trainer.worker.job_utils import (
     setup_env,
     setup_job_logging,
 )
+from model_trainer.worker.progress_store import ProgressStore
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
 _log = get_logger(__name__)
@@ -99,6 +102,19 @@ def _upload_and_persist_pointer(
 
     from model_trainer.core import _test_hooks
 
+    log = get_logger(__name__)
+    log.info(
+        "Artifact upload started run_id=%s out_dir=%s",
+        run_id,
+        out_dir,
+        extra={
+            "category": "artifact",
+            "event": "upload_started",
+            "run_id": run_id,
+            "out_dir": out_dir,
+        },
+    )
+
     api_url = settings["app"]["data_bank_api_url"]
     api_key = settings["app"]["data_bank_api_key"]
     if api_url.strip() == "" or api_key.strip() == "":
@@ -111,7 +127,24 @@ def _upload_and_persist_pointer(
     base = _Path(out_dir)
     fid_resp = store.upload_artifact(base, artifact_name=f"model-{run_id}", request_id=run_id)
     r.set(artifact_file_id_key(run_id), fid_resp["file_id"])
-    return fid_resp["file_id"], int(fid_resp["size"])
+
+    file_id = fid_resp["file_id"]
+    file_size = int(fid_resp["size"])
+    log.info(
+        "Artifact upload completed run_id=%s file_id=%s size=%d",
+        run_id,
+        file_id,
+        file_size,
+        extra={
+            "category": "artifact",
+            "event": "upload_completed",
+            "run_id": run_id,
+            "file_id": file_id,
+            "size": file_size,
+        },
+    )
+
+    return file_id, file_size
 
 
 def _handle_post_save_or_cancel(
@@ -126,8 +159,37 @@ def _handle_post_save_or_cancel(
     store: TrainerJobStore,
     ctx: JobContext,
     created_at: datetime,
+    progress_store: ProgressStore,
+    total_epochs: int,
 ) -> None:
+    from model_trainer.core.contracts.progress import TrainingProgress
+
+    def _save_phase_progress(
+        phase: Literal["uploading", "completed", "cancelled"],
+    ) -> None:
+        """Save progress with given phase."""
+        phase_lit = phase
+
+        now = datetime.utcnow()
+        progress: TrainingProgress = {
+            "run_id": run_id,
+            "phase": phase_lit,
+            "epoch": total_epochs,
+            "total_epochs": total_epochs,
+            "step": result["steps"],
+            "total_steps": result["steps"],
+            "train_loss": result["loss"],
+            "train_ppl": result["perplexity"],
+            "grad_norm": 0.0,
+            "samples_per_sec": 0.0,
+            "val_loss": result["best_val_loss"],
+            "val_ppl": None,  # val_perplexity not tracked in TrainOutcome
+            "updated_at": now.isoformat(),
+        }
+        progress_store.save(progress)
+
     if cancelled:
+        _save_phase_progress("cancelled")
         now = datetime.utcnow()
         store.save(
             {
@@ -152,7 +214,12 @@ def _handle_post_save_or_cancel(
         ctx.publish_failed("system", "Training cancelled")
         return
 
+    # Transition to uploading phase
+    _save_phase_progress("uploading")
     file_id, file_bytes = _upload_and_persist_pointer(settings, r, run_id, out_dir)
+
+    # Transition to completed phase
+    _save_phase_progress("completed")
 
     now = datetime.utcnow()
     store.save(
@@ -211,7 +278,44 @@ def _execute_training(
     created_at: datetime,
 ) -> None:
     """Execute training workflow."""
+    from model_trainer.core.contracts.progress import TrainingPhase, TrainingProgress
+
     log = get_logger(__name__)
+    progress_store = ProgressStore(r)
+
+    # Track total steps (updated during training)
+    total_steps_ref: list[int] = [0]
+    last_val_loss_ref: list[float | None] = [None]
+    last_val_ppl_ref: list[float | None] = [None]
+
+    def _save_progress(
+        phase: TrainingPhase,
+        epoch: int,
+        step: int,
+        train_loss: float,
+        train_ppl: float,
+        grad_norm: float,
+        samples_per_sec: float,
+    ) -> None:
+        """Save training progress to Redis."""
+        now = datetime.utcnow()
+        progress: TrainingProgress = {
+            "run_id": run_id,
+            "phase": phase,
+            "epoch": epoch,
+            "total_epochs": cfg["num_epochs"],
+            "step": step,
+            "total_steps": total_steps_ref[0],
+            "train_loss": train_loss,
+            "train_ppl": train_ppl,
+            "grad_norm": grad_norm,
+            "samples_per_sec": samples_per_sec,
+            "val_loss": last_val_loss_ref[0],
+            "val_ppl": last_val_ppl_ref[0],
+            "updated_at": now.isoformat(),
+        }
+        progress_store.save(progress)
+
     heartbeat_fn(_time.time())
     log.info(
         "Training started run_id=%s model_family=%s model_size=%s max_seq_len=%d "
@@ -228,6 +332,9 @@ def _execute_training(
     )
     ctx.publish_started()
     emit_config_event(r, run_id, user_id, cfg, threads)
+
+    # Save initial progress
+    _save_progress("queued", 0, 0, 0.0, 0.0, 0.0, 0.0)
 
     def _progress(
         step: int,
@@ -248,6 +355,21 @@ def _execute_training(
             train_ppl,
             grad_norm,
         )
+        # Update validation metrics (store latest values, None if validation hasn't run)
+        last_val_loss_ref[0] = val_loss if val_loss is not None else last_val_loss_ref[0]
+        last_val_ppl_ref[0] = val_ppl if val_ppl is not None else last_val_ppl_ref[0]
+
+        # Save detailed progress
+        _save_progress(
+            "training",
+            epoch,
+            step,
+            train_loss,
+            train_ppl,
+            grad_norm,
+            samples_per_sec,
+        )
+
         progress_pct = max(0, min(99, int((epoch * 100) / max(cfg["num_epochs"], 1))))
         now = datetime.utcnow()
         store.save(
@@ -319,6 +441,15 @@ def _execute_training(
         wandb_publisher=wandb_pub,
     )
     if result["cancelled"]:
+        _save_progress(
+            "cancelled",
+            cfg["num_epochs"],
+            result["steps"],
+            result["loss"],
+            result["perplexity"],
+            0.0,
+            0.0,
+        )
         now = datetime.utcnow()
         store.save(
             {
@@ -342,6 +473,16 @@ def _execute_training(
         )
         ctx.publish_failed("system", "Training cancelled")
         return
+    # Transition to saving phase
+    _save_progress(
+        "saving",
+        cfg["num_epochs"],
+        result["steps"],
+        result["loss"],
+        result["perplexity"],
+        0.0,
+        0.0,
+    )
     out_dir = str(model_dir(settings, run_id))
     _ = backend.save(prepared, out_dir)
     _handle_post_save_or_cancel(
@@ -355,13 +496,22 @@ def _execute_training(
         store=store,
         ctx=ctx,
         created_at=created_at,
+        progress_store=progress_store,
+        total_epochs=cfg["num_epochs"],
     )
 
 
-def process_train_job(payload: TrainJobPayload) -> None:
-    """Process a training job."""
+def process_train_job(payload_raw: JSONObject) -> None:
+    """Process a training job.
+
+    Args:
+        payload_raw: Raw JSON object from RQ queue to be decoded and validated.
+    """
     settings = _test_hooks.load_settings()
     setup_job_logging(settings)
+
+    # Decode and validate the entire payload from raw JSON
+    payload = decode_train_job_payload(payload_raw)
 
     r = redis_client(settings)
     run_id = payload["run_id"]
