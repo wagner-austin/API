@@ -7,7 +7,7 @@ from collections.abc import Callable
 from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot import _test_hooks
-from tankpit_bot._test_hooks import ResponseProtocol
+from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot.browser.login import (
     ensure_on_play_page,
     handle_account_login,
@@ -15,6 +15,7 @@ from tankpit_bot.browser.login import (
     handle_login_flow,
     join_room,
 )
+from tests.fakes import FakeKeyboard
 
 
 class FakeCDPLogin:
@@ -172,6 +173,11 @@ class FakePageLogin:
         """Evaluate JavaScript expression - returns empty list in tests."""
         _ = expression
         return []
+
+    @property
+    def keyboard(self) -> KeyboardProtocol:
+        """Get keyboard for typing."""
+        return FakeKeyboard()
 
 
 # =============================================================================
@@ -747,6 +753,11 @@ class FakePageLoginTimeout:
         _ = expression
         return []
 
+    @property
+    def keyboard(self) -> KeyboardProtocol:
+        """Get keyboard for typing."""
+        return FakeKeyboard()
+
 
 class FakeCDPLoginNoErrors:
     """Fake CDP that returns no errors during account login (for timeout testing)."""
@@ -857,6 +868,11 @@ class FakePageLoginIntermediateUrl:
         """Evaluate JavaScript expression."""
         _ = expression
         return []
+
+    @property
+    def keyboard(self) -> KeyboardProtocol:
+        """Get keyboard for typing."""
+        return FakeKeyboard()
 
 
 def test_handle_account_login_intermediate_url_then_timeout() -> None:
