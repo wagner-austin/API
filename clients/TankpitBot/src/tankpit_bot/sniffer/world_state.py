@@ -18,8 +18,10 @@ from tankpit_bot.state import (
     WorldStateDict,
     add_mine_from_radar,
     make_empty_world_state,
+    pickup_container,
     render_world_ascii,
     update_container_from_radar,
+    update_self_fuel,
     update_self_position_and_viewport,
 )
 
@@ -122,14 +124,45 @@ def update_world_state_from_tank_registry_container(
     # Use sniffer's viewport tracking which is updated from position_update messages
     viewport_left = get_viewport_left()
     if viewport_left is None:
-        log.info("Cannot add container: viewport_left not yet known (y=%d, vx=%d)",
-                 container_y, container_viewport_x)
+        log.info(
+            "Cannot add container: viewport_left not yet known (y=%d, vx=%d)",
+            container_y,
+            container_viewport_x,
+        )
         return
     container_x = viewport_left + container_viewport_x
     ts = get_current_time_ms()
     # Volume unknown from tank_registry, use 1 as placeholder (is_fuel=True)
     _world_state = update_container_from_radar(_world_state, container_x, container_y, 1, ts)
     log.debug("Added container from tank_registry: (%d, %d)", container_x, container_y)
+
+
+def update_world_state_from_fuel_change(amount: int) -> None:
+    """Update world state with fuel gain or deposit.
+
+    Args:
+        amount: Fuel amount to add (positive for gain).
+    """
+    global _world_state
+    ts = get_current_time_ms()
+    _world_state = update_self_fuel(_world_state, amount, ts)
+    if _world_state["self_state"] is not None:
+        log.info("Fuel updated: %+d -> %d", amount, _world_state["self_state"]["fuel"])
+
+
+def update_world_state_from_container_pickup(x: int, y: int) -> None:
+    """Update world state when container is picked up.
+
+    Removes container and adds its fuel to self_state.
+
+    Args:
+        x: Container X coordinate.
+        y: Container Y coordinate.
+    """
+    global _world_state
+    ts = get_current_time_ms()
+    _world_state = pickup_container(_world_state, x, y, ts)
+    log.info("Picked up container at (%d, %d)", x, y)
 
 
 def render_world_state_ascii() -> str | None:
@@ -208,6 +241,9 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
     - position_update: Update self position from absolute coords (enter/teleport)
     - movement: Update self position after applying waypoints
     - MovementResponse (0x3D): Update self position
+    - FuelGain (0x44): Update self fuel
+    - FuelDeposit (0x64): Update self fuel
+    - container_pickup: Remove container and add fuel
 
     Args:
         decoded: Decoded binary protocol message.
@@ -244,6 +280,15 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
         }:
             update_world_state_from_tank_registry_container(cy, cvx)
             log.info("Container from tank_registry: y=%d vx=%d", cy, cvx)
+        case {"msg_type": 0x44, "amount": int(amount)}:
+            # FuelGain message - add fuel to self
+            update_world_state_from_fuel_change(amount)
+        case {"msg_type": 0x64, "amount": int(amount)}:
+            # FuelDeposit message - add fuel to self
+            update_world_state_from_fuel_change(amount)
+        case {"msg_type": "container_pickup", "x": int(x), "y": int(y)}:
+            # Container pickup - remove from world and add fuel
+            update_world_state_from_container_pickup(x, y)
 
 
 __all__ = [
@@ -251,6 +296,8 @@ __all__ = [
     "get_world_state",
     "render_world_state_ascii",
     "reset_world_state",
+    "update_world_state_from_container_pickup",
+    "update_world_state_from_fuel_change",
     "update_world_state_from_position",
     "update_world_state_from_radar",
     "update_world_state_from_tank_registry_container",
