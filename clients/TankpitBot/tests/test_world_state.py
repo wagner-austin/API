@@ -58,13 +58,16 @@ from tankpit_bot.state import (
     make_tank_state,
     make_terrain_tile,
     parse_coord_key,
+    pickup_container,
     remove_container,
     remove_mine,
     remove_tank,
     render_world_ascii,
+    set_self_fuel,
     terrain_to_ascii,
     update_container_from_radar,
     update_self_from_movement_response,
+    update_self_fuel,
     update_tank_damage,
     update_tank_from_registry,
     update_terrain_from_viewport,
@@ -1452,3 +1455,132 @@ class TestRenderWorldAscii:
         assert "Tanks:" in output
         assert "allies=" in output
         assert "enemies=" in output
+
+
+class TestUpdateSelfFuel:
+    """Tests for update_self_fuel mutation."""
+
+    def test_update_self_fuel_no_self_state(self) -> None:
+        """Returns unchanged state when self_state is None."""
+        state = make_empty_world_state()
+        result = update_self_fuel(state, 50, 1000)
+        assert result["self_state"] is None
+        assert result is state
+
+    def test_update_self_fuel_adds_fuel(self) -> None:
+        """Adds fuel to existing self_state."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        initial_fuel = get_self_state(state)["fuel"]
+
+        result = update_self_fuel(state, 50, 1000)
+        assert get_self_state(result)["fuel"] == initial_fuel + 50
+
+    def test_update_self_fuel_subtracts_fuel(self) -> None:
+        """Subtracts fuel (damage) from self_state, clamped to zero."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        current_fuel = get_self_state(state)["fuel"]
+
+        # Subtract more than available - should clamp to 0
+        result = update_self_fuel(state, -(current_fuel + 200), 700)
+        assert get_self_state(result)["fuel"] == 0
+
+
+class TestSetSelfFuel:
+    """Tests for set_self_fuel mutation."""
+
+    def test_set_self_fuel_no_self_state(self) -> None:
+        """Returns unchanged state when self_state is None."""
+        state = make_empty_world_state()
+        result = set_self_fuel(state, 50, 1000)
+        assert result["self_state"] is None
+        assert result is state
+
+    def test_set_self_fuel_sets_absolute_value(self) -> None:
+        """Sets fuel to absolute value."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+
+        result = set_self_fuel(state, 250, 1000)
+        assert get_self_state(result)["fuel"] == 250
+
+    def test_set_self_fuel_clamps_negative(self) -> None:
+        """Clamps negative values to zero."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+
+        result = set_self_fuel(state, -10, 1000)
+        assert get_self_state(result)["fuel"] == 0
+
+
+class TestPickupContainer:
+    """Tests for pickup_container mutation."""
+
+    def test_pickup_container_removes_container(self) -> None:
+        """Removes container from world state."""
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=50, y=60, volume=100, timestamp_ms=500)
+        assert coord_key(50, 60) in state["containers"]
+
+        result = pickup_container(state, 50, 60, 1000)
+        assert coord_key(50, 60) not in result["containers"]
+
+    def test_pickup_fuel_container_adds_fuel(self) -> None:
+        """Picking up fuel container adds fuel to self."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        initial_fuel = get_self_state(state)["fuel"]
+
+        # Add a fuel container with volume 100
+        state = update_container_from_radar(state, x=50, y=60, volume=100, timestamp_ms=600)
+
+        result = pickup_container(state, 50, 60, 700)
+        assert get_self_state(result)["fuel"] == initial_fuel + 100
+        assert coord_key(50, 60) not in result["containers"]
+
+    def test_pickup_equipment_container_no_fuel_change(self) -> None:
+        """Picking up equipment container does not add fuel."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        initial_fuel = get_self_state(state)["fuel"]
+
+        # Add an equipment container (volume=-1)
+        state = update_container_from_radar(state, x=50, y=60, volume=-1, timestamp_ms=600)
+
+        result = pickup_container(state, 50, 60, 700)
+        # Fuel unchanged since equipment containers have is_fuel=False
+        assert get_self_state(result)["fuel"] == initial_fuel
+        assert coord_key(50, 60) not in result["containers"]
+
+    def test_pickup_nonexistent_container(self) -> None:
+        """Picking up nonexistent container just returns state with no change."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        initial_fuel = get_self_state(state)["fuel"]
+
+        result = pickup_container(state, 99, 99, 700)
+        assert get_self_state(result)["fuel"] == initial_fuel
+
+    def test_pickup_container_no_self_state(self) -> None:
+        """Picking up container without self_state still removes container."""
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=50, y=60, volume=100, timestamp_ms=500)
+
+        result = pickup_container(state, 50, 60, 700)
+        assert coord_key(50, 60) not in result["containers"]
+        assert result["self_state"] is None
