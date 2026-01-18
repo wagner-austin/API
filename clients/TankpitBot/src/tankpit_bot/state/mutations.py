@@ -483,6 +483,136 @@ def update_terrain_from_viewport(
     )
 
 
+def update_self_fuel(
+    state: WorldStateDict,
+    fuel_delta: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Update self fuel from FuelGain/FuelDeposit messages.
+
+    Args:
+        state: Current world state.
+        fuel_delta: Fuel amount to add (can be negative for damage).
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New WorldStateDict with updated fuel, or unchanged if no self_state.
+    """
+    if state["self_state"] is None:
+        return state
+
+    new_fuel = max(0, state["self_state"]["fuel"] + fuel_delta)
+    new_self = SelfStateDict(
+        tank_id=state["self_state"]["tank_id"],
+        x=state["self_state"]["x"],
+        y=state["self_state"]["y"],
+        team=state["self_state"]["team"],
+        rank=state["self_state"]["rank"],
+        fuel=new_fuel,
+        leaderboard_position=state["self_state"]["leaderboard_position"],
+    )
+
+    return WorldStateDict(
+        self_state=new_self,
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def set_self_fuel(
+    state: WorldStateDict,
+    fuel: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Set self fuel to absolute value (from inventory or sync messages).
+
+    Args:
+        state: Current world state.
+        fuel: Absolute fuel value.
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New WorldStateDict with updated fuel, or unchanged if no self_state.
+    """
+    if state["self_state"] is None:
+        return state
+
+    new_self = SelfStateDict(
+        tank_id=state["self_state"]["tank_id"],
+        x=state["self_state"]["x"],
+        y=state["self_state"]["y"],
+        team=state["self_state"]["team"],
+        rank=state["self_state"]["rank"],
+        fuel=max(0, fuel),
+        leaderboard_position=state["self_state"]["leaderboard_position"],
+    )
+
+    return WorldStateDict(
+        self_state=new_self,
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def pickup_container(
+    state: WorldStateDict,
+    x: int,
+    y: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Pick up container and add fuel to self (if fuel container).
+
+    Removes the container from world state and adds its volume to self fuel.
+
+    Args:
+        state: Current world state.
+        x: Container X coordinate.
+        y: Container Y coordinate.
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New WorldStateDict with container removed and fuel updated.
+    """
+    key = coord_key(x, y)
+    container = state["containers"].get(key)
+
+    # Remove container
+    new_containers = dict(state["containers"])
+    new_containers.pop(key, None)
+
+    # Add fuel to self if it was a fuel container
+    new_self = state["self_state"]
+    if new_self is not None and container is not None and container["is_fuel"]:
+        new_fuel = new_self["fuel"] + container["volume"]
+        new_self = SelfStateDict(
+            tank_id=new_self["tank_id"],
+            x=new_self["x"],
+            y=new_self["y"],
+            team=new_self["team"],
+            rank=new_self["rank"],
+            fuel=new_fuel,
+            leaderboard_position=new_self["leaderboard_position"],
+        )
+
+    return WorldStateDict(
+        self_state=new_self,
+        tanks=state["tanks"],
+        containers=new_containers,
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
 def remove_tank(
     state: WorldStateDict,
     tank_id: int,
@@ -523,11 +653,14 @@ def remove_tank(
 __all__ = [
     "add_mine",
     "add_mine_from_radar",
+    "pickup_container",
     "remove_container",
     "remove_mine",
     "remove_tank",
+    "set_self_fuel",
     "update_container_from_radar",
     "update_self_from_movement_response",
+    "update_self_fuel",
     "update_self_position_and_viewport",
     "update_tank_damage",
     "update_tank_from_registry",
