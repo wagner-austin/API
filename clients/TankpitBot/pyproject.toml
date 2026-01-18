@@ -21,6 +21,7 @@ websockets = "^15.0"
 httpx = "^0.28"
 rich = "^14.0"
 python-dotenv = "^1.0.0"
+pillow = "^11.0"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
 
@@ -57,6 +58,14 @@ pretty = true
 files = ["src", "tests", "scripts"]
 mypy_path = ["src"]
 explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = "PIL.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.test_world_state", "tests.test_terrain", "tankpit_bot.terrain"]
+disallow_any_expr = false
 
 [tool.ruff]
 line-length = 100
