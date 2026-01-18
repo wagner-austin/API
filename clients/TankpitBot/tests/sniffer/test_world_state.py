@@ -622,3 +622,219 @@ class TestModuleLevelFunctions:
 
         # Invalid payload, result is None, should not log
         decode_received_text_message("xxx")
+
+    def test_get_world_state_returns_current_state(self) -> None:
+        """Test get_world_state returns the current world state."""
+        from tankpit_bot.sniffer.world_state import get_world_state
+
+        # After reset, state should have None self_state
+        state = get_world_state()
+        assert state["self_state"] is None
+        assert state["containers"] == {}
+        assert state["mines"] == {}
+
+        # Update position and verify state is updated
+        update_world_state_from_position(50, 60)
+        state = get_world_state()
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        assert state["self_state"]["x"] == 50
+        assert state["self_state"]["y"] == 60
+
+    def test_update_world_state_from_tank_registry_container_no_viewport(self) -> None:
+        """Test container update when viewport_left is not known."""
+        from tankpit_bot.sniffer import viewport
+        from tankpit_bot.sniffer.world_state import (
+            update_world_state_from_tank_registry_container,
+        )
+
+        # Ensure viewport_left is None
+        viewport._viewport_left = None
+
+        # Should log and return without updating
+        update_world_state_from_tank_registry_container(100, 5)
+
+        # No container should be added since viewport_left is unknown
+        state = world_state._world_state
+        assert state["containers"] == {}
+
+    def test_update_world_state_from_tank_registry_container_with_viewport(self) -> None:
+        """Test container update when viewport_left is known."""
+        from tankpit_bot.sniffer import viewport
+        from tankpit_bot.sniffer.world_state import (
+            update_world_state_from_tank_registry_container,
+        )
+
+        # Set viewport_left
+        viewport._viewport_left = 100
+
+        # Update container - should calculate absolute x = 100 + 5 = 105
+        update_world_state_from_tank_registry_container(50, 5)
+
+        # Container should be added at (105, 50) with key "105,50"
+        state = world_state._world_state
+        assert "105,50" in state["containers"]
+
+        # Reset viewport state
+        viewport._viewport_left = None
+
+    def test_update_world_state_from_fuel_change(self) -> None:
+        """Test fuel change updates self_state fuel."""
+        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_change
+
+        # First set up a position to create self_state
+        update_world_state_from_position(100, 100)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        initial_fuel = state["self_state"]["fuel"]
+
+        # Update fuel - adds to existing
+        update_world_state_from_fuel_change(50)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        assert state["self_state"]["fuel"] == initial_fuel + 50
+
+    def test_update_world_state_from_fuel_change_no_self_state(self) -> None:
+        """Test fuel change does nothing when self_state is None."""
+        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_change
+
+        # Reset to ensure no self_state
+        reset_world_state()
+
+        # Verify self_state is None
+        state = world_state._world_state
+        assert state["self_state"] is None
+
+        # Update fuel - should do nothing since no self_state
+        update_world_state_from_fuel_change(50)
+
+        state = world_state._world_state
+        assert state["self_state"] is None
+
+    def test_update_world_state_from_container_pickup(self) -> None:
+        """Test container pickup removes container and adds fuel."""
+        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.sniffer.world_state import (
+            update_world_state_from_container_pickup,
+        )
+
+        # First set up a position to create self_state
+        update_world_state_from_position(100, 100)
+
+        # Add a container via radar
+        containers: list[RadarContainerDict] = [RadarContainerDict(x=50, y=60, volume=100)]
+        mines: list[RadarMineDict] = []
+        update_world_state_from_radar(containers, mines)
+
+        state = world_state._world_state
+        assert "50,60" in state["containers"]
+
+        # Pick up the container
+        update_world_state_from_container_pickup(50, 60)
+
+        state = world_state._world_state
+        # Container should be removed
+        assert "50,60" not in state["containers"]
+
+    def test_dispatch_tank_registry_container(self) -> None:
+        """Test dispatch handles tank_registry container message."""
+        from tankpit_bot.container import TankRegistryDict
+        from tankpit_bot.sniffer import viewport
+
+        # Set viewport_left for container calculation
+        viewport._viewport_left = 200
+
+        msg = TankRegistryDict(
+            msg_type="tank_registry",
+            flags=0,
+            tank_id=1000,
+            info_bytes=b"",
+            team="red",
+            tank_name="",
+            military_rank=0,
+            badge_count=0,
+            is_bot=False,
+            is_container=True,
+            container_x=None,
+            container_y=75,
+            container_viewport_x=3,
+        )
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        # Container x = 200 + 3 = 203
+        assert "203,75" in state["containers"]
+
+        # Reset viewport state
+        viewport._viewport_left = None
+
+    def test_dispatch_fuel_gain_message(self) -> None:
+        """Test dispatch handles FuelGain (0x44) message."""
+        from tankpit_bot.protocol import FuelGainDict
+
+        # First set up a position to create self_state
+        update_world_state_from_position(100, 100)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        initial_fuel = state["self_state"]["fuel"]
+
+        msg = FuelGainDict(msg_type=0x44, amount=25, is_free=False)
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        assert state["self_state"]["fuel"] == initial_fuel + 25
+
+    def test_dispatch_fuel_deposit_message(self) -> None:
+        """Test dispatch handles FuelDeposit (0x64) message."""
+        from tankpit_bot.protocol import FuelDepositDict
+
+        # First set up a position to create self_state
+        update_world_state_from_position(100, 100)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        initial_fuel = state["self_state"]["fuel"]
+
+        msg = FuelDepositDict(msg_type=0x64, amount=30)
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        if state["self_state"] is None:
+            raise AssertionError("self_state should not be None")
+        assert state["self_state"]["fuel"] == initial_fuel + 30
+
+    def test_dispatch_container_pickup_message(self) -> None:
+        """Test dispatch handles container_pickup message."""
+        from tankpit_bot.container import (
+            ContainerPickupDict,
+            RadarContainerDict,
+            RadarMineDict,
+        )
+
+        # First set up a position to create self_state
+        update_world_state_from_position(100, 100)
+
+        # Add a container via radar
+        containers: list[RadarContainerDict] = [RadarContainerDict(x=80, y=90, volume=50)]
+        mines: list[RadarMineDict] = []
+        update_world_state_from_radar(containers, mines)
+
+        state = world_state._world_state
+        assert "80,90" in state["containers"]
+
+        # Dispatch container pickup
+        msg = ContainerPickupDict(msg_type="container_pickup", x=80, y=90, volume=50, is_fuel=True)
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        # Container should be removed
+        assert "80,90" not in state["containers"]
