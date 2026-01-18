@@ -18,6 +18,7 @@ Game coordinates map directly to image pixel coordinates:
 """
 
 from pathlib import Path
+from typing import ClassVar
 
 from PIL import Image
 
@@ -41,9 +42,13 @@ class TerrainMap:
     COLOR_GROUND_01 = (51, 102, 51)
 
     # Combined color sets for matching
-    ROCK_COLORS = {COLOR_ROCK_42, COLOR_ROCK_01}
-    WATER_COLORS = {COLOR_WATER_42, COLOR_WATER_01}
-    GROUND_COLORS = {COLOR_GROUND_42A, COLOR_GROUND_42B, COLOR_GROUND_01}
+    ROCK_COLORS: ClassVar[set[tuple[int, int, int]]] = {COLOR_ROCK_42, COLOR_ROCK_01}
+    WATER_COLORS: ClassVar[set[tuple[int, int, int]]] = {COLOR_WATER_42, COLOR_WATER_01}
+    GROUND_COLORS: ClassVar[set[tuple[int, int, int]]] = {
+        COLOR_GROUND_42A,
+        COLOR_GROUND_42B,
+        COLOR_GROUND_01,
+    }
 
     def __init__(self, gif_path: str | Path) -> None:
         """Load terrain from GIF file.
