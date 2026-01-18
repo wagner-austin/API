@@ -760,6 +760,18 @@ def test_browser_session_poll_fuel_with_results() -> None:
     assert result["js_variables"][0]["value"] == 800
 
 
+class _FakeKeyboardMinimal:
+    """Minimal fake keyboard for static key tests."""
+
+    def press(self, key: str, *, delay: float | None = None) -> None:
+        """Press key (no-op)."""
+        _ = (key, delay)
+
+    def type(self, text: str, *, delay: float | None = None) -> None:
+        """Type text (no-op)."""
+        _ = (text, delay)
+
+
 class FakePageWithStaticKey:
     """Fake page that can find and fetch tpclient script for testing."""
 
@@ -767,11 +779,17 @@ class FakePageWithStaticKey:
         """Initialize with eval count tracker."""
         self._eval_count = 0
         self._url = "https://tankpit.com/play"
+        self._keyboard = _FakeKeyboardMinimal()
 
     @property
     def url(self) -> str:
         """Return test URL."""
         return self._url
+
+    @property
+    def keyboard(self) -> _FakeKeyboardMinimal:
+        """Return keyboard interface."""
+        return self._keyboard
 
     def goto(
         self,
@@ -813,6 +831,114 @@ class FakePageWithStaticKey:
             key = "A" * 1000
             return f'var x = "{key}";'
         # First call - looking for tpclient script URL
+        return "https://tankpit.com/js/tpclient.min.js"
+
+
+class FakePageNoKey:
+    """Fake page that returns JS without a 1000-char key."""
+
+    def __init__(self) -> None:
+        """Initialize."""
+        self._url = "https://tankpit.com/play"
+        self._keyboard = _FakeKeyboardMinimal()
+
+    @property
+    def url(self) -> str:
+        """Return test URL."""
+        return self._url
+
+    @property
+    def keyboard(self) -> _FakeKeyboardMinimal:
+        """Return keyboard interface."""
+        return self._keyboard
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for timeout."""
+        _ = timeout
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for event."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for function - always succeeds."""
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Return script URL or JS content without 1000-char key."""
+        if "fetch" in expression:
+            # Return JS without a 1000-char key
+            return 'var x = "short_key";'
+        return "https://tankpit.com/js/tpclient.min.js"
+
+
+class FakePageFetchFails:
+    """Fake page where fetch returns non-string."""
+
+    def __init__(self) -> None:
+        """Initialize."""
+        self._url = "https://tankpit.com/play"
+        self._keyboard = _FakeKeyboardMinimal()
+
+    @property
+    def url(self) -> str:
+        """Return test URL."""
+        return self._url
+
+    @property
+    def keyboard(self) -> _FakeKeyboardMinimal:
+        """Return keyboard interface."""
+        return self._keyboard
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait for timeout."""
+        _ = timeout
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for event."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for function - always succeeds."""
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Return script URL or None for fetch."""
+        if "fetch" in expression:
+            # Return None (simulates failed fetch)
+            return None
         return "https://tankpit.com/js/tpclient.min.js"
 
 
@@ -938,57 +1064,7 @@ def test_browser_session_derive_static_key_no_binary_messages() -> None:
 
 def test_browser_session_capture_static_key_no_key_found() -> None:
     """Test _capture_static_key logs warning when no 1000-char key found."""
-
     from tankpit_bot._test_hooks import PageProtocol
-
-    class FakePageNoKey:
-        """Fake page that returns JS without a 1000-char key."""
-
-        def __init__(self) -> None:
-            """Initialize."""
-            self._url = "https://tankpit.com/play"
-
-        @property
-        def url(self) -> str:
-            """Return test URL."""
-            return self._url
-
-        def goto(
-            self,
-            url: str,
-            *,
-            referer: str | None = None,
-            timeout: float | None = None,
-            wait_until: str | None = None,
-        ) -> None:
-            """Navigate to URL."""
-            _ = (referer, timeout, wait_until)
-            self._url = url
-
-        def wait_for_timeout(self, timeout: float) -> None:
-            """Wait for timeout."""
-            _ = timeout
-
-        def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-            """Wait for event."""
-            _ = (event, timeout)
-
-        def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-            """Wait for function - always succeeds."""
-            _ = (expression, timeout)
-
-        def close(
-            self, *, reason: str | None = None, run_before_unload: bool | None = None
-        ) -> None:
-            """Close page."""
-            _ = (reason, run_before_unload)
-
-        def evaluate(self, expression: str) -> JSONValue:
-            """Return script URL or JS content without 1000-char key."""
-            if "fetch" in expression:
-                # Return JS without a 1000-char key
-                return 'var x = "short_key";'
-            return "https://tankpit.com/js/tpclient.min.js"
 
     session = BrowserSession("https://example.com")
     page: PageProtocol = FakePageNoKey()
@@ -1000,57 +1076,7 @@ def test_browser_session_capture_static_key_no_key_found() -> None:
 
 def test_browser_session_capture_static_key_fetch_fails() -> None:
     """Test _capture_static_key logs warning when fetch returns non-string."""
-
     from tankpit_bot._test_hooks import PageProtocol
-
-    class FakePageFetchFails:
-        """Fake page where fetch returns non-string."""
-
-        def __init__(self) -> None:
-            """Initialize."""
-            self._url = "https://tankpit.com/play"
-
-        @property
-        def url(self) -> str:
-            """Return test URL."""
-            return self._url
-
-        def goto(
-            self,
-            url: str,
-            *,
-            referer: str | None = None,
-            timeout: float | None = None,
-            wait_until: str | None = None,
-        ) -> None:
-            """Navigate to URL."""
-            _ = (referer, timeout, wait_until)
-            self._url = url
-
-        def wait_for_timeout(self, timeout: float) -> None:
-            """Wait for timeout."""
-            _ = timeout
-
-        def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-            """Wait for event."""
-            _ = (event, timeout)
-
-        def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-            """Wait for function - always succeeds."""
-            _ = (expression, timeout)
-
-        def close(
-            self, *, reason: str | None = None, run_before_unload: bool | None = None
-        ) -> None:
-            """Close page."""
-            _ = (reason, run_before_unload)
-
-        def evaluate(self, expression: str) -> JSONValue:
-            """Return script URL or None for fetch."""
-            if "fetch" in expression:
-                # Return None (simulates failed fetch)
-                return None
-            return "https://tankpit.com/js/tpclient.min.js"
 
     session = BrowserSession("https://example.com")
     page: PageProtocol = FakePageFetchFails()
