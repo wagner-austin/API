@@ -217,6 +217,31 @@ class CDPSessionProtocol(Protocol):
         ...
 
 
+class KeyboardProtocol(Protocol):
+    """Protocol for Playwright Keyboard.
+
+    Matches playwright.sync_api.Keyboard interface for methods we use.
+    """
+
+    def press(self, key: str, *, delay: float | None = None) -> None:
+        """Press a keyboard key.
+
+        Args:
+            key: Key name (e.g., "f", "Enter", "ArrowUp").
+            delay: Time to wait between keydown and keyup in milliseconds.
+        """
+        ...
+
+    def type(self, text: str, *, delay: float | None = None) -> None:
+        """Type text character by character.
+
+        Args:
+            text: Text to type.
+            delay: Time to wait between key presses in milliseconds.
+        """
+        ...
+
+
 class PageProtocol(Protocol):
     """Protocol for Playwright Page.
 
@@ -226,6 +251,15 @@ class PageProtocol(Protocol):
     @property
     def url(self) -> str:
         """Get the current URL of the page."""
+        ...
+
+    @property
+    def keyboard(self) -> KeyboardProtocol:
+        """Get the keyboard interface for this page.
+
+        Returns:
+            Keyboard interface for sending key events.
+        """
         ...
 
     def goto(
@@ -606,6 +640,7 @@ __all__ = [
     "BrowserTypeProtocol",
     "CDPSessionProtocol",
     "FindBestStaticByteProtocol",
+    "KeyboardProtocol",
     "LoadTerrainMapProtocol",
     "PageProtocol",
     "PathExistsProtocol",
