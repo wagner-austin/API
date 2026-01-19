@@ -29,6 +29,7 @@ class _HFTokenizerProto(Protocol):
     """Protocol for HuggingFace tokenizers.Tokenizer instance."""
 
     pre_tokenizer: _PreTokenizerProto
+    decoder: _DecoderProto | None
 
     def train_from_iterator(
         self,
@@ -102,6 +103,16 @@ class _PreTokenizerProto(Protocol):
     pass
 
 
+class _DecoderProto(Protocol):
+    """Protocol for tokenizer decoder that reconstructs original text from tokens.
+
+    The decoder reverses the pre-tokenizer's splitting, joining subword
+    tokens back into whole words with proper spacing.
+    """
+
+    pass
+
+
 def _get_tokenizer_class() -> _TokenizerClassProto:
     """Get tokenizers.Tokenizer class via dynamic import."""
     tokenizers_mod = __import__("tokenizers", fromlist=["Tokenizer"])
@@ -123,10 +134,31 @@ def _get_bpe_trainer_ctor() -> _BpeTrainerCtorProto:
     return ctor
 
 
-def _get_whitespace_pretokenizer() -> _PreTokenizerProto:
-    """Get tokenizers.pre_tokenizers.Whitespace instance via dynamic import."""
-    pre_tok_mod = __import__("tokenizers.pre_tokenizers", fromlist=["Whitespace"])
-    cls: type[_PreTokenizerProto] = pre_tok_mod.Whitespace
+def _get_metaspace_pretokenizer() -> _PreTokenizerProto:
+    """Get tokenizers.pre_tokenizers.Metaspace instance via dynamic import.
+
+    Metaspace pre-tokenizer replaces spaces with a special character (▁)
+    at the beginning of words, enabling proper round-trip encode/decode.
+
+    Returns:
+        A Metaspace pre-tokenizer instance.
+    """
+    pre_tok_mod = __import__("tokenizers.pre_tokenizers", fromlist=["Metaspace"])
+    cls: type[_PreTokenizerProto] = pre_tok_mod.Metaspace
+    return cls()
+
+
+def _get_metaspace_decoder() -> _DecoderProto:
+    """Get tokenizers.decoders.Metaspace instance via dynamic import.
+
+    Metaspace decoder reconstructs original text by replacing the special
+    character (▁) back to spaces, enabling proper round-trip decode.
+
+    Returns:
+        A Metaspace decoder instance.
+    """
+    decoders_mod = __import__("tokenizers.decoders", fromlist=["Metaspace"])
+    cls: type[_DecoderProto] = decoders_mod.Metaspace
     return cls()
 
 
@@ -172,8 +204,12 @@ def train_bpe_tokenizer(
     # Initialize tokenizer with BPE model
     tokenizer: _HFTokenizerProto = tokenizer_cls(bpe_model_ctor(unk_token="[UNK]"))
 
-    # Set pre-tokenizer (splits on whitespace before BPE)
-    tokenizer.pre_tokenizer = _get_whitespace_pretokenizer()
+    # Set pre-tokenizer (marks word boundaries with ▁ before BPE)
+    tokenizer.pre_tokenizer = _get_metaspace_pretokenizer()
+
+    # Set decoder (reconstructs original text from subword tokens)
+    # This ensures proper round-trip by restoring spaces from ▁ markers
+    tokenizer.decoder = _get_metaspace_decoder()
 
     # Create trainer with configuration
     trainer: _BpeTrainerProto = bpe_trainer_ctor(
