@@ -178,10 +178,12 @@ def test_runs_progress_with_data(tmp_path: Path, settings_factory: _SettingsFact
     res = client.get("/runs/run-api-progress/progress")
     assert res.status_code == 200
 
-    from platform_core.json_utils import load_json_str
+    from platform_core.json_utils import JSONValue, load_json_str
 
-    body = load_json_str(res.text)
-    assert isinstance(body, dict)
+    body_raw = load_json_str(res.text)
+    if not isinstance(body_raw, dict):
+        raise AssertionError(f"Expected dict, got {type(body_raw)}")
+    body: dict[str, JSONValue] = body_raw
     assert body["run_id"] == "run-api-progress"
     assert body["phase"] == "training"
     assert body["epoch"] == 3
