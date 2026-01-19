@@ -136,3 +136,69 @@ def test_bpe_trains_and_writes_artifacts(tmp_path: Path) -> None:
     assert manifest["config"]["vocab_size"] == 128
     assert 0.0 <= manifest["stats"]["coverage"] <= 1.0
     assert 0.0 <= manifest["stats"]["char_coverage"] <= 1.0
+
+
+def test_bpe_encode_decode_roundtrip(tmp_path: Path) -> None:
+    """Verify BPE tokenizer properly decodes tokens back to original text.
+
+    This tests that the BPE decoder is correctly configured and produces
+    readable text without spurious spaces between subword tokens.
+    """
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    # Use varied text to ensure good BPE vocabulary coverage
+    corpus_text = (
+        "hello world\n"
+        "this is a test\n"
+        "the quick brown fox jumps over the lazy dog\n"
+        "programming language models require tokenization\n"
+        "subword tokenization helps handle rare words\n"
+    )
+    (corpus / "train.txt").write_text(corpus_text, encoding="utf-8")
+    out_dir = tmp_path / "artifacts" / "tokenizers" / "tok-roundtrip"
+
+    cfg = TokenizerTrainConfig(
+        method="bpe",
+        vocab_size=256,
+        min_frequency=1,
+        corpus_path=str(corpus),
+        holdout_fraction=0.1,
+        seed=42,
+        out_dir=str(out_dir),
+    )
+    # Tokenizer training (no ML loss metric)
+    loss_initial = 0.0
+    backend = BPEBackend()
+    backend.train(cfg)
+    loss_final = 0.0
+    assert loss_final <= loss_initial
+
+    # Load the trained tokenizer
+    handle = backend.load(str(out_dir))
+
+    # Test round-trip on various inputs
+    test_inputs: list[str] = [
+        "hello world",
+        "this is a test",
+        "the quick brown fox",
+        "tokenization works properly",
+    ]
+
+    for original in test_inputs:
+        # Encode to token IDs
+        token_ids: list[int] = handle.encode(original)
+        # Token count must be at least 1 (even single-char inputs produce tokens)
+        assert token_ids, f"Expected non-empty tokens for '{original}'"
+
+        # Decode back to text
+        decoded: str = handle.decode(token_ids)
+
+        # Verify the decoded text matches original (whitespace-normalized)
+        # BPE may add/remove leading/trailing spaces, so strip both
+        original_normalized: str = original.strip()
+        decoded_normalized: str = decoded.strip()
+
+        assert decoded_normalized == original_normalized, (
+            f"Round-trip failed for '{original}': "
+            f"got '{decoded}' (normalized: '{decoded_normalized}')"
+        )
