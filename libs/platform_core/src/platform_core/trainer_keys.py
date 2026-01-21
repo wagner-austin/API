@@ -12,6 +12,7 @@ SCORE_KEY_PREFIX: Final[str] = "runs:score:"
 GENERATE_KEY_PREFIX: Final[str] = "runs:gen:"
 CONVERSATION_KEY_PREFIX: Final[str] = "runs:conv:"
 CONVERSATION_META_KEY_PREFIX: Final[str] = "runs:conv:meta:"
+PROGRESS_KEY_PREFIX: Final[str] = "runs:progress:"
 
 
 def heartbeat_key(run_id: str) -> str:
@@ -54,6 +55,10 @@ def conversation_meta_key(run_id: str, session_id: str) -> str:
     return f"{CONVERSATION_META_KEY_PREFIX}{run_id}:{session_id}"
 
 
+def progress_key(run_id: str) -> str:
+    return f"{PROGRESS_KEY_PREFIX}{run_id}"
+
+
 __all__ = [
     "ARTIFACT_FILE_ID_PREFIX",
     "CANCEL_KEY_PREFIX",
@@ -63,6 +68,7 @@ __all__ = [
     "GENERATE_KEY_PREFIX",
     "HEARTBEAT_KEY_PREFIX",
     "MSG_KEY_PREFIX",
+    "PROGRESS_KEY_PREFIX",
     "SCORE_KEY_PREFIX",
     "STATUS_KEY_PREFIX",
     "artifact_file_id_key",
@@ -73,6 +79,7 @@ __all__ = [
     "generate_key",
     "heartbeat_key",
     "message_key",
+    "progress_key",
     "score_key",
     "status_key",
 ]

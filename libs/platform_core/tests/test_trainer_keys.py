@@ -9,6 +9,7 @@ from platform_core.trainer_keys import (
     GENERATE_KEY_PREFIX,
     HEARTBEAT_KEY_PREFIX,
     MSG_KEY_PREFIX,
+    PROGRESS_KEY_PREFIX,
     SCORE_KEY_PREFIX,
     STATUS_KEY_PREFIX,
     artifact_file_id_key,
@@ -19,6 +20,7 @@ from platform_core.trainer_keys import (
     generate_key,
     heartbeat_key,
     message_key,
+    progress_key,
     score_key,
     status_key,
 )
@@ -39,3 +41,4 @@ def test_trainer_key_helpers() -> None:
     assert conversation_key(rid, session_id) == f"{CONVERSATION_KEY_PREFIX}{rid}:{session_id}"
     expected_conversation_meta_key = f"{CONVERSATION_META_KEY_PREFIX}{rid}:{session_id}"
     assert conversation_meta_key(rid, session_id) == expected_conversation_meta_key
+    assert progress_key(rid) == f"{PROGRESS_KEY_PREFIX}{rid}"
