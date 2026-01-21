@@ -211,6 +211,70 @@ Get training run status and heartbeat information.
 
 ---
 
+### GET /runs/{run_id}/progress
+
+Get detailed training progress for real-time monitoring.
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `run_id` | string | Training run identifier |
+
+**Response (200):**
+```json
+{
+  "run_id": "gpt2-run-001",
+  "phase": "training",
+  "epoch": 1,
+  "total_epochs": 3,
+  "step": 150,
+  "total_steps": 500,
+  "train_loss": 3.42,
+  "train_ppl": 30.6,
+  "grad_norm": 0.85,
+  "samples_per_sec": 128.5,
+  "val_loss": 3.65,
+  "val_ppl": 38.5,
+  "updated_at": "2024-11-27T10:30:05Z"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `run_id` | string | Training run identifier |
+| `phase` | string | Current phase (see below) |
+| `epoch` | int | Current epoch number (0-indexed during training) |
+| `total_epochs` | int | Total number of epochs configured |
+| `step` | int | Current step number within the epoch |
+| `total_steps` | int | Total steps per epoch (0 if unknown) |
+| `train_loss` | float | Current training loss value |
+| `train_ppl` | float | Current training perplexity |
+| `grad_norm` | float | Current gradient norm value |
+| `samples_per_sec` | float | Training throughput in samples per second |
+| `val_loss` | float\|null | Validation loss from last validation (null if not run yet) |
+| `val_ppl` | float\|null | Validation perplexity from last validation (null if not run yet) |
+| `updated_at` | string | ISO 8601 timestamp of last update |
+
+**Phase Values:**
+
+| Phase | Description |
+|-------|-------------|
+| `queued` | Job is queued, waiting for worker |
+| `tokenization` | Tokenizing corpus data |
+| `training` | Active training loop |
+| `validation` | Running validation epoch |
+| `test` | Running test evaluation |
+| `saving` | Saving model checkpoint |
+| `uploading` | Uploading artifacts to storage |
+| `completed` | Training finished successfully |
+| `failed` | Training failed with error |
+| `cancelled` | Training was cancelled |
+
+---
+
 ### POST /runs/{run_id}/evaluate
 
 Enqueue evaluation job for a completed training run.
@@ -732,6 +796,7 @@ curl -H "X-Api-Key: your-secret-key" http://localhost:8000/runs/train ...
 **Protected endpoints:**
 - `POST /runs/train`
 - `GET /runs/{run_id}`
+- `GET /runs/{run_id}/progress`
 - `POST /runs/{run_id}/evaluate`
 - `GET /runs/{run_id}/eval`
 - `GET /runs/{run_id}/artifact`
