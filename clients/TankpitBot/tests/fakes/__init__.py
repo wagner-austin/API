@@ -8,8 +8,6 @@ This package is split into modules:
 - base: Core fakes for general testing
 - probe: Probe-specific fakes
 - bot: Bot-specific fakes
-
-All classes and functions are re-exported here for backward compatibility.
 """
 
 from tests.fakes.base import (

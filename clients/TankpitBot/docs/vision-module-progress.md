@@ -116,7 +116,7 @@ Split the 1840-line monolithic fakes file into 4 focused modules under `tests/fa
 
 | Module | Description | Classes |
 |--------|-------------|---------|
-| `__init__.py` | Re-exports all classes for backward compatibility | - |
+| `__init__.py` | Package entry point with exports | - |
 | `base.py` | Core fakes for general testing | 12 classes + 7 functions |
 | `probe.py` | Probe-specific fakes | 8 classes + 9 functions |
 | `bot.py` | Bot-specific fakes | 8 classes + 1 function |
