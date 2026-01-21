@@ -29,6 +29,14 @@ from tankpit_bot.bot.types import (
     make_pickup_move_command,
     make_teleport_command,
 )
+from tankpit_bot.bot.vision import (
+    VisionStateDict,
+    get_merged_fuel,
+    get_merged_fuel_containers,
+    make_empty_vision_state,
+    render_vision_ascii,
+    render_vision_debug,
+)
 from tankpit_bot.browser import BrowserSession, get_current_time_ms
 from tankpit_bot.protocol.commands import (
     CMD_MAP_OPEN,
@@ -101,6 +109,8 @@ class Bot(BrowserSession):
         self._equipment_enabled: list[bool] = [False, False, False, False, False]
         # Map state
         self._map_is_open: bool = False
+        # Vision state for fallback tracking
+        self._vision_state: VisionStateDict = make_empty_vision_state()
 
     # =========================================================================
     # State Machine
@@ -288,6 +298,76 @@ class Bot(BrowserSession):
             return None
 
         # Sort by Manhattan distance
+        my_x, my_y = pos
+        fuel_containers.sort(key=lambda c: abs(c["x"] - my_x) + abs(c["y"] - my_y))
+        return fuel_containers[0]
+
+    # =========================================================================
+    # Vision (Multi-Perspective Tracking)
+    # =========================================================================
+
+    def get_vision_state(self) -> VisionStateDict:
+        """Get current vision state (fallback caches).
+
+        Returns:
+            VisionStateDict with tank registry, position cache, containers.
+        """
+        return self._vision_state
+
+    def get_all_fuel_containers(self) -> list[ContainerStateDict]:
+        """Get fuel containers from both world state and vision cache.
+
+        Merges containers from both sources for more complete coverage.
+        Prefers world state when both have same location.
+
+        Returns:
+            List of fuel containers with volume > 0.
+        """
+        return get_merged_fuel_containers(self._vision_state)
+
+    def get_all_fuel(self) -> int:
+        """Get fuel from world state, falling back to vision cache.
+
+        Uses world state when available, vision cache as fallback.
+
+        Returns:
+            Current fuel amount.
+        """
+        return get_merged_fuel(self._vision_state)
+
+    def render_ascii(self) -> str | None:
+        """Render current world state as ASCII viewport.
+
+        Returns:
+            Multi-line ASCII string showing visible area, or None if
+            terrain map not loaded.
+        """
+        return render_vision_ascii()
+
+    def render_debug(self) -> str:
+        """Render vision debug info.
+
+        Returns:
+            Multi-line debug string with cache stats and comparison.
+        """
+        return render_vision_debug(self._vision_state)
+
+    def get_nearest_all_fuel_container(self) -> ContainerStateDict | None:
+        """Get nearest fuel container using merged sources.
+
+        Uses both world state and vision cache for more complete coverage.
+
+        Returns:
+            Nearest ContainerStateDict, or None if none found.
+        """
+        pos = self.get_position()
+        if pos is None:
+            return None
+
+        fuel_containers = self.get_all_fuel_containers()
+        if not fuel_containers:
+            return None
+
         my_x, my_y = pos
         fuel_containers.sort(key=lambda c: abs(c["x"] - my_x) + abs(c["y"] - my_y))
         return fuel_containers[0]
@@ -575,6 +655,7 @@ class Bot(BrowserSession):
         self._ws_urls = {}
         self._magic = None
         self._state_data = make_initial_state_data()
+        self._vision_state = make_empty_vision_state()
 
         with _test_hooks.sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=self._headless)
