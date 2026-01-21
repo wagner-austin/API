@@ -54,10 +54,25 @@ def _base_manifest() -> _ManifestDict:
         "holdout_fraction": 0.1,
         "pretrained_run_id": None,
         "git_commit": "g",
+        "timing": {
+            "training_duration_sec": 10.5,
+            "started_at": "2024-01-15T10:00:00",
+            "completed_at": "2024-01-15T10:00:10",
+        },
+        "performance": {
+            "peak_gpu_memory_mb": None,
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+        "model_info": {
+            "param_count": 1000,
+            "model_size_mb": 5.0,
+            "vocab_size": 256,
+        },
     }
 
 
-_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int | float]]
+_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int | float | None]]
 
 
 def _manifest_unknown() -> _ManifestDict:
@@ -112,7 +127,7 @@ def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
     assert isinstance(versions_raw, dict) and len(versions_raw) == 4
     versions = dict(versions_raw)
     versions[field] = value
-    bad_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    bad_manifest: _ManifestDict = {
         **base,
         "versions": versions,
     }
@@ -123,7 +138,7 @@ def test_load_manifest_versions_require_strings(field: str, value: int) -> None:
 
 def test_load_manifest_system_not_dict() -> None:
     base = _manifest_unknown()
-    bad_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    bad_manifest: _ManifestDict = {
         **base,
         "system": "oops",
     }
@@ -146,7 +161,7 @@ def test_load_manifest_system_field_types(field: str, value: str | int, message:
     assert isinstance(system_raw, dict) and len(system_raw) == 4
     system = dict(system_raw)
     system[field] = value
-    bad_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    bad_manifest: _ManifestDict = {
         **base,
         "system": system,
     }
@@ -155,7 +170,7 @@ def test_load_manifest_system_field_types(field: str, value: str | int, message:
 
 
 def test_load_manifest_loss_must_be_number() -> None:
-    bad_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    bad_manifest: _ManifestDict = {
         **_manifest_unknown(),
         "loss": "high",
     }
@@ -165,7 +180,7 @@ def test_load_manifest_loss_must_be_number() -> None:
 
 def test_load_manifest_pretrained_run_id_must_be_str_or_null() -> None:
     """Cover manifest.py lines 100-101 - _decode_manifest_str_or_none error case."""
-    bad_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    bad_manifest: _ManifestDict = {
         **_base_manifest(),
         "pretrained_run_id": 123,  # should be str or null, not int
     }
@@ -175,7 +190,7 @@ def test_load_manifest_pretrained_run_id_must_be_str_or_null() -> None:
 
 def test_load_manifest_pretrained_run_id_valid_string() -> None:
     """Cover manifest.py line 102 - _decode_manifest_str_or_none returns valid string."""
-    valid_manifest: dict[str, str | int | float | bool | None | dict[str, str | int | float]] = {
+    valid_manifest: _ManifestDict = {
         **_base_manifest(),
         "pretrained_run_id": "run-base-123",  # valid string value
     }
@@ -249,3 +264,45 @@ def test_load_manifest_tokenizer_id_non_string_error() -> None:
     }
     with pytest.raises(JSONTypeError, match="tokenizer_id"):
         _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+
+
+def test_load_manifest_peak_gpu_memory_mb_bool_error() -> None:
+    """Cover manifest.py _decode_manifest_performance bool check for peak_gpu_memory_mb."""
+    bad_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "performance": {
+            "peak_gpu_memory_mb": True,  # should be number or null, not bool
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+    }
+    with pytest.raises(JSONTypeError, match="peak_gpu_memory_mb"):
+        _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+
+
+def test_load_manifest_peak_gpu_memory_mb_string_error() -> None:
+    """Cover manifest.py _decode_manifest_performance else branch for peak_gpu_memory_mb."""
+    bad_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "performance": {
+            "peak_gpu_memory_mb": "high",  # should be number or null, not string
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+    }
+    with pytest.raises(JSONTypeError, match="peak_gpu_memory_mb"):
+        _ = manifest.load_manifest_from_text(dump_json_str(bad_manifest))
+
+
+def test_load_manifest_peak_gpu_memory_mb_valid_number() -> None:
+    """Cover manifest.py _decode_manifest_performance valid float path for peak_gpu_memory_mb."""
+    valid_manifest: _ManifestDict = {
+        **_base_manifest(),
+        "performance": {
+            "peak_gpu_memory_mb": 1024.5,  # valid float value
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+    }
+    result = manifest.load_manifest_from_text(dump_json_str(valid_manifest))
+    assert result["performance"]["peak_gpu_memory_mb"] == 1024.5

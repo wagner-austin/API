@@ -101,6 +101,21 @@ def _make_manifest(model_family: str, tokenizer_id: str) -> str:
             "platform_release": "5.15.0",
             "machine": "x86_64",
         },
+        "timing": {
+            "training_duration_sec": 10.5,
+            "started_at": "2024-01-15T10:00:00",
+            "completed_at": "2024-01-15T10:00:10",
+        },
+        "performance": {
+            "peak_gpu_memory_mb": None,
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+        "model_info": {
+            "param_count": 1000,
+            "model_size_mb": 5.0,
+            "vocab_size": 256,
+        },
     }
     return dump_json_str(manifest)
 
