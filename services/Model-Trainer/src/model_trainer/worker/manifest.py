@@ -18,7 +18,10 @@ from platform_core.json_utils import (
 
 from model_trainer.infra.persistence.models import (
     TrainingManifest,
+    TrainingManifestModelInfo,
+    TrainingManifestPerformance,
     TrainingManifestSystem,
+    TrainingManifestTiming,
     TrainingManifestVersions,
 )
 
@@ -86,6 +89,82 @@ def _decode_manifest_system(obj: JSONObject) -> TrainingManifestSystem:
         "platform": require_str(sys, "platform"),
         "platform_release": require_str(sys, "platform_release"),
         "machine": require_str(sys, "machine"),
+    }
+
+
+def _decode_manifest_timing(obj: JSONObject) -> TrainingManifestTiming:
+    """Decode timing section from manifest JSON.
+
+    Args:
+        obj: JSON object containing a 'timing' key.
+
+    Returns:
+        TrainingManifestTiming with decoded values.
+
+    Raises:
+        JSONTypeError: If required fields are missing or have wrong type.
+    """
+    timing = require_dict(obj, "timing")
+    return {
+        "training_duration_sec": require_float(timing, "training_duration_sec"),
+        "started_at": require_str(timing, "started_at"),
+        "completed_at": require_str(timing, "completed_at"),
+    }
+
+
+def _decode_manifest_performance(obj: JSONObject) -> TrainingManifestPerformance:
+    """Decode performance section from manifest JSON.
+
+    Args:
+        obj: JSON object containing a 'performance' key.
+
+    Returns:
+        TrainingManifestPerformance with decoded values.
+
+    Raises:
+        JSONTypeError: If required fields are missing or have wrong type.
+    """
+    perf = require_dict(obj, "performance")
+    # peak_gpu_memory_mb is optional (None if CPU training)
+    gpu_mem_val = perf.get("peak_gpu_memory_mb")
+    peak_gpu_memory_mb: float | None = None
+    if gpu_mem_val is not None:
+        if isinstance(gpu_mem_val, bool):
+            type_name = type(gpu_mem_val).__name__
+            raise JSONTypeError(
+                f"Field 'peak_gpu_memory_mb' must be a number or null, got {type_name}"
+            )
+        if isinstance(gpu_mem_val, int | float):
+            peak_gpu_memory_mb = float(gpu_mem_val)
+        else:
+            type_name = type(gpu_mem_val).__name__
+            raise JSONTypeError(
+                f"Field 'peak_gpu_memory_mb' must be a number or null, got {type_name}"
+            )
+    return {
+        "peak_gpu_memory_mb": peak_gpu_memory_mb,
+        "avg_samples_per_sec": require_float(perf, "avg_samples_per_sec"),
+        "total_tokens_processed": require_int(perf, "total_tokens_processed"),
+    }
+
+
+def _decode_manifest_model_info(obj: JSONObject) -> TrainingManifestModelInfo:
+    """Decode model_info section from manifest JSON.
+
+    Args:
+        obj: JSON object containing a 'model_info' key.
+
+    Returns:
+        TrainingManifestModelInfo with decoded values.
+
+    Raises:
+        JSONTypeError: If required fields are missing or have wrong type.
+    """
+    info = require_dict(obj, "model_info")
+    return {
+        "param_count": require_int(info, "param_count"),
+        "model_size_mb": require_float(info, "model_size_mb"),
+        "vocab_size": require_int(info, "vocab_size"),
     }
 
 
@@ -235,12 +314,22 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
 def load_manifest_from_text(text: str) -> TrainingManifest:
     """Parse manifest JSON text into typed TrainingManifest.
 
+    Args:
+        text: JSON string containing manifest data.
+
+    Returns:
+        Fully decoded and validated TrainingManifest.
+
     Raises:
-        JSONTypeError: if the manifest is not a well-formed JSON object.
+        JSONTypeError: If the manifest is not a well-formed JSON object
+            or required fields are missing/invalid.
     """
     obj = narrow_json_to_dict(load_json_str(text))
     versions = _decode_manifest_versions(obj)
     system = _decode_manifest_system(obj)
+    timing = _decode_manifest_timing(obj)
+    performance = _decode_manifest_performance(obj)
+    model_info = _decode_manifest_model_info(obj)
     fields = _decode_manifest_fields(obj)
 
     return {
@@ -273,4 +362,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "test_perplexity": fields.test_perplexity,
         "best_val_loss": fields.best_val_loss,
         "early_stopped": fields.early_stopped,
+        "timing": timing,
+        "performance": performance,
+        "model_info": model_info,
     }
