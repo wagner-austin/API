@@ -277,11 +277,22 @@ Lifecycle events carry `job_id` (run_id), `user_id`, `queue`, progress, and opti
   "seed": 42,
   "device": "cuda",
   "precision": "fp16",
-  "final_loss": 3.21,
-  "final_perplexity": 24.8,
-  "training_time_seconds": 3600,
-  "created_at": "2024-11-27T10:00:00Z",
-  "completed_at": "2024-11-27T11:00:00Z"
+  "loss": 3.21,
+  "timing": {
+    "training_duration_sec": 3600.5,
+    "started_at": "2024-11-27T10:00:00",
+    "completed_at": "2024-11-27T11:00:00"
+  },
+  "performance": {
+    "peak_gpu_memory_mb": 4096.0,
+    "avg_samples_per_sec": 125.4,
+    "total_tokens_processed": 1048576
+  },
+  "model_info": {
+    "param_count": 124439808,
+    "model_size_mb": 474.7,
+    "vocab_size": 50257
+  }
 }
 ```
 
