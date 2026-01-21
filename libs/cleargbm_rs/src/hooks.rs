@@ -57,12 +57,18 @@ pub type BuildHistogramFn = fn(
 /// This struct enables testing of error propagation paths that would otherwise
 /// be unreachable. By injecting a histogram builder that returns errors, tests
 /// can exercise the `?` error propagation in `build_tree` and related functions.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Hooks {
     /// Hook for building histograms from sample data.
     ///
     /// Default: `crate::histogram::build_histogram`
     pub build_histogram: BuildHistogramFn,
+
+    /// Optional error to inject in finalize_nodes.
+    ///
+    /// If Some, finalize_nodes returns this error immediately.
+    /// Used for testing error propagation in build_tree.
+    pub finalize_nodes_error: Option<ClearGbmError>,
 }
 
 impl Default for Hooks {
@@ -72,6 +78,7 @@ impl Default for Hooks {
     fn default() -> Self {
         Self {
             build_histogram: crate::histogram::build_histogram,
+            finalize_nodes_error: None,
         }
     }
 }
@@ -87,7 +94,29 @@ impl Hooks {
     ///
     /// A new `Hooks` instance with the custom histogram builder.
     pub const fn with_histogram_builder(build_histogram: BuildHistogramFn) -> Self {
-        Self { build_histogram }
+        Self {
+            build_histogram,
+            finalize_nodes_error: None,
+        }
+    }
+
+    /// Creates hooks with a finalize_nodes error injection.
+    ///
+    /// When finalize_nodes is called with these hooks, it will return the
+    /// provided error immediately. Used for testing error propagation.
+    ///
+    /// # Args
+    ///
+    /// * `error` - The error to return from finalize_nodes.
+    ///
+    /// # Returns
+    ///
+    /// A new `Hooks` instance that will cause finalize_nodes to fail.
+    pub fn with_finalize_nodes_error(error: ClearGbmError) -> Self {
+        Self {
+            build_histogram: crate::histogram::build_histogram,
+            finalize_nodes_error: Some(error),
+        }
     }
 }
 
@@ -135,9 +164,9 @@ mod tests {
     }
 
     #[test]
-    fn test_hooks_copy() -> Result<(), ClearGbmError> {
+    fn test_hooks_clone() -> Result<(), ClearGbmError> {
         let hooks1 = Hooks::default();
-        let hooks2 = hooks1;
+        let hooks2 = hooks1.clone();
         // Both should work independently - verify by calling both
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
@@ -151,6 +180,59 @@ mod tests {
 
         assert!(result1.is_ok());
         assert!(result2.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_hooks_with_finalize_nodes_error() -> Result<(), ClearGbmError> {
+        let hooks = Hooks::with_finalize_nodes_error(ClearGbmError::TreeConstructionFailed {
+            reason: "test error".to_string(),
+        });
+
+        // finalize_nodes_error should be set
+        assert!(hooks.finalize_nodes_error.is_some());
+
+        // build_histogram should still be the default
+        let sample_indices = vec![0_usize, 1_usize];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
+        let bins = vec![0_usize, 1_usize];
+        let result =
+            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        assert!(result.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_hooks_default_has_no_finalize_error() -> Result<(), ClearGbmError> {
+        let hooks = Hooks::default();
+        assert!(hooks.finalize_nodes_error.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_hooks_with_histogram_builder_has_no_finalize_error() -> Result<(), ClearGbmError> {
+        fn custom_histogram(
+            _: &[usize],
+            _: &[f64],
+            _: &[f64],
+            _: &[usize],
+            _: usize,
+        ) -> Result<HistogramBuffer, ClearGbmError> {
+            Ok(HistogramBuffer::new(3_usize))
+        }
+
+        let hooks = Hooks::with_histogram_builder(custom_histogram);
+        assert!(hooks.finalize_nodes_error.is_none());
+
+        // Actually call the custom histogram to cover it
+        let sample_indices = vec![0_usize, 1_usize];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
+        let bins = vec![0_usize, 1_usize];
+        let result =
+            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        assert!(result.is_ok());
         Ok(())
     }
 }
