@@ -22,6 +22,9 @@ pub mod split;
 pub mod tree;
 pub mod types;
 
+#[cfg(test)]
+pub mod testkit;
+
 pub use error::ClearGbmError;
 pub use histogram::{build_histogram, subtract_histogram};
 pub use hooks::Hooks;
