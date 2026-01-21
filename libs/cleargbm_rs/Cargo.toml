@@ -11,7 +11,7 @@ categories = ["science", "algorithms"]
 
 [lib]
 name = "cleargbm_rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 pyo3 = { version = "0.27", features = ["extension-module"] }
