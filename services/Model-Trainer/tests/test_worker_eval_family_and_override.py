@@ -38,7 +38,7 @@ from model_trainer.worker.eval_job import process_eval_job
 
 
 # Type alias for manifest dict to avoid line length violations
-_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int]]
+_ManifestDict = dict[str, str | int | float | bool | None | dict[str, str | int | float | None]]
 
 
 class _FakeStoreForEval:
@@ -130,6 +130,21 @@ def _create_eval_manifest(run_id: str) -> _ManifestDict:
         "seed": 0,
         "pretrained_run_id": None,
         "git_commit": "g",
+        "timing": {
+            "training_duration_sec": 10.5,
+            "started_at": "2024-01-15T10:00:00",
+            "completed_at": "2024-01-15T10:00:10",
+        },
+        "performance": {
+            "peak_gpu_memory_mb": None,
+            "avg_samples_per_sec": 100.0,
+            "total_tokens_processed": 1024,
+        },
+        "model_info": {
+            "param_count": 1000,
+            "model_size_mb": 5.0,
+            "vocab_size": 256,
+        },
     }
 
 

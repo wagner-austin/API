@@ -217,6 +217,21 @@ class _FakeStore:
             "versions": {"torch": "0", "transformers": "0", "tokenizers": "0", "datasets": "0"},
             "system": {"cpu_count": 1, "platform": "X", "platform_release": "Y", "machine": "Z"},
             "git_commit": "g",
+            "timing": {
+                "training_duration_sec": 10.5,
+                "started_at": "2024-01-15T10:00:00",
+                "completed_at": "2024-01-15T10:00:10",
+            },
+            "performance": {
+                "peak_gpu_memory_mb": None,
+                "avg_samples_per_sec": 100.0,
+                "total_tokens_processed": 1024,
+            },
+            "model_info": {
+                "param_count": 1000,
+                "model_size_mb": 5.0,
+                "vocab_size": 256,
+            },
         }
         (out / "manifest.json").write_text(dump_json_str(manifest), encoding="utf-8")
         return out
