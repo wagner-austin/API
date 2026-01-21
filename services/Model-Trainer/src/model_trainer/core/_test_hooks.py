@@ -7,6 +7,7 @@ No conditionals needed - just call the hook directly.
 
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from types import TracebackType
 from typing import Protocol
@@ -905,3 +906,135 @@ class LoadOrchestratorProto(Protocol):
 # Guard hooks - None means use default behavior (production implementation)
 guard_find_monorepo_root: FindMonorepoRootProto | None = None
 guard_load_orchestrator: LoadOrchestratorProto | None = None
+
+
+# ============================================================================
+# Training metrics hooks for timing, memory, and model info
+# ============================================================================
+
+
+class TimeMonotonicProto(Protocol):
+    """Protocol for time.monotonic hook."""
+
+    def __call__(self) -> float:
+        """Return monotonic time in seconds.
+
+        Returns:
+            Current monotonic clock value.
+        """
+        ...
+
+
+class DatetimeUtcnowIsoProto(Protocol):
+    """Protocol for getting current UTC time as ISO 8601 string."""
+
+    def __call__(self) -> str:
+        """Return current UTC time as ISO 8601 string.
+
+        Returns:
+            ISO 8601 formatted timestamp (e.g., '2024-01-15T10:30:00').
+        """
+        ...
+
+
+class GpuMaxMemoryAllocatedProto(Protocol):
+    """Protocol for torch.cuda.max_memory_allocated hook."""
+
+    def __call__(self) -> int:
+        """Return peak GPU memory allocated in bytes.
+
+        Returns:
+            Peak memory in bytes, or 0 if CUDA not available.
+        """
+        ...
+
+
+class GpuResetPeakMemoryStatsProto(Protocol):
+    """Protocol for torch.cuda.reset_peak_memory_stats hook."""
+
+    def __call__(self) -> None:
+        """Reset peak memory tracking stats."""
+        ...
+
+
+class CountModelParametersProto(Protocol):
+    """Protocol for counting model parameters."""
+
+    def __call__(self, model: LMModelProto) -> int:
+        """Count total trainable parameters in model.
+
+        Args:
+            model: The language model.
+
+        Returns:
+            Total number of trainable parameters.
+        """
+        ...
+
+
+class GetDirectorySizeBytesProto(Protocol):
+    """Protocol for calculating directory size on disk."""
+
+    def __call__(self, path: Path) -> int:
+        """Calculate total size of directory contents in bytes.
+
+        Args:
+            path: Directory path.
+
+        Returns:
+            Total size in bytes.
+        """
+        ...
+
+
+def _default_time_monotonic() -> float:
+    """Production time.monotonic - used as default hook."""
+    import time
+
+    return time.monotonic()
+
+
+def _default_datetime_utcnow_iso() -> str:
+    """Production datetime.utcnow ISO format - used as default hook."""
+    from datetime import datetime
+
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _default_gpu_max_memory_allocated() -> int:
+    """Production torch.cuda.max_memory_allocated - used as default hook."""
+    if not cuda_is_available():
+        return 0
+    return torch.cuda.max_memory_allocated()
+
+
+def _default_gpu_reset_peak_memory_stats() -> None:
+    """Production torch.cuda.reset_peak_memory_stats - used as default hook."""
+    if cuda_is_available():
+        torch.cuda.reset_peak_memory_stats()
+
+
+def _default_count_model_parameters(model: LMModelProto) -> int:
+    """Production count_model_parameters - used as default hook."""
+    total = 0
+    for param in model.parameters():
+        total += param.numel()
+    return total
+
+
+def _default_get_directory_size_bytes(path: Path) -> int:
+    """Production get_directory_size_bytes - used as default hook."""
+    total = 0
+    for entry in path.rglob("*"):
+        if entry.is_file():
+            total += entry.stat().st_size
+    return total
+
+
+# Training metrics hooks
+time_monotonic: TimeMonotonicProto = _default_time_monotonic
+datetime_utcnow_iso: DatetimeUtcnowIsoProto = _default_datetime_utcnow_iso
+gpu_max_memory_allocated: GpuMaxMemoryAllocatedProto = _default_gpu_max_memory_allocated
+gpu_reset_peak_memory_stats: GpuResetPeakMemoryStatsProto = _default_gpu_reset_peak_memory_stats
+count_model_parameters: CountModelParametersProto = _default_count_model_parameters
+get_directory_size_bytes: GetDirectorySizeBytesProto = _default_get_directory_size_bytes

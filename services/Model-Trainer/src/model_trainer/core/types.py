@@ -13,6 +13,10 @@ class ConfigLike(Protocol):
 class ParameterLike(Protocol):
     """Protocol for model parameters (tensors with gradients)."""
 
+    def numel(self) -> int:
+        """Return total number of elements in the parameter tensor."""
+        ...
+
 
 class OptimizerProto(Protocol):
     """Protocol for PyTorch optimizer instances."""

@@ -46,6 +46,9 @@ from model_trainer.infra.persistence.models import (
     TrainingManifest,
     TrainingManifestConfig,
     TrainingManifestFull,
+    TrainingManifestModelInfo,
+    TrainingManifestPerformance,
+    TrainingManifestTiming,
     TrainingManifestVersions,
 )
 
@@ -170,6 +173,11 @@ class BaseTrainer:
     _val_loader: DataLoader | None
     _test_loader: DataLoader | None
     _epoch_summaries: list[tuple[int, float, float, float, float]]
+    # Training metrics tracking
+    _training_start_time: float
+    _training_start_iso: str
+    _total_samples_processed: int
+    _total_tokens_processed: int
 
     def __init__(
         self: BaseTrainer,
@@ -211,6 +219,11 @@ class BaseTrainer:
         self._service_name = service_name
         self._wandb = wandb_publisher
         self._epoch_summaries: list[tuple[int, float, float, float, float]] = []
+        # Initialize training metrics tracking (may be overwritten in train())
+        self._training_start_time = 0.0
+        self._training_start_iso = ""
+        self._total_samples_processed = 0
+        self._total_tokens_processed = 0
 
     def train(self: BaseTrainer) -> TrainOutcome:
         """Execute the training loop with early stopping and validation.
@@ -222,8 +235,17 @@ class BaseTrainer:
         torch.manual_seed(self._cfg["seed"])
         random.seed(self._cfg["seed"])
 
+        # Initialize training metrics tracking
+        self._training_start_time = _test_hooks.time_monotonic()
+        self._training_start_iso = _test_hooks.datetime_utcnow_iso()
+        self._total_samples_processed = 0
+        self._total_tokens_processed = 0
+
         # 1. Setup device (NEW - GPU support)
         self._device = self._setup_device()
+
+        # Reset GPU peak memory stats before training
+        _test_hooks.gpu_reset_peak_memory_stats()
 
         # 2. Apply LR cap if fine-tuning (NEW)
         effective_lr = self._apply_lr_cap()
@@ -292,6 +314,26 @@ class BaseTrainer:
         if self._es_state["best_val_loss"] < float("inf"):
             best_val_loss = self._es_state["best_val_loss"]
 
+        # 8. Compute training metrics for manifest
+        training_end_time = _test_hooks.time_monotonic()
+        training_end_iso = _test_hooks.datetime_utcnow_iso()
+        training_duration_sec = training_end_time - self._training_start_time
+
+        # Get GPU peak memory (None if CPU training)
+        peak_gpu_memory_bytes = _test_hooks.gpu_max_memory_allocated()
+        peak_gpu_memory_mb: float | None = None
+        if self._cfg["device"] == "cuda" and peak_gpu_memory_bytes > 0:
+            peak_gpu_memory_mb = peak_gpu_memory_bytes / (1024 * 1024)
+
+        # Compute average throughput
+        avg_samples_per_sec = self._total_samples_processed / max(training_duration_sec, 0.001)
+
+        # Get model info
+        param_count = _test_hooks.count_model_parameters(self._prepared.model)
+        model_size_bytes = _test_hooks.get_directory_size_bytes(Path(out_dir))
+        model_size_mb = model_size_bytes / (1024 * 1024)
+        vocab_size = self._prepared.tok_for_dataset.get_vocab_size()
+
         self._write_manifest(
             out_dir=out_dir,
             steps=step,
@@ -300,6 +342,15 @@ class BaseTrainer:
             test_ppl=test_ppl,
             best_val_loss=best_val_loss,
             early_stopped=early_stopped,
+            training_duration_sec=training_duration_sec,
+            started_at=self._training_start_iso,
+            completed_at=training_end_iso,
+            peak_gpu_memory_mb=peak_gpu_memory_mb,
+            avg_samples_per_sec=avg_samples_per_sec,
+            total_tokens_processed=self._total_tokens_processed,
+            param_count=param_count,
+            model_size_mb=model_size_mb,
+            vocab_size=vocab_size,
         )
 
         # Log final metrics and epoch table to wandb
@@ -783,6 +834,11 @@ class BaseTrainer:
             step += 1
             samples_processed += batch_size
 
+            # Track tokens processed (batch_size * sequence_length)
+            tokens_in_batch = inputs.numel()
+            self._total_samples_processed += batch_size
+            self._total_tokens_processed += tokens_in_batch
+
             # Compute current throughput
             elapsed = _time.time() - epoch_start_time
             samples_per_sec = samples_processed / max(elapsed, 0.001)
@@ -829,6 +885,15 @@ class BaseTrainer:
         test_ppl: float | None,
         best_val_loss: float | None,
         early_stopped: bool,
+        training_duration_sec: float,
+        started_at: str,
+        completed_at: str,
+        peak_gpu_memory_mb: float | None,
+        avg_samples_per_sec: float,
+        total_tokens_processed: int,
+        param_count: int,
+        model_size_mb: float,
+        vocab_size: int,
     ) -> None:
         """Write training manifest to disk.
 
@@ -840,10 +905,37 @@ class BaseTrainer:
             test_ppl: Test set perplexity (None if no test evaluation).
             best_val_loss: Best validation loss achieved (None if no validation).
             early_stopped: Whether training stopped early due to no improvement.
+            training_duration_sec: Total training time in seconds.
+            started_at: ISO 8601 timestamp when training began.
+            completed_at: ISO 8601 timestamp when training finished.
+            peak_gpu_memory_mb: Maximum GPU memory used (None if CPU).
+            avg_samples_per_sec: Average throughput during training.
+            total_tokens_processed: Total tokens seen during training.
+            param_count: Total trainable parameters in model.
+            model_size_mb: Size of saved model on disk in megabytes.
+            vocab_size: Tokenizer vocabulary size.
         """
         import platform as _platform
 
         vers: TrainingManifestVersions = _gather_lib_versions(self._service_name)
+
+        timing: TrainingManifestTiming = {
+            "training_duration_sec": training_duration_sec,
+            "started_at": started_at,
+            "completed_at": completed_at,
+        }
+
+        performance: TrainingManifestPerformance = {
+            "peak_gpu_memory_mb": peak_gpu_memory_mb,
+            "avg_samples_per_sec": avg_samples_per_sec,
+            "total_tokens_processed": total_tokens_processed,
+        }
+
+        model_info: TrainingManifestModelInfo = {
+            "param_count": param_count,
+            "model_size_mb": model_size_mb,
+            "vocab_size": vocab_size,
+        }
 
         manifest: TrainingManifest = {
             "run_id": self._run_id,
@@ -880,6 +972,9 @@ class BaseTrainer:
             "test_perplexity": test_ppl,
             "best_val_loss": best_val_loss,
             "early_stopped": early_stopped,
+            "timing": timing,
+            "performance": performance,
+            "model_info": model_info,
         }
 
         cfg_block: TrainingManifestConfig = {
@@ -935,6 +1030,9 @@ class BaseTrainer:
             "test_perplexity": manifest["test_perplexity"],
             "best_val_loss": manifest["best_val_loss"],
             "early_stopped": manifest["early_stopped"],
+            "timing": manifest["timing"],
+            "performance": manifest["performance"],
+            "model_info": manifest["model_info"],
         }
 
         Path(out_dir).joinpath("manifest.json").write_text(dump_json_str(full), encoding="utf-8")
