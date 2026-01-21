@@ -742,6 +742,86 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
     Ok(())
 }
 
+/// Test all TreeNode accessor methods for coverage
+#[test]
+fn test_tree_node_accessors() -> std::result::Result<(), ClearGbmError> {
+    // Build a simple tree to get TreeNode instances
+    let sample_indices: Vec<usize> = (0_usize..6_usize).collect();
+    let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+
+    let bins = vec![
+        vec![0_usize],
+        vec![0_usize],
+        vec![0_usize],
+        vec![1_usize],
+        vec![1_usize],
+        vec![1_usize],
+    ];
+    let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
+
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let tree_config = match TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 0.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+
+    let input = BuildTreeInput {
+        sample_indices: &sample_indices,
+        gradients: &gradients,
+        hessians: &hessians,
+        bins: &bins,
+        n_regular_bins: 2_usize,
+        bin_thresholds: &bin_thresholds,
+        config: &tree_config,
+        monotonic_constraints: None,
+    };
+
+    let tree = match build_tree(&input, &Hooks::default()) {
+        Ok(t) => t,
+        Err(e) => return Err(e),
+    };
+
+    // Exercise all TreeNode accessors on root
+    let root = match tree.root() {
+        Ok(r) => r,
+        Err(e) => return Err(e),
+    };
+
+    // All accessor methods
+    let _ = root.node_id();
+    let _ = root.is_leaf();
+    let _ = root.feature_index();
+    let _ = root.threshold();
+    let _ = root.value();
+    let _ = root.n_samples();
+    let _ = root.left_child();
+    let _ = root.right_child();
+    let _ = root.nan_goes_left();
+
+    // If root has children, exercise accessors on them too
+    if let Some(left_id) = root.left_child() {
+        let left = match tree.node(left_id) {
+            Ok(n) => n,
+            Err(e) => return Err(e),
+        };
+        let _ = left.node_id();
+        let _ = left.is_leaf();
+        let _ = left.feature_index();
+        let _ = left.threshold();
+        let _ = left.value();
+        let _ = left.n_samples();
+        let _ = left.left_child();
+        let _ = left.right_child();
+        let _ = left.nan_goes_left();
+    }
+
+    Ok(())
+}
+
 /// Test that sibling histogram subtraction is mathematically correct
 #[test]
 fn test_sibling_subtraction_correctness() -> std::result::Result<(), ClearGbmError> {
@@ -820,6 +900,58 @@ fn test_sibling_subtraction_correctness() -> std::result::Result<(), ClearGbmErr
         (h0 - 1.5_f64).abs() < EPSILON,
         "Bin 0 hessian: expected 1.5, got {h0}"
     );
+
+    Ok(())
+}
+
+// =============================================================================
+// Serde round-trip tests (for coverage of serde instantiations)
+// =============================================================================
+
+/// Test NanDirection serde round-trip for both variants
+#[test]
+fn test_nan_direction_serde_roundtrip() -> std::result::Result<(), ClearGbmError> {
+    use cleargbm_rs::NanDirection;
+
+    // Test Left variant
+    let left = NanDirection::Left;
+    let json_left = match serde_json::to_string(&left) {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(ClearGbmError::SerializationFailed {
+                reason: e.to_string(),
+            })
+        }
+    };
+    let parsed_left: NanDirection = match serde_json::from_str(&json_left) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: e.to_string(),
+            })
+        }
+    };
+    assert!(matches!(parsed_left, NanDirection::Left));
+
+    // Test Right variant
+    let right = NanDirection::Right;
+    let json_right = match serde_json::to_string(&right) {
+        Ok(s) => s,
+        Err(e) => {
+            return Err(ClearGbmError::SerializationFailed {
+                reason: e.to_string(),
+            })
+        }
+    };
+    let parsed_right: NanDirection = match serde_json::from_str(&json_right) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: e.to_string(),
+            })
+        }
+    };
+    assert!(matches!(parsed_right, NanDirection::Right));
 
     Ok(())
 }
