@@ -133,6 +133,12 @@ target/
 Cargo.lock
 *.lcov
 coverage.lcov
+# LLVM coverage output (cargo llvm-cov)
+cov_*.json
+cov_*.txt
+coverage*.json
+coverage*.txt
+coverage_html/
 
 # Claude temp directories
 tmpclaude-*
