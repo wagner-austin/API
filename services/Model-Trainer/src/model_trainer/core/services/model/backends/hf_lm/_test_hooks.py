@@ -177,14 +177,14 @@ class CreateTrainerFn(Protocol):
 # ============================================================================
 
 
-class BPEBackendLoader(Protocol):
-    """Protocol for loading BPE tokenizers."""
+class TokenizerLoader(Protocol):
+    """Protocol for loading tokenizers with automatic backend detection."""
 
     def __call__(self, path: str) -> TokenizerHandle:
-        """Load a BPE tokenizer from path.
+        """Load a tokenizer from path with automatic backend detection.
 
         Args:
-            path: Path to tokenizer artifacts.
+            path: Path to tokenizer artifact directory.
 
         Returns:
             Loaded tokenizer handle.
@@ -372,7 +372,7 @@ class Hooks:
     create_trainer: CreateTrainerFn | None = None
 
     # evaluate.py hooks
-    load_bpe_tokenizer: BPEBackendLoader | None = None
+    load_tokenizer: TokenizerLoader | None = None
     load_prepared_model: PreparedModelLoader | None = None
     create_causal_dataset: CreateCausalDatasetFn | None = None
     create_dataloader: CreateDataLoaderFn | None = None
@@ -388,7 +388,7 @@ def reset_hooks() -> None:
     Hooks.load_hf_model = None
     Hooks.load_hf_tokenizer = None
     Hooks.create_trainer = None
-    Hooks.load_bpe_tokenizer = None
+    Hooks.load_tokenizer = None
     Hooks.load_prepared_model = None
     Hooks.create_causal_dataset = None
     Hooks.create_dataloader = None
@@ -470,18 +470,18 @@ def _default_create_trainer(
     return trainer
 
 
-def _default_load_bpe_tokenizer(path: str) -> TokenizerHandle:
-    """Production implementation for loading BPE tokenizers.
+def _default_load_tokenizer(path: str) -> TokenizerHandle:
+    """Production implementation for loading tokenizers with automatic detection.
 
     Args:
-        path: Path to tokenizer artifacts.
+        path: Path to tokenizer artifact directory.
 
     Returns:
         Loaded tokenizer handle.
     """
-    from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
+    from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
 
-    return BPEBackend().load(path)
+    return load_tokenizer_from_dir(path)
 
 
 def _default_load_prepared_model(
@@ -647,7 +647,7 @@ def init_production_hooks() -> None:
     Hooks.load_hf_model = _default_load_hf_model
     Hooks.load_hf_tokenizer = _default_load_hf_tokenizer
     Hooks.create_trainer = _default_create_trainer
-    Hooks.load_bpe_tokenizer = _default_load_bpe_tokenizer
+    Hooks.load_tokenizer = _default_load_tokenizer
     Hooks.load_prepared_model = _default_load_prepared_model
     Hooks.create_causal_dataset = _default_create_causal_dataset
     Hooks.create_dataloader = _default_create_dataloader
@@ -657,7 +657,6 @@ def init_production_hooks() -> None:
 
 
 __all__ = [
-    "BPEBackendLoader",
     "CausalLMDatasetProto",
     "CreateCausalDatasetFn",
     "CreateDataLoaderFn",
@@ -672,6 +671,7 @@ __all__ = [
     "PreparedModelLoader",
     "ProgressCallback",
     "ReadTextFileFn",
+    "TokenizerLoader",
     "TrainerProto",
     "init_production_hooks",
     "reset_hooks",

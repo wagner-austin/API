@@ -23,7 +23,6 @@ from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 
 from ._test_hooks import (
-    BPEBackendLoader,
     CausalLMDatasetProto,
     CreateCausalDatasetFn,
     CreateDataLoaderFn,
@@ -32,6 +31,7 @@ from ._test_hooks import (
     Hooks,
     ModelDirFn,
     PreparedModelLoader,
+    TokenizerLoader,
 )
 
 
@@ -97,11 +97,9 @@ def evaluate_hf_lm(
         RuntimeError: If required hooks are not initialized.
     """
     # Get hooks
-    load_bpe: BPEBackendLoader | None = Hooks.load_bpe_tokenizer
-    if load_bpe is None:
-        raise RuntimeError(
-            "Hooks.load_bpe_tokenizer not initialized - call init_production_hooks()"
-        )
+    load_tok: TokenizerLoader | None = Hooks.load_tokenizer
+    if load_tok is None:
+        raise RuntimeError("Hooks.load_tokenizer not initialized - call init_production_hooks()")
 
     load_model: PreparedModelLoader | None = Hooks.load_prepared_model
     if load_model is None:
@@ -132,8 +130,8 @@ def evaluate_hf_lm(
     tokenizer_handle: TokenizerHandle | None
     if tokenizer_id is not None:
         artifacts_root = settings["app"]["artifacts_root"]
-        tokenizer_path = Path(artifacts_root) / "tokenizers" / tokenizer_id
-        tokenizer_handle = load_bpe(str(tokenizer_path))
+        tokenizer_dir = Path(artifacts_root) / "tokenizers" / tokenizer_id
+        tokenizer_handle = load_tok(str(tokenizer_dir))
     else:
         # HF LM uses tokenizer from hub_model_id, not a custom tokenizer
         tokenizer_handle = None
