@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
-from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.job_events import default_events_channel
 from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.queues import TRAINER_QUEUE
@@ -32,8 +30,7 @@ from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import TrainRequestPayload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
-from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
-from model_trainer.core.services.tokenizer.spm_backend import SentencePieceBackend
+from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
 
 EVENTS_CHANNEL = default_events_channel("trainer")
 
@@ -138,27 +135,20 @@ def setup_job_logging(settings: Settings) -> None:
 
 
 def load_tokenizer_for_training(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
-    """Load tokenizer from artifacts directory."""
+    """Load tokenizer from artifacts directory.
+
+    Args:
+        settings: Application settings containing artifacts_root path.
+        tokenizer_id: Identifier for the tokenizer artifact.
+
+    Returns:
+        Loaded tokenizer handle ready for encoding/decoding.
+
+    Raises:
+        AppError: If tokenizer artifacts are not found.
+    """
     tok_dir = os.path.join(settings["app"]["artifacts_root"], "tokenizers", tokenizer_id)
-    tok_json = os.path.join(tok_dir, "tokenizer.json")
-    tok_spm = os.path.join(tok_dir, "tokenizer.model")
-    if os.path.exists(tok_json):
-        from platform_core.json_utils import load_json_str as _load_json_str
-
-        text = Path(tok_json).read_text(encoding="utf-8")
-        obj = _load_json_str(text)
-        if isinstance(obj, dict) and obj.get("kind") == "char":
-            from model_trainer.core.services.tokenizer.char_backend import CharBackend
-
-            return CharBackend().load(tok_json)
-        return BPEBackend().load(tok_json)
-    if os.path.exists(tok_spm):
-        return SentencePieceBackend().load(tok_spm)
-    raise AppError(
-        ModelTrainerErrorCode.TOKENIZER_NOT_FOUND,
-        f"Tokenizer artifact not found: expected {tok_json} or {tok_spm}",
-        model_trainer_status_for(ModelTrainerErrorCode.TOKENIZER_NOT_FOUND),
-    )
+    return load_tokenizer_from_dir(tok_dir)
 
 
 def emit_config_event(
