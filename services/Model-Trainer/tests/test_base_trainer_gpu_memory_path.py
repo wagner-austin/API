@@ -9,6 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal, Protocol
 
+import torch
+
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
@@ -133,12 +135,29 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
 
     # Save original hooks
     orig_gpu_mem = _test_hooks.gpu_max_memory_allocated
+    orig_cuda_is_available = _test_hooks.cuda_is_available
+    orig_torch_device = _test_hooks.torch_device
+    orig_gpu_reset = _test_hooks.gpu_reset_peak_memory_stats
 
     # Override hooks to simulate CUDA scenario
     def _fake_gpu_memory() -> int:
         return 1024 * 1024 * 100  # 100 MB
 
+    def _fake_cuda_available() -> bool:
+        return True
+
+    def _fake_torch_device(device_str: str) -> torch.device:
+        # Always return CPU device for actual tensor operations
+        return torch.device("cpu")
+
+    def _fake_gpu_reset() -> None:
+        # No-op since we're not actually using CUDA
+        pass
+
     _test_hooks.gpu_max_memory_allocated = _fake_gpu_memory
+    _test_hooks.cuda_is_available = _fake_cuda_available
+    _test_hooks.torch_device = _fake_torch_device
+    _test_hooks.gpu_reset_peak_memory_stats = _fake_gpu_reset
 
     # Temporarily modify cfg to have device='cuda' to trigger the conditional
     # The actual tensor operations happen on CPU, but the string check passes
@@ -182,3 +201,6 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
     finally:
         # Restore hooks
         _test_hooks.gpu_max_memory_allocated = orig_gpu_mem
+        _test_hooks.cuda_is_available = orig_cuda_is_available
+        _test_hooks.torch_device = orig_torch_device
+        _test_hooks.gpu_reset_peak_memory_stats = orig_gpu_reset
