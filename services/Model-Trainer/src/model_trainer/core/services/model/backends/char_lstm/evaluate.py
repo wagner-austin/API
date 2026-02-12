@@ -52,11 +52,18 @@ class EvalResult:
         self.perplexity = perplexity
 
 
-def _load_tokenizer_for_dataset(tokenizer_path: str) -> TokenizerHandle:
-    # Load a TokenizerHandle via char backend explicitly
-    from model_trainer.core.services.tokenizer.char_backend import CharBackend
+def _load_tokenizer_for_dataset(tokenizer_dir: str) -> TokenizerHandle:
+    """Load a tokenizer with automatic backend detection.
 
-    return CharBackend().load(tokenizer_path)
+    Args:
+        tokenizer_dir: Path to tokenizer artifact directory.
+
+    Returns:
+        Loaded tokenizer handle.
+    """
+    from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
+
+    return load_tokenizer_from_dir(tokenizer_dir)
 
 
 def evaluate_char_lstm(
@@ -66,8 +73,8 @@ def evaluate_char_lstm(
     if tokenizer_id is None:
         raise ValueError("tokenizer_id is required for char_lstm backend")
     artifacts_root = settings["app"]["artifacts_root"]
-    tokenizer_path = str(Path(artifacts_root) / "tokenizers" / tokenizer_id / "tokenizer.json")
-    handle = _load_tokenizer_for_dataset(tokenizer_path)
+    tokenizer_dir = str(Path(artifacts_root) / "tokenizers" / tokenizer_id)
+    handle = _load_tokenizer_for_dataset(tokenizer_dir)
     eos_id, pad_id, _ = token_ids(handle)
 
     ds_cfg = DatasetConfig(
