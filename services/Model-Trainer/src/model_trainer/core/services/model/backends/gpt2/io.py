@@ -28,10 +28,17 @@ def token_ids(tokenizer: _TokenInfoProto) -> tuple[int, int, int]:
 
 
 def load_encoder_for_dataset(tokenizer_path: str) -> Encoder:
-    # Leverage BPE backend loader to get a TokenizerHandle, then adapt.
-    from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
+    """Load an encoder for dataset processing with automatic backend detection.
 
-    handle = BPEBackend().load(tokenizer_path)
+    Args:
+        tokenizer_path: Path to tokenizer artifact file or directory.
+
+    Returns:
+        Encoder wrapping the loaded tokenizer handle.
+    """
+    from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_path
+
+    handle = load_tokenizer_from_path(tokenizer_path)
     return HandleEncoder(handle)
 
 

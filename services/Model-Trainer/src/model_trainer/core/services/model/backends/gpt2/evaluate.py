@@ -73,8 +73,8 @@ def evaluate_gpt2(
     if tokenizer_id is None:
         raise ValueError("tokenizer_id is required for gpt2 backend")
     artifacts_root = settings["app"]["artifacts_root"]
-    tokenizer_path = str(Path(artifacts_root) / "tokenizers" / tokenizer_id / "tokenizer.json")
-    tokenizer = load_tokenizer_for_dataset(tokenizer_path)
+    tokenizer_dir = str(Path(artifacts_root) / "tokenizers" / tokenizer_id)
+    tokenizer = load_tokenizer_for_dataset(tokenizer_dir)
     eos_id, pad_id, _ = token_ids(tokenizer)
 
     ds_cfg = DatasetConfig(
