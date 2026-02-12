@@ -987,6 +987,53 @@ class GetDirectorySizeBytesProto(Protocol):
         ...
 
 
+class TorchCudaMaxMemoryAllocatedProto(Protocol):
+    """Protocol for torch.cuda.max_memory_allocated hook."""
+
+    def __call__(self) -> int:
+        """Return peak GPU memory allocated in bytes.
+
+        Returns:
+            Peak memory in bytes.
+        """
+        ...
+
+
+class TorchCudaResetPeakMemoryStatsProto(Protocol):
+    """Protocol for torch.cuda.reset_peak_memory_stats hook."""
+
+    def __call__(self) -> None:
+        """Reset peak memory tracking stats."""
+        ...
+
+
+def _default_torch_cuda_max_memory_allocated() -> int:
+    """Production torch.cuda.max_memory_allocated - used as default hook.
+
+    Returns:
+        Peak GPU memory allocated in bytes, or 0 if CUDA unavailable.
+    """
+    if not torch.cuda.is_available():
+        return 0
+    return torch.cuda.max_memory_allocated()
+
+
+def _default_torch_cuda_reset_peak_memory_stats() -> None:
+    """Production torch.cuda.reset_peak_memory_stats - used as default hook."""
+    if not torch.cuda.is_available():
+        return
+    torch.cuda.reset_peak_memory_stats()
+
+
+# Lower-level torch.cuda hooks (used by gpu_max_memory_allocated/gpu_reset_peak_memory_stats)
+torch_cuda_max_memory_allocated: TorchCudaMaxMemoryAllocatedProto = (
+    _default_torch_cuda_max_memory_allocated
+)
+torch_cuda_reset_peak_memory_stats: TorchCudaResetPeakMemoryStatsProto = (
+    _default_torch_cuda_reset_peak_memory_stats
+)
+
+
 def _default_time_monotonic() -> float:
     """Production time.monotonic - used as default hook."""
     import time
@@ -1005,13 +1052,13 @@ def _default_gpu_max_memory_allocated() -> int:
     """Production torch.cuda.max_memory_allocated - used as default hook."""
     if not cuda_is_available():
         return 0
-    return torch.cuda.max_memory_allocated()
+    return torch_cuda_max_memory_allocated()
 
 
 def _default_gpu_reset_peak_memory_stats() -> None:
     """Production torch.cuda.reset_peak_memory_stats - used as default hook."""
     if cuda_is_available():
-        torch.cuda.reset_peak_memory_stats()
+        torch_cuda_reset_peak_memory_stats()
 
 
 def _default_count_model_parameters(model: LMModelProto) -> int:
@@ -1031,6 +1078,26 @@ def _default_get_directory_size_bytes(path: Path) -> int:
     return total
 
 
+class TorchDeviceProto(Protocol):
+    """Protocol for torch.device creation hook."""
+
+    def __call__(self, device_str: str) -> torch.device:
+        """Create a torch.device from string.
+
+        Args:
+            device_str: Device string ('cpu' or 'cuda').
+
+        Returns:
+            The torch device.
+        """
+        ...
+
+
+def _default_torch_device(device_str: str) -> torch.device:
+    """Production torch.device - used as default hook."""
+    return torch.device(device_str)
+
+
 # Training metrics hooks
 time_monotonic: TimeMonotonicProto = _default_time_monotonic
 datetime_utcnow_iso: DatetimeUtcnowIsoProto = _default_datetime_utcnow_iso
@@ -1038,3 +1105,4 @@ gpu_max_memory_allocated: GpuMaxMemoryAllocatedProto = _default_gpu_max_memory_a
 gpu_reset_peak_memory_stats: GpuResetPeakMemoryStatsProto = _default_gpu_reset_peak_memory_stats
 count_model_parameters: CountModelParametersProto = _default_count_model_parameters
 get_directory_size_bytes: GetDirectorySizeBytesProto = _default_get_directory_size_bytes
+torch_device: TorchDeviceProto = _default_torch_device
