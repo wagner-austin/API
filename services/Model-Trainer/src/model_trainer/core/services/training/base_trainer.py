@@ -388,8 +388,8 @@ class BaseTrainer:
         if device_str == "cuda":
             if not _test_hooks.cuda_is_available():
                 raise RuntimeError("CUDA requested but not available")
-            return torch.device("cuda")
-        return torch.device("cpu")
+            return _test_hooks.torch_device("cuda")
+        return _test_hooks.torch_device("cpu")
 
     def _apply_lr_cap(self: BaseTrainer) -> float:
         """Apply LR cap when fine-tuning from pretrained model.
