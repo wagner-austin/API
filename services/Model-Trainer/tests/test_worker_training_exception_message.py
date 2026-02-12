@@ -73,12 +73,12 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
         },
     }
 
-    with pytest.raises(AppError, match="Tokenizer artifact not found"):
+    with pytest.raises(AppError, match="No tokenizer artifacts found in"):
         train_job.process_train_job(encode_train_job_payload(payload))
 
     # Status and message set in job store
     status_data = fake.hgetall(job_key("trainer", "run-x"))
     assert status_data["status"] == "failed"
     msg = status_data.get("error", "")
-    assert "Tokenizer artifact not found" in msg
+    assert "No tokenizer artifacts found in" in msg
     fake.assert_only_called({"set", "hset", "hgetall", "publish", "expire"})
