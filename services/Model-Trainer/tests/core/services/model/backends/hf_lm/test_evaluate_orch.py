@@ -32,7 +32,7 @@ from .testing import (
     FakeEncoder,
     FakeEvalModel,
     FakeHFModel,
-    FakeTokenizerHandle,
+    fake_load_tokenizer,
     make_test_config,
 )
 
@@ -139,12 +139,12 @@ class TestEvaluateHfLm:
     def test_raises_when_load_bpe_hook_not_initialized(
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
-        """Test error when load_bpe_tokenizer hook is None."""
+        """Test error when load_tokenizer hook is None."""
         cfg = make_test_config()
         settings = self._make_settings(tmp_path, settings_factory)
         dataset_builder = _FakeDatasetBuilder([])
 
-        with pytest.raises(RuntimeError, match=r"Hooks\.load_bpe_tokenizer not initialized"):
+        with pytest.raises(RuntimeError, match=r"Hooks\.load_tokenizer not initialized"):
             evaluate_hf_lm(
                 run_id="test-run",
                 cfg=cfg,
@@ -156,7 +156,7 @@ class TestEvaluateHfLm:
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
         """Test error when load_prepared_model hook is None."""
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
 
         cfg = make_test_config()
         settings = self._make_settings(tmp_path, settings_factory)
@@ -174,7 +174,7 @@ class TestEvaluateHfLm:
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
         """Test error when get_model_dir hook is None."""
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
             model=FakeHFModel(),
             tokenizer_id="test",
@@ -200,7 +200,7 @@ class TestEvaluateHfLm:
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
         """Test error when get_eval_dir hook is None."""
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
             model=FakeHFModel(),
             tokenizer_id="test",
@@ -227,7 +227,7 @@ class TestEvaluateHfLm:
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
         """Test error when create_causal_dataset hook is None."""
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
             model=FakeHFModel(),
             tokenizer_id="test",
@@ -255,7 +255,7 @@ class TestEvaluateHfLm:
         self, tmp_path: Path, settings_factory: _SettingsFactory
     ) -> None:
         """Test error when create_dataloader hook is None."""
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
             model=FakeHFModel(),
             tokenizer_id="test",
@@ -323,7 +323,7 @@ class TestEvaluateHfLm:
         ) -> DataLoaderProto:
             return FakeDataLoader(dataset, batch_size)
 
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = _FakeModelLoader()
         Hooks.get_model_dir = lambda s, r: Path("/tmp/model")
         Hooks.get_eval_dir = lambda s, r: eval_dir
@@ -376,7 +376,7 @@ class TestEvaluateHfLm:
         ) -> DataLoaderProto:
             return FakeDataLoader(dataset, batch_size)
 
-        Hooks.load_bpe_tokenizer = lambda p: FakeTokenizerHandle()
+        Hooks.load_tokenizer = fake_load_tokenizer
         Hooks.load_prepared_model = lambda p, t: PreparedLMModel(
             model=FakeEvalModel(),
             tokenizer_id="test",
@@ -450,14 +450,14 @@ class TestEvaluateHfLm:
         ) -> DataLoaderProto:
             return FakeDataLoader(dataset, batch_size)
 
-        # load_bpe_tokenizer should not be called when tokenizer_id is None
+        # load_tokenizer should not be called when tokenizer_id is None
         class _FailingTokenizerLoader:
             """Loader that fails if called."""
 
             def __call__(self: _FailingTokenizerLoader, path: str) -> TokenizerHandle:
-                raise AssertionError("load_bpe_tokenizer should not be called")
+                raise AssertionError("load_tokenizer should not be called")
 
-        Hooks.load_bpe_tokenizer = _FailingTokenizerLoader()
+        Hooks.load_tokenizer = _FailingTokenizerLoader()
         Hooks.load_prepared_model = _FakeModelLoader()
         Hooks.get_model_dir = lambda s, r: Path("/tmp/model")
         Hooks.get_eval_dir = lambda s, r: eval_dir

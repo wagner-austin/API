@@ -19,10 +19,10 @@ from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
     _default_create_trainer,
     _default_get_eval_dir,
     _default_get_model_dir,
-    _default_load_bpe_tokenizer,
     _default_load_hf_model,
     _default_load_hf_tokenizer,
     _default_load_prepared_model,
+    _default_load_tokenizer,
     _default_read_text_file,
     init_production_hooks,
     reset_hooks,
@@ -310,7 +310,7 @@ class TestDefaultLoadHfTokenizer:
 
 
 class TestDefaultLoadBpeTokenizer:
-    """Tests for _default_load_bpe_tokenizer function."""
+    """Tests for _default_load_tokenizer function."""
 
     def test_loads_bpe_tokenizer_from_path(self, tmp_path: Path) -> None:
         """Test loading a BPE tokenizer from path."""
@@ -339,7 +339,7 @@ class TestDefaultLoadBpeTokenizer:
         assert loss_final <= loss_initial
 
         # Now test loading it
-        handle = _default_load_bpe_tokenizer(str(tok_dir))
+        handle = _default_load_tokenizer(str(tok_dir))
 
         # Verify handle works by checking first ID
         ids = handle.encode("hello")
@@ -392,7 +392,7 @@ class TestDefaultLoadPreparedModel:
         assert loss_final <= loss_initial
 
         # Load tokenizer handle
-        handle = _default_load_bpe_tokenizer(str(tok_dir))
+        handle = _default_load_tokenizer(str(tok_dir))
 
         # Load tiny model and create PreparedLMModel
         model = _default_load_hf_model("sshleifer/tiny-gpt2")

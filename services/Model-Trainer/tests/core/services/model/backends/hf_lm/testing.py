@@ -928,3 +928,15 @@ def make_generate_config(
         "seed": seed,
         "num_return_sequences": num_return_sequences,
     }
+
+
+def fake_load_tokenizer(path: str) -> FakeTokenizerHandle:
+    """Fake tokenizer loader for testing.
+
+    Args:
+        path: Path to tokenizer (ignored in fake).
+
+    Returns:
+        FakeTokenizerHandle instance.
+    """
+    return FakeTokenizerHandle()
