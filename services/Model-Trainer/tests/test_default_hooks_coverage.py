@@ -972,3 +972,86 @@ def test_char_lstm_model_gradient_checkpointing_enable() -> None:
 
     # Should not raise - just a no-op
     wrapper.gradient_checkpointing_enable()
+
+
+def test_default_gpu_max_memory_allocated_cuda_available() -> None:
+    """Test _default_gpu_max_memory_allocated when CUDA available.
+
+    This covers line 1008 in _test_hooks.py - the torch_cuda_max_memory_allocated call.
+    """
+    from model_trainer.core import _test_hooks
+    from model_trainer.core._test_hooks import _default_gpu_max_memory_allocated
+
+    # Save original hooks
+    orig_cuda = _test_hooks.cuda_is_available
+    orig_mem = _test_hooks.torch_cuda_max_memory_allocated
+
+    def _fake_cuda_available() -> bool:
+        return True
+
+    def _fake_cuda_memory() -> int:
+        return 1024 * 1024 * 50  # 50 MB
+
+    _test_hooks.cuda_is_available = _fake_cuda_available
+    _test_hooks.torch_cuda_max_memory_allocated = _fake_cuda_memory
+    try:
+        result = _default_gpu_max_memory_allocated()
+        assert result == 1024 * 1024 * 50
+    finally:
+        _test_hooks.cuda_is_available = orig_cuda
+        _test_hooks.torch_cuda_max_memory_allocated = orig_mem
+
+
+def test_default_gpu_reset_peak_memory_stats_cuda_available() -> None:
+    """Test _default_gpu_reset_peak_memory_stats when CUDA available.
+
+    This covers line 1014 in _test_hooks.py - the torch_cuda_reset_peak_memory_stats call.
+    """
+    from model_trainer.core import _test_hooks
+    from model_trainer.core._test_hooks import _default_gpu_reset_peak_memory_stats
+
+    # Save original hooks
+    orig_cuda = _test_hooks.cuda_is_available
+    orig_reset = _test_hooks.torch_cuda_reset_peak_memory_stats
+
+    reset_called = False
+
+    def _fake_cuda_available() -> bool:
+        return True
+
+    def _fake_cuda_reset() -> None:
+        nonlocal reset_called
+        reset_called = True
+
+    _test_hooks.cuda_is_available = _fake_cuda_available
+    _test_hooks.torch_cuda_reset_peak_memory_stats = _fake_cuda_reset
+    try:
+        _default_gpu_reset_peak_memory_stats()
+        assert reset_called
+    finally:
+        _test_hooks.cuda_is_available = orig_cuda
+        _test_hooks.torch_cuda_reset_peak_memory_stats = orig_reset
+
+
+def test_default_torch_cuda_max_memory_allocated_direct() -> None:
+    """Test _default_torch_cuda_max_memory_allocated returns non-negative int.
+
+    The function has a guard that checks torch.cuda.is_available() directly,
+    so it's safe to call regardless of CUDA hardware presence.
+    """
+    from model_trainer.core._test_hooks import _default_torch_cuda_max_memory_allocated
+
+    result = _default_torch_cuda_max_memory_allocated()
+    # On non-CUDA systems returns 0, on CUDA systems returns actual memory
+    assert result >= 0
+
+
+def test_default_torch_cuda_reset_peak_memory_stats_direct() -> None:
+    """Test _default_torch_cuda_reset_peak_memory_stats completes without error.
+
+    The function has a guard that checks torch.cuda.is_available() directly,
+    so it's safe to call regardless of CUDA hardware presence.
+    """
+    from model_trainer.core._test_hooks import _default_torch_cuda_reset_peak_memory_stats
+
+    _default_torch_cuda_reset_peak_memory_stats()
