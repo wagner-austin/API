@@ -17,9 +17,11 @@ rust-lint:
 rust-test:
 	cargo test --all-features
 
-# Rust coverage (requires cargo-llvm-cov) - 100% lines AND regions
+# Rust coverage (requires cargo-llvm-cov) - 100% segment coverage
+# Uses segment-based check to avoid false negatives from generic instantiations
 rust-cov:
-	cargo llvm-cov --all-features --fail-under-lines 100 --fail-under-regions 100
+	cargo llvm-cov --all-features --json --output-path coverage.json
+	python tools/check_segment_coverage.py --threshold 100
 
 # Python linting: ruff + mypy + guard
 python-lint:
