@@ -1,0 +1,81 @@
+# Docker Compose for Art-Trainer
+# Usage: docker compose up -d
+# NOTE: Requires root docker-compose to be running first (provides platform-redis + network)
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/Art-Trainer/Dockerfile
+      target: api
+      args:
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
+    container_name: art-trainer-api
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - HF_HOME=/hf-cache
+    volumes:
+      - ./data:/data
+      - ./logs:/data/logs
+      - hf-cache:/hf-cache
+      - ${COMFYUI_PATH:-C:/Users/Test/PROJECTS/ComfyUI}/models/loras:/opt/ComfyUI/models/loras
+      - ${COMFYUI_PATH:-C:/Users/Test/PROJECTS/ComfyUI}/models/checkpoints:/opt/ComfyUI/models/checkpoints:ro
+    ports:
+      - "8011:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.art-trainer.rule=PathPrefix(`/art-trainer`)"
+      - "traefik.http.routers.art-trainer.middlewares=art-trainer-strip"
+      - "traefik.http.middlewares.art-trainer-strip.stripprefix.prefixes=/art-trainer"
+      - "traefik.http.services.art-trainer.loadbalancer.server.port=8000"
+      - "traefik.docker.network=platform-network"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - platform-network
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: services/Art-Trainer/Dockerfile
+      target: worker
+      args:
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
+    container_name: art-trainer-worker
+    command: ["arttrainer-rq-worker"]
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://platform-redis:6379/0}
+      - HF_HOME=/hf-cache
+    volumes:
+      - ./data:/data
+      - ./logs:/data/logs
+      - hf-cache:/hf-cache
+      - ${COMFYUI_PATH:-C:/Users/Test/PROJECTS/ComfyUI}/models/loras:/opt/ComfyUI/models/loras
+      - ${COMFYUI_PATH:-C:/Users/Test/PROJECTS/ComfyUI}/models/checkpoints:/opt/ComfyUI/models/checkpoints:ro
+      - ${KOHYA_SS_PATH:-C:/Users/Test/PROJECTS/kohya_ss}:/opt/kohya_ss:ro
+    restart: unless-stopped
+    networks:
+      - platform-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  platform-network:
+    external: true
+
+volumes:
+  hf-cache:
