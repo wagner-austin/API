@@ -7,15 +7,18 @@ for convenience. Calendar-specific fakes and hooks are defined here.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, CalendarErrorCode
+from platform_core.json_utils import JSONObject
 
 # Re-export OAuth testing utilities from platform_core for convenience.
 # Note: platform_calendar has its own make_fake_credentials/make_fake_tokens
 # that create hook functions, so we don't re-export the platform_core versions
 # which return data directly.
 from platform_core.oauth_testing import make_error_response_json, make_token_response_json
+from rich.console import Console
 
 from platform_calendar.types import (
     CalendarEvent,
@@ -205,6 +208,17 @@ FileExistsHook = Callable[[str], bool]
 ConsoleOutputHook = Callable[[str], None]
 ConsoleInputHook = Callable[[str], str]
 
+# CLI-specific hooks
+CliApiGetHook = Callable[[str, str], JSONObject]
+CliApiPostHook = Callable[[str, str, JSONObject], JSONObject]
+CliApiDeleteHook = Callable[[str, str], None]
+CliGetEnvHook = Callable[[str], str | None]
+CliSetEnvHook = Callable[[str, str], None]
+CliGetNowHook = Callable[[], datetime]
+CliPromptAskHook = Callable[[str], str]
+CliConfirmAskHook = Callable[[str], bool]
+CliGetConsoleHook = Callable[[], Console]
+
 
 # =============================================================================
 # Hooks Container
@@ -228,6 +242,17 @@ class HooksContainer:
     file_exists: FileExistsHook
     console_output: ConsoleOutputHook
     console_input: ConsoleInputHook
+
+    # CLI-specific hooks
+    cli_api_get: CliApiGetHook
+    cli_api_post: CliApiPostHook
+    cli_api_delete: CliApiDeleteHook
+    cli_get_env: CliGetEnvHook
+    cli_set_env: CliSetEnvHook
+    cli_get_now: CliGetNowHook
+    cli_prompt_ask: CliPromptAskHook
+    cli_confirm_ask: CliConfirmAskHook
+    cli_get_console: CliGetConsoleHook
 
 
 hooks = HooksContainer()
@@ -538,6 +563,192 @@ def _prod_console_input(
     return input_func(prompt)
 
 
+# =============================================================================
+# CLI Production Implementations
+# =============================================================================
+
+# Module-level cache for CLI environment and console
+_cli_env_loaded: bool = False
+_cli_env_cache: dict[str, str] = {}
+_cli_default_console: Console | None = None
+
+
+def _prod_cli_api_get(access_token: str, url: str) -> JSONObject:
+    """Production CLI API GET request.
+
+    Args:
+        access_token: OAuth access token.
+        url: Full API URL.
+
+    Returns:
+        Parsed JSON response.
+    """
+    import http.client
+    import urllib.request
+
+    from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    resp: http.client.HTTPResponse = urllib.request.urlopen(req)
+    body = resp.read().decode("utf-8")
+    raw = load_json_str(body)
+    return narrow_json_to_dict(raw)
+
+
+def _prod_cli_api_post(access_token: str, url: str, request_body: JSONObject) -> JSONObject:
+    """Production CLI API POST request.
+
+    Args:
+        access_token: OAuth access token.
+        url: Full API URL.
+        request_body: JSON request body.
+
+    Returns:
+        Parsed JSON response.
+    """
+    import http.client
+    import urllib.request
+
+    from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+
+    data = dump_json_str(request_body).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    resp: http.client.HTTPResponse = urllib.request.urlopen(req)
+    body = resp.read().decode("utf-8")
+    raw = load_json_str(body)
+    return narrow_json_to_dict(raw)
+
+
+def _prod_cli_api_delete(access_token: str, url: str) -> None:
+    """Production CLI API DELETE request.
+
+    Args:
+        access_token: OAuth access token.
+        url: Full API URL.
+    """
+    import urllib.request
+
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {access_token}"},
+        method="DELETE",
+    )
+    urllib.request.urlopen(req)
+
+
+def _prod_cli_get_env(key: str) -> str | None:
+    """Production CLI environment variable getter.
+
+    Loads from .env file in the platform_calendar package directory.
+
+    Args:
+        key: Environment variable name.
+
+    Returns:
+        Value if found, None otherwise.
+    """
+    import os
+
+    global _cli_env_loaded, _cli_env_cache
+
+    if not _cli_env_loaded:
+        # Load from .env file relative to this module
+        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+        if os.path.exists(env_path):
+            with open(env_path) as f:
+                for line in f:
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.strip().split("=", 1)
+                        _cli_env_cache[k] = v
+        _cli_env_loaded = True
+
+    return _cli_env_cache.get(key)
+
+
+def _prod_cli_set_env(key: str, value: str) -> None:
+    """Production CLI environment variable setter.
+
+    Updates the in-memory cache with the new value.
+
+    Args:
+        key: Environment variable name.
+        value: Value to set.
+    """
+    global _cli_env_cache
+    _cli_env_cache[key] = value
+
+
+def _prod_cli_get_now() -> datetime:
+    """Production CLI current datetime.
+
+    Returns:
+        Current datetime.
+    """
+    return datetime.now()
+
+
+def _prod_cli_prompt_ask(
+    message: str,
+    _prompt_func: Callable[[str], str] | None = None,
+) -> str:
+    """Production CLI prompt using Rich.
+
+    Args:
+        message: Prompt message.
+        _prompt_func: Optional override for testing.
+
+    Returns:
+        User input.
+    """
+    from rich.prompt import Prompt
+
+    prompt_func = _prompt_func if _prompt_func is not None else Prompt.ask
+    return prompt_func(message)
+
+
+def _prod_cli_confirm_ask(
+    message: str,
+    _confirm_func: Callable[[str], bool] | None = None,
+) -> bool:
+    """Production CLI confirm using Rich.
+
+    Args:
+        message: Prompt message.
+        _confirm_func: Optional override for testing.
+
+    Returns:
+        True if confirmed.
+    """
+    from rich.prompt import Confirm
+
+    confirm_func = _confirm_func if _confirm_func is not None else Confirm.ask
+    return confirm_func(message)
+
+
+def _prod_cli_get_console() -> Console:
+    """Production CLI console getter.
+
+    Returns:
+        Rich Console instance (cached).
+    """
+    global _cli_default_console
+
+    if _cli_default_console is None:
+        _cli_default_console = Console()
+    return _cli_default_console
+
+
 def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
     hooks.http_get = _prod_http_get
@@ -554,6 +765,16 @@ def _init_production_hooks() -> None:
     hooks.file_exists = _prod_file_exists
     hooks.console_output = _prod_console_output
     hooks.console_input = _prod_console_input
+    # CLI hooks
+    hooks.cli_api_get = _prod_cli_api_get
+    hooks.cli_api_post = _prod_cli_api_post
+    hooks.cli_api_delete = _prod_cli_api_delete
+    hooks.cli_get_env = _prod_cli_get_env
+    hooks.cli_set_env = _prod_cli_set_env
+    hooks.cli_get_now = _prod_cli_get_now
+    hooks.cli_prompt_ask = _prod_cli_prompt_ask
+    hooks.cli_confirm_ask = _prod_cli_confirm_ask
+    hooks.cli_get_console = _prod_cli_get_console
 
 
 # Initialize on module load
@@ -562,6 +783,10 @@ _init_production_hooks()
 
 def reset_hooks() -> None:
     """Reset all hooks to production implementations (for test teardown)."""
+    global _cli_env_loaded, _cli_env_cache, _cli_default_console
+    _cli_env_loaded = False
+    _cli_env_cache = {}
+    _cli_default_console = None
     _init_production_hooks()
 
 
