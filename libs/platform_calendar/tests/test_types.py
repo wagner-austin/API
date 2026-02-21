@@ -36,6 +36,7 @@ from platform_calendar.types import (
     encode_oauth_tokens,
     encode_reminder_override,
     encode_tracked_competition,
+    is_all_day_event,
 )
 
 
@@ -65,9 +66,32 @@ class TestEventDateTime:
         assert dt["dateTime"] == "2025-12-26T14:00:00-08:00"
         assert dt["timeZone"] == "America/Los_Angeles"
 
-    def test_decode_event_datetime_missing_field(self) -> None:
+    def test_decode_event_datetime_missing_timezone_defaults_utc(self) -> None:
+        dt = decode_event_datetime({"dateTime": "2025-12-26T14:00:00-08:00"})
+        assert dt["dateTime"] == "2025-12-26T14:00:00-08:00"
+        assert dt["timeZone"] == "UTC"
+
+    def test_decode_event_datetime_missing_both_fields(self) -> None:
         with pytest.raises(JSONTypeError):
-            decode_event_datetime({"dateTime": "2025-12-26T14:00:00-08:00"})
+            decode_event_datetime({})
+
+    def test_decode_event_datetime_all_day(self) -> None:
+        dt = decode_event_datetime({"date": "2025-12-26"})
+        assert dt["date"] == "2025-12-26"
+        assert "dateTime" not in dt
+
+    def test_is_all_day_event_true(self) -> None:
+        dt = EventDateTime(date="2025-12-26")
+        assert is_all_day_event(dt) is True
+
+    def test_is_all_day_event_false(self) -> None:
+        dt = EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC")
+        assert is_all_day_event(dt) is False
+
+    def test_encode_event_datetime_all_day(self) -> None:
+        dt = EventDateTime(date="2025-12-26")
+        encoded = encode_event_datetime(dt)
+        assert encoded == {"date": "2025-12-26"}
 
     def test_roundtrip_event_datetime(self) -> None:
         original = EventDateTime(

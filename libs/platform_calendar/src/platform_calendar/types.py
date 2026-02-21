@@ -120,15 +120,27 @@ def _require_list_int(obj: JSONObject, key: str) -> list[int]:
 # =============================================================================
 
 
-class EventDateTime(TypedDict):
-    """DateTime for calendar event."""
+class EventDateTime(TypedDict, total=False):
+    """DateTime for calendar event.
+
+    For timed events: dateTime and timeZone are set.
+    For all-day events: date is set instead.
+    """
 
     dateTime: str  # RFC 3339: "2025-12-26T14:00:00-08:00"
     timeZone: str  # e.g., "America/Los_Angeles"
+    date: str  # For all-day events: "2025-12-26"
+
+
+def is_all_day_event(dt: EventDateTime) -> bool:
+    """Check if this is an all-day event."""
+    return "date" in dt and "dateTime" not in dt
 
 
 def encode_event_datetime(dt: EventDateTime) -> JSONObject:
     """Encode EventDateTime to JSON-serializable dict."""
+    if is_all_day_event(dt):
+        return {"date": dt["date"]}
     result: JSONObject = {
         "dateTime": dt["dateTime"],
         "timeZone": dt["timeZone"],
@@ -138,9 +150,13 @@ def encode_event_datetime(dt: EventDateTime) -> JSONObject:
 
 def decode_event_datetime(data: JSONObject) -> EventDateTime:
     """Decode EventDateTime from dict with validation."""
+    # All-day events have 'date' instead of 'dateTime'
+    if "date" in data:
+        return EventDateTime(date=require_str(data, "date"))
+    # Timed events require dateTime
     return EventDateTime(
         dateTime=require_str(data, "dateTime"),
-        timeZone=require_str(data, "timeZone"),
+        timeZone=optional_str(data, "timeZone") or "UTC",
     )
 
 

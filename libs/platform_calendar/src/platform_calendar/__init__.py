@@ -144,6 +144,7 @@ from platform_calendar.types import (
     encode_event_reminders,
     encode_reminder_override,
     encode_tracked_competition,
+    is_all_day_event,
 )
 
 __all__ = [
@@ -212,6 +213,7 @@ __all__ = [
     "get_valid_tokens",
     "google_calendar_client",
     "hooks",
+    "is_all_day_event",
     "is_token_expired",
     "load_competitions",
     "load_credentials",
