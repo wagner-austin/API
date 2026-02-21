@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `platform_calendar` library provides Google Calendar API integration for tracking competition deadlines with automatic reminders. It handles OAuth 2.0 authentication, calendar event CRUD operations, and competition-to-calendar synchronization.
+The `platform_calendar` library provides Google Calendar API integration for tracking competition deadlines with automatic reminders. It handles OAuth 2.0 authentication, calendar event CRUD operations, competition-to-calendar synchronization, and a CLI for managing events across multiple accounts.
 
 ## Dependencies
 
@@ -12,6 +12,7 @@ The `platform_calendar` library provides Google Calendar API integration for tra
   - `oauth_testing.py`: `make_token_response_json`, `make_error_response_json`
   - `json_utils.py`: `require_*` helpers, `load_json_str`, `dump_json_str`
   - `errors.py`: `AppError`, `CalendarErrorCode`
+- `rich` - Terminal formatting for CLI
 
 No external HTTP libraries - uses Python stdlib (`urllib.request`, `webbrowser`) for OAuth and API calls.
 
@@ -24,6 +25,7 @@ libs/platform_calendar/
 ├── Makefile
 ├── .gitignore
 ├── .env.example
+├── .env                      # Local config (gitignored)
 ├── docs/
 │   └── architecture-plan.md
 ├── scripts/
@@ -37,6 +39,7 @@ libs/platform_calendar/
 │   ├── auth.py               # OAuth flow + token management
 │   ├── client.py             # Google Calendar API wrapper
 │   ├── competitions.py       # Competition → Event mapping
+│   ├── cli.py                # Command-line interface
 │   └── testing.py            # Protocols, hooks, fakes, factories
 └── tests/
     ├── __init__.py
@@ -46,6 +49,7 @@ libs/platform_calendar/
     ├── test_auth.py
     ├── test_competitions.py
     ├── test_config.py
+    ├── test_cli.py           # CLI tests
     ├── test_fake_client.py
     ├── test_hooks.py
     ├── test_prod_hooks.py
@@ -259,7 +263,135 @@ def get_competition(competitions: tuple[TrackedCompetition, ...], competition_id
 def update_competition(competitions: tuple[TrackedCompetition, ...], competition_id: str, **updates) -> tuple[TrackedCompetition, ...]: ...
 ```
 
-### 4. testing.py - Protocols, Hooks, Fakes
+### 4. cli.py - Command-Line Interface
+
+The CLI provides multi-account calendar management with Rich formatting.
+
+#### TypedDict Argument Structures
+
+```python
+class ListArgs(TypedDict):
+    """Arguments for list command."""
+    date: str
+
+class CreateArgs(TypedDict):
+    """Arguments for create command."""
+    title: str
+    time: str
+    date: str
+    duration: int
+    location: str
+    account: str
+
+class DeleteArgs(TypedDict):
+    """Arguments for delete command."""
+    date: str
+```
+
+#### Token Refresh Types
+
+```python
+class TokenRefreshResponse(TypedDict):
+    """Response from Google OAuth token refresh endpoint."""
+    access_token: str
+    expires_in: int
+    token_type: str
+
+def require_str(data: JSONObject, key: str) -> str:
+    """Require a string value from a JSON object."""
+
+def require_int(data: JSONObject, key: str) -> int:
+    """Require an int value from a JSON object."""
+
+def decode_token_refresh_response(data: JSONObject) -> TokenRefreshResponse:
+    """Decode token refresh response from JSON."""
+```
+
+#### Account Configuration
+
+```python
+class Account:
+    """Account configuration."""
+    name: str              # Display name (e.g., "Personal", "Interns")
+    email: str             # Email address
+    token_env: str         # Environment variable name for access token
+    refresh_token_env: str # Environment variable name for refresh token
+    expires_at_env: str    # Environment variable name for token expiration
+    default_calendar: str  # Default calendar ID (usually "primary")
+
+ACCOUNTS = [
+    Account(
+        name="Personal",
+        email="austin.o.wagner@gmail.com",
+        token_env="GOOGLE_CALENDAR_ACCESS_TOKEN",
+        refresh_token_env="GOOGLE_CALENDAR_REFRESH_TOKEN",
+        expires_at_env="GOOGLE_CALENDAR_TOKEN_EXPIRES_AT",
+    ),
+    Account(
+        name="Interns",
+        email="interns@liuforirvine.com",
+        token_env="GOOGLE_CALENDAR_INTERNS_ACCESS_TOKEN",
+        refresh_token_env="GOOGLE_CALENDAR_INTERNS_REFRESH_TOKEN",
+        expires_at_env="GOOGLE_CALENDAR_INTERNS_EXPIRES_AT",
+    ),
+]
+```
+
+#### Token Refresh Functions
+
+```python
+def _is_token_expired(expires_at_str: str) -> bool:
+    """Check if token is expired or will expire within 60 seconds."""
+
+def _refresh_token(client_id: str, client_secret: str, refresh_token: str) -> TokenRefreshResponse:
+    """Refresh an access token using the refresh token."""
+
+def _get_valid_token_for_account(account: Account) -> str | None:
+    """Get a valid access token for an account, refreshing if expired."""
+```
+
+#### Commands
+
+```python
+def cmd_list(cmd_args: ListArgs) -> None:
+    """List events for a date across all accounts."""
+
+def cmd_calendars() -> None:
+    """List all calendars for all accounts."""
+
+def cmd_create(cmd_args: CreateArgs) -> None:
+    """Create a new event."""
+
+def cmd_delete(cmd_args: DeleteArgs) -> None:
+    """Delete an event (interactive selection)."""
+
+def cmd_tomorrow() -> None:
+    """Show tomorrow's events."""
+
+def cmd_week() -> None:
+    """Show this week's events."""
+
+def main() -> None:
+    """Main entry point - parses args and dispatches to commands."""
+```
+
+#### CLI Argument Parsing
+
+```python
+def _build_parser() -> argparse.ArgumentParser:
+    """Build argument parser with subcommands."""
+
+def decode_list_args(args: argparse.Namespace) -> ListArgs:
+    """Decode argparse.Namespace to typed ListArgs."""
+
+def decode_create_args(args: argparse.Namespace) -> CreateArgs:
+    """Decode argparse.Namespace to typed CreateArgs."""
+
+def decode_delete_args(args: argparse.Namespace) -> DeleteArgs:
+    """Decode argparse.Namespace to typed DeleteArgs."""
+```
+
+### 5. testing.py - Protocols, Hooks, Fakes
 
 #### Protocol
 
@@ -278,15 +410,22 @@ class CalendarClientProtocol(Protocol):
 
 #### Hooks Container
 
+All external dependencies are accessed through hooks for testability:
+
 ```python
 class HooksContainer:
+    # HTTP hooks (for auth and client modules)
     http_get: HttpGetHook
     http_post: HttpPostHook
     http_patch: HttpPatchHook
     http_delete: HttpDeleteHook
+
+    # Token/credential hooks (for auth module)
     load_tokens: LoadTokensHook
     save_tokens: SaveTokensHook
     load_credentials: LoadCredentialsHook
+
+    # System hooks
     open_browser: OpenBrowserHook
     console_output: ConsoleOutputHook
     console_input: ConsoleInputHook
@@ -295,10 +434,58 @@ class HooksContainer:
     write_file: WriteFileHook
     file_exists: FileExistsHook
 
+    # CLI-specific hooks
+    cli_api_get: CliApiGetHook        # GET requests with access token
+    cli_api_post: CliApiPostHook      # POST requests with access token
+    cli_api_delete: CliApiDeleteHook  # DELETE requests with access token
+    cli_get_env: CliGetEnvHook        # Environment variable access
+    cli_get_now: CliGetNowHook        # Current datetime
+    cli_prompt_ask: CliPromptAskHook  # Rich Prompt.ask wrapper
+    cli_confirm_ask: CliConfirmAskHook # Rich Confirm.ask wrapper
+    cli_get_console: CliGetConsoleHook # Rich Console instance
+
 hooks = HooksContainer()
 
 def reset_hooks() -> None:
     """Reset all hooks to production implementations."""
+```
+
+#### Hook Type Definitions
+
+```python
+from datetime import datetime
+from platform_core.json_utils import JSONObject
+from rich.console import Console
+
+# HTTP hooks
+HttpGetHook = Callable[[str, dict[str, str]], str]
+HttpPostHook = Callable[[str, dict[str, str], str], str]
+HttpPatchHook = Callable[[str, dict[str, str], str], str]
+HttpDeleteHook = Callable[[str, dict[str, str]], None]
+
+# Token hooks
+LoadTokensHook = Callable[[], OAuthTokens | None]
+SaveTokensHook = Callable[[OAuthTokens], None]
+LoadCredentialsHook = Callable[[], OAuthCredentials]
+
+# System hooks
+OpenBrowserHook = Callable[[str], None]
+CurrentTimeHook = Callable[[], int]
+ReadFileHook = Callable[[str], str]
+WriteFileHook = Callable[[str, str], None]
+FileExistsHook = Callable[[str], bool]
+ConsoleOutputHook = Callable[[str], None]
+ConsoleInputHook = Callable[[str], str]
+
+# CLI-specific hooks
+CliApiGetHook = Callable[[str, str], JSONObject]      # (access_token, url) -> response
+CliApiPostHook = Callable[[str, str, JSONObject], JSONObject]  # (access_token, url, body) -> response
+CliApiDeleteHook = Callable[[str, str], None]         # (access_token, url) -> None
+CliGetEnvHook = Callable[[str], str | None]           # (key) -> value or None
+CliGetNowHook = Callable[[], datetime]                # () -> current datetime
+CliPromptAskHook = Callable[[str], str]               # (message) -> user input
+CliConfirmAskHook = Callable[[str], bool]             # (message) -> True/False
+CliGetConsoleHook = Callable[[], Console]             # () -> Console instance
 ```
 
 #### Fake Client
@@ -342,154 +529,117 @@ from platform_core.oauth_testing import make_token_response_json
 from platform_core.oauth_testing import make_error_response_json
 ```
 
-## FastAPI Service Integration
+#### Production Hook Implementations
 
-### Startup Initialization
+Production hooks are set at module load and restored by `reset_hooks()`:
 
 ```python
-# app/dependencies.py
-from platform_calendar import (
-    CalendarClientProtocol,
-    google_calendar_client,
-    load_or_authorize,
-    OAuthTokens,
-)
+def _prod_cli_api_get(access_token: str, url: str) -> JSONObject:
+    """Make authenticated GET request using urllib."""
 
-_calendar_client: CalendarClientProtocol | None = None
+def _prod_cli_api_post(access_token: str, url: str, request_body: JSONObject) -> JSONObject:
+    """Make authenticated POST request using urllib."""
 
-def get_calendar_client() -> CalendarClientProtocol:
-    """FastAPI dependency for calendar client."""
-    if _calendar_client is None:
-        raise RuntimeError("Calendar client not initialized")
-    return _calendar_client
+def _prod_cli_api_delete(access_token: str, url: str) -> None:
+    """Make authenticated DELETE request using urllib."""
 
-def init_calendar_client() -> None:
-    """Initialize calendar client at startup."""
-    global _calendar_client
-    tokens = load_or_authorize()
-    _calendar_client = google_calendar_client(tokens=tokens)
+def _prod_cli_get_env(key: str) -> str | None:
+    """Get environment variable from .env file cache."""
+
+def _prod_cli_get_now() -> datetime:
+    """Get current datetime."""
+
+def _prod_cli_prompt_ask(message: str, _prompt_func: Callable[[str], str] | None = None) -> str:
+    """Prompt for user input using Rich Prompt.ask."""
+
+def _prod_cli_confirm_ask(message: str, _confirm_func: Callable[[str], bool] | None = None) -> bool:
+    """Prompt for confirmation using Rich Confirm.ask."""
+
+def _prod_cli_get_console() -> Console:
+    """Get cached Rich Console instance."""
 ```
 
+## CLI Testing Patterns
+
+### Setting Up CLI Hooks for Tests
+
 ```python
-# app/main.py
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from app.dependencies import init_calendar_client
+import io
+from datetime import datetime
+from platform_core.json_utils import JSONObject
+from rich.console import Console
+from platform_calendar.testing import hooks, reset_hooks
+from platform_calendar.cli import cmd_list, ListArgs
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_calendar_client()
-    yield
+def test_cmd_list() -> None:
+    """Test listing events."""
+    # Capture output
+    output = io.StringIO()
+    console = Console(file=output, force_terminal=True)
+    hooks.cli_get_console = lambda: console
 
-app = FastAPI(lifespan=lifespan)
+    # Set up fake environment
+    hooks.cli_get_env = lambda key: "token" if "ACCESS_TOKEN" in key else None
+    hooks.cli_get_now = lambda: datetime(2026, 2, 20, 10, 0, 0)
+
+    # Set up fake API responses
+    def fake_api_get(token: str, url: str) -> JSONObject:
+        if "calendarList" in url:
+            return {"items": [{"id": "primary", "summary": "Main"}]}
+        return {
+            "items": [
+                {
+                    "id": "evt1",
+                    "summary": "Meeting",
+                    "start": {"dateTime": "2026-02-20T14:00:00-08:00"},
+                }
+            ]
+        }
+
+    hooks.cli_api_get = fake_api_get
+
+    # Execute command
+    cmd_list(ListArgs(date="2026-02-20"))
+
+    # Verify output
+    result = output.getvalue()
+    assert "Meeting" in result
 ```
 
-### Route Handlers
+### Testing Event Creation
 
 ```python
-# app/routes/calendar.py
-from fastapi import APIRouter, Depends, HTTPException
-from platform_calendar import CalendarClientProtocol, EventDateTime
-from platform_core.errors import AppError, CalendarErrorCode
-from app.dependencies import get_calendar_client
+def test_cmd_create() -> None:
+    """Test creating an event."""
+    output = io.StringIO()
+    console = Console(file=output, force_terminal=True)
+    hooks.cli_get_console = lambda: console
 
-router = APIRouter(prefix="/calendar", tags=["calendar"])
+    hooks.cli_get_env = lambda key: "token" if "ACCESS_TOKEN" in key else None
+    hooks.cli_get_now = lambda: datetime(2026, 2, 20, 10, 0, 0)
 
-@router.get("/events")
-def list_events(
-    calendar_id: str = "primary",
-    time_min: str = Query(...),
-    time_max: str = Query(...),
-    client: CalendarClientProtocol = Depends(get_calendar_client),
-):
-    try:
-        events = client.get_events(
-            calendar_id=calendar_id,
-            time_min=time_min,
-            time_max=time_max,
-        )
-        return {"events": [dict(e) for e in events]}
-    except AppError as e:
-        raise HTTPException(status_code=e.http_status, detail=e.message)
+    created_events: list[JSONObject] = []
 
-@router.post("/events")
-def create_event(
-    calendar_id: str = "primary",
-    summary: str = Body(...),
-    description: str = Body(""),
-    start: str = Body(...),
-    end: str = Body(...),
-    location: str = Body(""),
-    client: CalendarClientProtocol = Depends(get_calendar_client),
-):
-    try:
-        event = client.create_event(
-            calendar_id=calendar_id,
-            summary=summary,
-            description=description,
-            start=EventDateTime(dateTime=start, timeZone="UTC"),
-            end=EventDateTime(dateTime=end, timeZone="UTC"),
-            reminders=(60,),
-            location=location,
-        )
-        return dict(event)
-    except AppError as e:
-        raise HTTPException(status_code=e.http_status, detail=e.message)
+    def fake_api_post(token: str, url: str, body: JSONObject) -> JSONObject:
+        created_events.append(body)
+        return {"id": "new_event", "summary": body.get("summary", "")}
 
-@router.get("/events/{event_id}")
-def get_event(
-    event_id: str,
-    calendar_id: str = "primary",
-    client: CalendarClientProtocol = Depends(get_calendar_client),
-):
-    try:
-        event = client.get_event(calendar_id=calendar_id, event_id=event_id)
-        return dict(event)
-    except AppError as e:
-        if e.code == CalendarErrorCode.EVENT_NOT_FOUND:
-            raise HTTPException(status_code=404, detail="Event not found")
-        raise HTTPException(status_code=e.http_status, detail=e.message)
-```
+    hooks.cli_api_post = fake_api_post
 
-### Testing FastAPI Routes
+    from platform_calendar.cli import cmd_create, CreateArgs
+    cmd_create(CreateArgs(
+        title="Team Meeting",
+        time="14:00",
+        date="2026-02-20",
+        duration=60,
+        location="Room A",
+        account="Personal",
+    ))
 
-```python
-# tests/test_routes_calendar.py
-import pytest
-from fastapi.testclient import TestClient
-from platform_calendar import FakeCalendarClient, EventDateTime
-
-from app.main import app
-from app import dependencies
-
-@pytest.fixture
-def fake_client():
-    client = FakeCalendarClient()
-    client.add_calendar(calendar_id="primary", summary="Test")
-    return client
-
-@pytest.fixture
-def test_client(fake_client):
-    # Override dependency
-    def override_get_calendar_client():
-        return fake_client
-    app.dependency_overrides[dependencies.get_calendar_client] = override_get_calendar_client
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-
-def test_create_event(test_client, fake_client):
-    response = test_client.post("/calendar/events", json={
-        "summary": "Test Event",
-        "start": "2025-12-26T14:00:00Z",
-        "end": "2025-12-26T15:00:00Z",
-    })
-    assert response.status_code == 200
-    assert response.json()["summary"] == "Test Event"
-    assert len(fake_client.get_created_events()) == 1
-
-def test_get_event_not_found(test_client):
-    response = test_client.get("/calendar/events/nonexistent")
-    assert response.status_code == 404
+    result = output.getvalue()
+    assert "Created:" in result
+    assert len(created_events) == 1
+    assert created_events[0]["summary"] == "Team Meeting"
 ```
 
 ## Environment Configuration
@@ -500,6 +650,7 @@ def test_get_event_not_found(test_client):
 ~/.google/calendar_credentials.json  - OAuth client ID/secret
 ~/.google/calendar_tokens.json       - Access/refresh tokens
 ~/.competitions/tracked.json         - Tracked competitions
+libs/platform_calendar/.env          - CLI environment variables
 ```
 
 ### Production (Environment Variables)
@@ -514,46 +665,14 @@ GOOGLE_CALENDAR_REDIRECT_URI=http://localhost
 GOOGLE_CALENDAR_ACCESS_TOKEN=ya29.your_access_token
 GOOGLE_CALENDAR_REFRESH_TOKEN=1//your_refresh_token
 GOOGLE_CALENDAR_TOKEN_EXPIRES_AT=1735200000
+
+# Additional accounts
+GOOGLE_CALENDAR_INTERNS_ACCESS_TOKEN=ya29.work_access_token
+GOOGLE_CALENDAR_INTERNS_REFRESH_TOKEN=1//work_refresh_token
+GOOGLE_CALENDAR_INTERNS_EXPIRES_AT=1735200000
 ```
 
 Environment variables take precedence over files. Partial configuration raises `AppError`.
-
-## Public API (__init__.py)
-
-```python
-# Auth functions
-from platform_calendar.auth import (
-    authorize, build_auth_url, exchange_code_for_tokens,
-    get_valid_tokens, is_token_expired, load_or_authorize,
-    refresh_access_token,
-)
-
-# Client factory
-from platform_calendar.client import google_calendar_client
-
-# Competition functions
-from platform_calendar.competitions import (
-    add_competition, get_competition, load_competitions,
-    make_competition, remove_competition, save_competitions,
-    sync_all_competitions, sync_competition, update_competition,
-)
-
-# Types
-from platform_calendar.types import (
-    CalendarEvent, CalendarListItem, CompetitionSource,
-    DEFAULT_REMINDERS, EventDateTime, EventReminders, EventStatus,
-    OAuthCredentials, OAuthTokens, ReminderOverride, TrackedCompetition,
-)
-
-# Testing utilities
-from platform_calendar.testing import (
-    CalendarClientProtocol, FakeCalendarClient, hooks,
-    make_fake_calendar, make_fake_event, make_fake_http_delete,
-    make_fake_http_get, make_fake_http_patch, make_fake_http_post,
-    make_fake_tokens, make_raising_http_delete, make_raising_http_get,
-    make_raising_http_patch, make_raising_http_post, reset_hooks,
-)
-```
 
 ## Test Coverage
 
@@ -565,4 +684,6 @@ from platform_calendar.testing import (
 - Tests for competition sync with fake client
 - Tests for environment variable loading
 - Tests for production HTTP hooks with local server
+- Tests for CLI commands with fake hooks
+- Tests for CLI argument parsing and TypedDict decoding
 - Tests for guard.py using runpy

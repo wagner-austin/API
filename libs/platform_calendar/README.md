@@ -1,6 +1,6 @@
 # platform_calendar
 
-Google Calendar API integration for tracking competition deadlines with automatic reminders.
+Google Calendar API integration for tracking competition deadlines with automatic reminders, plus a CLI for managing events across multiple accounts.
 
 ## Installation
 
@@ -33,10 +33,12 @@ poetry add platform-calendar
 - **Strict Typing**: mypy strict mode, no Any, 100% test coverage
 - **Project Mapping**: Link competitions to your codebase projects
 - **Testable Design**: Hooks-based dependency injection for full testability
+- **CLI Tool**: Rich terminal interface for managing events across multiple accounts
 
 ## Dependencies
 
 - `platform-core` - OAuth types and PKCE utilities, JSON utilities, error handling
+- `rich` - Terminal formatting for CLI
 
 ## Setup
 
@@ -48,12 +50,88 @@ poetry add platform-calendar
 
 ### 2. Create OAuth 2.0 Credentials
 
-1. Go to APIs & Services → Credentials
-2. Create Credentials → OAuth client ID
+1. Go to APIs & Services -> Credentials
+2. Create Credentials -> OAuth client ID
 3. Application type: "Desktop app"
-4. Download JSON → save as `~/.google/calendar_credentials.json`
+4. Download JSON -> save as `~/.google/calendar_credentials.json`
 
-## Quick Start
+## CLI Usage
+
+The CLI provides commands for managing calendar events across multiple Google accounts.
+
+### Commands
+
+```bash
+# List today's events (default)
+poetry run python -m platform_calendar.cli list
+poetry run python -m platform_calendar.cli ls
+poetry run python -m platform_calendar.cli l
+
+# List events for a specific date
+poetry run python -m platform_calendar.cli list --date 2026-02-25
+
+# List tomorrow's events
+poetry run python -m platform_calendar.cli tomorrow
+poetry run python -m platform_calendar.cli tm
+
+# List this week's events
+poetry run python -m platform_calendar.cli week
+poetry run python -m platform_calendar.cli w
+
+# List all calendars
+poetry run python -m platform_calendar.cli calendars
+poetry run python -m platform_calendar.cli cals
+
+# Create an event
+poetry run python -m platform_calendar.cli create "Team Meeting" 14:00 --duration 60 --location "Room A"
+poetry run python -m platform_calendar.cli add "Lunch" 12:00 --date 2026-02-25
+
+# Delete an event (interactive)
+poetry run python -m platform_calendar.cli delete
+poetry run python -m platform_calendar.cli rm --date 2026-02-25
+```
+
+### CLI Configuration
+
+The CLI reads OAuth tokens from environment variables. Create a `.env` file in the package directory:
+
+```bash
+# OAuth Credentials (required for token refresh)
+GOOGLE_CALENDAR_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_CALENDAR_CLIENT_SECRET=GOCSPX-your_secret
+GOOGLE_CALENDAR_REDIRECT_URI=http://localhost
+
+# Account 1: Personal
+GOOGLE_CALENDAR_ACCESS_TOKEN=ya29.your_access_token
+GOOGLE_CALENDAR_REFRESH_TOKEN=1//your_refresh_token
+GOOGLE_CALENDAR_TOKEN_EXPIRES_AT=1735200000
+
+# Account 2: Work (example)
+GOOGLE_CALENDAR_INTERNS_ACCESS_TOKEN=ya29.work_access_token
+GOOGLE_CALENDAR_INTERNS_REFRESH_TOKEN=1//work_refresh_token
+GOOGLE_CALENDAR_INTERNS_EXPIRES_AT=1735200000
+```
+
+### Automatic Token Refresh
+
+The CLI automatically refreshes expired access tokens using the refresh token. When a token expires:
+
+1. The CLI checks `TOKEN_EXPIRES_AT` before each API call
+2. If expired (or expiring within 60 seconds), it uses the refresh token to get a new access token
+3. The new token is cached in memory for subsequent calls
+
+This means you only need to authenticate once - the CLI handles token refresh automatically.
+
+### CLI Output
+
+The CLI uses Rich for formatted output with color-coded styling:
+- **Headers**: Bold cyan
+- **Account names**: Bold yellow
+- **Times**: Green (regular events) or Blue (all-day events)
+- **Errors**: Bold red
+- **Success messages**: Bold green
+
+## Quick Start (Python API)
 
 ```python
 from platform_calendar import (
@@ -127,8 +205,8 @@ event = client.create_event(
     start=EventDateTime(dateTime="2025-12-26T14:00:00Z", timeZone="UTC"),
     end=EventDateTime(dateTime="2025-12-26T15:00:00Z", timeZone="UTC"),
     reminders=(1440, 60),  # 1 day and 1 hour before
-    location="Conference Room A",  # Optional
-    recurrence=("RRULE:FREQ=WEEKLY;COUNT=10",),  # Optional: recurring event
+    location="Conference Room A",
+    recurrence=("RRULE:FREQ=WEEKLY;COUNT=10",),
 )
 
 # Update event (partial update - only specified fields are changed)
@@ -139,142 +217,13 @@ updated = client.update_event(
     description="New description",
     start=EventDateTime(dateTime="2025-12-27T14:00:00Z", timeZone="UTC"),
     end=EventDateTime(dateTime="2025-12-27T15:00:00Z", timeZone="UTC"),
-    reminders=(60, 30),  # Update reminders
+    reminders=(60, 30),
     location="New Location",
     recurrence=("RRULE:FREQ=DAILY;COUNT=5",),
 )
 
 # Delete event
 client.delete_event(calendar_id="primary", event_id=event["id"])
-```
-
-## Using in a FastAPI Service
-
-### 1. Add Dependency
-
-```toml
-# pyproject.toml
-[tool.poetry.dependencies]
-platform-calendar = { path = "../platform_calendar", develop = true }
-```
-
-### 2. Initialize at Startup
-
-```python
-# app/dependencies.py
-from platform_calendar import (
-    CalendarClientProtocol,
-    google_calendar_client,
-    load_or_authorize,
-)
-
-_client: CalendarClientProtocol | None = None
-
-def init_calendar() -> None:
-    global _client
-    tokens = load_or_authorize()
-    _client = google_calendar_client(tokens=tokens)
-
-def get_calendar_client() -> CalendarClientProtocol:
-    if _client is None:
-        raise RuntimeError("Calendar not initialized")
-    return _client
-```
-
-```python
-# app/main.py
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from app.dependencies import init_calendar
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_calendar()
-    yield
-
-app = FastAPI(lifespan=lifespan)
-```
-
-### 3. Use in Routes
-
-```python
-# app/routes/calendar.py
-from fastapi import APIRouter, Depends, HTTPException
-from platform_calendar import CalendarClientProtocol, EventDateTime
-from platform_core.errors import AppError
-from app.dependencies import get_calendar_client
-
-router = APIRouter(prefix="/calendar")
-
-@router.post("/events")
-def create_event(
-    summary: str,
-    start: str,
-    end: str,
-    client: CalendarClientProtocol = Depends(get_calendar_client),
-):
-    try:
-        event = client.create_event(
-            calendar_id="primary",
-            summary=summary,
-            description="",
-            start=EventDateTime(dateTime=start, timeZone="UTC"),
-            end=EventDateTime(dateTime=end, timeZone="UTC"),
-            reminders=(60,),
-        )
-        return dict(event)
-    except AppError as e:
-        raise HTTPException(status_code=e.http_status, detail=e.message)
-```
-
-### 4. Test with Fake Client
-
-```python
-# tests/test_routes.py
-import pytest
-from fastapi.testclient import TestClient
-from platform_calendar import FakeCalendarClient
-from app.main import app
-from app import dependencies
-
-@pytest.fixture
-def test_client():
-    fake = FakeCalendarClient()
-    fake.add_calendar(calendar_id="primary", summary="Test")
-    app.dependency_overrides[dependencies.get_calendar_client] = lambda: fake
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-
-def test_create_event(test_client):
-    response = test_client.post("/calendar/events", params={
-        "summary": "Test",
-        "start": "2025-12-26T14:00:00Z",
-        "end": "2025-12-26T15:00:00Z",
-    })
-    assert response.status_code == 200
-```
-
-See `docs/architecture-plan.md` for detailed patterns.
-
-## Competition Storage
-
-Competitions are stored at `~/.competitions/tracked.json`:
-
-```json
-{
-  "competitions": [
-    {
-      "id": "devpost-build-from-scratch-2025",
-      "source": "devpost",
-      "name": "Build From Scratch - Season I",
-      "deadline": "2025-12-25T22:00:00Z",
-      "url": "https://devpost.com/...",
-      "project_path": "libs/cleargbm",
-      "calendar_event_id": "abc123",
-      "reminders": [1440, 60]
-    }
-  ]
-}
 ```
 
 ## Testing
@@ -289,8 +238,6 @@ from platform_calendar import (
     make_fake_tokens,
     make_fake_http_get,
     make_fake_http_post,
-    make_fake_http_patch,
-    make_fake_http_delete,
     make_fake_event,
 )
 
@@ -317,22 +264,9 @@ event = client.create_event(
     recurrence=("RRULE:FREQ=DAILY",),
 )
 
-# Get event by ID
-fetched = client.get_event(calendar_id="primary", event_id=event["id"])
-
-# Update event
-updated = client.update_event(
-    calendar_id="primary",
-    event_id=event["id"],
-    summary="Updated Event",
-    reminders=(30, 15),
-)
-
 # Use fake HTTP responses for real client testing
 hooks.http_get = make_fake_http_get('{"items": []}')
 hooks.http_post = make_fake_http_post('{"id": "new123"}')
-hooks.http_patch = make_fake_http_patch('{"id": "updated123"}')
-hooks.http_delete = make_fake_http_delete()
 hooks.load_tokens = make_fake_tokens(tokens)
 
 # Create fake events for testing
@@ -343,6 +277,35 @@ fake_event = make_fake_event(
     recurrence=("RRULE:FREQ=WEEKLY",),
 )
 ```
+
+### Hooks Architecture
+
+The `HooksContainer` provides dependency injection for all external dependencies:
+
+| Hook | Type | Description |
+|------|------|-------------|
+| `http_get` | `HttpGetHook` | HTTP GET requests |
+| `http_post` | `HttpPostHook` | HTTP POST requests |
+| `http_patch` | `HttpPatchHook` | HTTP PATCH requests |
+| `http_delete` | `HttpDeleteHook` | HTTP DELETE requests |
+| `load_tokens` | `LoadTokensHook` | Load OAuth tokens |
+| `save_tokens` | `SaveTokensHook` | Save OAuth tokens |
+| `load_credentials` | `LoadCredentialsHook` | Load OAuth credentials |
+| `open_browser` | `OpenBrowserHook` | Open browser for OAuth |
+| `current_time` | `CurrentTimeHook` | Get current timestamp |
+| `read_file` | `ReadFileHook` | Read file contents |
+| `write_file` | `WriteFileHook` | Write file contents |
+| `file_exists` | `FileExistsHook` | Check file existence |
+| `console_output` | `ConsoleOutputHook` | Console output |
+| `console_input` | `ConsoleInputHook` | Console input |
+| `cli_api_get` | `CliApiGetHook` | CLI API GET requests |
+| `cli_api_post` | `CliApiPostHook` | CLI API POST requests |
+| `cli_api_delete` | `CliApiDeleteHook` | CLI API DELETE requests |
+| `cli_get_env` | `CliGetEnvHook` | CLI environment variables |
+| `cli_get_now` | `CliGetNowHook` | CLI current datetime |
+| `cli_prompt_ask` | `CliPromptAskHook` | CLI user prompts |
+| `cli_confirm_ask` | `CliConfirmAskHook` | CLI confirmations |
+| `cli_get_console` | `CliGetConsoleHook` | CLI Rich console |
 
 ### Testing Helpers
 
@@ -355,8 +318,6 @@ fake_event = make_fake_event(
 | `make_fake_http_delete()` | No-op for DELETE requests |
 | `make_raising_http_get(error)` | Raises specified exception on GET |
 | `make_raising_http_post(error)` | Raises specified exception on POST |
-| `make_raising_http_patch(error)` | Raises specified exception on PATCH |
-| `make_raising_http_delete(error)` | Raises specified exception on DELETE |
 | `make_fake_event(...)` | Create a CalendarEvent with defaults |
 | `make_fake_calendar(...)` | Create a CalendarListItem with defaults |
 | `make_fake_tokens(tokens)` | Returns fixed tokens |
@@ -390,12 +351,6 @@ The `CalendarClientProtocol` provides the following methods:
 | `update_event(...)` | Partial update (PATCH) - only updates specified fields |
 | `delete_event(calendar_id, event_id)` | Delete an event |
 
-### Client Factory
-
-| Function | Description |
-|----------|-------------|
-| `google_calendar_client` | Create calendar client from tokens |
-
 ### Competition Functions
 
 | Function | Description |
@@ -410,6 +365,17 @@ The `CalendarClientProtocol` provides the following methods:
 | `sync_competition` | Create calendar event |
 | `sync_all_competitions` | Sync all unsynced |
 
+### CLI Commands
+
+| Command | Aliases | Description |
+|---------|---------|-------------|
+| `list` | `ls`, `l` | List events for a date |
+| `calendars` | `cals` | List all calendars |
+| `create` | `add`, `new` | Create a new event |
+| `delete` | `rm`, `del` | Delete an event (interactive) |
+| `tomorrow` | `tm` | Show tomorrow's events |
+| `week` | `w` | Show this week's events |
+
 ### Types
 
 | Type | Description |
@@ -422,21 +388,6 @@ The `CalendarClientProtocol` provides the following methods:
 | `EventDateTime` | Event start/end time (dateTime, timeZone) |
 | `EventReminders` | Reminder configuration (useDefault, overrides) |
 | `ReminderOverride` | Individual reminder (method, minutes) |
-
-### CalendarEvent Fields
-
-```python
-class CalendarEvent(TypedDict):
-    id: str                      # Event ID
-    summary: str                 # Event title
-    description: str             # Event description
-    start: EventDateTime         # Start time
-    end: EventDateTime           # End time
-    status: EventStatus          # "confirmed", "tentative", or "cancelled"
-    reminders: EventReminders    # Reminder settings
-    location: str                # Location string (optional in API, always present in type)
-    recurrence: tuple[str, ...]  # RRULE strings for recurring events
-```
 
 ### Error Handling
 
@@ -493,119 +444,6 @@ GOOGLE_CALENDAR_TOKEN_EXPIRES_AT=1735200000  # Unix timestamp
 
 Environment variables take precedence over files. If any credential env var is set, all required ones must be present (partial config raises an error).
 
-See `.env.example` for a template.
-
-## Try It Out
-
-### Step 1: Install Dependencies
-
-```bash
-cd libs/platform_calendar
-poetry install
-```
-
-### Step 2: Authorize (First Time)
-
-Run the OAuth flow to get tokens:
-
-```bash
-poetry run python -c "
-from platform_calendar import load_or_authorize
-tokens = load_or_authorize()
-print('Access Token:', tokens['access_token'][:50] + '...')
-print('Refresh Token:', tokens['refresh_token'])
-print('Expires At:', tokens['expires_at'])
-print()
-print('Add these to your .env:')
-print(f\"GOOGLE_CALENDAR_ACCESS_TOKEN={tokens['access_token']}\")
-print(f\"GOOGLE_CALENDAR_REFRESH_TOKEN={tokens['refresh_token']}\")
-print(f\"GOOGLE_CALENDAR_TOKEN_EXPIRES_AT={tokens['expires_at']}\")
-"
-```
-
-This opens your browser for Google sign-in. After authorizing, tokens are saved to `~/.google/calendar_tokens.json`.
-
-### Step 3: List Your Calendars
-
-```bash
-poetry run python -c "
-from platform_calendar import load_or_authorize, google_calendar_client
-
-tokens = load_or_authorize()
-client = google_calendar_client(tokens=tokens)
-
-print('Your calendars:')
-for cal in client.list_calendars():
-    primary = ' (primary)' if cal['primary'] else ''
-    print(f\"  - {cal['summary']}{primary}: {cal['id']}\")
-"
-```
-
-### Step 4: Create a Test Event
-
-```bash
-poetry run python -c "
-from platform_calendar import (
-    load_or_authorize,
-    google_calendar_client,
-    EventDateTime,
-)
-
-tokens = load_or_authorize()
-client = google_calendar_client(tokens=tokens)
-
-event = client.create_event(
-    calendar_id='primary',
-    summary='Test Event from platform_calendar',
-    description='This is a test event created by the library',
-    start=EventDateTime(dateTime='2025-12-27T14:00:00Z', timeZone='UTC'),
-    end=EventDateTime(dateTime='2025-12-27T15:00:00Z', timeZone='UTC'),
-    reminders=(60,),  # 1 hour before
-)
-print(f\"Created event: {event['id']}\")
-print(f\"Summary: {event['summary']}\")
-"
-```
-
-### Step 5: Track a Competition
-
-```bash
-poetry run python -c "
-from platform_calendar import (
-    load_or_authorize,
-    google_calendar_client,
-    make_competition,
-    sync_competition,
-    add_competition,
-    load_competitions,
-    save_competitions,
-)
-
-tokens = load_or_authorize()
-client = google_calendar_client(tokens=tokens)
-
-# Create a competition
-comp = make_competition(
-    competition_id='devpost-test-2025',
-    source='devpost',
-    name='Test Competition',
-    deadline='2025-12-31T23:59:00Z',
-    url='https://devpost.com/example',
-    project_path='libs/platform_calendar',
-)
-
-# Sync to calendar
-synced = sync_competition(client, competition=comp)
-print(f\"Created calendar event: {synced['calendar_event_id']}\")
-
-# Save to tracked competitions
-comps = load_competitions()
-comps = add_competition(comps, synced)
-save_competitions(comps)
-print(f\"Saved to ~/.competitions/tracked.json\")
-"
-```
-
 ## Development
 
 ```bash
@@ -619,4 +457,5 @@ make test   # Run tests only
 
 - Python 3.11+
 - platform-core (OAuth types, PKCE utilities, error handling, JSON utilities)
+- rich (terminal formatting for CLI)
 - 100% test coverage enforced
