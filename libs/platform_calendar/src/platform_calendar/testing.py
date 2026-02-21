@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from platform_core.errors import AppError, CalendarErrorCode
@@ -784,10 +785,69 @@ _init_production_hooks()
 def reset_hooks() -> None:
     """Reset all hooks to production implementations (for test teardown)."""
     global _cli_env_loaded, _cli_env_cache, _cli_default_console
+    global guard_find_monorepo_root, guard_load_orchestrator
     _cli_env_loaded = False
     _cli_env_cache = {}
     _cli_default_console = None
+    guard_find_monorepo_root = None
+    guard_load_orchestrator = None
     _init_production_hooks()
+
+
+# =============================================================================
+# Guard Script Hooks
+# =============================================================================
+
+
+class RunForProjectProto(Protocol):
+    """Protocol for run_for_project function from monorepo_guards."""
+
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
+        """Run guard checks for a project.
+
+        Args:
+            monorepo_root: Root directory of the monorepo.
+            project_root: Root directory of the project to check.
+
+        Returns:
+            Exit code (0 for success).
+        """
+        ...
+
+
+class FindMonorepoRootProto(Protocol):
+    """Protocol for finding the monorepo root directory."""
+
+    def __call__(self, start: Path) -> Path:
+        """Find monorepo root by searching upward for libs directory.
+
+        Args:
+            start: Starting directory for search.
+
+        Returns:
+            Path to monorepo root.
+        """
+        ...
+
+
+class LoadOrchestratorProto(Protocol):
+    """Protocol for loading the guard orchestrator."""
+
+    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
+        """Load the orchestrator's run_for_project function.
+
+        Args:
+            monorepo_root: Root directory of the monorepo.
+
+        Returns:
+            The run_for_project function.
+        """
+        ...
+
+
+# Guard hooks - None means use default behavior (production implementation)
+guard_find_monorepo_root: FindMonorepoRootProto | None = None
+guard_load_orchestrator: LoadOrchestratorProto | None = None
 
 
 # =============================================================================
