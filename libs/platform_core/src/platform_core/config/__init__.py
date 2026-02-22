@@ -14,6 +14,15 @@ from ._utils import (
     _require_env_csv,
     _require_env_str,
 )
+from .art_trainer import (
+    ArtTrainerAppConfig,
+    ArtTrainerLoggingConfig,
+    ArtTrainerRedisConfig,
+    ArtTrainerRQConfig,
+    ArtTrainerSecurityConfig,
+    ArtTrainerSettings,
+    load_art_trainer_settings,
+)
 from .covenant_radar import (
     CovenantRadarAppConfig,
     CovenantRadarDatadogConfig,
@@ -63,6 +72,12 @@ from .model_trainer import (
 from .turkic_api import TurkicApiSettings, load_turkic_api_settings
 
 __all__ = [
+    "ArtTrainerAppConfig",
+    "ArtTrainerLoggingConfig",
+    "ArtTrainerRQConfig",
+    "ArtTrainerRedisConfig",
+    "ArtTrainerSecurityConfig",
+    "ArtTrainerSettings",
     "CovenantRadarAppConfig",
     "CovenantRadarDatadogConfig",
     "CovenantRadarLoggingConfig",
@@ -109,6 +124,7 @@ __all__ = [
     "_require_env_str",
     "config_test_hooks",
     "limits_from_handwriting_ai_settings",
+    "load_art_trainer_settings",
     "load_covenant_radar_settings",
     "load_data_bank_settings",
     "load_discordbot_settings",

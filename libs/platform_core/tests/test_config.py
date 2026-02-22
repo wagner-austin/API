@@ -16,6 +16,7 @@ from platform_core.config import (
     _parse_str,
     _require_env_csv,
     _require_env_str,
+    load_art_trainer_settings,
     load_data_bank_settings,
     load_turkic_api_settings,
 )
@@ -238,3 +239,118 @@ def test_fake_env_delete() -> None:
     assert env.get("KEY") is None
     # Deleting non-existent key should not raise
     env.delete("NONEXISTENT")
+
+
+def test_load_art_trainer_settings_defaults() -> None:
+    """Test load_art_trainer_settings with default values."""
+    make_fake_env()
+    cfg = load_art_trainer_settings()
+    assert cfg["app_env"] == "dev"
+    assert cfg["logging"]["level"] == "INFO"
+    assert cfg["redis"]["enabled"] is True
+    assert cfg["redis"]["url"] == "redis://redis:6379/0"
+    assert cfg["rq"]["queue_name"] == "art-trainer"
+    assert cfg["rq"]["job_timeout_sec"] == 86_400
+    assert cfg["rq"]["result_ttl_sec"] == 86_400
+    assert cfg["rq"]["failure_ttl_sec"] == 7 * 86_400
+    assert cfg["rq"]["retry_max"] == 1
+    assert cfg["rq"]["retry_intervals_sec"] == "300"
+    assert cfg["app"]["data_root"] == "/data"
+    assert cfg["app"]["output_root"] == "/data/output"
+    assert cfg["app"]["logs_root"] == "/data/logs"
+    assert cfg["app"]["data_bank_api_url"] == ""
+    assert cfg["app"]["data_bank_api_key"] == ""
+    assert cfg["app"]["kohya_ss_path"] == "/opt/kohya_ss"
+    assert cfg["app"]["comfyui_lora_path"] == "/opt/ComfyUI/models/loras"
+    assert cfg["app"]["blip_model_name"] == "Salesforce/blip-image-captioning-large"
+    assert cfg["app"]["caption_trigger_word"] == "sks person"
+    assert cfg["security"]["api_key"] == ""
+
+
+def test_load_art_trainer_settings_prod_env() -> None:
+    """Test load_art_trainer_settings with prod environment."""
+    env = make_fake_env()
+    env.set("APP_ENV", "prod")
+    cfg = load_art_trainer_settings()
+    assert cfg["app_env"] == "prod"
+
+
+def test_load_art_trainer_settings_gateway_url() -> None:
+    """Test load_art_trainer_settings prefers API_GATEWAY_URL over direct URL."""
+    env = make_fake_env()
+    env.set("API_GATEWAY_URL", "https://gateway.example.com")
+    env.set("APP__DATA_BANK_API_URL", "https://direct.example.com")
+    cfg = load_art_trainer_settings()
+    assert cfg["app"]["data_bank_api_url"] == "https://gateway.example.com/data-bank"
+
+
+def test_load_art_trainer_settings_direct_url() -> None:
+    """Test load_art_trainer_settings uses direct URL when gateway not set."""
+    env = make_fake_env()
+    env.set("APP__DATA_BANK_API_URL", "https://direct.example.com")
+    cfg = load_art_trainer_settings()
+    assert cfg["app"]["data_bank_api_url"] == "https://direct.example.com"
+
+
+def test_load_art_trainer_settings_log_level_debug() -> None:
+    """Test load_art_trainer_settings with DEBUG log level."""
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "DEBUG")
+    cfg = load_art_trainer_settings()
+    assert cfg["logging"]["level"] == "DEBUG"
+
+
+def test_load_art_trainer_settings_log_level_warning() -> None:
+    """Test load_art_trainer_settings with WARNING log level."""
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "WARNING")
+    cfg = load_art_trainer_settings()
+    assert cfg["logging"]["level"] == "WARNING"
+
+
+def test_load_art_trainer_settings_log_level_error() -> None:
+    """Test load_art_trainer_settings with ERROR log level."""
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "ERROR")
+    cfg = load_art_trainer_settings()
+    assert cfg["logging"]["level"] == "ERROR"
+
+
+def test_load_art_trainer_settings_log_level_critical() -> None:
+    """Test load_art_trainer_settings with CRITICAL log level."""
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "CRITICAL")
+    cfg = load_art_trainer_settings()
+    assert cfg["logging"]["level"] == "CRITICAL"
+
+
+def test_load_art_trainer_settings_custom_values() -> None:
+    """Test load_art_trainer_settings with custom environment values."""
+    env = make_fake_env()
+    env.set("REDIS__ENABLED", "false")
+    env.set("REDIS__URL", "redis://custom:6379/1")
+    env.set("RQ__QUEUE_NAME", "custom-queue")
+    env.set("APP__DATA_ROOT", "/custom/data")
+    env.set("APP__KOHYA_SS_PATH", "/custom/kohya")
+    env.set("APP__COMFYUI_LORA_PATH", "/custom/comfyui/loras")
+    env.set("APP__BLIP_MODEL_NAME", "custom/blip-model")
+    env.set("APP__CAPTION_TRIGGER_WORD", "xyz person")
+    env.set("SECURITY__API_KEY", "secret-key")
+    cfg = load_art_trainer_settings()
+    assert cfg["redis"]["enabled"] is False
+    assert cfg["redis"]["url"] == "redis://custom:6379/1"
+    assert cfg["rq"]["queue_name"] == "custom-queue"
+    assert cfg["app"]["data_root"] == "/custom/data"
+    assert cfg["app"]["kohya_ss_path"] == "/custom/kohya"
+    assert cfg["app"]["comfyui_lora_path"] == "/custom/comfyui/loras"
+    assert cfg["app"]["blip_model_name"] == "custom/blip-model"
+    assert cfg["app"]["caption_trigger_word"] == "xyz person"
+    assert cfg["security"]["api_key"] == "secret-key"
+
+
+def test_load_art_trainer_settings_log_level_invalid_uses_info() -> None:
+    """Test load_art_trainer_settings uses INFO for invalid log level."""
+    env = make_fake_env()
+    env.set("LOGGING__LEVEL", "INVALID")
+    cfg = load_art_trainer_settings()
+    assert cfg["logging"]["level"] == "INFO"
