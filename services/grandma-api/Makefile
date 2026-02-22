@@ -16,8 +16,9 @@ test:
 	poetry lock
 	poetry install --with dev
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run pytest -n auto -v @covArgs
+	Push-Location web; npm run test:unit; Pop-Location
 
-check: lint | test
+check: lint test
 
 up:
 	& .\scripts\start.ps1
