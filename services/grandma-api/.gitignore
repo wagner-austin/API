@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Logs and runtime files
+logs/
+.pids/
+
+# Web build
+web/dist/
+web/node_modules/
+
+# SSL certs (local dev)
+web/*.pem

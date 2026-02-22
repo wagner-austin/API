@@ -9,7 +9,7 @@
     "test": "vitest",
     "test:unit": "vitest run --coverage",
     "check": "npm run lint && npm run typecheck && npm run test:unit",
-    "serve": "npx serve -l 3000",
+    "serve": "npx serve -l tcp://0.0.0.0:8091",
     "dev": "npm run build && npm run serve"
   },
   "devDependencies": {
