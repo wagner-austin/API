@@ -80,10 +80,7 @@ class SpokenLanguageDetector:
         # Apply confidence threshold and handle unsupported languages
         # "auto" means let Whisper auto-detect (for unsupported languages)
         threshold = self._config["confidence_threshold"]
-        if confidence < threshold or whisper_code is None:
-            language = "auto"
-        else:
-            language = whisper_code
+        language = "auto" if confidence < threshold or whisper_code is None else whisper_code
 
         return SpokenLanguageResult(
             language=language,

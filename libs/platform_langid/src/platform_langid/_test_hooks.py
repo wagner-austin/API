@@ -184,6 +184,43 @@ class _ResampleClassProtocol(Protocol):
 
 
 # =============================================================================
+# Langcodes Protocols
+# =============================================================================
+
+
+class _LanguageProtocol(Protocol):
+    """Protocol for langcodes Language instance."""
+
+    @property
+    def language(self) -> str:
+        """Get primary language subtag (ISO 639-1 or 639-3)."""
+        ...
+
+    def broader_tags(self) -> list[str]:
+        """Get broader language tags for fallback matching.
+
+        Returns:
+            List of broader language codes that encompass this language.
+        """
+        ...
+
+
+class _LanguageClassProtocol(Protocol):
+    """Protocol for langcodes Language class."""
+
+    def get(self, code: str) -> _LanguageProtocol:
+        """Parse language code and return Language object.
+
+        Args:
+            code: Language code in any standard format (ISO 639-1, 639-3, etc.).
+
+        Returns:
+            Parsed Language object.
+        """
+        ...
+
+
+# =============================================================================
 # Detector Protocol
 # =============================================================================
 
@@ -451,17 +488,110 @@ class LanguageCodeConverterProtocol(Protocol):
 
 # Whisper-supported language codes (from openai/whisper tokenizer.py)
 # These are the only codes Whisper API accepts
-WHISPER_SUPPORTED_CODES: frozenset[str] = frozenset({
-    "en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca",
-    "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "he", "uk", "el", "ms",
-    "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la",
-    "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn",
-    "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw",
-    "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be",
-    "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn",
-    "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha",
-    "ba", "jw", "su", "yue",
-})
+WHISPER_SUPPORTED_CODES: frozenset[str] = frozenset(
+    {
+        "en",
+        "zh",
+        "de",
+        "es",
+        "ru",
+        "ko",
+        "fr",
+        "ja",
+        "pt",
+        "tr",
+        "pl",
+        "ca",
+        "nl",
+        "ar",
+        "sv",
+        "it",
+        "id",
+        "hi",
+        "fi",
+        "vi",
+        "he",
+        "uk",
+        "el",
+        "ms",
+        "cs",
+        "ro",
+        "da",
+        "hu",
+        "ta",
+        "no",
+        "th",
+        "ur",
+        "hr",
+        "bg",
+        "lt",
+        "la",
+        "mi",
+        "ml",
+        "cy",
+        "sk",
+        "te",
+        "fa",
+        "lv",
+        "bn",
+        "sr",
+        "az",
+        "sl",
+        "kn",
+        "et",
+        "mk",
+        "br",
+        "eu",
+        "is",
+        "hy",
+        "ne",
+        "mn",
+        "bs",
+        "kk",
+        "sq",
+        "sw",
+        "gl",
+        "mr",
+        "pa",
+        "si",
+        "km",
+        "sn",
+        "yo",
+        "so",
+        "af",
+        "oc",
+        "ka",
+        "be",
+        "tg",
+        "sd",
+        "gu",
+        "am",
+        "yi",
+        "lo",
+        "uz",
+        "fo",
+        "ht",
+        "ps",
+        "tk",
+        "nn",
+        "mt",
+        "sa",
+        "lb",
+        "my",
+        "bo",
+        "tl",
+        "mg",
+        "as",
+        "tt",
+        "haw",
+        "ln",
+        "ha",
+        "ba",
+        "jw",
+        "su",
+        "yue",
+    }
+)
 
 
 def _default_convert_language_code(code: str) -> str | None:
@@ -479,8 +609,8 @@ def _default_convert_language_code(code: str) -> str | None:
         return code
 
     langcodes_mod = __import__("langcodes")
-    language_cls = langcodes_mod.Language
-    lang = language_cls.get(code)
+    language_cls: _LanguageClassProtocol = langcodes_mod.Language
+    lang: _LanguageProtocol = language_cls.get(code)
 
     # .language gives the primary subtag (may be 2 or 3 letters)
     primary: str = lang.language

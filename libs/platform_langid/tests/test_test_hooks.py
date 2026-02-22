@@ -254,6 +254,60 @@ class TestDefaultDetectorFactory:
         assert detector.__class__.__name__ == "SpokenLanguageDetector"
 
 
+class TestDefaultConvertLanguageCode:
+    """Tests for _default_convert_language_code function."""
+
+    def test_returns_whisper_code_directly(self) -> None:
+        """Return code unchanged if already Whisper-supported.
+
+        Whisper supports standard ISO 639-1 codes like 'en', 'vi', 'es'.
+        These should be returned as-is without conversion.
+        """
+        result = _test_hooks._default_convert_language_code("en")
+        assert result == "en"
+
+        result = _test_hooks._default_convert_language_code("vi")
+        assert result == "vi"
+
+    def test_converts_iso_639_3_to_whisper_code(self) -> None:
+        """Convert ISO 639-3 codes to Whisper-compatible ISO 639-1.
+
+        MMS-LID returns 3-letter codes like 'eng', 'vie'. These need
+        conversion to 2-letter codes that Whisper understands.
+        """
+        result = _test_hooks._default_convert_language_code("eng")
+        assert result == "en"
+
+        result = _test_hooks._default_convert_language_code("vie")
+        assert result == "vi"
+
+    def test_converts_chinese_mandarin_code(self) -> None:
+        """Convert Mandarin Chinese code 'cmn' to Whisper 'zh'.
+
+        Mandarin Chinese uses ISO 639-3 code 'cmn' but Whisper expects 'zh'.
+        The broader_tags() method provides this mapping.
+        """
+        result = _test_hooks._default_convert_language_code("cmn")
+        assert result == "zh"
+
+    def test_returns_none_for_unsupported_language(self) -> None:
+        """Return None for languages not supported by Whisper.
+
+        When a language code cannot be mapped to a Whisper-supported code,
+        return None to signal that Whisper should auto-detect.
+        """
+        # Afrikaans Oorlams variant - rare language not in Whisper
+        result = _test_hooks._default_convert_language_code("oor")
+        assert result is None
+
+    def test_convert_language_code_hook_default(self) -> None:
+        """convert_language_code hook defaults to _default_convert_language_code."""
+        from platform_langid.testing import reset_hooks
+
+        reset_hooks()
+        assert _test_hooks.convert_language_code is _test_hooks._default_convert_language_code
+
+
 class TestDefaultHooks:
     """Tests for default hook values."""
 
@@ -281,6 +335,11 @@ class TestDefaultHooks:
         reset_hooks()
         assert _test_hooks.detector_factory is _test_hooks._default_detector_factory
 
+    def test_convert_language_code_default(self) -> None:
+        """convert_language_code defaults to _default_convert_language_code."""
+        reset_hooks()
+        assert _test_hooks.convert_language_code is _test_hooks._default_convert_language_code
+
 
 class TestExports:
     """Tests for module exports."""
@@ -295,6 +354,7 @@ class TestExports:
         assert "ProcessorFactoryProtocol" in _test_hooks.__all__
         assert "DetectorFactoryProtocol" in _test_hooks.__all__
         assert "AudioLoaderProtocol" in _test_hooks.__all__
+        assert "LanguageCodeConverterProtocol" in _test_hooks.__all__
 
     def test_all_defaults_exported(self) -> None:
         """All default implementations are in __all__."""
@@ -302,6 +362,7 @@ class TestExports:
         assert "_default_processor_factory" in _test_hooks.__all__
         assert "_default_audio_loader" in _test_hooks.__all__
         assert "_default_detector_factory" in _test_hooks.__all__
+        assert "_default_convert_language_code" in _test_hooks.__all__
 
     def test_all_hooks_exported(self) -> None:
         """All hook variables are in __all__."""
@@ -309,3 +370,4 @@ class TestExports:
         assert "processor_factory" in _test_hooks.__all__
         assert "audio_loader" in _test_hooks.__all__
         assert "detector_factory" in _test_hooks.__all__
+        assert "convert_language_code" in _test_hooks.__all__

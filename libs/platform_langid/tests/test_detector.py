@@ -72,7 +72,11 @@ class TestSpokenLanguageDetector:
         assert fake_loader.calls[0] == (b"\x00\x01", 44100)
 
     def test_detect_with_confidence_threshold(self) -> None:
-        """Detect returns 'und' when confidence below threshold."""
+        """Detect returns 'auto' when confidence below threshold.
+
+        When confidence is below threshold, return 'auto' to let Whisper
+        perform its own language detection instead of using our uncertain result.
+        """
         # Set model to return low confidence
         # With 5 classes and 0.3 confidence for class 0, others have 0.175 each
         # so class 0 wins argmax but with low confidence
@@ -90,7 +94,7 @@ class TestSpokenLanguageDetector:
         detector = SpokenLanguageDetector(config)
         result = detector.detect(b"\x00\x01", 16000)
 
-        assert result["language"] == "und"
+        assert result["language"] == "auto"
         assert result["confidence"] == pytest.approx(0.3, abs=0.05)
 
     def test_detect_above_threshold(self) -> None:

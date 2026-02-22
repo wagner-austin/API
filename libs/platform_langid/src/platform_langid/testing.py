@@ -390,6 +390,7 @@ def set_production_hooks() -> None:
     _test_hooks.processor_factory = _test_hooks._default_processor_factory
     _test_hooks.audio_loader = _test_hooks._default_audio_loader
     _test_hooks.detector_factory = _test_hooks._default_detector_factory
+    _test_hooks.convert_language_code = _test_hooks._default_convert_language_code
 
 
 def reset_hooks() -> None:
