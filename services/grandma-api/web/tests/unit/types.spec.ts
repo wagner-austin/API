@@ -70,26 +70,32 @@ describe("types", () => {
   });
 
   describe("TranslateResponse", () => {
+    const validResponse = {
+      text: "Hello grandmother",
+      detected_language: "vi",
+      source_text: "Xin chào bà",
+      confidence: 0.95,
+    };
+
     describe("encodeTranslateResponse", () => {
       it("encodes TranslateResponse to object", () => {
-        const response = { text: "Hello grandmother" };
-        const encoded = encodeTranslateResponse(response);
+        const encoded = encodeTranslateResponse(validResponse);
 
-        expect(encoded).toEqual({ text: "Hello grandmother" });
+        expect(encoded).toEqual(validResponse);
       });
     });
 
     describe("decodeTranslateResponse", () => {
       it("decodes valid object to TranslateResponse", () => {
-        const input = { text: "Hello grandmother" };
-        const result = decodeTranslateResponse(input);
+        const result = decodeTranslateResponse(validResponse);
 
-        expect(result).toEqual({ text: "Hello grandmother" });
+        expect(result).toEqual(validResponse);
       });
 
       it("decodes empty text", () => {
-        const result = decodeTranslateResponse({ text: "" });
-        expect(result).toEqual({ text: "" });
+        const input = { ...validResponse, text: "" };
+        const result = decodeTranslateResponse(input);
+        expect(result?.text).toBe("");
       });
 
       it("returns null for non-object", () => {
@@ -104,17 +110,35 @@ describe("types", () => {
       });
 
       it("returns null for non-string text", () => {
-        expect(decodeTranslateResponse({ text: 123 })).toBeNull();
-        expect(decodeTranslateResponse({ text: null })).toBeNull();
+        expect(decodeTranslateResponse({ ...validResponse, text: 123 })).toBeNull();
+        expect(decodeTranslateResponse({ ...validResponse, text: null })).toBeNull();
+      });
+
+      it("returns null for missing detected_language", () => {
+        const { detected_language: _, ...partial } = validResponse;
+        expect(decodeTranslateResponse(partial)).toBeNull();
+      });
+
+      it("returns null for missing source_text", () => {
+        const { source_text: _, ...partial } = validResponse;
+        expect(decodeTranslateResponse(partial)).toBeNull();
+      });
+
+      it("returns null for missing confidence", () => {
+        const { confidence: _, ...partial } = validResponse;
+        expect(decodeTranslateResponse(partial)).toBeNull();
+      });
+
+      it("returns null for non-number confidence", () => {
+        expect(decodeTranslateResponse({ ...validResponse, confidence: "high" })).toBeNull();
       });
     });
 
     describe("requireTranslateResponse", () => {
       it("returns TranslateResponse for valid input", () => {
-        const input = { text: "Hello grandmother" };
-        const result = requireTranslateResponse(input);
+        const result = requireTranslateResponse(validResponse);
 
-        expect(result).toEqual({ text: "Hello grandmother" });
+        expect(result).toEqual(validResponse);
       });
 
       it("throws for invalid input", () => {

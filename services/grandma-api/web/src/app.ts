@@ -25,6 +25,8 @@ import {
   createRecorderState,
   AppEventType,
   TranslationErrorDetail,
+  TranslateResponse,
+  TranslationCompleteDetail,
 } from "./types.js";
 
 /** Chunk interval for streaming recordings (15 seconds). */
@@ -347,16 +349,23 @@ export class App {
         const fixedBlob = await fixWebmBlob(blob);
         log.info("Fixed blob:", fixedBlob.size, "bytes");
 
-        const text = await translateAudio(config.API_BASE_URL, token, fixedBlob);
-        log.info("Translation complete:", text.length, "chars");
+        const response = await translateAudio(config.API_BASE_URL, token, fixedBlob);
+        log.info("Translation complete:", response.text.length, "chars");
 
+        const formattedText = this.formatTranscript(response);
         if (this.chunkTranslationFailed && this.currentSessionIndex !== -1) {
           // Replace partial transcript with full translation
-          this.transcripts[this.currentSessionIndex] = text;
+          this.transcripts[this.currentSessionIndex] = formattedText;
         } else {
-          this.transcripts.push(text);
+          this.transcripts.push(formattedText);
         }
         this.updateTranscriptDisplay();
+        emitEvent<TranslationCompleteDetail>("app:translation-complete", {
+          text: response.text,
+          detected_language: response.detected_language,
+          source_text: response.source_text,
+          confidence: response.confidence,
+        });
       } else {
         log.info("Keeping chunk translations, skipping final blob translation");
       }
@@ -479,16 +488,18 @@ export class App {
     try {
       const fixedBlob = await fixWebmBlob(blob);
       log.info("Fixed chunk blob:", fixedBlob.size, "bytes");
-      const text = await translateAudio(config.API_BASE_URL, token, fixedBlob);
-      log.info("Chunk translation received:", text.length, "chars");
+      const response = await translateAudio(config.API_BASE_URL, token, fixedBlob);
+      log.info("Chunk translation received:", response.text.length, "chars");
 
       // APPEND chunk text to current session's transcript
+      const formattedText = this.formatTranscript(response);
       if (this.currentSessionIndex === -1 || this.currentSessionIndex >= this.transcripts.length) {
-        this.transcripts.push(text);
+        this.transcripts.push(formattedText);
         this.currentSessionIndex = this.transcripts.length - 1;
       } else {
+        // For subsequent chunks, only append the English text
         const existing = this.transcripts[this.currentSessionIndex] ?? "";
-        this.transcripts[this.currentSessionIndex] = existing + " " + text;
+        this.transcripts[this.currentSessionIndex] = existing + " " + response.text;
       }
       this.updateTranscriptDisplay();
 
@@ -545,16 +556,17 @@ export class App {
 
     try {
       // Skip fixWebmBlob - send directly to API
-      const text = await translateAudio(config.API_BASE_URL, token, blob);
-      log.info("Raw chunk translation received:", text.length, "chars");
+      const response = await translateAudio(config.API_BASE_URL, token, blob);
+      log.info("Raw chunk translation received:", response.text.length, "chars");
 
-      // APPEND chunk text to current session's transcript
+      // APPEND chunk text to current session's transcript (only English text for subsequent chunks)
       if (this.currentSessionIndex === -1 || this.currentSessionIndex >= this.transcripts.length) {
-        this.transcripts.push(text);
+        const formattedText = this.formatTranscript(response);
+        this.transcripts.push(formattedText);
         this.currentSessionIndex = this.transcripts.length - 1;
       } else {
         const existing = this.transcripts[this.currentSessionIndex] ?? "";
-        this.transcripts[this.currentSessionIndex] = existing + " " + text;
+        this.transcripts[this.currentSessionIndex] = existing + " " + response.text;
       }
       this.updateTranscriptDisplay();
 
@@ -597,6 +609,27 @@ export class App {
     } else {
       this.elements.transcript.textContent = this.transcripts.join("\n\n");
     }
+  }
+
+  /**
+   * Format a translation response for display.
+   *
+   * Shows detected language, confidence, source text, and English translation.
+   *
+   * Args:
+   *   response: Translation response from API
+   *
+   * Returns:
+   *   Formatted string for display
+   */
+  private formatTranscript(response: TranslateResponse): string {
+    const confidencePercent = Math.round(response.confidence * 100);
+    const langLabel = response.detected_language.toUpperCase();
+    return (
+      `[${langLabel} ${confidencePercent}%]\n` +
+      `${response.source_text}\n` +
+      `→ ${response.text}`
+    );
   }
 
   // ============================================================================

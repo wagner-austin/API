@@ -9,6 +9,23 @@ import {
 } from "../../src/testing.js";
 import { createApp, App, autoInit, clearConfigCache } from "../../src/app.js";
 
+/**
+ * Create a full translation response for testing.
+ */
+function createTranslationResponse(
+  text: string,
+  detectedLanguage: string = "vi",
+  sourceText: string = "Xin chào",
+  confidence: number = 0.95
+): Record<string, unknown> {
+  return {
+    text,
+    detected_language: detectedLanguage,
+    source_text: sourceText,
+    confidence,
+  };
+}
+
 describe("app", () => {
   let elements: Map<string, HTMLElement>;
   let fakes: FakeHooksResult;
@@ -254,7 +271,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // for stop recording
+          createFakeResponse(createTranslationResponse("Hello")), // for stop recording
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -277,7 +294,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello grandmother" }), // chunk translation (kept)
+          createFakeResponse(createTranslationResponse("Hello grandmother")), // chunk translation (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -305,7 +322,7 @@ describe("app", () => {
       await app.handleRecordClick();
 
       const transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("Hello grandmother");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ Hello grandmother");
     });
 
     it("throws if stopPromise is null when stopping", async () => {
@@ -340,8 +357,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "First" }), // session 1 chunk (kept)
-          createFakeResponse({ text: "Second" }), // session 2 chunk (kept)
+          createFakeResponse(createTranslationResponse("First")), // session 1 chunk (kept)
+          createFakeResponse(createTranslationResponse("Second")), // session 2 chunk (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -374,7 +391,7 @@ describe("app", () => {
       await app.handleRecordClick();
 
       const transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("First\n\nSecond");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ First\n\n[VI 95%]\nXin chào\n→ Second");
     });
 
     it("appends text when multiple chunks arrive", async () => {
@@ -383,8 +400,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "First chunk" }), // chunk 1 translation
-          createFakeResponse({ text: "second chunk" }), // chunk 2 translation
+          createFakeResponse(createTranslationResponse("First chunk")), // chunk 1 translation
+          createFakeResponse(createTranslationResponse("second chunk")), // chunk 2 translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -408,14 +425,14 @@ describe("app", () => {
       await app.waitForPendingOperations();
 
       let transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("First chunk");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ First chunk");
 
       // Second chunk APPENDS to existing entry
       recorder.requestData();
       await app.waitForPendingOperations();
 
       transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("First chunk second chunk");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ First chunk second chunk");
 
       // Still only one transcript entry (appended in place)
       let state = app.getState();
@@ -425,7 +442,7 @@ describe("app", () => {
       await app.handleRecordClick();
 
       transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("First chunk second chunk");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ First chunk second chunk");
       state = app.getState();
       expect(state.transcripts.length).toBe(1);
     });
@@ -436,7 +453,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Chunk result" }), // chunk translation (kept)
+          createFakeResponse(createTranslationResponse("Chunk result")), // chunk translation (kept)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -464,7 +481,7 @@ describe("app", () => {
 
       // Chunk result should be kept (no final re-translation)
       const transcript = elements.get("transcript");
-      expect(transcript?.textContent).toBe("Chunk result");
+      expect(transcript?.textContent).toBe("[VI 95%]\nXin chào\n→ Chunk result");
     });
 
     it("updates timer display after 1 second", async () => {
@@ -484,7 +501,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Hello")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -530,7 +547,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Hello")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -567,7 +584,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // for stop recording
+          createFakeResponse(createTranslationResponse("Hello")), // for stop recording
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -617,7 +634,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // for stop recording
+          createFakeResponse(createTranslationResponse("Hello")), // for stop recording
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -659,7 +676,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Hello")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -702,7 +719,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Auto-stopped translation" }),
+          createFakeResponse(createTranslationResponse("Auto-stopped translation")),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -739,7 +756,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Manual stop translation" }),
+          createFakeResponse(createTranslationResponse("Manual stop translation")),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -773,7 +790,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Translation" }),
+          createFakeResponse(createTranslationResponse("Translation")),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -807,7 +824,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Some text" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Some text")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -877,7 +894,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // for stop recording
+          createFakeResponse(createTranslationResponse("Hello")), // for stop recording
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -942,7 +959,7 @@ describe("app", () => {
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeErrorResponse(401, "Invalid token"), // chunk translation error
-          createFakeResponse({ text: "Final transcript" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Final transcript")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -987,8 +1004,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Chunk text" }), // chunk translation
-          createFakeResponse({ text: "Final text" }), // final translation
+          createFakeResponse(createTranslationResponse("Chunk text")), // chunk translation
+          createFakeResponse(createTranslationResponse("Final text")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1037,7 +1054,7 @@ describe("app", () => {
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeErrorResponse(500, "Server error"), // chunk translation error
-          createFakeResponse({ text: "Final text" }), // final translation
+          createFakeResponse(createTranslationResponse("Final text")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1086,7 +1103,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Final text" }), // final translation (after muxer reset)
+          createFakeResponse(createTranslationResponse("Final text")), // final translation (after muxer reset)
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
         webmMuxerConfig: {
@@ -1117,7 +1134,7 @@ describe("app", () => {
 
       // Reset hooks without error to allow final translation
       fakes = createFakeHooks({
-        fetchResponses: [createFakeResponse({ text: "Final text" })],
+        fetchResponses: [createFakeResponse(createTranslationResponse("Final text"))],
         elements,
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1139,7 +1156,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Final text" }), // final translation only
+          createFakeResponse(createTranslationResponse("Final text")), // final translation only
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1190,8 +1207,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Chunk 2 text" }), // chunk 2 raw translation (no fixWebmBlob)
-          createFakeResponse({ text: "Final" }), // final translation
+          createFakeResponse(createTranslationResponse("Chunk 2 text")), // chunk 2 raw translation (no fixWebmBlob)
+          createFakeResponse(createTranslationResponse("Final")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1248,8 +1265,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "First successful chunk" }), // chunk 2 is first success
-          createFakeResponse({ text: "Final" }), // final translation
+          createFakeResponse(createTranslationResponse("First successful chunk")), // chunk 2 is first success
+          createFakeResponse(createTranslationResponse("Final")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1287,7 +1304,7 @@ describe("app", () => {
 
       // Should have created a new transcript entry
       expect(appAny.transcripts.length).toBe(1);
-      expect(appAny.transcripts[0]).toBe("First successful chunk");
+      expect(appAny.transcripts[0]).toBe("[VI 95%]\nXin chào\n→ First successful chunk");
       expect(appAny.currentSessionIndex).toBe(0);
 
       // Stop recording
@@ -1306,8 +1323,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Appended text" }), // will be appended
-          createFakeResponse({ text: "Final" }), // final translation
+          createFakeResponse(createTranslationResponse("Appended text")), // will be appended
+          createFakeResponse(createTranslationResponse("Final")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1360,7 +1377,7 @@ describe("app", () => {
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
           createFakeResponse({ status: 500, ok: false }), // chunk 2 translation fails
-          createFakeResponse({ text: "Full recording translation" }), // fallback full blob translation
+          createFakeResponse(createTranslationResponse("Full recording translation")), // fallback full blob translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1410,7 +1427,7 @@ describe("app", () => {
       await app.handleRecordClick();
 
       // Full blob translation replaces the partial transcript
-      expect(elements.get("transcript")?.textContent).toBe("Full recording translation");
+      expect(elements.get("transcript")?.textContent).toBe("[VI 95%]\nXin chào\n→ Full recording translation");
 
       globalThis.AudioContext = savedAudioContext;
     });
@@ -1424,7 +1441,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Chunk text" }),
+          createFakeResponse(createTranslationResponse("Chunk text")),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1463,7 +1480,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ status: 500, ok: false }),
+          createFakeErrorResponse(500),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1500,7 +1517,7 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "New text" }),
+          createFakeResponse(createTranslationResponse("New text")),
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1540,9 +1557,9 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "First chunk" }), // first chunk
-          createFakeResponse({ text: "Second chunk" }), // second chunk
-          createFakeResponse({ text: "Final" }), // final translation
+          createFakeResponse(createTranslationResponse("First chunk")), // first chunk
+          createFakeResponse(createTranslationResponse("Second chunk")), // second chunk
+          createFakeResponse(createTranslationResponse("Final")), // final translation
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });
@@ -1623,8 +1640,8 @@ describe("app", () => {
       setupHooks({
         fetchResponses: [
           createFakeResponse({ API_BASE_URL: "https://api.test.com" }),
-          createFakeResponse({ text: "Hello" }), // chunk translation
-          createFakeResponse({ text: "Hello final" }), // final translation on stop
+          createFakeResponse(createTranslationResponse("Hello")), // chunk translation
+          createFakeResponse(createTranslationResponse("Hello final")), // final translation on stop
         ],
         initialStorage: new Map([["grandma_token", "token"]]),
       });

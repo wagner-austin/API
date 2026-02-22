@@ -83,6 +83,9 @@ export function requireAppConfig(value: unknown): AppConfig {
  */
 export interface TranslateResponse {
   readonly text: string;
+  readonly detected_language: string;
+  readonly source_text: string;
+  readonly confidence: number;
 }
 
 /**
@@ -97,6 +100,9 @@ export interface TranslateResponse {
 export function encodeTranslateResponse(response: TranslateResponse): Record<string, unknown> {
   return {
     text: response.text,
+    detected_language: response.detected_language,
+    source_text: response.source_text,
+    confidence: response.confidence,
   };
 }
 
@@ -115,10 +121,27 @@ export function decodeTranslateResponse(value: unknown): TranslateResponse | nul
   }
   const obj = value as Record<string, unknown>;
   const text = obj["text"];
+  const detectedLanguage = obj["detected_language"];
+  const sourceText = obj["source_text"];
+  const confidence = obj["confidence"];
   if (typeof text !== "string") {
     return null;
   }
-  return { text };
+  if (typeof detectedLanguage !== "string") {
+    return null;
+  }
+  if (typeof sourceText !== "string") {
+    return null;
+  }
+  if (typeof confidence !== "number") {
+    return null;
+  }
+  return {
+    text,
+    detected_language: detectedLanguage,
+    source_text: sourceText,
+    confidence,
+  };
 }
 
 /**
@@ -268,6 +291,9 @@ export type AppEventType =
  */
 export interface TranslationCompleteDetail {
   readonly text: string;
+  readonly detected_language: string;
+  readonly source_text: string;
+  readonly confidence: number;
 }
 
 /**

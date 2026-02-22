@@ -1,7 +1,24 @@
-import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { setHooks, resetHooks } from "../../src/_test_hooks.js";
 import { createFakeHooks, createFakeResponse, createFakeErrorResponse } from "../../src/testing.js";
 import { translateAudio } from "../../src/api.js";
+
+/**
+ * Create a full translation response for testing.
+ */
+function createFullResponse(
+  text: string,
+  detectedLanguage: string = "vi",
+  sourceText: string = "Xin chào",
+  confidence: number = 0.95
+): Record<string, unknown> {
+  return {
+    text,
+    detected_language: detectedLanguage,
+    source_text: sourceText,
+    confidence,
+  };
+}
 
 describe("api", () => {
   afterEach(() => {
@@ -9,16 +26,19 @@ describe("api", () => {
   });
 
   describe("translateAudio", () => {
-    it("sends audio and returns translated text", async () => {
+    it("sends audio and returns full translation response", async () => {
       const { hooks, getFetchCalls } = createFakeHooks({
-        fetchResponses: [createFakeResponse({ text: "Hello grandmother" })],
+        fetchResponses: [createFakeResponse(createFullResponse("Hello grandmother"))],
       });
       setHooks(hooks);
 
       const blob = new Blob(["audio"], { type: "audio/webm" });
       const result = await translateAudio("https://api.example.com", "token123", blob);
 
-      expect(result).toBe("Hello grandmother");
+      expect(result.text).toBe("Hello grandmother");
+      expect(result.detected_language).toBe("vi");
+      expect(result.source_text).toBe("Xin chào");
+      expect(result.confidence).toBe(0.95);
       expect(getFetchCalls()).toHaveLength(1);
 
       const call = getFetchCalls()[0];
@@ -126,22 +146,26 @@ describe("api", () => {
 
       try {
         // Create a fetch that never resolves, simulating a slow network
-        let abortSignal: AbortSignal | undefined;
-        const neverResolvingFetch = vi.fn(
-          (_url: string, init?: RequestInit) =>
-            new Promise<Response>((_resolve, reject) => {
-              abortSignal = init?.signal;
-              // When abort is called, reject with AbortError
-              if (abortSignal) {
-                abortSignal.addEventListener("abort", () => {
-                  const abortError = new Error("The operation was aborted");
-                  abortError.name = "AbortError";
-                  reject(abortError);
-                });
-              }
-            })
-        );
-        setHooks({ fetch: neverResolvingFetch });
+        let abortSignal: AbortSignal | null | undefined;
+        const { hooks } = createFakeHooks();
+        // Override the default fetch with one that never resolves
+        const originalHooks = { ...hooks };
+        originalHooks.fetch = (
+          _url: string | URL,
+          init?: RequestInit
+        ): Promise<Response> =>
+          new Promise<Response>((_resolve, reject) => {
+            abortSignal = init?.signal;
+            // When abort is called, reject with AbortError
+            if (abortSignal) {
+              abortSignal.addEventListener("abort", () => {
+                const abortError = new Error("The operation was aborted");
+                abortError.name = "AbortError";
+                reject(abortError);
+              });
+            }
+          });
+        setHooks(originalHooks);
 
         const blob = new Blob(["audio"], { type: "audio/webm" });
 

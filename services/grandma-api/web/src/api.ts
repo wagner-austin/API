@@ -7,7 +7,11 @@
 
 import { getFetch } from "./_test_hooks.js";
 import { createLogger } from "./logger.js";
-import { requireTranslateResponse, decodeErrorResponse } from "./types.js";
+import {
+  TranslateResponse,
+  requireTranslateResponse,
+  decodeErrorResponse,
+} from "./types.js";
 
 const log = createLogger("api");
 
@@ -17,7 +21,8 @@ const TRANSLATE_TIMEOUT_MS = 30000;
 /**
  * Send audio to the translation API.
  *
- * Uploads audio data to the /translate endpoint and returns the translated text.
+ * Uploads audio data to the /translate endpoint and returns the translation result
+ * including detected language, source text, confidence, and English translation.
  * Uses the fetch hook from _test_hooks for testability.
  *
  * Args:
@@ -26,17 +31,18 @@ const TRANSLATE_TIMEOUT_MS = 30000;
  *   audioBlob: Audio data as Blob
  *
  * Returns:
- *   Promise resolving to translated text string
+ *   Promise resolving to TranslateResponse with text, detected_language,
+ *   source_text, and confidence
  *
  * Raises:
  *   Error if request fails with HTTP error
- *   Error if response is invalid or missing text field
+ *   Error if response is invalid or missing required fields
  */
 export async function translateAudio(
   baseUrl: string,
   token: string,
   audioBlob: Blob
-): Promise<string> {
+): Promise<TranslateResponse> {
   const fetch = getFetch();
 
   const formData = new FormData();
@@ -88,5 +94,5 @@ export async function translateAudio(
   log.info("Translation response:", data);
   const response = requireTranslateResponse(data);
 
-  return response.text;
+  return response;
 }
