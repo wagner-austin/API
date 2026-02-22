@@ -15,35 +15,67 @@ from grandma_api.types import (
 
 def test_encode_translation_response() -> None:
     """Test encoding TranslationResponse to JSON."""
-    result = TranslationResponse(text="Hello from grandmother")
+    result = TranslationResponse(
+        text="Hello from grandmother",
+        detected_language="vi",
+        source_text="Xin chào",
+        confidence=0.95,
+    )
     encoded = encode_translation_response(result)
-    assert encoded == {"text": "Hello from grandmother"}
+    assert encoded == {
+        "text": "Hello from grandmother",
+        "detected_language": "vi",
+        "source_text": "Xin chào",
+        "confidence": 0.95,
+    }
 
 
 def test_decode_translation_response() -> None:
     """Test decoding JSON to TranslationResponse."""
-    obj: JSONObject = {"text": "Hello from grandmother"}
+    obj: JSONObject = {
+        "text": "Hello from grandmother",
+        "detected_language": "vi",
+        "source_text": "Xin chào",
+        "confidence": 0.95,
+    }
     decoded = decode_translation_response(obj)
     assert decoded["text"] == "Hello from grandmother"
+    assert decoded["detected_language"] == "vi"
+    assert decoded["source_text"] == "Xin chào"
+    assert decoded["confidence"] == 0.95
 
 
 def test_decode_translation_response_missing_text() -> None:
     """Test decode raises when text field is missing."""
-    obj: JSONObject = {"other": "value"}
+    obj: JSONObject = {
+        "detected_language": "vi",
+        "source_text": "Xin chào",
+        "confidence": 0.95,
+    }
     with pytest.raises(JSONTypeError, match="Missing required field 'text'"):
         decode_translation_response(obj)
 
 
 def test_decode_translation_response_wrong_type() -> None:
     """Test decode raises when text field has wrong type."""
-    obj: JSONObject = {"text": 123}
+    obj: JSONObject = {
+        "text": 123,
+        "detected_language": "vi",
+        "source_text": "Xin chào",
+        "confidence": 0.95,
+    }
     with pytest.raises(JSONTypeError, match="Field 'text' must be a string"):
         decode_translation_response(obj)
 
 
 def test_require_translation_response() -> None:
     """Test require_translation_response with valid dict."""
-    obj: JSONValue = {"text": "Hello"}
+    obj: JSONValue = {
+        "text": "Hello",
+        "detected_language": "en",
+        "source_text": "Hello",
+        "confidence": 1.0,
+    }
     result = require_translation_response(obj)
     assert result["text"] == "Hello"
 

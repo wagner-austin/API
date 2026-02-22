@@ -22,6 +22,8 @@ python-multipart = "^0.0.18"
 typing-extensions = "^4.12.2"
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-stt = { path = "../../libs/platform_stt", develop = true }
+platform-langid = { path = "../../libs/platform_langid", develop = true }
+platform-translate = { path = "../../libs/platform_translate", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

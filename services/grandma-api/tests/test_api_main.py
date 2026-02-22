@@ -35,7 +35,7 @@ def test_create_app_with_settings() -> None:
     set_fake_env({"OPENAI_API_KEY": "sk-test", "API_TOKEN": "token"})
 
     settings = _make_test_settings()
-    container, _ = make_test_container(settings)
+    container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)
 
     assert app.title == "Grandma API"
@@ -61,7 +61,7 @@ def test_create_app_has_healthz_route() -> None:
     set_fake_env({"OPENAI_API_KEY": "sk-test", "API_TOKEN": "token"})
 
     settings = _make_test_settings()
-    container, _ = make_test_container(settings)
+    container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)
     client = TestClient(app)
 
@@ -75,7 +75,7 @@ def test_create_app_has_translate_route() -> None:
     set_fake_env({"OPENAI_API_KEY": "sk-test", "API_TOKEN": "token"})
 
     settings = _make_test_settings()
-    container, _ = make_test_container(settings)
+    container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)
     client = TestClient(app)
 
@@ -95,7 +95,7 @@ def test_create_app_with_text_format() -> None:
         log_level="DEBUG",
         log_format="text",
     )
-    container, _ = make_test_container(settings)
+    container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)
 
     # Verify app was created with expected metadata
@@ -108,7 +108,7 @@ def test_create_app_exposes_container() -> None:
     set_fake_env({"OPENAI_API_KEY": "sk-test", "API_TOKEN": "token"})
 
     settings = _make_test_settings()
-    container, _ = make_test_container(settings)
+    container, _, _, _ = make_test_container(settings)
     app = create_app(settings, container=container)
 
     state: _AppStateProto = app.state
