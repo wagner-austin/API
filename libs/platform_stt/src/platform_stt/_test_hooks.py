@@ -243,6 +243,27 @@ class LangIdDownloadProtocol(Protocol):
 
 
 # =============================================================================
+# File I/O Protocols
+# =============================================================================
+
+
+class WriteTextFileProtocol(Protocol):
+    """Protocol for writing text to a file."""
+
+    def __call__(self, path: Path, content: str) -> None:
+        """Write text content to file path.
+
+        Args:
+            path: Destination file path.
+            content: Text content to write.
+
+        Raises:
+            OSError: If file cannot be written.
+        """
+        ...
+
+
+# =============================================================================
 # Default Implementations
 # =============================================================================
 
@@ -430,6 +451,19 @@ def _default_langid_get_fasttext_factory() -> LangIdModelFactoryProtocol:
     return factory
 
 
+def _default_write_text_file(path: Path, content: str) -> None:
+    """Production implementation - writes text to file with UTF-8 encoding.
+
+    Args:
+        path: Destination file path.
+        content: Text content to write.
+
+    Raises:
+        OSError: If file cannot be written.
+    """
+    path.write_text(content, encoding="utf-8")
+
+
 # =============================================================================
 # Module-level Hooks
 # =============================================================================
@@ -469,6 +503,9 @@ langid_get_fasttext_factory: Callable[[], LangIdModelFactoryProtocol] = (
     _default_langid_get_fasttext_factory
 )
 
+# Hook for writing text files
+write_text_file: WriteTextFileProtocol = _default_write_text_file
+
 
 __all__ = [
     "AudioChunkerFactoryProtocol",
@@ -482,6 +519,7 @@ __all__ = [
     "SubprocessRunProtocol",
     "SubprocessRunResult",
     "TranscribeFnProtocol",
+    "WriteTextFileProtocol",
     "_default_audio_chunker_factory",
     "_default_ffmpeg_available",
     "_default_langid_download",
@@ -493,6 +531,7 @@ __all__ = [
     "_default_os_remove",
     "_default_os_stat",
     "_default_subprocess_run",
+    "_default_write_text_file",
     "audio_chunker_factory",
     "ffmpeg_available",
     "langid_download",
@@ -504,4 +543,5 @@ __all__ = [
     "os_remove",
     "os_stat",
     "subprocess_run",
+    "write_text_file",
 ]

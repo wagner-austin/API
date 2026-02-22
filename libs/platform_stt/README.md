@@ -12,24 +12,35 @@ platform-stt = { path = "../libs/platform_stt", develop = true }
 ## Quick Start
 
 ```python
-from platform_stt import OpenAISttClient, AudioChunker, TranscriptMerger
+from pathlib import Path
+from platform_stt import OpenAISttClient, format_srt, write_srt
 
-# Simple transcription
+# Transcribe audio and generate SRT subtitles
 client = OpenAISttClient(api_key="...")
 with open("audio.mp3", "rb") as f:
-    result = client.transcribe(file=f, language="vi")
+    result = client.transcribe(file=f, language="en")
+
+# Generate SRT file
+srt_content = format_srt(result["segments"])
+write_srt(srt_content, Path("subtitles.srt"))
 
 # Translation to English
 with open("audio.mp3", "rb") as f:
     result = client.translate(file=f)
+```
 
-# Chunk large audio files
+### Additional Features
+
+```python
+from platform_stt import AudioChunker, TranscriptMerger
+
+# Chunk large audio files (for files > 25MB)
 chunker = AudioChunker()
-chunks = chunker.chunk_audio("large_file.mp3")
+chunks = chunker.chunk_audio("large_file.mp3", total_duration=3600.0, estimated_mb=100.0)
 
 # Merge transcripts from chunks
 merger = TranscriptMerger()
-merged = merger.merge(segments_list)
+merged = merger.merge(segments_list, chunk_start_times)
 ```
 
 ## OpenAI Whisper Client
@@ -186,6 +197,70 @@ verbose: VerboseResponse = to_verbose_response(sdk_response)
 segments: list[TranscriptSegment] = convert_verbose_to_segments(verbose)
 ```
 
+## SRT Subtitle Generation
+
+Generate SRT subtitle files from Whisper transcription segments.
+
+```python
+from pathlib import Path
+from platform_stt import OpenAISttClient, format_srt, write_srt
+
+# Transcribe audio
+client = OpenAISttClient(api_key="...")
+with open("video_audio.mp3", "rb") as f:
+    response = client.transcribe(file=f, language="en")
+
+# Generate SRT content
+srt_content = format_srt(response["segments"])
+
+# Write to file
+write_srt(srt_content, Path("subtitles.srt"))
+```
+
+### SRT Output Format
+
+```
+1
+00:00:00,000 --> 00:00:04,000
+First sentence of your video.
+
+2
+00:00:04,500 --> 00:00:08,000
+Second sentence here.
+```
+
+### SRT Functions
+
+| Function | Description |
+|----------|-------------|
+| `format_srt(segments)` | Convert `VerboseSegment[]` to full SRT string |
+| `format_srt_entry(entry)` | Format single `SrtEntry` block |
+| `format_timestamp(seconds)` | Convert seconds to `HH:MM:SS,mmm` |
+| `write_srt(content, path)` | Write SRT content to file |
+| `segments_to_srt_entries(segments)` | Convert segments to `SrtEntry[]` |
+
+### SrtEntry TypedDict
+
+```python
+from platform_stt import (
+    SrtEntry,
+    encode_srt_entry,
+    decode_srt_entry,
+    require_srt_entry,
+)
+
+entry = SrtEntry(
+    index=1,
+    start_seconds=0.0,
+    end_seconds=2.5,
+    text="Hello world",
+)
+
+# Encode/decode for JSON serialization
+encoded = encode_srt_entry(entry)
+decoded = decode_srt_entry(encoded)
+```
+
 ## Type Definitions
 
 All types use TypedDict with strict typing. No `Any` types allowed.
@@ -200,6 +275,7 @@ All types use TypedDict with strict typing. No `Any` types allowed.
 | `AudioChunk` | Chunk with path, start, duration, size |
 | `ChunkerConfig` | Chunker configuration |
 | `LanguageDetectionResult` | Language, confidence, script |
+| `SrtEntry` | SRT subtitle entry with index, timestamps, text |
 
 ### Encode/Decode Functions
 
@@ -257,6 +333,7 @@ from platform_stt.testing import (
     FakeSTTClient,
     FakeSubprocessResult,
     FakeSubprocessRun,
+    FakeWriteTextFile,
     make_fake_audio_chunker_factory,
     make_fake_langid_model_factory,
     make_fake_subprocess_run,

@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import BinaryIO
 
 import numpy as np
@@ -246,6 +247,33 @@ class FakeSubprocessRun:
 
 
 # =============================================================================
+# Fake File Writer
+# =============================================================================
+
+
+class FakeWriteTextFile:
+    """Fake file writer for testing.
+
+    Records all write operations instead of writing to disk.
+    """
+
+    __slots__ = ("writes",)
+
+    def __init__(self) -> None:
+        """Initialize fake writer with empty writes list."""
+        self.writes: list[tuple[Path, str]] = []
+
+    def __call__(self, path: Path, content: str) -> None:
+        """Record write operation.
+
+        Args:
+            path: Destination file path.
+            content: Content that would be written.
+        """
+        self.writes.append((path, content))
+
+
+# =============================================================================
 # Hook Management
 # =============================================================================
 
@@ -263,6 +291,7 @@ def set_production_hooks() -> None:
     _test_hooks.langid_download = _test_hooks._default_langid_download
     _test_hooks.langid_ensure_model_path = _test_hooks._default_langid_ensure_model_path
     _test_hooks.langid_get_fasttext_factory = _test_hooks._default_langid_get_fasttext_factory
+    _test_hooks.write_text_file = _test_hooks._default_write_text_file
 
 
 def reset_hooks() -> None:
@@ -339,6 +368,7 @@ __all__ = [
     "FakeSTTClient",
     "FakeSubprocessResult",
     "FakeSubprocessRun",
+    "FakeWriteTextFile",
     "make_fake_audio_chunker_factory",
     "make_fake_langid_model_factory",
     "make_fake_subprocess_run",
