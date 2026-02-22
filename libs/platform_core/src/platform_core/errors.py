@@ -191,6 +191,33 @@ class CalendarErrorCode(ErrorCodeBase):
     COMPETITIONS_FILE_ERROR = "COMPETITIONS_FILE_ERROR"
 
 
+class EmailErrorCode(ErrorCodeBase):
+    """Domain-specific email service error codes.
+
+    Generic errors (unauthorized, timeout, etc.) use centralized ErrorCode.
+    """
+
+    # Authentication errors
+    CREDENTIALS_NOT_FOUND = "CREDENTIALS_NOT_FOUND"
+    TOKEN_EXPIRED = "TOKEN_EXPIRED"
+    AUTH_FAILED = "AUTH_FAILED"
+
+    # API errors
+    EMAIL_API_ERROR = "EMAIL_API_ERROR"
+    EMAIL_NOT_FOUND = "EMAIL_NOT_FOUND"
+    FOLDER_NOT_FOUND = "FOLDER_NOT_FOUND"
+    DRAFT_NOT_FOUND = "DRAFT_NOT_FOUND"
+
+    # Send errors
+    SEND_FAILED = "SEND_FAILED"
+    INVALID_RECIPIENT = "INVALID_RECIPIENT"
+    ATTACHMENT_TOO_LARGE = "ATTACHMENT_TOO_LARGE"
+
+    # Provider errors
+    PROVIDER_NOT_CONFIGURED = "PROVIDER_NOT_CONFIGURED"
+    PROVIDER_ERROR = "PROVIDER_ERROR"
+
+
 ErrorCodeType = TypeVar("ErrorCodeType", bound=ErrorCodeBase)
 
 
@@ -519,6 +546,7 @@ def model_trainer_status_for(code: ModelTrainerErrorCode) -> int:
 __all__ = [
     "AppError",
     "CalendarErrorCode",
+    "EmailErrorCode",
     "ErrorCode",
     "ErrorCodeBase",
     "HandwritingErrorCode",
