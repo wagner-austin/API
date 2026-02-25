@@ -139,6 +139,7 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     tok_handle = BPEBackend().load(str(tok_dir / "tokenizer.json"))
     prepared = prepare_gpt2_with_handle(tok_handle, cfg)

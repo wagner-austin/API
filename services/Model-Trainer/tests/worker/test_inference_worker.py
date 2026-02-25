@@ -181,6 +181,9 @@ class _FakeLMModel:
     def save_pretrained(self, out_dir: str) -> None:
         pass
 
+    def gradient_checkpointing_enable(self) -> None:
+        return None
+
 
 class _FakeEncoder:
     """Fake encoder that satisfies Encoder protocol."""
