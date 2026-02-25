@@ -84,6 +84,7 @@ def test_training_orchestrator_rejects_empty_corpus_file_id(tmp_path: Path) -> N
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(AppError) as ei2:
         _ = orch.enqueue_training(req)
