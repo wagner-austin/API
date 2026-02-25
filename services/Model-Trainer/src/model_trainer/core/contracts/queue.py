@@ -5,6 +5,7 @@ from typing import Literal
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.model import (
+    GgufExportConfig,
     LoraConfig,
     QuantizationConfig,
     UnslothConfig,
@@ -55,6 +56,7 @@ class TrainRequestPayload(TypedDict):
     lora: LoraConfig | None
     quantization: QuantizationConfig | None
     unsloth: UnslothConfig | None
+    gguf_export: GgufExportConfig | None
 
 
 class TrainJobPayload(TypedDict):
