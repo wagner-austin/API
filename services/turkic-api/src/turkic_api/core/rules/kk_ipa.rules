@@ -6,15 +6,11 @@
 #
 # Simplified: no diphthongs, no dental diacritics, no optional allophones.
 
-$V = [ɑ æ e ə ɪ ɵ ʏ o ʊ];          # vowel macro
-
-# ---------------------------------------------------------------------------
-# Context-sensitive glide for <У>
-# After a vowel it is the glide [w]; elsewhere phonemic /u/.
-$V } У > w ;  $V } у > w ;
-
 # ---------------------------------------------------------------------------
 # One-to-one grapheme → phone map (no diphthongs, no dental marks)
+#
+# Note: У/у is always [w] in Kazakh per McCollum & Chen (2021)
+# Consonant inventory: w — уақ /wɑq/ 'time' — тау /tɑw/ 'mountain'
 А > ɑ ;  а > ɑ ;
 Ә > æ ;  ә > æ ;
 Б > b ;  б > b ;
@@ -40,7 +36,7 @@ $V } У > w ;  $V } у > w ;
 Р > r ;  р > r ;
 С > s ;  с > s ;
 Т > t ;  т > t ;
-У > u ;  у > u ;
+У > w ;  у > w ;
 Ұ > ʊ ;  ұ > ʊ ;
 Ү > ʏ ;  ү > ʏ ;
 Ф > f ;  ф > f ;
