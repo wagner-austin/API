@@ -240,6 +240,10 @@ class CharLSTMModel(LMModelProto):
     def save_pretrained(self: CharLSTMModel, out_dir: str) -> None:
         self._m.save_pretrained(out_dir)
 
+    def gradient_checkpointing_enable(self: CharLSTMModel) -> None:
+        """Enable gradient checkpointing (no-op for CharLSTM)."""
+        return
+
     @property
     def config(self: CharLSTMModel) -> _Config:
         return self._m.config
