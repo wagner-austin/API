@@ -1,0 +1,71 @@
+# Russian → IPA transliteration rules (ru_ipa.rules)
+#
+# Source: Yanushevskaya, I. & Bunčić, D. (2015). "Russian".
+#         Journal of the International Phonetic Association, 45(2): 221-228.
+#         DOI: https://doi.org/10.1017/S0025100314000395
+#
+# Simplified orthographic transcription for cross-language comparison.
+# No vowel reduction, no allophonic detail, consistent with Kazakh/Kyrgyz rules.
+
+# ---------------------------------------------------------------------------
+# 1. IOTATED VOWELS
+#
+# These represent [j]+vowel word-initially/after vowels, or palatalize preceding C.
+# For simplicity, we map to j+vowel sequences (phonemic level).
+
+Е > je ;  е > je ;
+Ё > jo ;  ё > jo ;
+Ю > ju ;  ю > ju ;
+Я > ja ;  я > ja ;
+
+# ---------------------------------------------------------------------------
+# 2. CONSONANTS
+#
+# Basic consonant mappings (hard/non-palatalized by default).
+
+Б > b ;  б > b ;
+В > v ;  в > v ;
+Г > ɡ ;  г > ɡ ;
+Д > d ;  д > d ;
+Ж > ʒ ;  ж > ʒ ;       # always hard, no palatalized counterpart
+З > z ;  з > z ;
+Й > j ;  й > j ;
+К > k ;  к > k ;
+Л > l ;  л > l ;
+М > m ;  м > m ;
+Н > n ;  н > n ;
+П > p ;  п > p ;
+Р > r ;  р > r ;
+С > s ;  с > s ;
+Т > t ;  т > t ;
+Ф > f ;  ф > f ;
+Х > x ;  х > x ;
+
+# Affricates and palatalized-only consonants
+Ц > t͡s ;  ц > t͡s ;     # always hard, no palatalized counterpart
+Ч > t͡ʃʲ ; ч > t͡ʃʲ ;   # always palatalized
+Ш > ʃ ;  ш > ʃ ;       # always hard, no palatalized counterpart
+Щ > ʃʲː ; щ > ʃʲː ;   # always palatalized, long
+
+# ---------------------------------------------------------------------------
+# 3. VOWELS
+
+А > a ;  а > a ;
+Э > e ;  э > e ;       # "hard" e (after hard consonants, word-initial)
+И > i ;  и > i ;
+О > o ;  о > o ;
+У > u ;  у > u ;
+Ы > ɨ ;  ы > ɨ ;       # close central unrounded vowel
+
+# ---------------------------------------------------------------------------
+# 4. SPECIAL CHARACTERS
+
+# Soft sign - palatalizes preceding consonant
+Ь > ʲ ;  ь > ʲ ;
+
+# Hard sign - silent, blocks palatalization
+Ъ >  ;  ъ >  ;
+
+# ---------------------------------------------------------------------------
+
+:: NFC ;
