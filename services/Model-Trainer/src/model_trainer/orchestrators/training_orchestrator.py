@@ -107,6 +107,7 @@ class TrainingOrchestrator:
             "lora": req["lora"],
             "quantization": req["quantization"],
             "unsloth": req["unsloth"],
+            "gguf_export": req["gguf_export"],
         }
         payload: TrainJobPayload = {
             "run_id": run_id,
