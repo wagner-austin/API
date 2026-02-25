@@ -128,6 +128,10 @@ class FakeHFModel(LMModelProto):
         p = Path(out_dir)
         p.mkdir(parents=True, exist_ok=True)
 
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
+
     @property
     def config(self) -> ConfigLike:
         """Return fake config.
@@ -240,6 +244,7 @@ def make_test_config(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
 
@@ -436,6 +441,10 @@ class FakeScoreModel(LMModelProto):
         """
         self._save_path = out_dir
 
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
+
     @property
     def config(self) -> ConfigLike:
         """Return config."""
@@ -546,6 +555,10 @@ class FakeGenerateModel(LMModelProto):
             out_dir: Output directory.
         """
         self._save_path = out_dir
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
 
     @property
     def config(self) -> ConfigLike:
@@ -664,6 +677,10 @@ class FakeEvalModel(LMModelProto):
         """
         self._save_path = out_dir
 
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
+
     @property
     def config(self) -> ConfigLike:
         """Return config."""
@@ -779,6 +796,10 @@ class FakeSinglePositionScoreModel(LMModelProto):
             out_dir: Output directory.
         """
         self._save_path = out_dir
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
 
     @property
     def config(self) -> ConfigLike:
