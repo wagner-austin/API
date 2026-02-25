@@ -108,6 +108,7 @@ def _prepare_trained_model(settings: Settings, tmp_path: Path) -> tuple[Prepared
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings["app"]["artifacts_root"]) / "tokenizers" / tok_id

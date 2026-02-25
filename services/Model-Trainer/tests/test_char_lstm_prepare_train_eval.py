@@ -82,6 +82,7 @@ def test_char_lstm_end_to_end_small(settings_with_paths: Settings, tmp_path: Pat
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
 
@@ -175,6 +176,7 @@ def test_char_lstm_invalid_size_raises(settings_with_paths: Settings, tmp_path: 
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -219,6 +221,7 @@ def test_char_lstm_freeze_embed_preserves_embedding_weights(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -336,6 +339,7 @@ def test_char_lstm_training_reduces_loss(settings_with_paths: Settings, tmp_path
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -419,6 +423,7 @@ def test_char_lstm_save_load_consistency(settings_with_paths: Settings, tmp_path
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -516,6 +521,7 @@ def test_char_lstm_forward_pass_shapes(settings_with_paths: Settings, tmp_path: 
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -570,6 +576,7 @@ def test_char_lstm_gradient_flow(settings_with_paths: Settings, tmp_path: Path) 
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -638,6 +645,7 @@ def test_char_lstm_long_input_truncation(settings_with_paths: Settings, tmp_path
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -696,6 +704,7 @@ def test_char_lstm_generation_determinism(settings_with_paths: Settings, tmp_pat
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -803,6 +812,7 @@ def test_char_lstm_continued_training_reduces_loss(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())
     tok_dir = Path(settings_with_paths["app"]["artifacts_root"]) / "tokenizers" / tok_id
@@ -870,6 +880,7 @@ def test_char_lstm_continued_training_reduces_loss(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     continued_losses: list[float] = []
@@ -999,6 +1010,7 @@ def test_char_lstm_prepare_raises_when_tokenizer_none(settings_with_paths: Setti
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer is required for char_lstm backend"):
         prepare_char_lstm_with_handle(None, cfg)
@@ -1035,6 +1047,7 @@ def test_char_lstm_prepare_raises_when_tokenizer_id_none(settings_with_paths: Se
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for char_lstm backend"):
         prepare_char_lstm_with_handle(_FakeTokHandle(), cfg)
@@ -1082,6 +1095,7 @@ def test_char_lstm_evaluate_raises_when_tokenizer_id_none(settings_with_paths: S
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for char_lstm backend"):
         evaluate_char_lstm(
