@@ -119,6 +119,7 @@ def build_cfg(req: TrainRequestPayload, corpus_path: str) -> ModelTrainConfig:
         "lora": req["lora"],
         "quantization": req["quantization"],
         "unsloth": req["unsloth"],
+        "gguf_export": req["gguf_export"],
     }
     return cfg
 

@@ -109,6 +109,7 @@ def process_eval_job(payload: EvalJobPayload) -> None:
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         }
 
         container = _test_hooks.service_container_from_settings(settings)

@@ -20,10 +20,11 @@ from platform_workers.redis import RedisStrProto, is_redis_error
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
-from model_trainer.core.contracts.model import ModelTrainConfig, TrainOutcome
+from model_trainer.core.contracts.model import GgufExportConfig, ModelTrainConfig, TrainOutcome
 from model_trainer.core.contracts.queue_encoding import decode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import model_dir
+from model_trainer.core.services.export.gguf_export import GgufExportResult, export_lora_to_gguf
 from model_trainer.worker.job_utils import (
     build_cfg,
     emit_completed_metrics,
@@ -147,6 +148,38 @@ def _upload_and_persist_pointer(
     return file_id, file_size
 
 
+def _maybe_export_to_gguf(
+    gguf_export: GgufExportConfig | None,
+    out_dir: str,
+    hub_model_id: str | None,
+) -> GgufExportResult | None:
+    """Export to GGUF format if configured.
+
+    Args:
+        gguf_export: GGUF export configuration, or None if not enabled.
+        out_dir: Output directory containing the adapter weights.
+        hub_model_id: HuggingFace model ID of the base model.
+
+    Returns:
+        GgufExportResult if export was performed, None otherwise.
+
+    Raises:
+        RuntimeError: If export is enabled but hub_model_id is None.
+    """
+    if gguf_export is None or not gguf_export["enabled"]:
+        return None
+
+    if hub_model_id is None:
+        raise RuntimeError("GGUF export requires hub_model_id to be set")
+
+    return export_lora_to_gguf(
+        adapter_dir=out_dir,
+        base_model_id=hub_model_id,
+        output_dir=out_dir,
+        output_type=gguf_export["output_type"],
+    )
+
+
 def _handle_post_save_or_cancel(
     *,
     r: RedisStrProto,
@@ -161,6 +194,7 @@ def _handle_post_save_or_cancel(
     created_at: datetime,
     progress_store: ProgressStore,
     total_epochs: int,
+    gguf_export_result: GgufExportResult | None,
 ) -> None:
     from model_trainer.core.contracts.progress import TrainingProgress
 
@@ -485,6 +519,31 @@ def _execute_training(
     )
     out_dir = str(model_dir(settings, run_id))
     _ = backend.save(prepared, out_dir)
+
+    # GGUF export phase (for LoRA strategies only)
+    gguf_export_result: GgufExportResult | None = None
+    gguf_export_cfg = cfg.get("gguf_export")
+    if gguf_export_cfg is not None and gguf_export_cfg["enabled"]:
+        _save_progress(
+            "exporting",
+            cfg["num_epochs"],
+            result["steps"],
+            result["loss"],
+            result["perplexity"],
+            0.0,
+            0.0,
+        )
+        gguf_export_result = _maybe_export_to_gguf(
+            gguf_export=gguf_export_cfg,
+            out_dir=out_dir,
+            hub_model_id=cfg.get("hub_model_id"),
+        )
+        log.info(
+            "GGUF export completed run_id=%s output_size=%d",
+            run_id,
+            gguf_export_result["output_size_bytes"] if gguf_export_result else 0,
+        )
+
     _handle_post_save_or_cancel(
         r=r,
         settings=settings,
@@ -498,6 +557,7 @@ def _execute_training(
         created_at=created_at,
         progress_store=progress_store,
         total_epochs=cfg["num_epochs"],
+        gguf_export_result=gguf_export_result,
     )
 
 
