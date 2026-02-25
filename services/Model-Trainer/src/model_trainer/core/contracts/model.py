@@ -96,6 +96,21 @@ class UnslothConfig(TypedDict):
     dtype: Literal["float16", "bfloat16"] | None  # None = auto-detect
 
 
+class GgufExportConfig(TypedDict):
+    """Configuration for GGUF export of LoRA adapters.
+
+    GGUF format enables direct compatibility with llama.cpp for efficient
+    inference. Only valid for LoRA-based fine-tuning strategies.
+
+    Attributes:
+        enabled: Whether GGUF export is enabled after training.
+        output_type: Output precision format for the GGUF file.
+    """
+
+    enabled: bool
+    output_type: Literal["f32", "f16", "bf16", "q8_0"]
+
+
 class ModelTrainConfig(TypedDict):
     """Configuration for model training.
 
@@ -135,6 +150,7 @@ class ModelTrainConfig(TypedDict):
     lora: LoraConfig | None  # Config for lora/qlora/unsloth strategies
     quantization: QuantizationConfig | None  # Config for qlora strategy
     unsloth: UnslothConfig | None  # Config for unsloth strategy
+    gguf_export: GgufExportConfig | None  # Config for GGUF export (lora strategies only)
 
 
 class TrainOutcome(TypedDict):
