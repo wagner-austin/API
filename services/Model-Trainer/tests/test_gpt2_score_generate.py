@@ -99,6 +99,9 @@ class _FakeLM(LMModelProto):
     def save_pretrained(self: _FakeLM, out_dir: str) -> None:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
 
+    def gradient_checkpointing_enable(self: _FakeLM) -> None:
+        return None
+
     @property
     def config(self: _FakeLM) -> ConfigLike:
         return _LMConfig()

@@ -88,6 +88,7 @@ def test_gpt2_prepare_from_artifact(tmp_path: Path, settings_factory: _SettingsF
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     prepared = prepare_gpt2_with_handle(tok_handle, cfg)
     assert prepared.max_seq_len == 16
@@ -146,6 +147,7 @@ def test_gpt2_backend_impl_end_to_end(tmp_path: Path, settings_factory: _Setting
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     builder = LocalTextDatasetBuilder()
@@ -242,6 +244,7 @@ def test_gpt2_prepare_raises_when_tokenizer_none() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer is required for gpt2 backend"):
         prepare_gpt2_with_handle(None, cfg)
@@ -276,6 +279,7 @@ def test_gpt2_prepare_raises_when_tokenizer_id_none() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):
         prepare_gpt2_with_handle(_FakeTokHandle(), cfg)
@@ -318,6 +322,7 @@ def test_gpt2_evaluate_raises_when_tokenizer_id_none(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     with pytest.raises(ValueError, match="tokenizer_id is required for gpt2 backend"):
         evaluate_gpt2(

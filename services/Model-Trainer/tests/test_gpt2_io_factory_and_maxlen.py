@@ -49,6 +49,9 @@ class _MockModelWithPositions:
     def save_pretrained(self: _MockModelWithPositions, out_dir: str) -> None:
         pass
 
+    def gradient_checkpointing_enable(self: _MockModelWithPositions) -> None:
+        return None
+
 
 class _MockModelNoPositions:
     """Mock model without n_positions in config."""
@@ -84,6 +87,9 @@ class _MockModelNoPositions:
 
     def save_pretrained(self: _MockModelNoPositions, out_dir: str) -> None:
         pass
+
+    def gradient_checkpointing_enable(self: _MockModelNoPositions) -> None:
+        return None
 
 
 class _MockModelNonIntPositions:
@@ -121,6 +127,9 @@ class _MockModelNonIntPositions:
     def save_pretrained(self: _MockModelNonIntPositions, out_dir: str) -> None:
         pass
 
+    def gradient_checkpointing_enable(self: _MockModelNonIntPositions) -> None:
+        return None
+
 
 class _MockModelConfigProperty:
     """Mock model with config as property."""
@@ -154,6 +163,9 @@ class _MockModelConfigProperty:
 
     def save_pretrained(self: _MockModelConfigProperty, out_dir: str) -> None:
         pass
+
+    def gradient_checkpointing_enable(self: _MockModelConfigProperty) -> None:
+        return None
 
     @property
     def config(self: _MockModelConfigProperty) -> ConfigLike:

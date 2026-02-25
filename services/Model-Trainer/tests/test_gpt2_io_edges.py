@@ -66,6 +66,9 @@ class FakeModel(LMModelProto):
         p.mkdir(parents=True, exist_ok=True)
         (p / "weights.bin").write_bytes(b"ok")
 
+    def gradient_checkpointing_enable(self: FakeModel) -> None:
+        return None
+
     @property
     def config(self: FakeModel) -> ConfigLike:
         return _FakeModelConfig()
@@ -177,6 +180,9 @@ class _FakeModel(LMModelProto):
 
     def save_pretrained(self: _FakeModel, out_dir: str) -> None:
         pass
+
+    def gradient_checkpointing_enable(self: _FakeModel) -> None:
+        return None
 
     @property
     def config(self: _FakeModel) -> ConfigLike:
