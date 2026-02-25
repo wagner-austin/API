@@ -295,6 +295,7 @@ class TestTrainRequestPayloadEncoding:
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         }
 
     def test_encode_decode_roundtrip_minimal(self) -> None:
@@ -554,6 +555,7 @@ class TestTrainJobPayloadEncoding:
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         }
 
     def _make_job_payload(self) -> TrainJobPayload:
