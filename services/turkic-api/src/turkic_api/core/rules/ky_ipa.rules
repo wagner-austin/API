@@ -7,13 +7,13 @@
 # Features: Includes long vowel representations (double letters → ː)
 # License: CC-BY 4.0 (source article)
 
-$V  = [ɑeiouøyɯ];            # vowel macro: Kyrgyz short vowels
-$VL = [ɑːeːiːoːøːuːyːɯː];    # vowel macro: Kyrgyz long vowels  ◄ NEW
+# Cyrillic vowels for context-sensitive rules (input side)
+$CV = [А а Ә ә Е е Ё ё И и О о Ө ө У у Ү ү Ы ы І і Э э Ю ю Я я];
 
 # ---------------------------------------------------------------------------
 # /je/ only after another vowel
-$V } Е > je ;
-$V } е > je ;
+$CV } Е > je ;
+$CV } е > je ;
 
 # ---------------------------------------------------------------------------
 # digraph affricates (loans)
@@ -29,6 +29,13 @@ $V } е > je ;
 УУ > uː ; уу > uː ;
 ҮҮ > yː ; үү > yː ;
 ЫЫ > ɯː ; ыы > ɯː ;
+
+# ---------------------------------------------------------------------------
+# /w/ after vowels (glide), /u/ elsewhere (vowel)
+# Per McCollum (2020): Kyrgyz has both /u/ vowel and /w/ glide
+# MUST come before У > u to take precedence
+$CV } У > w ;
+$CV } у > w ;
 
 # ---------------------------------------------------------------------------
 # One-to-one grapheme → phone map
@@ -71,11 +78,6 @@ $V } е > je ;
 Ю > ju ; ю > ju ;
 Я > ja ; я > ja ;
 Ў > w ;  ў > w ;
-
-# ---------------------------------------------------------------------------
-# /w/ between vowels
-$V } У > w ;
-$V } у > w ;
 
 # ---------------------------------------------------------------------------
 # ADDITIONS 2025-12-02: Missing chars found in OSCAR corpus audit
