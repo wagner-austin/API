@@ -975,6 +975,7 @@ class BaseTrainer:
             "timing": timing,
             "performance": performance,
             "model_info": model_info,
+            "gguf_export": None,
         }
 
         cfg_block: TrainingManifestConfig = {
@@ -1033,6 +1034,7 @@ class BaseTrainer:
             "timing": manifest["timing"],
             "performance": manifest["performance"],
             "model_info": manifest["model_info"],
+            "gguf_export": manifest["gguf_export"],
         }
 
         Path(out_dir).joinpath("manifest.json").write_text(dump_json_str(full), encoding="utf-8")
