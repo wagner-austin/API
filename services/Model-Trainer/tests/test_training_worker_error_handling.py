@@ -101,6 +101,7 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
     corpus_root = tmp_path / "corpus"
@@ -191,6 +192,7 @@ def test_process_train_job_logs_redis_error_on_handle_error(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
     corpus_root = tmp_path / "corpus"

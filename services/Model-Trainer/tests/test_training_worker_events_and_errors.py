@@ -96,6 +96,7 @@ def test_emit_metrics_helpers_publish() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     # Does not raise - metrics events (no failed event - handled by job_events)
     job_utils.emit_config_event(r, run_id, 123, cfg, threads=2)
@@ -152,6 +153,7 @@ def test_process_train_job_sets_status_message_on_exception(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
     corpus_root = tmp_path / "corpus"
