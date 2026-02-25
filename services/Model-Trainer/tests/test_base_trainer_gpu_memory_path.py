@@ -124,6 +124,7 @@ def test_gpu_memory_mb_calculation_path(tmp_path: Path, settings_factory: _Setti
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     backend = create_char_lstm_backend(LocalTextDatasetBuilder())

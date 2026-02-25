@@ -56,6 +56,9 @@ class _FakeLM(LMModelProto):
     def save_pretrained(self: _FakeLM, out_dir: str) -> None:
         pass
 
+    def gradient_checkpointing_enable(self: _FakeLM) -> None:
+        return None
+
     @property
     def config(self: _FakeLM) -> ConfigLike:
         class _C(ConfigLike):
@@ -133,6 +136,7 @@ def test_unavailable_backend_all_methods_raise() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     s = load_settings()
 

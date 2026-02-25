@@ -139,6 +139,7 @@ def test_build_cfg_resolves_auto_and_adjusts_batch_size() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     cfg = build_cfg(req, corpus_path="/tmp/corpus")
     assert cfg["device"] == "cuda"
@@ -182,6 +183,7 @@ def test_build_cfg_auto_cpu_keeps_batch_size() -> None:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
     cfg = build_cfg(req, corpus_path="/tmp/corpus")
     assert cfg["device"] == "cpu"
