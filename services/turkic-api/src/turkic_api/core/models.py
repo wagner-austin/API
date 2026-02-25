@@ -5,7 +5,7 @@ from typing import Literal, TypeGuard
 from typing_extensions import TypedDict
 
 Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en"]
+Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"]
 
 
 class ProcessSpec(TypedDict):
@@ -21,4 +21,4 @@ def is_source(value: str) -> TypeGuard[Source]:
 
 
 def is_language(value: str) -> TypeGuard[Language]:
-    return value in ("kk", "ky", "uz", "tr", "ug", "fi", "az", "en")
+    return value in ("kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru")

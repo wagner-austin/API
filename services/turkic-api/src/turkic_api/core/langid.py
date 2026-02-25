@@ -66,6 +66,8 @@ def _parse_label(raw: str) -> tuple[str, str | None]:
         # ISO 639-3 to 639-1 for common languages
         "eng": "en",
         "en": "en",
+        "rus": "ru",
+        "ru": "ru",
     }
     return mapping.get(lang_part, lang_part), script
 
