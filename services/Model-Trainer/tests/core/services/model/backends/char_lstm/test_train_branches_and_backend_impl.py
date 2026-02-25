@@ -69,6 +69,9 @@ class _LM(LMModelProto):
     def save_pretrained(self: _LM, out_dir: str) -> None:
         Path(out_dir).mkdir(parents=True, exist_ok=True)
 
+    def gradient_checkpointing_enable(self: _LM) -> None:
+        return None
+
     @property
     def config(self: _LM) -> ConfigLike:
         class _C(ConfigLike):
@@ -134,6 +137,7 @@ def _make_cfg() -> ModelTrainConfig:
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
 
@@ -359,6 +363,7 @@ def test_train_prepared_calls_save_when_not_cancelled(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     train_prepared_char_lstm(
@@ -441,6 +446,7 @@ def test_train_prepared_skips_save_when_cancelled(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     train_prepared_char_lstm(

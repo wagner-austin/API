@@ -80,6 +80,7 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     )
     prep_med = prepare_char_lstm_with_handle(
@@ -111,6 +112,7 @@ def test_prepare_small_and_medium_and_wrapper_from_pretrained(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     )
     # Save one and load via wrapper to cover wrapper.from_pretrained and .config
