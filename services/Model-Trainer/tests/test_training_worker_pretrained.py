@@ -101,6 +101,9 @@ class _FakeLMModel(LMModelProto):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         (Path(out_dir) / "weights.bin").write_bytes(b"\x00fake")
 
+    def gradient_checkpointing_enable(self: _FakeLMModel) -> None:
+        return None
+
     @property
     def config(self: _FakeLMModel) -> ConfigLike:
         return self._config
@@ -486,6 +489,7 @@ def test_training_worker_loads_pretrained_model(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
 
@@ -700,6 +704,7 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
             ),
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
 
