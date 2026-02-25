@@ -63,6 +63,7 @@ services:
       - ./runs:/data/runs
       - ./logs:/data/logs
       - hf-cache:/hf-cache
+      - ${LLAMA_CPP_PATH:?Set LLAMA_CPP_PATH in .env}:/opt/llama.cpp:ro
     restart: unless-stopped
     networks:
       - platform-network
