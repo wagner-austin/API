@@ -63,6 +63,7 @@ def make_test_config(lora: LoraConfig | None = None) -> ModelTrainConfig:
         "lora": lora,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
 

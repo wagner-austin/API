@@ -81,6 +81,7 @@ def make_test_config(
         "lora": lora,
         "quantization": quantization,
         "unsloth": None,
+        "gguf_export": None,
     }
 
 

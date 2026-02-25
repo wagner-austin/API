@@ -121,6 +121,10 @@ class FakeModel(LMModelProto):
         p = Path(out_dir)
         p.mkdir(parents=True, exist_ok=True)
 
+    def gradient_checkpointing_enable(self) -> None:
+        """Enable gradient checkpointing (no-op for fake)."""
+        return
+
     @property
     def config(self) -> ConfigLike:
         """Return fake config.
