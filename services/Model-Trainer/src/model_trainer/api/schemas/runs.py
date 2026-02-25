@@ -62,6 +62,21 @@ class UnslothConfigRequest(TypedDict, total=True):
     dtype: Literal["float16", "bfloat16"] | None
 
 
+class GgufExportConfigRequest(TypedDict, total=True):
+    """API request schema for GGUF export configuration.
+
+    Maps to core GgufExportConfig TypedDict. GGUF export is only valid
+    for LoRA-based fine-tuning strategies (lora, qlora, unsloth).
+
+    Attributes:
+        enabled: Whether GGUF export is enabled after training.
+        output_type: Output precision format for the GGUF file.
+    """
+
+    enabled: bool
+    output_type: Literal["f32", "f16", "bf16", "q8_0"]
+
+
 class TrainRequest(TypedDict, total=True):
     """Request to start model training.
 
@@ -106,6 +121,7 @@ class TrainRequest(TypedDict, total=True):
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
     unsloth: UnslothConfigRequest | None
+    gguf_export: GgufExportConfigRequest | None
 
 
 class TrainResponse(TypedDict, total=True):
@@ -253,6 +269,7 @@ class ProgressResponse(TypedDict, total=True):
         "validation",
         "test",
         "saving",
+        "exporting",
         "uploading",
         "completed",
         "failed",
