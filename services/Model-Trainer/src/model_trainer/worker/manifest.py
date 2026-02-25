@@ -17,6 +17,7 @@ from platform_core.json_utils import (
 )
 
 from model_trainer.infra.persistence.models import (
+    GgufExportManifest,
     TrainingManifest,
     TrainingManifestModelInfo,
     TrainingManifestPerformance,
@@ -311,6 +312,32 @@ def _decode_manifest_fields(obj: JSONObject) -> _ManifestFields:
     )
 
 
+def _decode_optional_gguf_export_manifest(obj: JSONObject) -> GgufExportManifest | None:
+    """Decode optional gguf_export section from manifest JSON.
+
+    Args:
+        obj: The root manifest JSON object.
+
+    Returns:
+        Decoded GgufExportManifest or None if field is missing/null.
+
+    Raises:
+        JSONTypeError: If the field exists but has invalid structure.
+    """
+    raw = obj.get("gguf_export")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise JSONTypeError(
+            f"Field 'gguf_export' must be an object or null, got {type(raw).__name__}"
+        )
+    return {
+        "output_type": require_str(raw, "output_type"),
+        "output_filename": require_str(raw, "output_filename"),
+        "output_size_bytes": require_int(raw, "output_size_bytes"),
+    }
+
+
 def load_manifest_from_text(text: str) -> TrainingManifest:
     """Parse manifest JSON text into typed TrainingManifest.
 
@@ -331,6 +358,7 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
     performance = _decode_manifest_performance(obj)
     model_info = _decode_manifest_model_info(obj)
     fields = _decode_manifest_fields(obj)
+    gguf_export = _decode_optional_gguf_export_manifest(obj)
 
     return {
         "run_id": fields.run_id,
@@ -365,4 +393,5 @@ def load_manifest_from_text(text: str) -> TrainingManifest:
         "timing": timing,
         "performance": performance,
         "model_info": model_info,
+        "gguf_export": gguf_export,
     }
