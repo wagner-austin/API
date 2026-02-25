@@ -11,6 +11,12 @@ from platform_core.queues import TRAINER_QUEUE
 from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
 from model_trainer import _test_hooks
+from model_trainer.core.services.finetuning.strategies._test_hooks import (
+    init_production_hooks as init_finetuning_hooks,
+)
+from model_trainer.core.services.model.backends.hf_lm._test_hooks import (
+    init_production_hooks as init_hf_lm_hooks,
+)
 
 
 class LoggerProtocol(Protocol):
@@ -79,6 +85,10 @@ def main(
         logger: Logger instance. If None, uses default logger after setup.
         runner: Worker runner function. If None, uses _get_default_runner().
     """
+    # Initialize production hooks for training backends
+    init_hf_lm_hooks()
+    init_finetuning_hooks()
+
     setup_logging(
         level="INFO",
         format_mode="json",
