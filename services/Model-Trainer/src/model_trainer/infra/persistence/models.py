@@ -69,6 +69,20 @@ class TrainingManifestModelInfo(TypedDict):
     vocab_size: int
 
 
+class GgufExportManifest(TypedDict):
+    """Manifest section for GGUF export results.
+
+    Attributes:
+        output_type: The output precision format used for GGUF export.
+        output_filename: Name of the generated GGUF file.
+        output_size_bytes: Size of the GGUF file in bytes.
+    """
+
+    output_type: str
+    output_filename: str
+    output_size_bytes: int
+
+
 class TrainingManifest(TypedDict):
     """Training manifest with all configuration and results.
 
@@ -109,6 +123,7 @@ class TrainingManifest(TypedDict):
     timing: TrainingManifestTiming
     performance: TrainingManifestPerformance
     model_info: TrainingManifestModelInfo
+    gguf_export: GgufExportManifest | None
 
 
 class TrainingManifestConfig(TypedDict):
@@ -180,3 +195,4 @@ class TrainingManifestFull(TypedDict):
     timing: TrainingManifestTiming
     performance: TrainingManifestPerformance
     model_info: TrainingManifestModelInfo
+    gguf_export: GgufExportManifest | None
