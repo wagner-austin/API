@@ -16,6 +16,7 @@ from ..schemas.runs import (
     ChatRequest,
     EvaluateRequest,
     GenerateRequest,
+    GgufExportConfigRequest,
     LoraConfigRequest,
     QuantizationConfigRequest,
     ScoreRequest,
@@ -34,6 +35,7 @@ _LORA_BIASES: frozenset[str] = frozenset({"none", "all", "lora_only"})
 _QUANT_COMPUTE_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16", "float32"})
 _QUANT_TYPES: frozenset[str] = frozenset({"nf4", "fp4"})
 _UNSLOTH_DTYPES: frozenset[str] = frozenset({"float16", "bfloat16"})
+_GGUF_OUTPUT_TYPES: frozenset[str] = frozenset({"f32", "f16", "bf16", "q8_0"})
 _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
     {
         "model_family",
@@ -64,6 +66,7 @@ _ALLOWED_TRAIN_FIELDS: frozenset[str] = frozenset(
         "lora",
         "quantization",
         "unsloth",
+        "gguf_export",
     }
 )
 
@@ -208,6 +211,24 @@ def _narrow_unsloth_dtype(raw: str | None) -> Literal["float16", "bfloat16"] | N
     if raw == "bfloat16":
         return "bfloat16"
     return "float16"
+
+
+def _narrow_gguf_output_type(raw: str) -> Literal["f32", "f16", "bf16", "q8_0"]:
+    """Narrow GGUF output type to Literal type.
+
+    Args:
+        raw: Raw output type string from request.
+
+    Returns:
+        Narrowed Literal type for GGUF output.
+    """
+    if raw == "f16":
+        return "f16"
+    if raw == "bf16":
+        return "bf16"
+    if raw == "q8_0":
+        return "q8_0"
+    return "f32"
 
 
 def _narrow_optimizer(raw: str | None) -> Literal["adamw", "adam", "sgd"]:
@@ -458,6 +479,59 @@ def _decode_optional_unsloth(d: dict[str, JSONValue]) -> UnslothConfigRequest | 
     return _decode_unsloth_config(unsloth_raw)
 
 
+def _decode_gguf_export_config(d: dict[str, JSONValue]) -> GgufExportConfigRequest:
+    """Decode and validate GGUF export configuration from JSON dict.
+
+    Args:
+        d: Raw dictionary with GGUF export config fields.
+
+    Returns:
+        Validated GgufExportConfigRequest TypedDict.
+
+    Raises:
+        AppError: If required fields are missing or invalid.
+    """
+    enabled_raw = d.get("enabled")
+    if enabled_raw is None:
+        enabled = True
+    elif not isinstance(enabled_raw, bool):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="gguf_export.enabled must be a boolean",
+            http_status=400,
+        )
+    else:
+        enabled = enabled_raw
+
+    output_type_raw = validate_optional_literal(
+        d.get("output_type"),
+        "gguf_export.output_type",
+        _GGUF_OUTPUT_TYPES,
+    )
+    output_type = _narrow_gguf_output_type(
+        output_type_raw if output_type_raw is not None else "f16"
+    )
+
+    return {
+        "enabled": enabled,
+        "output_type": output_type,
+    }
+
+
+def _decode_optional_gguf_export(d: dict[str, JSONValue]) -> GgufExportConfigRequest | None:
+    """Decode optional GGUF export config from dict."""
+    gguf_export_raw = d.get("gguf_export")
+    if gguf_export_raw is None:
+        return None
+    if not isinstance(gguf_export_raw, dict):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="gguf_export must be an object",
+            http_status=400,
+        )
+    return _decode_gguf_export_config(gguf_export_raw)
+
+
 def _validate_hf_lm_cross_fields(
     model_family: Literal["gpt2", "llama", "qwen", "char_lstm", "hf_lm"],
     hub_model_id: str | None,
@@ -465,6 +539,7 @@ def _validate_hf_lm_cross_fields(
     lora: LoraConfigRequest | None,
     quantization: QuantizationConfigRequest | None,
     unsloth: UnslothConfigRequest | None,
+    gguf_export: GgufExportConfigRequest | None,
 ) -> None:
     """Validate cross-field requirements for HF LM backend."""
     if model_family == "hf_lm" and hub_model_id is None:
@@ -491,6 +566,12 @@ def _validate_hf_lm_cross_fields(
             message="unsloth config is required for finetuning_strategy 'unsloth'",
             http_status=400,
         )
+    if gguf_export is not None and finetuning_strategy not in ("lora", "qlora", "unsloth"):
+        raise AppError(
+            code=ErrorCode.INVALID_INPUT,
+            message="gguf_export requires finetuning_strategy lora, qlora, or unsloth",
+            http_status=400,
+        )
 
 
 class _HfLmFields:
@@ -501,6 +582,7 @@ class _HfLmFields:
     lora: LoraConfigRequest | None
     quantization: QuantizationConfigRequest | None
     unsloth: UnslothConfigRequest | None
+    gguf_export: GgufExportConfigRequest | None
 
     def __init__(
         self,
@@ -509,12 +591,14 @@ class _HfLmFields:
         lora: LoraConfigRequest | None,
         quantization: QuantizationConfigRequest | None,
         unsloth: UnslothConfigRequest | None,
+        gguf_export: GgufExportConfigRequest | None,
     ) -> None:
         self.hub_model_id = hub_model_id
         self.finetuning_strategy = finetuning_strategy
         self.lora = lora
         self.quantization = quantization
         self.unsloth = unsloth
+        self.gguf_export = gguf_export
 
 
 def _decode_hf_lm_fields(
@@ -546,9 +630,10 @@ def _decode_hf_lm_fields(
     lora = _decode_optional_lora(d)
     quantization = _decode_optional_quantization(d)
     unsloth = _decode_optional_unsloth(d)
+    gguf_export = _decode_optional_gguf_export(d)
 
     _validate_hf_lm_cross_fields(
-        model_family, hub_model_id, finetuning_strategy, lora, quantization, unsloth
+        model_family, hub_model_id, finetuning_strategy, lora, quantization, unsloth, gguf_export
     )
 
     return _HfLmFields(
@@ -557,6 +642,7 @@ def _decode_hf_lm_fields(
         lora=lora,
         quantization=quantization,
         unsloth=unsloth,
+        gguf_export=gguf_export,
     )
 
 
@@ -690,6 +776,7 @@ def _decode_train_request(obj: JSONValue) -> TrainRequest:
         "lora": hf_fields.lora,
         "quantization": hf_fields.quantization,
         "unsloth": hf_fields.unsloth,
+        "gguf_export": hf_fields.gguf_export,
     }
 
 
