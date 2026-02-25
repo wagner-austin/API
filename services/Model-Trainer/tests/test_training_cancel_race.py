@@ -117,6 +117,9 @@ class _FakeLMModel(LMModelProto):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         (Path(out_dir) / "weights.bin").write_bytes(b"\x00fake")
 
+    def gradient_checkpointing_enable(self: _FakeLMModel) -> None:
+        return None
+
     @property
     def config(self: _FakeLMModel) -> ConfigLike:
         return self._config
@@ -421,6 +424,7 @@ def test_training_cancel_race_avoids_upload(
             "lora": None,
             "quantization": None,
             "unsloth": None,
+            "gguf_export": None,
         },
     }
 

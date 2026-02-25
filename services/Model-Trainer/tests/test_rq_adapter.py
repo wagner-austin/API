@@ -110,6 +110,7 @@ def test_rq_enqueuer_methods() -> None:
                 "lora": None,
                 "quantization": None,
                 "unsloth": None,
+                "gguf_export": None,
             },
             "user_id": 1,
         }

@@ -136,6 +136,7 @@ def test_training_and_eval_tiny(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     def _hb(_: float) -> None:
@@ -307,6 +308,7 @@ def test_cancel_during_eval_returns_partial_results(
         "lora": None,
         "quantization": None,
         "unsloth": None,
+        "gguf_export": None,
     }
 
     def _hb(_: float) -> None:
