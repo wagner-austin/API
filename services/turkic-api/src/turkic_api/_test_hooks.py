@@ -593,6 +593,7 @@ language_map: dict[str, str] = {
     "fi": "fi",
     "az": "az",
     "en": "en",
+    "ru": "ru",
 }
 
 
