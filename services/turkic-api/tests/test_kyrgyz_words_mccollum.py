@@ -54,3 +54,19 @@ def test_kyrgyz_word_to_ipa(cyr: str, ipa: str) -> None:
     predicted = _canonical(ud.normalize("NFC", to_ipa(cyr, "ky")))
     expected = _canonical(ipa)
     assert predicted == expected, f"{cyr} → {predicted!r}, expected {expected!r}"
+
+
+def test_у_after_vowel_becomes_w() -> None:
+    """Test context-sensitive у → w rule.
+
+    In Kyrgyz, у is /u/ (vowel) normally, but /w/ (glide) after another vowel.
+    Per McCollum (2020) consonant inventory: Glide = w, j
+    """
+    # у after vowel → w
+    assert to_ipa("тау", "ky") == "tɑw"  # post-vocalic у = w
+    assert to_ipa("бауыр", "ky") == "bɑwɯr"  # а + у = aw
+
+    # у NOT after vowel → u
+    assert to_ipa("ун", "ky") == "un"  # word-initial у = u
+    assert to_ipa("бул", "ky") == "bul"  # after consonant у = u
+    assert to_ipa("кул", "ky") == "kul"  # 'slave' from article
