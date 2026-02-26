@@ -50,7 +50,7 @@ def _hook_decode_optional_literal(
 Status = Literal["queued", "processing", "completed", "failed"]
 Script = Literal["Latn", "Cyrl", "Arab"]
 Source = Literal["oscar", "wikipedia", "culturax"]
-Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en"]
+Language = Literal["kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"]
 ErrorCode = Literal[
     "INVALID_REQUEST",
     "JOB_NOT_FOUND",
@@ -111,9 +111,20 @@ class ErrorResponse(TypedDict):
 # Parse functions with explicit validation
 
 _SOURCE_VALUES = frozenset({"oscar", "wikipedia", "culturax"})
-_LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az", "en"})
+_LANGUAGE_VALUES = frozenset({"kk", "ky", "uz", "tr", "ug", "fi", "az", "en", "ru"})
 _SCRIPT_VALUES = frozenset({"Latn", "Cyrl", "Arab"})
 _SCRIPT_MAP: dict[str, Script] = {"Latn": "Latn", "Cyrl": "Cyrl", "Arab": "Arab"}
+_LANGUAGE_MAP: dict[str, Language] = {
+    "kk": "kk",
+    "ky": "ky",
+    "uz": "uz",
+    "tr": "tr",
+    "ug": "ug",
+    "fi": "fi",
+    "az": "az",
+    "en": "en",
+    "ru": "ru",
+}
 
 
 def _get_source_map() -> dict[str, str]:
@@ -162,28 +173,15 @@ def _decode_language_literal(val: JSONValue) -> Language:
             message="Invalid language",
             http_status=400,
         )
-    # Narrow to Language literal
-    if lang_val == "kk":
-        return "kk"
-    if lang_val == "ky":
-        return "ky"
-    if lang_val == "uz":
-        return "uz"
-    if lang_val == "tr":
-        return "tr"
-    if lang_val == "ug":
-        return "ug"
-    if lang_val == "fi":
-        return "fi"
-    if lang_val == "az":
-        return "az"
-    if lang_val == "en":
-        return "en"
-    raise AppError(
-        code=PlatformErrorCode.INVALID_INPUT,
-        message="Invalid language",
-        http_status=400,
-    )
+    # Narrow to Language literal using map
+    result = _LANGUAGE_MAP.get(lang_val)
+    if result is None:
+        raise AppError(
+            code=PlatformErrorCode.INVALID_INPUT,
+            message="Invalid language",
+            http_status=400,
+        )
+    return result
 
 
 def _decode_script_literal(val: JSONValue) -> Script | None:
