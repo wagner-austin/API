@@ -33,7 +33,7 @@ GOLD = {
     "р": "r",  # ← was r̪
     "с": "s",  # ← was s̪
     "т": "t",  # ← was t̪
-    "у": "u",  # ← was u͡w
+    "у": "w",  # always [w] per article consonant inventory
     "ұ": "ʊ",
     "ү": "ʏ",
     "ф": "f",
