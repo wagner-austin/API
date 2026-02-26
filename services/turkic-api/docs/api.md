@@ -57,7 +57,7 @@ Create a new corpus extraction job.
 |-------|------|----------|---------|-------------|
 | `user_id` | int | Yes | - | User ID for tracking |
 | `source` | string | Yes | - | Dataset source: `oscar`, `wikipedia`, `culturax` |
-| `language` | string | Yes | - | Language code: `kk`, `ky`, `uz`, `tr`, `ug`, `fi`, `az`, `en` |
+| `language` | string | Yes | - | Language code: `kk`, `ky`, `uz`, `tr`, `ug`, `fi`, `az`, `en`, `ru` |
 | `script` | string | No | `null` | Script filter: `Latn`, `Cyrl`, `Arab` |
 | `max_sentences` | int | No | `1000` | Maximum sentences to extract (1-100000) |
 | `transliterate` | bool | No | `true` | Apply IPA transliteration to output |
@@ -358,6 +358,7 @@ The `request_id` appears in:
 | `fi` | Finnish | Latin | Yes |
 | `az` | Azerbaijani | Latin | Yes |
 | `en` | English | Latin | Yes |
+| `ru` | Russian | Cyrillic | Yes |
 
 ---
 
