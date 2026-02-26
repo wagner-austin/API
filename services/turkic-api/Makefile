@@ -1,7 +1,7 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: lint test check
+.PHONY: lint test check corpus
 
 lint:
 	@$$ErrorActionPreference = 'SilentlyContinue'; poetry run mypy --version | Out-Null; if (-not $$?) { Write-Host "[lint] Stale venv detected; removing..." -ForegroundColor Yellow; if (Test-Path ".venv") { Remove-Item -Recurse -Force ".venv" } }
@@ -18,3 +18,6 @@ test:
 	$$covArgs = @("--cov-branch","--cov-report=term-missing"); $$cands = @("src","scripts"); foreach ($$c in $$cands) { if (Test-Path (Join-Path "." $$c)) { $$covArgs += "--cov=$$c" } }; poetry run pytest -n auto -v @covArgs
 
 check: lint | test
+
+corpus:
+	poetry run python scripts/build_balanced_corpora.py --source oscar --threshold 0.95 --out-dir "C:\Users\Test\PROJECTS\LSTM\09_Downloaded_Corpora_2" --progress-every 100 --report "C:\Users\Test\PROJECTS\LSTM\09_Downloaded_Corpora_2\manifest.json"
