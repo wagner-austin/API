@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
+from numpy.typing import NDArray
+
 from cleargbm._test_hooks import (
     RandomStateProtocol,
     _PythonRandomStateWrapper,
@@ -9,7 +12,11 @@ from cleargbm._test_hooks import (
     create_histogram_buffer,
     create_int_buffer,
     get_random_state,
+    predict_tree,
+    sigmoid,
+    sigmoid_array,
 )
+from cleargbm.types import DecisionTree, TreeNode
 
 
 class TestPythonRandomStateWrapper:
@@ -201,3 +208,333 @@ class TestCreateHistogramBuffer:
         assert buf.get_gradient_sum(1) == 2.0
         assert buf.get_hessian_sum(1) == 1.0
         assert buf.get_count(1) == 1
+
+
+def _float_matrix(data: list[list[float]]) -> NDArray[np.float64]:
+    """Create a 2D float array from nested list."""
+    return np.array(data, dtype=np.float64)
+
+
+def _float_array(data: list[float]) -> NDArray[np.float64]:
+    """Create a 1D float array from list."""
+    return np.array(data, dtype=np.float64)
+
+
+class TestPredictTreeHook:
+    """Tests for predict_tree backend hook."""
+
+    def test_predicts_single_leaf(self) -> None:
+        """Should return leaf value for all samples."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=0.5,
+                    n_samples=10,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=0,
+            n_leaves=1,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[1.0], [2.0]])
+        preds = predict_tree(tree, x)
+
+        assert preds.shape == (2,)
+        pred_0: float = preds.item(0)
+        pred_1: float = preds.item(1)
+        assert pred_0 == 0.5
+        assert pred_1 == 0.5
+
+    def test_navigates_left_and_right(self) -> None:
+        """Should navigate tree based on feature values."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="left",
+                    value=0.0,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+                TreeNode(
+                    node_id=1,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=-1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+                TreeNode(
+                    node_id=2,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=1,
+            n_leaves=2,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[0.0], [1.0]])
+        preds = predict_tree(tree, x)
+
+        pred_0: float = preds.item(0)
+        pred_1: float = preds.item(1)
+        assert pred_0 == -1.0
+        assert pred_1 == 1.0
+
+    def test_handles_missing_feature_info(self) -> None:
+        """Should return node value when feature_index or threshold is None."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=0.25,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+            ),
+            max_depth=0,
+            n_leaves=0,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[0.0]])
+        preds = predict_tree(tree, x)
+
+        pred_0: float = preds.item(0)
+        assert pred_0 == 0.25
+
+    def test_handles_missing_child(self) -> None:
+        """Should return node value when next child is None."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="left",
+                    value=0.75,
+                    n_samples=10,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=0,
+            n_leaves=0,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[0.0]])
+        preds = predict_tree(tree, x)
+
+        pred_0: float = preds.item(0)
+        assert pred_0 == 0.75
+
+    def test_routes_nan_left(self) -> None:
+        """Should route NaN to left child when nan_direction is left."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="left",
+                    value=0.0,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+                TreeNode(
+                    node_id=1,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=-1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+                TreeNode(
+                    node_id=2,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=1,
+            n_leaves=2,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[float("nan")]])
+        preds = predict_tree(tree, x)
+
+        pred_0: float = preds.item(0)
+        assert pred_0 == -1.0
+
+    def test_routes_nan_right(self) -> None:
+        """Should route NaN to right child when nan_direction is right."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="right",
+                    value=0.0,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+                TreeNode(
+                    node_id=1,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=-1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+                TreeNode(
+                    node_id=2,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=1,
+            n_leaves=2,
+            feature_names=("f0",),
+        )
+
+        x = _float_matrix([[float("nan")]])
+        preds = predict_tree(tree, x)
+
+        pred_0: float = preds.item(0)
+        assert pred_0 == 1.0
+
+
+class TestSigmoidHook:
+    """Tests for sigmoid backend hook."""
+
+    def test_sigmoid_at_zero(self) -> None:
+        """sigmoid(0) should return 0.5."""
+        assert sigmoid(0.0) == 0.5
+
+    def test_sigmoid_positive(self) -> None:
+        """Large positive input should produce value near 1."""
+        result = sigmoid(100.0)
+        assert result > 0.99
+        assert result <= 1.0
+
+    def test_sigmoid_negative(self) -> None:
+        """Large negative input should produce value near 0."""
+        result = sigmoid(-100.0)
+        assert result > 0.0
+        assert result < 0.01
+
+    def test_sigmoid_extreme_positive(self) -> None:
+        """Extreme positive input should not overflow."""
+        result = sigmoid(1000.0)
+        assert result > 0.0
+        assert result <= 1.0
+
+    def test_sigmoid_extreme_negative(self) -> None:
+        """Extreme negative input should not overflow."""
+        result = sigmoid(-1000.0)
+        assert result >= 0.0
+        assert result < 1.0
+
+
+class TestSigmoidArrayHook:
+    """Tests for sigmoid_array backend hook."""
+
+    def test_sigmoid_array_basic(self) -> None:
+        """Should compute sigmoid for each element."""
+        x = _float_array([0.0, 100.0, -100.0])
+        result = sigmoid_array(x)
+
+        assert result.shape == (3,)
+        val_0: float = result.item(0)
+        val_1: float = result.item(1)
+        val_2: float = result.item(2)
+        assert abs(val_0 - 0.5) < 1e-10
+        assert val_1 > 0.99
+        assert val_2 < 0.01
+
+    def test_sigmoid_array_extreme_values(self) -> None:
+        """Should handle extreme values without overflow."""
+        x = _float_array([1000.0, -1000.0])
+        result = sigmoid_array(x)
+
+        val_0: float = result.item(0)
+        val_1: float = result.item(1)
+        assert val_0 <= 1.0
+        assert val_0 > 0.0
+        assert val_1 >= 0.0
+        assert val_1 < 1.0
+
+    def test_sigmoid_array_preserves_shape(self) -> None:
+        """Should preserve input array shape."""
+        x: NDArray[np.float64] = np.zeros(5, dtype=np.float64)
+        result = sigmoid_array(x)
+
+        assert result.shape == (5,)
+        for i in range(5):
+            val: float = result.item(i)
+            assert abs(val - 0.5) < 1e-10

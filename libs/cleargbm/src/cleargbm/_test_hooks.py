@@ -8,15 +8,18 @@ This module is private (underscore prefix) - not for external use.
 
 from __future__ import annotations
 
+import math
 import multiprocessing
 import random
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
 from cleargbm.buffers import FloatBuffer, HistogramBuffer, IntBuffer
+from cleargbm.types import DecisionTree, TreeNode
 
 
 class RandomStateProtocol(Protocol):
@@ -441,15 +444,453 @@ def create_histogram_buffer(n_bins: int) -> HistogramBuffer:
     return _histogram_buffer_factory(n_bins)
 
 
+# =============================================================================
+# Histogram Backend Hooks
+# =============================================================================
+
+
+class BuildHistogramBackend(Protocol):
+    """Protocol for histogram building backend."""
+
+    def __call__(
+        self,
+        sample_indices: NDArray[np.int64],
+        gradients: NDArray[np.float64],
+        hessians: NDArray[np.float64],
+        sample_bins: NDArray[np.int64],
+        n_bins: int,
+    ) -> HistogramBuffer:
+        """Build gradient/hessian histogram for one feature in a node.
+
+        Args:
+            sample_indices: Indices of samples in this node.
+            gradients: Gradient for each sample (full dataset).
+            hessians: Hessian for each sample (full dataset).
+            sample_bins: Bin ID for each sample on this feature (1D array).
+            n_bins: Number of bins.
+
+        Returns:
+            HistogramBuffer with gradient/hessian sums per bin.
+        """
+        ...
+
+
+class SubtractHistogramBackend(Protocol):
+    """Protocol for histogram subtraction backend."""
+
+    def __call__(
+        self,
+        parent: HistogramBuffer,
+        child: HistogramBuffer,
+    ) -> HistogramBuffer:
+        """Compute sibling histogram by subtraction (parent - child).
+
+        Args:
+            parent: Parent node histogram buffer.
+            child: One child's histogram buffer.
+
+        Returns:
+            Other child's histogram buffer (sibling = parent - child).
+        """
+        ...
+
+
+def _default_build_histogram(
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_bins: NDArray[np.int64],
+    n_bins: int,
+) -> HistogramBuffer:
+    """Python histogram building implementation.
+
+    Accumulates gradient/hessian statistics into bins using vectorized
+    numpy operations.
+
+    Args:
+        sample_indices: Indices of samples in this node.
+        gradients: Gradient for each sample (full dataset).
+        hessians: Hessian for each sample (full dataset).
+        sample_bins: Bin ID for each sample on this feature (1D array).
+        n_bins: Number of bins.
+
+    Returns:
+        HistogramBuffer with gradient/hessian sums per bin.
+    """
+    buf = _histogram_buffer_factory(n_bins)
+    bins_for_node: NDArray[np.int64] = sample_bins[sample_indices]
+    grads_for_node: NDArray[np.float64] = gradients[sample_indices]
+    hess_for_node: NDArray[np.float64] = hessians[sample_indices]
+    buf.accumulate_batch(bins_for_node, grads_for_node, hess_for_node)
+    return buf
+
+
+def _default_subtract_histogram(
+    parent: HistogramBuffer,
+    child: HistogramBuffer,
+) -> HistogramBuffer:
+    """Python histogram subtraction implementation.
+
+    Computes sibling = parent - child using numpy subtraction.
+
+    Args:
+        parent: Parent node histogram buffer.
+        child: One child's histogram buffer.
+
+    Returns:
+        Other child's histogram buffer (sibling = parent - child).
+    """
+    sibling = _histogram_buffer_factory(parent.n_bins)
+    sibling.subtract_into(parent, child)
+    return sibling
+
+
+# Module-level hooks for histogram backend.
+# Production sets these to Rust implementations at startup.
+# Tests override to provide Python fakes.
+_build_histogram_backend: BuildHistogramBackend = _default_build_histogram
+_subtract_histogram_backend: SubtractHistogramBackend = _default_subtract_histogram
+
+
+def build_histogram(
+    sample_indices: NDArray[np.int64],
+    gradients: NDArray[np.float64],
+    hessians: NDArray[np.float64],
+    sample_bins: NDArray[np.int64],
+    n_bins: int,
+) -> HistogramBuffer:
+    """Build gradient/hessian histogram for one feature in a node.
+
+    Delegates to the active backend hook.
+
+    Args:
+        sample_indices: Indices of samples in this node.
+        gradients: Gradient for each sample (full dataset).
+        hessians: Hessian for each sample (full dataset).
+        sample_bins: Bin ID for each sample on this feature (1D array).
+        n_bins: Number of bins.
+
+    Returns:
+        HistogramBuffer with gradient/hessian sums per bin.
+    """
+    return _build_histogram_backend(sample_indices, gradients, hessians, sample_bins, n_bins)
+
+
+def subtract_histogram(
+    parent: HistogramBuffer,
+    child: HistogramBuffer,
+) -> HistogramBuffer:
+    """Compute sibling histogram by subtraction (parent - child).
+
+    Delegates to the active backend hook.
+
+    Args:
+        parent: Parent node histogram buffer.
+        child: One child's histogram buffer.
+
+    Returns:
+        Other child's histogram buffer (sibling = parent - child).
+    """
+    return _subtract_histogram_backend(parent, child)
+
+
+# =============================================================================
+# Prediction Backend Hooks
+# =============================================================================
+
+
+class PredictTreeBackend(Protocol):
+    """Protocol for tree prediction backend."""
+
+    def __call__(
+        self,
+        tree: DecisionTree,
+        x: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Get predictions from tree for all samples.
+
+        Args:
+            tree: Trained decision tree.
+            x: Feature matrix (n_samples, n_features).
+
+        Returns:
+            Prediction array for each sample.
+        """
+        ...
+
+
+def _traverse_tree_single(
+    nodes: tuple[TreeNode, ...],
+    x_single: NDArray[np.float64],
+) -> float:
+    """Traverse decision tree for a single sample.
+
+    Args:
+        nodes: All nodes in the tree.
+        x_single: Single sample feature vector (1D array).
+
+    Returns:
+        Prediction value.
+    """
+    node_id = 0
+
+    while True:
+        node = nodes[node_id]
+        if node["is_leaf"]:
+            return node["value"]
+
+        feature_idx = node["feature_index"]
+        threshold = node["threshold"]
+
+        if feature_idx is None or threshold is None:
+            return node["value"]
+
+        feature_value: float = x_single.item(feature_idx)
+
+        # Handle NaN values using stored nan_direction
+        if math.isnan(feature_value):
+            nan_dir = node["nan_direction"]
+            next_id = node["left_child"] if nan_dir == "left" else node["right_child"]
+        elif feature_value <= threshold:
+            next_id = node["left_child"]
+        else:
+            next_id = node["right_child"]
+
+        if next_id is None:
+            return node["value"]
+
+        node_id = next_id
+
+
+def _default_predict_tree(
+    tree: DecisionTree,
+    x: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Python tree prediction implementation.
+
+    Loops over all samples and traverses the tree for each.
+
+    Args:
+        tree: Trained decision tree.
+        x: Feature matrix (n_samples, n_features).
+
+    Returns:
+        Prediction array for each sample.
+    """
+    n_samples: int = int(x.shape[0])
+    predictions: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
+    nodes = tree["nodes"]
+    for i in range(n_samples):
+        x_row: NDArray[np.float64] = x[i, :]
+        predictions[i] = _traverse_tree_single(nodes, x_row)
+    return predictions
+
+
+# Module-level hook for tree prediction backend.
+# Production sets this to Rust implementation at startup.
+# Tests override to provide Python fakes.
+_predict_tree_backend: PredictTreeBackend = _default_predict_tree
+
+
+def predict_tree(
+    tree: DecisionTree,
+    x: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Get predictions from tree for all samples.
+
+    Delegates to the active backend hook.
+
+    Args:
+        tree: Trained decision tree.
+        x: Feature matrix (n_samples, n_features).
+
+    Returns:
+        Prediction array for each sample.
+    """
+    return _predict_tree_backend(tree, x)
+
+
+# =============================================================================
+# Sigmoid Backend Hooks
+# =============================================================================
+
+
+class SigmoidBackend(Protocol):
+    """Protocol for scalar sigmoid backend."""
+
+    def __call__(self, x: float) -> float:
+        """Compute sigmoid function.
+
+        Args:
+            x: Input value (log-odds).
+
+        Returns:
+            Probability in [0, 1].
+        """
+        ...
+
+
+class SigmoidArrayBackend(Protocol):
+    """Protocol for vectorized sigmoid backend."""
+
+    def __call__(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Compute sigmoid function for array.
+
+        Args:
+            x: Input array (log-odds).
+
+        Returns:
+            Probabilities in [0, 1].
+        """
+        ...
+
+
+def _default_sigmoid(x: float) -> float:
+    """Python scalar sigmoid implementation.
+
+    Clips input to [-500, 500] to prevent overflow.
+
+    Args:
+        x: Input value (log-odds).
+
+    Returns:
+        Probability in [0, 1].
+    """
+    x_clipped = max(-500.0, min(500.0, x))
+    return 1.0 / (1.0 + math.exp(-x_clipped))
+
+
+def _default_sigmoid_array(x: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Python vectorized sigmoid implementation.
+
+    Uses numpy for efficient array operations. Clips to [-500, 500].
+
+    Args:
+        x: Input array (log-odds).
+
+    Returns:
+        Probabilities in [0, 1].
+    """
+    x_clipped: NDArray[np.float64] = np.clip(x, -500.0, 500.0)
+    result: NDArray[np.float64] = 1.0 / (1.0 + np.exp(-x_clipped))
+    return result
+
+
+# Module-level hooks for sigmoid backend.
+# Production sets these to Rust implementations at startup.
+# Tests override to provide Python fakes.
+_sigmoid_backend: SigmoidBackend = _default_sigmoid
+_sigmoid_array_backend: SigmoidArrayBackend = _default_sigmoid_array
+
+
+def sigmoid(x: float) -> float:
+    """Compute sigmoid function.
+
+    Delegates to the active backend hook.
+
+    Args:
+        x: Input value (log-odds).
+
+    Returns:
+        Probability in [0, 1].
+    """
+    return _sigmoid_backend(x)
+
+
+def sigmoid_array(x: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Compute sigmoid function for array.
+
+    Delegates to the active backend hook.
+
+    Args:
+        x: Input array (log-odds).
+
+    Returns:
+        Probabilities in [0, 1].
+    """
+    return _sigmoid_array_backend(x)
+
+
+# =============================================================================
+# Guard Script Hooks
+# =============================================================================
+
+
+class FindMonorepoRootProto(Protocol):
+    """Protocol for _find_monorepo_root hook."""
+
+    def __call__(self, start: Path) -> Path:
+        """Find monorepo root starting from given path.
+
+        Args:
+            start: Starting path to search from.
+
+        Returns:
+            Path to monorepo root.
+        """
+        ...
+
+
+class RunForProjectProto(Protocol):
+    """Protocol for run_for_project hook."""
+
+    def __call__(self, *, monorepo_root: Path, project_root: Path) -> int:
+        """Run guard checks for a project.
+
+        Args:
+            monorepo_root: Path to monorepo root.
+            project_root: Path to project root.
+
+        Returns:
+            Exit code from guard checks.
+        """
+        ...
+
+
+class LoadOrchestratorProto(Protocol):
+    """Protocol for _load_orchestrator hook."""
+
+    def __call__(self, monorepo_root: Path) -> RunForProjectProto:
+        """Load the guard orchestrator.
+
+        Args:
+            monorepo_root: Path to monorepo root.
+
+        Returns:
+            run_for_project function.
+        """
+        ...
+
+
+# Guard hooks - None means use default behavior (production implementation)
+guard_find_monorepo_root: FindMonorepoRootProto | None = None
+guard_load_orchestrator: LoadOrchestratorProto | None = None
+
+
 __all__ = [
+    "BuildHistogramBackend",
+    "FindMonorepoRootProto",
     "FloatBuffer",
     "HistogramBuffer",
     "IntBuffer",
+    "LoadOrchestratorProto",
+    "PredictTreeBackend",
     "RandomStateProtocol",
+    "RunForProjectProto",
+    "SigmoidArrayBackend",
+    "SigmoidBackend",
+    "SubtractHistogramBackend",
     "WorkerPoolProtocol",
+    "build_histogram",
     "create_float_buffer",
     "create_histogram_buffer",
     "create_int_buffer",
     "create_worker_pool",
     "get_random_state",
+    "guard_find_monorepo_root",
+    "guard_load_orchestrator",
+    "predict_tree",
+    "sigmoid",
+    "sigmoid_array",
+    "subtract_histogram",
 ]

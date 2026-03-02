@@ -1003,6 +1003,108 @@ class TestPredictSingle:
 
         assert pred == 0.25
 
+    def test_routes_nan_left(self) -> None:
+        """Should route NaN to left child when nan_direction is left."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="left",
+                    value=0.0,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+                TreeNode(
+                    node_id=1,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=-1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+                TreeNode(
+                    node_id=2,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=1,
+            n_leaves=2,
+            feature_names=("f0",),
+        )
+
+        x_nan = _float_array([float("nan")])
+        pred = _predict_single(tree, x_nan)
+
+        assert pred == -1.0
+
+    def test_routes_nan_right(self) -> None:
+        """Should route NaN to right child when nan_direction is right."""
+        tree = DecisionTree(
+            nodes=(
+                TreeNode(
+                    node_id=0,
+                    is_leaf=False,
+                    feature_index=0,
+                    feature_name="f0",
+                    threshold=0.5,
+                    nan_direction="right",
+                    value=0.0,
+                    n_samples=10,
+                    left_child=1,
+                    right_child=2,
+                ),
+                TreeNode(
+                    node_id=1,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=-1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+                TreeNode(
+                    node_id=2,
+                    is_leaf=True,
+                    feature_index=None,
+                    feature_name=None,
+                    threshold=None,
+                    nan_direction=None,
+                    value=1.0,
+                    n_samples=5,
+                    left_child=None,
+                    right_child=None,
+                ),
+            ),
+            max_depth=1,
+            n_leaves=2,
+            feature_names=("f0",),
+        )
+
+        x_nan = _float_array([float("nan")])
+        pred = _predict_single(tree, x_nan)
+
+        assert pred == 1.0
+
 
 class TestComputeChildHistograms:
     """Tests for _compute_child_histograms."""

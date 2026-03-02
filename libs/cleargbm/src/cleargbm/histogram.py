@@ -15,7 +15,12 @@ from typing import Literal, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import create_histogram_buffer
+from cleargbm._test_hooks import (
+    build_histogram as _build_histogram_hook,
+)
+from cleargbm._test_hooks import (
+    subtract_histogram as _subtract_histogram_hook,
+)
 from cleargbm.buffers import HistogramBuffer
 
 # NaN bin is always the last bin (index = n_regular_bins)
@@ -216,8 +221,7 @@ def build_histogram(
 ) -> HistogramBuffer:
     """Build gradient/hessian histogram for one feature in a node.
 
-    Uses HistogramBuffer for efficient in-place accumulation with
-    pre-allocated numpy arrays.
+    Uses the active backend (Rust when available, Python fallback).
 
     Args:
         sample_indices: Indices of samples in this node.
@@ -229,15 +233,7 @@ def build_histogram(
     Returns:
         HistogramBuffer with gradient/hessian sums per bin.
     """
-    buf = create_histogram_buffer(n_bins)
-
-    # Use vectorized batch accumulation
-    bins_for_node: NDArray[np.int64] = sample_bins[sample_indices]
-    grads_for_node: NDArray[np.float64] = gradients[sample_indices]
-    hess_for_node: NDArray[np.float64] = hessians[sample_indices]
-    buf.accumulate_batch(bins_for_node, grads_for_node, hess_for_node)
-
-    return buf
+    return _build_histogram_hook(sample_indices, gradients, hessians, sample_bins, n_bins)
 
 
 def subtract_histogram(parent: HistogramBuffer, child: HistogramBuffer) -> HistogramBuffer:
@@ -245,7 +241,7 @@ def subtract_histogram(parent: HistogramBuffer, child: HistogramBuffer) -> Histo
 
     sibling = parent - child (the histogram trick for 2x speedup).
 
-    Uses numpy operations for efficient subtraction.
+    Uses the active backend (Rust when available, Python fallback).
 
     Args:
         parent: Parent node histogram buffer.
@@ -254,9 +250,7 @@ def subtract_histogram(parent: HistogramBuffer, child: HistogramBuffer) -> Histo
     Returns:
         Other child's histogram buffer.
     """
-    sibling = create_histogram_buffer(parent.n_bins)
-    sibling.subtract_into(parent, child)
-    return sibling
+    return _subtract_histogram_hook(parent, child)
 
 
 def _compute_split_gain(

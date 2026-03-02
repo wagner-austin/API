@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from cleargbm._test_hooks import RandomStateProtocol, WorkerPoolProtocol, get_random_state
+from cleargbm._test_hooks import predict_tree as _predict_tree_hook
 from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
     FeatureBins,
@@ -485,6 +486,8 @@ def predict_tree(
 ) -> NDArray[np.float64]:
     """Get predictions from tree for all samples.
 
+    Uses the active backend (Rust when available, Python fallback).
+
     Args:
         tree: Trained decision tree.
         x: Feature matrix (n_samples, n_features).
@@ -492,12 +495,7 @@ def predict_tree(
     Returns:
         Prediction array for each sample.
     """
-    n_samples: int = int(x.shape[0])
-    predictions: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
-    for i in range(n_samples):
-        x_row: NDArray[np.float64] = x[i, :]
-        predictions[i] = _predict_single(tree, x_row)
-    return predictions
+    return _predict_tree_hook(tree, x)
 
 
 def explain_tree_prediction(

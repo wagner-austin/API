@@ -11,6 +11,9 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
+from cleargbm._test_hooks import sigmoid as _sigmoid_hook
+from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
+
 
 class LossFunction(Protocol):
     """Protocol for loss functions used in gradient boosting."""
@@ -81,6 +84,8 @@ class LossFunction(Protocol):
 def sigmoid(x: float) -> float:
     """Compute sigmoid function with numerical stability.
 
+    Uses the active backend (Rust when available, Python fallback).
+
     Args:
         x: Input value (log-odds).
 
@@ -95,13 +100,13 @@ def sigmoid(x: float) -> float:
         >>> sigmoid(-100.0) > 0.0
         True
     """
-    # Clip to avoid overflow
-    x_clipped = max(-500.0, min(500.0, x))
-    return 1.0 / (1.0 + math.exp(-x_clipped))
+    return _sigmoid_hook(x)
 
 
 def sigmoid_array(x: NDArray[np.float64]) -> NDArray[np.float64]:
     """Compute sigmoid function for array with numerical stability.
+
+    Uses the active backend (Rust when available, Python fallback).
 
     Args:
         x: Input array (log-odds).
@@ -109,10 +114,7 @@ def sigmoid_array(x: NDArray[np.float64]) -> NDArray[np.float64]:
     Returns:
         Probabilities in [0, 1].
     """
-    # Vectorized sigmoid with clipping for stability
-    x_clipped: NDArray[np.float64] = np.clip(x, -500.0, 500.0)
-    result: NDArray[np.float64] = 1.0 / (1.0 + np.exp(-x_clipped))
-    return result
+    return _sigmoid_array_hook(x)
 
 
 class BinaryLogLoss:
