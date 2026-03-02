@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import runpy
 import sys
+import types
 from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-
 from scripts import _test_hooks, guard
 
 
-@pytest.fixture
+@pytest.fixture()
 def fake_is_dir_false() -> Generator[None, None, None]:
     """Override is_dir to always return False."""
     original = _test_hooks.is_dir
@@ -28,7 +28,7 @@ def fake_is_dir_false() -> Generator[None, None, None]:
         _test_hooks.is_dir = original
 
 
-@pytest.fixture
+@pytest.fixture()
 def fake_is_dir_for_libs(tmp_path: Path) -> Generator[Path, None, None]:
     """Override is_dir to return True only for the fake libs directory."""
     original = _test_hooks.is_dir
@@ -46,9 +46,7 @@ def fake_is_dir_for_libs(tmp_path: Path) -> Generator[Path, None, None]:
         _test_hooks.is_dir = original
 
 
-def test_find_monorepo_root_raises_when_not_found(
-    fake_is_dir_false: None, tmp_path: Path
-) -> None:
+def test_find_monorepo_root_raises_when_not_found(fake_is_dir_false: None, tmp_path: Path) -> None:
     """_find_monorepo_root should raise RuntimeError when libs not found."""
     del fake_is_dir_false
     with pytest.raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
@@ -65,9 +63,7 @@ def test_find_monorepo_root_finds_libs(fake_is_dir_for_libs: Path) -> None:
     assert result == fake_monorepo
 
 
-def test_main_with_verbose_flag(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_main_with_verbose_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """main should print exit code when --verbose is passed."""
     # Create fake monorepo structure
     fake_libs = tmp_path / "libs"
@@ -76,10 +72,10 @@ def test_main_with_verbose_flag(
     fake_guards.mkdir(parents=True)
 
     # Create fake orchestrator module
-    orchestrator_code = '''
+    orchestrator_code = """
 def run_for_project(*, monorepo_root, project_root):
     return 0
-'''
+"""
     (fake_guards / "__init__.py").write_text("")
     (fake_guards / "orchestrator.py").write_text(orchestrator_code)
 
@@ -132,10 +128,10 @@ def test_main_with_root_override(tmp_path: Path) -> None:
     fake_guards.mkdir(parents=True)
 
     # Create fake orchestrator module
-    orchestrator_code = '''
+    orchestrator_code = """
 def run_for_project(*, monorepo_root, project_root):
     return 0
-'''
+"""
     (fake_guards / "__init__.py").write_text("")
     (fake_guards / "orchestrator.py").write_text(orchestrator_code)
 
@@ -187,10 +183,10 @@ def test_main_ignores_unknown_args(tmp_path: Path) -> None:
     fake_guards = fake_libs / "monorepo_guards" / "src" / "monorepo_guards"
     fake_guards.mkdir(parents=True)
 
-    orchestrator_code = '''
+    orchestrator_code = """
 def run_for_project(*, monorepo_root, project_root):
     return 0
-'''
+"""
     (fake_guards / "__init__.py").write_text("")
     (fake_guards / "orchestrator.py").write_text(orchestrator_code)
 
@@ -232,73 +228,62 @@ def run_for_project(*, monorepo_root, project_root):
 
 def test_main_entry_point(tmp_path: Path) -> None:
     """__main__ block should call main and exit with its return code."""
-    # Create fake monorepo structure
+    # Create fake monorepo with orchestrator
     fake_libs = tmp_path / "libs"
     fake_libs.mkdir()
     fake_guards = fake_libs / "monorepo_guards" / "src" / "monorepo_guards"
     fake_guards.mkdir(parents=True)
-
-    orchestrator_code = '''
-def run_for_project(*, monorepo_root, project_root):
-    return 42
-'''
     (fake_guards / "__init__.py").write_text("")
-    (fake_guards / "orchestrator.py").write_text(orchestrator_code)
+    (fake_guards / "orchestrator.py").write_text(
+        "def run_for_project(*, monorepo_root, project_root):\n    return 42\n"
+    )
 
+    # Set up hooks
     original_is_dir = _test_hooks.is_dir
+    original_get_script_path = _test_hooks.get_script_path
+
+    fake_project = tmp_path / "project"
+    fake_scripts = fake_project / "scripts"
+    fake_scripts.mkdir(parents=True)
+    fake_guard = fake_scripts / "guard.py"
+    fake_guard.write_text("")
 
     def _fake_is_dir(path: Path) -> bool:
         if path == fake_libs:
             return True
         return path.is_dir()
 
+    def _fake_get_script_path() -> Path:
+        return fake_guard
+
     _test_hooks.is_dir = _fake_is_dir
+    _test_hooks.get_script_path = _fake_get_script_path
 
-    # Create a copy of guard.py in the fake project
-    fake_project = tmp_path / "project"
-    fake_project.mkdir()
-    fake_scripts = fake_project / "scripts"
-    fake_scripts.mkdir()
-    fake_guard = fake_scripts / "guard.py"
-
-    # Copy _test_hooks
-    hooks_content = Path(guard.__file__).parent / "_test_hooks.py"
-    (fake_scripts / "__init__.py").write_text("")
-    (fake_scripts / "_test_hooks.py").write_text(hooks_content.read_text())
-
-    # Create guard with patched hooks
-    guard_source = Path(guard.__file__).read_text()
-    # Patch the _test_hooks import to use our fake
-    patched_guard = guard_source.replace(
-        "from scripts import _test_hooks",
-        f'''
-import sys
-sys.path.insert(0, r"{fake_libs / "monorepo_guards" / "src"}")
-sys.path.insert(0, r"{fake_libs}")
-
-from pathlib import Path as _Path
-
-class _FakeHooks:
-    @staticmethod
-    def is_dir(path: _Path) -> bool:
-        return path == _Path(r"{fake_libs}")
-
-    @staticmethod
-    def get_script_path() -> _Path:
-        return _Path(r"{fake_guard}")
-
-    @staticmethod
-    def set_script_path(path: _Path) -> None:
-        pass
-
-_test_hooks = _FakeHooks()
-'''
-    )
-    (fake_scripts / "guard.py").write_text(patched_guard)
+    # Clear cached orchestrator so import finds the fake one in tmp_path
+    cached_keys = [k for k in sys.modules if k.startswith("monorepo_guards")]
+    cached_modules: dict[str, types.ModuleType] = {}
+    for k in cached_keys:
+        mod = sys.modules.pop(k)
+        if mod is not None:
+            cached_modules[k] = mod
 
     try:
+        if "scripts.guard" in sys.modules:
+            del sys.modules["scripts.guard"]
         with pytest.raises(SystemExit) as exc_info:
-            runpy.run_path(str(fake_scripts / "guard.py"), run_name="__main__")
-        assert exc_info.value.code == 42
+            runpy.run_path(
+                str(Path(guard.__file__).resolve()),
+                run_name="__main__",
+            )
+        code = exc_info.value.code if isinstance(exc_info.value.code, int) else 0
+        assert code == 42
     finally:
         _test_hooks.is_dir = original_is_dir
+        _test_hooks.get_script_path = original_get_script_path
+        # Restore cached orchestrator modules
+        sys.modules.update(cached_modules)
+        guards_src = str(fake_libs / "monorepo_guards" / "src")
+        if guards_src in sys.path:
+            sys.path.remove(guards_src)
+        if str(fake_libs) in sys.path:
+            sys.path.remove(str(fake_libs))

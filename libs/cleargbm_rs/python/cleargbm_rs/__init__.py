@@ -9,21 +9,22 @@ with a helpful message.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
     import numpy as np
+    from numpy.typing import NDArray
 
 __version__ = "0.1.0"
 
 
-def _raise_not_built() -> None:
-    """Raise ImportError indicating Rust extension not built."""
-    msg = (
-        "cleargbm_rs Rust extension not built. "
-        "Run 'maturin develop' to build the extension."
-    )
+def _raise_not_built() -> NoReturn:
+    """Raise ImportError indicating Rust extension not built.
+
+    Raises:
+        ImportError: Always raised.
+    """
+    msg = "cleargbm_rs Rust extension not built. Run 'maturin develop' to build the extension."
     raise ImportError(msg)
 
 
@@ -51,8 +52,6 @@ def build_histogram_rs(
         ValueError: If input arrays have invalid shapes.
     """
     _raise_not_built()
-    # This line is never reached but satisfies type checker
-    raise AssertionError("unreachable")
 
 
 __all__ = [
