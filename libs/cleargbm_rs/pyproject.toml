@@ -29,7 +29,7 @@ dev = [
 ]
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
+features = ["extension-module"]
 python-source = "python"
 module-name = "cleargbm_rs"
 
@@ -58,7 +58,7 @@ explicit_package_bases = true
 line-length = 100
 target-version = "py311"
 src = ["python", "tests", "scripts"]
-exclude = [".venv"]
+exclude = [".venv", "tools"]
 
 [tool.ruff.lint]
 select = [
