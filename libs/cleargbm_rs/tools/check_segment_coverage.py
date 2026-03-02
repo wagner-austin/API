@@ -148,11 +148,9 @@ def main() -> int:
             src_path = Path(filename)
             short_name = src_path.name
             print(f"\n  {short_name} ({pct:.1f}%):")
-            for line_num in uncovered[:10]:
+            for line_num in uncovered:
                 source = get_source_line(src_path, line_num)
                 print(f"    {line_num:4d}: {source}")
-            if len(uncovered) > 10:
-                print(f"    ... and {len(uncovered) - 10} more")
     else:
         print("All source lines are covered!")
 
@@ -160,9 +158,8 @@ def main() -> int:
     if overall_pct >= args.threshold:
         print(f"PASS: Coverage {overall_pct:.2f}% >= {args.threshold:.2f}%")
         return 0
-    else:
-        print(f"FAIL: Coverage {overall_pct:.2f}% < {args.threshold:.2f}%")
-        return 1
+    print(f"FAIL: Coverage {overall_pct:.2f}% < {args.threshold:.2f}%")
+    return 1
 
 
 if __name__ == "__main__":
