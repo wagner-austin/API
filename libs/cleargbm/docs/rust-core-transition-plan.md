@@ -156,14 +156,19 @@ libs/
     └── src/
         ├── lib.rs               # Module exports
         ├── error.rs             # ClearGbmError enum (with inline tests)
-        ├── types.rs             # TreeNode, HistogramBuffer, SplitConfig (with inline tests)
-        ├── histogram.rs         # build_histogram, subtract_histogram (with inline tests)
-        ├── split.rs             # Split finding: find_best_split_from_histogram, find_best_split_across_features (with inline tests)
-        └── tree.rs              # Tree construction: build_tree, TreeBuildConfig, Tree (with inline tests)
+        ├── types/               # TreeNode, HistogramBuffer, SplitConfig (with inline tests)
+        ├── histogram/           # build_histogram, subtract_histogram (with inline tests)
+        ├── split/               # Split finding (with inline tests)
+        ├── tree/                # Tree construction: build_tree, TreeBuildConfig, Tree (with inline tests)
+        └── predict/             # Prediction/inference (IMPLEMENTED)
+            ├── mod.rs           # sigmoid, predict_single, predict_tree, predict_ensemble, predict_proba
+            └── tests/           # 57 unit tests across 5 test files
+    └── tests/
+        └── integration_tests.rs # 17 end-to-end integration tests
 ```
 
 **Note:** Tests are inline in each module (`#[cfg(test)] mod tests { ... }`) following Rust convention.
-No separate tests/ or benches/ directories - keeps tests co-located with implementation.
+Integration tests are in `tests/integration_tests.rs`.
 
 ---
 
@@ -176,12 +181,12 @@ No separate tests/ or benches/ directories - keeps tests co-located with impleme
 | 3 | Histogram Building | **COMPLETED** |
 | 4 | Split Finding | **COMPLETED** |
 | 5 | Tree Construction | **COMPLETED** |
-| 6 | Prediction/Inference | PENDING |
-| 7 | PyO3 Bindings | PENDING |
+| 6 | Prediction/Inference | **COMPLETED** |
+| 7 | PyO3 Bindings | **COMPLETED** |
 | 8 | Python Integration | PENDING |
 | 9 | Benchmarking and Optimization | PENDING |
 
-**Current Status:** `make check` passes (103 tests, clippy clean, fmt clean).
+**Current Status:** `make check` passes (1122 tests, clippy clean, fmt clean, 100% segment coverage). All lints at `forbid`.
 
 ---
 
@@ -787,159 +792,208 @@ pub fn build_tree(input: &BuildTreeInput<'_>) -> std::result::Result<Tree, Clear
 
 ---
 
-## Phase 6: Prediction/Inference (PENDING)
-
-To be implemented following same patterns (no type alias, explicit Result types).
-
----
-
-## Phase 7: PyO3 Bindings (PENDING)
-
-**Note:** PyO3 bindings will need to use `usize::try_from()` instead of `as usize`
-to comply with our `as_conversions = "deny"` lint. Example pattern:
+## Phase 6: Prediction/Inference (COMPLETED)
 
 ```rust
-// Convert i64 to usize safely (no `as` casts)
-let indices: std::result::Result<Vec<usize>, _> = sample_indices
-    .as_slice()?
-    .iter()
-    .map(|&x| usize::try_from(x).map_err(|_| ClearGbmError::IntegerConversion {
-        context: "i64 to usize".to_string(),
-    }))
-    .collect();
+// src/predict/mod.rs (IMPLEMENTED)
 
-// Use slice accessors instead of unwrap_or
-let grad_sums: Vec<f64> = result.gradient_sums().to_vec();
-let hess_sums: Vec<f64> = result.hessian_sums().to_vec();
-let counts: Vec<usize> = result.counts().to_vec();
+use crate::error::ClearGbmError;
+use crate::tree::Tree;
+
+/// Configuration for ensemble prediction.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PredictEnsembleConfig {
+    base_prediction: f64,
+    learning_rate: f64,
+}
+
+impl PredictEnsembleConfig {
+    /// Creates a new ensemble prediction configuration.
+    ///
+    /// # Errors
+    /// Returns `ClearGbmError::InvalidParameter` if learning_rate is not in (0.0, 1.0].
+    pub fn new(base_prediction: f64, learning_rate: f64)
+        -> std::result::Result<Self, ClearGbmError> { ... }
+
+    // Getters: base_prediction(), learning_rate()
+    // All are `#[must_use] pub const fn`
+}
+
+/// Computes the sigmoid (logistic) function with input clipping to [-500, 500].
+#[must_use]
+pub fn sigmoid(x: f64) -> f64 { ... }
+
+/// Predicts a single sample by traversing the tree from root to leaf.
+///
+/// # Errors
+/// * `ClearGbmError::NodeNotFound` - If a referenced node does not exist.
+/// * `ClearGbmError::FeatureIndexOutOfBounds` - If a node references an invalid feature.
+/// * `ClearGbmError::TreeConstructionFailed` - If the tree is malformed or contains cycles.
+pub fn predict_single(tree: &Tree, features: &[f64])
+    -> std::result::Result<f64, ClearGbmError> { ... }
+
+/// Predicts multiple samples against a single tree.
+///
+/// # Errors
+/// * `ClearGbmError::EmptyInput` - If features is empty.
+/// * Any error from `predict_single`.
+pub fn predict_tree(tree: &Tree, features: &[&[f64]])
+    -> std::result::Result<Vec<f64>, ClearGbmError> { ... }
+
+/// Predicts raw scores for multiple samples using an ensemble of trees.
+/// Formula: base_prediction + learning_rate * sum(tree_predictions)
+///
+/// # Errors
+/// * `ClearGbmError::EmptyInput` - If features or trees is empty.
+/// * Any error from `predict_single`.
+pub fn predict_ensemble(trees: &[Tree], features: &[&[f64]], config: &PredictEnsembleConfig)
+    -> std::result::Result<Vec<f64>, ClearGbmError> { ... }
+
+/// Converts raw predictions to class probabilities via sigmoid.
+/// Returns Vec<(prob_class_0, prob_class_1)>.
+#[must_use]
+pub fn predict_proba(raw_predictions: &[f64]) -> Vec<(f64, f64)> { ... }
 ```
+
+### Key Implementation Details
+
+- **Cycle guard in `predict_single`**: Caps iterations at `tree.n_nodes()` to detect malformed trees
+- **NaN handling**: Respects `nan_goes_left` flag on each internal node
+- **Sigmoid clipping**: Input clamped to [-500, 500] for numerical stability
+- **`predict_proba` is infallible**: Returns empty vec for empty input (matches `compute_leaf_value` pattern)
+- **57 unit tests + 5 integration tests**: Covers sigmoid, single prediction, batch, ensemble, probability conversion, and all error paths
+- **Test files**: `src/predict/tests/{sigmoid_tests,single_tests,batch_tests,ensemble_tests,error_tests}.rs`
 
 ---
 
-## Phase 8: Python Integration (PENDING)
+## Phase 7: PyO3 Bindings (COMPLETED)
 
-```python
-# cleargbm/histogram.py (updated to use Rust when available)
+### Approach
 
-"""Histogram building for gradient boosting.
+All bindings use `PyCFunction::new_closure` with manual argument extraction.
+No `#[pyfunction]` proc macros. All lints stay at `forbid` — no relaxation.
 
-Uses Rust implementation when available, falls back to Python otherwise.
-"""
+### Architecture
 
-from __future__ import annotations
+Two-level function pattern for each binding:
+- `_rs` function: typed, testable, calls Rust core
+- `_from_args` wrapper: extracts from `PyTuple`, calls `_rs`
 
-from typing import TYPE_CHECKING
+Module registration uses `.and_then()` chains — no explicit `Err` arms in our source.
 
-import numpy as np
-from numpy.typing import NDArray
+### Files
 
-from cleargbm._test_hooks import histogram_backend
-
-if TYPE_CHECKING:
-    from cleargbm.types import HistogramResult
-
-
-def build_histogram(
-    sample_indices: NDArray[np.int64],
-    gradients: NDArray[np.float64],
-    hessians: NDArray[np.float64],
-    bins: NDArray[np.int64],
-    n_bins: int,
-) -> HistogramResult:
-    """Build gradient/hessian histogram for split finding.
-
-    Args:
-        sample_indices: Indices of samples at this node.
-        gradients: Gradient values for all samples.
-        hessians: Hessian values for all samples.
-        bins: Pre-computed bin assignments.
-        n_bins: Number of histogram bins.
-
-    Returns:
-        HistogramResult with gradient_sums, hessian_sums, counts.
-    """
-    return histogram_backend(sample_indices, gradients, hessians, bins, n_bins)
+```
+src/pyo3_module/
+├── mod.rs                 # Module entry (#[pymodule]) + register_all via .and_then()
+├── array_helpers.rs       # Generic try_convert_int<F,T> + convert_int_slice<F,T>
+├── error_conversion.rs    # ClearGbmError → PyErr conversion
+├── histogram_fns.rs       # build_histogram_rs, subtract_histogram_rs
+├── prediction_fns.rs      # sigmoid_rs, predict_single/tree/ensemble/proba_rs
+├── tree_fns.rs            # build_tree_rs, PyTree (#[pyclass]), json serde
+└── tests/                 # 6 test modules, all Err paths exercised
+    ├── mod.rs
+    ├── array_helpers_tests.rs
+    ├── error_conversion_tests.rs
+    ├── histogram_fns_tests.rs
+    ├── module_init_tests.rs
+    ├── prediction_fns_tests.rs
+    └── tree_fns_tests.rs
 ```
 
+### Exposed Python API
+
+| Function | Description |
+|---|---|
+| `build_histogram_rs(indices, grads, hess, bins, n_bins)` | Returns `(grad_sums, hess_sums, counts)` as numpy arrays |
+| `subtract_histogram_rs(g1, h1, c1, g2, h2, c2, n_bins)` | Sibling histogram subtraction |
+| `build_tree_rs(indices, grads, hess, bins, n_bins, thresholds, config_json)` | Returns `PyTree` |
+| `predict_single_rs(tree, features)` | Single sample prediction |
+| `predict_tree_rs(tree, features_2d)` | Batch prediction |
+| `predict_ensemble_rs(trees, features_2d, base_pred, lr)` | Ensemble prediction |
+| `predict_proba_rs(raw_preds)` | Raw → probability conversion |
+| `sigmoid_rs(x)` | Sigmoid function |
+| `PyTree` | Class with `.to_json()`, `.from_json()`, `.max_depth`, `.n_leaves`, `.n_nodes` |
+
+### Key Patterns
+
+- **Generic integer conversion**: `try_convert_int<F, T>` tested with u64→u32 overflow to exercise Err arms unreachable on 64-bit (usize↔u64)
+- **Named error helpers**: `ser_err()`, `shape_err()` extracted from `.map_err()` closures for compact calls + direct testing
+- **`.and_then()` chains**: Module registration eliminates explicit Err arms; error propagation lives in `Result::and_then`
+- **`.map()` for infallible transforms**: `PyTuple::new().map(|t| t.unbind().into_any())`
+
+### Stats
+
+- **1122 tests** (1105 unit + 17 integration), all passing
+- **3253/3253 lines — 100.00% segment coverage**
+- All clippy lints at `forbid` including `question_mark_used`, `as_conversions`, `unwrap_used`
+- `unsafe_code = "forbid"` — PyO3 0.27.2's `#[pymodule]` expansion passes this lint
+
+---
+
+## Phase 8: Python Integration (IN PROGRESS)
+
+### Approach
+
+All hot-path operations are wired through `_test_hooks.py` module-level hooks.
+Each hook follows a three-part pattern:
+
+1. **Protocol** — typed callable interface (e.g., `PredictTreeBackend`)
+2. **Default implementation** — pure Python function (e.g., `_default_predict_tree`)
+3. **Module-level hook variable** — set to default, swappable at startup (e.g., `_predict_tree_backend`)
+4. **Public accessor** — calls the hook directly (e.g., `predict_tree()`)
+
+No `try/except`, no auto-detection, no `_get_default_backend()`. Production sets hooks
+to Rust implementations at startup. Tests call through the Python defaults or inject fakes.
+
+### Hook Inventory
+
+| Hook Variable | Protocol | Default | Caller Module |
+|---|---|---|---|
+| `_random_state_factory` | `Callable[[int], RandomStateProtocol]` | `_default_random_state_factory` | `tree.py` |
+| `_pool_factory` | `Callable[..., WorkerPoolProtocol]` | `_default_pool_factory` | `tree.py` |
+| `_float_buffer_factory` | `Callable[[int], FloatBuffer]` | `_default_float_buffer_factory` | (internal) |
+| `_int_buffer_factory` | `Callable[[int], IntBuffer]` | `_default_int_buffer_factory` | (internal) |
+| `_histogram_buffer_factory` | `Callable[[int], HistogramBuffer]` | `_default_histogram_buffer_factory` | (internal) |
+| `_build_histogram_backend` | `BuildHistogramBackend` | `_default_build_histogram` | `histogram.py` |
+| `_subtract_histogram_backend` | `SubtractHistogramBackend` | `_default_subtract_histogram` | `histogram.py` |
+| `_predict_tree_backend` | `PredictTreeBackend` | `_default_predict_tree` | `tree.py` |
+| `_sigmoid_backend` | `SigmoidBackend` | `_default_sigmoid` | `losses.py` |
+| `_sigmoid_array_backend` | `SigmoidArrayBackend` | `_default_sigmoid_array` | `losses.py` |
+
+### Caller Wiring
+
+Each caller imports the public accessor and delegates to it:
+
 ```python
-# cleargbm/_test_hooks.py
+# histogram.py
+from cleargbm._test_hooks import build_histogram as _build_histogram_hook
+from cleargbm._test_hooks import subtract_histogram as _subtract_histogram_hook
 
-"""Hooks for dependency injection in cleargbm.
+# tree.py
+from cleargbm._test_hooks import predict_tree as _predict_tree_hook
 
-Production sets hooks to Rust implementations at startup.
-Tests set hooks to Python fakes.
-"""
-
-from __future__ import annotations
-
-from typing import Protocol
-
-import numpy as np
-from numpy.typing import NDArray
-
-from cleargbm.types import HistogramResult
-
-
-class HistogramBackendProtocol(Protocol):
-    """Protocol for histogram building backend."""
-
-    def __call__(
-        self,
-        sample_indices: NDArray[np.int64],
-        gradients: NDArray[np.float64],
-        hessians: NDArray[np.float64],
-        bins: NDArray[np.int64],
-        n_bins: int,
-    ) -> HistogramResult:
-        """Build histogram from sample data."""
-        ...
-
-
-def _python_histogram_backend(
-    sample_indices: NDArray[np.int64],
-    gradients: NDArray[np.float64],
-    hessians: NDArray[np.float64],
-    bins: NDArray[np.int64],
-    n_bins: int,
-) -> HistogramResult:
-    """Pure Python implementation (fallback/testing)."""
-    # Existing Python implementation
-    ...
-
-
-def _rust_histogram_backend(
-    sample_indices: NDArray[np.int64],
-    gradients: NDArray[np.float64],
-    hessians: NDArray[np.float64],
-    bins: NDArray[np.int64],
-    n_bins: int,
-) -> HistogramResult:
-    """Rust implementation via PyO3."""
-    from cleargbm_rs import build_histogram_rs
-
-    grad_sums, hess_sums, counts = build_histogram_rs(
-        sample_indices, gradients, hessians, bins, n_bins
-    )
-    return HistogramResult(
-        gradient_sums=grad_sums,
-        hessian_sums=hess_sums,
-        counts=counts,
-    )
-
-
-def _get_default_backend() -> HistogramBackendProtocol:
-    """Get default backend (Rust if available, else Python)."""
-    try:
-        import cleargbm_rs  # noqa: F401
-        return _rust_histogram_backend
-    except ImportError:
-        return _python_histogram_backend
-
-
-# Production code calls this directly
-# Tests override: _test_hooks.histogram_backend = fake_backend
-histogram_backend: HistogramBackendProtocol = _get_default_backend()
+# losses.py
+from cleargbm._test_hooks import sigmoid as _sigmoid_hook
+from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
 ```
+
+### Stats
+
+- **486 tests**, all passing
+- **2042 statements, 588 branches — 100.00% coverage**
+- No `Any`, no `cast()`, no `type: ignore`
+- All hooks tested directly in `test_test_hooks.py`
+
+### Remaining Work
+
+- **Rust adapter functions**: Wrapper functions that accept Python types (e.g., `DecisionTree`
+  TypedDict) and call `cleargbm_rs` functions (which use `PyTree` opaque wrapper)
+- **Production startup wiring**: Code that sets `_test_hooks._predict_tree_backend = rust_adapter`
+  when the Rust extension is available
+- **Type bridge**: Converting between Python `DecisionTree` TypedDict and Rust `PyTree`
+  (via JSON or direct field mapping)
+- **`maturin develop`** verification: Build Rust extension and verify `import cleargbm_rs` works
 
 ---
 
@@ -975,53 +1029,32 @@ must also follow the no-unwrap pattern.
 
 ### Python Integration Tests
 
+Integration tests will verify Rust backends match Python defaults by:
+
+1. Saving the current (Python default) hook
+2. Setting the hook to the Rust adapter
+3. Running the same inputs through both and comparing results
+4. Restoring the original hook
+
 ```python
-# tests/test_rust_integration.py
+# tests/test_rust_integration.py (planned — requires maturin build)
 
 """Integration tests verifying Rust backend matches Python backend."""
 
-import numpy as np
-import pytest
-
 from cleargbm import _test_hooks
-from cleargbm._test_hooks import (
-    _python_histogram_backend,
-    _rust_histogram_backend,
-)
 
+def test_rust_histogram_matches_python() -> None:
+    """Verify Rust histogram produces same results as Python."""
+    # Save Python default
+    python_backend = _test_hooks._build_histogram_backend
 
-def test_rust_matches_python() -> None:
-    """Verify Rust implementation produces same results as Python."""
-    rng = np.random.default_rng(42)
-    n_samples = 10000
-    n_bins = 64
+    # Set Rust adapter (from production startup wiring)
+    _test_hooks._build_histogram_backend = rust_histogram_adapter
 
-    sample_indices = np.arange(n_samples, dtype=np.int64)
-    gradients = rng.standard_normal(n_samples)
-    hessians = np.ones(n_samples, dtype=np.float64)
-    bins = rng.integers(0, n_bins, size=n_samples, dtype=np.int64)
+    # ... run same inputs through both, compare results ...
 
-    python_result = _python_histogram_backend(
-        sample_indices, gradients, hessians, bins, n_bins
-    )
-    rust_result = _rust_histogram_backend(
-        sample_indices, gradients, hessians, bins, n_bins
-    )
-
-    np.testing.assert_allclose(
-        python_result.gradient_sums,
-        rust_result.gradient_sums,
-        rtol=1e-10,
-    )
-    np.testing.assert_allclose(
-        python_result.hessian_sums,
-        rust_result.hessian_sums,
-        rtol=1e-10,
-    )
-    np.testing.assert_array_equal(
-        python_result.counts,
-        rust_result.counts,
-    )
+    # Restore
+    _test_hooks._build_histogram_backend = python_backend
 ```
 
 ---
@@ -1035,21 +1068,27 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 
 ## Validation Checklist
 
-### Code Quality (Rust) - Phases 1-5 COMPLETED
-- [x] `cargo clippy` passes with all lints enabled
+### Code Quality (Rust) - Phases 1-7 COMPLETED
+- [x] `cargo clippy` passes with all lints at `forbid`
 - [x] `cargo fmt --check` passes
-- [x] `cargo test` passes (103 tests)
-- [ ] `cargo tarpaulin --fail-under 100` passes (future)
+- [x] `cargo test --all-features` passes (1122 tests)
+- [x] `cargo llvm-cov` + `check_segment_coverage.py` passes (100.00%, 3253/3253 lines)
 - [x] No `unsafe` code (`unsafe_code = "forbid"`)
-- [x] No `unwrap()`, `expect()`, or `panic!()` (`unwrap_used = "deny"`)
-- [x] All public items have doc comments (`missing_docs = "deny"`)
+- [x] No `unwrap()`, `expect()`, or `panic!()` (all at `forbid`)
+- [x] No `?` operator (`question_mark_used = "forbid"`)
+- [x] No `as` casts (`as_conversions = "forbid"`)
+- [x] All public items have doc comments (`missing_docs = "forbid"`)
 - [x] All error variants documented
 
-### Code Quality (Python Integration) - PENDING
-- [ ] `make check` passes in cleargbm
-- [ ] 100% test coverage maintained
-- [ ] No `Any`, `cast()`, or `type: ignore`
-- [ ] `_test_hooks.py` pattern used for DI
+### Code Quality (Python Integration) - IN PROGRESS
+- [x] `make check` passes in cleargbm (486 tests, 100.00% coverage)
+- [x] 100% test coverage maintained (2042 statements, 588 branches)
+- [x] No `Any`, `cast()`, or `type: ignore`
+- [x] `_test_hooks.py` pattern used for DI (10 hooks, all Protocol-typed)
+- [x] All hot-path callers wired through hooks (histogram, predict_tree, sigmoid, sigmoid_array)
+- [ ] Rust adapter functions (convert Python types to Rust types)
+- [ ] Production startup wiring (set hooks to Rust implementations)
+- [ ] `maturin develop` builds and `import cleargbm_rs` works
 
 ### Performance - PENDING
 - [ ] Benchmark shows 10x+ improvement over Python
@@ -1058,7 +1097,7 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 
 ### Integration - PENDING
 - [ ] Python API unchanged (no breaking changes)
-- [ ] Rust backend optional (graceful fallback)
+- [ ] Rust backend set via hooks at startup (no try/except, no auto-detection)
 - [ ] CI builds both Python and Rust
 
 ---
@@ -1070,13 +1109,13 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 3. **Phase 3**: Histogram building with tests ✅ COMPLETED
 4. **Phase 4**: Split finding ✅ COMPLETED
 5. **Phase 5**: Tree construction ✅ COMPLETED
-6. **Phase 6**: Prediction/inference ⏳ NEXT
-7. **Phase 7**: PyO3 bindings
-8. **Phase 8**: Python integration with _test_hooks
+6. **Phase 6**: Prediction/inference ✅ COMPLETED
+7. **Phase 7**: PyO3 bindings (PyCFunction::new_closure, manual extraction) ✅ COMPLETED
+8. **Phase 8**: Python integration with _test_hooks ⏳ IN PROGRESS (hooks wired, adapters pending)
 9. **Phase 9**: Final benchmarking and optimization
 
 Each phase must pass `make check` before proceeding.
 
 ---
 
-*Last updated: January 2026*
+*Last updated: March 2026*
