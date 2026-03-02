@@ -18,6 +18,9 @@
 pub mod error;
 pub mod histogram;
 pub mod hooks;
+pub mod predict;
+#[cfg(feature = "python-bindings")]
+pub mod pyo3_module;
 pub mod split;
 pub mod tree;
 pub mod types;
@@ -28,6 +31,9 @@ pub mod testkit;
 pub use error::ClearGbmError;
 pub use histogram::{build_histogram, subtract_histogram};
 pub use hooks::Hooks;
+pub use predict::{
+    predict_ensemble, predict_proba, predict_single, predict_tree, sigmoid, PredictEnsembleConfig,
+};
 pub use split::{
     check_monotonicity_constraint, compute_split_gain, find_best_split_across_features,
     find_best_split_from_histogram, MonotonicConstraint, NanDirection, SplitResult,
