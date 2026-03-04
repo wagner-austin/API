@@ -453,16 +453,13 @@ def process_train_job(config_json: str) -> dict[str, JSONValue]:
 
     # Upload to data-bank if configured
     if use_data_bank:
-        model_path_str = result.get("active_model_path")
-        if isinstance(model_path_str, str):
-            model_path = Path(model_path_str)
-            if model_path.exists():
-                file_id = _upload_model_to_data_bank(
-                    model_path,
-                    data_bank_url,
-                    data_bank_key,
-                )
-                result["model_file_id"] = file_id
+        model_path = Path(str(result["active_model_path"]))
+        file_id = _upload_model_to_data_bank(
+            model_path,
+            data_bank_url,
+            data_bank_key,
+        )
+        result["model_file_id"] = file_id
 
         # Clean up temp directory
         shutil.rmtree(model_output_dir, ignore_errors=True)
