@@ -37,6 +37,18 @@ from covenant_ml.ensemble.optimizer import (
     set_minimize_hook,
     use_real_scipy,
 )
+from covenant_ml.ensemble.regression_optimizer import (
+    create_regression_equal_weights,
+    extract_regression_prediction_matrix,
+    optimize_regression_ensemble_weights,
+    validate_regression_oof_data,
+)
+from covenant_ml.ensemble.regression_types import (
+    RegressionEnsembleOOFData,
+    RegressionOptimizationConfig,
+    RegressionOptimizationResult,
+    make_default_regression_optimization_config,
+)
 from covenant_ml.ensemble.types import (
     EnsembleOOFData,
     EnsemblePrediction,
@@ -62,14 +74,22 @@ __all__ = [
     "ModelOOFPredictions",
     "OptimizationConfig",
     "OptimizationResult",
+    "RegressionEnsembleOOFData",
+    "RegressionOptimizationConfig",
+    "RegressionOptimizationResult",
     "compute_weighted_predictions",
     "create_equal_weights",
     "create_oof_data",
+    "create_regression_equal_weights",
     "extract_prediction_matrix",
+    "extract_regression_prediction_matrix",
     "make_default_optimization_config",
+    "make_default_regression_optimization_config",
     "optimize_ensemble_weights",
+    "optimize_regression_ensemble_weights",
     "set_minimize_hook",
     "use_real_scipy",
     "validate_oof_data",
+    "validate_regression_oof_data",
     "validate_weights",
 ]

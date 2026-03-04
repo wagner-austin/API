@@ -47,6 +47,17 @@ from covenant_ml.validation.registry import (
     CVSplitterRegistry,
     default_cv_registry,
 )
+from covenant_ml.validation.regression_runner import (
+    FoldRegressorTrainer,
+    TrainedRegressor,
+    get_regression_fold_data,
+    kfold_split,
+    run_regression_cross_validation,
+)
+from covenant_ml.validation.regression_types import (
+    RegressionCVResult,
+    RegressionFoldResult,
+)
 from covenant_ml.validation.runner import (
     FoldTrainer,
     TrainedModel,
@@ -85,14 +96,18 @@ __all__ = [
     "CVSplitterRegistry",
     "CVStrategyCapabilities",
     "CVStrategyName",
+    "FoldRegressorTrainer",
     "FoldResult",
     "FoldTrainer",
     "GroupStratifiedKFoldSplitter",
     "OOFMetrics",
+    "RegressionCVResult",
+    "RegressionFoldResult",
     "ShuffleSplitSplitter",
     "StratifiedKFoldSplitter",
     "TimeSeriesSplitter",
     "TrainedModel",
+    "TrainedRegressor",
     "combine_oof_predictions",
     "compute_oof_auc",
     "compute_oof_metrics",
@@ -103,9 +118,12 @@ __all__ = [
     "default_cv_registry",
     "get_fold_data",
     "get_oof_for_stacking",
+    "get_regression_fold_data",
     "group_stratified_kfold_split",
+    "kfold_split",
     "run_cross_validation",
     "run_group_cross_validation",
+    "run_regression_cross_validation",
     "stratified_kfold_split",
     "validate_oof_coverage",
 ]
