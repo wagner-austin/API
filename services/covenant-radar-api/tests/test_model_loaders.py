@@ -918,18 +918,18 @@ class TestLoadLogregModelFull:
 
     def test_load_logreg_model_full_path(self, tmp_path: Path) -> None:
         """Load LogReg model from saved joblib file."""
-        from covenant_ml.backends.logreg.backend import _get_sklearn_imports
-
-        # Get sklearn imports via typed accessor
-        logreg_ctor, dump_fn, _ = _get_sklearn_imports()
+        from covenant_ml.backends.logreg.backend import (
+            _create_logreg_model,
+            _get_joblib_imports,
+        )
 
         # Create and fit a model directly (not via backend.train)
         x_data: NDArray[np.float64] = np.random.randn(100, 10).astype(np.float64)
         y_data: NDArray[np.int64] = np.random.randint(0, 2, size=100).astype(np.int64)
 
-        model = logreg_ctor(
+        model = _create_logreg_model(
             penalty="l2",
-            C=1.0,
+            inverse_reg_strength=1.0,
             solver="lbfgs",
             max_iter=200,
             tol=1e-4,
@@ -942,6 +942,7 @@ class TestLoadLogregModelFull:
 
         # Save model
         model_path = tmp_path / "logreg_model.joblib"
+        dump_fn, _ = _get_joblib_imports()
         dump_fn(model, str(model_path))
 
         # Load and verify by testing prediction
