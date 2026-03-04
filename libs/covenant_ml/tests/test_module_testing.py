@@ -6,9 +6,13 @@ Tests the public testing utility functions.
 from __future__ import annotations
 
 from covenant_ml.testing import (
+    make_lightgbm_regressor_config,
     make_logreg_config,
+    make_lstm_regressor_config,
+    make_mlp_regressor_config,
     make_random_forest_config,
     make_train_config,
+    make_xgboost_regressor_config,
 )
 
 
@@ -134,3 +138,144 @@ def test_make_random_forest_config_no_max_depth() -> None:
     config = make_random_forest_config(max_depth=None)
 
     assert config["max_depth"] is None
+
+
+# =============================================================================
+# Tests: Regressor Config Factories
+# =============================================================================
+
+
+def test_make_xgboost_regressor_config_defaults() -> None:
+    """make_xgboost_regressor_config creates TrainConfig with defaults."""
+    config = make_xgboost_regressor_config()
+
+    assert config["device"] == "cpu"
+    assert config["learning_rate"] == 0.1
+    assert config["max_depth"] == 3
+    assert config["n_estimators"] == 10
+    assert config["random_state"] == 42
+    assert config["reg_alpha"] == 0.0
+    assert config["reg_lambda"] == 1.0
+    assert "scale_pos_weight" not in config
+
+
+def test_make_xgboost_regressor_config_custom() -> None:
+    """make_xgboost_regressor_config accepts custom values."""
+    config = make_xgboost_regressor_config(
+        device="cuda",
+        learning_rate=0.05,
+        max_depth=5,
+        n_estimators=50,
+        random_state=99,
+    )
+
+    assert config["device"] == "cuda"
+    assert config["learning_rate"] == 0.05
+    assert config["max_depth"] == 5
+    assert config["n_estimators"] == 50
+    assert config["random_state"] == 99
+
+
+def test_make_lightgbm_regressor_config_defaults() -> None:
+    """make_lightgbm_regressor_config creates LightGBMConfig with defaults."""
+    config = make_lightgbm_regressor_config()
+
+    assert config["device"] == "cpu"
+    assert config["learning_rate"] == 0.1
+    assert config["max_depth"] == -1
+    assert config["n_estimators"] == 10
+    assert config["num_leaves"] == 31
+    assert config["min_child_samples"] == 20
+    assert config["random_state"] == 42
+    assert config["early_stopping_rounds"] == 10
+
+
+def test_make_lightgbm_regressor_config_custom() -> None:
+    """make_lightgbm_regressor_config accepts custom values."""
+    config = make_lightgbm_regressor_config(
+        learning_rate=0.05,
+        num_leaves=15,
+        min_child_samples=5,
+        n_estimators=50,
+        random_state=99,
+    )
+
+    assert config["learning_rate"] == 0.05
+    assert config["num_leaves"] == 15
+    assert config["min_child_samples"] == 5
+    assert config["n_estimators"] == 50
+    assert config["random_state"] == 99
+
+
+def test_make_mlp_regressor_config_defaults() -> None:
+    """make_mlp_regressor_config creates MLPConfig with defaults."""
+    config = make_mlp_regressor_config()
+
+    assert config["device"] == "cpu"
+    assert config["precision"] == "fp32"
+    assert config["optimizer"] == "adamw"
+    assert config["hidden_sizes"] == (32, 16)
+    assert config["learning_rate"] == 0.001
+    assert config["batch_size"] == 256
+    assert config["n_epochs"] == 10
+    assert config["dropout"] == 0.1
+    assert config["random_state"] == 42
+    assert config["early_stopping_patience"] == 5
+
+
+def test_make_mlp_regressor_config_custom() -> None:
+    """make_mlp_regressor_config accepts custom values."""
+    config = make_mlp_regressor_config(
+        optimizer="adam",
+        hidden_sizes=(64, 32, 16),
+        learning_rate=0.01,
+        n_epochs=20,
+        dropout=0.2,
+        random_state=99,
+    )
+
+    assert config["optimizer"] == "adam"
+    assert config["hidden_sizes"] == (64, 32, 16)
+    assert config["learning_rate"] == 0.01
+    assert config["n_epochs"] == 20
+    assert config["dropout"] == 0.2
+    assert config["random_state"] == 99
+
+
+def test_make_lstm_regressor_config_defaults() -> None:
+    """make_lstm_regressor_config creates LSTMConfig with defaults."""
+    config = make_lstm_regressor_config()
+
+    assert config["device"] == "cpu"
+    assert config["precision"] == "fp32"
+    assert config["hidden_size"] == 32
+    assert config["num_layers"] == 1
+    assert config["dropout"] == 0.0
+    assert config["bidirectional"] is False
+    assert config["sequence_length"] == 4
+    assert config["learning_rate"] == 0.001
+    assert config["batch_size"] == 256
+    assert config["n_epochs"] == 10
+    assert config["random_state"] == 42
+    assert config["early_stopping_patience"] == 5
+
+
+def test_make_lstm_regressor_config_custom() -> None:
+    """make_lstm_regressor_config accepts custom values."""
+    config = make_lstm_regressor_config(
+        hidden_size=64,
+        num_layers=2,
+        dropout=0.2,
+        bidirectional=True,
+        sequence_length=8,
+        learning_rate=0.01,
+        random_state=99,
+    )
+
+    assert config["hidden_size"] == 64
+    assert config["num_layers"] == 2
+    assert config["dropout"] == 0.2
+    assert config["bidirectional"] is True
+    assert config["sequence_length"] == 8
+    assert config["learning_rate"] == 0.01
+    assert config["random_state"] == 99
