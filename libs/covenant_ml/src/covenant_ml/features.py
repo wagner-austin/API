@@ -34,6 +34,7 @@ class FeatureEngineeringConfig(TypedDict):
     use_ratios: bool
     use_products: bool
     use_log_transforms: bool
+    use_temporal: bool
     max_ratio_features: int  # Limit to avoid explosion (0 = no limit)
     max_product_features: int  # Limit to avoid explosion (0 = no limit)
 
@@ -47,6 +48,7 @@ class EngineeredFeatures(TypedDict):
     n_ratios: int
     n_products: int
     n_log: int
+    n_temporal: int
 
 
 def default_feature_config() -> FeatureEngineeringConfig:
@@ -55,6 +57,7 @@ def default_feature_config() -> FeatureEngineeringConfig:
         "use_ratios": True,
         "use_products": False,  # Products can cause multicollinearity
         "use_log_transforms": True,
+        "use_temporal": False,
         "max_ratio_features": 500,  # Limit ratio features
         "max_product_features": 200,  # Limit product features
     }
@@ -222,18 +225,34 @@ def engineer_features(
     x: NDArray[np.float64],
     feature_names: list[str],
     config: FeatureEngineeringConfig,
+    temporal_features: NDArray[np.float64] | None = None,
+    temporal_feature_names: tuple[str, ...] = (),
 ) -> EngineeredFeatures:
     """Apply feature engineering transforms based on configuration.
 
+    Temporal features are computed upstream (via fit/transform pattern) and
+    passed in as pre-computed columns. The ``use_temporal`` flag in *config*
+    controls whether they are appended to the output.
+
     Args:
-        x: Original feature matrix (n_samples, n_features)
-        feature_names: Names of original features
-        config: Feature engineering configuration
+        x: Original feature matrix (n_samples, n_features).
+        feature_names: Names of original features.
+        config: Feature engineering configuration.
+        temporal_features: Pre-computed temporal feature matrix
+            (n_samples, n_temporal). Required when ``use_temporal`` is True.
+        temporal_feature_names: Ordered names for temporal feature columns.
+            Required when ``use_temporal`` is True.
 
     Returns:
-        EngineeredFeatures with combined feature matrix and metadata
+        EngineeredFeatures with combined feature matrix and metadata.
+
+    Raises:
+        ValueError: If ``use_temporal`` is True but *temporal_features* or
+            *temporal_feature_names* is missing, or if the sample count does
+            not match.
     """
     n_original: int = int(x.shape[1])
+    n_samples: int = int(x.shape[0])
 
     # Start with original features
     all_features: list[NDArray[np.float64]] = [x]
@@ -242,6 +261,7 @@ def engineer_features(
     n_ratios = 0
     n_products = 0
     n_log = 0
+    n_temporal = 0
 
     # Add ratio features
     if config["use_ratios"]:
@@ -272,6 +292,21 @@ def engineer_features(
         all_names.extend(log_names)
         n_log = len(log_names)
 
+    # Add temporal features
+    if config["use_temporal"]:
+        if temporal_features is None:
+            raise ValueError("use_temporal is True but temporal_features was not provided")
+        if len(temporal_feature_names) == 0:
+            raise ValueError("use_temporal is True but temporal_feature_names is empty")
+        temporal_samples: int = int(temporal_features.shape[0])
+        if temporal_samples != n_samples:
+            raise ValueError(
+                f"temporal_features has {temporal_samples} samples but x has {n_samples}"
+            )
+        all_features.append(temporal_features)
+        all_names.extend(temporal_feature_names)
+        n_temporal = len(temporal_feature_names)
+
     # Combine all features
     combined: NDArray[np.float64] = np.hstack(all_features)
 
@@ -282,27 +317,29 @@ def engineer_features(
         "n_ratios": n_ratios,
         "n_products": n_products,
         "n_log": n_log,
+        "n_temporal": n_temporal,
     }
 
 
 # Feature engineering presets for Optuna
-FeaturePreset = Literal["none", "log_only", "ratios_only", "full"]
+FeaturePreset = Literal["none", "log_only", "ratios_only", "full", "temporal"]
 
 
 def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringConfig:
     """Get feature engineering config for a named preset.
 
     Args:
-        preset: One of "none", "log_only", "ratios_only", "full"
+        preset: One of "none", "log_only", "ratios_only", "full", "temporal".
 
     Returns:
-        FeatureEngineeringConfig for the preset
+        FeatureEngineeringConfig for the preset.
     """
     if preset == "none":
         return {
             "use_ratios": False,
             "use_products": False,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
@@ -311,6 +348,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "use_ratios": False,
             "use_products": False,
             "use_log_transforms": True,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
@@ -319,7 +357,17 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
             "use_ratios": True,
             "use_products": False,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 500,
+            "max_product_features": 0,
+        }
+    if preset == "temporal":
+        return {
+            "use_ratios": False,
+            "use_products": False,
+            "use_log_transforms": False,
+            "use_temporal": True,
+            "max_ratio_features": 0,
             "max_product_features": 0,
         }
     # "full"
@@ -327,6 +375,7 @@ def get_feature_config_for_preset(preset: FeaturePreset) -> FeatureEngineeringCo
         "use_ratios": True,
         "use_products": True,
         "use_log_transforms": True,
+        "use_temporal": False,
         "max_ratio_features": 500,
         "max_product_features": 200,
     }

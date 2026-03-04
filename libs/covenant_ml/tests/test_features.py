@@ -67,6 +67,7 @@ class TestDefaultFeatureConfig:
         assert config["use_ratios"] is True
         assert config["use_products"] is False
         assert config["use_log_transforms"] is True
+        assert config["use_temporal"] is False
         assert config["max_ratio_features"] == 500
         assert config["max_product_features"] == 200
 
@@ -260,6 +261,7 @@ class TestEngineerFeatures:
             "use_ratios": False,
             "use_products": False,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
@@ -272,6 +274,7 @@ class TestEngineerFeatures:
         assert result["n_ratios"] == 0
         assert result["n_products"] == 0
         assert result["n_log"] == 0
+        assert result["n_temporal"] == 0
 
     def test_log_only(self) -> None:
         """Adds only log transforms."""
@@ -281,6 +284,7 @@ class TestEngineerFeatures:
             "use_ratios": False,
             "use_products": False,
             "use_log_transforms": True,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 0,
         }
@@ -291,6 +295,7 @@ class TestEngineerFeatures:
         assert result["x"].shape == (2, 4)
         assert result["n_original"] == 2
         assert result["n_log"] == 2
+        assert result["n_temporal"] == 0
         assert "log(A)" in result["feature_names"]
         assert "log(B)" in result["feature_names"]
 
@@ -302,6 +307,7 @@ class TestEngineerFeatures:
             "use_ratios": True,
             "use_products": False,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 100,
             "max_product_features": 0,
         }
@@ -312,6 +318,7 @@ class TestEngineerFeatures:
         assert result["x"].shape == (2, 4)
         assert result["n_original"] == 2
         assert result["n_ratios"] == 2
+        assert result["n_temporal"] == 0
         assert "A/B" in result["feature_names"]
 
     def test_products_only(self) -> None:
@@ -322,6 +329,7 @@ class TestEngineerFeatures:
             "use_ratios": False,
             "use_products": True,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 100,
         }
@@ -332,6 +340,7 @@ class TestEngineerFeatures:
         assert result["x"].shape == (2, 3)
         assert result["n_original"] == 2
         assert result["n_products"] == 1
+        assert result["n_temporal"] == 0
         assert "A*B" in result["feature_names"]
 
     def test_full_engineering(self) -> None:
@@ -342,6 +351,7 @@ class TestEngineerFeatures:
             "use_ratios": True,
             "use_products": True,
             "use_log_transforms": True,
+            "use_temporal": False,
             "max_ratio_features": 100,
             "max_product_features": 100,
         }
@@ -354,6 +364,7 @@ class TestEngineerFeatures:
         assert result["n_ratios"] == 2
         assert result["n_products"] == 1
         assert result["n_log"] == 2
+        assert result["n_temporal"] == 0
 
     def test_output_is_float64(self) -> None:
         """Output array is float64."""
@@ -364,6 +375,7 @@ class TestEngineerFeatures:
         result = engineer_features(x, names, config)
 
         assert result["x"].dtype == np.float64
+        assert result["n_temporal"] == 0
 
 
 class TestGetFeatureConfigForPreset:
@@ -376,6 +388,7 @@ class TestGetFeatureConfigForPreset:
         assert config["use_ratios"] is False
         assert config["use_products"] is False
         assert config["use_log_transforms"] is False
+        assert config["use_temporal"] is False
 
     def test_log_only_preset(self) -> None:
         """'log_only' preset enables only log transforms."""
@@ -384,6 +397,7 @@ class TestGetFeatureConfigForPreset:
         assert config["use_ratios"] is False
         assert config["use_products"] is False
         assert config["use_log_transforms"] is True
+        assert config["use_temporal"] is False
 
     def test_ratios_only_preset(self) -> None:
         """'ratios_only' preset enables only ratios."""
@@ -392,21 +406,29 @@ class TestGetFeatureConfigForPreset:
         assert config["use_ratios"] is True
         assert config["use_products"] is False
         assert config["use_log_transforms"] is False
+        assert config["use_temporal"] is False
         assert config["max_ratio_features"] == 500
 
     def test_full_preset(self) -> None:
-        """'full' preset enables everything."""
+        """'full' preset enables everything except temporal."""
         config = get_feature_config_for_preset("full")
 
         assert config["use_ratios"] is True
         assert config["use_products"] is True
         assert config["use_log_transforms"] is True
+        assert config["use_temporal"] is False
         assert config["max_ratio_features"] == 500
         assert config["max_product_features"] == 200
 
     def test_all_presets_return_typed_config(self) -> None:
         """All presets return valid FeatureEngineeringConfig."""
-        presets: list[FeaturePreset] = ["none", "log_only", "ratios_only", "full"]
+        presets: list[FeaturePreset] = [
+            "none",
+            "log_only",
+            "ratios_only",
+            "full",
+            "temporal",
+        ]
 
         for preset in presets:
             config = get_feature_config_for_preset(preset)
@@ -414,6 +436,7 @@ class TestGetFeatureConfigForPreset:
             assert "use_ratios" in config
             assert "use_products" in config
             assert "use_log_transforms" in config
+            assert "use_temporal" in config
             assert "max_ratio_features" in config
             assert "max_product_features" in config
 
@@ -463,6 +486,7 @@ class TestEngineerFeaturesEdgeCases:
             "use_ratios": True,
             "use_products": False,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 100,
             "max_product_features": 0,
         }
@@ -472,6 +496,7 @@ class TestEngineerFeaturesEdgeCases:
         # Should only have original feature (no ratios possible with 1 feature)
         assert result["n_original"] == 1
         assert result["n_ratios"] == 0
+        assert result["n_temporal"] == 0
         assert result["x"].shape == (2, 1)
 
     def test_single_feature_with_products_enabled(self) -> None:
@@ -482,6 +507,7 @@ class TestEngineerFeaturesEdgeCases:
             "use_ratios": False,
             "use_products": True,
             "use_log_transforms": False,
+            "use_temporal": False,
             "max_ratio_features": 0,
             "max_product_features": 100,
         }
@@ -491,6 +517,7 @@ class TestEngineerFeaturesEdgeCases:
         # Should only have original feature (no products possible with 1 feature)
         assert result["n_original"] == 1
         assert result["n_products"] == 0
+        assert result["n_temporal"] == 0
         assert result["x"].shape == (2, 1)
 
 
@@ -509,6 +536,7 @@ class TestIntegration:
             "use_ratios": True,
             "use_products": True,
             "use_log_transforms": True,
+            "use_temporal": False,
             "max_ratio_features": 200,
             "max_product_features": 100,
         }
@@ -520,6 +548,7 @@ class TestIntegration:
         assert result["n_ratios"] <= 200
         assert result["n_products"] <= 100
         assert result["n_log"] == 50
+        assert result["n_temporal"] == 0
 
         # All values should be finite
         assert _all_finite(result["x"])
