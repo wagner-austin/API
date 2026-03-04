@@ -419,6 +419,39 @@ class TestDataReplayRunner:
 
         assert fake_producer.flush_count == 1
 
+    def test_run_no_delay_with_full_batches(
+        self,
+        restore_hooks: None,
+        fake_producer: FakeProducer,
+        external_dir: Path,
+    ) -> None:
+        """Test runner with instant speed and exact batch multiple (delay=0)."""
+        # 3 samples * 2 features = 6 events, batch size 3 = 2 full batches, no remainder
+        dataset = make_test_loaded_dataset(n_samples=3, n_features=2)
+        loader = FakeDatasetLoader(dataset)
+        config = make_test_dataset_config(name="test")
+        registry = FakeDatasetRegistry(config)
+        ts_registry = FakeTimeSeriesRegistry()
+
+        _test_hooks.dataset_loader_factory = lambda: loader
+        _test_hooks.registry_factory = lambda: registry
+        _test_hooks.timeseries_registry_factory = lambda: ts_registry
+        _test_hooks.perf_counter = lambda: 1.0
+        _test_hooks.generate_uuid = lambda: "test-uuid"
+
+        replay_config = make_replay_config(
+            dataset="test",
+            speed="instant",
+            batch_size=3,
+        )
+
+        runner = DataReplayRunner(fake_producer, replay_config, external_dir)
+        stats = runner.run()
+
+        # 6 events / 3 per batch = 2 batches, no remainder
+        assert stats["batches_sent"] == 2
+        assert stats["events_sent"] == 6
+
 
 class TestRunReplay:
     """Tests for run_replay convenience function."""

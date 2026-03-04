@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+from numpy.typing import NDArray
 from scripts.replay_data._test_hooks import (
     FakeProducer,
     _real_dataset_loader_factory,
@@ -16,6 +18,7 @@ from scripts.replay_data._test_hooks import (
     registry_factory,
     sleep,
     timeseries_registry_factory,
+    wrap_features,
 )
 
 from covenant_radar_api.streaming.schemas import make_measurement_event
@@ -235,3 +238,19 @@ class TestFakeProducer:
         fake = FakeProducer()
         result = fake.flush(10.0)
         assert result == 0
+
+
+class TestFeatures2DWrapper:
+    """Tests for _Features2DWrapper via wrap_features."""
+
+    def test_shape_returns_rows_and_cols(self) -> None:
+        """Test shape property returns (n_rows, n_cols)."""
+        data: NDArray[np.float64] = np.zeros((3, 5), dtype=np.float64)
+        wrapper = wrap_features(data)
+        assert wrapper.shape == (3, 5)
+
+    def test_shape_single_row(self) -> None:
+        """Test shape with single row."""
+        data: NDArray[np.float64] = np.zeros((1, 7), dtype=np.float64)
+        wrapper = wrap_features(data)
+        assert wrapper.shape == (1, 7)
