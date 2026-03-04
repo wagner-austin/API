@@ -36,18 +36,18 @@ class TestLogRegLoaderHook:
         Creates a LogReg model, saves it to a joblib file, then loads it
         via the hook and verifies prediction works correctly.
         """
-        from covenant_ml.backends.logreg.backend import _get_sklearn_imports
-
-        # Get sklearn imports via typed accessor
-        logreg_ctor, dump_fn, _ = _get_sklearn_imports()
+        from covenant_ml.backends.logreg.backend import (
+            _create_logreg_model,
+            _get_joblib_imports,
+        )
 
         # Create and fit a model
         x_data: NDArray[np.float64] = np.random.randn(100, 10).astype(np.float64)
         y_data: NDArray[np.int64] = np.random.randint(0, 2, size=100).astype(np.int64)
 
-        model = logreg_ctor(
+        model = _create_logreg_model(
             penalty="l2",
-            C=1.0,
+            inverse_reg_strength=1.0,
             solver="lbfgs",
             max_iter=200,
             tol=1e-4,
@@ -60,6 +60,7 @@ class TestLogRegLoaderHook:
 
         # Save model
         model_path = tmp_path / "logreg_model.joblib"
+        dump_fn, _ = _get_joblib_imports()
         dump_fn(model, str(model_path))
 
         # Load via hook and verify
@@ -138,3 +139,73 @@ class TestRandomForestLoaderHook:
 
         with pytest.raises(FileNotFoundError):
             _real_random_forest_loader(model_path)
+
+
+# =============================================================================
+# Tests for _real_data_bank_uploader
+# =============================================================================
+
+
+class TestRealDataBankUploader:
+    """Tests for _real_data_bank_uploader function."""
+
+    def test_uploads_model_file_and_returns_file_id(self, tmp_path: Path) -> None:
+        """Test _real_data_bank_uploader uploads file via DataBankClient."""
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from platform_core.json_utils import dump_json_str
+
+        from covenant_radar_api.worker._test_hooks import _real_data_bank_uploader
+
+        # Create a dummy model file
+        model_path = tmp_path / "test_model.ubj"
+        model_path.write_bytes(b"\x00\x01\x02\x03")
+
+        # Start a local HTTP server that returns valid upload response
+        received_requests: list[str] = []
+
+        class UploadHandler(BaseHTTPRequestHandler):
+            """Handler that accepts POST /files and returns upload response."""
+
+            def do_POST(self) -> None:
+                """Handle POST request."""
+                received_requests.append(self.path)
+                # Consume request body to avoid connection reset
+                content_length = int(self.headers.get("Content-Length", 0))
+                if content_length > 0:
+                    self.rfile.read(content_length)
+                body = dump_json_str(
+                    {
+                        "file_id": "test_model.ubj",
+                        "size": 4,
+                        "sha256": "abc123",
+                        "content_type": "application/octet-stream",
+                        "created_at": "2025-01-01T00:00:00Z",
+                    }
+                )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body.encode())
+
+            def log_message(self, format: str, *args: str) -> None:
+                """Suppress log output."""
+
+        server = HTTPServer(("127.0.0.1", 0), UploadHandler)
+        port = server.server_address[1]
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        base_url = f"http://127.0.0.1:{port}"
+        try:
+            file_id = _real_data_bank_uploader(model_path, base_url, "test-api-key")
+        finally:
+            server.shutdown()
+            thread.join(timeout=5.0)
+            server.server_close()
+
+        assert file_id == "test_model.ubj"
+        assert len(received_requests) == 1
+        assert received_requests[0] == "/files"
