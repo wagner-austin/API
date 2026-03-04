@@ -11,7 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from covenant_ml.backends.registry import ClassifierRegistry, default_registry
+from covenant_ml.backends.registry import (
+    BackendFactory,
+    BackendRegistration,
+    ClassifierRegistry,
+    default_registry,
+)
 from covenant_ml.datasets import (
     DatasetConfig,
     DatasetRegistry,
@@ -53,7 +58,23 @@ class RegistryFactory(Protocol):
     def __call__(self) -> ClassifierRegistry: ...
 
 
-registry_factory: RegistryFactory = default_registry
+def _full_registry() -> ClassifierRegistry:
+    """Build registry with all backends including PyTorch (covenant_nn).
+
+    Returns:
+        ClassifierRegistry with tree-based backends from covenant_ml
+        and neural backends (MLP, LSTM) from covenant_nn.
+    """
+    reg = default_registry()
+    nn_mod = __import__("covenant_nn", fromlist=["create_mlp_backend", "create_lstm_backend"])
+    create_mlp: BackendFactory = nn_mod.create_mlp_backend
+    create_lstm: BackendFactory = nn_mod.create_lstm_backend
+    reg.register("mlp", BackendRegistration(create_mlp))
+    reg.register("lstm", BackendRegistration(create_lstm))
+    return reg
+
+
+registry_factory: RegistryFactory = _full_registry
 
 
 # =============================================================================
