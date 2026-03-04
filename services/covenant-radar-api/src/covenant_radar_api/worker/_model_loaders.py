@@ -330,7 +330,7 @@ def _build_mlp_model(
 ) -> TrainableModel:
     """Build MLP model architecture for loading state dict.
 
-    Mirrors the _build_model function in covenant_ml.backends.mlp.backend.
+    Mirrors the _build_model function in covenant_nn.backends.mlp.backend.
 
     Args:
         n_features: Number of input features.
@@ -473,7 +473,7 @@ class _LinearLayerProto(Protocol):
 class _LSTMClassifierWrapper:
     """LSTM classifier combining LSTM and linear layers.
 
-    Mirrors the _LSTMClassifierWrapper in covenant_ml.backends.lstm.backend.
+    Mirrors the _LSTMClassifierWrapper in covenant_nn.backends.lstm.backend.
     """
 
     def __init__(
@@ -550,7 +550,7 @@ def _build_lstm_model(
 ) -> tuple[_LSTMClassifierWrapper, int]:
     """Build LSTM model architecture for loading state dict.
 
-    Mirrors the _build_model function in covenant_ml.backends.lstm.backend.
+    Mirrors the _build_model function in covenant_nn.backends.lstm.backend.
 
     Args:
         n_features: Total number of input features.
