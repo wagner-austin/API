@@ -38,13 +38,14 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
 covenant-ml = { path = "../../libs/covenant_ml", develop = true }
+covenant-nn = { path = "../../libs/covenant_nn", develop = true }
 covenant-persistence = { path = "../../libs/covenant_persistence", develop = true }
 openpyxl = "^3.1.0"
 xlrd = "^2.0.2"
 
 [[tool.poetry.source]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
 priority = "explicit"
 
 [tool.poetry.group.dev.dependencies]
@@ -87,7 +88,7 @@ disallow_any_explicit = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv"]
+exclude = [".venv", "mckinnon_sources"]
 
 [tool.ruff.lint]
 select = [
