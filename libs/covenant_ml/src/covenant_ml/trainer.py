@@ -20,12 +20,19 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
-from .metrics import compute_all_metrics, format_metrics_str
+from .metrics import (
+    compute_all_metrics,
+    compute_all_regression_metrics,
+    format_metrics_str,
+    format_regression_metrics_str,
+)
 from .preprocessing import AutoPreprocessor, PreprocessingState
 from .types import (
     DMatrixFactory,
     DMatrixProtocol,
     FeatureImportance,
+    RegressionTrainOutcome,
+    RegressionTrainProgress,
     RequestedDevice,
     ResolvedDevice,
     TrainConfig,
@@ -33,6 +40,8 @@ from .types import (
     TrainProgress,
     XGBClassifierFactory,
     XGBModelProtocol,
+    XGBRegressorFactory,
+    XGBRegressorModelProtocol,
 )
 
 _log = get_logger(__name__)
@@ -172,6 +181,50 @@ class DataSplits:
         return self.n_train + self.n_val + self.n_test
 
 
+class RegressionDataSplits:
+    """Container for regression train/val/test data splits.
+
+    Parallel to DataSplits for classification. Uses float64 targets
+    instead of int64 labels.
+    """
+
+    def __init__(
+        self,
+        x_train: NDArray[np.float64],
+        y_train: NDArray[np.float64],
+        x_val: NDArray[np.float64],
+        y_val: NDArray[np.float64],
+        x_test: NDArray[np.float64],
+        y_test: NDArray[np.float64],
+    ) -> None:
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_val = x_val
+        self.y_val = y_val
+        self.x_test = x_test
+        self.y_test = y_test
+
+    @property
+    def n_train(self) -> int:
+        """Number of training samples."""
+        return len(self.y_train)
+
+    @property
+    def n_val(self) -> int:
+        """Number of validation samples."""
+        return len(self.y_val)
+
+    @property
+    def n_test(self) -> int:
+        """Number of test samples."""
+        return len(self.y_test)
+
+    @property
+    def n_total(self) -> int:
+        """Total number of samples across all splits."""
+        return self.n_train + self.n_val + self.n_test
+
+
 class PreprocessedDataSplits:
     """Container for preprocessed train/val/test data splits.
 
@@ -269,6 +322,19 @@ class _XGBCoreProto(Protocol):
 class _XGBModuleProto(Protocol):
     core: _XGBCoreProto
     XGBClassifier: XGBClassifierFactory
+    DMatrix: DMatrixFactory
+
+
+class _XGBRegressorModuleProto(Protocol):
+    """Protocol for the xgboost module used by regression training.
+
+    Includes all _XGBModuleProto attributes for _resolve_device compatibility,
+    plus the XGBRegressor factory. The real xgboost module satisfies both.
+    """
+
+    core: _XGBCoreProto
+    XGBClassifier: XGBClassifierFactory
+    XGBRegressor: XGBRegressorFactory
     DMatrix: DMatrixFactory
 
 
@@ -460,6 +526,73 @@ def stratified_split(
     )
 
 
+def regression_split(
+    x_features: NDArray[np.float64],
+    y_targets: NDArray[np.float64],
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+    random_state: int,
+) -> RegressionDataSplits:
+    """Split regression data into train/val/test sets.
+
+    Uses random shuffling (not stratified — regression has no classes).
+
+    Args:
+        x_features: Feature matrix (n_samples, n_features).
+        y_targets: Continuous target values (n_samples,).
+        train_ratio: Fraction for training (e.g., 0.7).
+        val_ratio: Fraction for validation (e.g., 0.15).
+        test_ratio: Fraction for test holdout (e.g., 0.15).
+        random_state: Random seed for reproducibility.
+
+    Returns:
+        RegressionDataSplits container with train/val/test arrays.
+
+    Raises:
+        ValueError: If ratios don't sum to 1.0 (within tolerance).
+    """
+    total = train_ratio + val_ratio + test_ratio
+    if abs(total - 1.0) > 0.01:
+        raise ValueError(
+            f"Split ratios must sum to 1.0, got {total:.3f} "
+            f"(train={train_ratio}, val={val_ratio}, test={test_ratio})"
+        )
+
+    n = len(y_targets)
+    rng = np.random.default_rng(random_state)
+    indices: NDArray[np.intp] = np.arange(n, dtype=np.intp)
+    rng.shuffle(indices)
+
+    train_end = int(n * train_ratio)
+    val_end = int(n * (train_ratio + val_ratio))
+
+    train_idx: NDArray[np.intp] = indices[:train_end]
+    val_idx: NDArray[np.intp] = indices[train_end:val_end]
+    test_idx: NDArray[np.intp] = indices[val_end:]
+
+    _log.info(
+        "Regression data split complete",
+        extra={
+            "train_ratio": train_ratio,
+            "val_ratio": val_ratio,
+            "test_ratio": test_ratio,
+            "n_train": len(train_idx),
+            "n_val": len(val_idx),
+            "n_test": len(test_idx),
+        },
+    )
+
+    return RegressionDataSplits(
+        x_train=x_features[train_idx],
+        y_train=y_targets[train_idx],
+        x_val=x_features[val_idx],
+        y_val=y_targets[val_idx],
+        x_test=x_features[test_idx],
+        y_test=y_targets[test_idx],
+    )
+
+
 def _get_probabilities(
     model: XGBModelProtocol,
     x_features: NDArray[np.float64],
@@ -473,6 +606,22 @@ def _get_probabilities(
     booster = model.get_booster()
     raw_preds: NDArray[np.float32] = booster.predict(dmatrix)
     return np.asarray(raw_preds, dtype=np.float64)
+
+
+def _get_regression_predictions(
+    model: XGBRegressorModelProtocol,
+    x_features: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Get regression predictions from a trained model.
+
+    Args:
+        model: Trained XGBoost regressor.
+        x_features: Feature matrix, shape (n_samples, n_features).
+
+    Returns:
+        Predicted values, shape (n_samples,).
+    """
+    return model.predict(x_features)
 
 
 def _compute_scale_pos_weight(
@@ -517,13 +666,15 @@ def _compute_scale_pos_weight(
 
 
 def extract_feature_importances(
-    model: XGBModelProtocol,
+    model: XGBModelProtocol | XGBRegressorModelProtocol,
     feature_names: list[str],
 ) -> list[FeatureImportance]:
     """Extract feature importances from trained model.
 
+    Works with both classifier and regressor XGBoost models.
+
     Args:
-        model: Trained XGBoost model
+        model: Trained XGBoost model (classifier or regressor)
         feature_names: List of feature names (must match number of model features)
 
     Returns:
@@ -808,6 +959,259 @@ def train_model_with_validation(
     )
 
 
+def train_regression_model_with_validation(
+    x_features: NDArray[np.float64],
+    y_targets: NDArray[np.float64],
+    config: TrainConfig,
+    output_dir: Path,
+    feature_names: list[str],
+    progress_callback: Callable[[RegressionTrainProgress], None] | None = None,
+) -> RegressionTrainOutcome:
+    """Train XGBoost regressor with validation and early stopping.
+
+    Parallel to train_model_with_validation for classification.
+    Key differences:
+    - objective='reg:squarederror', eval_metric='rmse'
+    - No scale_pos_weight (regression has no class imbalance)
+    - Early stopping on validation RMSE (lower is better)
+    - Uses regression_split (random, not stratified)
+    - Returns RegressionTrainOutcome with RegressionMetrics
+
+    Args:
+        x_features: Feature matrix (n_samples, n_features).
+        y_targets: Continuous target values (n_samples,).
+        config: Training configuration with hyperparameters.
+        output_dir: Directory to save model artifacts.
+        feature_names: List of feature names for importance reporting.
+        progress_callback: Optional callback for progress updates.
+
+    Returns:
+        RegressionTrainOutcome with complete training results.
+    """
+    xgb = __import__("xgboost")
+    xgb_module: _XGBRegressorModuleProto = xgb
+    regressor_factory: XGBRegressorFactory = xgb_module.XGBRegressor
+    resolved_device = _resolve_device(config["device"], xgb_module)
+    n_jobs = max(1, int(os.cpu_count() or 1))
+
+    splits = regression_split(
+        x_features,
+        y_targets,
+        train_ratio=config["train_ratio"],
+        val_ratio=config["val_ratio"],
+        test_ratio=config["test_ratio"],
+        random_state=config["random_state"],
+    )
+
+    def _build_regressor(
+        total_estimators: int,
+    ) -> XGBRegressorModelProtocol:
+        return regressor_factory(
+            learning_rate=config["learning_rate"],
+            max_depth=config["max_depth"],
+            n_estimators=total_estimators,
+            subsample=config["subsample"],
+            colsample_bytree=config["colsample_bytree"],
+            random_state=config["random_state"],
+            objective="reg:squarederror",
+            eval_metric="rmse",
+            n_jobs=n_jobs,
+            tree_method="hist",
+            device=resolved_device,
+            reg_alpha=config["reg_alpha"],
+            reg_lambda=config["reg_lambda"],
+        )
+
+    n_estimators = config["n_estimators"]
+    early_stopping_rounds = config["early_stopping_rounds"]
+
+    # Track best model state (RMSE: lower is better)
+    best_val_rmse = float("inf")
+    best_round = 0
+    rounds_no_improve = 0
+    early_stopped = False
+
+    model: XGBRegressorModelProtocol | None = None
+    current_round = 0
+
+    for current_round in range(1, n_estimators + 1):
+        model = _build_regressor(current_round)
+        model.fit(splits.x_train, splits.y_train, verbose=False)
+
+        # Evaluate on train and validation sets
+        train_preds = _get_regression_predictions(
+            model,
+            splits.x_train,
+        )
+        val_preds = _get_regression_predictions(
+            model,
+            splits.x_val,
+        )
+
+        train_metrics = compute_all_regression_metrics(
+            splits.y_train,
+            train_preds,
+        )
+        val_metrics = compute_all_regression_metrics(
+            splits.y_val,
+            val_preds,
+        )
+
+        # Report progress
+        if progress_callback is not None:
+            progress_callback(
+                RegressionTrainProgress(
+                    round=current_round,
+                    total_rounds=n_estimators,
+                    train_rmse=train_metrics["rmse"],
+                    val_rmse=val_metrics["rmse"],
+                )
+            )
+
+        # Check for improvement (RMSE — lower is better)
+        if val_metrics["rmse"] < best_val_rmse:
+            best_val_rmse = val_metrics["rmse"]
+            best_round = current_round
+            rounds_no_improve = 0
+        else:
+            rounds_no_improve += 1
+
+        # Log progress every 50 rounds
+        if current_round % 50 == 0:
+            _log.debug(
+                "Regression training progress",
+                extra={
+                    "round": current_round,
+                    "total_rounds": n_estimators,
+                    "train_rmse": train_metrics["rmse"],
+                    "val_rmse": val_metrics["rmse"],
+                    "best_val_rmse": best_val_rmse,
+                    "best_round": best_round,
+                    "rounds_no_improve": rounds_no_improve,
+                },
+            )
+
+        # Early stopping check
+        if rounds_no_improve >= early_stopping_rounds:
+            early_stopped = True
+            _log.info(
+                "Regression early stopping triggered",
+                extra={
+                    "stopped_at_round": current_round,
+                    "best_round": best_round,
+                    "best_val_rmse": best_val_rmse,
+                    "early_stopping_rounds": early_stopping_rounds,
+                },
+            )
+            break
+
+    # If early stopped, retrain with optimal number of estimators
+    if early_stopped and best_round < current_round:
+        _log.info(
+            "Retraining regressor with optimal estimators",
+            extra={"best_round": best_round},
+        )
+        model = _build_regressor(best_round)
+        model.fit(splits.x_train, splits.y_train, verbose=False)
+        actual_rounds = best_round
+    else:
+        actual_rounds = current_round
+
+    if model is None:
+        raise RuntimeError("Model not trained - n_estimators must be >= 1")
+
+    # Final evaluation on all splits
+    final_train_preds = _get_regression_predictions(
+        model,
+        splits.x_train,
+    )
+    final_val_preds = _get_regression_predictions(
+        model,
+        splits.x_val,
+    )
+    final_test_preds = _get_regression_predictions(
+        model,
+        splits.x_test,
+    )
+
+    final_train_metrics = compute_all_regression_metrics(
+        splits.y_train,
+        final_train_preds,
+    )
+    final_val_metrics = compute_all_regression_metrics(
+        splits.y_val,
+        final_val_preds,
+    )
+    final_test_metrics = compute_all_regression_metrics(
+        splits.y_test,
+        final_test_preds,
+    )
+
+    _log.info(
+        "Regression training complete",
+        extra={
+            "total_rounds_trained": actual_rounds,
+            "early_stopped": early_stopped,
+            "best_round": best_round,
+            "train_metrics": format_regression_metrics_str(
+                final_train_metrics,
+            ),
+            "val_metrics": format_regression_metrics_str(
+                final_val_metrics,
+            ),
+            "test_metrics": format_regression_metrics_str(
+                final_test_metrics,
+            ),
+        },
+    )
+
+    # Save model
+    model_id = str(uuid.uuid4())
+    model_filename = f"covenant_reg_{model_id[:8]}.ubj"
+    model_path = output_dir / model_filename
+
+    save_model(model, str(model_path))
+
+    _log.info(
+        "Regression model saved",
+        extra={"model_path": str(model_path)},
+    )
+
+    # Extract feature importances
+    importances = extract_feature_importances(model, feature_names)
+
+    _log.info(
+        "Regression feature importances extracted",
+        extra={
+            "top_features": [
+                {
+                    "name": f["name"],
+                    "importance": f"{f['importance']:.4f}",
+                }
+                for f in importances[:3]
+            ],
+        },
+    )
+
+    return RegressionTrainOutcome(
+        model_path=str(model_path),
+        model_id=model_id,
+        samples_total=splits.n_total,
+        samples_train=splits.n_train,
+        samples_val=splits.n_val,
+        samples_test=splits.n_test,
+        train_metrics=final_train_metrics,
+        val_metrics=final_val_metrics,
+        test_metrics=final_test_metrics,
+        best_val_rmse=best_val_rmse,
+        best_round=best_round,
+        total_rounds=actual_rounds,
+        early_stopped=early_stopped,
+        config=config,
+        feature_importances=importances,
+    )
+
+
 def train_model(
     x_features: NDArray[np.float64],
     y_labels: NDArray[np.int64],
@@ -856,9 +1260,13 @@ def train_model(
     return model
 
 
-def save_model(model: XGBModelProtocol, path: str) -> None:
+def save_model(
+    model: XGBModelProtocol | XGBRegressorModelProtocol,
+    path: str,
+) -> None:
     """Save trained model to file path.
 
+    Works with both classifier and regressor XGBoost models.
     Uses get_booster().save_model() for XGBoost 3.x compatibility.
     """
     booster = model.get_booster()
@@ -870,11 +1278,14 @@ __all__ = [
     "FeatureScaler",
     "PreprocessedDataSplits",
     "ProgressCallback",
+    "RegressionDataSplits",
     "compute_feature_scaler",
     "extract_feature_importances",
     "preprocess_data_splits",
+    "regression_split",
     "save_model",
     "stratified_split",
     "train_model",
     "train_model_with_validation",
+    "train_regression_model_with_validation",
 ]
