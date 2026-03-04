@@ -31,7 +31,9 @@ from covenant_ml.datasets.registry import (
 )
 from covenant_ml.datasets.testing import (
     FakeDatasetLoader,
+    FakeRegressionDatasetLoader,
     create_fake_dataset_loader,
+    create_fake_regression_dataset_loader,
 )
 from covenant_ml.datasets.types import (
     AggregationStrategy,
@@ -42,6 +44,7 @@ from covenant_ml.datasets.types import (
     FileFormat,
     LabelType,
     LoadedDataset,
+    RegressionLoadedDataset,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -57,10 +60,12 @@ __all__ = [
     "DatasetValidationResult",
     "DatasetValidatorProtocol",
     "FakeDatasetLoader",
+    "FakeRegressionDatasetLoader",
     "FileEncoding",
     "FileFormat",
     "LabelType",
     "LoadedDataset",
+    "RegressionLoadedDataset",
     "TargetColumnSpec",
     "TimeSeriesCSVLoader",
     "TimeSeriesDatasetConfig",
@@ -68,6 +73,7 @@ __all__ = [
     "TimeSeriesSpec",
     "create_dataset_loader",
     "create_fake_dataset_loader",
+    "create_fake_regression_dataset_loader",
     "create_timeseries_csv_loader",
     "make_default_registry",
     "make_default_timeseries_registry",
