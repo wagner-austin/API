@@ -5,13 +5,15 @@ This package provides TypedDict-based Kafka integration for:
 - Producing prediction and alert events
 - Strict schema validation with encode/decode functions
 - Streaming inference worker for real-time prediction
+- Generic streaming worker for multi-domain ML prediction
 
 Modules:
 - config: Configuration TypedDicts and environment parsing
 - schemas: Kafka event TypedDicts with encode/decode/TypeGuards
 - producer: High-level producer wrapper
 - consumer: High-level consumer wrapper
-- worker: Streaming inference worker
+- worker: Streaming inference worker (covenant-specific)
+- generic_worker: Domain-agnostic streaming worker
 - _test_hooks: Dependency injection for testing (private)
 
 Strict typing: no Any, no casts, no type: ignore.
@@ -36,6 +38,12 @@ from .consumer import (
     StreamingConsumer,
     create_consumer_from_parts,
     create_streaming_consumer,
+)
+from .generic_worker import (
+    GenericProcessingResult,
+    GenericStreamingWorker,
+    GenericWorkerConfig,
+    make_generic_worker_config,
 )
 from .producer import (
     StreamingProducer,
@@ -91,6 +99,9 @@ __all__ = [
     "ConsumedMeasurement",
     "ConsumerConfig",
     "EvaluationStatus",
+    "GenericProcessingResult",
+    "GenericStreamingWorker",
+    "GenericWorkerConfig",
     "KafkaEventType",
     "KafkaEventV1",
     "KafkaTopicsConfig",
@@ -125,6 +136,7 @@ __all__ = [
     "load_streaming_config",
     "make_alert_event",
     "make_default_worker_config",
+    "make_generic_worker_config",
     "make_measurement_event",
     "make_prediction_event",
 ]
