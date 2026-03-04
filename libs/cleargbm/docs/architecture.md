@@ -16,10 +16,11 @@ libs/cleargbm/
 ├── README.md
 ├── Makefile
 ├── docs/
-│   ├── architecture.md      # This file
-│   └── hybrid_model.md      # Future roadmap (GOSS, oblivious trees, etc.)
+│   ├── architecture.md              # This file
+│   └── rust-core-transition-plan.md # Rust core transition plan (phases 1-9)
 ├── scripts/
 │   ├── __init__.py
+│   ├── _test_hooks.py       # Guard hook protocols for testability
 │   ├── guard.py             # Monorepo guard runner
 │   ├── benchmark.py         # Performance benchmark suite
 │   └── autotune.py          # Grid search for optimal n_jobs/max_bins
@@ -108,6 +109,7 @@ class GradientBoostingConfig(TypedDict):
     reg_alpha: float   # L1 regularization
     reg_lambda: float  # L2 regularization
     n_jobs: int
+    early_stopping_rounds: int | None  # None = disabled
 
 class SplitCandidate(TypedDict):
     feature_index: int
@@ -383,7 +385,7 @@ from cleargbm.explain import explain_prediction, extract_rules
 
 ## Test Coverage
 
-- 459 tests passing
+- 488 tests passing
 - 100% statement and branch coverage required
 - Tests for each encode/decode pair with round-trip validation
 - Tests for parallel equivalence (n_jobs=1 vs n_jobs=2 produce identical results)
@@ -409,9 +411,11 @@ poetry run python -m scripts.autotune --samples 10000 --features 50
 
 ## Future Roadmap
 
-See [hybrid_model.md](hybrid_model.md) for planned features:
-- Early stopping
+See [rust-core-transition-plan.md](rust-core-transition-plan.md) for the Rust core transition (phases 1-9).
+
+Planned algorithm features (not yet implemented):
 - Gradient quantization
 - Leaf-wise tree growth
 - GOSS sampling
 - Oblivious trees
+- Ordered boosting
