@@ -40,8 +40,8 @@ def suppress_verbose_logging() -> None:
     # Suppress training progress logs from backends
     for name in (
         "covenant_ml.trainer",
-        "covenant_ml.backends.mlp.backend",
-        "covenant_ml.backends.lstm.backend",
+        "covenant_nn.backends.mlp.backend",
+        "covenant_nn.backends.lstm.backend",
         "covenant_ml.optimizer.objectives.lightgbm_objective",
         "covenant_ml.backends.lightgbm.backend",
     ):
