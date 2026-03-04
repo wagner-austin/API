@@ -2,6 +2,8 @@
 
 Covers default registry composition and non-torch paths to keep strict typing
 without importing heavy frameworks. Does not execute training loops here.
+
+PyTorch backends (mlp, lstm) live in covenant_nn.
 """
 
 from __future__ import annotations
@@ -10,17 +12,22 @@ from covenant_ml.backends import default_registry
 
 
 def test_default_registry_lists_backends() -> None:
-    """Default registry exposes both xgboost and mlp backends."""
+    """Default registry exposes tree-based and sklearn backends."""
     reg = default_registry()
     names = reg.list_backends()
     assert "xgboost" in names
-    assert "mlp" in names
+    assert "lightgbm" in names
+    assert "cleargbm" in names
+    assert "logreg" in names
+    assert "random_forest" in names
+    assert "mlp" not in names
+    assert "lstm" not in names
 
 
 def test_capabilities_present_for_each_backend() -> None:
     """Capabilities are cached and include required keys."""
     reg = default_registry()
-    for name in ("xgboost", "mlp"):
+    for name in ("xgboost", "lightgbm"):
         caps = reg.get_capabilities(name)
         assert caps["supports_train"] is True
         assert caps["supports_early_stopping"] in (True, False)
@@ -33,8 +40,8 @@ def test_registry_get_returns_backend_instance() -> None:
     reg = default_registry()
     xgb = reg.get("xgboost")
     assert xgb.backend_name() == "xgboost"
-    mlp = reg.get("mlp")
-    assert mlp.backend_name() == "mlp"
+    lgbm = reg.get("lightgbm")
+    assert lgbm.backend_name() == "lightgbm"
 
 
 def test_backend_registration_factory_returns_callable() -> None:

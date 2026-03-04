@@ -409,7 +409,7 @@ def test_rf_backend_with_oob_score(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_rf_config(n_estimators=20, bootstrap=True, oob_score=True)
+    config = _make_rf_config(n_estimators=100, bootstrap=True, oob_score=True)
 
     outcome = _invoke_rf_train(backend, x, y, names, config, tmp_path)
 

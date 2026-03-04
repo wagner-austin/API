@@ -405,7 +405,7 @@ def test_logreg_backend_with_l1_penalty(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="l1", solver="saga", max_iter=500)
+    config = _make_logreg_config(penalty="l1", solver="saga", max_iter=10000)
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
 
@@ -432,7 +432,7 @@ def test_logreg_backend_with_elasticnet_penalty(tmp_path: Path) -> None:
     dataset = load_us_bankruptcy_data()
     x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
 
-    config = _make_logreg_config(penalty="elasticnet", solver="saga", max_iter=500)
+    config = _make_logreg_config(penalty="elasticnet", solver="saga", max_iter=10000)
     config["l1_ratio"] = 0.5  # Mix of L1 and L2
 
     outcome = _invoke_logreg_train(backend, x, y, names, config, tmp_path)
