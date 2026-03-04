@@ -89,26 +89,6 @@ class _LogRegModelProtocol(Protocol):
         ...
 
 
-class _LogRegClassifierCtor(Protocol):
-    """Protocol for LogisticRegression constructor."""
-
-    def __call__(
-        self,
-        *,
-        penalty: str | None,
-        C: float,
-        solver: str,
-        max_iter: int,
-        tol: float,
-        random_state: int,
-        class_weight: str | None,
-        l1_ratio: float | None,
-        n_jobs: int,
-    ) -> _LogRegModelProtocol:
-        """Construct LogisticRegression with given parameters."""
-        ...
-
-
 class _JoblibDumpProtocol(Protocol):
     """Protocol for joblib.dump function."""
 
@@ -163,25 +143,64 @@ LOGREG_CAPABILITIES: BackendCapabilities = {
 }
 
 
-def _get_sklearn_imports() -> (
-    tuple[_LogRegClassifierCtor, _JoblibDumpProtocol, _JoblibLoadProtocol]
-):
-    """Get sklearn LogisticRegression and joblib via dynamic import.
+def _get_joblib_imports() -> tuple[_JoblibDumpProtocol, _JoblibLoadProtocol]:
+    """Get joblib dump/load via dynamic import.
 
     Returns:
-        Tuple of (LogisticRegression constructor, joblib.dump, joblib.load).
+        Tuple of (joblib.dump, joblib.load).
+    """
+    joblib_module = __import__("joblib", fromlist=["dump", "load"])
+    dump_fn: _JoblibDumpProtocol = joblib_module.dump
+    load_fn: _JoblibLoadProtocol = joblib_module.load
+    return dump_fn, load_fn
+
+
+def _create_logreg_model(
+    *,
+    penalty: str | None,
+    inverse_reg_strength: float,
+    solver: str,
+    max_iter: int,
+    tol: float,
+    random_state: int,
+    class_weight: str | None,
+    l1_ratio: float | None,
+    n_jobs: int,
+) -> _LogRegModelProtocol:
+    """Create sklearn LogisticRegression with given parameters.
+
+    Maps inverse_reg_strength to sklearn's uppercase C parameter.
+
+    Args:
+        penalty: Regularization type ("l1", "l2", "elasticnet", or None).
+        inverse_reg_strength: Inverse of regularization strength (sklearn C).
+        solver: Optimization algorithm.
+        max_iter: Maximum iterations for convergence.
+        tol: Tolerance for stopping criteria.
+        random_state: Random seed.
+        class_weight: Class weight strategy ("balanced" or None).
+        l1_ratio: ElasticNet mixing (only for elasticnet penalty).
+        n_jobs: Number of parallel jobs.
+
+    Returns:
+        Fitted LogisticRegression model satisfying _LogRegModelProtocol.
     """
     sklearn_module = __import__(
         "sklearn.linear_model",
         fromlist=["LogisticRegression"],
     )
-    logreg_ctor: _LogRegClassifierCtor = sklearn_module.LogisticRegression
-
-    joblib_module = __import__("joblib", fromlist=["dump", "load"])
-    dump_fn: _JoblibDumpProtocol = joblib_module.dump
-    load_fn: _JoblibLoadProtocol = joblib_module.load
-
-    return logreg_ctor, dump_fn, load_fn
+    model: _LogRegModelProtocol = sklearn_module.LogisticRegression(
+        penalty=penalty,
+        C=inverse_reg_strength,
+        solver=solver,
+        max_iter=max_iter,
+        tol=tol,
+        random_state=random_state,
+        class_weight=class_weight,
+        l1_ratio=l1_ratio,
+        n_jobs=n_jobs,
+    )
+    return model
 
 
 def _compute_class_weight(y_train: NDArray[np.int64]) -> float:
@@ -333,7 +352,7 @@ class LogRegBackend(ClassifierBackend):
             raise RuntimeError("LogRegBackend requires LogRegConfig")
 
         cfg: LogRegConfig = config
-        logreg_ctor, dump_fn, _ = _get_sklearn_imports()
+        dump_fn, _ = _get_joblib_imports()
 
         splits = stratified_split(
             x_features,
@@ -357,9 +376,9 @@ class LogRegBackend(ClassifierBackend):
         penalty_arg: str | None = None if cfg["penalty"] == "none" else cfg["penalty"]
         l1_ratio_arg: float | None = cfg["l1_ratio"] if cfg["penalty"] == "elasticnet" else None
 
-        model = logreg_ctor(
+        model = _create_logreg_model(
             penalty=penalty_arg,
-            C=cfg["C"],
+            inverse_reg_strength=cfg["C"],
             solver=cfg["solver"],
             max_iter=cfg["max_iter"],
             tol=cfg["tol"],
@@ -491,7 +510,7 @@ class LogRegBackend(ClassifierBackend):
         Returns:
             PreparedClassifier wrapping the loaded model.
         """
-        _, _, load_fn = _get_sklearn_imports()
+        _, load_fn = _get_joblib_imports()
         model = load_fn(path)
         return _LogRegPrepared(model)
 
