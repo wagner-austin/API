@@ -116,14 +116,19 @@ curl "https://covenant-radar-api-production.up.railway.app/ml/models/active"
 
 Open in browser: `https://covenant-radar-api-production.up.railway.app/dashboard`
 
-## ML Backends
+## ML Backends (Classification)
 
-| Backend | Format | GPU | Feature Importance | Best For |
-|---------|--------|-----|-------------------|----------|
-| `xgboost` | `.ubj` | CUDA | Yes (ranked, shap_tree, permutation) | Tabular data |
-| `lightgbm` | `.txt` | CUDA | Yes (ranked, shap_tree, permutation) | Large datasets |
-| `mlp` | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Non-linear patterns |
-| `lstm` | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Temporal sequences |
+Tree/linear backends live in `covenant_ml`. PyTorch backends (`mlp`, `lstm`) live in `covenant_nn`.
+
+| Backend | Package | Format | GPU | Feature Importance | Best For |
+|---------|---------|--------|-----|-------------------|----------|
+| `xgboost` | covenant_ml | `.ubj` | CUDA | Yes (ranked, shap_tree, permutation) | Tabular data |
+| `lightgbm` | covenant_ml | `.txt` | CUDA | Yes (ranked, shap_tree, permutation) | Large datasets |
+| `cleargbm` | covenant_ml | `.pkl` | No | Yes (shap, permutation) | Interpretable boosting |
+| `logreg` | covenant_ml | `.joblib` | No | Yes (permutation) | Linear baselines |
+| `random_forest` | covenant_ml | `.joblib` | No | Yes (permutation) | Ensemble baselines |
+| `mlp` | covenant_nn | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Non-linear patterns |
+| `lstm` | covenant_nn | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Temporal sequences |
 
 ## Datasets
 
