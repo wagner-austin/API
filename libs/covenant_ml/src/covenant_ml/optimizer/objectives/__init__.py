@@ -3,77 +3,26 @@
 Each backend has its own objective function that:
 1. Takes hyperparameters sampled by Optuna
 2. Trains a model with those hyperparameters
-3. Returns validation AUC for Optuna to maximize
+3. Returns validation metric for Optuna to maximize
+
+Classification objectives return AUC (higher is better).
+Regression objectives return negative RMSE (higher = lower error = better).
+
+PyTorch objectives (MLP, LSTM) live in covenant_nn.
 
 Usage:
     from covenant_ml.optimizer.objectives import (
         XGBoostObjective,
         create_xgboost_objective,
-        MLPObjective,
-        create_mlp_objective,
-        LSTMObjective,
-        create_lstm_objective,
         LightGBMObjective,
         create_lightgbm_objective,
         ClearGBMObjective,
         create_cleargbm_objective,
+        XGBoostRegressorObjective,
+        create_xgboost_regressor_objective,
+        LightGBMRegressorObjective,
+        create_lightgbm_regressor_objective,
     )
-
-    # XGBoost objective
-    xgb_objective = create_xgboost_objective(
-        x_features=X,
-        y_labels=y,
-        feature_names=names,
-        device="auto",
-        feature_preset="none",
-    )
-
-    # MLP objective
-    mlp_objective = create_mlp_objective(
-        x_features=X,
-        y_labels=y,
-        feature_names=names,
-        device="auto",
-        precision="fp32",
-        feature_preset="none",
-        n_epochs=20,
-        early_stopping_patience=5,
-    )
-
-    # LSTM objective
-    lstm_objective = create_lstm_objective(
-        x_features=X,
-        y_labels=y,
-        feature_names=names,
-        device="auto",
-        precision="fp32",
-        feature_preset="none",
-        n_epochs=20,
-        early_stopping_patience=5,
-        sequence_length=5,
-        bidirectional=False,
-    )
-
-    # LightGBM objective
-    lgb_objective = create_lightgbm_objective(
-        x_features=X,
-        y_labels=y,
-        feature_names=names,
-        device="auto",
-        feature_preset="none",
-        early_stopping_rounds=10,
-    )
-
-    # ClearGBM objective
-    cgbm_objective = create_cleargbm_objective(
-        x_features=X,
-        y_labels=y,
-        feature_names=names,
-        feature_preset="none",
-        early_stopping_rounds=10,
-    )
-
-    # Pass to optimizer.optimize()
 """
 
 from .cleargbm_objective import (
@@ -84,28 +33,28 @@ from .lightgbm_objective import (
     LightGBMObjective,
     create_lightgbm_objective,
 )
-from .lstm_objective import (
-    LSTMObjective,
-    create_lstm_objective,
-)
-from .mlp_objective import (
-    MLPObjective,
-    create_mlp_objective,
+from .lightgbm_regressor_objective import (
+    LightGBMRegressorObjective,
+    create_lightgbm_regressor_objective,
 )
 from .xgboost_objective import (
     XGBoostObjective,
     create_xgboost_objective,
 )
+from .xgboost_regressor_objective import (
+    XGBoostRegressorObjective,
+    create_xgboost_regressor_objective,
+)
 
 __all__ = [
     "ClearGBMObjective",
-    "LSTMObjective",
     "LightGBMObjective",
-    "MLPObjective",
+    "LightGBMRegressorObjective",
     "XGBoostObjective",
+    "XGBoostRegressorObjective",
     "create_cleargbm_objective",
     "create_lightgbm_objective",
-    "create_lstm_objective",
-    "create_mlp_objective",
+    "create_lightgbm_regressor_objective",
     "create_xgboost_objective",
+    "create_xgboost_regressor_objective",
 ]

@@ -1,8 +1,10 @@
 """Hyperparameter optimization module for covenant_ml.
 
 Provides pluggable optimization strategies with Bayesian (Optuna TPE),
-random search, and grid search algorithms. Supports XGBoost, MLP, LSTM,
-and LightGBM backends through a unified interface.
+random search, and grid search algorithms. Supports XGBoost, LightGBM,
+ClearGBM, MLP, and LSTM search spaces through a unified interface.
+
+PyTorch objectives (MLPObjective, LSTMObjective) live in covenant_nn.
 
 Key components:
 - HyperparameterOptimizerProtocol: Unified protocol for all optimizers
@@ -45,14 +47,14 @@ Usage:
 from .objectives import (
     ClearGBMObjective,
     LightGBMObjective,
-    LSTMObjective,
-    MLPObjective,
+    LightGBMRegressorObjective,
     XGBoostObjective,
+    XGBoostRegressorObjective,
     create_cleargbm_objective,
     create_lightgbm_objective,
-    create_lstm_objective,
-    create_mlp_objective,
+    create_lightgbm_regressor_objective,
     create_xgboost_objective,
+    create_xgboost_regressor_objective,
 )
 from .optuna_backend import (
     OptunaClearGBMOptimizer,
@@ -139,13 +141,12 @@ __all__ = [
     "GridSearchOptimizer",
     "HyperparameterOptimizerProtocol",
     "IntRangeSpec",
-    "LSTMObjective",
     "LSTMOptimizerProtocol",
     "LSTMSearchSpace",
     "LightGBMObjective",
     "LightGBMOptimizerProtocol",
+    "LightGBMRegressorObjective",
     "LightGBMSearchSpace",
-    "MLPObjective",
     "MLPOptimizerProtocol",
     "MLPSearchSpace",
     "ObjectiveProtocol",
@@ -171,20 +172,21 @@ __all__ = [
     "TrialState",
     "XGBoostObjective",
     "XGBoostOptimizerProtocol",
+    "XGBoostRegressorObjective",
     "XGBoostSearchSpace",
     "create_cleargbm_objective",
     "create_cleargbm_optimizer",
     "create_grid_search_optimizer",
     "create_lightgbm_objective",
     "create_lightgbm_optimizer",
-    "create_lstm_objective",
+    "create_lightgbm_regressor_objective",
     "create_lstm_optimizer",
-    "create_mlp_objective",
     "create_mlp_optimizer",
     "create_optuna_tpe_optimizer",
     "create_random_search_optimizer",
     "create_xgboost_objective",
     "create_xgboost_optimizer",
+    "create_xgboost_regressor_objective",
     "default_optimizer_registry",
     "make_cleargbm_default_space",
     "make_cleargbm_focused_space",
