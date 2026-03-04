@@ -10,6 +10,10 @@ from covenant_ml.types import (
     DMatrixProtocol,
     EvalMetrics,
     FeatureImportance,
+    RegressionMetrics,
+    RegressionTrainOutcome,
+    RegressionTrainProgress,
+    RegressorBackendName,
     TrainOutcome,
     TrainProgress,
     XGBBoosterProtocol,
@@ -311,3 +315,118 @@ def test_protocols_are_callable() -> None:
     loaded_model = loader()
     created_model.save_model("y.ubj")
     loaded_model.load_model("y.ubj")
+
+
+# =============================================================================
+# Regression Type Tests
+# =============================================================================
+
+
+def test_regressor_backend_name_values() -> None:
+    """RegressorBackendName accepts all four regressor backends."""
+    names: list[RegressorBackendName] = [
+        "xgboost_reg",
+        "lightgbm_reg",
+        "mlp_reg",
+        "lstm_reg",
+    ]
+    assert len(names) == 4
+    assert "xgboost_reg" in names
+    assert "lightgbm_reg" in names
+    assert "mlp_reg" in names
+    assert "lstm_reg" in names
+
+
+def test_regression_metrics_has_all_fields() -> None:
+    """RegressionMetrics TypedDict has all required fields."""
+    metrics: RegressionMetrics = {
+        "mse": 0.25,
+        "rmse": 0.5,
+        "mae": 0.4,
+        "r_squared": 0.85,
+        "mape": 0.12,
+    }
+
+    assert metrics["mse"] == 0.25
+    assert metrics["rmse"] == 0.5
+    assert metrics["mae"] == 0.4
+    assert metrics["r_squared"] == 0.85
+    assert metrics["mape"] == 0.12
+
+
+def test_regression_train_progress_with_val() -> None:
+    """RegressionTrainProgress works with validation RMSE."""
+    progress: RegressionTrainProgress = {
+        "round": 5,
+        "total_rounds": 100,
+        "train_rmse": 0.123,
+        "val_rmse": 0.145,
+    }
+
+    assert progress["round"] == 5
+    assert progress["total_rounds"] == 100
+    assert progress["train_rmse"] == 0.123
+    assert progress["val_rmse"] == 0.145
+
+
+def test_regression_train_progress_without_val() -> None:
+    """RegressionTrainProgress works with None validation RMSE."""
+    progress: RegressionTrainProgress = {
+        "round": 1,
+        "total_rounds": 50,
+        "train_rmse": 0.5,
+        "val_rmse": None,
+    }
+
+    assert progress["val_rmse"] is None
+
+
+def test_regression_train_outcome_with_xgboost_config() -> None:
+    """RegressionTrainOutcome accepts TrainConfig (XGBoost regressor)."""
+    config: TrainConfig = {
+        "device": "cpu",
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "n_estimators": 100,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "random_state": 42,
+        "train_ratio": 0.7,
+        "val_ratio": 0.15,
+        "test_ratio": 0.15,
+        "early_stopping_rounds": 10,
+        "reg_alpha": 0.0,
+        "reg_lambda": 1.0,
+    }
+    metrics: RegressionMetrics = {
+        "mse": 0.01,
+        "rmse": 0.1,
+        "mae": 0.08,
+        "r_squared": 0.95,
+        "mape": 0.03,
+    }
+    outcome: RegressionTrainOutcome = {
+        "model_path": "/tmp/model.ubj",
+        "model_id": "reg-001",
+        "samples_total": 1000,
+        "samples_train": 700,
+        "samples_val": 150,
+        "samples_test": 150,
+        "train_metrics": metrics,
+        "val_metrics": metrics,
+        "test_metrics": metrics,
+        "best_val_rmse": 0.1,
+        "best_round": 42,
+        "total_rounds": 100,
+        "early_stopped": True,
+        "config": config,
+        "feature_importances": [
+            FeatureImportance(name="feat1", importance=0.6, rank=1),
+        ],
+    }
+
+    assert outcome["model_id"] == "reg-001"
+    assert outcome["best_val_rmse"] == 0.1
+    assert outcome["early_stopped"] is True
+    assert outcome["train_metrics"]["r_squared"] == 0.95
+    assert len(outcome["feature_importances"]) == 1
