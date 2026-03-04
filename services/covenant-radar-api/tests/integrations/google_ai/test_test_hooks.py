@@ -284,6 +284,44 @@ class TestRealGeminiClientEmptyResponse:
             client.generate_content("gemini-2.0-flash", "test")
 
 
+class TestRealGeminiClientGenerateContentWithFake:
+    """Tests for RealGeminiClient.generate_content using fake inner client."""
+
+    def test_generate_content_returns_text_when_not_none(self) -> None:
+        """Test that generate_content returns text when response is not None."""
+        from covenant_radar_api.integrations.google_ai._test_hooks import (
+            RealGeminiClient,
+        )
+
+        class FakeResponse:
+            @property
+            def text(self) -> str:
+                return "generated text"
+
+        class FakeCountTokensResponse:
+            @property
+            def total_tokens(self) -> int:
+                return 10
+
+        class FakeModels:
+            def generate_content(self, model: str, contents: str) -> FakeResponse:
+                return FakeResponse()
+
+            def count_tokens(self, model: str, contents: str) -> FakeCountTokensResponse:
+                return FakeCountTokensResponse()
+
+        class FakeInnerClient:
+            @property
+            def models(self) -> FakeModels:
+                return FakeModels()
+
+        client = RealGeminiClient("dummy-api-key-for-test")
+        client._client = FakeInnerClient()
+
+        result = client.generate_content("gemini-2.0-flash", "test prompt")
+        assert result == "generated text"
+
+
 class TestRealGeminiClientCountTokensWithFake:
     """Tests for RealGeminiClient.count_tokens using fake inner client."""
 
