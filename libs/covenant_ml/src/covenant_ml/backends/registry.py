@@ -59,12 +59,12 @@ def default_registry() -> ClassifierRegistry:
 
     Includes:
     - xgboost: wraps existing XGBoost trainer
-    - mlp: torch-based MLP backend
-    - lstm: torch-based LSTM backend for temporal sequences
     - lightgbm: LightGBM gradient boosting backend
     - cleargbm: numpy-based gradient boosting with built-in interpretability
     - logreg: sklearn Logistic Regression (interpretable baseline)
     - random_forest: sklearn Random Forest (bagging ensemble)
+
+    PyTorch backends (mlp, lstm) live in covenant_nn.
     """
     reg = ClassifierRegistry()
 
@@ -75,22 +75,6 @@ def default_registry() -> ClassifierRegistry:
     )
     create_xgboost_backend: BackendFactory = xgb_mod.create_xgboost_backend
     reg.register("xgboost", BackendRegistration(create_xgboost_backend))
-
-    # MLP backend
-    mlp_pkg = __import__(
-        "covenant_ml.backends.mlp",
-        fromlist=["create_mlp_backend"],
-    )
-    create_mlp_backend: BackendFactory = mlp_pkg.create_mlp_backend
-    reg.register("mlp", BackendRegistration(create_mlp_backend))
-
-    # LSTM backend
-    lstm_pkg = __import__(
-        "covenant_ml.backends.lstm",
-        fromlist=["create_lstm_backend"],
-    )
-    create_lstm_backend: BackendFactory = lstm_pkg.create_lstm_backend
-    reg.register("lstm", BackendRegistration(create_lstm_backend))
 
     # LightGBM backend
     lgbm_pkg = __import__(
