@@ -17,10 +17,10 @@ from covenant_ml.optimizer import (
     LSTMSearchSpace,
     OptimizationSummary,
     TrialResult,
-    create_lstm_objective,
     create_lstm_optimizer,
 )
 from covenant_ml.types import LSTMConfig, LSTMPrecision, TrainProgress
+from covenant_nn import create_lstm_objective
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,

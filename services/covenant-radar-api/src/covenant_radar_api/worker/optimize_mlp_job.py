@@ -17,10 +17,10 @@ from covenant_ml.optimizer import (
     MLPSearchSpace,
     OptimizationSummary,
     TrialResult,
-    create_mlp_objective,
     create_mlp_optimizer,
 )
 from covenant_ml.types import MLPConfig, MLPOptimizer, MLPPrecision, TrainProgress
+from covenant_nn import create_mlp_objective
 from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
