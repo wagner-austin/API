@@ -142,7 +142,6 @@ def _load_model(model_path: Path, model_type: ModelType) -> PredictorProtocol:
 
     Raises:
         FileNotFoundError: If model file does not exist.
-        ValueError: If model type is not supported.
     """
     if not model_path.exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -161,15 +160,13 @@ def _load_model(model_path: Path, model_type: ModelType) -> PredictorProtocol:
     if model_type == "random_forest":
         return load_random_forest_model(model_path)
     if model_type == "xgboost":
-        # XGBoost uses JSON or UBJ format - use hook for testability
         return _hooks.xgboost_loader(str(model_path))
-    if model_type == "mlp":
-        from .worker._model_loaders import load_mlp_model
 
-        meta_path = model_path.with_suffix(".meta.json")
-        return load_mlp_model(model_path, meta_path)
+    # model_type == "mlp"
+    from .worker._model_loaders import load_mlp_model
 
-    raise ValueError(f"Unsupported model type: {model_type}")
+    meta_path = model_path.with_suffix(".meta.json")
+    return load_mlp_model(model_path, meta_path)
 
 
 def _load_encoders() -> tuple[dict[str, int], dict[str, int]]:
