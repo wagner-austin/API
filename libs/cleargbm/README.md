@@ -151,7 +151,7 @@ make check  # lint + test
 
 ## Architecture
 
-See [docs/plan.md](docs/plan.md) for detailed architecture and implementation plan.
+See [docs/architecture.md](docs/architecture.md) for detailed architecture and [docs/rust-core-transition-plan.md](docs/rust-core-transition-plan.md) for the Rust core transition plan.
 
 ## Requirements
 
