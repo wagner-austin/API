@@ -960,6 +960,8 @@ to Rust implementations at startup. Tests call through the Python defaults or in
 | `_predict_tree_backend` | `PredictTreeBackend` | `_default_predict_tree` | `tree.py` |
 | `_sigmoid_backend` | `SigmoidBackend` | `_default_sigmoid` | `losses.py` |
 | `_sigmoid_array_backend` | `SigmoidArrayBackend` | `_default_sigmoid_array` | `losses.py` |
+| `guard_find_monorepo_root` | `FindMonorepoRootProto \| None` | `None` | `scripts/guard.py` |
+| `guard_load_orchestrator` | `LoadOrchestratorProto \| None` | `None` | `scripts/guard.py` |
 
 ### Caller Wiring
 
@@ -980,8 +982,8 @@ from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
 
 ### Stats
 
-- **486 tests**, all passing
-- **2042 statements, 588 branches — 100.00% coverage**
+- **488 tests**, all passing
+- **2057 statements, 592 branches — 100.00% coverage**
 - No `Any`, no `cast()`, no `type: ignore`
 - All hooks tested directly in `test_test_hooks.py`
 
@@ -994,6 +996,75 @@ from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
 - **Type bridge**: Converting between Python `DecisionTree` TypedDict and Rust `PyTree`
   (via JSON or direct field mapping)
 - **`maturin develop`** verification: Build Rust extension and verify `import cleargbm_rs` works
+
+---
+
+## Downstream Consumers
+
+### covenant_ml (direct dependency)
+
+covenant_ml registers cleargbm as a classifier backend via `covenant_ml.backends.cleargbm.backend`.
+This is the only downstream consumer of cleargbm's public API.
+
+**Imports from cleargbm:**
+
+```python
+from cleargbm.ensemble import predict_proba as cgbm_predict_proba
+from cleargbm.ensemble import train_gradient_boosting
+from cleargbm.explain import get_feature_importances
+from cleargbm.types import (
+    GradientBoostingConfig,
+    GradientBoostingModel,
+    TrainingProgress,
+    decode_gradient_boosting_model,
+    encode_gradient_boosting_model,
+)
+```
+
+**API surface consumed:**
+
+| Function / Type | Module | Usage |
+|---|---|---|
+| `train_gradient_boosting()` | `ensemble` | Core training loop (x_train, y_train, x_val, y_val, config, feature_names, progress_callback) |
+| `predict_proba()` | `ensemble` | Inference — returns tuple, wrapped into ndarray |
+| `get_feature_importances()` | `explain` | Returns list of dicts with `feature_name` and `total_contribution` keys |
+| `GradientBoostingConfig` | `types` | TypedDict passed to `train_gradient_boosting()` |
+| `GradientBoostingModel` | `types` | TypedDict returned from training, stored in `_ClearGBMPrepared` |
+| `TrainingProgress` | `types` | TypedDict passed to progress callback (keys: `tree_index`, `total_trees`, `train_loss`, `val_loss`) |
+| `encode_gradient_boosting_model()` | `types` | Serializes model to dict for JSON persistence |
+| `decode_gradient_boosting_model()` | `types` | Deserializes model from dict loaded from JSON |
+
+**Hard constraints for Rust transition:**
+
+1. **Function signatures unchanged** — `train_gradient_boosting()` and `predict_proba()` must
+   accept and return identical types
+2. **JSON serialization format identical** — saved `.json` model files must be loadable by both
+   old and new code (no migration needed)
+3. **TypedDict structures frozen** — `GradientBoostingConfig`, `GradientBoostingModel`,
+   `TrainingProgress` field names, types, and optionality must not change
+4. **Feature importance format unchanged** — `get_feature_importances()` must return the same
+   list-of-dicts structure with `feature_name` and `total_contribution` keys
+5. **Progress callback interface unchanged** — `TrainingProgress` dict keys and value types
+   must remain compatible
+
+**Integration test gate:** covenant_ml has a 928-line integration test suite at
+`covenant_ml/tests/backends/cleargbm/test_cleargbm_integration.py` that exercises training,
+evaluation, save/load, feature importance, early stopping, and progress callbacks. This suite
+must pass after the Rust transition with zero changes.
+
+### covenant_nn (no dependency)
+
+covenant_nn provides PyTorch neural network backends (MLP, LSTM) for covenant_ml. It depends on
+covenant_ml's protocols but has **no dependency on cleargbm**. The Rust transition does not
+affect covenant_nn.
+
+### covenant-radar-api (indirect dependency)
+
+covenant-radar-api consumes cleargbm indirectly through covenant_ml's backend registry. The
+`train_job.py` worker creates a `ClearGBMBackend` via the registry and calls `train()`. No
+direct imports from cleargbm exist in the service — all interaction flows through covenant_ml's
+`ClassifierBackend` protocol. The Rust transition is transparent to the service as long as
+covenant_ml's API surface is preserved.
 
 ---
 
@@ -1081,10 +1152,10 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 - [x] All error variants documented
 
 ### Code Quality (Python Integration) - IN PROGRESS
-- [x] `make check` passes in cleargbm (486 tests, 100.00% coverage)
-- [x] 100% test coverage maintained (2042 statements, 588 branches)
+- [x] `make check` passes in cleargbm (488 tests, 100.00% coverage)
+- [x] 100% test coverage maintained (2057 statements, 592 branches)
 - [x] No `Any`, `cast()`, or `type: ignore`
-- [x] `_test_hooks.py` pattern used for DI (10 hooks, all Protocol-typed)
+- [x] `_test_hooks.py` pattern used for DI (12 hooks, all Protocol-typed)
 - [x] All hot-path callers wired through hooks (histogram, predict_tree, sigmoid, sigmoid_array)
 - [ ] Rust adapter functions (convert Python types to Rust types)
 - [ ] Production startup wiring (set hooks to Rust implementations)
@@ -1099,6 +1170,12 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 - [ ] Python API unchanged (no breaking changes)
 - [ ] Rust backend set via hooks at startup (no try/except, no auto-detection)
 - [ ] CI builds both Python and Rust
+
+### Downstream Compatibility - PENDING
+- [ ] covenant_ml `test_cleargbm_integration.py` passes with zero changes (928-line suite)
+- [ ] JSON model serialization format unchanged (encode/decode round-trip)
+- [ ] `TrainingProgress` callback interface unchanged
+- [ ] `get_feature_importances()` output format unchanged
 
 ---
 
