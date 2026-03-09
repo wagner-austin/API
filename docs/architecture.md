@@ -26,29 +26,47 @@ The API platform is a Python monorepo using FastAPI for HTTP services, RQ (Redis
 ## Directory Structure
 
 ```
-C:\Users\austi\PROJECTS\API/
-├── libs/                          # Shared libraries (10 packages)
+API/
+├── libs/                          # Shared libraries (22 packages)
+│   ├── cleargbm/                  # Pure-Python gradient boosting (ClearGBM)
+│   ├── cleargbm_rs/               # Rust core for ClearGBM (PyO3 bindings)
 │   ├── covenant_domain/           # Loan covenant domain models & rule engine
-│   ├── covenant_ml/               # XGBoost training and prediction for covenants
+│   ├── covenant_ml/               # Pluggable ML framework for covenants & climate
+│   ├── covenant_nn/               # PyTorch neural network backends (MLP, LSTM)
 │   ├── covenant_persistence/      # PostgreSQL repositories for covenant data
 │   ├── instrument_io/             # IO for analytical chemistry data formats
 │   ├── monorepo_guards/           # Guard rules for monorepo integrity
+│   ├── platform_calendar/         # Google Calendar API for deadline tracking
+│   ├── platform_codebase/         # Codebase capability detection & profiling
 │   ├── platform_core/             # Typed event schemas & platform utilities
+│   ├── platform_devpost/          # Devpost hackathon discovery & matching
 │   ├── platform_discord/          # Discord integration helpers
+│   ├── platform_email/            # Email integration (Outlook Graph API, Gmail)
+│   ├── platform_kaggle/           # Kaggle competition discovery & matching
+│   ├── platform_langid/           # Spoken language ID via Meta MMS-LID
 │   ├── platform_ml/               # ML artifact handling (manifests, storage)
 │   ├── platform_music/            # Music analytics library
-│   └── platform_workers/          # Workers tooling (Redis helpers, RQ harness)
-├── services/                      # API microservices (8 services)
+│   ├── platform_stt/              # Speech-to-text (Whisper, chunking, merging)
+│   ├── platform_translate/        # Text translation (Anthropic, OpenAI backends)
+│   ├── platform_workers/          # Workers tooling (Redis helpers, RQ harness)
+│   └── procart/                   # Procedural art core (neon visuals, HDR)
+├── services/                      # API microservices (13 services)
+│   ├── Art-Trainer/               # Image generation model training (LoRA)
 │   ├── covenant-radar-api/        # Loan covenant monitoring & ML prediction
 │   ├── data-bank-api/             # Central file storage for artifacts
+│   ├── github-stats-api/          # GitHub stats SVG card generation
+│   ├── grandma-api/               # Multi-language audio-to-English translation
 │   ├── handwriting-ai/            # MNIST digit recognition (ResNet-18)
 │   ├── Model-Trainer/             # LLM training & tokenizer service
 │   ├── music-wrapped-api/         # Music analytics API
+│   ├── opportunity-radar-api/     # Hackathon & competition discovery
+│   ├── procart-api/               # Procedural art rendering orchestration
 │   ├── qr-api/                    # QR code generation
 │   ├── transcript-api/            # Video captions & speech-to-text
 │   └── turkic-api/                # Turkic language processing
 ├── clients/                       # Client applications
-│   └── DiscordBot/                # Discord bot for user interaction
+│   ├── DiscordBot/                # Discord bot integrating all services
+│   └── TankpitBot/                # Tankpit.com WebSocket bot
 └── docs/                          # Monorepo documentation
 ```
 
@@ -60,7 +78,9 @@ All services connect to shared infrastructure started via `make infra`:
 
 | Component | Container Name | Port | Purpose |
 |-----------|---------------|------|---------|
-| Redis | platform-redis | 6379 | Job queue, pub/sub, caching |
+| Redis 7 | platform-redis | 6379 | Job queue, pub/sub, status tracking |
+| PostgreSQL 16 | platform-postgres | 5432 | Covenant-radar persistence |
+| Traefik 3 | traefik | 80, 8080 | API gateway + dashboard |
 | Network | platform-network | - | Docker bridge for inter-service communication |
 
 ---
@@ -163,7 +183,7 @@ model-artifact.tar.xz
 **Key Components:**
 | Module | Description |
 |--------|-------------|
-| `adapters/` | Spotify, Apple Music, Last.fm API clients |
+| `adapters/` | Spotify, Apple Music, YouTube Music, Last.fm API clients |
 | `models.py` | TypedDict-based track/album/artist types |
 | `aggregation.py` | Listening statistics computation |
 | `redis_cache.py` | Caching layer for API responses |
@@ -233,14 +253,56 @@ model-artifact.tar.xz
 
 ### covenant_ml
 
-**Purpose:** XGBoost training and prediction for covenant breach probability.
+**Purpose:** Pluggable ML framework for covenant breach prediction and climate trend analysis.
 
 **Key Components:**
 | Module | Description |
 |--------|-------------|
-| `trainer.py` | XGBoost model training |
-| `predictor.py` | Breach probability prediction |
+| `backends/` | Pluggable model backends (XGBoost, LightGBM, Random Forest, LogReg, ClearGBM) |
+| `backends/regressor_registry.py` | Regression backend registry (LightGBM, XGBoost regressors) |
+| `optimizer/` | Optuna-based hyperparameter optimization with TPE, grid, and random search |
+| `ensemble/` | Weighted ensemble and regression ensemble optimization |
+| `validation/` | Cross-validation runners, splitters, strategies (stratified k-fold, time series, etc.) |
+| `calibration/` | Probability calibration with Platt scaling |
+| `preprocessing/` | Feature preprocessing pipelines |
 | `features.py` | Feature engineering for tabular data |
+| `metrics.py` | Classification and regression metrics |
+| `trainer.py` | Unified training orchestrator |
+| `predictor.py` | Prediction interface |
+| `datasets/` | Dataset loaders (CSV, Parquet, ARFF, time series, NetCDF temporal) |
+| `datasets/loaders/_netcdf_temporal.py` | McKinnon PNAS 2024 temporal feature extraction (steps 1-3) |
+| `datasets/loaders/_netcdf_trend_testing.py` | McKinnon rank-trend hypothesis testing (steps 4-7) |
+| `datasets/types.py` | Temporal types, rank-trend types, heat metric constants |
+| `explainers/` | Model explainability (permutation importance, ClearGBM SHAP) |
+
+**Stats:** 1924 tests, 100% statement + branch coverage
+
+**Used by:** covenant-radar-api
+
+---
+
+### covenant_nn
+
+**Purpose:** PyTorch neural network backends for covenant breach prediction and regression, extracted from covenant_ml to isolate CUDA/torch dependencies.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `backends/mlp/backend.py` | MLP classifier (binary classification, early stopping on AUC) |
+| `backends/mlp/regressor.py` | MLP regressor (continuous prediction, early stopping on RMSE) |
+| `backends/lstm/backend.py` | LSTM classifier (temporal sequence classification) |
+| `backends/lstm/regressor.py` | LSTM regressor (temporal sequence regression) |
+| `backends/lstm/sequences.py` | Sequence building (sliding windows, entity grouping) |
+| `objectives/` | Optuna objectives for all 4 backends |
+
+**Features:**
+- CUDA support with mixed precision (fp16/bf16)
+- Early stopping on validation metrics (AUC for classifiers, RMSE for regressors)
+- Class weighting for imbalanced classification
+- Model serialization (.pt weights + .json metadata)
+- Bidirectional LSTM support
+
+**Dependencies:** `covenant_ml` (protocols, types, metrics), `platform_ml` (device selection), `torch` ^2.5
 
 **Used by:** covenant-radar-api
 
@@ -257,6 +319,219 @@ model-artifact.tar.xz
 | `connection.py` | Database connection management |
 
 **Used by:** covenant-radar-api
+
+---
+
+### cleargbm
+
+**Purpose:** Pure-Python gradient boosting implementation with strict typing.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `histogram.py` | Histogram-based split finding |
+| `tree.py` | Decision tree construction |
+| `losses.py` | Loss functions (binary logistic, sigmoid) |
+| `_test_hooks.py` | Protocol-based dependency injection for testing |
+
+**Stats:** 486 tests, 100% coverage
+
+**Used by:** covenant_ml (as a backend)
+
+---
+
+### cleargbm_rs
+
+**Purpose:** High-performance Rust core for ClearGBM via PyO3 bindings.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `src/histogram/` | O(n) histogram building with NaN handling |
+| `src/split/` | Split finding with monotonicity constraints |
+| `src/tree/` | Tree construction with histogram subtraction trick |
+| `src/predict/` | Ensemble prediction with sigmoid |
+| `src/pyo3_module/` | PyO3 bindings (PyCFunction::new_closure pattern) |
+
+**Stats:** 1122 tests (Rust), 100% segment coverage. All clippy lints at `forbid`.
+
+**Used by:** cleargbm (Python integration pending)
+
+---
+
+### platform_email
+
+**Purpose:** Email integration with OAuth 2.0 authentication for Outlook Graph API and Gmail.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `outlook/` | Microsoft Graph API client for sending and reading emails |
+| `gmail/` | Gmail API client with OAuth 2.0 |
+| `cli.py` | CLI for sending emails and managing OAuth tokens |
+| `testing.py` | Production hook validation and test fakes |
+
+**Used by:** Services requiring email notifications
+
+---
+
+### platform_stt
+
+**Purpose:** Reusable speech-to-text library (Whisper API, audio chunking, parallel transcription).
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `whisper_client.py` | OpenAI Whisper API client |
+| `chunker.py` | Silence-based audio splitting via ffmpeg |
+| `parallel.py` | Bounded-concurrency parallel transcription |
+| `merger.py` | Segment merging with time offset correction |
+| `langid.py` | FastText language detection |
+
+**Used by:** transcript-api, grandma-api
+
+---
+
+### platform_langid
+
+**Purpose:** Spoken language identification from audio using Meta's MMS-LID model (`facebook/mms-lid-4017`).
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `detector.py` | `detect_spoken_language()` one-shot detection |
+| `config.py` | `DetectorConfig` (model_id, device, confidence_threshold) |
+| `types.py` | `SpokenLanguageResult` (ISO language code, confidence, model_id) |
+
+**Features:**
+- Returns ISO 639 language code with confidence score (0-1)
+- Returns `"und"` (undetermined) when confidence is below threshold
+- Audio resampled to 16000 Hz target sample rate
+- CUDA device support
+
+**Dependencies:** PyTorch, torchaudio, Transformers, soundfile, langcodes
+
+**Used by:** grandma-api
+
+---
+
+### platform_translate
+
+**Purpose:** Text translation with pluggable backends.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `translator.py` | `translate_text()` one-shot, `create_translator()` persistent |
+| `config.py` | `TranslatorConfig` (backend, api_key, model) |
+| `backends/` | Anthropic Claude (default), OpenAI |
+
+**Features:**
+- Default backend: Anthropic Claude (`claude-3-haiku-20240307`)
+- Pluggable backend architecture for future DeepL / NLLB-200 support
+
+**Dependencies:** `anthropic`, `openai`
+
+**Used by:** grandma-api
+
+---
+
+### platform_calendar
+
+**Purpose:** Google Calendar API integration for tracking competition deadlines with automatic reminders.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `client.py` | `CalendarClientProtocol` — list, get, create, update, delete events |
+| `auth.py` | OAuth 2.0 PKCE authentication with auto token refresh |
+| `tracking.py` | `TrackedCompetition` linked to calendar events |
+| `cli.py` | Rich CLI (list, tomorrow, week, calendars, create, delete) |
+
+**Features:**
+- Multi-account support via environment variable prefixes
+- Automatic reminders (1 day + 1 hour before deadline)
+- 24+ injectable hooks covering all external I/O
+
+**Dependencies:** `platform-core` (OAuth types, PKCE utilities)
+
+**Used by:** opportunity-radar-api
+
+---
+
+### platform_codebase
+
+**Purpose:** Codebase capability detection and profiling for monorepos.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `scanner.py` | `scan_libs()`, `scan_services()` — local filesystem scanning |
+| `github.py` | `GitHubClient` — remote scanning for containerized deployments |
+| `types.py` | `LibInfo`, `ServiceInfo`, `CodebaseProfile`, `CodebaseCapability` |
+| `matching.py` | Strength levels (strong/moderate/basic), recommendation scoring |
+
+**Used by:** github-stats-api, opportunity-radar-api
+
+---
+
+### platform_devpost
+
+**Purpose:** Devpost hackathon discovery with codebase capability matching.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `client.py` | `DevpostClient` — list and get hackathons from Devpost API |
+| `matching.py` | Score hackathons against `CodebaseProfile` |
+| `filters.py` | Interest filtering by themes, states, featured-only |
+
+**Dependencies:** `platform-core`, `platform-codebase`
+
+**Used by:** opportunity-radar-api
+
+---
+
+### platform_kaggle
+
+**Purpose:** Kaggle competition discovery with codebase capability matching.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `client.py` | `KaggleClient` — list and get competitions via official `kaggle` library |
+| `matching.py` | Score competitions against `CodebaseProfile` |
+| `profile.py` | Auto-detect capabilities from pyproject.toml dependencies |
+| `pages.py` | `KagglePageFetcher` — fetch competition description, evaluation, timeline |
+
+**Dependencies:** `platform-core`, `platform-codebase`, `kaggle`
+
+**Used by:** github-stats-api, opportunity-radar-api
+
+---
+
+### procart
+
+**Purpose:** Procedural art core library for generating looping neon visual scenes.
+
+**Key Components:**
+| Module | Description |
+|--------|-------------|
+| `scene.py` | `Scene` / `Layer` composition with camera and parallax |
+| `modules/` | Pluggable `VisualModule` registry (background, neon_orbs, recursive_rects, fractal_mandelbrot, spiral_flow) |
+| `hdr.py` | HDR linear RGBA render pipeline with exposure/gamma tone mapping |
+| `camera.py` | Camera paths registry with typed `CameraConfig` builder |
+| `schedule.py` | `ScheduleConfig` (constant | linear) for parameter evolution |
+| `ffmpeg.py` | `FfmpegRunner` Protocol for video encoding |
+
+**Features:**
+- Supersampling and deterministic seeds to prevent frame drift
+- `MathBackend` Protocol (NumPy default) — swappable math implementation
+- PNG output via Pillow
+
+**Dependencies:** NumPy, Pillow
+
+**Used by:** procart-api
 
 ---
 
@@ -285,17 +560,23 @@ model-artifact.tar.xz
 
 **Service → Library Dependencies:**
 
-| Service | platform_core | platform_workers | platform_ml | platform_discord | platform_music |
-|---------|:-------------:|:----------------:|:-----------:|:----------------:|:--------------:|
-| Model-Trainer | ✓ | ✓ | ✓ | | |
-| handwriting-ai | ✓ | | ✓ | | |
-| covenant-radar-api | ✓ | ✓ | ✓ | | |
-| data-bank-api | ✓ | ✓ | | | |
-| turkic-api | ✓ | ✓ | | | |
-| transcript-api | ✓ | ✓ | | | |
-| qr-api | ✓ | ✓ | | | |
-| music-wrapped-api | ✓ | | | | ✓ |
-| DiscordBot | ✓ | ✓ | | ✓ | |
+| Service | core | workers | ml | discord | music | stt | langid | translate | codebase | calendar | devpost | kaggle | procart |
+|---------|:----:|:-------:|:--:|:-------:|:-----:|:---:|:------:|:---------:|:--------:|:--------:|:-------:|:------:|:-------:|
+| Model-Trainer | ✓ | ✓ | ✓ | | | | | | | | | | |
+| Art-Trainer | ✓ | ✓ | ✓ | | | | | | | | | | |
+| handwriting-ai | ✓ | | ✓ | | | | | | | | | | |
+| covenant-radar-api | ✓ | ✓ | ✓ | | | | | | | | | | |
+| data-bank-api | ✓ | ✓ | | | | | | | | | | | |
+| turkic-api | ✓ | ✓ | | | | | | | | | | | |
+| transcript-api | ✓ | ✓ | | | | | | | | | | | |
+| qr-api | ✓ | ✓ | | | | | | | | | | | |
+| music-wrapped-api | ✓ | | | | ✓ | | | | | | | | |
+| grandma-api | ✓ | | | | | ✓ | ✓ | ✓ | | | | | |
+| github-stats-api | ✓ | | | | | | | | ✓ | | | ✓ | |
+| opportunity-radar-api | ✓ | | | | | | | | ✓ | ✓ | ✓ | ✓ | |
+| procart-api | ✓ | | | | | | | | | | | | ✓ |
+| DiscordBot | ✓ | ✓ | | ✓ | | | | | | | | | |
+| TankpitBot | ✓ | | | | | | | | | | | | |
 
 ---
 
@@ -450,7 +731,7 @@ POST /files (multipart) → SHA256 hash → Filesystem
 **Purpose:** Turkic language NLP (detection and IPA transliteration).
 
 **Supported Languages:**
-- Turkish, Kazakh, Uzbek, Kyrgyz, Azerbaijani
+- Turkish, Kazakh, Uzbek, Kyrgyz, Russian, Azerbaijani, +3 more
 - Multiple scripts: Latin, Cyrillic, Arabic
 
 **Architecture:**
@@ -485,6 +766,7 @@ POST /files (multipart) → SHA256 hash → Filesystem
 **Streaming Services:**
 - Spotify
 - Apple Music
+- YouTube Music
 - Last.fm
 
 **Features:**
@@ -496,7 +778,7 @@ POST /files (multipart) → SHA256 hash → Filesystem
 
 ### covenant-radar-api
 
-**Purpose:** Loan covenant monitoring and breach prediction using XGBoost.
+**Purpose:** Loan covenant monitoring and breach prediction with pluggable ML backends.
 
 **Architecture:**
 ```
@@ -508,16 +790,22 @@ src/covenant_radar_api/
 │   │   ├── covenants.py          # CRUD for covenant rules
 │   │   ├── measurements.py       # Financial metric ingestion
 │   │   ├── evaluate.py           # Deterministic evaluation
-│   │   └── ml.py                 # Prediction & training
+│   │   └── ml.py                 # Prediction, training, optimization, explanation
 │   └── decode.py                 # JSON request decoders
 ├── core/
 │   ├── config.py                 # Settings re-export
 │   ├── container.py              # ServiceContainer for DI
 │   └── _test_hooks.py            # Container hooks for testing
 ├── worker/
-│   ├── train_job.py              # XGBoost training job
-│   └── evaluate_job.py           # Batch evaluation job
+│   ├── train_job.py              # Internal-data training job
+│   ├── train_external_job.py     # External-dataset training job
+│   ├── optimize_mlp_job.py       # MLP hyperparameter optimization
+│   ├── optimize_lstm_job.py      # LSTM hyperparameter optimization
+│   ├── _model_loaders.py         # Model deserialization per backend
+│   ├── _optimize_common.py       # Shared optimization utilities
+│   └── _test_hooks.py            # Worker DI hooks (registry, loaders, datasets)
 ├── worker_entry.py               # RQ worker entry point
+├── streaming_worker_entry.py     # Kafka streaming worker entry point
 └── _test_hooks.py                # Worker runner hooks
 ```
 
@@ -525,20 +813,154 @@ src/covenant_radar_api/
 | Library | Purpose |
 |---------|---------|
 | `covenant_domain` | TypedDict models, formula parser, rule engine |
-| `covenant_ml` | XGBoost training and prediction |
+| `covenant_ml` | Tree-based ML (XGBoost, LightGBM, Random Forest, LogReg, ClearGBM) |
+| `covenant_nn` | Neural network ML (MLP, LSTM classifiers and regressors) |
 | `covenant_persistence` | PostgreSQL repositories |
 
 **Features:**
 - CRUD operations for deals and covenants
 - Deterministic covenant rule evaluation
-- XGBoost-based breach probability prediction
-- Background training jobs via RQ
+- Pluggable ML backends: XGBoost, LightGBM, ClearGBM, LogReg, Random Forest (tree-based via covenant_ml); MLP, LSTM (neural via covenant_nn)
+- Optuna hyperparameter optimization with Bayesian TPE
+- Model explainability (permutation importance, SHAP, gradient, integrated gradients)
+- External dataset training (Taiwan, US, Polish bankruptcy datasets)
+- Temporal feature extraction (McKinnon PNAS 2024) and rank-trend hypothesis testing
+- Background training and optimization jobs via RQ
 
 **Dependencies:**
-- `xgboost` ^3.1
+- `xgboost` ^3.1, `lightgbm`, `scikit-learn`
 - `numpy` ^2.3
 - `psycopg` ^3.3
 - `platform-core`, `platform-workers`, `platform-ml`
+- `covenant_ml`, `covenant_nn` (neural backends, optional torch dependency)
+
+---
+
+### Art-Trainer
+
+**Purpose:** Image generation model training service (LoRAs for SD 1.5, SDXL, FLUX) with Kohya-ss backend.
+
+**Features:**
+- Multi-model support: SD 1.5, SDXL, FLUX LoRA training
+- Style, character, and concept training presets
+- Dataset upload + multi-backend auto-captioning (BLIP / Gemini / GPT-4o)
+- Durable job queue with progress tracking, cancellation, retry
+- ComfyUI automatic deployment of trained LoRAs
+- Data-bank API integration for artifact upload/download
+
+**Key Endpoints:**
+```
+POST /lora/train                 Enqueue LoRA training job
+GET  /lora/{job_id}              Get job status
+GET  /lora/{job_id}/progress     Get training progress
+POST /lora/{job_id}/cancel       Cancel job
+POST /dataset/upload             Upload images for training
+GET  /dataset/{dataset_id}       Get dataset info
+POST /dataset/{dataset_id}/caption  Caption images
+```
+
+**Dependencies:**
+- `torch` (CUDA), `transformers`, `diffusers`, `peft`, `safetensors`
+- `platform-core`, `platform-workers`, `platform-ml`
+
+---
+
+### grandma-api
+
+**Purpose:** Multi-language audio-to-English translation API. Supports 57 input languages with automatic language detection.
+
+**Architecture:**
+- Python FastAPI backend + vanilla TypeScript browser frontend
+- Audio recording in browser, real-time translation to English
+
+**Features:**
+- Translates speech from 57 languages to English text
+- Automatic language detection (no language parameter needed)
+- Supports WebM, MP3, WAV, M4A, OGG audio formats
+- Token-based authentication (`API_TOKEN`)
+
+**Key Endpoints:**
+```
+POST /translate    Translate audio to English text
+```
+
+**Dependencies:**
+- `platform-core`, `platform-stt`, `platform-langid`, `platform-translate`
+
+---
+
+### github-stats-api
+
+**Purpose:** GitHub statistics SVG card generation API (Python reimplementation of github-readme-stats).
+
+**Features:**
+- User stats cards and top languages cards as SVG
+- Capabilities card, hero card, skills/tech stack card
+- 10 themes: 5 basic + 5 premium animated (cyberpunk, synthwave, neon, aurora, radical)
+- Premium themes: gradient backgrounds, pulsing glow, twinkling sparkles (CSS animations)
+- Language card layouts: default, compact, donut, pie
+- Configurable caching (default 30 min TTL)
+
+**Key Endpoints:**
+```
+GET /api            Generate user stats SVG card
+GET /api/top-langs  Generate top languages SVG card
+```
+
+**Dependencies:**
+- `platform-core`, `platform-codebase`, `platform-kaggle`
+
+---
+
+### opportunity-radar-api
+
+**Purpose:** Discover Kaggle competitions and Devpost hackathons matching the monorepo's codebase capabilities.
+
+**Features:**
+- Codebase scanning: detects ML backends, frameworks, technologies from pyproject.toml
+- Dual scanning modes: local filesystem or GitHub API (for containers)
+- Kaggle competition matching with scored recommendations
+- Devpost hackathon matching with theme/state/featured filtering
+- Recommendation levels: `strong_fit`, `good_fit`, `stretch`, `new_territory`
+
+**Key Endpoints:**
+```
+GET /codebase/profile          Get capability profile
+GET /codebase/libs             List monorepo libraries
+GET /codebase/services         List monorepo services
+GET /kaggle/competitions       Find matching competitions
+GET /kaggle/competitions/{ref} Get competition by ref
+GET /devpost/hackathons        Find matching hackathons
+GET /devpost/hackathons/{id}   Get hackathon by ID
+```
+
+**Dependencies:**
+- `platform-core`, `platform-codebase`, `platform-kaggle`, `platform-devpost`, `platform-calendar`
+
+---
+
+### procart-api
+
+**Purpose:** Procedural art rendering orchestration via the `procart` library.
+
+**Features:**
+- Registry endpoints for discovering available visual modules, camera paths, and tone mappers
+- Frame preview rendering (single frame)
+- Full frame sequence rendering to disk
+- Video encoding via ffmpeg (injected runner)
+
+**Key Endpoints:**
+```
+GET  /registries/modules       List available visual modules
+GET  /registries/camera-paths  List camera path types
+GET  /registries/tone-mappers  List tone mapping types
+POST /render/preview           Render a single frame preview
+POST /render/frames            Render all frames to disk
+POST /render/video             Encode frames to video via ffmpeg
+```
+
+**Dependencies:**
+- `procart`, `platform-core`
 
 ---
 
@@ -547,8 +969,12 @@ src/covenant_radar_api/
 | Service | ML Type | Framework | Model Architecture |
 |---------|---------|-----------|-------------------|
 | Model-Trainer | Sequence modeling | PyTorch | GPT-2, Char-LSTM |
+| Art-Trainer | Image generation | PyTorch, Diffusers, Kohya-ss | SD 1.5, SDXL, FLUX LoRAs |
 | handwriting-ai | Image classification | PyTorch | ResNet-18 |
-| covenant-radar-api | Tabular classification | XGBoost | Gradient boosted trees |
+| covenant-radar-api | Tabular classification | XGBoost, LightGBM, ClearGBM, LogReg, Random Forest | Tree-based + linear (covenant_ml) |
+| covenant-radar-api | Neural classification/regression | PyTorch | MLP, LSTM (covenant_nn) |
+| covenant-radar-api | Tabular regression | XGBoost, LightGBM | Tree-based regressors (covenant_ml) |
+| grandma-api | Speech-to-text | OpenAI Whisper, Meta MMS-LID | Language detection + translation |
 
 **Model-Trainer is NOT suitable for:**
 - Tree-based models (XGBoost, LightGBM, Random Forest)
@@ -558,9 +984,9 @@ src/covenant_radar_api/
 **Reasoning:** Model-Trainer's contracts assume `torch.nn.Module` models with tokenization pipelines. The training loop is designed for gradient descent, not boosting iterations.
 
 **covenant-radar-api** handles tabular ML:
-- XGBoost gradient boosted trees for breach probability prediction
-- Standalone service with dedicated `covenant_ml` library
-- Uses `platform_workers` for background training jobs
+- 7 classifier backends + 4 regressor backends via pluggable registry
+- Standalone service with dedicated `covenant_ml` + `covenant_nn` libraries
+- Uses `platform_workers` for background training and optimization jobs
 
 ---
 
@@ -615,12 +1041,17 @@ Services communicate over `platform-network`:
 | Model-Trainer | 8005 | ✓ |
 | music-wrapped-api | 8006 | |
 | covenant-radar-api | 8007 | |
+| grandma-api | 8008 | |
+| github-stats-api | 8009 | |
+| opportunity-radar-api | 8010 | |
+| Art-Trainer | 8011 | ✓ |
+| procart-api | - | |
 
 ---
 
 ## GPU Support
 
-Model-Trainer uses NVIDIA GPU acceleration:
+Model-Trainer and Art-Trainer use NVIDIA GPU acceleration:
 
 ```yaml
 deploy:
@@ -713,5 +1144,7 @@ make check  # Runs mypy + ruff + pytest --cov --cov-branch
 
 **For ML Services:**
 - If sequence/language modeling → extend Model-Trainer backends
+- If image generation → follow Art-Trainer pattern (Kohya-ss + diffusers)
 - If tabular/tree-based ML → create standalone service using `platform_workers` + `platform_ml`
 - If image classification → follow handwriting-ai pattern
+- If speech/audio → use `platform_stt` + `platform_langid` (follow grandma-api pattern)

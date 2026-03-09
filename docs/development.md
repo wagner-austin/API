@@ -3,10 +3,11 @@
 ## Prerequisites
 
 - Python 3.11+
+- Node.js 20+ (for grandma-api frontend)
 - Poetry (dependency management)
 - Docker + Docker Compose
 - Make (via PowerShell on Windows)
-- NVIDIA GPU + CUDA 12.4 (for Model-Trainer only)
+- NVIDIA GPU + CUDA 12.4 (for Model-Trainer, Art-Trainer)
 
 ## Quick Start
 
@@ -15,16 +16,38 @@
 git clone https://github.com/wagner-austin/API.git
 cd API
 
-# Start shared infrastructure (Redis + network)
+# Start shared infrastructure (Redis + PostgreSQL + Traefik)
 make infra
 
 # Start a specific service
-make up-trainer      # Model-Trainer (GPU)
-make up-databank     # data-bank-api
-make up-handwriting  # handwriting-ai
+make up-databank      # data-bank-api
+make up-trainer       # Model-Trainer (GPU)
+make up-art-trainer   # Art-Trainer (GPU)
+make up-handwriting   # handwriting-ai
+make up-qr            # qr-api
+make up-transcript    # transcript-api
+make up-turkic        # turkic-api
+make up-music         # music-wrapped-api
+make up-covenant      # covenant-radar-api
+make up-grandma       # grandma-api
+make up-github-stats  # github-stats-api
+make up-opportunity   # opportunity-radar-api
+make up-discord       # DiscordBot
+
+# Start all services
+make up-all
+
+# Stop everything
+make down
+
+# Stop all services and prune Docker volumes
+make clean
 
 # View running containers
 make status
+
+# Stream logs
+make logs
 ```
 
 ## Local Development
@@ -90,28 +113,46 @@ poetry run ruff format .
 
 ```
 API/
-├── libs/                    # Shared libraries
+├── libs/                    # Shared libraries (22 packages)
+│   ├── cleargbm/            # Pure-Python gradient boosting
+│   ├── cleargbm_rs/         # Rust core for ClearGBM (PyO3)
 │   ├── covenant_domain/     # Covenant domain models & rules
-│   ├── covenant_ml/         # XGBoost training for covenants
+│   ├── covenant_ml/         # Pluggable ML framework (classifiers + regressors)
+│   ├── covenant_nn/         # PyTorch neural backends (MLP, LSTM)
 │   ├── covenant_persistence/# PostgreSQL repositories
 │   ├── instrument_io/       # Scientific formats
 │   ├── monorepo_guards/     # Static analysis
+│   ├── platform_calendar/   # Google Calendar API for deadline tracking
+│   ├── platform_codebase/   # Codebase capability detection
 │   ├── platform_core/       # Config, logging, HTTP
+│   ├── platform_devpost/    # Devpost hackathon discovery
 │   ├── platform_discord/    # Discord utilities
+│   ├── platform_email/      # Email integration (Outlook, Gmail)
+│   ├── platform_kaggle/     # Kaggle competition discovery
+│   ├── platform_langid/     # Spoken language ID (Meta MMS-LID)
 │   ├── platform_ml/         # ML artifacts
 │   ├── platform_music/      # Music service adapters
-│   └── platform_workers/    # RQ job infrastructure
-├── services/                # Microservices
+│   ├── platform_stt/        # Speech-to-text (Whisper)
+│   ├── platform_translate/  # Text translation (Anthropic, OpenAI)
+│   ├── platform_workers/    # RQ job infrastructure
+│   └── procart/             # Procedural art core (neon visuals, HDR)
+├── services/                # Microservices (13 services)
+│   ├── Art-Trainer/         # Image generation model training (LoRA)
 │   ├── covenant-radar-api/
 │   ├── data-bank-api/
+│   ├── github-stats-api/    # GitHub stats SVG cards
+│   ├── grandma-api/         # Audio-to-English translation
 │   ├── handwriting-ai/
 │   ├── Model-Trainer/
 │   ├── music-wrapped-api/
+│   ├── opportunity-radar-api/ # Hackathon & competition discovery
+│   ├── procart-api/         # Procedural art rendering
 │   ├── qr-api/
 │   ├── transcript-api/
 │   └── turkic-api/
 ├── clients/                 # Client applications
-│   └── DiscordBot/
+│   ├── DiscordBot/          # Discord bot integrating all services
+│   └── TankpitBot/          # Tankpit.com WebSocket bot
 ├── docs/                    # Documentation
 ├── docker-compose.yml       # Shared infrastructure
 ├── Makefile                 # Root orchestration
@@ -129,7 +170,17 @@ make infra
 # Individual services
 make up-databank
 make up-trainer
+make up-art-trainer
 make up-handwriting
+make up-qr
+make up-transcript
+make up-turkic
+make up-music
+make up-covenant
+make up-grandma
+make up-github-stats
+make up-opportunity
+make up-discord
 
 # All services
 make up-all
@@ -248,7 +299,7 @@ poetry install --with dev
 make infra
 ```
 
-### GPU not detected (Model-Trainer)
+### GPU not detected (Model-Trainer / Art-Trainer)
 
 1. Verify NVIDIA Container Toolkit is installed
 2. Check Docker GPU access: `docker run --rm --gpus all nvidia/cuda:12.4-base nvidia-smi`

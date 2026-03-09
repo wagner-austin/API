@@ -5,13 +5,18 @@
 | Service | Port | Description | GPU |
 |---------|------|-------------|-----|
 | data-bank-api | 8001 | Content-addressed file storage | No |
-| Model-Trainer | 8005 | GPT-2 and Char-LSTM training | Yes |
+| Model-Trainer | 8005 | Language model training with LoRA/QLoRA/Unsloth, GPT-2, Char-LSTM | Yes |
+| Art-Trainer | 8011 | Image generation model training (LoRA) | Yes |
 | handwriting-ai | 8004 | MNIST digit recognition | No |
 | turkic-api | 8000 | Turkic language NLP | No |
 | transcript-api | 8003 | YouTube transcription | No |
 | qr-api | 8002 | QR code generation | No |
 | music-wrapped-api | 8006 | Music analytics | No |
 | covenant-radar-api | 8007 | Loan covenant monitoring | No |
+| grandma-api | 8008 | Multi-language audio-to-English translation | No |
+| github-stats-api | 8009 | GitHub stats SVG card generation | No |
+| opportunity-radar-api | 8010 | Hackathon & competition discovery | No |
+| procart-api | - | Procedural art rendering | No |
 
 ---
 
@@ -176,6 +181,7 @@ Music listening analytics aggregating data from streaming services.
 **Features:**
 - Spotify listening history analysis
 - Apple Music integration
+- YouTube Music integration
 - Last.fm scrobble aggregation
 - Yearly wrapped-style reports
 
@@ -203,9 +209,10 @@ Loan covenant monitoring and breach prediction service with pluggable ML backend
 - CRUD operations for loan deals and covenant definitions
 - Financial measurement ingestion
 - Deterministic covenant rule evaluation
-- Pluggable ML backends: XGBoost, LightGBM, MLP neural networks, LSTM
-- Feature importance ranking for tree-based models (XGBoost, LightGBM)
-- Model explainability with multiple explainer methods (permutation, gradient, integrated gradients, SHAP)
+- Pluggable ML backends: XGBoost, LightGBM, Random Forest, Logistic Regression, ClearGBM (tree-based via covenant_ml); MLP, LSTM classifiers and regressors (neural via covenant_nn)
+- Feature importance ranking for tree-based models (XGBoost, LightGBM, ClearGBM)
+- Model explainability (permutation importance, ClearGBM SHAP)
+- Temporal feature extraction (McKinnon PNAS 2024) and rank-trend hypothesis testing
 - Optuna hyperparameter optimization with Bayesian TPE
 - External dataset training (Taiwan, US, Polish bankruptcy datasets)
 - Background training and optimization jobs via RQ
@@ -235,6 +242,151 @@ make up-covenant
 
 ---
 
+## Art-Trainer
+
+Image generation model training (LoRAs for SD 1.5, SDXL, FLUX) with Kohya-ss backend.
+
+**Features:**
+- Multi-model support: SD 1.5, SDXL, FLUX LoRA training
+- Style, character, and concept training presets
+- Dataset upload + multi-backend auto-captioning (BLIP / Gemini / GPT-4o)
+- Durable job queue with progress tracking, cancellation, retry
+- ComfyUI automatic deployment of trained LoRAs
+
+**Key Endpoints:**
+```
+POST /lora/train                    Enqueue LoRA training job
+GET  /lora/{job_id}                 Get job status
+GET  /lora/{job_id}/progress        Get training progress
+POST /lora/{job_id}/cancel          Cancel job
+POST /dataset/upload                Upload images for training
+GET  /dataset/{dataset_id}          Get dataset info
+POST /dataset/{dataset_id}/caption  Caption images
+```
+
+**Requirements:**
+- NVIDIA GPU with CUDA 12.4+
+
+**Start:**
+```bash
+make up-art-trainer
+```
+
+**Docs:** [README](../services/Art-Trainer/README.md)
+
+---
+
+## grandma-api
+
+Multi-language audio-to-English translation API. Supports 57 input languages with automatic language detection.
+
+**Features:**
+- Translates speech from 57 languages to English text
+- Automatic language detection (no language parameter needed)
+- Supports WebM, MP3, WAV, M4A, OGG audio formats
+- Companion browser frontend for audio recording + real-time translation
+
+**Key Endpoints:**
+```
+POST /translate    Translate audio to English text
+```
+
+**Start:**
+```bash
+make up-grandma
+```
+
+**Docs:** [README](../services/grandma-api/README.md)
+
+---
+
+## github-stats-api
+
+GitHub statistics SVG card generation API (Python reimplementation of github-readme-stats).
+
+**Features:**
+- User stats cards and top languages cards as SVG
+- 10 themes: 5 basic + 5 premium animated (cyberpunk, synthwave, neon, aurora, radical)
+- Language card layouts: default, compact, donut, pie
+- Configurable caching (default 30 min TTL)
+
+**Key Endpoints:**
+```
+GET /api            Generate user stats SVG card
+GET /api/top-langs  Generate top languages SVG card
+```
+
+**Start:**
+```bash
+make up-github-stats
+```
+
+**Docs:** [README](../services/github-stats-api/README.md)
+
+---
+
+## opportunity-radar-api
+
+Discover Kaggle competitions and Devpost hackathons matching the monorepo's codebase capabilities.
+
+**Features:**
+- Codebase scanning: detects ML backends, frameworks, technologies
+- Dual scanning modes: local filesystem or GitHub API (for containers)
+- Kaggle competition matching with scored recommendations
+- Devpost hackathon matching with theme/state/featured filtering
+- Recommendation levels: `strong_fit`, `good_fit`, `stretch`, `new_territory`
+
+**Key Endpoints:**
+```
+GET /codebase/profile          Get capability profile
+GET /codebase/libs             List monorepo libraries
+GET /codebase/services         List monorepo services
+GET /kaggle/competitions       Find matching competitions
+GET /kaggle/competitions/{ref} Get competition by ref
+GET /devpost/hackathons        Find matching hackathons
+GET /devpost/hackathons/{id}   Get hackathon by ID
+```
+
+**Start:**
+```bash
+make up-opportunity
+```
+
+**Docs:** [README](../services/opportunity-radar-api/README.md)
+
+---
+
+## procart-api
+
+Procedural art rendering orchestration via the `procart` library.
+
+**Features:**
+- Registry endpoints for discovering available visual modules, camera paths, and tone mappers
+- Frame preview rendering (single frame)
+- Full frame sequence rendering to disk
+- Video encoding via ffmpeg
+
+**Key Endpoints:**
+```
+GET  /registries/modules       List available visual modules
+GET  /registries/camera-paths  List camera path types
+GET  /registries/tone-mappers  List tone mapping types
+POST /render/preview           Render a single frame preview
+POST /render/frames            Render all frames to disk
+POST /render/video             Encode frames to video via ffmpeg
+```
+
+**Start:**
+```bash
+cd services/procart-api
+poetry install --with dev
+poetry run hypercorn src/procart_api/main:app --bind 0.0.0.0:8000
+```
+
+**Docs:** [README](../services/procart-api/README.md)
+
+---
+
 ## Clients
 
 ### DiscordBot
@@ -253,3 +405,17 @@ make up-discord
 ```
 
 **Docs:** [README](../clients/DiscordBot/README.md)
+
+---
+
+### TankpitBot
+
+Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol.
+
+**Features:**
+- WebSocket traffic capture via Chrome DevTools Protocol
+- XOR codec for message encoding/decoding (static + session keys)
+- 94% protocol signature coverage, 31+ message types documented
+- 3 CLI entry points: `tankpit-sniff`, `tankpit-probe`, `tankpit-bot`
+
+**Docs:** [README](../clients/TankpitBot/README.md)
