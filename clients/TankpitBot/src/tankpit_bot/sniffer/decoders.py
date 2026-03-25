@@ -13,9 +13,14 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.capture import decode_base64_safe
+from tankpit_bot.protocol.constants import RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
-from tankpit_bot.sniffer.world_state import dispatch_world_state_update
+from tankpit_bot.sniffer.world_state import (
+    dispatch_world_state_update,
+    register_room_image,
+    set_selected_room,
+)
 from tankpit_bot.sniffer.xor import xor_decode
 
 log = get_logger(__name__)
@@ -100,14 +105,68 @@ def try_decode_received(payload: str) -> str | None:
 
 
 def process_received_message(payload: str) -> None:
-    """Decode and log ALL received messages using protocol module.
+    """Decode, log, and dispatch received messages to world state.
+
+    A single WebSocket frame can contain multiple logical messages, each
+    with a 2-byte little-endian length prefix. This function splits the
+    frame and processes each message individually.
 
     Args:
-        payload: Base64-encoded message payload.
+        payload: Base64-encoded WebSocket frame payload.
     """
-    result = try_decode_received(payload)
-    if result is not None:
+    data = decode_base64_safe(payload)
+    if data is None or len(data) < 3:
+        return
+
+    # Split frame into individual messages (each prefixed with 2-byte LE length)
+    offset = 0
+    while offset + 2 < len(data):
+        msg_len = data[offset] | (data[offset + 1] << 8)
+        offset += 2
+        if msg_len == 0 or offset + msg_len > len(data):
+            break
+        body = data[offset : offset + msg_len]
+        offset += msg_len
+        _process_single_message(body)
+
+
+def _process_single_message(body: bytes) -> None:
+    """Process a single logical message (after frame splitting).
+
+    Args:
+        body: Message body bytes (without length prefix).
+    """
+    if len(body) == 0:
+        return
+
+    msg_type = body[0]
+
+    # Text messages — log only
+    if msg_type in TEXT_MESSAGE_TYPES:
+        text = body.decode("utf-8", errors="replace")
+        result = decode_text_message(text, len(body), "RECEIVED", body)
         log.info(result)
+        return
+
+    # Binary messages — XOR decode, log, and dispatch
+    decoded_data = xor_decode(body)
+    if len(decoded_data) == 0:
+        return
+
+    min_len = MSG_MIN_LENGTHS.get(msg_type)
+    if min_len is not None and len(decoded_data) >= min_len:
+        binary_decoded = protocol.try_decode_binary_message(msg_type, decoded_data)
+        if binary_decoded is not None:
+            log.info("[RECEIVED] %s", format_decoded_message(msg_type, binary_decoded))
+            dispatch_world_state_update(binary_decoded)
+            return
+    msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
+    log.info(
+        "[RECEIVED] type=0x%02X '%s' len=%d",
+        msg_type,
+        msg_char,
+        len(body),
+    )
 
 
 def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
@@ -250,7 +309,9 @@ def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None =
     if text.startswith("+") and "|" in text:
         return decode_plus_message(text, tag)
     if text.startswith("*"):
-        return f"[{tag}] SELECT: room={text[1:]}"
+        selected_room = text[1:]
+        set_selected_room(selected_room)
+        return f"[{tag}] SELECT: room={selected_room}"
     if text.startswith("="):
         return decode_join_confirm(text, tag)
     if text.startswith("$"):
@@ -297,6 +358,9 @@ def decode_message(payload: str, direction: str, magic: str | None = None) -> st
 def decode_plus_message(text: str, tag: str) -> str:
     """Decode a '+' prefixed message (ROOM_LIST or ACTION).
 
+    Room list format: +room_id|name|player_count|modes|unknown1|unknown2|image|year
+    Example: +2|World (Meltdown)|42|1,1,1,0,1,0,0|3|n|field42.gif|2026
+
     Args:
         text: Text starting with '+'.
         tag: Direction tag.
@@ -308,6 +372,9 @@ def decode_plus_message(text: str, tag: str) -> str:
     if len(parts) >= 3 and len(parts[0]) > 1 and parts[0][1:].isdigit():
         room_id = parts[0][1:]
         name = parts[1] if len(parts) > 1 else "?"
+        # Register field image if present (index 6 in pipe-delimited format)
+        if len(parts) >= 7:
+            register_room_image(room_id, parts[6])
         return f"[{tag}] ROOM_LIST: room={room_id} name={name}"
     # Action message with coords
     room_id = parts[0][1:] if len(parts) > 0 else "?"
@@ -322,7 +389,7 @@ def decode_join_confirm(text: str, tag: str) -> str:
     Example: =2|Sep. 25, 2012|Yuppler|4|9|9|9|10
 
     Rank values: 0=recruit, 1=private, 2=corporal, 3=sergeant,
-                 4=lieutenant, 5=captain, 6=major, 7=general
+                 4=lieutenant, 5=captain, 6=major, 7=colonel, 8=general
 
     Args:
         text: Text starting with '='.
@@ -331,21 +398,11 @@ def decode_join_confirm(text: str, tag: str) -> str:
     Returns:
         Decoded message string.
     """
-    rank_names = [
-        "recruit",
-        "private",
-        "corporal",
-        "sergeant",
-        "lieutenant",
-        "captain",
-        "major",
-        "general",
-    ]
     parts = text.split("|")
     room_id = parts[0][1:] if len(parts) > 0 else "?"
     tank_name = parts[2] if len(parts) > 2 else "?"
     rank_num = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
-    rank_str = rank_names[rank_num] if 0 <= rank_num < 8 else f"rank{rank_num}"
+    rank_str = RANK_NAMES[rank_num] if 0 <= rank_num < len(RANK_NAMES) else f"rank{rank_num}"
     return f"[{tag}] JOIN_CONFIRM: room={room_id} tank={tank_name} {rank_str}"
 
 

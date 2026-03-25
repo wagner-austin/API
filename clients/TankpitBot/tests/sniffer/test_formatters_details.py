@@ -122,8 +122,8 @@ class TestFormatFunctions:
         result = format_tank_details(msg)
         assert "tank=100" in result
         assert "captain" in result  # rank 5
-        assert "green" in result  # team 2
-        assert "score=1000" in result
+        assert "blue" in result  # team 2
+        assert "lb=1000" in result
 
     def test_format_tank_details_info(self) -> None:
         """Test format_tank_details for tank info (0x21)."""
@@ -139,7 +139,7 @@ class TestFormatFunctions:
         )
         result = format_tank_details(msg)
         assert "tank=100" in result
-        assert "blue" in result  # team 1
+        assert "purple" in result  # team 1
         assert "InfoTank" in result
 
     def test_format_tank_details_movement(self) -> None:
@@ -153,14 +153,14 @@ class TestFormatFunctions:
             start_y=60,
             direction=2,
             flag=0,
-            fuel=500,
+            leaderboard_position=500,
             waypoints=[],
         )
         result = format_tank_details(msg)
         assert "tank=100" in result
         assert "(50,60)" in result
         assert "dir=2" in result
-        assert "fuel=500" in result
+        assert "lb=500" in result
 
     def test_format_tank_details_movement_response(self) -> None:
         """Test format_tank_details for movement response (0x3D)."""
@@ -213,18 +213,18 @@ class TestFormatFunctions:
         """Test format_resource_details for fuel refill (0x44)."""
         from tankpit_bot.protocol import FuelGainDict
 
-        msg = FuelGainDict(msg_type=0x44, amount=500, is_free=True)
+        msg = FuelGainDict(msg_type=0x44, fuel_total=500, is_free=True)
         result = format_resource_details(msg)
-        assert "amount=500" in result
+        assert "fuel=500" in result
         assert "free=True" in result
 
     def test_format_resource_details_fuel_deposit(self) -> None:
         """Test format_resource_details for fuel deposit (0x64)."""
         from tankpit_bot.protocol import FuelDepositDict
 
-        msg = FuelDepositDict(msg_type=0x64, amount=1000)
+        msg = FuelDepositDict(msg_type=0x64, fuel_total=1000)
         result = format_resource_details(msg)
-        assert "amount=1000" in result
+        assert "fuel=1000" in result
 
     def test_format_resource_details_item_pickup(self) -> None:
         """Test format_resource_details for item pickup (0x49)."""
@@ -484,6 +484,8 @@ class TestFormatFunctions:
             container_x=None,
             container_y=None,
             container_viewport_x=None,
+            tank_y=None,
+            tank_viewport_x=None,
         )
         result = format_container_details(msg)
         assert "tank=100" in result

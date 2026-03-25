@@ -203,6 +203,8 @@ class TankRegistryDict(TypedDict):
     container_x: int | None  # Absolute x - requires player position to calculate
     container_y: int | None  # Absolute y coordinate
     container_viewport_x: int | None  # Viewport-relative x (player at center ~3)
+    tank_y: int | None  # Tank absolute Y coordinate (from info_bytes[5])
+    tank_viewport_x: int | None  # Tank viewport-relative X (from info_bytes[6])
 
 
 class TankStatusShortDict(TypedDict):

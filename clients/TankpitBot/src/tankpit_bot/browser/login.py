@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from typing import TypedDict
 
+from platform_core.json_utils import require_dict, require_str
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -379,7 +380,41 @@ def join_room(
     # Wait for lobby to load
     page.wait_for_timeout(2000.0)
 
-    # Try map click first
+    # Select room from dropdown in #game-list
+    # Room indices: 0=Meltdown, 1=Practice
+    room_name = _test_hooks.get_env("TANKPIT_ROOM") or "Practice"
+    room_index = 0 if room_name == "Meltdown" else 1
+    room_js = f"""
+    new Promise((resolve, reject) => {{
+        let attempts = 0;
+        const check = () => {{
+            const sel = document.querySelector('#game-list select');
+            if (!sel) {{ reject('no select in #game-list'); return; }}
+            if (sel.options.length >= 2) {{
+                sel.selectedIndex = {room_index};
+                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
+                const opt = sel.options[sel.selectedIndex];
+                const label = opt ? opt.text || opt.value : '?';
+                resolve('selected index={room_index} (' + label + ')');
+            }} else if (++attempts > 50) {{
+                reject('options never loaded after 50 checks');
+            }} else {{
+                setTimeout(check, 100);
+            }}
+        }};
+        check();
+    }})
+    """
+    room_result = cdp.send(
+        "Runtime.evaluate",
+        {"expression": room_js, "returnByValue": True, "awaitPromise": True},
+    )
+    result_obj = require_dict(room_result, "result")
+    room_val = require_str(result_obj, "value")
+    log.info("Room select: %s", room_val)
+    page.wait_for_timeout(1000.0)
+
+    # Click map to place tank
     map_result = _click_map(cdp)
     log.info("Map click: %s", map_result)
 

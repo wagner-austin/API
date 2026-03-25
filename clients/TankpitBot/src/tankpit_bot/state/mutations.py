@@ -56,7 +56,7 @@ def update_self_from_movement_response(
         y=y,
         team=team,
         rank=rank,
-        fuel=state["self_state"]["fuel"] if state["self_state"] else 1000,
+        fuel=state["self_state"]["fuel"] if state["self_state"] else 0,
         leaderboard_position=leaderboard_position,
     )
     return WorldStateDict(
@@ -109,7 +109,7 @@ def update_self_position_and_viewport(
             y=y,
             team=0,
             rank=0,
-            fuel=1000,
+            fuel=0,
             leaderboard_position=0,
         )
 
@@ -488,7 +488,7 @@ def update_self_fuel(
     fuel_delta: int,
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Update self fuel from FuelGain/FuelDeposit messages.
+    """Update self fuel by adding a delta.
 
     Args:
         state: Current world state.

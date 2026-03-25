@@ -24,6 +24,7 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot.types import CapturedMessage
 
 
 def _make_auth_payload(magic: str) -> str:
@@ -179,11 +180,14 @@ class FakeCDPSession:
         self._detached = False
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Send CDP command."""
+        """Send CDP command.
+
+        Returns a valid CDP response with ``{"result": {"value": ...}}``,
+        matching the real Chrome DevTools Protocol contract.
+        """
         _ = params
         self._sent_methods.append(method)
-        result: JSONObject = {}
-        return result
+        return {"result": {"value": "ok"}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Register event handler."""
@@ -421,6 +425,96 @@ class FakePageNoMessages:
     def wait_for_timeout(self, timeout: float) -> None:
         """Wait without emitting any WebSocket events."""
         _ = timeout
+
+    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
+        """Wait for an event - returns immediately in tests."""
+        _ = (event, timeout)
+
+    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
+        """Wait for JavaScript function to return truthy.
+
+        Args:
+            expression: JavaScript expression to evaluate.
+            timeout: Maximum wait time in milliseconds.
+        """
+        _ = (expression, timeout)
+
+    def close(self, *, reason: str | None = None, run_before_unload: bool | None = None) -> None:
+        """Close page."""
+        _ = (reason, run_before_unload)
+        self._closed = True
+
+    def evaluate(self, expression: str) -> JSONValue:
+        """Evaluate JavaScript expression - returns empty list in tests."""
+        _ = expression
+        return []
+
+
+class FakePageGrowingMessages:
+    """Fake page that appends messages to a list during wait_for_timeout.
+
+    Used to test stabilization reset in _wait_for_game_ready, where new
+    messages arrive during the stabilization loop.
+    """
+
+    def __init__(
+        self,
+        messages: list[CapturedMessage],
+        *,
+        add_on_call: int = 2,
+    ) -> None:
+        """Initialize fake page.
+
+        Args:
+            messages: Mutable message list (shared with the session under test).
+            add_on_call: Which wait_for_timeout call number triggers a new message.
+        """
+        self._messages = messages
+        self._add_on_call = add_on_call
+        self._call_count = 0
+        self._url = ""
+        self._closed = False
+
+    @property
+    def url(self) -> str:
+        """Get the current URL of the page."""
+        return self._url
+
+    @property
+    def keyboard(self) -> KeyboardProtocol:
+        """Get the keyboard interface.
+
+        Returns:
+            FakeKeyboard instance.
+        """
+        return FakeKeyboard()
+
+    def goto(
+        self,
+        url: str,
+        *,
+        referer: str | None = None,
+        timeout: float | None = None,
+        wait_until: str | None = None,
+    ) -> ResponseProtocol | None:
+        """Navigate to URL."""
+        _ = (referer, timeout, wait_until)
+        self._url = url
+        return FakeResponse()
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Wait and optionally add a message to trigger stabilization reset."""
+        _ = timeout
+        self._call_count += 1
+        if self._call_count == self._add_on_call:
+            self._messages.append(
+                CapturedMessage(
+                    timestamp_ms=self._call_count,
+                    direction="received",
+                    payload="growing",
+                    ws_url="ws://test",
+                ),
+            )
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""

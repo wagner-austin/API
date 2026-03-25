@@ -110,8 +110,7 @@ class FakeCDPSessionProbe:
                 self._emit_ws_sent(f"mouse_input_{self._input_count}")
                 self._emit_ws_received(f"mouse_response_{self._input_count}")
 
-        result: JSONObject = {}
-        return result
+        return {"result": {"value": "ok"}}
 
     def _emit_ws_sent(self, payload: str) -> None:
         """Emit a WebSocket sent event."""

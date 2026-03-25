@@ -6,6 +6,12 @@ documentation for the WebSocket sniffer.
 
 from __future__ import annotations
 
+from tankpit_bot.protocol.constants import (
+    DAMAGE_NAMES,
+    RANK_NAMES,
+    TEAM_NAMES,
+)
+
 # Default configuration constants
 DEFAULT_TARGET_URL = "https://tankpit.com"
 DEFAULT_OUTPUT_PATH = "capture_session.json"
@@ -142,23 +148,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x7A: ("zone_update", "IDENTIFIED"),  # 'z' - lowercase variant
 }
 
-# Rank number -> name mapping
-RANK_NAMES: tuple[str, ...] = (
-    "recruit",
-    "private",
-    "corporal",
-    "sergeant",
-    "lieutenant",
-    "captain",
-    "major",
-    "general",
-)
-
-# Damage state -> description
-DAMAGE_NAMES: tuple[str, ...] = ("full", "light", "medium", "critical")
-
-# Team number -> name
-TEAM_NAMES: tuple[str, ...] = ("red", "blue", "green", "purple")
+# RANK_NAMES, DAMAGE_NAMES, TEAM_NAMES imported from protocol.constants
 
 
 __all__ = [

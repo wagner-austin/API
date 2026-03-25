@@ -23,15 +23,33 @@ def decode_movement(data: bytes) -> MovementDict:
         DecodeError: If decoding fails.
     """
     require_min_length(data, 9, "Movement")
+    # Waypoints are ASCII direction chars at bytes 11+ (n/s/e/w)
+    path_str = ""
+    for i in range(11, len(data)):
+        ch = chr(data[i])
+        if ch in "nsew":
+            path_str += ch
+    # Compute final position from start + path
+    sx, sy = data[2], data[3]
+    fx, fy = sx, sy
+    for ch in path_str:
+        if ch == "n":
+            fy -= 1
+        elif ch == "s":
+            fy += 1
+        elif ch == "e":
+            fx += 1
+        elif ch == "w":
+            fx -= 1
     return MovementDict(
         msg_type=0x47,
         tank_id=x16(data[0], data[1]),
-        start_x=data[2],
-        start_y=data[3],
+        start_x=sx,
+        start_y=sy,
         direction=data[4],
         flag=data[5],
-        fuel=x24(data[6], data[7], data[8]),
-        waypoints=[],
+        leaderboard_position=x24(data[6], data[7], data[8]),
+        waypoints=[(fx, fy)],
     )
 
 

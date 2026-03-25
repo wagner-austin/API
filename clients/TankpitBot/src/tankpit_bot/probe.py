@@ -32,11 +32,11 @@ from tankpit_bot.browser import (
     GameNotJoinedError,
     PlaywrightNotInstalledError,
     get_current_time_ms,
+    reset_cdp_time_offset,
 )
 from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     build_xor_table,
-    extract_magic_from_auth_payload,
     load_static_key,
     xor_bytes,
 )
@@ -48,6 +48,7 @@ from tankpit_bot.protocol.commands import (
 )
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer import decode_message
+from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.types import (
     CapturedMessage,
     KeyInput,
@@ -59,45 +60,6 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
-
-
-def _is_valid_base64(s: str) -> bool:
-    """Check if string is valid base64.
-
-    Args:
-        s: String to check.
-
-    Returns:
-        True if valid base64, False otherwise.
-    """
-    import re
-
-    if not s:
-        return False
-    # Base64 characters plus padding
-    pattern = r"^[A-Za-z0-9+/]*={0,2}$"
-    if not re.match(pattern, s):
-        return False
-    # Must be multiple of 4 in length (with padding)
-    return len(s) % 4 == 0
-
-
-def _extract_magic_from_payload(payload_b64: str) -> str | None:
-    """Extract magic key from AUTH message payload.
-
-    Args:
-        payload_b64: Base64-encoded AUTH message payload.
-
-    Returns:
-        Magic key string, or None if not an AUTH message or extraction fails.
-    """
-    import base64
-
-    if not _is_valid_base64(payload_b64):
-        return None
-
-    data = base64.b64decode(payload_b64)
-    return extract_magic_from_auth_payload(data)
 
 
 class ProbeError(Exception):
@@ -207,17 +169,14 @@ class ProtocolProbe(BrowserSession):
         self._open_toggles: set[str] = set()
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Signal when a received message arrives and extract magic from AUTH.
+        """Signal when a received message arrives.
+
+        Magic extraction is handled by the base class.
 
         Args:
             message: The captured message.
         """
-        # Extract magic from AUTH message (sent messages)
-        if message["direction"] == "sent" and self._magic is None:
-            magic = _extract_magic_from_payload(message["payload"])
-            if magic is not None:
-                self._magic = magic
-                log.info("Captured magic from AUTH: %s...", magic[:20])
+        super()._on_message_captured(message)
 
         if message["direction"] == "received":
             self._received_event.set()
@@ -611,15 +570,27 @@ class ProtocolProbe(BrowserSession):
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 
+            # Reset session state for new session (matches sniffer)
+            reset_cdp_time_offset()
+            reset_viewport_tracking()
+
             # Set up console listener and CDP handlers
             self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)
+
+            # Navigate to target URL first (matches sniffer)
+            page.goto(self._target_url, wait_until="domcontentloaded")
+            log.info("Landed on %s", page.url)
+
+            # Handle login (this also calls page.goto internally)
             self._navigate_and_login(page, cdp, tank_name_prefix="P", auto_join_room=True)
 
             # Gather all available intel
             self._gather_intel(page, cdp)
 
-            self._wait_for_game_ready(page)
+            # Initialize DOM scraper for game log and combat tracker (matches sniffer)
+            self._init_game_log_scraper(cdp)
+            self._init_combat_tracker()
 
             # Build XOR table now that magic key is captured
             self._build_xor_table()

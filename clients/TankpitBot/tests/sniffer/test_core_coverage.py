@@ -192,11 +192,11 @@ class TestSnifferCoverageBranches:
 
         msg = FuelGainDict(
             msg_type=0x44,
-            amount=100,
+            fuel_total=100,
             is_free=False,
         )
         result = format_message_details(msg)
-        # FuelGain should include amount
+        # FuelGain should include fuel_total
         assert "100" in result
 
     def test_format_message_details_position_type(self) -> None:
@@ -321,6 +321,41 @@ class TestSnifferCoverageBranches:
         # Tables should be same (skipped re-init)
         for i in range(len(trackers.ALL_TRACKERS)):
             assert trackers.ALL_TRACKERS[i]._xor_table == first_tables[i]
+
+    def test_extract_magic_from_auth_valid(self) -> None:
+        """Test extract_magic_from_auth extracts magic from valid AUTH payload."""
+        import base64
+
+        from tankpit_bot.sniffer.trackers import extract_magic_from_auth
+
+        body = "%AUTH !be session|hash|ts test_magic_key_12345"
+        body_bytes = body.encode("utf-8")
+        length_prefix = len(body_bytes).to_bytes(2, "little")
+        payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+        result = extract_magic_from_auth(payload)
+        assert result == "test_magic_key_12345"
+
+    def test_extract_magic_from_auth_invalid_base64(self) -> None:
+        """Test extract_magic_from_auth returns None for invalid base64."""
+        from tankpit_bot.sniffer.trackers import extract_magic_from_auth
+
+        result = extract_magic_from_auth("not!valid@base64")
+        assert result is None
+
+    def test_extract_magic_from_auth_non_auth(self) -> None:
+        """Test extract_magic_from_auth returns None for non-AUTH message."""
+        import base64
+
+        from tankpit_bot.sniffer.trackers import extract_magic_from_auth
+
+        body = "HELLO test message"
+        body_bytes = body.encode("utf-8")
+        length_prefix = len(body_bytes).to_bytes(2, "little")
+        payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+        result = extract_magic_from_auth(payload)
+        assert result is None
 
     def test_format_container_details_movement(self) -> None:
         """Test format_container_details for movement message."""

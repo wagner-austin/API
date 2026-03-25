@@ -18,7 +18,7 @@ class TestRankEnum:
     """Tests for Rank enumeration."""
 
     def test_rank_values(self) -> None:
-        """Rank values are 0-7."""
+        """Rank values are 0-8."""
         assert int(Rank.RECRUIT) == 0
         assert int(Rank.PRIVATE) == 1
         assert int(Rank.CORPORAL) == 2
@@ -26,7 +26,8 @@ class TestRankEnum:
         assert int(Rank.LIEUTENANT) == 4
         assert int(Rank.CAPTAIN) == 5
         assert int(Rank.MAJOR) == 6
-        assert int(Rank.GENERAL) == 7
+        assert int(Rank.COLONEL) == 7
+        assert int(Rank.GENERAL) == 8
 
     def test_rank_fuel_mapping(self) -> None:
         """RANK_FUEL maps ranks to starting fuel."""
@@ -37,7 +38,8 @@ class TestRankEnum:
         assert RANK_FUEL[Rank.LIEUTENANT] == 1400
         assert RANK_FUEL[Rank.CAPTAIN] == 1500
         assert RANK_FUEL[Rank.MAJOR] == 1600
-        assert RANK_FUEL[Rank.GENERAL] == 1700
+        assert RANK_FUEL[Rank.COLONEL] == 1700
+        assert RANK_FUEL[Rank.GENERAL] == 1800
 
 
 class TestTeamEnum:

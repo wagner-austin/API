@@ -35,11 +35,11 @@ from tankpit_bot.combat import (
     encode_entity_pair_stats,
 )
 from tankpit_bot.inventory import (
-    InventoryScraper,
     InventoryState,
     decode_inventory_state,
     encode_inventory_state,
 )
+from tankpit_bot.sniffer.world_state import get_inventory_state
 
 log = get_logger(__name__)
 
@@ -187,23 +187,6 @@ def _make_empty_location() -> LocationState:
     return LocationState(x=0, y=0, raw="")
 
 
-def _make_empty_inventory() -> InventoryState:
-    """Create an empty inventory state.
-
-    Returns:
-        InventoryState with all items at zero.
-    """
-    from tankpit_bot.inventory import InventoryItem
-
-    return InventoryState(
-        armor_shields=InventoryItem(count=0, enabled=True),
-        dual_shots=InventoryItem(count=0, enabled=True),
-        missile_shots=InventoryItem(count=0, enabled=True),
-        homing_shots=InventoryItem(count=0, enabled=True),
-        extra_radars=InventoryItem(count=0, enabled=True),
-    )
-
-
 def _make_empty_session() -> SessionInfo:
     """Create an empty session info.
 
@@ -237,7 +220,6 @@ class GameStateManager:
     def __init__(self) -> None:
         """Initialize the state manager."""
         self._combat_tracker: CombatTracker | None = None
-        self._inventory_scraper: InventoryScraper | None = None
         self._game_log_scraper: GameLogScraper | None = None
         self._session_info = _make_empty_session()
         self._location = _make_empty_location()
@@ -250,14 +232,6 @@ class GameStateManager:
             tracker: CombatTracker instance to use.
         """
         self._combat_tracker = tracker
-
-    def set_inventory_scraper(self, scraper: InventoryScraper) -> None:
-        """Set the inventory scraper.
-
-        Args:
-            scraper: InventoryScraper instance to use.
-        """
-        self._inventory_scraper = scraper
 
     def set_game_log_scraper(self, scraper: GameLogScraper) -> None:
         """Set the game log scraper.
@@ -367,12 +341,8 @@ class GameStateManager:
         Returns:
             GameStateSnapshot with all current state.
         """
-        # Get inventory from scraper or use empty
-        inventory: InventoryState
-        if self._inventory_scraper is not None:
-            inventory = self._inventory_scraper.scrape()
-        else:
-            inventory = _make_empty_inventory()
+        # Get inventory from binary protocol tracking
+        inventory: InventoryState = get_inventory_state()
 
         # Get combat stats from tracker or use empty
         combat_stats: list[CombatStats]

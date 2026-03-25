@@ -137,7 +137,7 @@ def decode_tank_status(data: bytes) -> TankStatusDict:
     require_min_length(data, 13, "TankStatus")
     info_byte = data[0]
     team = info_byte & 0x03
-    rank = (info_byte >> 4) & 0x07
+    rank = (info_byte >> 4) & 0x0F
     tank_id = x16(data[1], data[2])
     decoration_state = bytes(data[3:7])
     lb_score = 256 * (256 * data[7] + data[8]) + data[9] if len(data) >= 10 else 0

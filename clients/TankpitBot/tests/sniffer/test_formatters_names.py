@@ -41,11 +41,12 @@ class TestRankName:
         assert rank_name(4) == "lieutenant"
         assert rank_name(5) == "captain"
         assert rank_name(6) == "major"
-        assert rank_name(7) == "general"
+        assert rank_name(7) == "colonel"
+        assert rank_name(8) == "general"
 
     def test_unknown_rank(self) -> None:
         """Test unknown rank values return formatted string."""
-        assert rank_name(8) == "r8"
+        assert rank_name(9) == "r9"
         assert rank_name(99) == "r99"
 
     def test_negative_rank(self) -> None:
@@ -85,9 +86,9 @@ class TestTeamName:
     def test_known_teams(self) -> None:
         """Test known team values return correct names."""
         assert team_name(0) == "red"
-        assert team_name(1) == "blue"
-        assert team_name(2) == "green"
-        assert team_name(3) == "purple"
+        assert team_name(1) == "purple"
+        assert team_name(2) == "blue"
+        assert team_name(3) == "orange"
 
     def test_unknown_team(self) -> None:
         """Test unknown team values return formatted string."""

@@ -31,7 +31,7 @@ def decode_fuel_gain(data: bytes) -> FuelGainDict:
     require_min_length(data, 3, "FuelGain")
     return FuelGainDict(
         msg_type=0x44,
-        amount=x16(data[0], data[1]),
+        fuel_total=x16(data[0], data[1]),
         is_free=data[2] == 0,
     )
 
@@ -49,7 +49,7 @@ def decode_fuel_deposit(data: bytes) -> FuelDepositDict:
         DecodeError: If decoding fails.
     """
     require_min_length(data, 2, "FuelDeposit")
-    return FuelDepositDict(msg_type=0x64, amount=x16(data[0], data[1]))
+    return FuelDepositDict(msg_type=0x64, fuel_total=x16(data[0], data[1]))
 
 
 def decode_inventory(data: bytes) -> InventoryDict:

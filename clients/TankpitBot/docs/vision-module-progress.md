@@ -91,7 +91,7 @@ Added vision method tests to `tests/test_bot.py`:
 - `test_render_debug()`
 - `test_get_nearest_all_fuel_container_*()` (3 cases)
 
-**Result: 100% test coverage (1834 tests pass)**
+**Result: 100% test coverage (2069 tests pass as of 2026-03-21)**
 
 ### 6. Modularized `tests/test_container_decoder.py`
 

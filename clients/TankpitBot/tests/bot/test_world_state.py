@@ -45,17 +45,17 @@ class TestBotWithWorldState:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_change,
+            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(50, 75)
-        update_world_state_from_fuel_change(500)
+        update_world_state_from_fuel_total(500)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel = bot.get_fuel()
-        # Initial fuel is 1000, plus 500
-        assert fuel == 1500
+        # fuel_total sets absolute value
+        assert fuel == 500
 
     def test_get_fuel_containers_with_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel_containers returns fuel containers."""

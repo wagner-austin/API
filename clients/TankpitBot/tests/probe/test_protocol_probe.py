@@ -6,7 +6,6 @@ import pytest
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.probe import (
-    GameNotJoinedError,
     PlaywrightNotInstalledError,
     ProbeError,
     ProtocolProbe,
@@ -44,7 +43,7 @@ def test_protocol_probe_run_game_not_joined(fake_fs: FakeFileSystem) -> None:
     _test_hooks.sync_playwright = fake_sync_playwright_probe_no_messages
 
     probe = ProtocolProbe("https://tankpit.com/play")
-    with pytest.raises(GameNotJoinedError, match="No WebSocket messages captured"):
+    with pytest.raises(ProbeError, match="Cannot build XOR table: magic key not captured"):
         probe.run(
             probe_keys=["s"],  # Use key with known command mapping
             probe_mouse_positions=[],

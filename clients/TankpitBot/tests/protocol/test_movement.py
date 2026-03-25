@@ -29,7 +29,7 @@ class TestDecodeMovement:
         assert result["start_y"] == 60
         assert result["direction"] == 3
         assert result["flag"] == 1
-        assert result["fuel"] == x24(0x03, 0x04, 0x05)
+        assert result["leaderboard_position"] == x24(0x03, 0x04, 0x05)
         assert result["waypoints"] == []
 
     def test_raises_on_short_data(self) -> None:

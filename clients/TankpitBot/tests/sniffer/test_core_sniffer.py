@@ -50,7 +50,9 @@ def test_websocket_sniffer_run_captures_messages(fake_fs: FakeFileSystem) -> Non
     session = sniffer.run(5000)
 
     assert session["base_url"] == "https://tankpit.com"
-    assert len(session["messages"]) == 2
+    # join_room has 3 wait_for_timeout calls + 1 capture wait = 4 cycles,
+    # each emitting a sent+received pair = 8 messages
+    assert len(session["messages"]) == 8
     assert session["messages"][0]["direction"] == "sent"
     assert session["messages"][0]["payload"] == "sent message"
     assert session["messages"][1]["direction"] == "received"

@@ -265,29 +265,24 @@ class TestFuelUpdate:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_update_world_state_from_fuel_change(self) -> None:
-        """Test fuel change updates self_state fuel."""
-        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_change
+    def test_update_world_state_from_fuel_total(self) -> None:
+        """Test fuel total sets self_state fuel to absolute value."""
+        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_total
 
         # First set up a position to create self_state
         update_world_state_from_position(100, 100)
 
-        state = world_state._world_state
-        if state["self_state"] is None:
-            raise AssertionError("self_state should not be None")
-        initial_fuel = state["self_state"]["fuel"]
-
-        # Update fuel - adds to existing
-        update_world_state_from_fuel_change(50)
+        # Update fuel - sets to absolute value
+        update_world_state_from_fuel_total(50)
 
         state = world_state._world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
-        assert state["self_state"]["fuel"] == initial_fuel + 50
+        assert state["self_state"]["fuel"] == 50
 
-    def test_update_world_state_from_fuel_change_no_self_state(self) -> None:
-        """Test fuel change does nothing when self_state is None."""
-        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_change
+    def test_update_world_state_from_fuel_total_no_self_state(self) -> None:
+        """Test fuel total does nothing when self_state is None."""
+        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_total
 
         # Reset to ensure no self_state
         reset_world_state()
@@ -297,7 +292,7 @@ class TestFuelUpdate:
         assert state["self_state"] is None
 
         # Update fuel - should do nothing since no self_state
-        update_world_state_from_fuel_change(50)
+        update_world_state_from_fuel_total(50)
 
         state = world_state._world_state
         assert state["self_state"] is None

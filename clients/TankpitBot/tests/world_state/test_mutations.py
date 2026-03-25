@@ -90,7 +90,7 @@ class TestUpdateSelfFromMovementResponse:
         assert self_state["fuel"] == 750
 
     def test_default_fuel_for_new_self(self) -> None:
-        """Uses default fuel of 1000 for new self state."""
+        """Uses default fuel of 0 for new self state (real fuel comes from TankStatusSync)."""
         state = make_empty_world_state()
         updated = update_self_from_movement_response(
             state,
@@ -104,7 +104,7 @@ class TestUpdateSelfFromMovementResponse:
         )
 
         self_state = get_self_state(updated)
-        assert self_state["fuel"] == 1000
+        assert self_state["fuel"] == 0
 
 
 class TestUpdateTankFromRegistry:

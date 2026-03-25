@@ -10,7 +10,7 @@ from enum import IntEnum
 
 
 class Rank(IntEnum):
-    """Tank rank levels (0-7)."""
+    """Tank rank levels (0-8)."""
 
     RECRUIT = 0
     PRIVATE = 1
@@ -19,7 +19,8 @@ class Rank(IntEnum):
     LIEUTENANT = 4
     CAPTAIN = 5
     MAJOR = 6
-    GENERAL = 7
+    COLONEL = 7
+    GENERAL = 8
 
 
 # Starting fuel by rank (resets on death/respawn)
@@ -31,8 +32,29 @@ RANK_FUEL: dict[Rank, int] = {
     Rank.LIEUTENANT: 1400,
     Rank.CAPTAIN: 1500,
     Rank.MAJOR: 1600,
-    Rank.GENERAL: 1700,
+    Rank.COLONEL: 1700,
+    Rank.GENERAL: 1800,
 }
+
+
+# Canonical team names indexed by team number (from JS client jb array)
+TEAM_NAMES: tuple[str, ...] = ("red", "purple", "blue", "orange")
+
+# Canonical rank names indexed by rank number (from JS client ec array)
+RANK_NAMES: tuple[str, ...] = (
+    "recruit",
+    "private",
+    "corporal",
+    "sergeant",
+    "lieutenant",
+    "captain",
+    "major",
+    "colonel",
+    "general",
+)
+
+# Damage state names indexed by damage value
+DAMAGE_NAMES: tuple[str, ...] = ("full", "light", "medium", "critical")
 
 
 class Team(IntEnum):
@@ -140,6 +162,7 @@ def is_text_message(msg_type: int) -> bool:
 
 
 __all__ = [
+    "DAMAGE_NAMES",
     "MSG_ACTION_DONE",
     "MSG_ACTIVE_FORCES",
     "MSG_ACTIVE_PLAYERS",
@@ -181,8 +204,10 @@ __all__ = [
     "MSG_TOP10",
     "MSG_VIEWPORT",
     "RANK_FUEL",
+    "RANK_NAMES",
     "SUPERVISOR_STATUS_PROMO_ELIGIBLE",
     "SUPERVISOR_STATUS_PROMO_KILL",
+    "TEAM_NAMES",
     "TEXT_MSG_TYPES",
     "Equipment",
     "Rank",

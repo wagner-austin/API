@@ -12,6 +12,14 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.bot.ai.loop import ai_tick
+from tankpit_bot.bot.ai.tactics import (
+    compute_desired_equipment,
+    find_teleport_target,
+    should_proactive_radar,
+    should_teleport_search,
+)
+from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.commands import (
     encode_move_command,
     encode_pickup_move_command,
@@ -25,6 +33,7 @@ from tankpit_bot.bot.states import (
     validate_transition,
 )
 from tankpit_bot.bot.types import (
+    BotCommand,
     make_move_command,
     make_pickup_move_command,
     make_teleport_command,
@@ -38,14 +47,26 @@ from tankpit_bot.bot.vision import (
     render_vision_debug,
 )
 from tankpit_bot.browser import BrowserSession, get_current_time_ms
+from tankpit_bot.protocol.codec import (
+    DEFAULT_STATIC_KEY_PATH,
+    build_xor_table,
+    load_static_key,
+    xor_bytes,
+)
 from tankpit_bot.protocol.commands import (
+    CMD_ENTER_GAME,
     CMD_MAP_OPEN,
+    CMD_NEAREST_ENEMY,
     CMD_RADAR,
+    COMMAND_PREFIX,
+    TICK_RATE_MS,
     build_query_command,
     build_shoot_command,
     build_toggle_equipment_command,
 )
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.decoders import process_received_message
+from tankpit_bot.sniffer.trackers import init_trackers_with_magic
+from tankpit_bot.sniffer.world_state import get_inventory_state, get_terrain_map, get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -105,8 +126,9 @@ class Bot(BrowserSession):
         self._cdp: _test_hooks.CDPSessionProtocol | None = None
         self._page: _test_hooks.PageProtocol | None = None
         self._state_data: BotStateDataDict = make_initial_state_data()
-        # Equipment state: [armor, dual, missile, homing, radar] - 0=off, 1=on
-        self._equipment_enabled: list[bool] = [False, False, False, False, False]
+        self._ai_state: AIStateDict = make_initial_ai_state()
+        # XOR encoding table for outgoing commands
+        self._xor_table: bytes | None = None
         # Map state
         self._map_is_open: bool = False
         # Vision state for fallback tracking
@@ -168,16 +190,31 @@ class Bot(BrowserSession):
     # Message Handling
     # =========================================================================
 
+    def _on_magic_captured(self, magic: str) -> None:
+        """Initialize trackers and build XOR table when magic key is captured.
+
+        Args:
+            magic: The session magic string.
+        """
+        init_trackers_with_magic(magic)
+        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
+        self._xor_table = build_xor_table(static_key, magic)
+        log.info("Built XOR table for command encoding")
+
     def _on_message_captured(self, message: CapturedMessage) -> None:
         """Handle captured WebSocket message.
 
-        Extends parent to update state machine based on game events.
+        Decodes incoming messages to build world state and updates
+        the state machine. Magic extraction is handled by the base class.
 
         Args:
             message: The captured message.
         """
-        # Call parent for decoding and state updates
         super()._on_message_captured(message)
+
+        # Decode received messages to update world state
+        if message["direction"] == "received":
+            process_received_message(message["payload"])
 
         # Update state machine based on world state changes
         self._update_state_from_world()
@@ -376,11 +413,34 @@ class Bot(BrowserSession):
     # Command Sending
     # =========================================================================
 
-    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
-        """Send raw bytes via WebSocket.
+    def _xor_encode_command(self, data: bytes) -> bytes:
+        """XOR encode a framed command for wire transmission.
+
+        Commands are framed as: [len_lo, len_hi, '!', type, cmd_id, ...data]
+        XOR encoding applies to everything after '!' (bytes at index 3+).
 
         Args:
-            data: Encoded command bytes to send.
+            data: Framed command bytes (with 2-byte length header).
+
+        Returns:
+            XOR-encoded framed command bytes.
+        """
+        if self._xor_table is None or len(data) < 4:
+            return data
+
+        # data[0:2] = length header, data[2] = '!' prefix, data[3:] = type+cmd+payload
+        header = data[:2]
+        prefix = data[2:3]  # '!' byte stays as-is
+        payload = data[3:]  # type + cmd_id + optional data
+
+        encoded_payload = xor_bytes(self._xor_table, payload, offset=0)
+        return header + prefix + encoded_payload
+
+    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+        """XOR encode and send command bytes via WebSocket.
+
+        Args:
+            data: Framed command bytes (with 2-byte length header).
             cmd_name: Command name for logging.
 
         Returns:
@@ -389,9 +449,27 @@ class Bot(BrowserSession):
         if self._cdp is None:
             log.warning("Cannot send %s: CDP session not available", cmd_name)
             return False
+
+        # XOR encode if it's a '!' command
+        if len(data) > 2 and data[2] == COMMAND_PREFIX:
+            data = self._xor_encode_command(data)
+
         self._send_websocket_bytes(self._cdp, data)
         log.info("Sent: %s", cmd_name)
         return True
+
+    def enter_game(self) -> bool:
+        """Send CMD_ENTER_GAME to activate the tank in the game world.
+
+        Must be sent after joining a room and before any movement or combat
+        commands. Without this, the server rejects actions with "You can't
+        do this".
+
+        Returns:
+            True if command was sent.
+        """
+        encoded = build_query_command(CMD_ENTER_GAME)
+        return self._send_bytes(encoded, "enter_game")
 
     def move_to(self, x: int, y: int) -> bool:
         """Send move command and transition to MOVING state.
@@ -437,26 +515,20 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        # Map must be open to teleport
-        if not self.open_map():
-            return False
+        # Single open, teleport, single close
+        self.open_map()
 
-        # Wait for map to open (if we have page reference)
         if self._page is not None:
-            self._page.wait_for_timeout(200)
+            self._page.wait_for_timeout(TICK_RATE_MS)
 
-        # Send teleport command
         cmd = make_teleport_command(x, y)
-        if not self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})"):
-            return False
+        self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
 
-        # Wait for teleport to process
         if self._page is not None:
-            self._page.wait_for_timeout(500)
+            self._page.wait_for_timeout(TICK_RATE_MS)
 
-        # Close map
-        self.close_map()
-
+        # Map auto-closes when server sends TeleportLanded response
+        self._map_is_open = False
         self._transition("MOVING", target_x=x, target_y=y)
         return True
 
@@ -490,6 +562,19 @@ class Bot(BrowserSession):
         self._transition("SCANNING", scan_pending=True)
         return True
 
+    def request_nearest_enemy(self) -> bool:
+        """Send CMD_NEAREST_ENEMY ('e' key) to get nearest enemy position.
+
+        Server responds with EnemyDetection (0x48) containing absolute x,y
+        of the nearest enemy. The response is dispatched to world state
+        automatically via process_received_message.
+
+        Returns:
+            True if command was sent.
+        """
+        encoded = build_query_command(CMD_NEAREST_ENEMY)
+        return self._send_bytes(encoded, "nearest_enemy")
+
     # =========================================================================
     # Equipment Management
     # =========================================================================
@@ -513,6 +598,8 @@ class Bot(BrowserSession):
     def enable_equipment(self, slot: int) -> bool:
         """Enable equipment slot if not already enabled.
 
+        Checks the server-tracked inventory state to avoid redundant toggles.
+
         Args:
             slot: Equipment slot (1-5): 1=armor, 2=dual, 3=missile, 4=homing, 5=radar.
 
@@ -522,10 +609,55 @@ class Bot(BrowserSession):
         if slot < 1 or slot > 5:
             log.warning("Invalid equipment slot: %d (must be 1-5)", slot)
             return False
-        slot_idx = slot - 1
-        if self._equipment_enabled[slot_idx]:
+        if self.is_equipment_enabled(slot):
             return True
         return self.toggle_equipment(slot)
+
+    def disable_equipment(self, slot: int) -> bool:
+        """Disable equipment slot if currently enabled.
+
+        Checks the server-tracked inventory state to avoid redundant toggles.
+
+        Args:
+            slot: Equipment slot (1-5): 1=armor, 2=dual, 3=missile, 4=homing, 5=radar.
+
+        Returns:
+            True if equipment is now disabled (or was already disabled).
+        """
+        if slot < 1 or slot > 5:
+            log.warning("Invalid equipment slot: %d (must be 1-5)", slot)
+            return False
+        if not self.is_equipment_enabled(slot):
+            return True
+        return self.toggle_equipment(slot)
+
+    def _has_equipment_stock(self, slot: int) -> bool:
+        """Check if equipment slot has remaining stock.
+
+        Returns True if the inventory count is above zero, OR if the
+        item is currently enabled (meaning the server knows we have it,
+        even if we haven't received an explicit count update yet).
+
+        Args:
+            slot: Equipment slot (1-5): 1=armor, 2=dual, 3=missile, 4=homing, 5=radar.
+
+        Returns:
+            True if equipment is available to use.
+        """
+        inventory = get_inventory_state()
+        if slot == 1:
+            item = inventory["armor_shields"]
+        elif slot == 2:
+            item = inventory["dual_shots"]
+        elif slot == 3:
+            item = inventory["missile_shots"]
+        elif slot == 4:
+            item = inventory["homing_shots"]
+        elif slot == 5:
+            item = inventory["extra_radars"]
+        else:
+            return False
+        return item["count"] > 0 or item["enabled"]
 
     def enable_homing(self) -> bool:
         """Enable homing shot equipment (slot 4)."""
@@ -540,38 +672,39 @@ class Bot(BrowserSession):
         return self.enable_equipment(5)
 
     def is_equipment_enabled(self, slot: int) -> bool:
-        """Check if equipment slot is enabled.
+        """Check if equipment slot is enabled using server-tracked inventory.
+
+        Reads the canonical inventory state from the protocol decoder,
+        which is updated by 0x49, 0x67, and 0x74 messages.
 
         Args:
-            slot: Equipment slot (1-5).
+            slot: Equipment slot (1-5): 1=armor, 2=dual, 3=missile, 4=homing, 5=radar.
 
         Returns:
             True if enabled.
         """
-        if slot < 1 or slot > 5:
-            return False
-        return self._equipment_enabled[slot - 1]
-
-    def update_equipment_state(self, states: list[bool]) -> None:
-        """Update equipment state from server response.
-
-        Called when receiving equipment toggle response (0x74).
-
-        Args:
-            states: List of 5 booleans [armor, dual, missile, homing, radar].
-        """
-        if len(states) == 5:
-            self._equipment_enabled = states.copy()
+        inventory = get_inventory_state()
+        if slot == 1:
+            return inventory["armor_shields"]["enabled"]
+        if slot == 2:
+            return inventory["dual_shots"]["enabled"]
+        if slot == 3:
+            return inventory["missile_shots"]["enabled"]
+        if slot == 4:
+            return inventory["homing_shots"]["enabled"]
+        if slot == 5:
+            return inventory["extra_radars"]["enabled"]
+        return False
 
     # =========================================================================
     # Map Operations
     # =========================================================================
 
     def open_map(self) -> bool:
-        """Open the map view.
+        """Open the map view (skips if already open).
 
         Returns:
-            True if command was sent.
+            True if command was sent or map already open.
         """
         if self._map_is_open:
             return True
@@ -582,18 +715,20 @@ class Bot(BrowserSession):
         return False
 
     def close_map(self) -> bool:
-        """Close the map view (toggle).
-
-        Returns:
-            True if command was sent.
-        """
-        if not self._map_is_open:
-            return True
-        encoded = build_query_command(CMD_MAP_OPEN)
-        if self._send_bytes(encoded, "map_close"):
-            self._map_is_open = False
-            return True
-        return False
+        """Close the map by simulating 'f' keypress via CDP."""
+        if self._cdp is not None:
+            try:
+                self._cdp.send("Input.dispatchKeyEvent", {
+                    "type": "keyDown", "key": "f", "code": "KeyF", "text": "f",
+                })
+                self._cdp.send("Input.dispatchKeyEvent", {
+                    "type": "keyUp", "key": "f", "code": "KeyF",
+                })
+                log.info("Map: closed via 'f' keypress")
+            except (OSError, RuntimeError) as e:
+                log.warning("close_map keypress failed: %s", e)
+        self._map_is_open = False
+        return True
 
     # =========================================================================
     # High-Level Actions
@@ -655,6 +790,7 @@ class Bot(BrowserSession):
         self._ws_urls = {}
         self._magic = None
         self._state_data = make_initial_state_data()
+        self._ai_state = make_initial_ai_state()
         self._vision_state = make_empty_vision_state()
 
         with _test_hooks.sync_playwright() as playwright:
@@ -681,6 +817,12 @@ class Bot(BrowserSession):
             # Wait for game to be ready
             self._wait_for_game_ready(page)
 
+            # Gather intel (saves tpclient.js for protocol analysis)
+            self._gather_intel(page, cdp)
+
+            # Start game log scraper for server feedback visibility
+            self._init_game_log_scraper(cdp)
+
             log.info("Bot started, entering game loop")
             log.info("State: %s", self.get_state())
 
@@ -695,50 +837,158 @@ class Bot(BrowserSession):
                 self._cleanup(cdp, page, context, browser)
 
     def _game_loop(self, page: _test_hooks.PageProtocol) -> None:
-        """Main game loop that takes actions based on state.
+        """Run the game loop (delegated to game_loop module)."""
+        from tankpit_bot.bot.game_loop import run_game_loop
+
+        run_game_loop(self, page)
+
+    def _ai_tick_once(self) -> None:
+        """Run one AI decision cycle and dispatch the resulting command.
+
+        Gets world state and self state, runs ai_tick to decide the best
+        behavior, manages equipment based on the chosen mode, dispatches
+        the command, and persists updated AI state.
+        """
+        world = self.get_world_state()
+        self_state = world["self_state"]
+
+        # Can't act without self state (not yet positioned in game)
+        if self_state is None:
+            return
+
+        # Each AI tick is a fresh decision — reset to IDLE before dispatching
+        self._state_data = transition_to(self._state_data, "IDLE")
+
+        terrain = get_terrain_map()
+        now = get_current_time_ms()
+        new_ai_state, command, behavior = ai_tick(
+            world,
+            self_state,
+            self._ai_state,
+            now,
+            terrain,
+        )
+
+        config = self._ai_state["config"]
+        fuel = self_state["fuel"]
+        last_scan = self._ai_state["last_scan_ms"]
+
+        # Proactive radar: scan when fuel is getting low and no fuel visible
+        if should_proactive_radar(fuel, world, last_scan, now, config):
+            log.info("AI: proactive radar (fuel=%d, no fuel visible)", fuel)
+            self.enable_equipment(5)
+            self.use_radar()
+            self._ai_state = AIStateDict(**{**new_ai_state, "last_scan_ms": now})
+            return
+
+        # Teleport search: relocate when low on fuel with nothing nearby
+        if should_teleport_search(
+            behavior,
+            fuel,
+            world,
+            last_scan,
+            now,
+            config,
+        ):
+            tx, ty = find_teleport_target(config, self_state)
+            log.info("AI: teleport search to (%d,%d) (fuel=%d)", tx, ty, fuel)
+            teleport_cmd = make_teleport_command(tx, ty)
+            self._apply_equipment(
+                behavior["mode"],
+                fuel,
+                0,
+                is_teleport=True,
+            )
+            self._dispatch_command(teleport_cmd)
+            self._ai_state = new_ai_state
+            return
+
+        log.info(
+            "AI: %s score=%d target=(%d,%d) reason=%s",
+            behavior["mode"],
+            behavior["score"],
+            behavior["target_x"],
+            behavior["target_y"],
+            behavior["reason"],
+        )
+
+        # Equipment management: toggle based on behavior, fuel, and target damage
+        target_damage = 0
+        if behavior["mode"] == "HUNT":
+            target_damage = next(
+                (
+                    t["damage_state"]
+                    for t in world["tanks"].values()
+                    if t["x"] == behavior["target_x"] and t["y"] == behavior["target_y"]
+                ),
+                0,
+            )
+        is_teleport = command["cmd_type"] == "teleport"
+        self._apply_equipment(
+            behavior["mode"],
+            fuel,
+            target_damage,
+            is_teleport=is_teleport,
+        )
+
+        self._dispatch_command(command)
+        self._ai_state = new_ai_state
+
+    def _apply_equipment(
+        self,
+        mode: str,
+        fuel: int,
+        target_damage: int,
+        is_teleport: bool = False,
+    ) -> None:
+        """Apply computed equipment state — enable desired, disable undesired.
+
+        Uses compute_desired_equipment from tactics to determine which slots
+        should be on, then enables/disables accordingly. Only enables
+        equipment if inventory stock is available.
 
         Args:
-            page: Playwright page for waiting.
+            mode: Current AI behavior mode name.
+            fuel: Current fuel level.
+            target_damage: Damage state of the hunt target (0-3), 0 if not hunting.
+            is_teleport: Whether the current command is a teleport.
         """
-        loop_delay_ms = 500
-        idle_action_delay_ms = 2000
-        last_idle_action_ms = 0
+        critical = self._ai_state["config"]["fuel_critical_threshold"]
+        desired = compute_desired_equipment(
+            mode,
+            fuel,
+            target_damage,
+            critical,
+            is_teleport,
+        )
 
-        while True:
-            state = self.get_state()
-            now = get_current_time_ms()
-            time_to_act = now - last_idle_action_ms > idle_action_delay_ms
+        # Extra radar: always enable if desired and stocked
+        if 5 in desired and self._has_equipment_stock(5):
+            self.enable_equipment(5)
 
-            # Take action based on current state
-            if state == "IDLE" and time_to_act:
-                self._handle_idle_state()
-                last_idle_action_ms = now
-            elif state == "LOW_FUEL" and time_to_act:
-                self._handle_low_fuel_state()
-                last_idle_action_ms = now
+        # Combat slots (1-4): enable if desired + stocked, disable otherwise
+        for slot in (1, 2, 4):
+            if slot in desired and self._has_equipment_stock(slot):
+                self.enable_equipment(slot)
+            else:
+                self.disable_equipment(slot)
 
-            # Wait before next iteration
-            page.wait_for_timeout(loop_delay_ms)
+    def _dispatch_command(self, command: BotCommand) -> None:
+        """Dispatch a BotCommand through the appropriate bot action method.
 
-    def _handle_idle_state(self) -> None:
-        """Handle IDLE state - scan or collect fuel."""
-        fuel_containers = self.get_fuel_containers()
-        if not fuel_containers:
-            log.info("IDLE: No fuel known, scanning...")
+        Args:
+            command: The bot command to execute.
+        """
+        if command["cmd_type"] == "move":
+            self.move_to(command["target_x"], command["target_y"])
+        elif command["cmd_type"] == "pickup_move":
+            self.pickup_move_to(command["target_x"], command["target_y"])
+        elif command["cmd_type"] == "shoot":
+            self.shoot_at(command["target_x"], command["target_y"])
+        elif command["cmd_type"] == "radar":
             self.use_radar()
-        else:
-            log.info("IDLE: %d fuel containers known, moving to nearest", len(fuel_containers))
-            self.go_to_nearest_fuel()
-
-    def _handle_low_fuel_state(self) -> None:
-        """Handle LOW_FUEL state - urgently find fuel."""
-        fuel_containers = self.get_fuel_containers()
-        if not fuel_containers:
-            log.info("LOW_FUEL: No fuel known, scanning urgently...")
-            self.use_radar()
-        else:
-            log.info("LOW_FUEL: Moving to nearest fuel!")
-            self.go_to_nearest_fuel()
+        else:  # teleport
+            self.teleport_to(command["target_x"], command["target_y"])
 
 
 def main() -> None:

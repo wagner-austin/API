@@ -149,38 +149,52 @@ class TestBotBaseMain:
 
 
 class TestBotGameLoopStates:
-    """Tests for Bot._game_loop state handling."""
+    """Tests for Bot._game_loop AI-driven state handling."""
 
-    def test_game_loop_handles_idle_state(self, fake_env: FakeEnv) -> None:
-        """Test _game_loop calls _handle_idle_state when in IDLE state."""
+    def test_game_loop_ai_tick_no_self_state(self, fake_env: FakeEnv) -> None:
+        """Game loop runs _ai_tick_once which returns early without self_state."""
         from tankpit_bot.bot.base import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state
         from tests.fakes import FakeCDPSession, FakePageInterrupting
 
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+
+        interrupting_page = FakePageInterrupting(interrupt_after=3)
+
+        with pytest.raises(KeyboardInterrupt):
+            bot._game_loop(interrupting_page)
+
+        # AI state unchanged — no self_state to act on
+        assert bot._ai_state["active_mode"] == "PATROL"
+        assert bot._ai_state["ticks_in_mode"] == 0
+
+    def test_game_loop_ai_tick_with_patrol(self, fake_env: FakeEnv) -> None:
+        """Game loop dispatches patrol move commands across multiple ticks."""
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_fuel_total,
+            update_world_state_from_position,
+        )
+        from tests.fakes import FakeCDPSession, FakePageInterrupting
+
+        reset_world_state()
+        update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(800)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
 
-        # Use page that interrupts after 3 waits to allow state handler to run
         interrupting_page = FakePageInterrupting(interrupt_after=3)
 
         with pytest.raises(KeyboardInterrupt):
             bot._game_loop(interrupting_page)
 
-    def test_game_loop_handles_low_fuel_state(self, fake_env: FakeEnv) -> None:
-        """Test _game_loop calls _handle_low_fuel_state when in LOW_FUEL state."""
-        from tankpit_bot.bot.base import Bot
-        from tests.fakes import FakeCDPSession, FakePageInterrupting
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        fake_cdp: FakeCDPSession = FakeCDPSession()
-        bot._cdp = fake_cdp
-        bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "LOW_FUEL"
-
-        # Use page that interrupts after 3 waits to allow state handler to run
-        interrupting_page = FakePageInterrupting(interrupt_after=3)
-
-        with pytest.raises(KeyboardInterrupt):
-            bot._game_loop(interrupting_page)
+        # Pre-loop overhead (hook, map open/sync/close) + patrol moves + per-tick syncs
+        runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
+        assert len(runtime_calls) == 9

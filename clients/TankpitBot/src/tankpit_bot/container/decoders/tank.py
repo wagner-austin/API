@@ -19,6 +19,7 @@ from tankpit_bot.container.types import (
     TankUpdateExtendedDict,
     TankUpdateFullDict,
 )
+from tankpit_bot.protocol.constants import TEAM_NAMES
 
 # Direction byte values for waypoints
 DIRECTION_WEST = 0x77  # 'w'
@@ -30,8 +31,6 @@ DIRECTION_BYTES = frozenset({DIRECTION_WEST, DIRECTION_SOUTH, DIRECTION_NORTH, D
 # Container subtype byte values (after XOR decoding)
 SUBTYPE_MOVEMENT = 0x47  # 'G' - Movement/waypoint messages
 SUBTYPE_TANK_REGISTRY = 0x21  # '!' - Tank registry messages
-
-_TEAM_NAMES: list[str] = ["red", "purple", "blue", "orange"]
 
 
 def _parse_tank_name(info_bytes: bytes, is_extended: bool) -> str:
@@ -109,7 +108,7 @@ def decode_tank_registry(data: bytes) -> TankRegistryDict:
 
     # Team from lower 2 bits of flags
     team_idx = flags & 0x03
-    team = _TEAM_NAMES[team_idx]
+    team = TEAM_NAMES[team_idx]
 
     # Parse rank and badges from first info byte
     rank_badges = info_bytes[0] if len(info_bytes) > 0 else 0
@@ -153,6 +152,15 @@ def decode_tank_registry(data: bytes) -> TankRegistryDict:
             # Clear the garbage "name" for containers
             tank_name = ""
 
+    # Extract tank position from info_bytes for non-container entries
+    # Standard: [rank_badges:1][?:4][pos_y:1][pos_vx:1][name]
+    # Extended: [rank_badges:1][?:4][pos_y:1][pos_vx:1][unk:3][name]
+    tank_y: int | None = None
+    tank_viewport_x: int | None = None
+    if not is_container and len(info_bytes) >= 7:
+        tank_y = info_bytes[5]
+        tank_viewport_x = info_bytes[6]
+
     return TankRegistryDict(
         msg_type="tank_registry",
         flags=flags,
@@ -167,6 +175,8 @@ def decode_tank_registry(data: bytes) -> TankRegistryDict:
         container_x=container_x,
         container_y=container_y,
         container_viewport_x=container_viewport_x,
+        tank_y=tank_y,
+        tank_viewport_x=tank_viewport_x,
     )
 
 

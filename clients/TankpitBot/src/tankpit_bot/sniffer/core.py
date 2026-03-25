@@ -27,7 +27,6 @@ from tankpit_bot.sniffer.constants import (
 )
 from tankpit_bot.sniffer.decoders import decode_message, process_received_message
 from tankpit_bot.sniffer.trackers import (
-    extract_magic_from_auth,
     init_trackers_with_magic,
     mine_tracker,
     tank_tracker,
@@ -116,6 +115,14 @@ class WebSocketSniffer(BrowserSession):
         # Call parent to log and process combat
         super()._process_game_log_entry(entry)
 
+    def _on_magic_captured(self, magic: str) -> None:
+        """Initialize trackers when magic key is captured.
+
+        Args:
+            magic: The session magic string.
+        """
+        init_trackers_with_magic(magic)
+
     def _on_message_captured(self, message: CapturedMessage) -> None:
         """Log decoded message if live decode is enabled.
 
@@ -124,15 +131,10 @@ class WebSocketSniffer(BrowserSession):
         Args:
             message: The captured message.
         """
+        super()._on_message_captured(message)
+
         payload = message["payload"]
         direction = message["direction"]
-
-        # Extract magic from AUTH messages (sent) - this is the actual session magic
-        if direction == "sent":
-            auth_magic = extract_magic_from_auth(payload)
-            if auth_magic is not None:
-                self._magic = auth_magic
-                init_trackers_with_magic(auth_magic)
 
         if not self._live_decode:
             return
@@ -149,7 +151,6 @@ class WebSocketSniffer(BrowserSession):
             log.info(decoded)
 
         self._poll_game_log()
-        self._poll_inventory()
 
     def _probe_js_fuel(self, cdp: _test_hooks.CDPSessionProtocol) -> None:
         """Probe JavaScript for fuel/HP variables.
@@ -238,14 +239,13 @@ class WebSocketSniffer(BrowserSession):
             log.info("Landed on %s", page.url)
 
             # Handle login
-            self._navigate_and_login(page, cdp, tank_name_prefix="B", auto_join_room=False)
+            self._navigate_and_login(page, cdp, tank_name_prefix="B", auto_join_room=True)
 
             # Gather all available intel
             self._gather_intel(page, cdp)
 
-            # Initialize DOM scrapers for log and inventory capture
+            # Initialize DOM scraper for game log and combat tracker
             self._init_game_log_scraper(cdp)
-            self._init_inventory_scraper(cdp)
             self._init_combat_tracker()
 
             # Probe for JS fuel variables

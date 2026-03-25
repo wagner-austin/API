@@ -12,6 +12,7 @@ organized into submodules:
 from __future__ import annotations
 
 from tankpit_bot.protocol.constants import (
+    DAMAGE_NAMES,
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
     MSG_ACTIVE_PLAYERS,
@@ -53,8 +54,10 @@ from tankpit_bot.protocol.constants import (
     MSG_TOP10,
     MSG_VIEWPORT,
     RANK_FUEL,
+    RANK_NAMES,
     SUPERVISOR_STATUS_PROMO_ELIGIBLE,
     SUPERVISOR_STATUS_PROMO_KILL,
+    TEAM_NAMES,
     TEXT_MSG_TYPES,
     Equipment,
     Rank,
@@ -163,6 +166,7 @@ from tankpit_bot.protocol.types import (
 )
 
 __all__ = [
+    "DAMAGE_NAMES",
     "MSG_ACTION_DONE",
     "MSG_ACTIVE_FORCES",
     "MSG_ACTIVE_PLAYERS",
@@ -204,8 +208,10 @@ __all__ = [
     "MSG_TOP10",
     "MSG_VIEWPORT",
     "RANK_FUEL",
+    "RANK_NAMES",
     "SUPERVISOR_STATUS_PROMO_ELIGIBLE",
     "SUPERVISOR_STATUS_PROMO_KILL",
+    "TEAM_NAMES",
     "TEXT_MSG_TYPES",
     "ActionDoneDict",
     "ActiveForcesDict",

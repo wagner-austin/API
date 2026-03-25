@@ -34,7 +34,7 @@ bot: install
 	poetry run tankpit-bot
 
 decode:
-	poetry run python -m scripts.verify_decode
+	poetry run python -m scripts.decode
 
 discover:
 	poetry run python discover_commands.py

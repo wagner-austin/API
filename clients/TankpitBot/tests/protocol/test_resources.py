@@ -22,11 +22,11 @@ class TestDecodeFuelGain:
 
     def test_decodes_paid_fuel(self) -> None:
         """Decodes paid fuel gain."""
-        # amount=0x1234, is_free=False (data[2] != 0)
+        # fuel_total=0x1234, is_free=False (data[2] != 0)
         data = bytes([0x34, 0x12, 1])
         result = decode_fuel_gain(data)
         assert result["msg_type"] == 0x44
-        assert result["amount"] == 0x1234
+        assert result["fuel_total"] == 0x1234
         assert result["is_free"] is False
 
     def test_decodes_free_fuel(self) -> None:
@@ -45,11 +45,11 @@ class TestDecodeFuelDeposit:
     """Tests for decode_fuel_deposit function."""
 
     def test_decodes_fuel_deposit(self) -> None:
-        """Decodes fuel deposit amount."""
-        data = bytes([0x64, 0x00])  # amount=100
+        """Decodes fuel deposit fuel_total."""
+        data = bytes([0x64, 0x00])  # fuel_total=100
         result = decode_fuel_deposit(data)
         assert result["msg_type"] == 0x64
-        assert result["amount"] == 100
+        assert result["fuel_total"] == 100
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""

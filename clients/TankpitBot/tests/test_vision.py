@@ -380,14 +380,18 @@ class TestMergeFunctions:
         assert containers[0]["volume"] == 500
 
     def test_get_merged_fuel_with_world_state(self) -> None:
-        from tankpit_bot.sniffer.world_state import update_world_state_from_position
+        from tankpit_bot.sniffer.world_state import (
+            update_world_state_from_fuel_total,
+            update_world_state_from_position,
+        )
 
         update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(1400)
 
         state = make_empty_vision_state()
         fuel = get_merged_fuel(state)
-        # World state has self_state with fuel now, default is 1000
-        assert fuel == 1000
+        # World state has self_state with fuel from TankStatusSync
+        assert fuel == 1400
 
     def test_get_merged_fuel_vision_fallback(self) -> None:
         state = make_empty_vision_state()

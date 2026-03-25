@@ -236,6 +236,57 @@ def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
     return None
 
 
+# Protocol types that are known to be tunneled inside 0x2E and have
+# structural validation strong enough to avoid misidentifying container
+# messages. Notably excludes MSG_SYNC (0x3F) which accepts any data
+# length and would swallow container messages like tank_update_compact.
+_TUNNELED_SUBTYPES: frozenset[int] = frozenset(
+    {
+        MSG_MOVE_RESPONSE,  # 0x3D — MovementResponse (9 bytes, specific fields)
+        MSG_TANK_STATUS_FULL,  # 0x3E — TankStatus (9+ bytes, specific fields)
+        MSG_TANK_INFO,  # 0x21 — TankInfo (4+ bytes)
+        MSG_TANK_ENTRY,  # 0x28 — TankEntry (11+ bytes)
+        MSG_INVENTORY,  # 0x49 — Inventory
+        MSG_EQUIP_GAIN,  # 0x67 — EquipmentGain
+        MSG_EQUIP_TOGGLE,  # 0x74 — EquipmentToggle
+        MSG_FUEL_GAIN,  # 0x44 — FuelGain
+        MSG_FUEL_DEPOSIT,  # 0x64 — FuelDeposit
+        MSG_VIEWPORT,  # 0x56 — ViewportUpdate
+    }
+)
+
+
+def _try_unwrap_0x2e(data: bytes) -> BinaryMessage | None:
+    """Try to decode a tunneled protocol message from inside a 0x2E envelope.
+
+    Only attempts unwrapping for a known allowlist of protocol types that
+    have strong structural validation. This prevents greedy decoders (like
+    Sync which accepts any data) from swallowing container messages
+    (tank_update_compact, position_update, movement, etc.).
+
+    Args:
+        data: XOR-decoded container body (without 0x2E prefix).
+
+    Returns:
+        Decoded protocol message if recognized, None to fall through
+        to container structure-based identification.
+    """
+    if len(data) < 2:
+        return None
+    subtype = data[0]
+    if subtype == MSG_TANK_STATS:
+        # Nested 0x2E — decode as TankStatusSync from data[1:]
+        if len(data) >= 9:
+            return decode_tank_status_sync(data[1:])
+        return None
+    if subtype not in _TUNNELED_SUBTYPES:
+        return None
+    try:
+        return try_decode_binary_message(subtype, data[1:])
+    except DecodeError:
+        return None
+
+
 def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
     """Decode tank status and info messages.
 
@@ -251,6 +302,11 @@ def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
     if msg_type == MSG_TANK_EXIT:
         return decode_tank_exit(data)
     if msg_type == MSG_TANK_STATS:
+        # 0x2E is a container envelope. Try unwrapping tunneled protocol
+        # messages before falling through to container structure matching.
+        tunneled = _try_unwrap_0x2e(data)
+        if tunneled is not None:
+            return tunneled
         return decode_0x2e_message(data)
     if msg_type == MSG_TANK_STATUS_FULL:
         return decode_tank_status(data)

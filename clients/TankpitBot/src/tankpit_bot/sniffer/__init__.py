@@ -101,8 +101,13 @@ from tankpit_bot.sniffer.viewport import (
 )
 from tankpit_bot.sniffer.world_state import (
     dispatch_world_state_update,
+    get_inventory_state,
     render_world_state_ascii,
     reset_world_state,
+    update_inventory_from_gain,
+    update_inventory_from_protocol,
+    update_inventory_from_toggle,
+    update_world_state_from_fuel_total,
     update_world_state_from_position,
     update_world_state_from_radar,
 )
@@ -161,6 +166,7 @@ __all__ = [
     "format_tank_status_short",
     "format_tank_update_details",
     "get_global_xor_table",
+    "get_inventory_state",
     "get_tank_name",
     "get_viewport_left",
     "handle_tank_registry",
@@ -188,7 +194,11 @@ __all__ = [
     "try_decode_binary",
     "try_decode_received",
     "try_decode_received_text",
+    "update_inventory_from_gain",
+    "update_inventory_from_protocol",
+    "update_inventory_from_toggle",
     "update_viewport_from_position_update",
+    "update_world_state_from_fuel_total",
     "update_world_state_from_position",
     "update_world_state_from_radar",
     "xor_decode",

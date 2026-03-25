@@ -191,7 +191,9 @@ def set_fuel_threshold(
 VALID_TRANSITIONS: dict[StateName, frozenset[StateName]] = {
     "INITIALIZING": frozenset({"WAITING_FOR_POSITION", "DISCONNECTED"}),
     "WAITING_FOR_POSITION": frozenset({"IDLE", "DISCONNECTED"}),
-    "IDLE": frozenset({"SCANNING", "MOVING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),
+    "IDLE": frozenset(
+        {"IDLE", "SCANNING", "MOVING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"},
+    ),
     "SCANNING": frozenset({"IDLE", "MOVING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),
     "MOVING": frozenset({"IDLE", "SCANNING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),
     "COLLECTING": frozenset({"IDLE", "SCANNING", "MOVING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),

@@ -5,8 +5,10 @@ from __future__ import annotations
 from tankpit_bot.browser import GameLogEntry, GameLogScraper
 from tankpit_bot.combat import CombatEvent, CombatTracker
 from tankpit_bot.game_state import GameStateManager
-from tankpit_bot.inventory import InventoryScraper, InventoryState
-from tests.game_state.conftest import make_sample_inventory
+from tankpit_bot.sniffer.world_state import (
+    reset_world_state,
+    update_inventory_from_protocol,
+)
 
 # =============================================================================
 # GameStateManager Basic Tests
@@ -188,25 +190,21 @@ def test_game_state_manager_set_combat_tracker() -> None:
     assert len(snapshot["entity_pair_stats"]) == 1
 
 
-def test_game_state_manager_set_inventory_scraper() -> None:
-    """Test setting inventory scraper."""
-
-    class FakeInventoryScraper(InventoryScraper):
-        """Fake inventory scraper for testing."""
-
-        def __init__(self) -> None:
-            """Initialize without CDP session."""
-            pass
-
-        def scrape(self) -> InventoryState:
-            """Return sample inventory."""
-            return make_sample_inventory()
+def test_game_state_manager_uses_binary_inventory() -> None:
+    """Test snapshot reads inventory from binary protocol tracking."""
+    reset_world_state()
+    update_inventory_from_protocol(
+        counts=[10, 5, 3, 2, 1],
+        enabled=[True, False, True, True, False],
+    )
 
     manager = GameStateManager()
-    manager.set_inventory_scraper(FakeInventoryScraper())
     snapshot = manager.get_snapshot()
 
     assert snapshot["inventory"]["armor_shields"]["count"] == 10
+    assert snapshot["inventory"]["dual_shots"]["enabled"] is False
+
+    reset_world_state()
 
 
 def test_game_state_manager_set_game_log_scraper() -> None:
@@ -235,6 +233,7 @@ def test_game_state_manager_set_game_log_scraper() -> None:
 
 def test_game_state_manager_snapshot_without_trackers() -> None:
     """Test getting snapshot without any trackers set."""
+    reset_world_state()
     manager = GameStateManager()
     snapshot = manager.get_snapshot()
 

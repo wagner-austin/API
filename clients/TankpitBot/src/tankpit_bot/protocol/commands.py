@@ -322,10 +322,10 @@ def deserialize_command(data: bytes, type_byte: int) -> QueryCommand | ActionCom
 #   4 = Movement (move, pickup, teleport)
 #   6 = Combat (shoot)
 
-TYPE_QUERY = 0x22  # 0x20 | 2
-TYPE_UI = 0x23  # 0x20 | 3
-TYPE_MOVEMENT = 0x24  # 0x20 | 4
-TYPE_COMBAT = 0x26  # 0x20 | 6
+TYPE_QUERY = 2  # Query commands (radar, mine, inventory, etc.)
+TYPE_UI = 3  # UI commands (scope, leaderboard, equipment toggle)
+TYPE_MOVEMENT = 4  # Movement commands (move, pickup, teleport)
+TYPE_COMBAT = 6  # Combat commands (shoot)
 
 
 def build_query_command(cmd_id: int) -> bytes:

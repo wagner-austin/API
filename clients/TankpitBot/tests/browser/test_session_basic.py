@@ -12,7 +12,13 @@ from tankpit_bot.browser import (
     PlaywrightNotInstalledError,
 )
 from tankpit_bot.types import CapturedMessage
-from tests.fakes import FakeBrowser, FakeBrowserContext, FakeCDPSession, FakePage
+from tests.fakes import (
+    FakeBrowser,
+    FakeBrowserContext,
+    FakeCDPSession,
+    FakePage,
+    FakePageGrowingMessages,
+)
 
 
 def test_browser_session_init() -> None:
@@ -78,8 +84,8 @@ def test_browser_session_on_websocket_frame_sent() -> None:
     assert msg["payload"] == "sent_payload"
 
 
-def test_browser_session_on_message_captured_default() -> None:
-    """Test _on_message_captured does nothing by default."""
+def test_browser_session_on_message_captured_non_auth_sent() -> None:
+    """Test _on_message_captured ignores non-AUTH sent messages."""
     session = BrowserSession("https://example.com")
     msg = CapturedMessage(
         timestamp_ms=12345,
@@ -87,8 +93,136 @@ def test_browser_session_on_message_captured_default() -> None:
         payload="test",
         ws_url="wss://example.com/ws",
     )
-    # Should not raise
     session._on_message_captured(msg)
+    assert session._magic is None
+
+
+def test_browser_session_on_message_captured_empty_payload() -> None:
+    """Test _on_message_captured ignores empty payloads."""
+    session = BrowserSession("https://example.com")
+    msg = CapturedMessage(
+        timestamp_ms=12345,
+        direction="sent",
+        payload="",
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg)
+    assert session._magic is None
+
+
+def test_browser_session_on_message_captured_invalid_base64() -> None:
+    """Test _on_message_captured ignores invalid base64 payloads."""
+    session = BrowserSession("https://example.com")
+    msg = CapturedMessage(
+        timestamp_ms=12345,
+        direction="sent",
+        payload="not!valid@base64",
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg)
+    assert session._magic is None
+
+
+def test_browser_session_on_message_captured_extracts_magic() -> None:
+    """Test _on_message_captured extracts magic from AUTH message."""
+    import base64
+
+    session = BrowserSession("https://example.com")
+    body = "%AUTH !be session|hash|ts test_magic_key_12345"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    msg = CapturedMessage(
+        timestamp_ms=12345,
+        direction="sent",
+        payload=payload,
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg)
+    assert session._magic == "test_magic_key_12345"
+
+
+def test_browser_session_on_message_captured_skips_received() -> None:
+    """Test _on_message_captured does not extract magic from received messages."""
+    import base64
+
+    session = BrowserSession("https://example.com")
+    body = "%AUTH !be session|hash|ts test_magic_key_12345"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    msg = CapturedMessage(
+        timestamp_ms=12345,
+        direction="received",
+        payload=payload,
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg)
+    assert session._magic is None
+
+
+def test_browser_session_on_message_captured_only_first_magic() -> None:
+    """Test _on_message_captured only captures magic once."""
+    import base64
+
+    session = BrowserSession("https://example.com")
+
+    def make_auth_payload(magic: str) -> str:
+        body = f"%AUTH !be session|hash|ts {magic}"
+        body_bytes = body.encode("utf-8")
+        length_prefix = len(body_bytes).to_bytes(2, "little")
+        return base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    msg1 = CapturedMessage(
+        timestamp_ms=1,
+        direction="sent",
+        payload=make_auth_payload("first_magic_key_12345"),
+        ws_url="wss://example.com/ws",
+    )
+    msg2 = CapturedMessage(
+        timestamp_ms=2,
+        direction="sent",
+        payload=make_auth_payload("second_magic_key_1234"),
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg1)
+    session._on_message_captured(msg2)
+    assert session._magic == "first_magic_key_12345"
+
+
+def test_browser_session_on_magic_captured_called() -> None:
+    """Test _on_magic_captured is called when magic is extracted."""
+    import base64
+
+    captured_magics: list[str] = []
+
+    class TestSession(BrowserSession):
+        def _on_magic_captured(self, magic: str) -> None:
+            captured_magics.append(magic)
+
+    session = TestSession("https://example.com")
+    body = "%AUTH !be session|hash|ts test_magic_key_12345"
+    body_bytes = body.encode("utf-8")
+    length_prefix = len(body_bytes).to_bytes(2, "little")
+    payload = base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+    msg = CapturedMessage(
+        timestamp_ms=12345,
+        direction="sent",
+        payload=payload,
+        ws_url="wss://example.com/ws",
+    )
+    session._on_message_captured(msg)
+    assert captured_magics == ["test_magic_key_12345"]
+
+
+def test_browser_session_on_magic_captured_default_noop() -> None:
+    """Test _on_magic_captured does nothing by default."""
+    session = BrowserSession("https://example.com")
+    # Should not raise
+    session._on_magic_captured("test_magic")
 
 
 def test_browser_session_setup_cdp_handlers() -> None:
@@ -124,6 +258,17 @@ def test_browser_session_wait_for_game_ready_no_messages() -> None:
     page = FakePage(cdp)
     with pytest.raises(GameNotJoinedError):
         session._wait_for_game_ready(page)
+
+
+def test_browser_session_wait_for_game_ready_stabilization_reset() -> None:
+    """Test _wait_for_game_ready resets when new messages arrive during wait."""
+    session = BrowserSession("https://example.com")
+    session._messages = [
+        CapturedMessage(timestamp_ms=1, direction="received", payload="msg1", ws_url="ws://test"),
+    ]
+    page = FakePageGrowingMessages(session._messages, add_on_call=2)
+    session._wait_for_game_ready(page)
+    assert len(session._messages) == 2
 
 
 def test_browser_session_launch_browser_no_playwright() -> None:
@@ -197,3 +342,29 @@ def test_browser_session_static_key_property() -> None:
     # After setting
     session._static_key = "test_static_key"
     assert session.static_key == "test_static_key"
+
+
+class _FakeCDPNoResultDict(FakeCDPSession):
+    """FakeCDPSession that returns empty response (no 'result' key)."""
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Return CDP response without a result dict.
+
+        Args:
+            method: CDP method name.
+            params: Optional parameters.
+
+        Returns:
+            Empty JSONObject (no 'result' key).
+        """
+        _ = params
+        self._sent_methods.append(method)
+        return {}
+
+
+def test_debug_js_websocket_no_result_dict() -> None:
+    """_debug_js_websocket handles CDP response without a result dict."""
+    session = BrowserSession("https://example.com", headless=True)
+    cdp = _FakeCDPNoResultDict()
+    session._debug_js_websocket(cdp)
+    assert len(cdp._sent_methods) == 1

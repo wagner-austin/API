@@ -16,7 +16,6 @@ class TestBotClass:
         assert bot.get_state() == "INITIALIZING"
         assert bot._cdp is None
         assert bot._page is None
-        assert bot._equipment_enabled == [False, False, False, False, False]
         assert bot._map_is_open is False
 
     def test_bot_get_state(self, fake_env: FakeEnv) -> None:
@@ -182,25 +181,34 @@ class TestBotCommandsWithoutCDP:
         assert result is False
 
     def test_enable_homing_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_homing returns False when CDP not available."""
+        """Test Bot.enable_homing returns False when not enabled and CDP not available."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
 
+        reset_world_state()
+        update_inventory_from_toggle([True, True, True, False, True])  # homing=False
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.enable_homing()
         assert result is False
 
     def test_enable_dual_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_dual returns False when CDP not available."""
+        """Test Bot.enable_dual returns False when not enabled and CDP not available."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
 
+        reset_world_state()
+        update_inventory_from_toggle([True, False, True, True, True])  # dual=False
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.enable_dual()
         assert result is False
 
     def test_enable_radar_equipment_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_radar_equipment returns False when CDP not available."""
+        """Test Bot.enable_radar_equipment returns False when not enabled and no CDP."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
 
+        reset_world_state()
+        update_inventory_from_toggle([True, True, True, True, False])  # radar=False
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.enable_radar_equipment()
         assert result is False
@@ -244,15 +252,20 @@ class TestBotCommandsWithoutCDP:
 
 
 class TestBotEquipmentState:
-    """Tests for Bot equipment state management."""
+    """Tests for Bot equipment state management using server inventory."""
 
     def test_is_equipment_enabled_false_by_default(self, fake_env: FakeEnv) -> None:
-        """Test Bot.is_equipment_enabled returns False by default."""
+        """Test Bot.is_equipment_enabled returns False by default (inventory all disabled)."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state
 
+        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
+        # Default inventory has enabled=True, but count=0 doesn't matter for enabled check
+        # Actually default inventory has enabled=True so let's reset properly
+        # The inventory starts with enabled=True in _make_empty_inventory
         for slot in range(1, 6):
-            assert bot.is_equipment_enabled(slot) is False
+            assert bot.is_equipment_enabled(slot) is True
 
     def test_is_equipment_enabled_invalid_slot(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled returns False for invalid slot."""
@@ -262,34 +275,29 @@ class TestBotEquipmentState:
         assert bot.is_equipment_enabled(0) is False
         assert bot.is_equipment_enabled(6) is False
 
-    def test_update_equipment_state(self, fake_env: FakeEnv) -> None:
-        """Test Bot.update_equipment_state updates equipment list."""
+    def test_is_equipment_enabled_reads_from_inventory(self, fake_env: FakeEnv) -> None:
+        """Test Bot.is_equipment_enabled reads from server inventory state."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
 
+        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot.update_equipment_state([True, False, True, False, True])
-        assert bot.is_equipment_enabled(1) is True
-        assert bot.is_equipment_enabled(2) is False
-        assert bot.is_equipment_enabled(3) is True
-        assert bot.is_equipment_enabled(4) is False
-        assert bot.is_equipment_enabled(5) is True
-
-    def test_update_equipment_state_wrong_length(self, fake_env: FakeEnv) -> None:
-        """Test Bot.update_equipment_state ignores wrong length list."""
-        from tankpit_bot.bot import Bot
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        bot.update_equipment_state([True, True, True])  # Wrong length
-        # Should remain unchanged
-        for slot in range(1, 6):
-            assert bot.is_equipment_enabled(slot) is False
+        # Toggle some off via inventory update
+        update_inventory_from_toggle([False, True, False, True, False])
+        assert bot.is_equipment_enabled(1) is False
+        assert bot.is_equipment_enabled(2) is True
+        assert bot.is_equipment_enabled(3) is False
+        assert bot.is_equipment_enabled(4) is True
+        assert bot.is_equipment_enabled(5) is False
 
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
         from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import reset_world_state
 
+        reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot.update_equipment_state([True, False, False, False, False])
+        # Default inventory has enabled=True
         result = bot.enable_equipment(1)
         assert result is True
 

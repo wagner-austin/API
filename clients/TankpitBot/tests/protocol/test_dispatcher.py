@@ -313,6 +313,155 @@ class TestTryDecodeBinaryMessage:
         assert result == expected
 
 
+class TestUnwrap0x2e:
+    """Tests for tunneled protocol messages inside 0x2E envelopes."""
+
+    # --- Resource messages ---
+
+    def test_unwraps_inventory_from_0x2e(self) -> None:
+        """Decodes tunneled 0x49 inventory from inside 0x2E."""
+        data = bytes([MSG_INVENTORY, 1, 40, 40, 40, 40, 40])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x49
+        assert result["counts"] == [40, 40, 40, 40, 40]
+
+    def test_unwraps_equipment_gain_from_0x2e(self) -> None:
+        """Decodes tunneled 0x67 equipment gain from inside 0x2E."""
+        data = bytes([MSG_EQUIP_GAIN, 1, 1, 2, 0, 1, 0])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x67
+        assert result["gained"] == [1, 2, 0, 1, 0]
+
+    def test_unwraps_equipment_toggle_from_0x2e(self) -> None:
+        """Decodes tunneled 0x74 equipment toggle from inside 0x2E."""
+        data = bytes([MSG_EQUIP_TOGGLE, 0, 0, 1, 1, 0])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x74
+        assert result["enabled"] == [False, False, True, True, False]
+
+    def test_unwraps_fuel_gain_from_0x2e(self) -> None:
+        """Decodes tunneled 0x44 fuel gain from inside 0x2E."""
+        data = bytes([MSG_FUEL_GAIN, 0x34, 0x12, 1])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x44
+
+    def test_unwraps_fuel_deposit_from_0x2e(self) -> None:
+        """Decodes tunneled 0x64 fuel deposit from inside 0x2E."""
+        data = bytes([MSG_FUEL_DEPOSIT, 0x64, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x64
+
+    # --- Combat messages ---
+
+    def test_unwraps_shoot_event_from_0x2e(self) -> None:
+        """Decodes tunneled 0x53 shoot event from inside 0x2E."""
+        data = bytes([MSG_SHOOT, 0x02, 0x01, 10, 20, 15, 25, 0x03, 0x04, 0x05, 1, 5, 0])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x53
+
+    def test_unwraps_deactivation_from_0x2e(self) -> None:
+        """Decodes tunneled 0x41 deactivation from inside 0x2E."""
+        data = bytes([MSG_DEACTIVATE, 0x02, 0x01, 0x04, 0x03, 5, 0x07, 0x06])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x41
+
+    # --- Radar messages ---
+
+    def test_unwraps_radar_result_from_0x2e(self) -> None:
+        """Decodes tunneled 0x46 radar result from inside 0x2E."""
+        data = bytes([MSG_RADAR_RESULT, 3, 1])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x46
+
+    # --- Tank messages ---
+
+    def test_unwraps_tank_entry_from_0x2e(self) -> None:
+        """Decodes tunneled 0x28 tank entry from inside 0x2E."""
+        data = bytes([MSG_TANK_ENTRY, 5, 0x02, 0x01, 60, 0, 0, 0, 0, 0, 0])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x28
+
+    def test_unwraps_tank_status_full_from_0x2e(self) -> None:
+        """Decodes tunneled 0x3E tank status from inside 0x2E."""
+        header = bytes([MSG_TANK_STATUS_FULL, 0x42, 0x02, 0x01, 0xDE, 0xAD, 0xBE, 0xEF])
+        lb = bytes([0x01, 0x02, 0x03, 0x04, 0x05, 0x06])
+        result = decode_message(MSG_TANK_STATS, header + lb)
+        assert result["msg_type"] == 0x3E
+
+    # --- Movement messages ---
+
+    def test_unwraps_movement_from_0x2e(self) -> None:
+        """Decodes tunneled 0x47 movement from inside 0x2E."""
+        data = bytes([MSG_MOVEMENT, 0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x47
+
+    def test_unwraps_move_response_from_0x2e(self) -> None:
+        """Decodes tunneled 0x3D move response from inside 0x2E."""
+        data = bytes([MSG_MOVE_RESPONSE, 1, 0x02, 0x01, 50, 60, 3, 0x00, 4, 0x05, 0x06, 0x07])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x3D
+
+    # --- World messages ---
+
+    def test_unwraps_sync_from_0x2e(self) -> None:
+        """Decodes tunneled 0x3F sync from inside 0x2E."""
+        data = bytes([MSG_SYNC, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x3F
+
+    def test_unwraps_viewport_from_0x2e(self) -> None:
+        """Decodes tunneled 0x5A viewport from inside 0x2E."""
+        data = bytes([MSG_VIEWPORT, 0, 0])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x5A
+
+    # --- Misc messages ---
+
+    def test_unwraps_action_done_from_0x2e(self) -> None:
+        """Decodes tunneled 0x54 action done from inside 0x2E."""
+        data = bytes([MSG_ACTION_DONE, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x54
+
+    # --- Fallback to container decoder ---
+
+    def test_nested_0x2e_decodes_as_tank_status_sync(self) -> None:
+        """Nested 0x2E decodes as TankStatusSync with fuel from long format."""
+        # Long format: subtype=3, tank_id=1227, damage=2, rank=4, score, lb, flag, fuel
+        inner = bytes([0x03, 0xCB, 0x04, 0x02, 0x04, 0x00, 0x22, 0x84, 0x08, 0x00, 0x78, 0x05])
+        data = bytes([MSG_TANK_STATS]) + inner
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x2E
+        assert result["tank_id"] == 1227
+        assert result["fuel"] == 1400
+
+    def test_nested_0x2e_short_falls_through_to_container(self) -> None:
+        """Nested 0x2E with < 9 bytes falls through to container decoder."""
+        data = bytes([MSG_TANK_STATS, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "tank_status_sync"
+
+    def test_short_data_falls_through_to_container(self) -> None:
+        """Single byte data is too short for unwrap, goes to container."""
+        data = bytes([0x49])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "teleport_landed"
+
+    def test_decode_error_falls_through_to_container(self) -> None:
+        """DecodeError in protocol decoder falls through to container."""
+        # 0x49 subtype but only 2 bytes total — too short for inventory
+        data = bytes([MSG_INVENTORY, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "tank_status_sync"
+
+    def test_unknown_subtype_falls_through_to_container(self) -> None:
+        """Unknown subtype falls through to container structure matching."""
+        data = bytes([0xFF, 0x01])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "tank_status_sync"
+
+
 class TestMessageConstants:
     """Tests for message type constants."""
 

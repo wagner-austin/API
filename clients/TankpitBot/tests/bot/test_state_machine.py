@@ -142,6 +142,7 @@ class TestBotStateUpdates:
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
+            update_world_state_from_fuel_total,
             update_world_state_from_position,
             update_world_state_from_radar,
         )
@@ -151,6 +152,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()  # -> WAITING_FOR_POSITION
         update_world_state_from_position(50, 50)
+        update_world_state_from_fuel_total(1400)
         bot._update_state_from_world()  # -> IDLE
         # Transition to SCANNING manually
         bot._state_data = bot._state_data.copy()
@@ -170,6 +172,7 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
+            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -178,6 +181,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()  # -> WAITING_FOR_POSITION
         update_world_state_from_position(50, 50)
+        update_world_state_from_fuel_total(1400)
         bot._update_state_from_world()  # -> IDLE
         # Transition to MOVING with target
         bot._state_data = bot._state_data.copy()
@@ -192,6 +196,7 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
+            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -200,6 +205,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()  # -> WAITING_FOR_POSITION
         update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(1400)
         bot._update_state_from_world()  # -> IDLE
         # Transition to COLLECTING with target
         bot._state_data = bot._state_data.copy()
@@ -239,6 +245,7 @@ class TestBotStateUpdateBranches:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
+            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -247,6 +254,7 @@ class TestBotStateUpdateBranches:
         bot._magic = "test_magic"
         bot._update_state_from_world()  # -> WAITING_FOR_POSITION
         update_world_state_from_position(50, 50)
+        update_world_state_from_fuel_total(1400)
         bot._update_state_from_world()  # -> IDLE
         # Set MOVING with different target
         bot._state_data = bot._state_data.copy()

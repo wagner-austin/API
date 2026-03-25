@@ -112,7 +112,7 @@ class MovementDict(TypedDict):
     start_y: int
     direction: int
     flag: int
-    fuel: int
+    leaderboard_position: int
     waypoints: list[tuple[int, int]]
 
 
@@ -135,18 +135,18 @@ class MovementResponseDict(TypedDict):
 
 
 class FuelGainDict(TypedDict):
-    """Fuel gain event (D message)."""
+    """Fuel gain event (D message). fuel_total is the new absolute fuel level."""
 
     msg_type: Literal[0x44]
-    amount: int
+    fuel_total: int
     is_free: bool
 
 
 class FuelDepositDict(TypedDict):
-    """Fuel deposit event (d message)."""
+    """Fuel deposit event (d message). fuel_total is the new absolute fuel level."""
 
     msg_type: Literal[0x64]
-    amount: int
+    fuel_total: int
 
 
 class InventoryDict(TypedDict):

@@ -9,6 +9,8 @@ Provides a base class that handles:
 
 from __future__ import annotations
 
+import base64
+import re
 import time
 import uuid
 from pathlib import Path
@@ -42,6 +44,7 @@ from tankpit_bot.browser.types import (
 )
 from tankpit_bot.combat import CombatEvent, CombatTracker
 from tankpit_bot.inventory import InventoryChange, InventoryScraper
+from tankpit_bot.protocol.codec import extract_magic_from_auth_payload
 from tankpit_bot.types import (
     CapturedMessage,
     MessageDirection,
@@ -50,6 +53,25 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
+
+# Base64 validation pattern: A-Z, a-z, 0-9, +, /, and = for padding
+_BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]*={0,2}$")
+
+
+def _is_valid_base64(payload: str) -> bool:
+    """Check if payload is valid base64.
+
+    Args:
+        payload: String to validate.
+
+    Returns:
+        True if valid base64, False otherwise.
+    """
+    if not payload:
+        return False
+    if not _BASE64_PATTERN.match(payload):
+        return False
+    return len(payload) % 4 == 0
 
 
 def get_current_time_ms() -> int:
@@ -309,10 +331,33 @@ class BrowserSession:
         self._on_message_captured(message)
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Called when a message is captured. Override in subclasses.
+        """Extract magic key from AUTH messages and notify subclasses.
+
+        Subclasses should call super()._on_message_captured(message) first,
+        then perform their own message processing.
 
         Args:
             message: The captured message.
+        """
+        if message["direction"] == "sent" and self._magic is None:
+            payload = message["payload"]
+            if not _is_valid_base64(payload):
+                return
+            data = base64.b64decode(payload)
+            magic = extract_magic_from_auth_payload(data)
+            if magic is not None:
+                self._magic = magic
+                log.info("Captured magic key: %s...", magic[:20])
+                self._on_magic_captured(magic)
+
+    def _on_magic_captured(self, magic: str) -> None:
+        """Called when magic key is first captured from AUTH message.
+
+        Override in subclasses to perform setup that requires the magic key
+        (e.g., initializing XOR tables, trackers).
+
+        Args:
+            magic: The session magic string.
         """
 
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
@@ -327,18 +372,66 @@ class BrowserSession:
         # Enable Page domain first - required for script injection to work
         cdp.send("Page.enable")
 
-        # Install WebSocket prototype hook BEFORE any page loads
-        # This captures the WebSocket instance when the game first sends data
+        # Install hooks BEFORE any page scripts load.
+        # Hooks EventTarget.prototype.addEventListener to intercept ALL
+        # WebSocket message handlers, capturing raw binary data as base64.
+        # Also hooks WebSocket.prototype.send for command injection.
         cdp.send(
             "Page.addScriptToEvaluateOnNewDocument",
             {
                 "source": """
             (function() {
                 window.__capturedWS = null;
+                window.__allWS = [];
+                window.__rawMsgs = [];
+                window.__wsRecvCount = 0;
+
+                // Hook EventTarget.prototype.addEventListener globally.
+                // This catches ALL addEventListener calls, including those
+                // made by the game on WebSocket instances.
+                const origAEL = EventTarget.prototype.addEventListener;
+                EventTarget.prototype.addEventListener = function(type, fn, opts) {
+                    if (this instanceof WebSocket && type === 'message') {
+                        if (window.__allWS.indexOf(this) === -1) {
+                            window.__allWS.push(this);
+                        }
+                        const ws = this;
+                        const origFn = fn;
+                        fn = function(event) {
+                            window.__wsRecvCount++;
+                            if (ws.readyState === 1) window.__capturedWS = ws;
+                            try {
+                                if (event.data instanceof Blob) {
+                                    const reader = new FileReader();
+                                    reader.onload = function() {
+                                        const bytes = new Uint8Array(reader.result);
+                                        let b = '';
+                                        for (let i = 0; i < bytes.length; i += 8192) {
+                                            b += String.fromCharCode.apply(null,
+                                                bytes.subarray(i, i + 8192));
+                                        }
+                                        window.__rawMsgs.push(btoa(b));
+                                        if (window.__rawMsgs.length > 500) {
+                                            window.__rawMsgs = window.__rawMsgs.slice(-200);
+                                        }
+                                    };
+                                    reader.readAsArrayBuffer(event.data);
+                                }
+                            } catch(e) {}
+                            return origFn.call(this, event);
+                        };
+                    }
+                    return origAEL.call(this, type, fn, opts);
+                };
+
+                // Hook send for command injection
                 const origSend = WebSocket.prototype.send;
                 WebSocket.prototype.send = function(data) {
-                    if (!window.__capturedWS && this.readyState === 1) {
-                        window.__capturedWS = this;
+                    if (!window.__capturedWS || window.__capturedWS.readyState !== 1) {
+                        if (this.readyState === 1) window.__capturedWS = this;
+                    }
+                    if (window.__allWS.indexOf(this) === -1) {
+                        window.__allWS.push(this);
                     }
                     return origSend.call(this, data);
                 };
@@ -701,10 +794,22 @@ class BrowserSession:
             context: Browser context.
             browser: Browser instance.
         """
-        cdp.detach()
-        page.close()
-        context.close()
-        browser.close()
+        try:
+            cdp.detach()
+        except Exception:
+            pass
+        try:
+            page.close()
+        except Exception:
+            pass
+        try:
+            context.close()
+        except Exception:
+            pass
+        try:
+            browser.close()
+        except Exception:
+            pass
 
 
 __all__ = [

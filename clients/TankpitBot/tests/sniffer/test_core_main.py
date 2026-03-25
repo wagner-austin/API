@@ -51,7 +51,7 @@ def test_run_sniffer_with_live_decode(fake_fs: FakeFileSystem) -> None:
         live_decode=True,
     )
 
-    assert len(session["messages"]) == 2
+    assert len(session["messages"]) == 8
 
 
 # =============================================================================
@@ -71,7 +71,7 @@ def test_main_with_defaults(
 
     captured = capsys.readouterr()
     output = captured.out
-    assert "Captured 2 WebSocket messages in" in output
+    assert "Captured 8 WebSocket messages in" in output
     assert "Saved to: capture_session.json" in output
 
 

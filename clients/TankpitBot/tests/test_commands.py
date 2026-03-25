@@ -315,27 +315,23 @@ def test_action_command_roundtrip_serialize_deserialize() -> None:
 
 
 def test_type_query_value() -> None:
-    """Test TYPE_QUERY is 0x22 (0x20 | 2)."""
-    assert TYPE_QUERY == 0x22
-    assert TYPE_QUERY == 0x20 | 2
+    """Test TYPE_QUERY is raw type number 2."""
+    assert TYPE_QUERY == 2
 
 
 def test_type_ui_value() -> None:
-    """Test TYPE_UI is 0x23 (0x20 | 3)."""
-    assert TYPE_UI == 0x23
-    assert TYPE_UI == 0x20 | 3
+    """Test TYPE_UI is raw type number 3."""
+    assert TYPE_UI == 3
 
 
 def test_type_movement_value() -> None:
-    """Test TYPE_MOVEMENT is 0x24 (0x20 | 4)."""
-    assert TYPE_MOVEMENT == 0x24
-    assert TYPE_MOVEMENT == 0x20 | 4
+    """Test TYPE_MOVEMENT is raw type number 4."""
+    assert TYPE_MOVEMENT == 4
 
 
 def test_type_combat_value() -> None:
-    """Test TYPE_COMBAT is 0x26 (0x20 | 6)."""
-    assert TYPE_COMBAT == 0x26
-    assert TYPE_COMBAT == 0x20 | 6
+    """Test TYPE_COMBAT is raw type number 6."""
+    assert TYPE_COMBAT == 6
 
 
 # =============================================================================
@@ -390,11 +386,14 @@ class TestBuildMoveCommand:
         result = build_move_command(0, 0)
         assert len(result) == 7
 
-    def test_matches_captured_format(self) -> None:
-        """Test output matches captured wire format from gameplay."""
-        # Captured: 05002124705c5b (move to 92, 91)
+    def test_matches_raw_format(self) -> None:
+        """Test output matches raw (pre-XOR) command format.
+
+        Raw format: [len_lo, len_hi, '!', type=4, cmd=0x70, x, y]
+        XOR encoding is applied later by the bot before sending.
+        """
         result = build_move_command(92, 91)
-        assert result.hex() == "05002124705c5b"
+        assert result.hex() == "05002104705c5b"
 
     def test_coordinates_masked_to_byte(self) -> None:
         """Test coordinates are masked to single byte."""

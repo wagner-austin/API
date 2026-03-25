@@ -600,6 +600,60 @@ load_terrain_map: LoadTerrainMapProtocol = _real_load_terrain_map
 
 
 # =============================================================================
+# Game Loop Bot Protocol
+# =============================================================================
+
+
+class GameLoopBotProtocol(Protocol):
+    """Protocol for the Bot interface required by game_loop.
+
+    Defines the minimal set of methods that the game loop needs
+    from the Bot class, breaking the circular import between
+    bot.base and bot.game_loop.
+    """
+
+    def get_position(self) -> tuple[int, int] | None:
+        """Get current tank position.
+
+        Returns:
+            Tuple of (x, y) coordinates, or None if not yet tracked.
+        """
+        ...
+
+    def _poll_game_log(self) -> list[dict[str, str]]:
+        """Poll for new game log entries.
+
+        Returns:
+            List of new entries found since last poll.
+        """
+        ...
+
+    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+        """XOR encode and send command bytes via WebSocket.
+
+        Args:
+            data: Framed command bytes (with 2-byte length header).
+            cmd_name: Command name for logging.
+
+        Returns:
+            True if sent, False if CDP session not available.
+        """
+        ...
+
+    def teleport_to(self, x: int, y: int) -> bool:
+        """Send teleport command.
+
+        Args:
+            x: Target X coordinate (0-255).
+            y: Target Y coordinate (0-255).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+
+# =============================================================================
 # CLI Argument Hook
 # =============================================================================
 
@@ -640,6 +694,7 @@ __all__ = [
     "BrowserTypeProtocol",
     "CDPSessionProtocol",
     "FindBestStaticByteProtocol",
+    "GameLoopBotProtocol",
     "KeyboardProtocol",
     "LoadTerrainMapProtocol",
     "PageProtocol",

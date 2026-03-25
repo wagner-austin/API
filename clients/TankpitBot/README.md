@@ -1,17 +1,18 @@
 # TankpitBot
 
-Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol, with XOR codec for message encoding/decoding.
+Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol, with XOR codec for message encoding/decoding. Includes a modular AI behavior system for autonomous tank control.
 
 ## Features
 
+- **Autonomous AI Bot**: Modular behavior system with evaluators, pathfinding, threat analysis, equipment management, and tactical decisions
 - **Protocol Discovery**: Captures WebSocket traffic via Playwright CDP integration
 - **WebSocket Injection**: Sends commands via captured WebSocket (synthetic JS events don't work)
 - **XOR Codec**: Full encode/decode with static + session magic keys
 - **Container Decoder**: Length-based message identification for 13+ container subtypes
 - **Intel Gathering**: Console listener, WebSocket URLs, JS debug info, script URLs
-- **Shared Architecture**: BrowserSession base class for sniffer and probe
-- **Type Safety**: mypy strict mode, zero `Any` types, TypedDict models
-- **100% Test Coverage**: Statements and branches
+- **Shared Architecture**: BrowserSession base class for sniffer, probe, and bot
+- **Type Safety**: mypy strict mode, zero `Any` types, immutable TypedDict models
+- **100% Test Coverage**: 2069 tests, statements and branches, no mocks
 - **Monorepo Integration**: Guard rules, platform_core utilities
 
 ## Quick Start
@@ -29,6 +30,14 @@ poetry install --with dev
 ```
 
 This installs dependencies and Playwright's Chromium browser.
+
+### Run the Bot
+
+```bash
+make bot
+```
+
+The bot joins a game, captures the WebSocket, and runs the AI behavior loop autonomously.
 
 ### Capture the Protocol
 
@@ -70,11 +79,47 @@ make decode
 
 Loads a capture session JSON, extracts the magic key, builds the XOR table, and decodes all command messages.
 
-### Run the Bot
+---
 
-```bash
-make bot
-```
+## AI Behavior System
+
+The bot uses a modular AI decision system built on pure functions and immutable TypedDicts. The architecture has two layers:
+
+- **Decision layer**: Evaluators score candidate behaviors based on world state
+- **Execution layer**: Actions translate chosen behaviors into Bot commands
+
+### Behavior Modes
+
+| Mode | Priority | Description |
+|------|----------|-------------|
+| `DEFEND` | Highest | Shields on, evade when under attack |
+| `HUNT` | High | Pursue and shoot nearby enemies |
+| `COLLECT_FUEL` | Medium-High | Three-tier fuel management |
+| `COLLECT_EQUIPMENT` | Medium | Pick up equipment containers |
+| `DEPOSIT_FUEL` | Medium | Deposit fuel at base |
+| `PATROL` | Low | Move through waypoints |
+
+### Three-Tier Fuel Management
+
+| Tier | Fuel Range | Strategy |
+|------|-----------|----------|
+| Critical | < 200 | Shields on, find best (highest volume) fuel |
+| Low | 200-500 | Find best fuel, no shields |
+| Normal | 500-1200 | Find nearest fuel |
+
+### Equipment Rules
+
+- **Extra radar (slot 5)**: Always on (running out = death)
+- **Dual shots (slot 2)**: Always on during HUNT (running out = zero kill threat)
+- **Homing shots (slot 4)**: Only when enemy is critically damaged (damage >= 3) to conserve ammo
+- **Armor/shields (slot 1)**: Only during DEFEND, critical fuel, or teleport
+- **Stock-aware**: Equipment is not enabled if inventory count is zero
+
+### Tactical Decisions
+
+- **Proactive radar**: Scans when fuel is approaching low threshold and no fuel containers are visible
+- **Teleport search**: Relocates to farthest waypoint when fuel is low, area is confirmed empty after scan, and no high-priority behavior is active
+- **Equipment toggling**: Enables AND disables equipment per mode transition (not just enables)
 
 ---
 
@@ -152,36 +197,37 @@ cp .env.example .env
 ### Commands
 
 ```bash
-make install  # Install dependencies + Playwright
-make lint     # Run guards + ruff + mypy
-make test     # Run pytest with coverage
-make check    # Run lint + test
-make sniff    # Run WebSocket sniffer
-make probe    # Run input probe
-make decode   # Decode captured session
-make bot      # Run bot client
+make install   # Install dependencies + Playwright
+make lint      # Run guards + ruff + mypy
+make test      # Run pytest with coverage
+make check     # Run lint + test
+make sniff     # Run WebSocket sniffer
+make probe     # Run input probe
+make decode    # Decode captured session
+make bot       # Run bot client
+make discover  # Run command discovery
 ```
 
 ### Quality Gates
 
 All code must pass:
 
-1. **Guard Scripts**: No `Any`, no `cast`, no `type: ignore`
+1. **Guard Scripts**: No `Any`, no `cast`, no `type: ignore`, no mocks, no weak assertions
 2. **Ruff**: Linting and formatting
-3. **Mypy**: Strict type checking
-4. **Pytest**: 100% statement and branch coverage
+3. **Mypy**: Strict type checking (src, tests, scripts)
+4. **Pytest**: 100% statement and branch coverage (src, scripts)
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (parallel via xdist)
 make test
 
 # Run specific test file
-poetry run pytest tests/test_types.py -v
+poetry run pytest tests/bot/ai/test_tactics.py -v
 
 # Run with coverage report
-poetry run pytest --cov-report=html
+poetry run pytest --cov=src --cov=scripts --cov-branch --cov-report=html
 ```
 
 ---
@@ -193,7 +239,6 @@ TankpitBot/
 ├── src/tankpit_bot/
 │   ├── __init__.py           # Package exports
 │   ├── _test_hooks.py        # Dependency injection hooks
-│   ├── bot.py                # Bot client entry point
 │   ├── combat.py             # Combat event tracking
 │   ├── decoder.py            # Session decoder for captured data
 │   ├── game_state.py         # Game state management
@@ -202,6 +247,24 @@ TankpitBot/
 │   ├── probe.py              # Input injection and command discovery
 │   ├── state_decoder.py      # Game state message decoder
 │   ├── terrain.py            # Terrain/map decoding
+│   │
+│   ├── bot/                  # Bot client package
+│   │   ├── __init__.py       # Re-exports Bot and all AI types
+│   │   ├── base.py           # Bot class (state machine, CDP, commands)
+│   │   ├── commands.py       # Command encoding (move, teleport, etc.)
+│   │   ├── states.py         # State machine (IDLE, MOVING, COMBAT, etc.)
+│   │   ├── types.py          # Command TypedDicts (MoveCommand, etc.)
+│   │   ├── vision.py         # Multi-perspective tracking and rendering
+│   │   └── ai/               # AI behavior system
+│   │       ├── __init__.py   # Re-exports all AI types and functions
+│   │       ├── types.py      # AIConfigDict, AIStateDict, BehaviorScoreDict
+│   │       ├── evaluators.py # Behavior scoring (hunt, collect, defend, etc.)
+│   │       ├── equipment.py  # Equipment/fuel finders (nearest, best, deposit)
+│   │       ├── threats.py    # Enemy analysis from world state
+│   │       ├── pathfinding.py# Terrain-aware A* pathfinding
+│   │       ├── tactics.py    # Tactical decisions (radar, teleport, equipment)
+│   │       ├── actions.py    # Behavior execution (command dispatch)
+│   │       └── loop.py       # Main AI tick orchestrator
 │   │
 │   ├── browser/              # Browser automation package
 │   │   ├── __init__.py
@@ -266,7 +329,7 @@ TankpitBot/
 │   │   ├── core.py           # Core sniffer logic
 │   │   ├── decoders.py       # Sniffer message decoders
 │   │   ├── formatters.py     # Output formatters
-│   │   ├── player_tracking.py # Player tracking
+│   │   ├── player_tracking.py# Player tracking
 │   │   ├── trackers.py       # Tracker coordination
 │   │   ├── viewport.py       # Viewport handling
 │   │   ├── world_state.py    # World state management
@@ -274,9 +337,9 @@ TankpitBot/
 │   │
 │   ├── state/                # Game state package
 │   │   ├── __init__.py
-│   │   ├── mutations.py      # State mutations
-│   │   ├── renderer.py       # State rendering
-│   │   └── types.py          # State TypedDicts
+│   │   ├── mutations.py      # Immutable state mutations
+│   │   ├── renderer.py       # ASCII state rendering
+│   │   └── types.py          # State TypedDicts (WorldState, SelfState, etc.)
 │   │
 │   └── types/                # Shared types package
 │       ├── __init__.py       # Re-exports all types
@@ -288,19 +351,51 @@ TankpitBot/
 │       └── session.py        # CaptureSession, SessionSummary
 │
 ├── tests/
-│   ├── conftest.py           # Test fixtures
-│   ├── fakes.py              # Fake Playwright classes
+│   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
+│   ├── fakes/                # Fake Playwright classes
+│   │   ├── base.py           # Core fakes (FakeCDPSession, FakePage)
+│   │   ├── bot.py            # Bot-specific fakes
+│   │   └── probe.py          # Probe-specific fakes
+│   ├── bot/                  # Bot tests
+│   │   ├── ai/               # AI behavior tests
+│   │   │   ├── test_types.py
+│   │   │   ├── test_evaluators.py
+│   │   │   ├── test_equipment.py
+│   │   │   ├── test_threats.py
+│   │   │   ├── test_pathfinding.py
+│   │   │   ├── test_tactics.py
+│   │   │   ├── test_actions.py
+│   │   │   └── test_loop.py
+│   │   ├── test_cdp.py       # CDP session + equipment + AI integration
+│   │   ├── test_class.py     # Bot initialization
+│   │   ├── test_commands.py  # Command encoding
+│   │   ├── test_main.py      # Entry point
+│   │   ├── test_run.py       # Game loop
+│   │   ├── test_state_machine.py
+│   │   ├── test_vision.py    # Vision module
+│   │   └── test_world_state.py
+│   ├── browser/              # Browser session tests
 │   ├── capture/              # Capture tracker tests
+│   ├── container/            # Container decoder tests
+│   ├── game_state/           # Game state tests
+│   ├── login/                # Login flow tests
+│   ├── probe/                # Probe tests
+│   ├── protocol/             # Protocol decoder tests
 │   ├── sniffer/              # Sniffer tests
-│   └── ...                   # Module tests
+│   │   └── trackers/         # Sniffer tracker tests
+│   ├── types/                # Type tests
+│   └── world_state/          # World state tests
 │
 ├── scripts/
 │   ├── guard.py              # Monorepo guard orchestrator
+│   ├── decode.py             # Session decode script
 │   └── _test_hooks.py        # Guard test hooks
 │
 ├── docs/
 │   ├── protocol.md           # Protocol documentation
-│   └── decoding_status.md    # Message decoding status + formats
+│   ├── protocol_reference.md # Protocol reference
+│   ├── decoding_status.md    # Message decoding status + formats
+│   └── vision-module-progress.md # Vision module progress
 │
 ├── pyproject.toml            # Poetry + tool config
 └── Makefile                  # Development commands
@@ -316,6 +411,8 @@ The codebase is organized into focused packages:
 
 | Package | Purpose |
 |---------|---------|
+| `bot/` | Bot client, state machine, command dispatch |
+| `bot/ai/` | AI behavior system (evaluators, pathfinding, tactics) |
 | `browser/` | Playwright automation, CDP setup, login flows |
 | `protocol/` | XOR codec, framing, command encoding |
 | `capture/` | Message capture, trackers, statistics |
@@ -324,9 +421,42 @@ The codebase is organized into focused packages:
 | `state/` | Game state management and rendering |
 | `types/` | Shared TypedDict models and validation |
 
+### AI Decision Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│  ai_tick() — Main orchestrator               │
+│  Runs evaluators, selects best behavior      │
+└──────────────┬───────────────────────────────┘
+               │
+     ┌─────────┴─────────┐
+     ▼                   ▼
+┌──────────┐    ┌──────────────┐
+│ Evaluators│    │ Threat       │
+│ score_*() │    │ Analysis     │
+│ 6 behaviors│   │ analyze_     │
+│ 0-1000    │    │ threats()    │
+└──────┬───┘    └──────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────┐
+│  _ai_tick_once() — Bot integration           │
+│  Proactive radar → Teleport search → Normal  │
+└──────────────┬───────────────────────────────┘
+               │
+     ┌─────────┼─────────┐
+     ▼         ▼         ▼
+┌────────┐ ┌────────┐ ┌────────────┐
+│ Tactics│ │ Actions│ │ Equipment  │
+│ radar, │ │ execute│ │ find_fuel, │
+│ teleport│ │ behavior│ │ pathfinding│
+│ equip  │ │ commands│ │            │
+└────────┘ └────────┘ └────────────┘
+```
+
 ### Shared BrowserSession Base Class
 
-Both sniffer and probe inherit from `browser.BrowserSession` which provides:
+Bot, sniffer, and probe inherit from `browser.BrowserSession` which provides:
 
 - **CDP Setup**: WebSocket event handlers for frame capture
 - **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
@@ -403,7 +533,7 @@ Both sniffer and probe inherit from `browser.BrowserSession` which provides:
 Dependency injection via hooks for testability without mocks:
 
 ```python
-# In _test_hooks.py
+# In _test_hooks.py — production code sets hooks to real implementations
 def get_env(key: str, default: str | None = None) -> str | None:
     return os.environ.get(key, default)
 
@@ -413,7 +543,7 @@ def path_exists(path: Path) -> bool:
 def read_text(path: Path) -> str:
     return path.read_text()
 
-# Tests can patch these functions directly
+# Tests replace hooks with fakes — no conditional logic in production code
 ```
 
 ### Type Models (`types/` package)
@@ -465,10 +595,12 @@ class CaptureSession(TypedDict):
 
 ## Quality Standards
 
-- **Type Safety**: mypy strict mode, no `Any`, no `cast`
-- **Coverage**: 100% statements and branches
-- **Guard Rules**: Enforced via `scripts/guard.py`
-- **Test Hooks**: Dependency injection for testing
+- **Type Safety**: mypy strict mode, no `Any`, no `cast`, no `type: ignore`
+- **Coverage**: 100% statements and branches (2069 tests)
+- **Guard Rules**: Enforced via `scripts/guard.py` (typing, patterns, test-quality, mock-ban)
+- **Test Hooks**: Dependency injection for testing, no mocks
+- **Immutable State**: All TypedDicts with encode/decode and require_* validation
+- **Google-style Docstrings**: Args, Returns, Raises sections
 
 ---
 

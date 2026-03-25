@@ -103,10 +103,14 @@ class FakeCDPSessionBot:
         method: str,
         params: JSONObject | None = None,
     ) -> JSONObject:
-        """Send CDP command."""
+        """Send CDP command.
+
+        Returns a valid CDP response with ``{"result": {"value": ...}}``,
+        matching the real Chrome DevTools Protocol contract.
+        """
         _ = params
         self._sent_methods.append(method)
-        return {}
+        return {"result": {"value": "ok"}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Register event handler."""

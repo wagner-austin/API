@@ -11,21 +11,11 @@ from collections.abc import Callable
 from platform_core.logging import get_logger
 
 from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
+from tankpit_bot.protocol.constants import RANK_NAMES, TEAM_NAMES
 
 log = get_logger(__name__)
 
-TEAM_COLORS: tuple[str, ...] = ("red", "purple", "blue", "orange")
-
-RANK_NAMES: tuple[str, ...] = (
-    "recruit",
-    "private",
-    "corporal",
-    "sergeant",
-    "lieutenant",
-    "captain",
-    "major",
-    "general",
-)
+TEAM_COLORS = TEAM_NAMES  # Backward-compatible alias
 
 
 class TankTracker:
@@ -178,7 +168,7 @@ class TankTracker:
 
         info_byte = decoded[0]
         team = info_byte & 0x03
-        rank = (info_byte >> 4) & 0x07
+        rank = (info_byte >> 4) & 0x0F
 
         tank_id = decoded[1] | (decoded[2] << 8)
 
@@ -186,7 +176,7 @@ class TankTracker:
         if len(decoded) > 13:
             name = bytes(decoded[13:]).decode("utf-8", errors="ignore").rstrip("\x00")
 
-        team_name = TEAM_COLORS[team] if team < len(TEAM_COLORS) else f"team{team}"
+        team_name = TEAM_NAMES[team] if team < len(TEAM_NAMES) else f"team{team}"
         rank_name = RANK_NAMES[rank] if rank < len(RANK_NAMES) else f"rank{rank}"
 
         self._tanks[tank_id] = {"team": team_name, "rank": rank_name, "name": name}
@@ -241,7 +231,7 @@ class TankTracker:
         direction = decoded[5]
         rank = decoded[7]
 
-        team_name = TEAM_COLORS[team] if team < len(TEAM_COLORS) else f"team{team}"
+        team_name = TEAM_NAMES[team] if team < len(TEAM_NAMES) else f"team{team}"
         rank_name = RANK_NAMES[rank] if rank < len(RANK_NAMES) else f"rank{rank}"
 
         if tank_id in self._tanks:
@@ -272,8 +262,8 @@ class TankTracker:
         shot_x = decoded[3]
         shot_y = decoded[4] if len(decoded) > 4 else 0
 
-        if shooter_team < len(TEAM_COLORS):
-            team_name = TEAM_COLORS[shooter_team]
+        if shooter_team < len(TEAM_NAMES):
+            team_name = TEAM_NAMES[shooter_team]
         else:
             team_name = f"team{shooter_team}"
 
@@ -377,20 +367,9 @@ class TankTracker:
         Returns:
             Promotion string.
         """
-        ranks = [
-            "recruit",
-            "private",
-            "corporal",
-            "sergeant",
-            "lieutenant",
-            "captain",
-            "major",
-            "colonel",
-            "general",
-        ]
         rank_idx = decoded[0]
         promoted = decoded[1] == 1
-        rank_name = ranks[rank_idx] if rank_idx < len(ranks) else f"rank{rank_idx}"
+        rank_name = RANK_NAMES[rank_idx] if rank_idx < len(RANK_NAMES) else f"rank{rank_idx}"
         if promoted:
             return f"[PROMOTED] to {rank_name}!"
         return f"[DEMOTED] to {rank_name}"

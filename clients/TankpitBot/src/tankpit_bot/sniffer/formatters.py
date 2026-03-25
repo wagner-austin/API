@@ -80,8 +80,9 @@ def format_decoded_message(msg_type: int, decoded: protocol.BinaryMessage) -> st
         # Container message - use specific type name
         type_name = actual_type.replace("_", " ").title().replace(" ", "")
     else:
-        # Protocol message - use int-based lookup
-        type_name = MSG_TYPE_NAMES.get(msg_type, f"Msg0x{msg_type:02X}")
+        # Protocol message - use decoded msg_type for lookup (handles
+        # 0x2E-tunneled messages where wire type differs from actual type)
+        type_name = MSG_TYPE_NAMES.get(actual_type, f"Msg0x{actual_type:02X}")
     details = format_message_details(decoded)
     if details:
         return f"[{type_name}] {details}"
@@ -127,18 +128,18 @@ def format_tank_details(d: protocol.BinaryMessage) -> str:
         dmg = damage_name(d["damage_state"])
         return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['leaderboard_position']}"
     if d["msg_type"] == 0x3E:
-        # TankStatusDict: has leaderboard_score not score
+        # TankStatusDict: has leaderboard_score (position ranking)
         rank = rank_name(d["rank"])
         team = team_name(d["team"])
-        return f"tank={d['tank_id']} {team} {rank} score={d['leaderboard_score']}"
+        return f"tank={d['tank_id']} {team} {rank} lb={d['leaderboard_score']}"
     if d["msg_type"] == 0x21:
         # TankInfoDict: has team
         team = team_name(d["team"])
         return f"tank={d['tank_id']} {team} name={d['name']}"
     if d["msg_type"] == 0x47:
-        # MovementDict: no rank, has fuel
+        # MovementDict: no rank, has leaderboard_position
         x, y, dr = d["start_x"], d["start_y"], d["direction"]
-        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} fuel={d['fuel']}"
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} lb={d['leaderboard_position']}"
     if d["msg_type"] == 0x3D:
         # MovementResponseDict: has rank and leaderboard_position
         rank = rank_name(d["rank"])
@@ -160,9 +161,9 @@ def format_resource_details(d: protocol.BinaryMessage) -> str:
         Formatted resource details string.
     """
     if d["msg_type"] == 0x44:
-        return f"amount={d['amount']} free={d['is_free']}"
+        return f"fuel={d['fuel_total']} free={d['is_free']}"
     if d["msg_type"] == 0x64:
-        return f"amount={d['amount']}"
+        return f"fuel={d['fuel_total']}"
     if d["msg_type"] == 0x49:
         return f"counts={d['counts']}"
     if d["msg_type"] == 0x43:
@@ -301,10 +302,9 @@ def format_radar_response(containers: list[RadarContainerDict], mines: list[Rada
             parts.append(f"({cx},{cy}):fuel={c['volume']}")
         else:
             parts.append(f"({cx},{cy}):equip")
-    team_names_list = ["red", "purple", "blue", "orange"]
     for m in mines:
         mx, my = m["x"], m["y"]
-        team = team_names_list[m["team"]] if 0 <= m["team"] < 4 else f"team{m['team']}"
+        team = TEAM_NAMES[m["team"]] if 0 <= m["team"] < len(TEAM_NAMES) else f"team{m['team']}"
         parts.append(f"({mx},{my}):mine[{team}]")
     return " ".join(parts)
 
@@ -362,18 +362,19 @@ def format_movement(sx: int, sy: int, pid: int, waypoints: str, is_self: bool) -
     return f'{who} from=({sx},{sy}) {tid_str} path="{waypoints}" ({tiles} tiles)'
 
 
-def format_combat_hit(direction: int, aid: int) -> str:
+def format_combat_hit(direction: int, aid: int, cd: bytes = b"") -> str:
     """Format combat hit details.
 
     Args:
         direction: Hit direction.
         aid: Attacker ID.
+        cd: Raw combat_data bytes.
 
     Returns:
         Formatted combat hit string.
     """
     dir_str = "out" if direction == 0x09 else "in"
-    return f"attacker={aid} dir={dir_str}"
+    return f"attacker={aid} dir={dir_str} data={cd.hex()}"
 
 
 def format_tank_status_short(tid: int, dmg: int, rank: int, lb: int) -> str:
@@ -490,8 +491,8 @@ def format_container_details(d: protocol.BinaryMessage) -> str:
         return simple
 
     match d:
-        case {"msg_type": "combat_hit", "direction": int(direction), "attacker_id": int(aid)}:
-            return format_combat_hit(direction, aid)
+        case {"msg_type": "combat_hit", "direction": int(direction), "attacker_id": int(aid), "combat_data": bytes(cd)}:
+            return format_combat_hit(direction, aid, cd)
         case {
             "msg_type": "tank_registry",
             "tank_id": int(tid),
