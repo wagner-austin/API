@@ -180,37 +180,12 @@ class TestBotCommandsWithoutCDP:
         result = bot.enable_equipment(6)
         assert result is False
 
-    def test_enable_homing_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_homing returns False when not enabled and CDP not available."""
+    def test_request_nearest_enemy_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.request_nearest_enemy returns False when CDP not available."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
 
-        reset_world_state()
-        update_inventory_from_toggle([True, True, True, False, True])  # homing=False
         bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.enable_homing()
-        assert result is False
-
-    def test_enable_dual_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_dual returns False when not enabled and CDP not available."""
-        from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
-
-        reset_world_state()
-        update_inventory_from_toggle([True, False, True, True, True])  # dual=False
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.enable_dual()
-        assert result is False
-
-    def test_enable_radar_equipment_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.enable_radar_equipment returns False when not enabled and no CDP."""
-        from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
-
-        reset_world_state()
-        update_inventory_from_toggle([True, True, True, True, False])  # radar=False
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.enable_radar_equipment()
+        result = bot.request_nearest_enemy()
         assert result is False
 
     def test_open_map_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
@@ -228,27 +203,6 @@ class TestBotCommandsWithoutCDP:
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.close_map()
         assert result is True
-
-    def test_go_to_nearest_fuel_returns_false_when_no_fuel(self, fake_env: FakeEnv) -> None:
-        """Test Bot.go_to_nearest_fuel returns False when no fuel containers."""
-        from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.go_to_nearest_fuel()
-        assert result is False
-
-    def test_scan_and_collect_fuel_scans_when_no_containers(self, fake_env: FakeEnv) -> None:
-        """Test Bot.scan_and_collect_fuel calls radar when no containers."""
-        from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
-
-        reset_world_state()
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        # Should attempt radar scan (returns False because no CDP)
-        result = bot.scan_and_collect_fuel()
-        assert result is False
 
 
 class TestBotEquipmentState:

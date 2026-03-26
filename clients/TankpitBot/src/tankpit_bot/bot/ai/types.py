@@ -26,18 +26,12 @@ BehaviorMode = Literal[
     "HUNT",
     "COLLECT_FUEL",
     "COLLECT_EQUIPMENT",
-    "DEPOSIT_FUEL",
-    "PATROL",
-    "DEFEND",
 ]
 
 BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
     "HUNT",
     "COLLECT_FUEL",
     "COLLECT_EQUIPMENT",
-    "DEPOSIT_FUEL",
-    "PATROL",
-    "DEFEND",
 )
 
 
@@ -74,6 +68,7 @@ class BehaviorScoreDict(TypedDict):
         score: Priority score (0-1000). Higher wins.
         target_x: Target X coordinate for this behavior.
         target_y: Target Y coordinate for this behavior.
+        target_id: Tank ID of the combat target (0 if no specific target).
         reason: Human-readable reason for debugging.
     """
 
@@ -81,6 +76,7 @@ class BehaviorScoreDict(TypedDict):
     score: int
     target_x: int
     target_y: int
+    target_id: int
     reason: str
 
 
@@ -90,6 +86,7 @@ def make_behavior_score(
     target_x: int,
     target_y: int,
     reason: str,
+    target_id: int = 0,
 ) -> BehaviorScoreDict:
     """Create a BehaviorScoreDict.
 
@@ -99,6 +96,7 @@ def make_behavior_score(
         target_x: Target X coordinate.
         target_y: Target Y coordinate.
         reason: Human-readable reason.
+        target_id: Tank ID of combat target (0 if no specific target).
 
     Returns:
         BehaviorScoreDict with the provided values.
@@ -108,6 +106,7 @@ def make_behavior_score(
         score=score,
         target_x=target_x,
         target_y=target_y,
+        target_id=target_id,
         reason=reason,
     )
 
@@ -126,6 +125,7 @@ def encode_behavior_score(score: BehaviorScoreDict) -> JSONObject:
         "score": score["score"],
         "target_x": score["target_x"],
         "target_y": score["target_y"],
+        "target_id": score["target_id"],
         "reason": score["reason"],
     }
 
@@ -148,6 +148,7 @@ def decode_behavior_score(data: JSONObject) -> BehaviorScoreDict:
         score=require_int(data, "score"),
         target_x=require_int(data, "target_x"),
         target_y=require_int(data, "target_y"),
+        target_id=require_int(data, "target_id"),
         reason=require_str(data, "reason"),
     )
 
@@ -338,11 +339,14 @@ class AIConfigDict(TypedDict):
     Attributes:
         fuel_critical_threshold: Below this, shields activate and fuel is emergency.
         fuel_low_threshold: Below this, fuel collection gets priority boost.
-        fuel_full_threshold: Above this level, DEPOSIT_FUEL becomes eligible.
+        fuel_full_threshold: Above this level, fuel collection score drops to zero.
         hunt_min_fuel: Minimum fuel required to engage in combat.
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
         shoot_cooldown_ms: Minimum milliseconds between shots.
+        teleport_fuel_cost: Estimated fuel consumed by a single teleport.
+        kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
+        map_open_cooldown_ms: Minimum milliseconds between map open commands.
         patrol_waypoints: Circuit of waypoints for PATROL behavior.
     """
 
@@ -353,6 +357,9 @@ class AIConfigDict(TypedDict):
     combat_range: int
     scan_cooldown_ms: int
     shoot_cooldown_ms: int
+    teleport_fuel_cost: int
+    kill_cooldown_ms: int
+    map_open_cooldown_ms: int
     patrol_waypoints: list[tuple[int, int]]
 
 
@@ -364,12 +371,15 @@ def make_default_ai_config() -> AIConfigDict:
     """
     return AIConfigDict(
         fuel_critical_threshold=200,
-        fuel_low_threshold=500,
+        fuel_low_threshold=700,
         fuel_full_threshold=1200,
-        hunt_min_fuel=400,
+        hunt_min_fuel=100,
         combat_range=20,
         scan_cooldown_ms=5000,
         shoot_cooldown_ms=2000,
+        teleport_fuel_cost=100,
+        kill_cooldown_ms=20000,
+        map_open_cooldown_ms=5000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
     )
 
@@ -392,6 +402,9 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "combat_range": config["combat_range"],
         "scan_cooldown_ms": config["scan_cooldown_ms"],
         "shoot_cooldown_ms": config["shoot_cooldown_ms"],
+        "teleport_fuel_cost": config["teleport_fuel_cost"],
+        "kill_cooldown_ms": config["kill_cooldown_ms"],
+        "map_open_cooldown_ms": config["map_open_cooldown_ms"],
         "patrol_waypoints": waypoints,
     }
 
@@ -444,6 +457,9 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         combat_range=require_int(data, "combat_range"),
         scan_cooldown_ms=require_int(data, "scan_cooldown_ms"),
         shoot_cooldown_ms=require_int(data, "shoot_cooldown_ms"),
+        teleport_fuel_cost=require_int(data, "teleport_fuel_cost"),
+        kill_cooldown_ms=require_int(data, "kill_cooldown_ms"),
+        map_open_cooldown_ms=require_int(data, "map_open_cooldown_ms"),
         patrol_waypoints=_decode_patrol_waypoints(data),
     )
 
@@ -462,10 +478,14 @@ class AIStateDict(TypedDict):
         patrol_waypoint_index: Current index in patrol waypoint circuit.
         last_scan_ms: Timestamp of last radar scan (milliseconds).
         last_shoot_ms: Timestamp of last shot fired (milliseconds).
+        last_map_open_ms: Timestamp of last map open command (milliseconds).
         combat_target_id: Tank ID of current combat target (-1 if none).
         combat_target_x: X coordinate of combat target.
         combat_target_y: Y coordinate of combat target.
         ticks_in_mode: How many ticks spent in current mode.
+        killed_tank_ids: Tank IDs on kill cooldown {str(tank_id): timestamp_ms}.
+        last_shot_target_id: Tank ID we shot at last tick (-1 if none).
+        last_shot_target_name: Name of tank we shot at last tick.
     """
 
     config: AIConfigDict
@@ -473,10 +493,14 @@ class AIStateDict(TypedDict):
     patrol_waypoint_index: int
     last_scan_ms: int
     last_shoot_ms: int
+    last_map_open_ms: int
     combat_target_id: int
     combat_target_x: int
     combat_target_y: int
     ticks_in_mode: int
+    killed_tank_ids: dict[str, int]
+    last_shot_target_id: int
+    last_shot_target_name: str
 
 
 def make_initial_ai_state(
@@ -492,14 +516,18 @@ def make_initial_ai_state(
     """
     return AIStateDict(
         config=config if config is not None else make_default_ai_config(),
-        active_mode="PATROL",
+        active_mode="HUNT",
         patrol_waypoint_index=0,
         last_scan_ms=0,
         last_shoot_ms=0,
+        last_map_open_ms=0,
         combat_target_id=-1,
         combat_target_x=0,
         combat_target_y=0,
         ticks_in_mode=0,
+        killed_tank_ids={},
+        last_shot_target_id=-1,
+        last_shot_target_name="",
     )
 
 
@@ -512,17 +540,45 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
     Returns:
         JSON-serializable dict representation.
     """
+    killed: JSONValue = dict(state["killed_tank_ids"])
     return {
         "config": encode_ai_config(state["config"]),
         "active_mode": state["active_mode"],
         "patrol_waypoint_index": state["patrol_waypoint_index"],
         "last_scan_ms": state["last_scan_ms"],
         "last_shoot_ms": state["last_shoot_ms"],
+        "last_map_open_ms": state["last_map_open_ms"],
         "combat_target_id": state["combat_target_id"],
         "combat_target_x": state["combat_target_x"],
         "combat_target_y": state["combat_target_y"],
         "ticks_in_mode": state["ticks_in_mode"],
+        "killed_tank_ids": killed,
+        "last_shot_target_id": state["last_shot_target_id"],
+        "last_shot_target_name": state["last_shot_target_name"],
     }
+
+
+def _decode_killed_tank_ids(data: JSONObject) -> dict[str, int]:
+    """Decode killed_tank_ids from JSON.
+
+    Args:
+        data: JSON object containing killed_tank_ids field.
+
+    Returns:
+        Dict mapping str(tank_id) to timestamp_ms.
+
+    Raises:
+        ValueError: If format is invalid.
+    """
+    raw = data.get("killed_tank_ids")
+    if not isinstance(raw, dict):
+        raise ValueError("killed_tank_ids must be an object")
+    result: dict[str, int] = {}
+    for k, v in raw.items():
+        if not isinstance(v, int):
+            raise ValueError(f"killed_tank_ids values must be int, got {type(v).__name__}")
+        result[k] = v
+    return result
 
 
 def decode_ai_state(data: JSONObject) -> AIStateDict:
@@ -547,10 +603,14 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         patrol_waypoint_index=require_int(data, "patrol_waypoint_index"),
         last_scan_ms=require_int(data, "last_scan_ms"),
         last_shoot_ms=require_int(data, "last_shoot_ms"),
+        last_map_open_ms=require_int(data, "last_map_open_ms"),
         combat_target_id=require_int(data, "combat_target_id"),
         combat_target_x=require_int(data, "combat_target_x"),
         combat_target_y=require_int(data, "combat_target_y"),
         ticks_in_mode=require_int(data, "ticks_in_mode"),
+        killed_tank_ids=_decode_killed_tank_ids(data),
+        last_shot_target_id=require_int(data, "last_shot_target_id"),
+        last_shot_target_name=require_str(data, "last_shot_target_name"),
     )
 
 

@@ -796,20 +796,20 @@ class BrowserSession:
         """
         try:
             cdp.detach()
-        except Exception:
-            pass
+        except (OSError, RuntimeError) as exc:
+            log.debug("CDP detach failed (already closed): %s", exc)
         try:
             page.close()
-        except Exception:
-            pass
+        except (OSError, RuntimeError) as exc:
+            log.debug("Page close failed (already closed): %s", exc)
         try:
             context.close()
-        except Exception:
-            pass
+        except (OSError, RuntimeError) as exc:
+            log.debug("Context close failed (already closed): %s", exc)
         try:
             browser.close()
-        except Exception:
-            pass
+        except (OSError, RuntimeError) as exc:
+            log.debug("Browser close failed (already closed): %s", exc)
 
 
 __all__ = [

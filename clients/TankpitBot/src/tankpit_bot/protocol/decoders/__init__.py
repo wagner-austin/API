@@ -236,22 +236,30 @@ def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
     return None
 
 
-# Protocol types that are known to be tunneled inside 0x2E and have
-# structural validation strong enough to avoid misidentifying container
-# messages. Notably excludes MSG_SYNC (0x3F) which accepts any data
-# length and would swallow container messages like tank_update_compact.
+# Protocol types that are known to be tunneled inside 0x2E envelopes.
+# The first byte of the 0x2E body identifies the inner protocol message.
+# When matched, the body is unwrapped and decoded as that protocol type.
+# Unmatched subtypes fall through to container structure-based identification.
 _TUNNELED_SUBTYPES: frozenset[int] = frozenset(
     {
-        MSG_MOVE_RESPONSE,  # 0x3D — MovementResponse (9 bytes, specific fields)
-        MSG_TANK_STATUS_FULL,  # 0x3E — TankStatus (9+ bytes, specific fields)
-        MSG_TANK_INFO,  # 0x21 — TankInfo (4+ bytes)
-        MSG_TANK_ENTRY,  # 0x28 — TankEntry (11+ bytes)
-        MSG_INVENTORY,  # 0x49 — Inventory
-        MSG_EQUIP_GAIN,  # 0x67 — EquipmentGain
-        MSG_EQUIP_TOGGLE,  # 0x74 — EquipmentToggle
-        MSG_FUEL_GAIN,  # 0x44 — FuelGain
-        MSG_FUEL_DEPOSIT,  # 0x64 — FuelDeposit
-        MSG_VIEWPORT,  # 0x56 — ViewportUpdate
+        # Tank messages
+        MSG_TANK_INFO,  # 0x21 — TankInfo (10+ bytes)
+        MSG_TANK_ENTRY,  # 0x28 — TankEntry (10+ bytes)
+        # Movement messages
+        MSG_MOVE_RESPONSE,  # 0x3D — MovementResponse (11 bytes)
+        MSG_TANK_STATUS_FULL,  # 0x3E — TankStatus (13+ bytes)
+        MSG_SYNC,  # 0x3F — Sync heartbeat
+        MSG_DEACTIVATE,  # 0x41 — Tank deactivation (7 bytes)
+        MSG_FUEL_GAIN,  # 0x44 — FuelGain (3 bytes)
+        MSG_RADAR_RESULT,  # 0x46 — RadarResult (2 bytes)
+        MSG_MOVEMENT,  # 0x47 — Movement (9+ bytes)
+        MSG_INVENTORY,  # 0x49 — Inventory (6 bytes)
+        MSG_SHOOT,  # 0x53 — ShootEvent (12 bytes)
+        MSG_ACTION_DONE,  # 0x54 — ActionDone
+        MSG_VIEWPORT,  # 0x56 — ViewportUpdate (2+ bytes)
+        MSG_FUEL_DEPOSIT,  # 0x64 — FuelDeposit (2 bytes)
+        MSG_EQUIP_GAIN,  # 0x67 — EquipmentGain (6 bytes)
+        MSG_EQUIP_TOGGLE,  # 0x74 — EquipmentToggle (5 bytes)
     }
 )
 

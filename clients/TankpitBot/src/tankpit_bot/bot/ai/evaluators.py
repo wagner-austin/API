@@ -1,8 +1,9 @@
 """Behavior scoring evaluators for the AI system.
 
-Each evaluator is a pure function that takes world state and AI config,
-returning a BehaviorScoreDict. The select_best_behavior function picks
-the highest-scoring behavior each tick.
+Hard priority chain — not a scoring competition:
+1. COLLECT_FUEL — fuel low and containers visible
+2. COLLECT_EQUIPMENT — equipment low and containers visible
+3. HUNT — find and kill enemies
 """
 
 from __future__ import annotations
@@ -10,7 +11,6 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import (
     find_best_fuel,
-    find_nearest_deposit,
     find_nearest_equipment,
     find_nearest_fuel,
 )
@@ -21,6 +21,7 @@ from tankpit_bot.bot.ai.types import (
     EnemyThreatDict,
     make_behavior_score,
 )
+from tankpit_bot.sniffer.world_state import get_inventory_state
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 
 # Rank bonus: lower-rank enemies are easier kills. Max rank is 7.
@@ -51,7 +52,7 @@ def score_hunt(
     """
     config = ai_state["config"]
 
-    if self_state["fuel"] < config["hunt_min_fuel"]:
+    if self_state["fuel"] <= config["hunt_min_fuel"]:
         return make_behavior_score("HUNT", 0, 0, 0, "fuel too low")
 
     in_range = threats_in_range(threats, config["combat_range"])
@@ -74,6 +75,7 @@ def score_hunt(
         target["y"],
         f"enemy {target['name']} dist={target['distance']}"
         f" dmg={target['damage_state']} rank={target['rank']}",
+        target_id=target["tank_id"],
     )
 
 
@@ -86,8 +88,7 @@ def score_collect_fuel(
     """Score the COLLECT_FUEL behavior.
 
     Score increases dramatically when fuel is low. Highest priority
-    when fuel drops below fuel_low_threshold. When terrain is available,
-    only considers reachable fuel containers.
+    when fuel drops below fuel_low_threshold.
 
     Args:
         world: Current world state.
@@ -101,7 +102,7 @@ def score_collect_fuel(
     config = ai_state["config"]
     fuel = self_state["fuel"]
 
-    # Critical: below critical threshold → emergency priority, enable shields
+    # Critical: below critical threshold → emergency priority
     if fuel < config["fuel_critical_threshold"]:
         target = find_best_fuel(world, self_state, terrain)
         if target is None:
@@ -157,8 +158,7 @@ def score_collect_equipment(
     """Score the COLLECT_EQUIPMENT behavior.
 
     Equipment collection is opportunistic — moderate priority when
-    equipment is nearby and fuel is adequate. When terrain is available,
-    only considers reachable equipment containers.
+    equipment is nearby and fuel is adequate.
 
     Args:
         world: Current world state.
@@ -174,6 +174,19 @@ def score_collect_equipment(
     nearest = find_nearest_equipment(world, self_state, terrain)
     if nearest is None:
         return make_behavior_score("COLLECT_EQUIPMENT", 0, 0, 0, "no equipment visible")
+
+    # Don't collect when inventory is full (rank capacity: 20 + rank * 5)
+    inventory = get_inventory_state()
+    rank_capacity = 20 + self_state["rank"] * 5
+    all_full = (
+        inventory["armor_shields"]["count"] >= rank_capacity
+        and inventory["dual_shots"]["count"] >= rank_capacity
+        and inventory["missile_shots"]["count"] >= rank_capacity
+        and inventory["homing_shots"]["count"] >= rank_capacity
+        and inventory["extra_radars"]["count"] >= rank_capacity
+    )
+    if all_full:
+        return make_behavior_score("COLLECT_EQUIPMENT", 0, 0, 0, "inventory full")
 
     # Don't collect equipment when fuel is critical
     if self_state["fuel"] < config["fuel_critical_threshold"]:
@@ -201,119 +214,16 @@ def score_collect_equipment(
     )
 
 
-def score_deposit_fuel(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    ai_state: AIStateDict,
-    terrain: TerrainMapProtocol | None = None,
-) -> BehaviorScoreDict:
-    """Score the DEPOSIT_FUEL behavior.
-
-    Deposit becomes eligible when fuel exceeds fuel_full_threshold.
-    Higher fuel surplus → higher priority. When terrain is available,
-    only considers reachable deposit targets.
-
-    Args:
-        world: Current world state.
-        self_state: Player's own state.
-        ai_state: Current AI state with config.
-        terrain: Optional terrain map for reachability checks.
-
-    Returns:
-        BehaviorScoreDict for DEPOSIT_FUEL behavior.
-    """
-    config = ai_state["config"]
-    fuel = self_state["fuel"]
-
-    if fuel < config["fuel_full_threshold"]:
-        return make_behavior_score("DEPOSIT_FUEL", 0, 0, 0, "not enough fuel")
-
-    nearest = find_nearest_deposit(world, self_state, terrain)
-    if nearest is None:
-        return make_behavior_score("DEPOSIT_FUEL", 0, 0, 0, "no deposit target")
-
-    # Score 600-800 based on fuel surplus
-    surplus = fuel - config["fuel_full_threshold"]
-    score = min(800, 600 + surplus // 2)
-
-    return make_behavior_score(
-        "DEPOSIT_FUEL",
-        score,
-        nearest["x"],
-        nearest["y"],
-        f"fuel={fuel} surplus={surplus}",
-    )
-
-
-def score_patrol(
-    ai_state: AIStateDict,
-) -> BehaviorScoreDict:
-    """Score the PATROL behavior.
-
-    Patrol is the default fallback behavior with low constant score.
-    Follows the waypoint circuit defined in config.
-
-    Args:
-        ai_state: Current AI state with config and waypoint index.
-
-    Returns:
-        BehaviorScoreDict for PATROL behavior.
-    """
-    config = ai_state["config"]
-    waypoints = config["patrol_waypoints"]
-    idx = ai_state["patrol_waypoint_index"] % len(waypoints)
-    wx, wy = waypoints[idx]
-
-    return make_behavior_score("PATROL", 100, wx, wy, f"waypoint {idx}")
-
-
-def score_defend(
-    self_state: SelfStateDict,
-    ai_state: AIStateDict,
-    threats: list[EnemyThreatDict],
-) -> BehaviorScoreDict:
-    """Score the DEFEND behavior.
-
-    Defend activates when enemies are very close and fuel is too low
-    to hunt. It's a reactive survival behavior.
-
-    Args:
-        self_state: Player's own state.
-        ai_state: Current AI state with config.
-        threats: Pre-computed sorted threat list.
-
-    Returns:
-        BehaviorScoreDict for DEFEND behavior.
-    """
-    config = ai_state["config"]
-
-    # Only defend if enemies are within half combat range
-    close_range = config["combat_range"] // 2
-    close_threats = threats_in_range(threats, close_range)
-    if not close_threats:
-        return make_behavior_score("DEFEND", 0, 0, 0, "no close threats")
-
-    target = close_threats[0]
-
-    # Defend is high priority when fuel is low but enemies are close
-    if self_state["fuel"] < config["hunt_min_fuel"]:
-        score = 850
-        reason = f"low fuel defense vs {target['name']}"
-    else:
-        # Moderate priority defense when under attack
-        score = 500
-        reason = f"defensive vs {target['name']} dist={target['distance']}"
-
-    return make_behavior_score("DEFEND", score, target["x"], target["y"], reason)
-
-
 def select_best_behavior(
     world: WorldStateDict,
     self_state: SelfStateDict,
     ai_state: AIStateDict,
     terrain: TerrainMapProtocol | None = None,
 ) -> BehaviorScoreDict:
-    """Run all evaluators and select the highest-scoring behavior.
+    """Hard priority chain: fuel > equipment > hunt.
+
+    Not a scoring competition. Fuel collection wins unconditionally
+    when fuel is low and containers are visible.
 
     Args:
         world: Current world state.
@@ -322,33 +232,35 @@ def select_best_behavior(
         terrain: Optional terrain map for reachability checks.
 
     Returns:
-        BehaviorScoreDict with the highest score.
+        BehaviorScoreDict for the chosen behavior.
     """
+    config = ai_state["config"]
+    fuel = self_state["fuel"]
+
+    # Priority 1: COLLECT_FUEL when fuel is low and containers visible
+    if fuel <= config["fuel_low_threshold"]:
+        fuel_score = score_collect_fuel(world, self_state, ai_state, terrain)
+        if fuel_score["score"] > 0:
+            return fuel_score
+
+    # Priority 2: COLLECT_EQUIPMENT when nearby and inventory has room
+    equip_score = score_collect_equipment(world, self_state, ai_state, terrain)
+    if equip_score["score"] > 0:
+        return equip_score
+
+    # Priority 3: HUNT enemies
     threats = analyze_threats(world, self_state)
+    hunt_score = score_hunt(world, self_state, ai_state, threats)
+    if hunt_score["score"] > 0:
+        return hunt_score
 
-    scores: list[BehaviorScoreDict] = [
-        score_hunt(world, self_state, ai_state, threats),
-        score_collect_fuel(world, self_state, ai_state, terrain),
-        score_collect_equipment(world, self_state, ai_state, terrain),
-        score_deposit_fuel(world, self_state, ai_state, terrain),
-        score_patrol(ai_state),
-        score_defend(self_state, ai_state, threats),
-    ]
-
-    best = scores[0]
-    for candidate in scores[1:]:
-        if candidate["score"] > best["score"]:
-            best = candidate
-
-    return best
+    # Nothing to do — return zero-score HUNT as fallback
+    return make_behavior_score("HUNT", 0, 0, 0, "nothing to do")
 
 
 __all__ = [
     "score_collect_equipment",
     "score_collect_fuel",
-    "score_defend",
-    "score_deposit_fuel",
     "score_hunt",
-    "score_patrol",
     "select_best_behavior",
 ]

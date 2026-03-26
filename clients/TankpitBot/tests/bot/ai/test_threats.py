@@ -218,6 +218,18 @@ class TestAnalyzeThreats:
         assert t["name"] == "enemy-42"
         assert t["is_bot"] is False
 
+    def test_filters_dead_tanks_at_origin(self) -> None:
+        """Dead tanks at (0,0) are excluded from threat analysis."""
+        world = _world(
+            {
+                "10": _tank("10", x=0, y=0, team=1),  # dead tank (corpse at origin)
+                "20": _tank("20", x=110, y=100, team=2),  # alive enemy
+            }
+        )
+        threats = analyze_threats(world, _self_at())
+        assert len(threats) == 1
+        assert threats[0]["tank_id"] == 20
+
     def test_mixed_allies_and_enemies(self) -> None:
         """Only enemy tanks appear in results."""
         world = _world(

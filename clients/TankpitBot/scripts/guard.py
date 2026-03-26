@@ -10,15 +10,15 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
-from scripts import _test_hooks
+from tankpit_bot import _hooks_guard
 
 
 class _RunForProject(Protocol):
     def __call__(self, *, monorepo_root: Path, project_root: Path) -> int: ...
 
 
-def _find_monorepo_root(start: Path) -> Path:
-    """Find the monorepo root by looking for libs directory.
+def _find_monorepo_root_impl(start: Path) -> Path:
+    """Production implementation - find monorepo root by looking for libs dir.
 
     Args:
         start: Starting path to search from.
@@ -31,15 +31,29 @@ def _find_monorepo_root(start: Path) -> Path:
     """
     current = start
     while True:
-        if _test_hooks.is_dir(current / "libs"):
+        if (current / "libs").is_dir():
             return current
         if current.parent == current:
             raise RuntimeError("monorepo root with 'libs' directory not found")
         current = current.parent
 
 
-def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
-    """Load the monorepo guards orchestrator.
+def _find_monorepo_root(start: Path) -> Path:
+    """Find monorepo root, using hook if set.
+
+    Args:
+        start: Starting path to search from.
+
+    Returns:
+        Path to monorepo root.
+    """
+    if _hooks_guard.guard_find_monorepo_root is not None:
+        return _hooks_guard.guard_find_monorepo_root(start)
+    return _find_monorepo_root_impl(start)
+
+
+def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
+    """Production implementation - load orchestrator from libs.
 
     Args:
         monorepo_root: Path to monorepo root.
@@ -54,6 +68,20 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     mod = __import__("monorepo_guards.orchestrator", fromlist=["run_for_project"])
     run_for_project: _RunForProject = mod.run_for_project
     return run_for_project
+
+
+def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
+    """Load orchestrator, using hook if set.
+
+    Args:
+        monorepo_root: Path to monorepo root.
+
+    Returns:
+        The run_for_project function from orchestrator.
+    """
+    if _hooks_guard.guard_load_orchestrator is not None:
+        return _hooks_guard.guard_load_orchestrator(monorepo_root)
+    return _load_orchestrator_impl(monorepo_root)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

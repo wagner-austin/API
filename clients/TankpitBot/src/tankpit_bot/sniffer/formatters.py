@@ -491,7 +491,12 @@ def format_container_details(d: protocol.BinaryMessage) -> str:
         return simple
 
     match d:
-        case {"msg_type": "combat_hit", "direction": int(direction), "attacker_id": int(aid), "combat_data": bytes(cd)}:
+        case {
+            "msg_type": "combat_hit",
+            "direction": int(direction),
+            "attacker_id": int(aid),
+            "combat_data": bytes(cd),
+        }:
             return format_combat_hit(direction, aid, cd)
         case {
             "msg_type": "tank_registry",

@@ -12,13 +12,6 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.bot.ai.loop import ai_tick
-from tankpit_bot.bot.ai.tactics import (
-    compute_desired_equipment,
-    find_teleport_target,
-    should_proactive_radar,
-    should_teleport_search,
-)
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.commands import (
     encode_move_command,
@@ -33,18 +26,13 @@ from tankpit_bot.bot.states import (
     validate_transition,
 )
 from tankpit_bot.bot.types import (
-    BotCommand,
     make_move_command,
     make_pickup_move_command,
     make_teleport_command,
 )
 from tankpit_bot.bot.vision import (
     VisionStateDict,
-    get_merged_fuel,
-    get_merged_fuel_containers,
     make_empty_vision_state,
-    render_vision_ascii,
-    render_vision_debug,
 )
 from tankpit_bot.browser import BrowserSession, get_current_time_ms
 from tankpit_bot.protocol.codec import (
@@ -66,7 +54,7 @@ from tankpit_bot.protocol.commands import (
 )
 from tankpit_bot.sniffer.decoders import process_received_message
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
-from tankpit_bot.sniffer.world_state import get_inventory_state, get_terrain_map, get_world_state
+from tankpit_bot.sniffer.world_state import get_inventory_state, get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -212,9 +200,10 @@ class Bot(BrowserSession):
         """
         super()._on_message_captured(message)
 
-        # Decode received messages to update world state
-        if message["direction"] == "received":
-            process_received_message(message["payload"])
+        # Decode all messages to update world state.
+        # Sent messages include SELECT (*room_id) which sets the terrain map.
+        # Received messages include all protocol data (positions, combat, etc).
+        process_received_message(message["payload"])
 
         # Update state machine based on world state changes
         self._update_state_from_world()
@@ -340,76 +329,6 @@ class Bot(BrowserSession):
         return fuel_containers[0]
 
     # =========================================================================
-    # Vision (Multi-Perspective Tracking)
-    # =========================================================================
-
-    def get_vision_state(self) -> VisionStateDict:
-        """Get current vision state (fallback caches).
-
-        Returns:
-            VisionStateDict with tank registry, position cache, containers.
-        """
-        return self._vision_state
-
-    def get_all_fuel_containers(self) -> list[ContainerStateDict]:
-        """Get fuel containers from both world state and vision cache.
-
-        Merges containers from both sources for more complete coverage.
-        Prefers world state when both have same location.
-
-        Returns:
-            List of fuel containers with volume > 0.
-        """
-        return get_merged_fuel_containers(self._vision_state)
-
-    def get_all_fuel(self) -> int:
-        """Get fuel from world state, falling back to vision cache.
-
-        Uses world state when available, vision cache as fallback.
-
-        Returns:
-            Current fuel amount.
-        """
-        return get_merged_fuel(self._vision_state)
-
-    def render_ascii(self) -> str | None:
-        """Render current world state as ASCII viewport.
-
-        Returns:
-            Multi-line ASCII string showing visible area, or None if
-            terrain map not loaded.
-        """
-        return render_vision_ascii()
-
-    def render_debug(self) -> str:
-        """Render vision debug info.
-
-        Returns:
-            Multi-line debug string with cache stats and comparison.
-        """
-        return render_vision_debug(self._vision_state)
-
-    def get_nearest_all_fuel_container(self) -> ContainerStateDict | None:
-        """Get nearest fuel container using merged sources.
-
-        Uses both world state and vision cache for more complete coverage.
-
-        Returns:
-            Nearest ContainerStateDict, or None if none found.
-        """
-        pos = self.get_position()
-        if pos is None:
-            return None
-
-        fuel_containers = self.get_all_fuel_containers()
-        if not fuel_containers:
-            return None
-
-        my_x, my_y = pos
-        fuel_containers.sort(key=lambda c: abs(c["x"] - my_x) + abs(c["y"] - my_y))
-        return fuel_containers[0]
-
-    # =========================================================================
     # Command Sending
     # =========================================================================
 
@@ -513,9 +432,11 @@ class Bot(BrowserSession):
             y: Target Y coordinate (0-255).
 
         Returns:
-            True if command was sent.
+            True if command was sent, False if CDP unavailable.
         """
-        # Single open, teleport, single close
+        if self._cdp is None:
+            return False
+
         self.open_map()
 
         if self._page is not None:
@@ -659,18 +580,6 @@ class Bot(BrowserSession):
             return False
         return item["count"] > 0 or item["enabled"]
 
-    def enable_homing(self) -> bool:
-        """Enable homing shot equipment (slot 4)."""
-        return self.enable_equipment(4)
-
-    def enable_dual(self) -> bool:
-        """Enable dual shot equipment (slot 2)."""
-        return self.enable_equipment(2)
-
-    def enable_radar_equipment(self) -> bool:
-        """Enable radar equipment (slot 5)."""
-        return self.enable_equipment(5)
-
     def is_equipment_enabled(self, slot: int) -> bool:
         """Check if equipment slot is enabled using server-tracked inventory.
 
@@ -715,56 +624,35 @@ class Bot(BrowserSession):
         return False
 
     def close_map(self) -> bool:
-        """Close the map by simulating 'f' keypress via CDP."""
-        if self._cdp is not None:
-            try:
-                self._cdp.send("Input.dispatchKeyEvent", {
-                    "type": "keyDown", "key": "f", "code": "KeyF", "text": "f",
-                })
-                self._cdp.send("Input.dispatchKeyEvent", {
-                    "type": "keyUp", "key": "f", "code": "KeyF",
-                })
-                log.info("Map: closed via 'f' keypress")
-            except (OSError, RuntimeError) as e:
-                log.warning("close_map keypress failed: %s", e)
+        """Close the map by simulating 'f' keypress via CDP.
+
+        Returns:
+            True if map is closed (or was already closed), False if CDP unavailable.
+        """
+        if not self._map_is_open:
+            return True
+        if self._cdp is None:
+            return False
+        self._cdp.send(
+            "Input.dispatchKeyEvent",
+            {
+                "type": "keyDown",
+                "key": "f",
+                "code": "KeyF",
+                "text": "f",
+            },
+        )
+        self._cdp.send(
+            "Input.dispatchKeyEvent",
+            {
+                "type": "keyUp",
+                "key": "f",
+                "code": "KeyF",
+            },
+        )
+        log.info("Map: closed via 'f' keypress")
         self._map_is_open = False
         return True
-
-    # =========================================================================
-    # High-Level Actions
-    # =========================================================================
-
-    def go_to_nearest_fuel(self) -> bool:
-        """Move to the nearest fuel container.
-
-        Returns:
-            True if movement command was sent, False if no fuel found.
-        """
-        container = self.get_nearest_fuel_container()
-        if container is None:
-            log.info("No fuel containers found")
-            return False
-
-        log.info(
-            "Moving to fuel at (%d, %d) with %d fuel",
-            container["x"],
-            container["y"],
-            container["volume"],
-        )
-        return self.pickup_move_to(container["x"], container["y"])
-
-    def scan_and_collect_fuel(self) -> bool:
-        """Scan for containers and move to nearest fuel.
-
-        Convenience method that scans first if no containers known.
-
-        Returns:
-            True if an action was taken.
-        """
-        if not self.get_fuel_containers():
-            log.info("No fuel containers known, scanning...")
-            return self.use_radar()
-        return self.go_to_nearest_fuel()
 
     # =========================================================================
     # Run Loop
@@ -837,158 +725,10 @@ class Bot(BrowserSession):
                 self._cleanup(cdp, page, context, browser)
 
     def _game_loop(self, page: _test_hooks.PageProtocol) -> None:
-        """Run the game loop (delegated to game_loop module)."""
-        from tankpit_bot.bot.game_loop import run_game_loop
+        """Run the tick loop: sync, decide, execute on each server tick."""
+        from tankpit_bot.bot.tick_loop import run_tick_loop
 
-        run_game_loop(self, page)
-
-    def _ai_tick_once(self) -> None:
-        """Run one AI decision cycle and dispatch the resulting command.
-
-        Gets world state and self state, runs ai_tick to decide the best
-        behavior, manages equipment based on the chosen mode, dispatches
-        the command, and persists updated AI state.
-        """
-        world = self.get_world_state()
-        self_state = world["self_state"]
-
-        # Can't act without self state (not yet positioned in game)
-        if self_state is None:
-            return
-
-        # Each AI tick is a fresh decision — reset to IDLE before dispatching
-        self._state_data = transition_to(self._state_data, "IDLE")
-
-        terrain = get_terrain_map()
-        now = get_current_time_ms()
-        new_ai_state, command, behavior = ai_tick(
-            world,
-            self_state,
-            self._ai_state,
-            now,
-            terrain,
-        )
-
-        config = self._ai_state["config"]
-        fuel = self_state["fuel"]
-        last_scan = self._ai_state["last_scan_ms"]
-
-        # Proactive radar: scan when fuel is getting low and no fuel visible
-        if should_proactive_radar(fuel, world, last_scan, now, config):
-            log.info("AI: proactive radar (fuel=%d, no fuel visible)", fuel)
-            self.enable_equipment(5)
-            self.use_radar()
-            self._ai_state = AIStateDict(**{**new_ai_state, "last_scan_ms": now})
-            return
-
-        # Teleport search: relocate when low on fuel with nothing nearby
-        if should_teleport_search(
-            behavior,
-            fuel,
-            world,
-            last_scan,
-            now,
-            config,
-        ):
-            tx, ty = find_teleport_target(config, self_state)
-            log.info("AI: teleport search to (%d,%d) (fuel=%d)", tx, ty, fuel)
-            teleport_cmd = make_teleport_command(tx, ty)
-            self._apply_equipment(
-                behavior["mode"],
-                fuel,
-                0,
-                is_teleport=True,
-            )
-            self._dispatch_command(teleport_cmd)
-            self._ai_state = new_ai_state
-            return
-
-        log.info(
-            "AI: %s score=%d target=(%d,%d) reason=%s",
-            behavior["mode"],
-            behavior["score"],
-            behavior["target_x"],
-            behavior["target_y"],
-            behavior["reason"],
-        )
-
-        # Equipment management: toggle based on behavior, fuel, and target damage
-        target_damage = 0
-        if behavior["mode"] == "HUNT":
-            target_damage = next(
-                (
-                    t["damage_state"]
-                    for t in world["tanks"].values()
-                    if t["x"] == behavior["target_x"] and t["y"] == behavior["target_y"]
-                ),
-                0,
-            )
-        is_teleport = command["cmd_type"] == "teleport"
-        self._apply_equipment(
-            behavior["mode"],
-            fuel,
-            target_damage,
-            is_teleport=is_teleport,
-        )
-
-        self._dispatch_command(command)
-        self._ai_state = new_ai_state
-
-    def _apply_equipment(
-        self,
-        mode: str,
-        fuel: int,
-        target_damage: int,
-        is_teleport: bool = False,
-    ) -> None:
-        """Apply computed equipment state — enable desired, disable undesired.
-
-        Uses compute_desired_equipment from tactics to determine which slots
-        should be on, then enables/disables accordingly. Only enables
-        equipment if inventory stock is available.
-
-        Args:
-            mode: Current AI behavior mode name.
-            fuel: Current fuel level.
-            target_damage: Damage state of the hunt target (0-3), 0 if not hunting.
-            is_teleport: Whether the current command is a teleport.
-        """
-        critical = self._ai_state["config"]["fuel_critical_threshold"]
-        desired = compute_desired_equipment(
-            mode,
-            fuel,
-            target_damage,
-            critical,
-            is_teleport,
-        )
-
-        # Extra radar: always enable if desired and stocked
-        if 5 in desired and self._has_equipment_stock(5):
-            self.enable_equipment(5)
-
-        # Combat slots (1-4): enable if desired + stocked, disable otherwise
-        for slot in (1, 2, 4):
-            if slot in desired and self._has_equipment_stock(slot):
-                self.enable_equipment(slot)
-            else:
-                self.disable_equipment(slot)
-
-    def _dispatch_command(self, command: BotCommand) -> None:
-        """Dispatch a BotCommand through the appropriate bot action method.
-
-        Args:
-            command: The bot command to execute.
-        """
-        if command["cmd_type"] == "move":
-            self.move_to(command["target_x"], command["target_y"])
-        elif command["cmd_type"] == "pickup_move":
-            self.pickup_move_to(command["target_x"], command["target_y"])
-        elif command["cmd_type"] == "shoot":
-            self.shoot_at(command["target_x"], command["target_y"])
-        elif command["cmd_type"] == "radar":
-            self.use_radar()
-        else:  # teleport
-            self.teleport_to(command["target_x"], command["target_y"])
+        run_tick_loop(self, page)
 
 
 def main() -> None:

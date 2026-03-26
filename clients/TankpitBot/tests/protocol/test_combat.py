@@ -83,27 +83,29 @@ class TestDecodeHitConfirmation:
 class TestDecodeDeactivation:
     """Tests for decode_deactivation function."""
 
-    def test_decodes_with_points(self) -> None:
-        """Decodes deactivation with points field."""
-        # victim=0x0102, killer=0x0304, rank=5, points=0x0607
-        data = bytes([0x02, 0x01, 0x04, 0x03, 5, 0x07, 0x06])
+    def test_decodes_deactivation(self) -> None:
+        """Decodes deactivation with pad-victim-pad-killer layout."""
+        # Layout: [pad:1] [victim_id:2 LE] [pad:1] [killer_id:2 LE]
+        # victim=x16(0x02,0x01)=0x0102, killer=x16(0x04,0x03)=0x0304
+        data = bytes([0x00, 0x02, 0x01, 0x00, 0x04, 0x03])
         result = decode_deactivation(data)
         assert result["msg_type"] == 0x41
         assert result["victim_id"] == 0x0102
         assert result["killer_id"] == 0x0304
-        assert result["rank"] == 5
-        assert result["points"] == 0x0607
-
-    def test_decodes_without_points(self) -> None:
-        """Decodes deactivation without points field."""
-        data = bytes([0x02, 0x01, 0x04, 0x03, 5])
-        result = decode_deactivation(data)
+        assert result["rank"] == 0
         assert result["points"] == 0
 
+    def test_decodes_with_extra_bytes(self) -> None:
+        """Decodes deactivation ignoring trailing bytes."""
+        data = bytes([0x00, 0x02, 0x01, 0x00, 0x04, 0x03, 0xFF, 0xFF])
+        result = decode_deactivation(data)
+        assert result["victim_id"] == 0x0102
+        assert result["killer_id"] == 0x0304
+
     def test_raises_on_short_data(self) -> None:
-        """Raises DecodeError on insufficient data."""
+        """Raises DecodeError on insufficient data (need 6 bytes)."""
         with pytest.raises(DecodeError):
-            decode_deactivation(bytes([1, 2, 3]))
+            decode_deactivation(bytes([1, 2, 3, 4, 5]))
 
 
 class TestDecodeMinePlacement:

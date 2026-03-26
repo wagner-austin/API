@@ -63,6 +63,9 @@ def analyze_threats(
     for tank in world["tanks"].values():
         if not _is_enemy(tank, self_team):
             continue
+        # Skip dead tanks — deactivation sets position to (0, 0)
+        if tank["x"] == 0 and tank["y"] == 0:
+            continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
         threats.append(
             make_enemy_threat(

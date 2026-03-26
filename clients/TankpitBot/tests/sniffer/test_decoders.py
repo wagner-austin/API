@@ -396,18 +396,32 @@ class TestTryDecodeReceived:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
 
-    def test_try_decode_received_binary_message(self) -> None:
-        """Test try_decode_received handles binary messages."""
+    def test_try_decode_received_binary_empty_decoded(self) -> None:
+        """Test try_decode_received returns EMPTY for 1-byte binary body."""
         from tankpit_bot.sniffer import try_decode_received
 
-        # 'G' = Movement, which is binary
+        # 1-byte binary body → xor_decode strips msg_type → empty decoded data
         body = bytes([0x47])
         payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
         result = try_decode_received(payload)
-        # Should return something (SHORT message or decoded)
+        if result is None:
+            raise AssertionError("Expected non-None result")
+        assert "EMPTY" in result
+        assert "0x47" in result
+
+    def test_try_decode_received_binary_multi_byte(self) -> None:
+        """Test try_decode_received decodes multi-byte binary message."""
+        from tankpit_bot.sniffer import try_decode_received
+
+        # 2-byte body: msg_type 0x01 (unknown) + data byte
+        # xor_decode produces 1-byte decoded data, type not in MSG_MIN_LENGTHS
+        body = bytes([0x01, 0xAB])
+        payload = base64.b64encode(len(body).to_bytes(2, "little") + body).decode()
+        result = try_decode_received(payload)
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
+        assert "UNKNOWN 0x01" in result
 
     def test_try_decode_received_short_payload(self) -> None:
         """Test try_decode_received returns None for short payloads."""
@@ -547,3 +561,62 @@ class TestDecodeCommandMovementBranches:
         assert "TELEPORT" in result
         assert "200" in result
         assert "180" in result
+
+
+# =============================================================================
+# Process Received Message Tests
+# =============================================================================
+
+
+class TestProcessReceivedMessage:
+    """Tests for process_received_message internal paths."""
+
+    def test_single_byte_binary_returns_early(self) -> None:
+        """process_received_message handles 1-byte binary body (empty decoded data)."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # Frame: 2-byte LE length (1) + 1-byte binary body (0x01)
+        # xor_decode strips msg_type → empty decoded_data → early return
+        frame = b"\x01\x00\x01"
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should not raise
+
+    def test_unknown_binary_type_logs_fallback(self) -> None:
+        """process_received_message logs fallback for unrecognized binary type."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # Frame: 2-byte LE length (3) + 3-byte body with unknown type 0x01
+        # msg_type 0x01 not in TEXT_MESSAGE_TYPES or MSG_MIN_LENGTHS
+        body = bytes([0x01, 0xAB, 0xCD])
+        frame = len(body).to_bytes(2, "little") + body
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should log fallback, not raise
+
+    def test_decodable_binary_dispatches(self) -> None:
+        """process_received_message decodes and dispatches a valid binary message.
+
+        Uses a 0x3F (Sync) message which has min_len=0 and is fully decodable.
+        """
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # 0x3F body with 2 bytes → decoded_data = 1 byte via xor_decode
+        # MSG_MIN_LENGTHS[0x3F] = 0, so condition passes
+        # try_decode_binary_message returns SyncDict
+        body = bytes([0x3F, 0x00])
+        frame = len(body).to_bytes(2, "little") + body
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should decode, log, and dispatch
+
+    def test_chat_message_decodes_and_dispatches(self) -> None:
+        """process_received_message decodes 0x4D ChatMessage through full path.
+
+        All types in MSG_MIN_LENGTHS have decoders, so decode_message
+        succeeds and the message is dispatched to world state.
+        """
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # 0x4D ('M') has min_len=3, needs 4+ byte body for 3+ decoded bytes
+        body = bytes([0x4D, 0x01, 0x02, 0x03])
+        frame = len(body).to_bytes(2, "little") + body
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should decode, log, and dispatch

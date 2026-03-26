@@ -600,43 +600,48 @@ load_terrain_map: LoadTerrainMapProtocol = _real_load_terrain_map
 
 
 # =============================================================================
-# Game Loop Bot Protocol
+# Tick Loop Bot Protocol
 # =============================================================================
 
 
-class GameLoopBotProtocol(Protocol):
-    """Protocol for the Bot interface required by game_loop.
+class BotProtocol(Protocol):
+    """Interface for bot command dispatch used by executor and world_sync.
 
-    Defines the minimal set of methods that the game loop needs
-    from the Bot class, breaking the circular import between
-    bot.base and bot.game_loop.
+    Defines the minimal set of methods these consumers need from the Bot
+    class.  tick_loop.py uses Bot directly for AI state access.  Tests
+    inject a FakeBot satisfying this protocol instead of mocking.
     """
 
-    def get_position(self) -> tuple[int, int] | None:
-        """Get current tank position.
+    @property
+    def _cdp(self) -> CDPSessionProtocol | None:
+        """CDP session for browser communication.
 
         Returns:
-            Tuple of (x, y) coordinates, or None if not yet tracked.
+            CDP session or None if not connected.
         """
         ...
 
-    def _poll_game_log(self) -> list[dict[str, str]]:
-        """Poll for new game log entries.
-
-        Returns:
-            List of new entries found since last poll.
-        """
-        ...
-
-    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
-        """XOR encode and send command bytes via WebSocket.
+    def move_to(self, x: int, y: int) -> bool:
+        """Send move command.
 
         Args:
-            data: Framed command bytes (with 2-byte length header).
-            cmd_name: Command name for logging.
+            x: Target X coordinate (0-255).
+            y: Target Y coordinate (0-255).
 
         Returns:
-            True if sent, False if CDP session not available.
+            True if command was sent.
+        """
+        ...
+
+    def pickup_move_to(self, x: int, y: int) -> bool:
+        """Send pickup move command.
+
+        Args:
+            x: Target X coordinate (0-255).
+            y: Target Y coordinate (0-255).
+
+        Returns:
+            True if command was sent.
         """
         ...
 
@@ -649,6 +654,68 @@ class GameLoopBotProtocol(Protocol):
 
         Returns:
             True if command was sent.
+        """
+        ...
+
+    def shoot_at(self, x: int, y: int, target_id: int) -> bool:
+        """Send shoot command.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+            target_id: Target entity ID.
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def use_radar(self) -> bool:
+        """Send radar scan command.
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def open_map(self) -> bool:
+        """Send map open command to reveal global enemy positions.
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def enable_equipment(self, slot: int) -> bool:
+        """Enable equipment slot if not already enabled.
+
+        Args:
+            slot: Equipment slot (1-5).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def disable_equipment(self, slot: int) -> bool:
+        """Disable equipment slot if currently enabled.
+
+        Args:
+            slot: Equipment slot (1-5).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def _has_equipment_stock(self, slot: int) -> bool:
+        """Check if equipment slot has remaining stock.
+
+        Args:
+            slot: Equipment slot (1-5).
+
+        Returns:
+            True if equipment is available to use.
         """
         ...
 
@@ -688,13 +755,13 @@ get_sync_playwright: Callable[[], SyncPlaywrightFactoryProtocol] = _real_get_syn
 
 
 __all__ = [
+    "BotProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
     "BrowserTypeLaunchProtocol",
     "BrowserTypeProtocol",
     "CDPSessionProtocol",
     "FindBestStaticByteProtocol",
-    "GameLoopBotProtocol",
     "KeyboardProtocol",
     "LoadTerrainMapProtocol",
     "PageProtocol",

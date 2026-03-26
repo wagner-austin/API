@@ -35,11 +35,13 @@ class ShootCommandDict(TypedDict):
         cmd_type: Command type identifier.
         target_x: Target X coordinate.
         target_y: Target Y coordinate.
+        target_id: Tank ID of the target (0 if no specific target).
     """
 
     cmd_type: Literal["shoot"]
     target_x: int
     target_y: int
+    target_id: int
 
 
 class RadarCommandDict(TypedDict):
@@ -84,17 +86,27 @@ def make_move_command(target_x: int, target_y: int) -> MoveCommandDict:
     return MoveCommandDict(cmd_type="move", target_x=target_x, target_y=target_y)
 
 
-def make_shoot_command(target_x: int, target_y: int) -> ShootCommandDict:
+def make_shoot_command(
+    target_x: int,
+    target_y: int,
+    target_id: int = 0,
+) -> ShootCommandDict:
     """Create a shoot command.
 
     Args:
         target_x: Target X coordinate.
         target_y: Target Y coordinate.
+        target_id: Tank ID of the target (0 if no specific target).
 
     Returns:
         ShootCommandDict with the specified target.
     """
-    return ShootCommandDict(cmd_type="shoot", target_x=target_x, target_y=target_y)
+    return ShootCommandDict(
+        cmd_type="shoot",
+        target_x=target_x,
+        target_y=target_y,
+        target_id=target_id,
+    )
 
 
 def make_radar_command() -> RadarCommandDict:
@@ -117,6 +129,25 @@ def make_pickup_move_command(target_x: int, target_y: int) -> PickupMoveCommandD
         PickupMoveCommandDict with the specified target.
     """
     return PickupMoveCommandDict(cmd_type="pickup_move", target_x=target_x, target_y=target_y)
+
+
+class MapOpenCommandDict(TypedDict):
+    """Map open command parameters (reveals global enemy positions).
+
+    Attributes:
+        cmd_type: Command type identifier.
+    """
+
+    cmd_type: Literal["map_open"]
+
+
+def make_map_open_command() -> MapOpenCommandDict:
+    """Create a map open command.
+
+    Returns:
+        MapOpenCommandDict for opening the map.
+    """
+    return MapOpenCommandDict(cmd_type="map_open")
 
 
 class TeleportCommandDict(TypedDict):
@@ -152,17 +183,20 @@ BotCommand = (
     | ShootCommandDict
     | RadarCommandDict
     | PickupMoveCommandDict
+    | MapOpenCommandDict
     | TeleportCommandDict
 )
 
 
 __all__ = [
     "BotCommand",
+    "MapOpenCommandDict",
     "MoveCommandDict",
     "PickupMoveCommandDict",
     "RadarCommandDict",
     "ShootCommandDict",
     "TeleportCommandDict",
+    "make_map_open_command",
     "make_move_command",
     "make_pickup_move_command",
     "make_radar_command",

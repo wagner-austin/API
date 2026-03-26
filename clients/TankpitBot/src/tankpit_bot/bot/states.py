@@ -198,7 +198,7 @@ VALID_TRANSITIONS: dict[StateName, frozenset[StateName]] = {
     "MOVING": frozenset({"IDLE", "SCANNING", "COLLECTING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),
     "COLLECTING": frozenset({"IDLE", "SCANNING", "MOVING", "COMBAT", "LOW_FUEL", "DISCONNECTED"}),
     "COMBAT": frozenset({"IDLE", "SCANNING", "MOVING", "COLLECTING", "LOW_FUEL", "DISCONNECTED"}),
-    "LOW_FUEL": frozenset({"IDLE", "SCANNING", "MOVING", "COLLECTING", "DISCONNECTED"}),
+    "LOW_FUEL": frozenset({"IDLE", "SCANNING", "MOVING", "COLLECTING", "COMBAT", "DISCONNECTED"}),
     "DISCONNECTED": frozenset({"INITIALIZING"}),
 }
 

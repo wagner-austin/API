@@ -43,14 +43,13 @@ class TestAITick:
         )
         ai_state = make_initial_ai_state()
 
-        new_state, command, behavior = ai_tick(world, self_state, ai_state, 1000)
+        new_state, _command, behavior = ai_tick(world, self_state, ai_state, 1000)
 
         assert new_state["active_mode"] == behavior["mode"]
-        assert command["cmd_type"] == "move"
         assert behavior["score"] >= 0
 
-    def test_patrol_default(self) -> None:
-        """Default behavior is PATROL when nothing is happening."""
+    def test_hunt_fallback_when_nothing_to_do(self) -> None:
+        """Fallback is HUNT with score=0 when nothing is happening."""
         world = _empty_world()
         self_state = make_self_state(
             tank_id=1,
@@ -63,11 +62,11 @@ class TestAITick:
         )
         ai_state = make_initial_ai_state()
 
-        new_state, command, behavior = ai_tick(world, self_state, ai_state, 1000)
+        new_state, _command, behavior = ai_tick(world, self_state, ai_state, 1000)
 
-        assert behavior["mode"] == "PATROL"
-        assert command["cmd_type"] == "move"
-        assert new_state["active_mode"] == "PATROL"
+        assert behavior["mode"] == "HUNT"
+        assert behavior["score"] == 0
+        assert new_state["active_mode"] == "HUNT"
 
     def test_collect_fuel_when_critical(self) -> None:
         """COLLECT_FUEL activates when fuel is critical and container visible."""
@@ -125,8 +124,8 @@ class TestAITick:
         assert behavior["mode"] == "HUNT"
         assert new_state["active_mode"] == "HUNT"
 
-    def test_defend_low_fuel_close_enemy(self) -> None:
-        """DEFEND activates when fuel is low and enemy is very close."""
+    def test_fuel_priority_over_hunt(self) -> None:
+        """COLLECT_FUEL beats HUNT when fuel is low and containers visible."""
         world = _empty_world()
         world["tanks"]["10"] = make_tank_state(
             tank_id=10,
@@ -139,20 +138,27 @@ class TestAITick:
             is_bot=True,
             is_self=False,
         )
+        world["containers"]["110,100"] = make_container_state(
+            x=110,
+            y=100,
+            is_fuel=True,
+            volume=500,
+        )
         self_state = make_self_state(
             tank_id=1,
             x=100,
             y=100,
             team=0,
             rank=4,
-            fuel=100,
+            fuel=300,
             leaderboard_position=1,
         )
         ai_state = make_initial_ai_state()
 
         _, _, behavior = ai_tick(world, self_state, ai_state, 5000)
 
-        assert behavior["mode"] == "DEFEND"
+        # Fuel collection wins over hunt when fuel is low
+        assert behavior["mode"] == "COLLECT_FUEL"
 
     def test_sequential_ticks_accumulate(self) -> None:
         """Multiple ticks accumulate ticks_in_mode."""
@@ -173,28 +179,3 @@ class TestAITick:
         state3, _, _ = ai_tick(world, self_state, state2, 3000)
 
         assert state3["ticks_in_mode"] == 3  # tick1=0→1, tick2=1→2, tick3=2→3
-
-    def test_deposit_when_fuel_full(self) -> None:
-        """DEPOSIT_FUEL activates when fuel exceeds threshold with target."""
-        world = _empty_world()
-        world["containers"]["110,100"] = make_container_state(
-            x=110,
-            y=100,
-            is_fuel=True,
-            volume=50,
-        )
-        self_state = make_self_state(
-            tank_id=1,
-            x=100,
-            y=100,
-            team=0,
-            rank=4,
-            fuel=1500,
-            leaderboard_position=1,
-        )
-        ai_state = make_initial_ai_state()
-
-        _, command, behavior = ai_tick(world, self_state, ai_state, 1000)
-
-        assert behavior["mode"] == "DEPOSIT_FUEL"
-        assert command["cmd_type"] == "pickup_move"

@@ -59,21 +59,78 @@ _terrain_map: _test_hooks.TerrainMapProtocol | None = None
 _room_images: dict[str, str] = {}
 _selected_room: str | None = None
 
-# Combat hit tracking — True when ANY CombatHit from us arrives (= shot connected)
-_got_combat_hit: bool = False
+# Combat hit tracking.
+#
+# CombatHit (0x2E) fires for EVERY shot — hits, misses, corpses, mines.
+# The last byte of combat_data is the WEAPON TYPE:
+#   00=single, 01=dual, 02=missile, 03=homing
+#
+# Hit detection: the game only uses special ammo (dual/missile/homing) when
+# shooting at an actual enemy. If the target position is empty, it falls back
+# to single shot (00) even with dual enabled. So:
+#   weapon_byte > 0 = hit (special ammo used = enemy at target)
+#   weapon_byte == 0 with dual enabled = miss (no enemy at target)
+#
+# The bot always keeps dual shots enabled, so 00 = miss, 01+ = hit.
+_got_confirmed_hit: bool = False
+
+# Kill tracking — tank IDs killed via Deactivation protocol message.
+# Corpses stay at their death position, so the AI must filter by ID not position.
+_killed_tank_ids: set[int] = set()
+
+# Buffered viewport entities — stored from ViewportUpdate (0x5A), processed
+# when MoveResponse (0x3D) provides the absolute self position needed to
+# compute viewport offset. Entity pattern from protocol analysis:
+#   entity_id == -1 (0xFFFF): equipment container
+#   entity_id > 0, not a known tank: fuel container (entity_id ≈ volume)
+#   entity_id > 0, known tank: tank (already tracked)
+_pending_viewport_entities: list[dict[str, int]] = []
 
 
-def mark_combat_hit() -> None:
-    """Called when we receive a CombatHit where we are the attacker."""
-    global _got_combat_hit
-    _got_combat_hit = True
+def mark_combat_hit(weapon_byte: int) -> None:
+    """Called when we receive a CombatHit where we are the attacker.
+
+    The weapon_byte (last byte of combat_data) determines hit vs miss:
+    0 = single shot (miss when dual is enabled), >0 = special ammo used (hit).
+
+    Args:
+        weapon_byte: Last byte of combat_data (weapon type).
+    """
+    global _got_confirmed_hit
+    if weapon_byte > 0:
+        _got_confirmed_hit = True
 
 
 def check_and_clear_combat_hit() -> bool:
-    """Check if we got a CombatHit since last check, then clear."""
-    global _got_combat_hit
-    result = _got_combat_hit
-    _got_combat_hit = False
+    """Check if our shot hit (special ammo was used), then clear.
+
+    Returns:
+        True if shot connected (weapon_byte > 0), False if miss.
+    """
+    global _got_confirmed_hit
+    result = _got_confirmed_hit
+    _got_confirmed_hit = False
+    return result
+
+
+def mark_tank_killed(tank_id: int) -> None:
+    """Record a tank as killed via Deactivation protocol message.
+
+    Args:
+        tank_id: The killed tank's ID.
+    """
+    _killed_tank_ids.add(tank_id)
+
+
+def drain_killed_tank_ids() -> set[int]:
+    """Get and clear all killed tank IDs since last drain.
+
+    Returns:
+        Set of tank IDs that were killed.
+    """
+    global _killed_tank_ids
+    result = _killed_tank_ids
+    _killed_tank_ids = set()
     return result
 
 
@@ -105,11 +162,15 @@ def _make_empty_inventory() -> InventoryState:
 def reset_world_state() -> None:
     """Reset world state for new session (used by tests)."""
     global _world_state, _terrain_map, _room_images, _selected_room, _inventory_state
+    global _got_combat_hit, _killed_tank_ids, _pending_viewport_entities
     _world_state = make_empty_world_state()
     _terrain_map = None
     _room_images = {}
     _selected_room = None
     _inventory_state = _make_empty_inventory()
+    _got_confirmed_hit = False
+    _killed_tank_ids = set()
+    _pending_viewport_entities = []
 
 
 def get_world_state() -> WorldStateDict:
@@ -353,8 +414,8 @@ def _load_terrain_map_if_needed() -> _test_hooks.TerrainMapProtocol | None:
 
     # Fallback: try known GIF paths
     gif_paths = [
-        Path("field42-r.gif"),
         Path("field01_r.gif"),
+        Path("field42-r.gif"),
     ]
     for gif_path in gif_paths:
         if _test_hooks.path_exists(gif_path):
@@ -586,6 +647,12 @@ def update_world_state_from_move_response_full(
         # Update self position
         update_world_state_from_position(x, y)
 
+    # Only process viewport entities for OUR MoveResponse.
+    # ViewportUpdate only arrives when the viewport shifts (self is centered).
+    self_id = _world_state["self_state"]["tank_id"] if _world_state["self_state"] else -1
+    if tank_id == self_id:
+        _process_buffered_viewport_entities(x, y)
+
     # Update the tank in the tank list
     key = str(tank_id)
     existing = _world_state["tanks"].get(key)
@@ -728,39 +795,168 @@ def render_world_state_ascii() -> str | None:
     return render_world_ascii(_world_state, terrain)
 
 
-def _update_viewport_entities(entities: list[dict]) -> None:  # type: ignore[type-arg]
-    """Invalidate tanks that should be in viewport but aren't in entity list.
+def _update_viewport_entities(entities: list[dict[str, int]]) -> None:
+    """Buffer viewport entities for processing when MoveResponse arrives.
 
-    The ViewportUpdate (0x5A) contains all entities currently visible.
-    Any tank we think is in the viewport but isn't in this list has left.
+    ViewportUpdate (0x5A) arrives BEFORE MoveResponse (0x3D). The entities
+    have viewport-relative col/row, but we need the absolute self position
+    from MoveResponse to compute the viewport offset. So we buffer here
+    and process in _process_buffered_viewport_entities.
+
+    Args:
+        entities: List of viewport entity dicts with col, row, entity_id, value, terrain_type.
     """
-    vp = _world_state["viewport"]
-    if vp["left"] == 0 and vp["top"] == 0 and vp["width"] == 18:
-        # Viewport not initialized yet
-        return
+    global _pending_viewport_entities
+    _pending_viewport_entities = entities
 
-    # Collect entity_ids from viewport update
-    visible_ids: set[int] = set()
+
+def _compute_viewport_offset(
+    self_x: int,
+    self_y: int,
+) -> tuple[int, int]:
+    """Compute viewport offset from self position.
+
+    The self tank is roughly centered in the 18x18 viewport.
+
+    Args:
+        self_x: Absolute X position of self tank.
+        self_y: Absolute Y position of self tank.
+
+    Returns:
+        Tuple of (vp_left, vp_top).
+    """
+    return (self_x - 9, self_y - 9)
+
+
+def _add_containers_from_entities(
+    entities: list[dict[str, int]],
+    vp_left: int,
+    vp_top: int,
+) -> None:
+    """Add containers from viewport entities to world state.
+
+    Viewport entity IDs are NOT tank IDs — tanks are tracked separately.
+    entity_id > 0: fuel container (entity_id ≈ volume)
+    entity_id == -1 (0xFFFF): equipment container
+    entity_id == 0: non-container entity (ignored)
+
+    Args:
+        entities: Viewport entity list.
+        vp_left: Viewport left offset.
+        vp_top: Viewport top offset.
+    """
+    global _world_state
+    ts = get_current_time_ms()
+
     for ent in entities:
         eid = ent.get("entity_id", -1)
-        if eid > 0:
+        abs_x = vp_left + ent["col"]
+        abs_y = vp_top + ent["row"]
+
+        if eid == -1:
+            _world_state = update_container_from_radar(
+                _world_state,
+                abs_x,
+                abs_y,
+                -1,
+                ts,
+            )
+        elif eid > 0:
+            _world_state = update_container_from_radar(
+                _world_state,
+                abs_x,
+                abs_y,
+                eid,
+                ts,
+            )
+
+
+def _process_buffered_viewport_entities(self_x: int, self_y: int) -> None:
+    """Process buffered viewport entities using the self position for offset.
+
+    Called from MoveResponse handler after self position is known.
+    Skips processing if self tank is not found in the entity list (cannot
+    verify viewport offset). After adding containers, invalidates tanks
+    within the viewport bounds that are absent from the entity list.
+
+    Args:
+        self_x: Absolute X position of self tank.
+        self_y: Absolute Y position of self tank.
+    """
+    global _pending_viewport_entities, _world_state
+    entities = _pending_viewport_entities
+    _pending_viewport_entities = []
+
+    if not entities:
+        return
+
+    # Verify self is in the entity list before trusting viewport offset
+    self_state = _world_state["self_state"]
+    if self_state is None:
+        return
+    self_tank_id = self_state["tank_id"]
+    self_found = False
+    for ent in entities:
+        if ent.get("entity_id", -1) == self_tank_id:
+            self_found = True
+            break
+    if not self_found:
+        return
+
+    vp_left, vp_top = _compute_viewport_offset(self_x, self_y)
+
+    # Update viewport in world state
+    from tankpit_bot.state.types import ViewportStateDict
+
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=_world_state["terrain"],
+        viewport=ViewportStateDict(left=vp_left, top=vp_top, width=18, height=18),
+        timestamp_ms=_world_state["timestamp_ms"],
+    )
+
+    _add_containers_from_entities(entities, vp_left, vp_top)
+    _invalidate_absent_viewport_tanks(entities, vp_left, vp_top)
+
+
+def _invalidate_absent_viewport_tanks(
+    entities: list[dict[str, int]],
+    vp_left: int,
+    vp_top: int,
+) -> None:
+    """Invalidate tanks within viewport that are absent from the entity list.
+
+    Tanks within the viewport bounds but not present in the viewport entity
+    list have likely moved or been destroyed. Their positions are reset to
+    (0, 0) so the AI does not target stale locations.
+
+    Args:
+        entities: Current viewport entity list.
+        vp_left: Viewport left offset.
+        vp_top: Viewport top offset.
+    """
+    visible_ids: set[int] = set()
+    for ent in entities:
+        eid = ent.get("entity_id", 0)
+        if eid != 0:
             visible_ids.add(eid)
 
-    # Check all tanks — if they claim to be in viewport but aren't visible, invalidate
-    for tank in _world_state["tanks"].values():
-        if tank["is_self"] or tank["x"] == 0 and tank["y"] == 0:
+    vp_right = vp_left + 18
+    vp_bottom = vp_top + 18
+
+    for tank in list(_world_state["tanks"].values()):
+        tid = tank["tank_id"]
+        if tank["is_self"]:
             continue
-        in_vp = (
-            vp["left"] <= tank["x"] < vp["left"] + vp["width"]
-            and vp["top"] <= tank["y"] < vp["top"] + vp["height"]
-        )
-        if in_vp and tank["tank_id"] not in visible_ids:
-            log.info(
-                "VIEWPORT: %s (tank=%d) no longer visible, invalidating",
-                tank["name"],
-                tank["tank_id"],
-            )
-            _update_tank_position(tank["tank_id"], 0, 0)
+        tx, ty = tank["x"], tank["y"]
+        if tx == 0 and ty == 0:
+            continue
+        in_viewport = vp_left <= tx < vp_right and vp_top <= ty < vp_bottom
+        if in_viewport and tid not in visible_ids:
+            _update_tank_position(tid, 0, 0)
 
 
 def _apply_waypoints(start_x: int, start_y: int, waypoints: str) -> tuple[int, int]:
@@ -905,10 +1101,75 @@ def _dispatch_tank_update(decoded: protocol.BinaryMessage) -> bool:
     return False
 
 
+def _handle_waypoint_movement(sx: int, sy: int, wps: list[tuple[int, int]]) -> None:
+    """Handle 0x47 waypoint movement for non-self tanks.
+
+    Resolves the final destination from waypoints and updates the tank
+    that matches the start position.
+
+    Args:
+        sx: Start X coordinate.
+        sy: Start Y coordinate.
+        wps: Waypoints list of (x, y) tuples from protocol decoder.
+    """
+    final_x: int = sx
+    final_y: int = sy
+    if wps:
+        final_x, final_y = wps[0]
+    for tank in _world_state["tanks"].values():
+        if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
+            _update_tank_position(tank["tank_id"], final_x, final_y)
+            break
+
+
+def _dispatch_container_movement(decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch container-decoded movement messages (msg_type="movement").
+
+    Container MovementDict has string waypoints and player_id-based
+    tank identification, unlike protocol MovementDict (0x47) which uses
+    positional tuple waypoints.
+
+    Args:
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True if the message was handled, False otherwise.
+    """
+    match decoded:
+        case {
+            "msg_type": "movement",
+            "start_x": int(sx),
+            "start_y": int(sy),
+            "waypoints": str(wps),
+            "is_self": True,
+        }:
+            fx, fy = _apply_waypoints(sx, sy, wps)
+            update_world_state_from_position(fx, fy)
+            _render_ascii_if_available("SelfMovement")
+            return True
+        case {
+            "msg_type": "movement",
+            "start_x": int(sx),
+            "start_y": int(sy),
+            "player_id": int(pid),
+            "waypoints": str(wps),
+            "is_self": False,
+        }:
+            from tankpit_bot.sniffer.player_tracking import _player_id_mapper
+
+            resolved_tid = _player_id_mapper.get_tank_id(pid)
+            if resolved_tid is not None:
+                fx, fy = _apply_waypoints(sx, sy, wps)
+                _update_tank_position(resolved_tid, fx, fy)
+            return True
+    return False
+
+
 def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
     """Dispatch position and movement messages to update world state.
 
-    Handles position_update, movement waypoints, and MovementResponse (0x3D).
+    Handles position_update, protocol movement (0x47), MovementResponse (0x3D),
+    container movement, and viewport updates (0x5A).
 
     Args:
         decoded: Decoded binary protocol message.
@@ -937,16 +1198,10 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             "start_y": int(sy),
             "waypoints": list(wps),
         }:
-            # 0x47 bytes 0,1 are player_id (not tank_id). Match by start position.
             self_state = _world_state["self_state"]
             is_self = self_state is not None and self_state["x"] == sx and self_state["y"] == sy
             if not is_self:
-                # waypoints[0] is (final_x, final_y) if path was parsed
-                final_x, final_y = wps[0] if wps else (sx, sy)
-                for tank in _world_state["tanks"].values():
-                    if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
-                        _update_tank_position(tank["tank_id"], final_x, final_y)
-                        break
+                _handle_waypoint_movement(sx, sy, wps)
             return True
         case {
             "msg_type": 0x3D,
@@ -964,6 +1219,52 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             "entities": list(entities),
         }:
             _update_viewport_entities(entities)
+            return True
+    return _dispatch_container_movement(decoded)
+
+
+def _dispatch_tank_event(decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch tank lifecycle events (leave, deactivation, damage, update).
+
+    Args:
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True if the message was handled, False otherwise.
+    """
+    match decoded:
+        case {
+            "msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full",
+            "tank_id": int(tid),
+            "status_data": bytes(sd),
+        }:
+            if len(sd) >= 2:
+                _update_tank_position(tid, sd[0], sd[1])
+            return True
+        case {
+            "msg_type": "tank_status_short",
+            "tank_id": int(tid),
+            "damage_state": int(dmg),
+        }:
+            update_world_state_from_tank_damage(tid, dmg)
+            return True
+        case {"msg_type": "tank_leave", "tank_id": int(tid)}:
+            update_world_state_from_tank_exit(tid)
+            return True
+        case {"msg_type": "deactivation_kill", "victim_id": int(vid)}:
+            # Log the raw victim_id and check if it matches any known tank
+            known_tanks = list(_world_state["tanks"].keys())
+            log.info(
+                "DEACTIVATION_KILL: victim_id=%d (0x%04X) known_tanks=%s",
+                vid,
+                vid,
+                known_tanks[:10],
+            )
+            _update_tank_position(vid, 0, 0)
+            mark_tank_killed(vid)
+            return True
+        case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
+            log.info("DEACTIVATION_DEATH: killed by tank=%d", kid)
             return True
     return False
 
@@ -990,10 +1291,19 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
         case {"msg_type": "container_pickup", "x": int(x), "y": int(y)}:
             update_world_state_from_container_pickup(x, y)
             return True
-        case {"msg_type": "combat_hit", "attacker_id": int(aid)}:
+        case {
+            "msg_type": "combat_hit",
+            "attacker_id": int(aid),
+            "direction": int(),
+            "is_outgoing": bool(),
+            "combat_data": bytes(cdata),
+        }:
             self_state = _world_state["self_state"]
+            # Our shot: check weapon byte for hit/miss
             if self_state is not None and aid == self_state["tank_id"]:
-                mark_combat_hit()
+                weapon_byte = cdata[-1] if len(cdata) > 0 else 0
+                log.info("OUR_SHOT: weapon_byte=%d data=%s", weapon_byte, cdata.hex())
+                mark_combat_hit(weapon_byte)
             return True
         case {
             "msg_type": "tank_registry",
@@ -1008,32 +1318,7 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
         }:
             update_world_state_from_tank_registry(tid, name, team_str, rank, is_bot, ty, tvx)
             return True
-        case {
-            "msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full",
-            "tank_id": int(tid),
-            "status_data": bytes(sd),
-        }:
-            if len(sd) >= 2:
-                _update_tank_position(tid, sd[0], sd[1])
-            return True
-        case {
-            "msg_type": "tank_status_short",
-            "tank_id": int(tid),
-            "damage_state": int(dmg),
-        }:
-            update_world_state_from_tank_damage(tid, dmg)
-            return True
-        case {"msg_type": "tank_leave", "tank_id": int(tid)}:
-            update_world_state_from_tank_exit(tid)
-            return True
-        case {"msg_type": "deactivation_kill", "victim_id": int(vid)}:
-            _update_tank_position(vid, 0, 0)
-            log.info("DEACTIVATION_KILL: tank=%d killed, position invalidated", vid)
-            return True
-        case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
-            log.info("DEACTIVATION_DEATH: killed by tank=%d", kid)
-            return True
-    return False
+    return _dispatch_tank_event(decoded)
 
 
 def _parse_world_state_blob(wd: bytes) -> None:

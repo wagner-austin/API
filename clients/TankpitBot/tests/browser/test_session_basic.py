@@ -368,3 +368,61 @@ def test_debug_js_websocket_no_result_dict() -> None:
     cdp = _FakeCDPNoResultDict()
     session._debug_js_websocket(cdp)
     assert len(cdp._sent_methods) == 1
+
+
+class _FakeCDPRaising(FakeCDPSession):
+    """CDP session fake that raises RuntimeError on detach."""
+
+    def detach(self) -> None:
+        """Raise RuntimeError to simulate already-closed session."""
+        msg = "already closed"
+        raise RuntimeError(msg)
+
+
+class _FakePageRaising(FakePage):
+    """Page fake that raises RuntimeError on close."""
+
+    def close(
+        self,
+        *,
+        reason: str | None = None,
+        run_before_unload: bool | None = None,
+    ) -> None:
+        """Raise RuntimeError to simulate already-closed page."""
+        _ = (reason, run_before_unload)
+        msg = "already closed"
+        raise RuntimeError(msg)
+
+
+class _FakeContextRaising(FakeBrowserContext):
+    """Browser context fake that raises RuntimeError on close."""
+
+    def close(self, *, reason: str | None = None) -> None:
+        """Raise RuntimeError to simulate already-closed context."""
+        _ = reason
+        msg = "already closed"
+        raise RuntimeError(msg)
+
+
+class _FakeBrowserRaising(FakeBrowser):
+    """Browser fake that raises RuntimeError on close."""
+
+    def close(self, *, reason: str | None = None) -> None:
+        """Raise RuntimeError to simulate already-closed browser."""
+        _ = reason
+        msg = "already closed"
+        raise RuntimeError(msg)
+
+
+class TestCleanup:
+    """Tests for BrowserSession._cleanup error handling."""
+
+    def test_cleanup_handles_all_errors(self) -> None:
+        """_cleanup catches RuntimeError from all resources without propagating."""
+        session = BrowserSession("https://example.com", headless=True)
+        cdp = _FakeCDPRaising()
+        page = _FakePageRaising(cdp)
+        context = _FakeContextRaising()
+        browser = _FakeBrowserRaising()
+        # Should not raise — all errors caught
+        session._cleanup(cdp, page, context, browser)

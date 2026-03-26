@@ -7,9 +7,8 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONObject
-from scripts import _test_hooks as scripts_test_hooks
 
-from tankpit_bot import _test_hooks
+from tankpit_bot import _hooks_guard, _test_hooks
 
 
 class FakeCDPSessionSimple:
@@ -105,11 +104,11 @@ def _restore_hooks() -> Generator[None, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _restore_scripts_hooks() -> Generator[None, None, None]:
-    """Restore scripts hooks after each test."""
-    original_is_dir = scripts_test_hooks.is_dir
+def _restore_guard_hooks() -> Generator[None, None, None]:
+    """Restore guard hooks after each test."""
     yield
-    scripts_test_hooks.is_dir = original_is_dir
+    _hooks_guard.guard_find_monorepo_root = None
+    _hooks_guard.guard_load_orchestrator = None
 
 
 class FakeEnv:

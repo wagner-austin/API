@@ -17,36 +17,6 @@ from tankpit_bot.decoder import DecodedCommand, DecodedLobbyMessage
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
-class IsDirProtocol(Protocol):
-    """Protocol for checking if a path is a directory."""
-
-    def __call__(self, path: Path) -> bool:
-        """Check if path is a directory.
-
-        Args:
-            path: Path to check.
-
-        Returns:
-            True if path is a directory, False otherwise.
-        """
-        ...
-
-
-def _real_is_dir(path: Path) -> bool:
-    """Real implementation using Path.is_dir().
-
-    Args:
-        path: Path to check.
-
-    Returns:
-        True if path is a directory, False otherwise.
-    """
-    return path.is_dir()
-
-
-is_dir: IsDirProtocol = _real_is_dir
-
-
 class PathExistsProtocol(Protocol):
     """Protocol for checking if a path exists."""
 
@@ -179,14 +149,12 @@ setup_rich_logging: SetupRichLoggingProtocol = _real_setup_rich_logging
 
 
 __all__ = [
-    "IsDirProtocol",
     "LoadAndDecodeSessionFunc",
     "LogLevel",
     "PathExistsProtocol",
     "ReadTextProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
-    "is_dir",
     "load_and_decode_session",
     "path_exists",
     "read_text",

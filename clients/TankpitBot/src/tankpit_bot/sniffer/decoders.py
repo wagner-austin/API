@@ -134,11 +134,9 @@ def _process_single_message(body: bytes) -> None:
     """Process a single logical message (after frame splitting).
 
     Args:
-        body: Message body bytes (without length prefix).
+        body: Non-empty message body bytes (without length prefix).
+            The frame parser guarantees msg_len > 0 before calling.
     """
-    if len(body) == 0:
-        return
-
     msg_type = body[0]
 
     # Text messages — log only
@@ -153,13 +151,14 @@ def _process_single_message(body: bytes) -> None:
     if len(decoded_data) == 0:
         return
 
+    # All types in MSG_MIN_LENGTHS have corresponding decoder implementations,
+    # so decode_message always succeeds for known types with sufficient data.
     min_len = MSG_MIN_LENGTHS.get(msg_type)
     if min_len is not None and len(decoded_data) >= min_len:
-        binary_decoded = protocol.try_decode_binary_message(msg_type, decoded_data)
-        if binary_decoded is not None:
-            log.info("[RECEIVED] %s", format_decoded_message(msg_type, binary_decoded))
-            dispatch_world_state_update(binary_decoded)
-            return
+        binary_decoded = protocol.decode_message(msg_type, decoded_data)
+        log.info("[RECEIVED] %s", format_decoded_message(msg_type, binary_decoded))
+        dispatch_world_state_update(binary_decoded)
+        return
     msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
     log.info(
         "[RECEIVED] type=0x%02X '%s' len=%d",
@@ -197,13 +196,9 @@ def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
             f"SHORT 0x{msg_type:02X} '{msg_char}' need={min_len} got={len(data)} data={hex_preview}"
         )
 
-    # Decode using protocol module - for binary messages only
-    # Text messages are handled separately in decode_text_message
     # All types in MSG_MIN_LENGTHS have corresponding decoder implementations,
-    # so try_decode_binary_message will return a value (not None) for any type
-    # that passes the min_len check above.
-    binary_decoded = protocol.try_decode_binary_message(msg_type, data)
-    assert binary_decoded is not None, f"Missing decoder for type 0x{msg_type:02X}"
+    # so decode_message always succeeds for known types with sufficient data.
+    binary_decoded = protocol.decode_message(msg_type, data)
 
     # Update world state from decoded message
     dispatch_world_state_update(binary_decoded)

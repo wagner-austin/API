@@ -38,6 +38,12 @@ class TestBotStates:
         # INITIALIZING -> WAITING_FOR_POSITION is valid
         assert is_valid_transition("INITIALIZING", "WAITING_FOR_POSITION")
 
+    def test_low_fuel_to_combat_is_valid(self) -> None:
+        """LOW_FUEL -> COMBAT is valid for low-fuel defense scenarios."""
+        from tankpit_bot.bot import is_valid_transition
+
+        assert is_valid_transition("LOW_FUEL", "COMBAT")
+
     def test_is_valid_transition_invalid(self) -> None:
         """Test is_valid_transition returns False for invalid transitions."""
         from tankpit_bot.bot import is_valid_transition

@@ -934,3 +934,936 @@ class TestWorldStateBlobParsing:
 
         state = world_state._world_state
         assert len(state["tanks"]) == 0
+
+
+class TestDispatchEnemyDetection:
+    """Tests for dispatch_world_state_update with EnemyDetection (0x48) messages."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_dispatch_enemy_detection_creates_tank(self) -> None:
+        """Dispatch 0x48 creates enemy tank entry via _update_enemy_from_detection."""
+        from tankpit_bot.protocol import EnemyDetectionDict
+
+        msg = EnemyDetectionDict(
+            msg_type=0x48,
+            tank_id=555,
+            x=120,
+            y=130,
+            rank=3,
+            team=2,
+        )
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        assert "555" in state["tanks"]
+        assert state["tanks"]["555"]["x"] == 120
+        assert state["tanks"]["555"]["y"] == 130
+        assert state["tanks"]["555"]["team"] == 2
+        assert state["tanks"]["555"]["rank"] == 3
+
+    def test_dispatch_enemy_detection_updates_existing_tank(self) -> None:
+        """Dispatch 0x48 updates position of already-registered enemy tank."""
+        from tankpit_bot.protocol import EnemyDetectionDict, TankEntryDict
+
+        # First create a tank with an old position
+        entry = TankEntryDict(msg_type=0x28, tank_id=556, x=50, y=60, name="OldPos")
+        dispatch_world_state_update(entry)
+
+        # Detection updates to new position
+        msg = EnemyDetectionDict(
+            msg_type=0x48,
+            tank_id=556,
+            x=200,
+            y=210,
+            rank=5,
+            team=1,
+        )
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        assert state["tanks"]["556"]["x"] == 200
+        assert state["tanks"]["556"]["y"] == 210
+
+
+class TestDispatchProtocolMovement:
+    """Tests for dispatch with protocol Movement (0x47) and Deactivation (0x41)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_dispatch_movement_with_waypoints_updates_enemy(self) -> None:
+        """Dispatch 0x47 movement with waypoints updates non-self tank position."""
+        from tankpit_bot.protocol import MovementDict, TankEntryDict
+
+        # Register enemy tank at start position
+        entry = TankEntryDict(msg_type=0x28, tank_id=600, x=80, y=90, name="Moving")
+        dispatch_world_state_update(entry)
+
+        # Movement from (80, 90) with waypoints leading to (82, 88)
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=600,
+            start_x=80,
+            start_y=90,
+            direction=1,
+            flag=0,
+            leaderboard_position=10,
+            waypoints=[(82, 88)],
+        )
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        assert state["tanks"]["600"]["x"] == 82
+        assert state["tanks"]["600"]["y"] == 88
+
+    def test_dispatch_movement_no_waypoints_keeps_start(self) -> None:
+        """Dispatch 0x47 movement without waypoints uses start position."""
+        from tankpit_bot.protocol import MovementDict, TankEntryDict
+
+        entry = TankEntryDict(msg_type=0x28, tank_id=601, x=50, y=60, name="Stationary")
+        dispatch_world_state_update(entry)
+
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=601,
+            start_x=50,
+            start_y=60,
+            direction=0,
+            flag=0,
+            leaderboard_position=0,
+            waypoints=[],
+        )
+        dispatch_world_state_update(msg)
+
+        state = world_state._world_state
+        # Position stays at start coords since no waypoints
+        assert state["tanks"]["601"]["x"] == 50
+        assert state["tanks"]["601"]["y"] == 60
+
+    def test_dispatch_movement_skips_self(self) -> None:
+        """Dispatch 0x47 movement does not process self-tank movement."""
+        from tankpit_bot.protocol import MovementDict, MovementResponseDict
+
+        # Create self state at (100, 100)
+        first = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=10,
+            x=100,
+            y=100,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(first)
+
+        # Movement from self's position — should skip _handle_waypoint_movement
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=10,
+            start_x=100,
+            start_y=100,
+            direction=1,
+            flag=0,
+            leaderboard_position=5,
+            waypoints=[(110, 110)],
+        )
+        dispatch_world_state_update(msg)
+
+        # Self position unchanged (0x47 doesn't update self)
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+
+    def test_dispatch_movement_no_matching_tank(self) -> None:
+        """Dispatch 0x47 movement with start position matching no tank."""
+        from tankpit_bot.protocol import MovementDict, TankEntryDict
+
+        # Tank at (50, 60) but movement starts at (200, 200)
+        entry = TankEntryDict(msg_type=0x28, tank_id=610, x=50, y=60, name="Far")
+        dispatch_world_state_update(entry)
+
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=610,
+            start_x=200,
+            start_y=200,
+            direction=0,
+            flag=0,
+            leaderboard_position=0,
+            waypoints=[(205, 205)],
+        )
+        dispatch_world_state_update(msg)
+
+        # Tank position unchanged — start coords didn't match
+        assert world_state._world_state["tanks"]["610"]["x"] == 50
+        assert world_state._world_state["tanks"]["610"]["y"] == 60
+
+    def test_dispatch_deactivate_invalidates_position(self) -> None:
+        """Dispatch 0x41 (Deactivation) invalidates killed tank position."""
+        from tankpit_bot.protocol import DeactivationDict, TankEntryDict
+
+        entry = TankEntryDict(msg_type=0x28, tank_id=700, x=100, y=100, name="Victim")
+        dispatch_world_state_update(entry)
+        assert world_state._world_state["tanks"]["700"]["x"] == 100
+
+        msg = DeactivationDict(
+            msg_type=0x41,
+            victim_id=700,
+            killer_id=1,
+            rank=2,
+            points=100,
+        )
+        dispatch_world_state_update(msg)
+
+        # Position invalidated to (0, 0)
+        assert world_state._world_state["tanks"]["700"]["x"] == 0
+        assert world_state._world_state["tanks"]["700"]["y"] == 0
+
+
+class TestDispatchViewportUpdate:
+    """Tests for dispatch with ViewportUpdate (0x5A)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_dispatch_viewport_update_invalidates_absent_tanks(self) -> None:
+        """Viewport entities + MoveResponse invalidates absent tanks."""
+        from tankpit_bot.protocol import (
+            MovementResponseDict,
+            TankEntryDict,
+            ViewportUpdateDict,
+        )
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        # Create self at (55, 55)
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=900,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Place enemy tank at (58, 58) — inside viewport
+        entry = TankEntryDict(msg_type=0x28, tank_id=800, x=58, y=58, name="Ghost")
+        dispatch_world_state_update(entry)
+        assert world_state._world_state["tanks"]["800"]["x"] == 58
+
+        # Viewport update with only self → buffers entities
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=900,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        # MoveResponse triggers buffered entity processing
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=900,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Tank 800 invalidated — in viewport but not in entity list
+        assert world_state._world_state["tanks"]["800"]["x"] == 0
+        assert world_state._world_state["tanks"]["800"]["y"] == 0
+
+    def test_dispatch_viewport_update_skips_invalid_entity_ids(self) -> None:
+        """Viewport entities with entity_id=0 are ignored (not tanks or containers)."""
+        from tankpit_bot.protocol import (
+            MovementResponseDict,
+            TankEntryDict,
+            ViewportUpdateDict,
+        )
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        # Create self at (55, 55)
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=900,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Place enemy at (58, 58) — inside viewport
+        entry = TankEntryDict(msg_type=0x28, tank_id=815, x=58, y=58, name="Target")
+        dispatch_world_state_update(entry)
+
+        # Viewport update with entity_id=0 (not a tank) + self entity
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=900,
+            value=255,
+            terrain_type=0,
+        )
+        entity_zero = ViewportEntityDict(
+            col=5,
+            row=5,
+            entity_id=0,
+            value=0,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent, entity_zero],
+        )
+        dispatch_world_state_update(msg)
+
+        # MoveResponse triggers processing
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=900,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Tank 815 invalidated — entity_id=0 is not a tank, so 815 not visible
+        assert world_state._world_state["tanks"]["815"]["x"] == 0
+        assert world_state._world_state["tanks"]["815"]["y"] == 0
+
+    def test_dispatch_viewport_update_keeps_visible_tank(self) -> None:
+        """Dispatch 0x5A does not invalidate tanks that appear in entity list."""
+        from tankpit_bot.protocol import TankEntryDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+        from tankpit_bot.state.types import ViewportStateDict
+
+        world_state._world_state["viewport"] = ViewportStateDict(
+            left=50,
+            top=50,
+            width=18,
+            height=18,
+        )
+
+        # Tank 810 in viewport at (55, 55)
+        entry = TankEntryDict(msg_type=0x28, tank_id=810, x=55, y=55, name="Visible")
+        dispatch_world_state_update(entry)
+
+        # Viewport update WITH entity_id=810 → tank stays
+        entity = ViewportEntityDict(col=5, row=5, entity_id=810, value=0, terrain_type=0)
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[entity],
+        )
+        dispatch_world_state_update(msg)
+
+        # Tank position preserved
+        assert world_state._world_state["tanks"]["810"]["x"] == 55
+        assert world_state._world_state["tanks"]["810"]["y"] == 55
+
+    def test_dispatch_viewport_update_skips_self_and_zeroed_tanks(self) -> None:
+        """Dispatch 0x5A skips self tank and already-invalidated (0,0) tanks."""
+        from tankpit_bot.protocol import (
+            MovementResponseDict,
+            TankEntryDict,
+            ViewportUpdateDict,
+        )
+        from tankpit_bot.state.types import ViewportStateDict
+
+        world_state._world_state["viewport"] = ViewportStateDict(
+            left=50,
+            top=50,
+            width=18,
+            height=18,
+        )
+
+        # Create self at (55, 55) — inside viewport
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=820,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Create enemy already at (0, 0) — already invalidated
+        entry = TankEntryDict(msg_type=0x28, tank_id=821, x=0, y=0, name="Zeroed")
+        dispatch_world_state_update(entry)
+
+        # Viewport update with no entities — should skip self and zeroed tank
+        msg = ViewportUpdateDict(msg_type=0x5A, direction=0, flags=0, entities=[])
+        dispatch_world_state_update(msg)
+
+        # Self position preserved (skipped because is_self)
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 55
+
+    def test_dispatch_viewport_update_skips_uninitialized_viewport(self) -> None:
+        """Dispatch 0x5A does nothing when viewport is not initialized."""
+        from tankpit_bot.protocol import TankEntryDict, ViewportUpdateDict
+
+        # Default viewport: left=0, top=0, width=18 → treated as uninitialized
+        entry = TankEntryDict(msg_type=0x28, tank_id=801, x=5, y=5, name="Safe")
+        dispatch_world_state_update(entry)
+
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[],
+        )
+        dispatch_world_state_update(msg)
+
+        # Tank position unchanged — viewport not initialized
+        assert world_state._world_state["tanks"]["801"]["x"] == 5
+        assert world_state._world_state["tanks"]["801"]["y"] == 5
+
+
+class TestViewportContainerExtraction:
+    """Tests for fuel/equipment container extraction from viewport entities."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_fuel_container_from_viewport_entity(self) -> None:
+        """Viewport entity with entity_id > 0 (not tank) adds fuel container."""
+        from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        # Create self at (60, 38) → viewport at (51, 29) if self is at col=9,row=9
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # ViewportUpdate: self at col=9,row=9 + fuel at col=15,row=3 (id=994)
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=1229,
+            value=255,
+            terrain_type=0,
+        )
+        fuel_ent = ViewportEntityDict(
+            col=15,
+            row=3,
+            entity_id=994,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent, fuel_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        # MoveResponse triggers processing
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Fuel container at abs (51+15, 29+3) = (66, 32) with volume ≈ 994
+        assert "66,32" in world_state._world_state["containers"]
+        container = world_state._world_state["containers"]["66,32"]
+        assert container["is_fuel"] is True
+        assert container["volume"] == 994
+
+    def test_equipment_container_from_viewport_entity(self) -> None:
+        """Viewport entity with entity_id=-1 adds equipment container."""
+        from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=1229,
+            value=255,
+            terrain_type=0,
+        )
+        equip_ent = ViewportEntityDict(
+            col=4,
+            row=11,
+            entity_id=-1,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent, equip_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Equipment container at abs (51+4, 29+11) = (55, 40)
+        assert "55,40" in world_state._world_state["containers"]
+        container = world_state._world_state["containers"]["55,40"]
+        assert container["is_fuel"] is False
+
+    def test_no_processing_without_self_in_entities(self) -> None:
+        """Buffered entities are discarded if self tank not found in entity list."""
+        from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Entity with unknown ID — self not found
+        unknown_ent = ViewportEntityDict(
+            col=5,
+            row=5,
+            entity_id=999,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[unknown_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=1229,
+            x=60,
+            y=38,
+            direction=0,
+            rank=1,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # No containers added — couldn't compute viewport offset
+        assert len(world_state._world_state["containers"]) == 0
+
+
+class TestViewportInvalidationEdgeCases:
+    """Tests for viewport entity processing edge cases."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_buffered_entities_discarded_when_self_state_none(self) -> None:
+        """Buffered entities are discarded if self_state is None."""
+        from tankpit_bot.sniffer import world_state as ws_mod
+        from tankpit_bot.sniffer.world_state import (
+            _process_buffered_viewport_entities,
+        )
+
+        # Buffer some entities without setting self_state
+        ws_mod._pending_viewport_entities = [
+            {"col": 5, "row": 5, "entity_id": 100, "value": 255, "terrain_type": 0},
+        ]
+        # self_state is None → function returns early, no crash
+        _process_buffered_viewport_entities(50, 50)
+        # Entities were consumed (cleared)
+        assert ws_mod._pending_viewport_entities == []
+
+    def test_invalidation_skips_already_zeroed_tanks(self) -> None:
+        """Tanks already at (0,0) are not re-invalidated."""
+        from tankpit_bot.protocol import MovementResponseDict, TankEntryDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        # Create self at (55, 55)
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=950,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Place enemy already at (0,0) — already invalidated
+        entry = TankEntryDict(msg_type=0x28, tank_id=951, x=0, y=0, name="Zeroed")
+        dispatch_world_state_update(entry)
+
+        # Viewport update with only self
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=950,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        # Trigger processing
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=950,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Zeroed tank stays at (0,0) — was already invalidated, just skipped
+        assert world_state._world_state["tanks"]["951"]["x"] == 0
+        assert world_state._world_state["tanks"]["951"]["y"] == 0
+
+    def test_invalidation_skips_tanks_outside_viewport(self) -> None:
+        """Tanks outside the viewport bounds are not invalidated."""
+        from tankpit_bot.protocol import MovementResponseDict, TankEntryDict, ViewportUpdateDict
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        # Create self at (55, 55) → viewport is (46, 46) to (64, 64)
+        self_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=960,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(self_msg)
+
+        # Place enemy far away at (200, 200) — outside viewport
+        entry = TankEntryDict(msg_type=0x28, tank_id=961, x=200, y=200, name="FarAway")
+        dispatch_world_state_update(entry)
+
+        # Viewport update with only self
+        self_ent = ViewportEntityDict(
+            col=9,
+            row=9,
+            entity_id=960,
+            value=255,
+            terrain_type=0,
+        )
+        msg = ViewportUpdateDict(
+            msg_type=0x5A,
+            direction=0,
+            flags=0,
+            entities=[self_ent],
+        )
+        dispatch_world_state_update(msg)
+
+        # Trigger processing
+        move_msg = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=960,
+            x=55,
+            y=55,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(move_msg)
+
+        # Far-away tank position preserved — not in viewport bounds
+        assert world_state._world_state["tanks"]["961"]["x"] == 200
+        assert world_state._world_state["tanks"]["961"]["y"] == 200
+
+
+class TestDispatchContainerCombatEvents:
+    """Tests for container combat events: combat_hit, deactivation_kill, deactivation_death."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_dispatch_combat_hit_marks_hit_for_self(self) -> None:
+        """Dispatch combat_hit calls mark_combat_hit when attacker is self."""
+        from tankpit_bot.container import CombatHitDict
+        from tankpit_bot.protocol import MovementResponseDict
+
+        # Set up self with tank_id=10
+        first = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=10,
+            x=100,
+            y=100,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(first)
+
+        # combat_hit where attacker_id matches self
+        msg = CombatHitDict(
+            msg_type="combat_hit",
+            direction=0x09,
+            attacker_id=10,
+            combat_data=b"\x00\x01\x02\x03\x04\x05",
+            is_outgoing=True,
+        )
+        dispatch_world_state_update(msg)
+
+        # Verify mark_combat_hit was called
+        assert world_state.check_and_clear_combat_hit() is True
+
+    def test_dispatch_combat_hit_ignores_other_attacker(self) -> None:
+        """Dispatch combat_hit does not mark hit when attacker is not self."""
+        from tankpit_bot.container import CombatHitDict
+        from tankpit_bot.protocol import MovementResponseDict
+
+        # Set up self with tank_id=10
+        first = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=10,
+            x=100,
+            y=100,
+            direction=0,
+            rank=2,
+            leaderboard_position=5,
+        )
+        dispatch_world_state_update(first)
+
+        # combat_hit from a different tank
+        msg = CombatHitDict(
+            msg_type="combat_hit",
+            direction=0x03,
+            attacker_id=99,
+            combat_data=b"\x00\x01\x02\x03\x04\x05",
+            is_outgoing=False,
+        )
+        dispatch_world_state_update(msg)
+
+        # No hit recorded for self
+        assert world_state.check_and_clear_combat_hit() is False
+
+    def test_dispatch_deactivation_kill_invalidates_victim(self) -> None:
+        """Dispatch deactivation_kill invalidates victim tank position."""
+        from tankpit_bot.container import DeactivationKillDict
+        from tankpit_bot.protocol import TankEntryDict
+
+        entry = TankEntryDict(msg_type=0x28, tank_id=900, x=100, y=100, name="Killed")
+        dispatch_world_state_update(entry)
+
+        msg = DeactivationKillDict(
+            msg_type="deactivation_kill",
+            victim_id=900,
+            killer_id=1,
+        )
+        dispatch_world_state_update(msg)
+
+        assert world_state._world_state["tanks"]["900"]["x"] == 0
+        assert world_state._world_state["tanks"]["900"]["y"] == 0
+
+    def test_dispatch_deactivation_death_is_handled(self) -> None:
+        """Dispatch deactivation_death is handled without error."""
+        from tankpit_bot.container import DeactivationDeathDict
+
+        msg = DeactivationDeathDict(
+            msg_type="deactivation_death",
+            flags=0,
+            killer_id=42,
+            extra_data=b"\x00\x01\x02",
+        )
+        dispatch_world_state_update(msg)  # should not raise
+
+
+class TestCombatHitTracking:
+    """Tests for mark_combat_hit and check_and_clear_combat_hit."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_check_and_clear_returns_false_by_default(self) -> None:
+        """check_and_clear_combat_hit returns False when no hit recorded."""
+        assert world_state.check_and_clear_combat_hit() is False
+
+    def test_mark_and_check_returns_true(self) -> None:
+        """mark_combat_hit sets flag, check_and_clear returns True then False."""
+        world_state.mark_combat_hit(weapon_byte=1)
+        assert world_state.check_and_clear_combat_hit() is True
+        # Second call returns False (cleared)
+        assert world_state.check_and_clear_combat_hit() is False
+
+    def test_mark_with_zero_weapon_byte_is_miss(self) -> None:
+        """mark_combat_hit with weapon_byte=0 does not set hit flag."""
+        world_state.mark_combat_hit(weapon_byte=0)
+        assert world_state.check_and_clear_combat_hit() is False
+
+
+class TestDispatchMoveResponseUpdatesSelf:
+    """Tests for 0x3D move response updating existing self position."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_move_response_for_different_tank_id(self) -> None:
+        """0x3D for a different tank than self skips self position update."""
+        from tankpit_bot.protocol import MovementResponseDict
+
+        # First establish self with tank_id=5
+        first = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=5,
+            x=100,
+            y=100,
+            direction=0,
+            rank=2,
+            leaderboard_position=3,
+        )
+        dispatch_world_state_update(first)
+
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["tank_id"] == 5
+
+        # Second 0x3D with different tank_id=99 — should NOT update self position
+        second = MovementResponseDict(
+            msg_type=0x3D,
+            team=2,
+            tank_id=99,
+            x=200,
+            y=200,
+            direction=0,
+            rank=3,
+            leaderboard_position=10,
+        )
+        dispatch_world_state_update(second)
+
+        # Self position unchanged
+        self_state = world_state._world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should not be None")
+        assert self_state["x"] == 100
+        assert self_state["y"] == 100
+        # But tank 99 should be registered
+        assert "99" in world_state._world_state["tanks"]

@@ -38,7 +38,7 @@ def ai_tick(
         Tuple of (updated AIStateDict, BotCommand to send, chosen BehaviorScoreDict).
     """
     behavior = select_best_behavior(world, self_state, ai_state, terrain)
-    new_state, command = execute_behavior(behavior, ai_state, self_state, timestamp_ms)
+    new_state, command = execute_behavior(behavior, ai_state, self_state, timestamp_ms, terrain)
     return new_state, command, behavior
 
 

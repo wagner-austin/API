@@ -6,10 +6,14 @@ from world state, with optional terrain-aware pathfinding for reachability.
 
 from __future__ import annotations
 
+from platform_core.logging import get_logger
+
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
+
+log = get_logger(__name__)
 
 
 def is_reachable(
@@ -158,19 +162,18 @@ def find_best_fuel(
     for container in world["containers"].values():
         if not container["is_fuel"]:
             continue
-        dist = manhattan_distance(
-            self_state["x"],
-            self_state["y"],
-            container["x"],
-            container["y"],
+        cx, cy = container["x"], container["y"]
+        dist = manhattan_distance(self_state["x"], self_state["y"], cx, cy)
+        passable = terrain.is_passable(cx, cy) if terrain is not None else True
+        reachable = is_reachable(
+            terrain, self_state["x"], self_state["y"], cx, cy,
+        ) if terrain is not None else True
+        log.info(
+            "FUEL_CHECK: (%d,%d) vol=%d dist=%d passable=%s reachable=%s terrain=%s",
+            cx, cy, container["volume"], dist, passable, reachable,
+            terrain is not None,
         )
-        if terrain is not None and not is_reachable(
-            terrain,
-            self_state["x"],
-            self_state["y"],
-            container["x"],
-            container["y"],
-        ):
+        if terrain is not None and not reachable:
             continue
         # Score: volume is more important than proximity
         score = container["volume"] - dist

@@ -39,8 +39,9 @@ def decode_movement(data: bytes) -> MovementDict:
             fy += 1
         elif ch == "e":
             fx += 1
-        elif ch == "w":
+        else:  # ch == "w" (path_str only contains nsew)
             fx -= 1
+    waypoints: list[tuple[int, int]] = [(fx, fy)] if path_str else []
     return MovementDict(
         msg_type=0x47,
         tank_id=x16(data[0], data[1]),
@@ -49,7 +50,7 @@ def decode_movement(data: bytes) -> MovementDict:
         direction=data[4],
         flag=data[5],
         leaderboard_position=x24(data[6], data[7], data[8]),
-        waypoints=[(fx, fy)],
+        waypoints=waypoints,
     )
 
 

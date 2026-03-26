@@ -6,6 +6,8 @@ shoot events, hit confirmations, deactivations, mine placement/detonation.
 
 from __future__ import annotations
 
+from platform_core.logging import get_logger
+
 from tankpit_bot.protocol.helpers import (
     DecodeError,
     require_exact_length,
@@ -20,6 +22,8 @@ from tankpit_bot.protocol.types import (
     MinePlacementDict,
     ShootEventDict,
 )
+
+log = get_logger(__name__)
 
 
 def decode_shoot_event(data: bytes) -> ShootEventDict:
@@ -89,13 +93,14 @@ def decode_deactivation(data: bytes) -> DeactivationDict:
     Raises:
         DecodeError: If decoding fails.
     """
-    require_min_length(data, 5, "Deactivation")
+    require_min_length(data, 6, "Deactivation")
+    # Layout: [pad:1] [victim_id:2 LE] [pad:1] [killer_id:2 LE]
     return DeactivationDict(
         msg_type=0x41,
-        victim_id=x16(data[0], data[1]),
-        killer_id=x16(data[2], data[3]),
-        rank=data[4],
-        points=x16(data[5], data[6]) if len(data) >= 7 else 0,
+        victim_id=x16(data[1], data[2]),
+        killer_id=x16(data[4], data[5]),
+        rank=0,
+        points=0,
     )
 
 

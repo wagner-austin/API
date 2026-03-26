@@ -33,14 +33,11 @@ class TestBehaviorModes:
     """Tests for BEHAVIOR_MODES constant."""
 
     def test_all_modes_present(self) -> None:
-        """All six behavior modes are defined."""
-        assert len(BEHAVIOR_MODES) == 6
+        """All three behavior modes are defined."""
+        assert len(BEHAVIOR_MODES) == 3
         assert "HUNT" in BEHAVIOR_MODES
         assert "COLLECT_FUEL" in BEHAVIOR_MODES
         assert "COLLECT_EQUIPMENT" in BEHAVIOR_MODES
-        assert "DEPOSIT_FUEL" in BEHAVIOR_MODES
-        assert "PATROL" in BEHAVIOR_MODES
-        assert "DEFEND" in BEHAVIOR_MODES
 
 
 # =============================================================================
@@ -179,9 +176,9 @@ class TestAIConfig:
         """Default config has sensible values."""
         config = make_default_ai_config()
         assert config["fuel_critical_threshold"] == 200
-        assert config["fuel_low_threshold"] == 500
+        assert config["fuel_low_threshold"] == 700
         assert config["fuel_full_threshold"] == 1200
-        assert config["hunt_min_fuel"] == 400
+        assert config["hunt_min_fuel"] == 100
         assert config["combat_range"] == 20
         assert config["scan_cooldown_ms"] == 5000
         assert config["shoot_cooldown_ms"] == 2000
@@ -204,6 +201,9 @@ class TestAIConfig:
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "teleport_fuel_cost": 100,
+            "kill_cooldown_ms": 20000,
+            "map_open_cooldown_ms": 5000,
             "patrol_waypoints": "not_a_list",
         }
         with pytest.raises(ValueError, match="must be a list"):
@@ -219,6 +219,9 @@ class TestAIConfig:
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "teleport_fuel_cost": 100,
+            "kill_cooldown_ms": 20000,
+            "map_open_cooldown_ms": 5000,
             "patrol_waypoints": [[1, 2, 3]],
         }
         with pytest.raises(ValueError, match="must be"):
@@ -234,6 +237,9 @@ class TestAIConfig:
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "teleport_fuel_cost": 100,
+            "kill_cooldown_ms": 20000,
+            "map_open_cooldown_ms": 5000,
             "patrol_waypoints": [["a", "b"]],
         }
         with pytest.raises(ValueError, match="must be int"):
@@ -255,16 +261,16 @@ class TestAIState:
     """Tests for AIStateDict factory and encode/decode."""
 
     def test_make_initial_ai_state_defaults(self) -> None:
-        """Initial state uses default config and PATROL mode."""
+        """Initial state uses default config and HUNT mode."""
         state = make_initial_ai_state()
-        assert state["active_mode"] == "PATROL"
+        assert state["active_mode"] == "HUNT"
         assert state["patrol_waypoint_index"] == 0
         assert state["last_scan_ms"] == 0
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
         assert state["ticks_in_mode"] == 0
         assert state["config"]["fuel_critical_threshold"] == 200
-        assert state["config"]["fuel_low_threshold"] == 500
+        assert state["config"]["fuel_low_threshold"] == 700
 
     def test_make_initial_ai_state_custom_config(self) -> None:
         """Initial state accepts custom config."""
@@ -279,6 +285,9 @@ class TestAIState:
             combat_range=config["combat_range"],
             scan_cooldown_ms=config["scan_cooldown_ms"],
             shoot_cooldown_ms=config["shoot_cooldown_ms"],
+            teleport_fuel_cost=config["teleport_fuel_cost"],
+            kill_cooldown_ms=config["kill_cooldown_ms"],
+            map_open_cooldown_ms=config["map_open_cooldown_ms"],
             patrol_waypoints=config["patrol_waypoints"],
         )
         state = make_initial_ai_state(custom)
@@ -296,7 +305,7 @@ class TestAIState:
         """Decode rejects non-dict config."""
         data: JSONObject = {
             "config": "not_a_dict",
-            "active_mode": "PATROL",
+            "active_mode": "HUNT",
             "patrol_waypoint_index": 0,
             "last_scan_ms": 0,
             "last_shoot_ms": 0,
@@ -324,3 +333,62 @@ class TestAIState:
         }
         with pytest.raises(ValueError, match="must be one of"):
             decode_ai_state(data)
+
+    def test_decode_killed_tank_ids_not_dict_raises(self) -> None:
+        """Decode rejects non-dict killed_tank_ids."""
+        config = encode_ai_config(make_default_ai_config())
+        data: JSONObject = {
+            "config": config,
+            "active_mode": "HUNT",
+            "patrol_waypoint_index": 0,
+            "last_scan_ms": 0,
+            "last_shoot_ms": 0,
+            "last_map_open_ms": 0,
+            "combat_target_id": -1,
+            "combat_target_x": 0,
+            "combat_target_y": 0,
+            "ticks_in_mode": 0,
+            "killed_tank_ids": "not_a_dict",
+            "last_shot_target_id": -1,
+            "last_shot_target_name": "",
+        }
+        with pytest.raises(ValueError, match="killed_tank_ids must be an object"):
+            decode_ai_state(data)
+
+    def test_decode_killed_tank_ids_non_int_value_raises(self) -> None:
+        """Decode rejects killed_tank_ids with non-int values."""
+        config = encode_ai_config(make_default_ai_config())
+        data: JSONObject = {
+            "config": config,
+            "active_mode": "HUNT",
+            "patrol_waypoint_index": 0,
+            "last_scan_ms": 0,
+            "last_shoot_ms": 0,
+            "last_map_open_ms": 0,
+            "combat_target_id": -1,
+            "combat_target_x": 0,
+            "combat_target_y": 0,
+            "ticks_in_mode": 0,
+            "killed_tank_ids": {"50": "not_an_int"},
+            "last_shot_target_id": -1,
+            "last_shot_target_name": "",
+        }
+        with pytest.raises(ValueError, match="must be int"):
+            decode_ai_state(data)
+
+    def test_encode_decode_roundtrip_with_killed_tanks(self) -> None:
+        """Encode then decode preserves killed_tank_ids."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        state = AIStateDict(
+            **{
+                **original,
+                "killed_tank_ids": {"50": 10000, "60": 20000},
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "Enemy",
+            }
+        )
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded == state

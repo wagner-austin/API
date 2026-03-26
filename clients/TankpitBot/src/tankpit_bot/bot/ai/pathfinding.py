@@ -14,8 +14,10 @@ from tankpit_bot.bot.ai.types import PathStepDict, make_path_step
 # 4-directional movement: right, down, left, up
 _DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (0, 1), (-1, 0), (0, -1))
 
-# Maximum A* iterations before giving up
-_MAX_ITERATIONS = 10000
+# Maximum A* iterations before giving up.
+# Map is 256x256 = 65536 tiles. Must be large enough to find winding paths
+# through narrow corridors surrounded by water/rocks.
+_MAX_ITERATIONS = 65536
 
 # Game map bounds
 _MAP_MIN = 0

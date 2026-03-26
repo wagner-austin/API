@@ -1,20 +1,9 @@
 """AI behavior system for autonomous tank control.
 
-This package provides a modular AI decision system built on pure functions
-and immutable TypedDicts. The architecture has two layers:
-
-- **Decision layer**: Evaluators score candidate behaviors based on world state.
-- **Execution layer**: Actions translate chosen behaviors into Bot commands.
-
-Submodules:
-- types: Core TypedDicts (AIConfigDict, AIStateDict, BehaviorScoreDict, etc.)
-- threats: Enemy analysis from world state
-- pathfinding: Terrain-aware A* pathfinding
-- equipment: Equipment management decisions
-- evaluators: Behavior scoring functions
-- actions: Behavior execution (Bot command dispatch)
-- tactics: Tactical decisions (radar, teleport search, equipment state)
-- loop: Main AI tick orchestrator
+Hard priority chain — not a scoring competition:
+1. COLLECT_FUEL — fuel low and containers visible
+2. COLLECT_EQUIPMENT — equipment low and containers visible
+3. HUNT — find and kill enemies
 """
 
 from __future__ import annotations
@@ -30,19 +19,14 @@ from tankpit_bot.bot.ai.equipment import (
 from tankpit_bot.bot.ai.evaluators import (
     score_collect_equipment,
     score_collect_fuel,
-    score_defend,
-    score_deposit_fuel,
     score_hunt,
-    score_patrol,
     select_best_behavior,
 )
 from tankpit_bot.bot.ai.loop import ai_tick
 from tankpit_bot.bot.ai.pathfinding import find_path, path_length
 from tankpit_bot.bot.ai.tactics import (
     compute_desired_equipment,
-    find_teleport_target,
     should_proactive_radar,
-    should_teleport_search,
 )
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
@@ -103,7 +87,6 @@ __all__ = [
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_path",
-    "find_teleport_target",
     "is_reachable",
     "make_behavior_score",
     "make_default_ai_config",
@@ -114,12 +97,8 @@ __all__ = [
     "path_length",
     "score_collect_equipment",
     "score_collect_fuel",
-    "score_defend",
-    "score_deposit_fuel",
     "score_hunt",
-    "score_patrol",
     "select_best_behavior",
     "should_proactive_radar",
-    "should_teleport_search",
     "threats_in_range",
 ]

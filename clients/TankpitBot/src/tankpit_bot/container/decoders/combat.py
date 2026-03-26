@@ -5,6 +5,8 @@ This module provides decoders for combat hit and deactivation messages.
 
 from __future__ import annotations
 
+from platform_core.logging import get_logger
+
 from tankpit_bot.container.helpers import (
     extract_uint16_le,
     require_exact_length,
@@ -14,6 +16,8 @@ from tankpit_bot.container.types import (
     DeactivationDeathDict,
     DeactivationKillDict,
 )
+
+log = get_logger(__name__)
 
 
 def is_combat_hit_structure(data: bytes) -> bool:
@@ -97,6 +101,12 @@ def decode_deactivation_kill(data: bytes) -> DeactivationKillDict:
         ContainerDecodeError: If structure validation fails.
     """
     require_exact_length(data, 5, "DeactivationKill")
+
+    log.info(
+        "DEACTIVATION_KILL RAW: hex=%s bytes=[%s]",
+        data.hex(),
+        ", ".join(str(b) for b in data),
+    )
 
     victim_id = extract_uint16_le(data, 1, "DeactivationKill.victim_id")
     killer_id = extract_uint16_le(data, 3, "DeactivationKill.killer_id")

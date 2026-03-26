@@ -187,7 +187,7 @@ class FakeCDPSession:
         """
         _ = params
         self._sent_methods.append(method)
-        return {"result": {"value": "ok"}}
+        return {"result": {"value": ""}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Register event handler."""
