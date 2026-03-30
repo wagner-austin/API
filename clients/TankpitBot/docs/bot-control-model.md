@@ -227,23 +227,26 @@ hierarchical controller.
 
 Current phases:
 
-- `acquiring`
-- `closing`
-- `engaging`
+- `none` (no combat engagement)
+- `acquiring` (opening map to locate target)
+- `closing` (teleporting to target, then verifying firing position)
+- `engaging` (shooting at target)
 
 Main functions:
 
 - `_try_combat(...)`
 - `_combat_open_map(...)`
 - `_combat_teleport(...)`
+- `_combat_close(...)` (verifies cardinal adjacency before shooting; re-teleports if not)
 - `_combat_shoot(...)`
 
 Current broad sequence:
 
 1. open map to refresh enemy positions
 2. teleport near target
-3. shoot
-4. on miss, reopen map and reacquire
+3. verify cardinally adjacent (re-teleport if not)
+4. shoot
+5. on miss, reopen map and reacquire
 
 If teleport finds no passable adjacent landing tile (e.g. enemy is on water with
 all 4 cardinal neighbors impassable), the target is added to
