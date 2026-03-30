@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     EnemyThreatDict,
     make_default_ai_config,
+    make_enemy_threat,
     make_initial_ai_state,
 )
 from tankpit_bot.bot.ai_strategy import (
@@ -1149,6 +1150,31 @@ class TestHelpers:
 
         assert result is None
 
+    def test_waypoint_move_command_rejects_outside_viewport_waypoint(self) -> None:
+        """An explicit off-viewport waypoint is rejected."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _waypoint_move_command(ctx, 105, 105, (109, 100))
+
+        assert result is None
+
+    def test_waypoint_move_command_rejects_recently_failed_waypoint(self) -> None:
+        """A recently failed waypoint is rejected before dispatch."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        mark_move_target_failed(105, 104, 90000)
+        result = _waypoint_move_command(ctx, 107, 107, (105, 104))
+
+        assert result is None
+
     def test_walk_or_teleport_rejects_failed_move_target(self) -> None:
         """_walk_or_teleport returns None for a recently failed move target."""
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
@@ -1194,7 +1220,7 @@ class TestHelpers:
         assert result is None
 
     def test_walk_or_teleport_rejects_enemy_occupied_waypoint(self) -> None:
-        """_walk_or_teleport returns None when A* waypoint is occupied by enemy."""
+        """_walk_or_teleport falls back to teleport when A* waypoint is occupied."""
         from tankpit_bot.bot.ai.pathfinding import find_path_segment_target
 
         # Set up terrain that blocks the direct path at x=101, forcing A*
@@ -1241,7 +1267,9 @@ class TestHelpers:
 
         result = _walk_or_teleport(ctx, 107, 100, pickup=False)
 
-        assert result is None
+        if result is None:
+            raise AssertionError("expected teleport fallback when waypoint is occupied")
+        assert result["cmd_type"] == "teleport"
 
     def test_walk_or_teleport_rejects_occupied_move_without_terrain(self) -> None:
         """_walk_or_teleport rejects occupied target even without terrain map."""
@@ -1805,6 +1833,90 @@ class TestDecideKillCooldown:
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_phase"] == "closing"
 
+    def test_closing_recloses_when_not_cardinally_adjacent(self) -> None:
+        """Closing combat does not shoot when the landed position is diagonal."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        world, self_state = _make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)
+        config = make_default_ai_config()
+        ai_state = AIStateDict(
+            config=config,
+            active_mode="HUNT",
+            patrol_waypoint_index=0,
+            last_scan_ms=99500,
+            last_shoot_ms=0,
+            last_map_open_ms=99500,
+            combat_target_id=50,
+            combat_target_x=101,
+            combat_target_y=100,
+            combat_phase="closing",
+            killed_tank_ids={},
+            blocked_combat_targets={},
+            last_shot_target_id=50,
+            last_shot_target_name="Enemy",
+            equipment_search_failures=0,
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
+
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["behavior"]["reason"] == "teleport Enemy"
+
+    def test_closing_shoots_when_cardinally_adjacent(self) -> None:
+        """Closing combat shoots once the actual landed position is usable."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=101,
+                y=99,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        world, self_state = _make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)
+        config = make_default_ai_config()
+        ai_state = AIStateDict(
+            config=config,
+            active_mode="HUNT",
+            patrol_waypoint_index=0,
+            last_scan_ms=99500,
+            last_shoot_ms=0,
+            last_map_open_ms=99500,
+            combat_target_id=50,
+            combat_target_x=101,
+            combat_target_y=99,
+            combat_phase="closing",
+            killed_tank_ids={},
+            blocked_combat_targets={},
+            last_shot_target_id=-1,
+            last_shot_target_name="",
+            equipment_search_failures=0,
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["updated_ai_state"]["combat_phase"] == "engaging"
+
     def test_expired_kills_removed(self) -> None:
         """Expired kill cooldowns are cleaned up."""
         world, self_state = _make_world(fuel=800)
@@ -1936,7 +2048,7 @@ class TestDecideTeleportToFarTarget:
         assert decision["behavior"]["target_x"] == 119
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
-        assert decision["updated_ai_state"]["combat_phase"] == "engaging"
+        assert decision["updated_ai_state"]["combat_phase"] == "closing"
 
     def test_locked_phase_one_target_uses_passable_adjacent_combat_landing(self) -> None:
         """Combat phase 1 picks a passable adjacent landing tile near the enemy."""
@@ -2287,6 +2399,146 @@ class TestDecideBlockedCombatTargets:
         assert decision["behavior"]["reason"] == "find_enemies"
         blocked = decision["updated_ai_state"]["blocked_combat_targets"]
         assert "50" in blocked
+
+    def test_combat_landing_skips_dynamic_occupiers(self) -> None:
+        """Combat landing avoids adjacent tiles occupied by containers."""
+        containers: dict[str, ContainerStateDict] = {
+            "104,100": _c(104, 100, 0, False),
+        }
+        world, self_state = _make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers=containers,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        target = make_enemy_threat(
+            tank_id=50,
+            x=105,
+            y=100,
+            distance=5,
+            damage_state=0,
+            rank=1,
+            team=2,
+            name="Enemy",
+            is_bot=False,
+            timestamp_ms=100000,
+        )
+
+        landing = _combat_landing_tile(ctx, target)
+
+        assert landing != (104, 100)
+
+    def test_combat_landing_skips_adjacent_enemy_occupier(self) -> None:
+        """Combat landing avoids adjacent tiles occupied by tanks."""
+        tanks: dict[str, TankStateDict] = {
+            "60": TankStateDict(
+                tank_id=60,
+                x=104,
+                y=100,
+                team=2,
+                rank=1,
+                name="Blocker",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = _make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            tanks=tanks,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        target = make_enemy_threat(
+            tank_id=50,
+            x=105,
+            y=100,
+            distance=5,
+            damage_state=0,
+            rank=1,
+            team=2,
+            name="Enemy",
+            is_bot=False,
+            timestamp_ms=100000,
+        )
+
+        landing = _combat_landing_tile(ctx, target)
+
+        assert landing != (104, 100)
+
+    def test_combat_landing_returns_none_when_all_adjacent_tiles_impassable(self) -> None:
+        """Combat landing fails when every adjacent terrain tile is blocked."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap(
+            terrain_data={
+                (106, 100): "W",
+                (104, 100): "W",
+                (105, 101): "W",
+                (105, 99): "W",
+            }
+        )
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        target = make_enemy_threat(
+            tank_id=50,
+            x=105,
+            y=100,
+            distance=5,
+            damage_state=0,
+            rank=1,
+            team=2,
+            name="Enemy",
+            is_bot=False,
+            timestamp_ms=100000,
+        )
+
+        landing = _combat_landing_tile(ctx, target)
+
+        assert landing == (-1, -1)
+
+    def test_combat_landing_returns_none_when_all_candidates_are_occupied(self) -> None:
+        """Combat landing fails when no adjacent candidate tile is usable."""
+        containers: dict[str, ContainerStateDict] = {
+            "106,100": _c(106, 100, 0, False),
+            "104,100": _c(104, 100, 0, False),
+            "105,101": _c(105, 101, 0, False),
+            "105,99": _c(105, 99, 0, False),
+        }
+        world, self_state = _make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers=containers,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        target = make_enemy_threat(
+            tank_id=50,
+            x=105,
+            y=100,
+            distance=5,
+            damage_state=0,
+            rank=1,
+            team=2,
+            name="Enemy",
+            is_bot=False,
+            timestamp_ms=100000,
+        )
+
+        landing = _combat_landing_tile(ctx, target)
+
+        assert landing == (-1, -1)
 
     def test_blocked_target_expires_after_ttl(self) -> None:
         """Blocked combat targets expire after kill_cooldown_ms TTL."""
