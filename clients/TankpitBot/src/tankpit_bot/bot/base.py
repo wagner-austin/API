@@ -20,8 +20,11 @@ from tankpit_bot.bot.commands import (
 )
 from tankpit_bot.bot.states import (
     BotStateDataDict,
+    InFlightActionDict,
     StateName,
+    make_in_flight_action,
     make_initial_state_data,
+    make_no_action,
     transition_to,
     validate_transition,
 )
@@ -47,14 +50,17 @@ from tankpit_bot.protocol.commands import (
     CMD_NEAREST_ENEMY,
     CMD_RADAR,
     COMMAND_PREFIX,
-    TICK_RATE_MS,
     build_query_command,
     build_shoot_command,
     build_toggle_equipment_command,
 )
-from tankpit_bot.sniffer.decoders import process_received_message
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
-from tankpit_bot.sniffer.world_state import get_inventory_state, get_world_state
+from tankpit_bot.sniffer.world_state import (
+    check_and_clear_radar_scan_complete,
+    check_and_clear_teleport_landed,
+    get_inventory_state,
+    get_world_state,
+)
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -118,9 +124,13 @@ class Bot(BrowserSession):
         # XOR encoding table for outgoing commands
         self._xor_table: bytes | None = None
         # Map state
+        # Legacy test/debug field only. The game does not expose a reliable
+        # authoritative map-open flag, so bot behavior must not depend on it.
         self._map_is_open: bool = False
         # Vision state for fallback tracking
         self._vision_state: VisionStateDict = make_empty_vision_state()
+        # CDP message buffer — received payloads for tick loop sync
+        self._cdp_message_buffer: list[str] = []
 
     # =========================================================================
     # State Machine
@@ -146,17 +156,16 @@ class Bot(BrowserSession):
         self,
         new_state: StateName,
         *,
-        target_x: int | None = None,
-        target_y: int | None = None,
-        scan_pending: bool | None = None,
+        in_flight_action: InFlightActionDict | None = None,
     ) -> None:
         """Transition to a new state with validation.
 
         Args:
             new_state: State to transition to.
-            target_x: Optional target X coordinate.
-            target_y: Optional target Y coordinate.
-            scan_pending: Optional scan pending flag.
+            in_flight_action: New action record. Pass
+                make_in_flight_action() for states with an active
+                command, or make_no_action() for IDLE. If None,
+                inherits the current action.
 
         Raises:
             ValueError: If transition is invalid.
@@ -167,10 +176,7 @@ class Bot(BrowserSession):
         self._state_data = transition_to(
             self._state_data,
             new_state,
-            target_x=target_x,
-            target_y=target_y,
-            scan_pending=scan_pending,
-            last_action_ms=get_current_time_ms(),
+            in_flight_action=in_flight_action,
         )
         log.info("State: %s -> %s", current_state, new_state)
 
@@ -190,42 +196,56 @@ class Bot(BrowserSession):
         log.info("Built XOR table for command encoding")
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Handle captured WebSocket message.
+        """Buffer received messages for tick loop sync phase.
 
-        Decodes incoming messages to build world state and updates
-        the state machine. Magic extraction is handled by the base class.
+        Extracts magic key (via base class) and buffers received payloads.
+        The tick loop drains the buffer and decodes in batch.
 
         Args:
             message: The captured message.
         """
         super()._on_message_captured(message)
+        if message["direction"] == "received":
+            self._cdp_message_buffer.append(message["payload"])
+            log.info("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
 
-        # Decode all messages to update world state.
-        # Sent messages include SELECT (*room_id) which sets the terrain map.
-        # Received messages include all protocol data (positions, combat, etc).
-        process_received_message(message["payload"])
+    def _maybe_transition_from_initializing(self, self_state: SelfStateDict | None) -> bool:
+        """Advance startup states when required bootstrap data is available.
 
-        # Update state machine based on world state changes
-        self._update_state_from_world()
+        Args:
+            self_state: Current self tank state, if known.
 
-    def _update_state_from_world(self) -> None:
-        """Update state machine based on current world state."""
+        Returns:
+            True if a transition was applied.
+        """
         current_state = self._state_data["state"]
-        world = self.get_world_state()
-        self_state = world["self_state"]
-
-        # Handle INITIALIZING -> WAITING_FOR_POSITION when magic is received
         if current_state == "INITIALIZING" and self._magic is not None:
             self._transition("WAITING_FOR_POSITION")
-            return
-
-        # Handle WAITING_FOR_POSITION -> IDLE when position is known
+            return True
         if current_state == "WAITING_FOR_POSITION" and self_state is not None:
             self._transition("IDLE")
-            return
+            return True
+        return False
 
-        # Check for LOW_FUEL condition
-        excluded_states = ("LOW_FUEL", "INITIALIZING", "WAITING_FOR_POSITION", "DISCONNECTED")
+    def _maybe_transition_to_low_fuel(self, self_state: SelfStateDict | None) -> bool:
+        """Enter LOW_FUEL when the tracked fuel total is below threshold.
+
+        Args:
+            self_state: Current self tank state, if known.
+
+        Returns:
+            True if a transition was applied.
+        """
+        current_state = self._state_data["state"]
+        excluded_states = (
+            "LOW_FUEL",
+            "INITIALIZING",
+            "WAITING_FOR_POSITION",
+            "DISCONNECTED",
+            "TELEPORTING",
+            "COLLECTING",
+            "SCANNING",
+        )
         is_low_fuel = (
             self_state is not None
             and current_state not in excluded_states
@@ -233,24 +253,115 @@ class Bot(BrowserSession):
         )
         if is_low_fuel:
             self._transition("LOW_FUEL")
-            return
+            return True
+        return False
 
-        # Handle SCANNING -> IDLE when scan completes
-        scan_complete = (
-            current_state == "SCANNING"
-            and self._state_data["scan_pending"]
-            and len(world["containers"]) > 0
-        )
-        if scan_complete:
-            self._transition("IDLE", scan_pending=False)
-            return
+    def _maybe_complete_scan(self, world: WorldStateDict) -> bool:
+        """Finish a pending scan when the server responds.
 
-        # Handle MOVING/COLLECTING completion (reached target)
-        if current_state in ("MOVING", "COLLECTING") and self_state is not None:
-            tx, ty = self._state_data["target_x"], self._state_data["target_y"]
-            if self_state["x"] == tx and self_state["y"] == ty:
-                self._transition("IDLE")
-                return
+        Completion is keyed off the in-flight action record, not the
+        state name. This means a scan completes correctly even if
+        something else moved the state away from SCANNING while the
+        radar was in flight.
+
+        Args:
+            world: Current world state snapshot.
+
+        Returns:
+            True if a transition was applied.
+        """
+        action = self._state_data["in_flight_action"]
+        if action["kind"] != "scan" or action["outcome"] != "pending":
+            return False
+        if not check_and_clear_radar_scan_complete():
+            return False
+        self._transition("IDLE", in_flight_action=make_no_action())
+        return True
+
+    def _maybe_complete_walk(self, self_state: SelfStateDict | None) -> bool:
+        """Finish MOVING once the tank reaches the exact walking target.
+
+        Args:
+            self_state: Current self tank state, if known.
+
+        Returns:
+            True if a transition was applied.
+        """
+        if self._state_data["state"] != "MOVING" or self_state is None:
+            return False
+        action = self._state_data["in_flight_action"]
+        tx, ty = action["target_x"], action["target_y"]
+        if self_state["x"] == tx and self_state["y"] == ty:
+            self._transition("IDLE", in_flight_action=make_no_action())
+            return True
+        return False
+
+    def _maybe_complete_teleport(self, self_state: SelfStateDict | None) -> bool:
+        """Finish TELEPORTING when the server confirms landing.
+
+        Args:
+            self_state: Current self tank state, if known.
+
+        Returns:
+            True if a transition was applied.
+        """
+        if (
+            self._state_data["state"] == "TELEPORTING"
+            and self_state is not None
+            and check_and_clear_teleport_landed()
+        ):
+            self._transition("IDLE", in_flight_action=make_no_action())
+            return True
+        return False
+
+    def _maybe_complete_collection(
+        self,
+        world: WorldStateDict,
+        self_state: SelfStateDict | None,
+    ) -> bool:
+        """Finish COLLECTING when the pickup target is reached or removed.
+
+        Args:
+            world: Current world state snapshot.
+            self_state: Current self tank state, if known.
+
+        Returns:
+            True if a transition was applied.
+        """
+        if self._state_data["state"] != "COLLECTING" or self_state is None:
+            return False
+        action = self._state_data["in_flight_action"]
+        tx, ty = action["target_x"], action["target_y"]
+        target_key = f"{tx},{ty}"
+        if (self_state["x"] == tx and self_state["y"] == ty) or target_key not in world[
+            "containers"
+        ]:
+            self._transition("IDLE", in_flight_action=make_no_action())
+            return True
+        return False
+
+    def _update_state_from_world(self) -> None:
+        """Update state machine based on current world state.
+
+        Order matters: in-flight action completions (teleport, walk,
+        collection, scan) are checked BEFORE low-fuel transitions.
+        Otherwise LOW_FUEL would stomp TELEPORTING/COLLECTING states
+        and cause repeated command spam.
+        """
+        world = self.get_world_state()
+        self_state = world["self_state"]
+
+        if self._maybe_transition_from_initializing(self_state):
+            return
+        if self._maybe_complete_teleport(self_state):
+            return
+        if self._maybe_complete_walk(self_state):
+            return
+        if self._maybe_complete_scan(world):
+            return
+        if self._maybe_complete_collection(world, self_state):
+            return
+        self._maybe_transition_to_low_fuel(self_state)
 
     # =========================================================================
     # State Access
@@ -403,7 +514,11 @@ class Bot(BrowserSession):
         cmd = make_move_command(x, y)
         if not self._send_bytes(encode_move_command(cmd), "move"):
             return False
-        self._transition("MOVING", target_x=x, target_y=y)
+        now = get_current_time_ms()
+        self._transition(
+            "MOVING",
+            in_flight_action=make_in_flight_action("move", x, y, now),
+        )
         return True
 
     def pickup_move_to(self, x: int, y: int) -> bool:
@@ -419,13 +534,15 @@ class Bot(BrowserSession):
         cmd = make_pickup_move_command(x, y)
         if not self._send_bytes(encode_pickup_move_command(cmd), "pickup_move"):
             return False
-        self._transition("COLLECTING", target_x=x, target_y=y)
+        now = get_current_time_ms()
+        self._transition(
+            "COLLECTING",
+            in_flight_action=make_in_flight_action("collect", x, y, now),
+        )
         return True
 
     def teleport_to(self, x: int, y: int) -> bool:
-        """Send teleport command and transition to MOVING state.
-
-        Opens map if needed, sends teleport, closes map.
+        """Send teleport command only. Map must already be open.
 
         Args:
             x: Target X coordinate (0-255).
@@ -437,24 +554,21 @@ class Bot(BrowserSession):
         if self._cdp is None:
             return False
 
-        self.open_map()
-
-        if self._page is not None:
-            self._page.wait_for_timeout(TICK_RATE_MS)
-
         cmd = make_teleport_command(x, y)
         self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
-
-        if self._page is not None:
-            self._page.wait_for_timeout(TICK_RATE_MS)
-
-        # Map auto-closes when server sends TeleportLanded response
-        self._map_is_open = False
-        self._transition("MOVING", target_x=x, target_y=y)
+        now = get_current_time_ms()
+        self._transition(
+            "TELEPORTING",
+            in_flight_action=make_in_flight_action("teleport", x, y, now),
+        )
         return True
 
     def shoot_at(self, x: int, y: int, target_id: int = 0) -> bool:
-        """Send shoot command and transition to COMBAT state.
+        """Send shoot command and record the action.
+
+        Every shot records a "shoot" action regardless of whether
+        the bot is already in COMBAT state. This keeps the
+        in_flight_action authoritative across consecutive shots.
 
         Args:
             x: Target X coordinate.
@@ -462,13 +576,21 @@ class Bot(BrowserSession):
             target_id: Target entity ID (0 if no specific target).
 
         Returns:
-            True if command was sent.
+            True if command was sent, False if CDP unavailable.
         """
         encoded = build_shoot_command(x, y, target_id)
         if not self._send_bytes(encoded, f"shoot({x},{y},id={target_id})"):
             return False
+        now = get_current_time_ms()
+        action = make_in_flight_action("shoot", x, y, now)
         if self.get_state() != "COMBAT":
-            self._transition("COMBAT")
+            self._transition("COMBAT", in_flight_action=action)
+        else:
+            self._state_data = transition_to(
+                self._state_data,
+                "COMBAT",
+                in_flight_action=action,
+            )
         return True
 
     def use_radar(self) -> bool:
@@ -480,7 +602,11 @@ class Bot(BrowserSession):
         encoded = build_query_command(CMD_RADAR)
         if not self._send_bytes(encoded, "radar"):
             return False
-        self._transition("SCANNING", scan_pending=True)
+        now = get_current_time_ms()
+        self._transition(
+            "SCANNING",
+            in_flight_action=make_in_flight_action("scan", 0, 0, now),
+        )
         return True
 
     def request_nearest_enemy(self) -> bool:
@@ -610,49 +736,44 @@ class Bot(BrowserSession):
     # =========================================================================
 
     def open_map(self) -> bool:
-        """Open the map view (skips if already open).
+        """Send the map-open toggle and record the action.
+
+        The game does not expose a reliable "map is open" flag. This method
+        therefore always sends the toggle when called and records a "map_open"
+        action for tick-loop timing/sync purposes. Callers must not treat local
+        state as authoritative UI truth.
 
         Returns:
-            True if command was sent or map already open.
+            True if the command was sent.
         """
-        if self._map_is_open:
-            return True
         encoded = build_query_command(CMD_MAP_OPEN)
         if self._send_bytes(encoded, "map_open"):
-            self._map_is_open = True
+            now = get_current_time_ms()
+            action = make_in_flight_action("map_open", 0, 0, now)
+            self._state_data = transition_to(
+                self._state_data,
+                self._state_data["state"],
+                in_flight_action=action,
+            )
             return True
         return False
 
     def close_map(self) -> bool:
-        """Close the map by simulating 'f' keypress via CDP.
+        """Send the map toggle once.
+
+        This helper remains available for explicit/manual use, but normal AI
+        flow should not depend on tracked map-open state. The game uses the
+        same protocol command as a toggle, and teleports close the map
+        automatically.
 
         Returns:
-            True if map is closed (or was already closed), False if CDP unavailable.
+            True if the toggle command was sent, False if CDP unavailable.
         """
-        if not self._map_is_open:
+        encoded = build_query_command(CMD_MAP_OPEN)
+        if self._send_bytes(encoded, "map_close"):
+            log.info("Map: closed via protocol toggle")
             return True
-        if self._cdp is None:
-            return False
-        self._cdp.send(
-            "Input.dispatchKeyEvent",
-            {
-                "type": "keyDown",
-                "key": "f",
-                "code": "KeyF",
-                "text": "f",
-            },
-        )
-        self._cdp.send(
-            "Input.dispatchKeyEvent",
-            {
-                "type": "keyUp",
-                "key": "f",
-                "code": "KeyF",
-            },
-        )
-        log.info("Map: closed via 'f' keypress")
-        self._map_is_open = False
-        return True
+        return False
 
     # =========================================================================
     # Run Loop
@@ -680,6 +801,7 @@ class Bot(BrowserSession):
         self._state_data = make_initial_state_data()
         self._ai_state = make_initial_ai_state()
         self._vision_state = make_empty_vision_state()
+        self._cdp_message_buffer = []
 
         with _test_hooks.sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=self._headless)
