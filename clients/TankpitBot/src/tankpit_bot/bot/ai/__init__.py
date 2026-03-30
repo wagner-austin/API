@@ -1,14 +1,12 @@
-"""AI behavior system for autonomous tank control.
+"""Shared AI support modules for the canonical tick-loop strategy.
 
-Hard priority chain — not a scoring competition:
-1. COLLECT_FUEL — fuel low and containers visible
-2. COLLECT_EQUIPMENT — equipment low and containers visible
-3. HUNT — find and kill enemies
+This package exposes reusable planning primitives such as pathfinding,
+threat analysis, equipment selection, and strongly typed AI data shapes.
+The live planner is ``tankpit_bot.bot.ai_strategy.decide``.
 """
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.actions import execute_behavior
 from tankpit_bot.bot.ai.equipment import (
     find_best_fuel,
     find_nearest_deposit,
@@ -16,13 +14,6 @@ from tankpit_bot.bot.ai.equipment import (
     find_nearest_fuel,
     is_reachable,
 )
-from tankpit_bot.bot.ai.evaluators import (
-    score_collect_equipment,
-    score_collect_fuel,
-    score_hunt,
-    select_best_behavior,
-)
-from tankpit_bot.bot.ai.loop import ai_tick
 from tankpit_bot.bot.ai.pathfinding import find_path, path_length
 from tankpit_bot.bot.ai.tactics import (
     compute_desired_equipment,
@@ -67,7 +58,6 @@ __all__ = [
     "BehaviorScoreDict",
     "EnemyThreatDict",
     "PathStepDict",
-    "ai_tick",
     "analyze_threats",
     "compute_desired_equipment",
     "decode_ai_config",
@@ -80,7 +70,6 @@ __all__ = [
     "encode_behavior_score",
     "encode_enemy_threat",
     "encode_path_step",
-    "execute_behavior",
     "find_best_fuel",
     "find_closest_threat",
     "find_nearest_deposit",
@@ -95,10 +84,6 @@ __all__ = [
     "make_path_step",
     "manhattan_distance",
     "path_length",
-    "score_collect_equipment",
-    "score_collect_fuel",
-    "score_hunt",
-    "select_best_behavior",
     "should_proactive_radar",
     "threats_in_range",
 ]
