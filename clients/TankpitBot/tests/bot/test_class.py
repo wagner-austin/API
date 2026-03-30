@@ -16,7 +16,6 @@ class TestBotClass:
         assert bot.get_state() == "INITIALIZING"
         assert bot._cdp is None
         assert bot._page is None
-        assert bot._map_is_open is False
 
     def test_bot_get_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_state returns current state name."""
@@ -33,9 +32,8 @@ class TestBotClass:
         bot = Bot("https://test.tankpit.com/", headless=True)
         state_data = bot.get_state_data()
         assert state_data["state"] == "INITIALIZING"
-        assert state_data["target_x"] == 0
-        assert state_data["target_y"] == 0
         assert state_data["fuel_threshold"] == 200
+        assert state_data["in_flight_action"]["kind"] == "none"
 
     def test_bot_get_world_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_world_state returns world state from module."""
@@ -197,12 +195,12 @@ class TestBotCommandsWithoutCDP:
         assert result is False
 
     def test_close_map_returns_true_when_already_closed(self, fake_env: FakeEnv) -> None:
-        """Test Bot.close_map returns True when map already closed."""
+        """Test Bot.close_map returns False without CDP."""
         from tankpit_bot.bot import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.close_map()
-        assert result is True
+        assert result is False
 
 
 class TestBotEquipmentState:
@@ -215,11 +213,9 @@ class TestBotEquipmentState:
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
-        # Default inventory has enabled=True, but count=0 doesn't matter for enabled check
-        # Actually default inventory has enabled=True so let's reset properly
-        # The inventory starts with enabled=True in _make_empty_inventory
+        # Default inventory starts with enabled=False for all slots
         for slot in range(1, 6):
-            assert bot.is_equipment_enabled(slot) is True
+            assert bot.is_equipment_enabled(slot) is False
 
     def test_is_equipment_enabled_invalid_slot(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled returns False for invalid slot."""
@@ -247,33 +243,36 @@ class TestBotEquipmentState:
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_inventory_from_toggle,
+        )
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
-        # Default inventory has enabled=True
+        # Set slot 1 to enabled via protocol
+        update_inventory_from_toggle([True, False, False, False, False])
         result = bot.enable_equipment(1)
         assert result is True
 
 
 class TestBotMapState:
-    """Tests for Bot map open/close state tracking."""
+    """Tests for Bot map toggle helpers."""
 
-    def test_open_map_when_already_open(self, fake_env: FakeEnv) -> None:
-        """Test Bot.open_map returns True when map already open."""
+    def test_open_map_ignores_legacy_map_flag_without_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.open_map does not trust the legacy local map flag."""
         from tankpit_bot.bot import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._map_is_open = True
         result = bot.open_map()
-        assert result is True
+        assert result is False
 
     def test_close_map_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.close_map returns False when map open but no CDP."""
+        """Test Bot.close_map returns False without CDP even if flag says open."""
         from tankpit_bot.bot import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._map_is_open = True
         result = bot.close_map()
-        # close_map returns False when CDP unavailable and map is open
         assert result is False
