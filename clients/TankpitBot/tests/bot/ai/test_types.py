@@ -175,14 +175,22 @@ class TestAIConfig:
     def test_make_default_ai_config(self) -> None:
         """Default config has sensible values."""
         config = make_default_ai_config()
-        assert config["fuel_critical_threshold"] == 200
-        assert config["fuel_low_threshold"] == 700
+        assert config["fuel_critical_threshold"] == 400
+        assert config["fuel_low_threshold"] == 500
         assert config["fuel_full_threshold"] == 1200
         assert config["hunt_min_fuel"] == 100
         assert config["combat_range"] == 20
         assert config["scan_cooldown_ms"] == 5000
         assert config["shoot_cooldown_ms"] == 2000
+        assert config["shot_feedback_timeout_ms"] == 4000
+        assert config["action_stall_timeout_ms"] == 10000
         assert len(config["patrol_waypoints"]) == 4
+        assert config["dual_break_threshold"] == 12
+        assert config["dual_resume_threshold"] == 20
+        assert config["radar_break_threshold"] == 8
+        assert config["radar_resume_threshold"] == 12
+        assert config["equip_search_hop_distance"] == 15
+        assert config["equip_search_max_failures"] == 3
 
     def test_encode_decode_roundtrip(self) -> None:
         """Encode then decode produces identical AIConfigDict."""
@@ -194,16 +202,24 @@ class TestAIConfig:
     def test_decode_invalid_waypoints_not_list_raises(self) -> None:
         """Decode rejects non-list patrol_waypoints."""
         data: JSONObject = {
-            "fuel_critical_threshold": 200,
+            "fuel_critical_threshold": 400,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "shot_feedback_timeout_ms": 4000,
+            "action_stall_timeout_ms": 10000,
             "teleport_fuel_cost": 100,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "dual_break_threshold": 12,
+            "dual_resume_threshold": 20,
+            "radar_break_threshold": 8,
+            "radar_resume_threshold": 12,
+            "equip_search_hop_distance": 15,
+            "equip_search_max_failures": 3,
             "patrol_waypoints": "not_a_list",
         }
         with pytest.raises(ValueError, match="must be a list"):
@@ -212,16 +228,24 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_format_raises(self) -> None:
         """Decode rejects waypoints that are not [x, y] pairs."""
         data: JSONObject = {
-            "fuel_critical_threshold": 200,
+            "fuel_critical_threshold": 400,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "shot_feedback_timeout_ms": 4000,
+            "action_stall_timeout_ms": 10000,
             "teleport_fuel_cost": 100,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "dual_break_threshold": 12,
+            "dual_resume_threshold": 20,
+            "radar_break_threshold": 8,
+            "radar_resume_threshold": 12,
+            "equip_search_hop_distance": 15,
+            "equip_search_max_failures": 3,
             "patrol_waypoints": [[1, 2, 3]],
         }
         with pytest.raises(ValueError, match="must be"):
@@ -230,16 +254,24 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_type_raises(self) -> None:
         """Decode rejects waypoints with non-int coordinates."""
         data: JSONObject = {
-            "fuel_critical_threshold": 200,
+            "fuel_critical_threshold": 400,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
             "shoot_cooldown_ms": 2000,
+            "shot_feedback_timeout_ms": 4000,
+            "action_stall_timeout_ms": 10000,
             "teleport_fuel_cost": 100,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
+            "dual_break_threshold": 12,
+            "dual_resume_threshold": 20,
+            "radar_break_threshold": 8,
+            "radar_resume_threshold": 12,
+            "equip_search_hop_distance": 15,
+            "equip_search_max_failures": 3,
             "patrol_waypoints": [["a", "b"]],
         }
         with pytest.raises(ValueError, match="must be int"):
@@ -265,12 +297,12 @@ class TestAIState:
         state = make_initial_ai_state()
         assert state["active_mode"] == "HUNT"
         assert state["patrol_waypoint_index"] == 0
-        assert state["last_scan_ms"] == 0
+        assert state["last_scan_ms"] == 1
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
-        assert state["ticks_in_mode"] == 0
-        assert state["config"]["fuel_critical_threshold"] == 200
-        assert state["config"]["fuel_low_threshold"] == 700
+        assert state["combat_phase"] == "none"
+        assert state["config"]["fuel_critical_threshold"] == 400
+        assert state["config"]["fuel_low_threshold"] == 500
 
     def test_make_initial_ai_state_custom_config(self) -> None:
         """Initial state accepts custom config."""
@@ -285,9 +317,17 @@ class TestAIState:
             combat_range=config["combat_range"],
             scan_cooldown_ms=config["scan_cooldown_ms"],
             shoot_cooldown_ms=config["shoot_cooldown_ms"],
+            shot_feedback_timeout_ms=config["shot_feedback_timeout_ms"],
+            action_stall_timeout_ms=config["action_stall_timeout_ms"],
             teleport_fuel_cost=config["teleport_fuel_cost"],
             kill_cooldown_ms=config["kill_cooldown_ms"],
             map_open_cooldown_ms=config["map_open_cooldown_ms"],
+            dual_break_threshold=config["dual_break_threshold"],
+            dual_resume_threshold=config["dual_resume_threshold"],
+            radar_break_threshold=config["radar_break_threshold"],
+            radar_resume_threshold=config["radar_resume_threshold"],
+            equip_search_hop_distance=config["equip_search_hop_distance"],
+            equip_search_max_failures=config["equip_search_max_failures"],
             patrol_waypoints=config["patrol_waypoints"],
         )
         state = make_initial_ai_state(custom)
@@ -312,7 +352,8 @@ class TestAIState:
             "combat_target_id": -1,
             "combat_target_x": 0,
             "combat_target_y": 0,
-            "ticks_in_mode": 0,
+            "combat_phase": "none",
+            "equipment_search_failures": 0,
         }
         with pytest.raises(ValueError, match="config must be an object"):
             decode_ai_state(data)
@@ -329,7 +370,31 @@ class TestAIState:
             "combat_target_id": -1,
             "combat_target_x": 0,
             "combat_target_y": 0,
-            "ticks_in_mode": 0,
+            "combat_phase": "none",
+            "equipment_search_failures": 0,
+        }
+        with pytest.raises(ValueError, match="must be one of"):
+            decode_ai_state(data)
+
+    def test_decode_invalid_combat_phase_raises(self) -> None:
+        """Decode rejects invalid combat_phase value."""
+        config = encode_ai_config(make_default_ai_config())
+        data: JSONObject = {
+            "config": config,
+            "active_mode": "HUNT",
+            "patrol_waypoint_index": 0,
+            "last_scan_ms": 0,
+            "last_shoot_ms": 0,
+            "last_map_open_ms": 0,
+            "combat_target_id": -1,
+            "combat_target_x": 0,
+            "combat_target_y": 0,
+            "combat_phase": "INVALID_PHASE",
+            "killed_tank_ids": {},
+            "blocked_combat_targets": {},
+            "last_shot_target_id": -1,
+            "last_shot_target_name": "",
+            "equipment_search_failures": 0,
         }
         with pytest.raises(ValueError, match="must be one of"):
             decode_ai_state(data)
@@ -347,10 +412,12 @@ class TestAIState:
             "combat_target_id": -1,
             "combat_target_x": 0,
             "combat_target_y": 0,
-            "ticks_in_mode": 0,
+            "combat_phase": "none",
             "killed_tank_ids": "not_a_dict",
+            "blocked_combat_targets": {},
             "last_shot_target_id": -1,
             "last_shot_target_name": "",
+            "equipment_search_failures": 0,
         }
         with pytest.raises(ValueError, match="killed_tank_ids must be an object"):
             decode_ai_state(data)
@@ -368,10 +435,12 @@ class TestAIState:
             "combat_target_id": -1,
             "combat_target_x": 0,
             "combat_target_y": 0,
-            "ticks_in_mode": 0,
+            "combat_phase": "none",
             "killed_tank_ids": {"50": "not_an_int"},
+            "blocked_combat_targets": {},
             "last_shot_target_id": -1,
             "last_shot_target_name": "",
+            "equipment_search_failures": 0,
         }
         with pytest.raises(ValueError, match="must be int"):
             decode_ai_state(data)
