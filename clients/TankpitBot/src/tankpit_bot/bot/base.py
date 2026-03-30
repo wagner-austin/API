@@ -60,6 +60,7 @@ from tankpit_bot.sniffer.world_state import (
     check_and_clear_teleport_landed,
     get_inventory_state,
     get_world_state,
+    mark_move_target_failed,
 )
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -310,6 +311,18 @@ class Bot(BrowserSession):
             and self_state is not None
             and check_and_clear_teleport_landed()
         ):
+            action = self._state_data["in_flight_action"]
+            tx, ty = action["target_x"], action["target_y"]
+            if self_state["x"] != tx or self_state["y"] != ty:
+                now = get_current_time_ms()
+                mark_move_target_failed(tx, ty, now)
+                log.info(
+                    "SYNC: teleport requested (%d,%d) but landed at (%d,%d); marked failed target",
+                    tx,
+                    ty,
+                    self_state["x"],
+                    self_state["y"],
+                )
             self._transition("IDLE", in_flight_action=make_no_action())
             return True
         return False
