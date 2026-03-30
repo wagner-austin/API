@@ -180,6 +180,32 @@ class TestBotWithCDP:
         assert result is True
         assert bot.get_state() == "TELEPORTING"
 
+    def test_teleport_to_clears_stale_landed_flag(self, fake_env: FakeEnv) -> None:
+        """A new teleport drains any stale TeleportLanded ack before sending."""
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.sniffer.world_state import (
+            check_and_clear_teleport_landed,
+            mark_teleport_landed,
+            reset_world_state,
+            update_world_state_from_position,
+        )
+        from tests.fakes import FakeCDPSession, FakePage
+
+        reset_world_state()
+        update_world_state_from_position(50, 50)
+        mark_teleport_landed()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._page = FakePage(fake_cdp)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "IDLE"
+
+        result = bot.teleport_to(200, 200)
+
+        assert result is True
+        assert check_and_clear_teleport_landed() is False
+
     def test_shoot_at_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at succeeds with CDP session."""
         from tankpit_bot.bot import Bot
@@ -287,6 +313,24 @@ class TestBotWithCDP:
         # Remove CDP to make _send_bytes fail
         bot._cdp = None
         result = bot.teleport_to(100, 100)
+        assert result is False
+
+    def test_teleport_fails_when_send_bytes_returns_false(self, fake_env: FakeEnv) -> None:
+        """Test teleport_to returns False when command dispatch itself fails."""
+        from tankpit_bot.bot import Bot
+        from tests.fakes import FakeCDPSession, FakePage
+
+        class FailingTeleportBot(Bot):
+            def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+                return False
+
+        bot = FailingTeleportBot("https://test.tankpit.com/", headless=True)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._page = FakePage(fake_cdp)
+
+        result = bot.teleport_to(100, 100)
+
         assert result is False
 
 
