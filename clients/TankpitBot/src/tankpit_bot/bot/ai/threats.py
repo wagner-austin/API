@@ -78,6 +78,7 @@ def analyze_threats(
                 team=tank["team"],
                 name=tank["name"],
                 is_bot=tank["is_bot"],
+                timestamp_ms=tank["timestamp_ms"],
             )
         )
 
@@ -85,19 +86,20 @@ def analyze_threats(
     return threats
 
 
-def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int]:
-    """Sort key for threats: distance ascending, then damage descending.
+def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int]:
+    """Sort key: distance ascending, damage descending, freshness descending.
 
     Closer threats come first. Among threats at equal distance,
-    more damaged enemies come first (easier to finish off).
+    more damaged enemies come first (easier to finish off). Among
+    equal distance and damage, prefer recently confirmed tanks.
 
     Args:
         threat: Enemy threat to compute sort key for.
 
     Returns:
-        Tuple of (distance, -damage_state) for sorting.
+        Tuple of (distance, -damage_state, -timestamp_ms) for sorting.
     """
-    return (threat["distance"], -threat["damage_state"])
+    return (threat["distance"], -threat["damage_state"], -threat["timestamp_ms"])
 
 
 def find_closest_threat(
