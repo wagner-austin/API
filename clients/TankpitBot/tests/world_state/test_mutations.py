@@ -14,6 +14,7 @@ from tankpit_bot.state import (
     add_mine,
     add_mine_from_radar,
     coord_key,
+    make_container_state,
     make_empty_world_state,
     pickup_container,
     remove_container,
@@ -288,6 +289,33 @@ class TestUpdateContainerFromRadar:
 
         # Empty fuel containers are skipped, not added
         assert "50,75" not in updated["containers"]
+
+    def test_removes_existing_fuel_container_when_radar_reports_empty(self) -> None:
+        """Radar volume=0 clears an already-known fuel container."""
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=50, y=75, volume=500, timestamp_ms=500)
+
+        updated = update_container_from_radar(state, x=50, y=75, volume=0, timestamp_ms=1000)
+
+        assert "50,75" not in updated["containers"]
+
+    def test_preserves_failed_pickups_when_refreshing_existing_container(self) -> None:
+        """Refreshing a known container keeps failed pickup memory intact."""
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=100, y=150, volume=500, timestamp_ms=500)
+        container = state["containers"]["100,150"]
+        state["containers"]["100,150"] = make_container_state(
+            x=container["x"],
+            y=container["y"],
+            is_fuel=container["is_fuel"],
+            volume=container["volume"],
+            timestamp_ms=container["timestamp_ms"],
+            failed_pickups=2,
+        )
+
+        updated = update_container_from_radar(state, x=100, y=150, volume=500, timestamp_ms=1000)
+
+        assert updated["containers"]["100,150"]["failed_pickups"] == 2
 
 
 class TestRemoveContainer:
