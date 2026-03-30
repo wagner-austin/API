@@ -37,7 +37,7 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
+        viewport=ViewportStateDict(left=x - 9, top=y - 9, width=18, height=18),
         timestamp_ms=0,
     )
     state = make_self_state(
@@ -267,6 +267,15 @@ class TestFindNearestFuel:
         )
         world["containers"]["103,100"] = farther
         assert find_nearest_fuel(world, state) == farther
+
+    def test_uses_viewport_bounds_not_distance_from_self(self) -> None:
+        """Visible containers at the far viewport edge are still eligible."""
+        world, state = _world_and_self(x=91, y=100)
+        world["viewport"] = ViewportStateDict(left=90, top=91, width=18, height=18)
+        expected = make_container_state(x=107, y=100, is_fuel=True, volume=300)
+        world["containers"]["107,100"] = expected
+
+        assert find_nearest_fuel(world, state) == expected
 
     def test_skips_stale_containers(self) -> None:
         """find_nearest_fuel skips containers older than freshness TTL."""
