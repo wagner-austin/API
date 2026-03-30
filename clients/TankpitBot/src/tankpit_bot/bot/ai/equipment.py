@@ -68,21 +68,23 @@ def describe_container_search(
             continue
         nearby += 1
         dist = manhattan_distance(sx, sy, cx, cy)
-        reason = "actionable"
-        is_actionable = True
-        if want_fuel and container["volume"] < minimum_volume:
-            low_volume += 1
-            reason = "low_volume"
-            is_actionable = False
-        elif terrain is not None and not is_reachable(terrain, sx, sy, cx, cy):
+        reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
+            _describe_candidate_reason(
+                container,
+                sx,
+                sy,
+                terrain,
+                want_fuel=want_fuel,
+                allow_unreachable=allow_unreachable,
+                minimum_volume=minimum_volume,
+            )
+        )
+        if is_blocked:
             blocked += 1
-            if not allow_unreachable:
-                reason = "blocked_walk"
-                is_actionable = False
-            elif find_teleport_landing_tile(terrain, sx, sy, cx, cy) is None:
-                no_landing += 1
-                reason = "blocked_no_landing"
-                is_actionable = False
+        if missing_landing:
+            no_landing += 1
+        if low_volume_target:
+            low_volume += 1
         if is_actionable:
             actionable += 1
         if dist < nearest_dist:
@@ -381,6 +383,37 @@ def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
     """
     age = now_ms - container["timestamp_ms"]
     return age > _CONTAINER_FRESHNESS_TTL_MS
+
+
+def _describe_candidate_reason(
+    container: ContainerStateDict,
+    start_x: int,
+    start_y: int,
+    terrain: TerrainMapProtocol | None,
+    *,
+    want_fuel: bool,
+    allow_unreachable: bool,
+    minimum_volume: int,
+) -> tuple[str, bool, bool, bool, bool]:
+    """Describe whether a visible candidate is actionable for diagnostics."""
+    if container["failed_pickups"] > 0:
+        return ("failed_pickup", False, False, False, False)
+    if want_fuel and container["volume"] < minimum_volume:
+        return ("low_volume", False, False, False, True)
+    if terrain is None or is_reachable(terrain, start_x, start_y, container["x"], container["y"]):
+        return ("actionable", True, False, False, False)
+    if not allow_unreachable:
+        return ("blocked_walk", False, True, False, False)
+    landing = find_teleport_landing_tile(
+        terrain,
+        start_x,
+        start_y,
+        container["x"],
+        container["y"],
+    )
+    if landing is None:
+        return ("blocked_no_landing", False, True, True, False)
+    return ("actionable", True, True, False, False)
 
 
 def _is_visible_candidate(
