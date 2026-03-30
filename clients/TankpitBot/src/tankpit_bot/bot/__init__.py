@@ -4,19 +4,14 @@ This module provides the Bot class and supporting types for building
 automated TankPit players with AI-driven autonomous control.
 
 Submodules:
-- ai: AI behavior system (evaluators, actions, pathfinding, threats)
+- ai: Shared AI support modules (pathfinding, equipment, threats, types)
 - base: Bot class extending WebSocketSniffer with AI game loop
 - commands: Command encoding utilities
 - states: State machine enum and transition logic
 - types: Bot-specific TypedDicts for commands
 """
 
-from tankpit_bot.bot.ai import (
-    ai_tick,
-    make_default_ai_config,
-    make_initial_ai_state,
-    select_best_behavior,
-)
+from tankpit_bot.bot.ai import make_default_ai_config, make_initial_ai_state
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.base import Bot, BotError, ProtocolNotDiscoveredError, main
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -29,14 +24,22 @@ from tankpit_bot.bot.commands import (
 )
 from tankpit_bot.bot.executor import apply_equipment, dispatch_command, execute
 from tankpit_bot.bot.states import (
+    ACTION_KINDS,
+    ACTION_OUTCOMES,
     VALID_TRANSITIONS,
+    ActionKind,
+    ActionOutcome,
     BotState,
     BotStateDataDict,
+    InFlightActionDict,
     StateName,
+    decode_in_flight_action,
+    encode_in_flight_action,
     is_valid_transition,
+    make_in_flight_action,
     make_initial_state_data,
+    make_no_action,
     set_fuel_threshold,
-    set_target,
     transition_to,
     validate_transition,
 )
@@ -92,10 +95,14 @@ from tankpit_bot.bot.vision import (
     update_self_fuel_vision,
     update_tank_position,
 )
-from tankpit_bot.bot.world_sync import drain_js_messages, install_ws_hook
+from tankpit_bot.bot.world_sync import drain_messages
 
 __all__ = [
+    "ACTION_KINDS",
+    "ACTION_OUTCOMES",
     "VALID_TRANSITIONS",
+    "ActionKind",
+    "ActionOutcome",
     "Bot",
     "BotCommand",
     "BotError",
@@ -103,6 +110,7 @@ __all__ = [
     "BotStateDataDict",
     "CombatFeedback",
     "ContainerEntryDict",
+    "InFlightActionDict",
     "MapOpenCommandDict",
     "MoveCommandDict",
     "PickupMoveCommandDict",
@@ -117,17 +125,18 @@ __all__ = [
     "VisionStateDict",
     "add_fuel_delta",
     "add_tank_to_registry",
-    "ai_tick",
     "apply_equipment",
     "decide",
     "decode_container_entry",
+    "decode_in_flight_action",
     "decode_position_entry",
     "decode_tank_registry_entry",
     "decode_tick_decision",
     "decode_vision_state",
     "dispatch_command",
-    "drain_js_messages",
+    "drain_messages",
     "encode_container_entry",
+    "encode_in_flight_action",
     "encode_move_command",
     "encode_pickup_move_command",
     "encode_position_entry",
@@ -140,16 +149,17 @@ __all__ = [
     "execute",
     "get_merged_fuel",
     "get_merged_fuel_containers",
-    "install_ws_hook",
     "is_valid_transition",
     "main",
     "make_container_entry",
     "make_default_ai_config",
     "make_empty_vision_state",
+    "make_in_flight_action",
     "make_initial_ai_state",
     "make_initial_state_data",
     "make_map_open_command",
     "make_move_command",
+    "make_no_action",
     "make_pickup_move_command",
     "make_position_entry",
     "make_radar_command",
@@ -162,10 +172,8 @@ __all__ = [
     "render_vision_ascii",
     "render_vision_debug",
     "run_tick_loop",
-    "select_best_behavior",
     "set_fuel_threshold",
     "set_self_tank_id",
-    "set_target",
     "transition_to",
     "update_container",
     "update_self_fuel_vision",
