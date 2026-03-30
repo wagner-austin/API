@@ -1195,17 +1195,18 @@ def _viewport_edge_target(ctx: _DecideCtx) -> tuple[int, int]:
 
     Uses the actual viewport bounds rather than assuming the player is
     centered.  The player moves freely inside the fixed viewport frame;
-    it only recenters when the player reaches the edge.  Walking toward
-    map center avoids getting stuck in corners.
+    it only recenters when the player reaches the edge. Enemy-search
+    scouting should target the inner actionable boundary, not the outer
+    radar fringe, so the move command stays inside the 16x16 action area.
 
     Clamps to [1, 254] to stay inside the 256x256 map.
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     viewport = ctx.world["viewport"]
-    left = viewport["left"]
-    top = viewport["top"]
-    right = left + viewport["width"] - 1
-    bottom = top + viewport["height"] - 1
+    left = viewport["left"] + 1
+    top = viewport["top"] + 1
+    right = viewport["left"] + viewport["width"] - 2
+    bottom = viewport["top"] + viewport["height"] - 2
 
     # Walk toward the viewport edge that is closer to map center.
     nx = right if sx < 128 else left
