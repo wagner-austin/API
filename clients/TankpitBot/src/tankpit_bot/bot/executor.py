@@ -63,7 +63,8 @@ def dispatch_command(bot: BotProtocol, command: BotCommand) -> bool:
         return bot.use_radar()
     if command["cmd_type"] == "map_open":
         return bot.open_map()
-    # BotCommand is exhaustive: move | pickup_move | shoot | radar | map_open | teleport
+    # Teleport: open map first (required), then teleport
+    bot.open_map()
     return bot.teleport_to(command["target_x"], command["target_y"])
 
 
