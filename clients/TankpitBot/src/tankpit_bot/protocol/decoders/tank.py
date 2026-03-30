@@ -6,10 +6,7 @@ tank info, entry, exit, status, and status sync.
 
 from __future__ import annotations
 
-from tankpit_bot.container import (
-    ContainerMessage,
-    decode_container_message,
-)
+from tankpit_bot.container.types import ContainerMessage
 from tankpit_bot.protocol.helpers import require_min_length, x16
 from tankpit_bot.protocol.types import (
     TankEntryDict,
@@ -171,6 +168,8 @@ def decode_0x2e_message(data: bytes) -> ContainerMessage:
     Raises:
         ContainerDecodeError: If structure validation fails.
     """
+    from tankpit_bot.container.decoders import decode_container_message
+
     return decode_container_message(data)
 
 

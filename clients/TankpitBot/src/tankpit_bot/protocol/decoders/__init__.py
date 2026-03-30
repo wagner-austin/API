@@ -6,7 +6,7 @@ all decoder functions from submodules.
 
 from __future__ import annotations
 
-from tankpit_bot.container import ContainerMessage
+from tankpit_bot.container.types import ContainerMessage
 from tankpit_bot.protocol.constants import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
