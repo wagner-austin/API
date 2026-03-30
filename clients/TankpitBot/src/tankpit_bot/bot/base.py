@@ -554,8 +554,14 @@ class Bot(BrowserSession):
         if self._cdp is None:
             return False
 
+        # TeleportLanded is a single buffered flag from the protocol layer.
+        # Clear any stale landing ack before issuing a new teleport so a late
+        # ack from a previous teleport cannot complete this new action early.
+        check_and_clear_teleport_landed()
+
         cmd = make_teleport_command(x, y)
-        self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
+        if not self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})"):
+            return False
         now = get_current_time_ms()
         self._transition(
             "TELEPORTING",
