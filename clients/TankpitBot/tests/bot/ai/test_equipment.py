@@ -604,6 +604,30 @@ class TestDescribeContainerSearch:
             "no_landing=0 low_volume=0 nearest=(101,100) actionable"
         )
 
+    def test_reports_failed_pickup_container_as_non_actionable(self) -> None:
+        """Summary matches selector behavior for failed pickup targets."""
+        world, state = _world_and_self()
+        world["containers"]["101,100"] = make_container_state(
+            x=101,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            failed_pickups=1,
+        )
+
+        result = describe_container_search(
+            world,
+            state,
+            None,
+            want_fuel=False,
+            allow_unreachable=True,
+        )
+
+        assert result == (
+            "equipment: total=1 nearby=1 actionable=0 blocked=0 "
+            "no_landing=0 low_volume=0 nearest=(101,100) failed_pickup"
+        )
+
     def test_with_terrain_skips_unreachable(self) -> None:
         """Skips equipment container that is unreachable due to terrain."""
         world, state = _world_and_self(x=10, y=10)
