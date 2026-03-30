@@ -56,7 +56,7 @@ class TestShouldProactiveRadar:
         """High fuel never triggers proactive radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        # fuel=800 > fuel_low_threshold=700 → no fuel need
+        # fuel=800 > fuel_low_threshold=500 → no fuel need
         result = should_proactive_radar(800, world, 0, 10000, config)
         assert result is False
 
@@ -64,8 +64,8 @@ class TestShouldProactiveRadar:
         """Fuel at low threshold with no containers triggers radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        # fuel=700 <= fuel_low_threshold=700, no containers, cooldown elapsed
-        result = should_proactive_radar(700, world, 0, 10000, config)
+        # fuel=500 <= fuel_low_threshold=500, no containers, cooldown elapsed
+        result = should_proactive_radar(500, world, 0, 10000, config)
         assert result is True
 
     def test_fuel_below_threshold_triggers(self) -> None:
@@ -83,13 +83,13 @@ class TestShouldProactiveRadar:
         result = should_proactive_radar(400, world, 0, 10000, config)
         assert result is False
 
-    def test_equipment_container_also_blocks_radar(self) -> None:
-        """Equipment containers also block radar (one radar per viewport)."""
+    def test_equipment_container_does_not_block_radar(self) -> None:
+        """Equipment containers do NOT block radar — only fuel containers do."""
         config = make_default_ai_config()
         world = _empty_world()
         world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=False, volume=0)
         result = should_proactive_radar(400, world, 0, 10000, config)
-        assert result is False
+        assert result is True
 
     def test_scan_cooldown_blocks_radar(self) -> None:
         """Recent scan prevents proactive radar."""
@@ -115,6 +115,7 @@ class TestShouldProactiveRadar:
             is_self=True,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         # Same-team tank — skipped by team check
         world["tanks"]["2"] = TankStateDict(
@@ -127,6 +128,7 @@ class TestShouldProactiveRadar:
             is_self=False,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         # Enemy at (0,0) — skipped as invalidated position
         world["tanks"]["50"] = TankStateDict(
@@ -139,6 +141,7 @@ class TestShouldProactiveRadar:
             is_self=False,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         # No live visible enemies → radar triggers
         result = should_proactive_radar(400, world, 0, 10000, config)
@@ -185,6 +188,7 @@ class TestShouldMapOpenForEnemies:
             is_self=False,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         self_state = _self()
         result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
@@ -204,6 +208,7 @@ class TestShouldMapOpenForEnemies:
             is_self=False,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         self_state = _self()
         result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
@@ -224,6 +229,7 @@ class TestShouldMapOpenForEnemies:
             is_self=False,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         self_state = _self()
         result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
@@ -243,6 +249,7 @@ class TestShouldMapOpenForEnemies:
             is_self=True,
             is_bot=False,
             damage_state=0,
+            timestamp_ms=0,
         )
         self_state = _self()
         result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
