@@ -322,11 +322,12 @@ class TestInventoryTracking:
         reset_world_state()
 
     def test_initial_inventory_is_empty(self) -> None:
-        """Test inventory starts at zero counts, all enabled."""
+        """Test inventory starts at zero counts, all disabled."""
         inv = get_inventory_state()
         assert inv["armor_shields"]["count"] == 0
-        assert inv["armor_shields"]["enabled"] is True
+        assert inv["armor_shields"]["enabled"] is False
         assert inv["dual_shots"]["count"] == 0
+        assert inv["dual_shots"]["enabled"] is False
         assert inv["missile_shots"]["count"] == 0
         assert inv["homing_shots"]["count"] == 0
         assert inv["extra_radars"]["count"] == 0
@@ -347,14 +348,21 @@ class TestInventoryTracking:
         assert inv["extra_radars"]["enabled"] is False
 
     def test_update_from_protocol_returns_changes(self) -> None:
-        """Test 0x49 message returns list of changes from zero."""
+        """Test 0x49 message returns all changes from initial state.
+
+        Initial state has enabled=False for all slots. First protocol
+        message sets enabled=True + armor count=10, so all 5 slots
+        report enabled_changed and armor also reports a count delta.
+        """
         changes = update_inventory_from_protocol(
             counts=[10, 0, 0, 0, 0],
             enabled=[True, True, True, True, True],
         )
-        assert len(changes) == 1
-        assert changes[0]["item"] == "armor_shields"
-        assert changes[0]["delta"] == 10
+        # All 5 slots changed enabled state (False→True), armor also changed count
+        assert len(changes) == 5
+        armor_change = next(c for c in changes if c["item"] == "armor_shields")
+        assert armor_change["delta"] == 10
+        assert armor_change["enabled_changed"] is True
 
     def test_update_from_protocol_no_changes_when_same(self) -> None:
         """Test 0x49 message returns empty when counts unchanged."""
@@ -481,7 +489,7 @@ class TestInventoryTracking:
 
         inv = get_inventory_state()
         assert inv["armor_shields"]["count"] == 0
-        assert inv["armor_shields"]["enabled"] is True
+        assert inv["armor_shields"]["enabled"] is False
 
     def test_dispatch_inventory_message(self) -> None:
         """Test dispatch_world_state_update handles 0x49 message."""
@@ -533,3 +541,61 @@ class TestInventoryTracking:
         assert inv["armor_shields"]["enabled"] is False
         assert inv["dual_shots"]["enabled"] is True
         assert inv["missile_shots"]["enabled"] is False
+
+
+class TestFailedMoveTargets:
+    """Tests for failed move target tracking."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def test_mark_and_check_failed_move(self) -> None:
+        """Marking a move target as failed makes it show as failed."""
+        from tankpit_bot.sniffer.world_state import (
+            is_move_target_failed,
+            mark_move_target_failed,
+        )
+
+        mark_move_target_failed(73, 158, 50000)
+        assert is_move_target_failed(73, 158, 60000) is True
+
+    def test_failed_move_expires_after_ttl(self) -> None:
+        """Failed move target expires after the TTL passes."""
+        from tankpit_bot.sniffer.world_state import (
+            is_move_target_failed,
+            mark_move_target_failed,
+        )
+
+        mark_move_target_failed(73, 158, 10000)
+        # 50000 - 10000 = 40000 > 30000 TTL → expired
+        assert is_move_target_failed(73, 158, 50000) is False
+
+    def test_unfailed_target_returns_false(self) -> None:
+        """Coordinates never marked as failed return False."""
+        from tankpit_bot.sniffer.world_state import is_move_target_failed
+
+        assert is_move_target_failed(50, 50, 100000) is False
+
+    def test_clear_failed_move_targets_resets_all(self) -> None:
+        """clear_failed_move_targets removes all recorded failures."""
+        from tankpit_bot.sniffer.world_state import (
+            clear_failed_move_targets,
+            is_move_target_failed,
+            mark_move_target_failed,
+        )
+
+        mark_move_target_failed(73, 158, 90000)
+        clear_failed_move_targets()
+        assert is_move_target_failed(73, 158, 100000) is False
+
+    def test_radar_refresh_clears_failed_moves(self) -> None:
+        """Fresh radar data clears all failed move targets."""
+        from tankpit_bot.sniffer.world_state import (
+            is_move_target_failed,
+            mark_move_target_failed,
+        )
+
+        mark_move_target_failed(73, 158, 90000)
+        update_world_state_from_radar([], [])
+        assert is_move_target_failed(73, 158, 100000) is False
