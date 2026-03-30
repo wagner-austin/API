@@ -15,7 +15,6 @@ from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStat
 
 log = get_logger(__name__)
 
-_VIEWPORT_RADIUS = 8
 _MAP_MIN = 0
 _MAP_MAX = 255
 _ADJACENT_DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -58,13 +57,14 @@ def describe_container_search(
     no_landing = 0
     nearest_desc = "none"
     nearest_dist = _MAX_DIST
+    left, top, right, bottom = _viewport_bounds(world)
 
     for container in world["containers"].values():
         if container["is_fuel"] != want_fuel:
             continue
         total += 1
         cx, cy = container["x"], container["y"]
-        if abs(cx - sx) > _VIEWPORT_RADIUS or abs(cy - sy) > _VIEWPORT_RADIUS:
+        if not (left <= cx <= right and top <= cy <= bottom):
             continue
         nearby += 1
         dist = manhattan_distance(sx, sy, cx, cy)
@@ -198,8 +198,7 @@ def find_nearest_fuel(
     for container in world["containers"].values():
         if not _is_visible_candidate(
             container,
-            sx,
-            sy,
+            world,
             want_fuel=True,
             now_ms=now_ms,
         ):
@@ -253,8 +252,7 @@ def find_nearest_equipment(
     for container in world["containers"].values():
         if not _is_visible_candidate(
             container,
-            sx,
-            sy,
+            world,
             want_fuel=False,
             now_ms=now_ms,
         ):
@@ -311,8 +309,7 @@ def find_best_fuel(
     for container in world["containers"].values():
         if not _is_visible_candidate(
             container,
-            sx,
-            sy,
+            world,
             want_fuel=True,
             now_ms=now_ms,
         ):
@@ -418,8 +415,7 @@ def _describe_candidate_reason(
 
 def _is_visible_candidate(
     container: ContainerStateDict,
-    self_x: int,
-    self_y: int,
+    world: WorldStateDict,
     *,
     want_fuel: bool,
     now_ms: int,
@@ -432,7 +428,18 @@ def _is_visible_candidate(
     if now_ms > 0 and _is_stale(container, now_ms):
         return False
     cx, cy = container["x"], container["y"]
-    return abs(cx - self_x) <= _VIEWPORT_RADIUS and abs(cy - self_y) <= _VIEWPORT_RADIUS
+    left, top, right, bottom = _viewport_bounds(world)
+    return left <= cx <= right and top <= cy <= bottom
+
+
+def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
+    """Return inclusive observable viewport bounds from world state."""
+    viewport = world["viewport"]
+    left = viewport["left"]
+    top = viewport["top"]
+    right = left + viewport["width"] - 1
+    bottom = top + viewport["height"] - 1
+    return (left, top, right, bottom)
 
 
 def _is_actionable_with_terrain(
