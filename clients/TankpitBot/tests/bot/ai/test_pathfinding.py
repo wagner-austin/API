@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.pathfinding import find_path, path_length
+from tankpit_bot.bot.ai.pathfinding import (
+    find_path,
+    find_path_segment_target,
+    is_direct_path_clear,
+    path_length,
+)
 from tests.fakes.base import FakeTerrainMap
 
 # =============================================================================
@@ -159,3 +164,48 @@ class TestPathLength:
         terrain = FakeTerrainMap()
         path = find_path(terrain, 0, 0, 5, 0)
         assert path_length(path) == 6
+
+
+class TestDirectPathHelpers:
+    """Tests for direct-path and waypoint helpers."""
+
+    def test_is_direct_path_clear_on_open_ground(self) -> None:
+        """Direct path is clear when no terrain blocks the line."""
+        terrain = FakeTerrainMap()
+        assert is_direct_path_clear(terrain, 10, 10, 15, 15) is True
+
+    def test_is_direct_path_clear_horizontal_line(self) -> None:
+        """Direct path handles horizontal lines without diagonal stepping."""
+        terrain = FakeTerrainMap()
+        assert is_direct_path_clear(terrain, 10, 10, 15, 10) is True
+
+    def test_is_direct_path_clear_vertical_line(self) -> None:
+        """Direct path handles vertical lines without horizontal stepping."""
+        terrain = FakeTerrainMap()
+        assert is_direct_path_clear(terrain, 10, 10, 10, 15) is True
+
+    def test_is_direct_path_clear_detects_blocked_line(self) -> None:
+        """Direct path is blocked when any line tile is impassable."""
+        terrain = FakeTerrainMap({(12, 12): "#"})
+        assert is_direct_path_clear(terrain, 10, 10, 15, 15) is False
+
+    def test_find_path_segment_target_returns_straight_goal(self) -> None:
+        """Waypoint helper returns the goal when the first segment stays straight."""
+        terrain = FakeTerrainMap()
+        assert find_path_segment_target(terrain, 10, 10, 15, 10) == (15, 10)
+
+    def test_find_path_segment_target_returns_first_turn_waypoint(self) -> None:
+        """Waypoint helper returns the farthest directly-reachable tile on the A* detour."""
+        terrain = FakeTerrainMap({(12, 10): "#"})
+        assert find_path_segment_target(terrain, 10, 10, 14, 10) == (13, 11)
+
+    def test_find_path_segment_target_returns_none_when_no_path(self) -> None:
+        """Waypoint helper returns None when no path exists."""
+        blocked = {
+            (11, 10): "W",
+            (9, 10): "W",
+            (10, 11): "W",
+            (10, 9): "W",
+        }
+        terrain = FakeTerrainMap(blocked)
+        assert find_path_segment_target(terrain, 10, 10, 15, 10) is None
