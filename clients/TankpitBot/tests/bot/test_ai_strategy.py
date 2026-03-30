@@ -728,13 +728,13 @@ class TestDecideEquipmentDepletion:
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
-        # Block viewport edge target (108,108) and all its neighbors
+        # Block actionable viewport edge target (107,107) and all its neighbors
         terrain_data: dict[tuple[int, int], str] = {
-            (108, 108): "W",
-            (109, 108): "W",
-            (107, 108): "W",
-            (108, 109): "#",
-            (108, 107): "#",
+            (107, 107): "W",
+            (108, 107): "W",
+            (106, 107): "W",
+            (107, 108): "#",
+            (107, 106): "#",
         }
         terrain = FakeTerrainMap(terrain_data=terrain_data)
 
@@ -1605,16 +1605,16 @@ class TestDecideMapOpen:
             equipment_search_failures=0,
         )
         inventory = _make_inventory()
-        # Block edge target (108,108) and its neighbors so walk fails.
-        # _viewport_edge_target picks the viewport right/bottom edge (108,108)
+        # Block edge target (107,107) and its neighbors so walk fails.
+        # _viewport_edge_target picks the inner actionable right/bottom edge (107,107)
         # because the player at (100,100) is in the lower-left half of the map.
         terrain = FakeTerrainMap(
             terrain_data={
-                (108, 108): "#",
-                (107, 108): "#",
-                (109, 108): "#",
+                (107, 107): "#",
+                (106, 107): "#",
                 (108, 107): "#",
-                (108, 109): "#",
+                (107, 106): "#",
+                (107, 108): "#",
             }
         )
 
@@ -2587,13 +2587,13 @@ class TestDecideBlockedEdgeSearch:
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
-        # Block viewport edge target (108,108) and all its neighbors
+        # Block actionable viewport edge target (107,107) and all its neighbors
         terrain_data: dict[tuple[int, int], str] = {
-            (108, 108): "W",
-            (109, 108): "W",
-            (107, 108): "W",
-            (108, 109): "#",
-            (108, 107): "#",
+            (107, 107): "W",
+            (108, 107): "W",
+            (106, 107): "W",
+            (107, 108): "#",
+            (107, 106): "#",
         }
         terrain = FakeTerrainMap(terrain_data=terrain_data)
 
