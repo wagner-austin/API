@@ -135,6 +135,10 @@ This is the central mutation router for:
 
 2. `radar_response`
    - local fuel/equipment/mine discovery
+   - radar `volume=0` clears an already-known empty fuel container from world
+     state
+   - refreshing a known container preserves `failed_pickups` so failed targets
+     are not immediately reselected
 
 3. `movement` / `movement_response` / `position_update`
    - self and tank positional updates
@@ -212,6 +216,11 @@ Current behavior:
 - command ID is `CMD_MAP_TELEPORT`
 - bot currently opens the map immediately before teleport in
   `src/tankpit_bot/bot/executor.py`
+- `TeleportLanded` completion is validated against the actual landed position in
+  `src/tankpit_bot/bot/base.py`
+- if the server lands the tank on a different square than requested, the
+  requested landing tile is marked as a failed move target immediately so the
+  planner does not retry the same bad landing in a loop
 
 ## Offline Decode Path
 
