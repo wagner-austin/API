@@ -27,6 +27,7 @@ from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.state import (
     WorldStateDict,
     add_mine_from_radar,
+    make_container_state,
     make_empty_world_state,
     pickup_container,
     remove_tank,
@@ -74,9 +75,42 @@ _selected_room: str | None = None
 # The bot always keeps dual shots enabled, so 00 = miss, 01+ = hit.
 _got_confirmed_hit: bool = False
 
+# Tracks whether ANY CombatHit response arrived for our shot (weapon_byte >= 0).
+# Separate from _got_confirmed_hit which only tracks weapon_byte > 0.
+# When weapon_byte=0 arrives, the server DID process our shot — it just used
+# single ammo (no dual available or target was empty).
+_got_our_shot_response: bool = False
+
+# Weapon byte → inventory item key. Used to decrement ammo on confirmed hits.
+# weapon_byte: 1=dual, 2=missile, 3=homing. 0=single (no ammo consumed).
+_WEAPON_BYTE_TO_ITEM: dict[int, ItemType] = {
+    1: "dual_shots",
+    2: "missile_shots",
+    3: "homing_shots",
+}
+
 # Kill tracking — tank IDs killed via Deactivation protocol message.
 # Corpses stay at their death position, so the AI must filter by ID not position.
 _killed_tank_ids: set[int] = set()
+
+# Teleport tracking — set to True when TeleportLanded is received from server.
+# Drained by the tick loop so it knows the teleport completed.
+_teleport_landed: bool = False
+
+# Radar scan tracking — set when a radar result/ack arrives from the server.
+# Drained by the bot state machine so SCANNING can complete even when the scan
+# finds zero containers.
+_radar_scan_complete: bool = False
+
+# Failed move targets — coordinates where a move stalled and timed out.
+# Maps "x,y" key to timestamp_ms of the failure. Cleared on radar refresh
+# and session reset. The planner rejects these coordinates until they expire
+# or are re-confirmed by fresh world data.
+_failed_move_targets: dict[str, int] = {}
+
+# TTL for failed move targets (30 seconds). After this, the target is
+# eligible again in case the obstacle was transient.
+_FAILED_MOVE_TTL_MS = 30000
 
 # Buffered viewport entities — stored from ViewportUpdate (0x5A), processed
 # when MoveResponse (0x3D) provides the absolute self position needed to
@@ -90,15 +124,21 @@ _pending_viewport_entities: list[dict[str, int]] = []
 def mark_combat_hit(weapon_byte: int) -> None:
     """Called when we receive a CombatHit where we are the attacker.
 
-    The weapon_byte (last byte of combat_data) determines hit vs miss:
-    0 = single shot (miss when dual is enabled), >0 = special ammo used (hit).
+    Records that the server processed our shot. If weapon_byte > 0,
+    special ammo was consumed (hit confirmed) and the corresponding
+    inventory count is decremented. If weapon_byte == 0, the server
+    used single shot — either because dual is depleted or the target
+    position was empty.
 
     Args:
-        weapon_byte: Last byte of combat_data (weapon type).
+        weapon_byte: Last byte of combat_data (0=single, 1=dual,
+            2=missile, 3=homing).
     """
-    global _got_confirmed_hit
+    global _got_confirmed_hit, _got_our_shot_response
+    _got_our_shot_response = True
     if weapon_byte > 0:
         _got_confirmed_hit = True
+        _decrement_ammo_for_weapon(weapon_byte)
 
 
 def check_and_clear_combat_hit() -> bool:
@@ -111,6 +151,73 @@ def check_and_clear_combat_hit() -> bool:
     result = _got_confirmed_hit
     _got_confirmed_hit = False
     return result
+
+
+def peek_combat_hit() -> bool:
+    """Return whether a confirmed outgoing hit is currently buffered.
+
+    Returns:
+        True if an outgoing hit has been observed and not yet consumed.
+    """
+    return _got_confirmed_hit
+
+
+def peek_our_shot_response() -> bool:
+    """Return whether any CombatHit response for our shot is buffered.
+
+    This is True for both weapon_byte > 0 (hit) and weapon_byte == 0
+    (single shot). Use this to distinguish "server responded with
+    single shot" from "server hasn't responded yet".
+
+    Returns:
+        True if any shot response has been observed and not yet consumed.
+    """
+    return _got_our_shot_response
+
+
+def check_and_clear_our_shot_response() -> bool:
+    """Check if any CombatHit for our shot arrived, then clear.
+
+    Returns:
+        True if the server sent a CombatHit response for our shot
+        (any weapon_byte, including 0).
+    """
+    global _got_our_shot_response
+    result = _got_our_shot_response
+    _got_our_shot_response = False
+    return result
+
+
+def _decrement_ammo_for_weapon(weapon_byte: int) -> None:
+    """Decrement inventory count for the ammo type consumed by a hit.
+
+    When the server confirms a hit with special ammo (weapon_byte > 0),
+    one unit of that ammo type was consumed. This keeps the local
+    inventory in sync with the server between full InventorySync (0x49)
+    messages.
+
+    Args:
+        weapon_byte: Weapon type from CombatHit (1=dual, 2=missile,
+            3=homing).
+    """
+    global _inventory_state
+    item_key = _WEAPON_BYTE_TO_ITEM.get(weapon_byte)
+    if item_key is None:
+        return
+    current = _inventory_state[item_key]
+    if current["count"] <= 0:
+        return
+    new_count = current["count"] - 1
+    updated_item = InventoryItem(count=new_count, enabled=current["enabled"])
+    old = _inventory_state
+    _inventory_state = InventoryState(
+        armor_shields=updated_item if item_key == "armor_shields" else old["armor_shields"],
+        dual_shots=updated_item if item_key == "dual_shots" else old["dual_shots"],
+        missile_shots=updated_item if item_key == "missile_shots" else old["missile_shots"],
+        homing_shots=updated_item if item_key == "homing_shots" else old["homing_shots"],
+        extra_radars=updated_item if item_key == "extra_radars" else old["extra_radars"],
+    )
+    log.info("AMMO: %s consumed by hit (%d -> %d)", item_key, current["count"], new_count)
 
 
 def mark_tank_killed(tank_id: int) -> None:
@@ -134,13 +241,52 @@ def drain_killed_tank_ids() -> set[int]:
     return result
 
 
+def mark_teleport_landed() -> None:
+    """Record that the server confirmed a teleport landing."""
+    global _teleport_landed
+    _teleport_landed = True
+
+
+def check_and_clear_teleport_landed() -> bool:
+    """Check if a teleport landed since last check, then clear.
+
+    Returns:
+        True if teleport landed confirmation was received.
+    """
+    global _teleport_landed
+    result = _teleport_landed
+    _teleport_landed = False
+    return result
+
+
+def mark_radar_scan_complete() -> None:
+    """Record that the server completed a radar scan."""
+    global _radar_scan_complete
+    _radar_scan_complete = True
+
+
+def check_and_clear_radar_scan_complete() -> bool:
+    """Check if a radar scan completed since last check, then clear.
+
+    Returns:
+        True if radar completion was observed.
+    """
+    global _radar_scan_complete
+    result = _radar_scan_complete
+    _radar_scan_complete = False
+    return result
+
+
 # Inventory tracking from binary protocol (0x49, 0x67, 0x74)
+# Default: all disabled, zero counts. The game starts with most items disabled
+# (armor, missile, homing disabled; dual and radar enabled). The protocol
+# messages (0x49 InventorySync) will set the correct state on first sync.
 _inventory_state: InventoryState = InventoryState(
-    armor_shields=InventoryItem(count=0, enabled=True),
-    dual_shots=InventoryItem(count=0, enabled=True),
-    missile_shots=InventoryItem(count=0, enabled=True),
-    homing_shots=InventoryItem(count=0, enabled=True),
-    extra_radars=InventoryItem(count=0, enabled=True),
+    armor_shields=InventoryItem(count=0, enabled=False),
+    dual_shots=InventoryItem(count=0, enabled=False),
+    missile_shots=InventoryItem(count=0, enabled=False),
+    homing_shots=InventoryItem(count=0, enabled=False),
+    extra_radars=InventoryItem(count=0, enabled=False),
 )
 
 
@@ -148,29 +294,35 @@ def _make_empty_inventory() -> InventoryState:
     """Create an empty inventory state with all items at zero.
 
     Returns:
-        InventoryState with all counts at 0 and enabled True.
+        InventoryState with all counts at 0 and enabled False.
     """
     return InventoryState(
-        armor_shields=InventoryItem(count=0, enabled=True),
-        dual_shots=InventoryItem(count=0, enabled=True),
-        missile_shots=InventoryItem(count=0, enabled=True),
-        homing_shots=InventoryItem(count=0, enabled=True),
-        extra_radars=InventoryItem(count=0, enabled=True),
+        armor_shields=InventoryItem(count=0, enabled=False),
+        dual_shots=InventoryItem(count=0, enabled=False),
+        missile_shots=InventoryItem(count=0, enabled=False),
+        homing_shots=InventoryItem(count=0, enabled=False),
+        extra_radars=InventoryItem(count=0, enabled=False),
     )
 
 
 def reset_world_state() -> None:
     """Reset world state for new session (used by tests)."""
     global _world_state, _terrain_map, _room_images, _selected_room, _inventory_state
-    global _got_combat_hit, _killed_tank_ids, _pending_viewport_entities
+    global _got_confirmed_hit, _got_our_shot_response
+    global _killed_tank_ids, _pending_viewport_entities, _teleport_landed
+    global _radar_scan_complete
     _world_state = make_empty_world_state()
     _terrain_map = None
     _room_images = {}
     _selected_room = None
     _inventory_state = _make_empty_inventory()
     _got_confirmed_hit = False
+    _got_our_shot_response = False
     _killed_tank_ids = set()
     _pending_viewport_entities = []
+    _teleport_landed = False
+    _radar_scan_complete = False
+    _failed_move_targets.clear()
 
 
 def get_world_state() -> WorldStateDict:
@@ -449,6 +601,8 @@ def update_world_state_from_radar(
     """
     global _world_state
     ts = get_current_time_ms()
+    mark_radar_scan_complete()
+    clear_failed_move_targets()
 
     # Add containers
     for c in containers:
@@ -783,6 +937,116 @@ def update_world_state_from_container_pickup(x: int, y: int) -> None:
     log.info("Picked up container at (%d, %d)", x, y)
 
 
+def remove_container_at(x: int, y: int) -> None:
+    """Remove a container from world state at the given position.
+
+    Used when the bot detects a container is unreachable (stuck timeout).
+
+    Args:
+        x: Container X coordinate.
+        y: Container Y coordinate.
+    """
+    global _world_state
+    key = f"{x},{y}"
+    if key in _world_state["containers"]:
+        new_containers = dict(_world_state["containers"])
+        del new_containers[key]
+        _world_state = WorldStateDict(
+            self_state=_world_state["self_state"],
+            tanks=_world_state["tanks"],
+            containers=new_containers,
+            mines=_world_state["mines"],
+            terrain=_world_state["terrain"],
+            viewport=_world_state["viewport"],
+            timestamp_ms=_world_state["timestamp_ms"],
+        )
+        log.info("Removed unreachable container at (%d, %d)", x, y)
+
+
+def increment_container_failed_pickups(x: int, y: int) -> None:
+    """Increment the failed_pickups counter on a container.
+
+    Called when a pickup attempt stalls. The container stays in world
+    state but is deprioritized by the planner. If the container is
+    later re-confirmed by a fresh radar/viewport, failed_pickups
+    resets to 0.
+
+    Args:
+        x: Container X coordinate.
+        y: Container Y coordinate.
+    """
+    global _world_state
+    key = f"{x},{y}"
+    container = _world_state["containers"].get(key)
+    if container is None:
+        return
+    new_container = make_container_state(
+        x=container["x"],
+        y=container["y"],
+        is_fuel=container["is_fuel"],
+        volume=container["volume"],
+        timestamp_ms=container["timestamp_ms"],
+        failed_pickups=container["failed_pickups"] + 1,
+    )
+    new_containers = dict(_world_state["containers"])
+    new_containers[key] = new_container
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=new_containers,
+        mines=_world_state["mines"],
+        terrain=_world_state["terrain"],
+        viewport=_world_state["viewport"],
+        timestamp_ms=_world_state["timestamp_ms"],
+    )
+    log.info(
+        "Container (%d,%d) failed_pickups: %d -> %d",
+        x,
+        y,
+        container["failed_pickups"],
+        new_container["failed_pickups"],
+    )
+
+
+def mark_move_target_failed(x: int, y: int, timestamp_ms: int) -> None:
+    """Record a move destination that stalled and timed out.
+
+    The planner should avoid re-selecting this coordinate until
+    it is cleared by a radar refresh or the TTL expires.
+
+    Args:
+        x: Failed destination X coordinate.
+        y: Failed destination Y coordinate.
+        timestamp_ms: When the failure was detected.
+    """
+    key = f"{x},{y}"
+    _failed_move_targets[key] = timestamp_ms
+    log.info("MOVE: marked (%d,%d) as failed target", x, y)
+
+
+def is_move_target_failed(x: int, y: int, now_ms: int) -> bool:
+    """Check if a move target was recently marked as failed.
+
+    Args:
+        x: Destination X coordinate.
+        y: Destination Y coordinate.
+        now_ms: Current timestamp for TTL check.
+
+    Returns:
+        True if the target failed recently and should be avoided.
+    """
+    key = f"{x},{y}"
+    failed_ms = _failed_move_targets.get(key)
+    if failed_ms is None:
+        return False
+    return (now_ms - failed_ms) < _FAILED_MOVE_TTL_MS
+
+
+def clear_failed_move_targets() -> None:
+    """Clear all failed move targets. Called on fresh radar data."""
+    _failed_move_targets.clear()
+
+
 def render_world_state_ascii() -> str | None:
     """Render current world state as ASCII.
 
@@ -888,19 +1152,6 @@ def _process_buffered_viewport_entities(self_x: int, self_y: int) -> None:
     _pending_viewport_entities = []
 
     if not entities:
-        return
-
-    # Verify self is in the entity list before trusting viewport offset
-    self_state = _world_state["self_state"]
-    if self_state is None:
-        return
-    self_tank_id = self_state["tank_id"]
-    self_found = False
-    for ent in entities:
-        if ent.get("entity_id", -1) == self_tank_id:
-            self_found = True
-            break
-    if not self_found:
         return
 
     vp_left, vp_top = _compute_viewport_offset(self_x, self_y)
@@ -1043,6 +1294,9 @@ def _dispatch_resource_update(decoded: protocol.BinaryMessage) -> bool:
         case {"msg_type": 0x74, "enabled": list(enabled)}:
             update_inventory_from_toggle(enabled)
             return True
+        case {"msg_type": 0x46}:
+            mark_radar_scan_complete()
+            return True
     return False
 
 
@@ -1096,9 +1350,32 @@ def _dispatch_tank_update(decoded: protocol.BinaryMessage) -> bool:
         }:
             # Tank killed — invalidate position so we stop targeting
             _update_tank_position(vid, 0, 0)
+            mark_tank_killed(vid)
             log.info("DEACTIVATED: tank=%d killed, position invalidated", vid)
             return True
     return False
+
+
+def _resolve_waypoint_destination(
+    start_x: int,
+    start_y: int,
+    waypoints: list[tuple[int, int]],
+) -> tuple[int, int]:
+    """Resolve the final destination from protocol waypoint tuples.
+
+    Args:
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        waypoints: Waypoints list from the protocol movement decoder.
+
+    Returns:
+        Final destination after applying the waypoint tuple list.
+    """
+    final_x: int = start_x
+    final_y: int = start_y
+    if waypoints:
+        final_x, final_y = waypoints[0]
+    return (final_x, final_y)
 
 
 def _handle_waypoint_movement(sx: int, sy: int, wps: list[tuple[int, int]]) -> None:
@@ -1112,10 +1389,7 @@ def _handle_waypoint_movement(sx: int, sy: int, wps: list[tuple[int, int]]) -> N
         sy: Start Y coordinate.
         wps: Waypoints list of (x, y) tuples from protocol decoder.
     """
-    final_x: int = sx
-    final_y: int = sy
-    if wps:
-        final_x, final_y = wps[0]
+    final_x, final_y = _resolve_waypoint_destination(sx, sy, wps)
     for tank in _world_state["tanks"].values():
         if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
             _update_tank_position(tank["tank_id"], final_x, final_y)
@@ -1194,13 +1468,18 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             return True
         case {
             "msg_type": 0x47,
+            "tank_id": int(tid),
             "start_x": int(sx),
             "start_y": int(sy),
             "waypoints": list(wps),
         }:
             self_state = _world_state["self_state"]
-            is_self = self_state is not None and self_state["x"] == sx and self_state["y"] == sy
-            if not is_self:
+            is_self = self_state is not None and tid == self_state["tank_id"]
+            if is_self:
+                final_x, final_y = _resolve_waypoint_destination(sx, sy, wps)
+                update_world_state_from_position(final_x, final_y)
+                _render_ascii_if_available("SelfMovement")
+            else:
                 _handle_waypoint_movement(sx, sy, wps)
             return True
         case {
@@ -1290,6 +1569,10 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
             return True
         case {"msg_type": "container_pickup", "x": int(x), "y": int(y)}:
             update_world_state_from_container_pickup(x, y)
+            return True
+        case {"msg_type": "teleport_landed"}:
+            log.info("TELEPORT_LANDED: server confirmed teleport")
+            mark_teleport_landed()
             return True
         case {
             "msg_type": "combat_hit",
@@ -1418,11 +1701,27 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
 
 
 __all__ = [
+    "check_and_clear_combat_hit",
+    "check_and_clear_our_shot_response",
+    "check_and_clear_radar_scan_complete",
+    "check_and_clear_teleport_landed",
+    "clear_failed_move_targets",
     "dispatch_world_state_update",
+    "drain_killed_tank_ids",
     "get_inventory_state",
     "get_terrain_map",
     "get_world_state",
+    "increment_container_failed_pickups",
+    "is_move_target_failed",
+    "mark_combat_hit",
+    "mark_move_target_failed",
+    "mark_radar_scan_complete",
+    "mark_tank_killed",
+    "mark_teleport_landed",
+    "peek_combat_hit",
+    "peek_our_shot_response",
     "register_room_image",
+    "remove_container_at",
     "render_world_state_ascii",
     "reset_world_state",
     "set_selected_room",
