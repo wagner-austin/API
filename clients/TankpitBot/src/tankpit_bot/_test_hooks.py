@@ -621,6 +621,8 @@ class BotProtocol(Protocol):
         """
         ...
 
+    _cdp_message_buffer: list[str]
+
     def move_to(self, x: int, y: int) -> bool:
         """Send move command.
 
