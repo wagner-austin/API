@@ -77,7 +77,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 - **FULL**: Complete field-by-field decoding with TypedDict structure
 - **IDENTIFIED**: Message type known, structure partially decoded
 
-**Implementation:** See `_identify_by_length()` in `sniffer/` and `identify_container_type()` in `container/identification.py`
+**Implementation:** See `process_received_message()` in `sniffer/decoders.py` (length-based dispatch) and `identify_container_type()` in `container/identification.py`
 
 ---
 
@@ -604,7 +604,10 @@ container_x = 136 + 8 = 144 ✓ (matches known container at (144,143))
 ```
 
 **Key insight:** The viewport is FIXED (moves with arrow keys, not player).
-The player can be anywhere within the 16x16 viewport.
+The player can be anywhere within the 16x16 actionable viewport. Radar
+reveals 1 extra tile beyond each edge (18x18 observable area). Move and
+pickup commands only work within the inner 16x16. The viewport recenters
+when the player walks to the edge (with a 1-tick delay).
 
 **For self-tank absolute position, use:**
 1. First PositionUpdate message after join/teleport (has absolute coords)
