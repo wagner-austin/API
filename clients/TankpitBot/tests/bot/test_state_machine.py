@@ -407,6 +407,37 @@ class TestBotStateUpdates:
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
 
+    def test_update_state_teleport_landing_mismatch_marks_failed_target(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Mismatched teleport landing blacklists the requested destination."""
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.browser import get_current_time_ms
+        from tankpit_bot.sniffer.world_state import (
+            is_move_target_failed,
+            mark_teleport_landed,
+            reset_world_state,
+            update_world_state_from_fuel_total,
+            update_world_state_from_position,
+        )
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        update_world_state_from_position(196, 85)
+        update_world_state_from_fuel_total(582)
+        bot._update_state_from_world()
+        bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
+
+        mark_teleport_landed()
+        bot._update_state_from_world()
+
+        now = get_current_time_ms()
+        assert bot.get_state() == "IDLE"
+        assert is_move_target_failed(196, 86, now) is True
+
     def test_low_fuel_does_not_stomp_teleporting(
         self,
         fake_env: FakeEnv,
