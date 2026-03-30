@@ -35,6 +35,45 @@ BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
 )
 
 
+# =============================================================================
+# Combat Phase — explicit FSM replacing opaque ticks_in_mode counter
+# =============================================================================
+
+CombatPhase = Literal[
+    "none",  # No combat engagement
+    "acquiring",  # Phase 0: opening map to locate target
+    "closing",  # Phase 1: teleporting to target
+    "engaging",  # Phase 2: shooting at target
+]
+
+COMBAT_PHASES: tuple[CombatPhase, ...] = (
+    "none",
+    "acquiring",
+    "closing",
+    "engaging",
+)
+
+
+def _require_combat_phase(data: JSONObject, key: str) -> CombatPhase:
+    """Validate and extract a CombatPhase from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated CombatPhase value.
+
+    Raises:
+        ValueError: If value is not a valid CombatPhase.
+    """
+    raw = require_str(data, key)
+    for phase in COMBAT_PHASES:
+        if raw == phase:
+            return phase
+    raise ValueError(f"{key} must be one of {COMBAT_PHASES}, got {raw!r}")
+
+
 def _require_behavior_mode(data: JSONObject, key: str) -> BehaviorMode:
     """Validate and extract a BehaviorMode from JSON.
 
@@ -171,6 +210,8 @@ class EnemyThreatDict(TypedDict):
         team: Enemy team ID (0-3).
         name: Enemy player name.
         is_bot: Whether this enemy is a bot.
+        timestamp_ms: When this tank was last confirmed by the server.
+            Used for freshness-based target selection.
     """
 
     tank_id: int
@@ -182,6 +223,7 @@ class EnemyThreatDict(TypedDict):
     team: int
     name: str
     is_bot: bool
+    timestamp_ms: int
 
 
 def make_enemy_threat(
@@ -194,6 +236,7 @@ def make_enemy_threat(
     team: int,
     name: str,
     is_bot: bool,
+    timestamp_ms: int = 0,
 ) -> EnemyThreatDict:
     """Create an EnemyThreatDict.
 
@@ -221,6 +264,7 @@ def make_enemy_threat(
         team=team,
         name=name,
         is_bot=is_bot,
+        timestamp_ms=timestamp_ms,
     )
 
 
@@ -243,6 +287,7 @@ def encode_enemy_threat(threat: EnemyThreatDict) -> JSONObject:
         "team": threat["team"],
         "name": threat["name"],
         "is_bot": threat["is_bot"],
+        "timestamp_ms": threat["timestamp_ms"],
     }
 
 
@@ -268,6 +313,7 @@ def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
         team=require_int(data, "team"),
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
+        timestamp_ms=require_int(data, "timestamp_ms"),
     )
 
 
@@ -344,6 +390,8 @@ class AIConfigDict(TypedDict):
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
         shoot_cooldown_ms: Minimum milliseconds between shots.
+        shot_feedback_timeout_ms: Milliseconds to wait before treating a shot as a miss.
+        action_stall_timeout_ms: Milliseconds to wait before abandoning a stuck move/pickup.
         teleport_fuel_cost: Estimated fuel consumed by a single teleport.
         kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
         map_open_cooldown_ms: Minimum milliseconds between map open commands.
@@ -357,10 +405,18 @@ class AIConfigDict(TypedDict):
     combat_range: int
     scan_cooldown_ms: int
     shoot_cooldown_ms: int
+    shot_feedback_timeout_ms: int
+    action_stall_timeout_ms: int
     teleport_fuel_cost: int
     kill_cooldown_ms: int
     map_open_cooldown_ms: int
     patrol_waypoints: list[tuple[int, int]]
+    dual_break_threshold: int
+    dual_resume_threshold: int
+    radar_break_threshold: int
+    radar_resume_threshold: int
+    equip_search_hop_distance: int
+    equip_search_max_failures: int
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -370,17 +426,25 @@ def make_default_ai_config() -> AIConfigDict:
         AIConfigDict with default values suitable for lieutenant rank.
     """
     return AIConfigDict(
-        fuel_critical_threshold=200,
-        fuel_low_threshold=700,
+        fuel_critical_threshold=400,
+        fuel_low_threshold=500,
         fuel_full_threshold=1200,
         hunt_min_fuel=100,
         combat_range=20,
         scan_cooldown_ms=5000,
         shoot_cooldown_ms=2000,
+        shot_feedback_timeout_ms=4000,
+        action_stall_timeout_ms=10000,
         teleport_fuel_cost=100,
-        kill_cooldown_ms=20000,
+        kill_cooldown_ms=30000,
         map_open_cooldown_ms=5000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
+        dual_break_threshold=12,
+        dual_resume_threshold=20,
+        radar_break_threshold=8,
+        radar_resume_threshold=12,
+        equip_search_hop_distance=15,
+        equip_search_max_failures=3,
     )
 
 
@@ -402,10 +466,18 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "combat_range": config["combat_range"],
         "scan_cooldown_ms": config["scan_cooldown_ms"],
         "shoot_cooldown_ms": config["shoot_cooldown_ms"],
+        "shot_feedback_timeout_ms": config["shot_feedback_timeout_ms"],
+        "action_stall_timeout_ms": config["action_stall_timeout_ms"],
         "teleport_fuel_cost": config["teleport_fuel_cost"],
         "kill_cooldown_ms": config["kill_cooldown_ms"],
         "map_open_cooldown_ms": config["map_open_cooldown_ms"],
         "patrol_waypoints": waypoints,
+        "dual_break_threshold": config["dual_break_threshold"],
+        "dual_resume_threshold": config["dual_resume_threshold"],
+        "radar_break_threshold": config["radar_break_threshold"],
+        "radar_resume_threshold": config["radar_resume_threshold"],
+        "equip_search_hop_distance": config["equip_search_hop_distance"],
+        "equip_search_max_failures": config["equip_search_max_failures"],
     }
 
 
@@ -457,10 +529,18 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         combat_range=require_int(data, "combat_range"),
         scan_cooldown_ms=require_int(data, "scan_cooldown_ms"),
         shoot_cooldown_ms=require_int(data, "shoot_cooldown_ms"),
+        shot_feedback_timeout_ms=require_int(data, "shot_feedback_timeout_ms"),
+        action_stall_timeout_ms=require_int(data, "action_stall_timeout_ms"),
         teleport_fuel_cost=require_int(data, "teleport_fuel_cost"),
         kill_cooldown_ms=require_int(data, "kill_cooldown_ms"),
         map_open_cooldown_ms=require_int(data, "map_open_cooldown_ms"),
         patrol_waypoints=_decode_patrol_waypoints(data),
+        dual_break_threshold=require_int(data, "dual_break_threshold"),
+        dual_resume_threshold=require_int(data, "dual_resume_threshold"),
+        radar_break_threshold=require_int(data, "radar_break_threshold"),
+        radar_resume_threshold=require_int(data, "radar_resume_threshold"),
+        equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
+        equip_search_max_failures=require_int(data, "equip_search_max_failures"),
     )
 
 
@@ -482,8 +562,12 @@ class AIStateDict(TypedDict):
         combat_target_id: Tank ID of current combat target (-1 if none).
         combat_target_x: X coordinate of combat target.
         combat_target_y: Y coordinate of combat target.
-        ticks_in_mode: How many ticks spent in current mode.
+        combat_phase: Explicit combat FSM phase. Replaces the opaque
+            ticks_in_mode counter with named states.
         killed_tank_ids: Tank IDs on kill cooldown {str(tank_id): timestamp_ms}.
+        blocked_combat_targets: Tank IDs that are temporarily unengageable
+            (e.g. no passable landing tile). {str(tank_id): timestamp_ms}.
+            Expired by the same TTL as killed_tank_ids.
         last_shot_target_id: Tank ID we shot at last tick (-1 if none).
         last_shot_target_name: Name of tank we shot at last tick.
     """
@@ -497,10 +581,12 @@ class AIStateDict(TypedDict):
     combat_target_id: int
     combat_target_x: int
     combat_target_y: int
-    ticks_in_mode: int
+    combat_phase: CombatPhase
     killed_tank_ids: dict[str, int]
+    blocked_combat_targets: dict[str, int]
     last_shot_target_id: int
     last_shot_target_name: str
+    equipment_search_failures: int
 
 
 def make_initial_ai_state(
@@ -518,16 +604,18 @@ def make_initial_ai_state(
         config=config if config is not None else make_default_ai_config(),
         active_mode="HUNT",
         patrol_waypoint_index=0,
-        last_scan_ms=0,
+        last_scan_ms=1,  # Non-zero so radar doesn't auto-fire on first tick
         last_shoot_ms=0,
         last_map_open_ms=0,
         combat_target_id=-1,
         combat_target_x=0,
         combat_target_y=0,
-        ticks_in_mode=0,
+        combat_phase="none",
         killed_tank_ids={},
+        blocked_combat_targets={},
         last_shot_target_id=-1,
         last_shot_target_name="",
+        equipment_search_failures=0,
     )
 
 
@@ -551,10 +639,12 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "combat_target_id": state["combat_target_id"],
         "combat_target_x": state["combat_target_x"],
         "combat_target_y": state["combat_target_y"],
-        "ticks_in_mode": state["ticks_in_mode"],
+        "combat_phase": state["combat_phase"],
         "killed_tank_ids": killed,
+        "blocked_combat_targets": dict(state["blocked_combat_targets"]),
         "last_shot_target_id": state["last_shot_target_id"],
         "last_shot_target_name": state["last_shot_target_name"],
+        "equipment_search_failures": state["equipment_search_failures"],
     }
 
 
@@ -570,13 +660,29 @@ def _decode_killed_tank_ids(data: JSONObject) -> dict[str, int]:
     Raises:
         ValueError: If format is invalid.
     """
-    raw = data.get("killed_tank_ids")
+    return _require_str_int_mapping(data, "killed_tank_ids")
+
+
+def _require_str_int_mapping(data: JSONObject, key: str) -> dict[str, int]:
+    """Decode a dict[str, int] field from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Dict mapping string keys to int values.
+
+    Raises:
+        ValueError: If format is invalid.
+    """
+    raw = data.get(key)
     if not isinstance(raw, dict):
-        raise ValueError("killed_tank_ids must be an object")
+        raise ValueError(f"{key} must be an object")
     result: dict[str, int] = {}
     for k, v in raw.items():
         if not isinstance(v, int):
-            raise ValueError(f"killed_tank_ids values must be int, got {type(v).__name__}")
+            raise ValueError(f"{key} values must be int, got {type(v).__name__}")
         result[k] = v
     return result
 
@@ -607,19 +713,23 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         combat_target_id=require_int(data, "combat_target_id"),
         combat_target_x=require_int(data, "combat_target_x"),
         combat_target_y=require_int(data, "combat_target_y"),
-        ticks_in_mode=require_int(data, "ticks_in_mode"),
+        combat_phase=_require_combat_phase(data, "combat_phase"),
         killed_tank_ids=_decode_killed_tank_ids(data),
+        blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),
+        equipment_search_failures=require_int(data, "equipment_search_failures"),
     )
 
 
 __all__ = [
     "BEHAVIOR_MODES",
+    "COMBAT_PHASES",
     "AIConfigDict",
     "AIStateDict",
     "BehaviorMode",
     "BehaviorScoreDict",
+    "CombatPhase",
     "EnemyThreatDict",
     "PathStepDict",
     "decode_ai_config",
