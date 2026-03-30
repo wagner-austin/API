@@ -284,10 +284,12 @@ Important points:
 - the planner uses map-open because it is the current known way to provoke the
   useful global enemy-position blob
 
-## Stale World-Reference Bug
+## Former Stale World-Reference Bug
 
-The tick loop in `_tick_once` reads the world state snapshot at the top of the
-tick, before in-flight action handling runs:
+This was a real bug in the earlier flat planner.
+
+The tick loop in `_tick_once` used to read the world state snapshot at the top
+of the tick, before in-flight action handling ran:
 
 ```
 world = bot.get_world_state()         # snapshot taken here
@@ -298,13 +300,16 @@ if _has_in_flight_action(bot):        # may mutate global _world_state
 decision = ai_strategy.decide(world, ...)  # uses stale snapshot
 ```
 
-When `_has_in_flight_action` clears a stalled collection, it calls
-`increment_container_failed_pickups`, which mutates the global `_world_state`.
-But the `world` variable still holds the pre-mutation snapshot. The planner then
-sees `failed_pickups=0` and retries the same dead container.
+When `_has_in_flight_action` cleared a stalled collection, it called
+`increment_container_failed_pickups`, which mutated the global `_world_state`.
+But the `world` variable still held the pre-mutation snapshot. The planner then
+saw `failed_pickups=0` and retried the same dead container.
 
-This is a concrete example of the current model mutating control-relevant state
-mid-tick without updating the decision input.
+That specific retry path has since been fixed by preserving `failed_pickups`
+across radar refreshes and clearing empty fuel containers when radar reports
+`volume=0`. The architectural lesson still stands: control-relevant world
+mutations around tick orchestration are easy to get wrong in the current flat
+model.
 
 ## Why This Model Feels Messy
 
@@ -320,8 +325,8 @@ Main reasons:
 4. world-state freshness/source is not yet expressed strongly enough in planner
    decisions
 5. executor does not yet act as a strong last-mile validator
-6. in-flight action handling can mutate world state after the planner snapshot is
-   taken (see Stale World-Reference Bug above)
+6. in-flight action handling and planner memory still interact in fragile ways,
+   even after the stale-container retry bug above was fixed
 
 ## What This Model Is Good At
 
