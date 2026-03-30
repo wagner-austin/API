@@ -83,43 +83,49 @@ Loads a capture session JSON, extracts the magic key, builds the XOR table, and 
 
 ## AI Behavior System
 
-The bot uses a modular AI decision system built on pure functions and immutable TypedDicts. The architecture has two layers:
+The current bot uses a tick-based planning pipeline built on pure functions,
+immutable TypedDicts, and an execution state machine. The important layers are:
 
-- **Decision layer**: Evaluators score candidate behaviors based on world state
-- **Execution layer**: Actions translate chosen behaviors into Bot commands
+- **World sync**: CDP WebSocket frames are drained each tick and decoded into
+  world state
+- **Planning**: `bot/ai_strategy.py` chooses one action for the current tick
+- **Execution**: `bot/executor.py` translates that action into bot commands
+- **Action lifecycle**: `bot/states.py` and `bot/tick_loop.py` track in-flight
+  actions and completion/timeouts
+
+This is still a flat planner with some tactical substate, not yet the final
+control architecture. The concrete refactor plan for the next step is in
+[`docs/bot-hfsm-refactor-plan.md`](docs/bot-hfsm-refactor-plan.md).
 
 ### Behavior Modes
 
 | Mode | Priority | Description |
 |------|----------|-------------|
-| `DEFEND` | Highest | Shields on, evade when under attack |
-| `HUNT` | High | Pursue and shoot nearby enemies |
-| `COLLECT_FUEL` | Medium-High | Three-tier fuel management |
-| `COLLECT_EQUIPMENT` | Medium | Pick up equipment containers |
-| `DEPOSIT_FUEL` | Medium | Deposit fuel at base |
-| `PATROL` | Low | Move through waypoints |
+| `HUNT` | High | Refresh enemy positions, close distance, and engage |
+| `COLLECT_FUEL` | High when low | Recover fuel via visible containers, radar, or reposition |
+| `COLLECT_EQUIPMENT` | High when depleted | Recover dual/radar reserves before new combat |
 
-### Three-Tier Fuel Management
+### Current Planner Notes
 
-| Tier | Fuel Range | Strategy |
-|------|-----------|----------|
-| Critical | < 200 | Shields on, find best (highest volume) fuel |
-| Low | 200-500 | Find best fuel, no shields |
-| Normal | 500-1200 | Find nearest fuel |
+- Combat currently uses map-open as the known fallback for global enemy refresh.
+- Radar is used for local resource search, not global enemy positions.
+- The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
+  `scan`, `shoot`, `map_open`) and waits for completion or timeout before
+  replanning.
+- Equipment recovery now uses break/resume thresholds rather than a single
+  hard-coded “critical” level.
 
-### Equipment Rules
+### Documentation Status
 
-- **Extra radar (slot 5)**: Always on (running out = death)
-- **Dual shots (slot 2)**: Always on during HUNT (running out = zero kill threat)
-- **Homing shots (slot 4)**: Only when enemy is critically damaged (damage >= 3) to conserve ammo
-- **Armor/shields (slot 1)**: Only during DEFEND, critical fuel, or teleport
-- **Stock-aware**: Equipment is not enabled if inventory count is zero
-
-### Tactical Decisions
-
-- **Proactive radar**: Scans when fuel is approaching low threshold and no fuel containers are visible
-- **Teleport search**: Relocates to farthest waypoint when fuel is low, area is confirmed empty after scan, and no high-priority behavior is active
-- **Equipment toggling**: Enables AND disables equipment per mode transition (not just enables)
+- Protocol/decode docs are in `docs/protocol-discovery.md`,
+  `docs/protocol-reference.md`, `docs/protocol-decoding-status.md`, and
+  `docs/protocol-pipeline.md`.
+- The current bot control model is documented in `docs/bot-control-model.md`.
+- The HFSM/control-architecture migration plan is in
+  `docs/bot-hfsm-refactor-plan.md`.
+- The old README descriptions of `DEFEND`, `PATROL`, `DEPOSIT_FUEL`, and
+  evaluator-based AI layers were stale and should not be used as the current
+  architecture reference.
 
 ---
 
@@ -156,7 +162,7 @@ cp .env.example .env
 - 31+ message types documented in `protocol/types.py`
 - Length-based identification for session-independent decoding
 - Container decoder (`container/`) for 0x2E subtypes
-- See `docs/decoding_status.md` for detailed message formats
+- See `docs/protocol-decoding-status.md` for detailed message formats
 
 ### Fully Decoded Messages
 
@@ -250,21 +256,23 @@ TankpitBot/
 │   │
 │   ├── bot/                  # Bot client package
 │   │   ├── __init__.py       # Re-exports Bot and all AI types
+│   │   ├── ai_strategy.py    # Main tick planner
 │   │   ├── base.py           # Bot class (state machine, CDP, commands)
-│   │   ├── commands.py       # Command encoding (move, teleport, etc.)
-│   │   ├── states.py         # State machine (IDLE, MOVING, COMBAT, etc.)
-│   │   ├── types.py          # Command TypedDicts (MoveCommand, etc.)
-│   │   ├── vision.py         # Multi-perspective tracking and rendering
-│   │   └── ai/               # AI behavior system
-│   │       ├── __init__.py   # Re-exports all AI types and functions
-│   │       ├── types.py      # AIConfigDict, AIStateDict, BehaviorScoreDict
-│   │       ├── evaluators.py # Behavior scoring (hunt, collect, defend, etc.)
-│   │       ├── equipment.py  # Equipment/fuel finders (nearest, best, deposit)
+│   │   ├── commands.py       # Command encoding helpers
+│   │   ├── executor.py       # Planner command dispatch
+│   │   ├── states.py         # Execution state machine + in-flight actions
+│   │   ├── tick_loop.py      # Sync -> decide -> execute orchestrator
+│   │   ├── tick_loop_types.py# Tick decision types
+│   │   ├── types.py          # Command TypedDicts
+│   │   ├── vision.py         # Vision/world-state fallback helpers
+│   │   ├── world_sync.py     # CDP buffer drain into decoder pipeline
+│   │   └── ai/               # AI helper modules
+│   │       ├── __init__.py   # Re-exports AI helper modules
+│   │       ├── types.py      # AI config/state/behavior types
+│   │       ├── equipment.py  # Fuel/equipment target selection
 │   │       ├── threats.py    # Enemy analysis from world state
-│   │       ├── pathfinding.py# Terrain-aware A* pathfinding
-│   │       ├── tactics.py    # Tactical decisions (radar, teleport, equipment)
-│   │       ├── actions.py    # Behavior execution (command dispatch)
-│   │       └── loop.py       # Main AI tick orchestrator
+│   │       ├── pathfinding.py# Terrain-aware path helpers
+│   │       └── tactics.py    # Equipment/radar helper logic
 │   │
 │   ├── browser/              # Browser automation package
 │   │   ├── __init__.py
