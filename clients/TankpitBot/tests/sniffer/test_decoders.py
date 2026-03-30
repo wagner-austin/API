@@ -607,6 +607,24 @@ class TestProcessReceivedMessage:
         payload = base64.b64encode(frame).decode()
         process_received_message(payload)  # should decode, log, and dispatch
 
+    def test_malformed_frame_length_breaks_early(self) -> None:
+        """process_received_message breaks on zero-length or oversized sub-message."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # Frame with msg_len=0 → triggers break at line 127
+        frame = b"\x00\x00"
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should not raise
+
+    def test_oversized_submessage_breaks_early(self) -> None:
+        """process_received_message breaks when sub-message extends beyond frame."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+
+        # Frame claims 100 bytes but only has 2 → offset + msg_len > len(data)
+        frame = b"\x64\x00\x01\x02"
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)  # should not raise
+
     def test_chat_message_decodes_and_dispatches(self) -> None:
         """process_received_message decodes 0x4D ChatMessage through full path.
 
