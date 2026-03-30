@@ -10,6 +10,8 @@ Combat phases (one action per tick):
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
@@ -442,7 +444,7 @@ def _try_combat(ctx: _DecideCtx) -> TickDecisionDict | None:
     if phase == "engaging":
         return _combat_shoot(ctx, target)
     if phase == "closing":
-        return _combat_teleport(ctx, target)
+        return _combat_close(ctx, target)
     return _combat_open_map(ctx, target)
 
 
@@ -490,11 +492,24 @@ def _combat_teleport(ctx: _DecideCtx, target: EnemyThreatDict) -> TickDecisionDi
                 "combat_target_id": target["tank_id"],
                 "combat_target_x": target["x"],
                 "combat_target_y": target["y"],
-                "combat_phase": "engaging",
+                "combat_phase": "closing",
             }
         ),
         ctx.equip,
     )
+
+
+def _combat_close(ctx: _DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+    """Phase closing: confirm actual post-teleport geometry before shooting."""
+    if _has_cardinal_combat_shot(ctx.self_state, target):
+        return _combat_shoot(ctx, target)
+    log.info(
+        "AI: not in cardinal firing position for %s from (%d,%d); re-closing",
+        target["name"],
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+    )
+    return _combat_teleport(ctx, target)
 
 
 def _combat_shoot(ctx: _DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
@@ -814,31 +829,66 @@ def _combat_landing_tile(ctx: _DecideCtx, target: EnemyThreatDict) -> tuple[int,
     Returns:
         Tuple of landing coordinates.
     """
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    if ctx.terrain is not None:
-        landing = find_teleport_landing_tile(ctx.terrain, sx, sy, target["x"], target["y"])
-        if landing is not None:
-            return landing
+    candidates = _combat_landing_candidates(ctx, target)
+    if not candidates:
         return (-1, -1)
 
-    candidates = (
+    if ctx.terrain is not None:
+        for candidate_x, candidate_y in candidates:
+            if ctx.terrain.is_passable(candidate_x, candidate_y):
+                return (candidate_x, candidate_y)
+        return (-1, -1)
+
+    return candidates[0]
+
+
+def _combat_landing_candidates(
+    ctx: _DecideCtx,
+    target: EnemyThreatDict,
+) -> list[tuple[int, int]]:
+    """Return usable adjacent landing tiles ordered by distance to self."""
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    candidates = [
         (target["x"] + 1, target["y"]),
         (target["x"] - 1, target["y"]),
         (target["x"], target["y"] + 1),
         (target["x"], target["y"] - 1),
-    )
-    best_x = target["x"]
-    best_y = target["y"]
-    best_dist = 512
+    ]
+    usable: list[tuple[int, int]] = []
     for candidate_x, candidate_y in candidates:
         if not (0 <= candidate_x <= 255 and 0 <= candidate_y <= 255):
             continue
-        dist = abs(candidate_x - sx) + abs(candidate_y - sy)
-        if dist < best_dist:
-            best_dist = dist
-            best_x = candidate_x
-            best_y = candidate_y
-    return (best_x, best_y)
+        if _is_dynamically_occupied(ctx, candidate_x, candidate_y):
+            continue
+        usable.append((candidate_x, candidate_y))
+    usable.sort(key=_combat_distance_key(sx, sy))
+    return usable
+
+
+def _combat_distance_key(sx: int, sy: int) -> Callable[[tuple[int, int]], int]:
+    """Return a stable Manhattan-distance key for combat landing sort."""
+
+    def key(pos: tuple[int, int]) -> int:
+        return abs(pos[0] - sx) + abs(pos[1] - sy)
+
+    return key
+
+
+def _is_dynamically_occupied(ctx: _DecideCtx, x: int, y: int) -> bool:
+    """Return True when a tile is occupied by a tank, container, or mine."""
+    if any(tank["x"] == x and tank["y"] == y for tank in ctx.filtered["tanks"].values()):
+        return True
+    if f"{x},{y}" in ctx.world["containers"]:
+        return True
+    return f"{x},{y}" in ctx.world["mines"]
+
+
+def _has_cardinal_combat_shot(
+    self_state: SelfStateDict,
+    target: EnemyThreatDict,
+) -> bool:
+    """Return True when self is cardinally adjacent to the target."""
+    return abs(self_state["x"] - target["x"]) + abs(self_state["y"] - target["y"]) == 1
 
 
 def _block_combat_target_and_replan(
@@ -1032,7 +1082,9 @@ def _walk_or_teleport_with_terrain(
         return _direct_move_command(ctx, tx, ty, pickup=pickup)
     waypoint = find_path_segment_target(terrain, sx, sy, tx, ty)
     if waypoint is not None:
-        return _waypoint_move_command(ctx, tx, ty, waypoint)
+        move_cmd = _waypoint_move_command(ctx, tx, ty, waypoint)
+        if move_cmd is not None:
+            return move_cmd
     return _teleport_fallback_command(terrain, sx, sy, tx, ty)
 
 
@@ -1087,22 +1139,32 @@ def _waypoint_move_command(
     ty: int,
     waypoint: tuple[int, int],
 ) -> BotCommand | None:
-    """Return an A*-derived waypoint move when the waypoint is usable.
-
-    Clamps the waypoint to the current viewport bounds. The game only
-    executes move commands within the visible viewport; A* pathfinding
-    on the full 256x256 terrain can produce waypoints beyond the frame.
-    """
+    """Return an A*-derived waypoint move when the waypoint is usable."""
     viewport = ctx.world["viewport"]
     left = viewport["left"]
     top = viewport["top"]
     right = left + viewport["width"] - 1
     bottom = top + viewport["height"] - 1
-    wx = min(max(waypoint[0], left), right)
-    wy = min(max(waypoint[1], top), bottom)
+    wx, wy = waypoint
+    if not (left <= wx <= right and top <= wy <= bottom):
+        log.info(
+            "AI: waypoint (%d,%d) for (%d,%d) is outside viewport (%d,%d)-(%d,%d)",
+            wx,
+            wy,
+            tx,
+            ty,
+            left,
+            top,
+            right,
+            bottom,
+        )
+        return None
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     if wx == sx and wy == sy:
-        log.info("AI: waypoint clamped to self position, skipping")
+        log.info("AI: waypoint is self position, skipping")
+        return None
+    if is_move_target_failed(wx, wy, ctx.timestamp_ms):
+        log.info("AI: waypoint (%d,%d) recently failed, skipping", wx, wy)
         return None
     if _is_occupied_by_enemy(ctx, wx, wy):
         log.info("AI: waypoint (%d,%d) is occupied by enemy", wx, wy)
