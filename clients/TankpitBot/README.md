@@ -12,7 +12,7 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 - **Intel Gathering**: Console listener, WebSocket URLs, JS debug info, script URLs
 - **Shared Architecture**: BrowserSession base class for sniffer, probe, and bot
 - **Type Safety**: mypy strict mode, zero `Any` types, immutable TypedDict models
-- **100% Test Coverage**: 2069 tests, statements and branches, no mocks
+- **100% Test Coverage**: statements and branches, no mocks
 - **Monorepo Integration**: Guard rules, platform_core utilities
 
 ## Quick Start
@@ -109,9 +109,13 @@ control architecture. The concrete refactor plan for the next step is in
 
 - Combat currently uses map-open as the known fallback for global enemy refresh.
 - Radar is used for local resource search, not global enemy positions.
+- World viewport state tracks the full 18x18 observable area; direct move and
+  pickup commands use the inner 16x16 actionable window.
 - The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
   `scan`, `shoot`, `map_open`) and waits for completion or timeout before
   replanning.
+- Teleport completion validates the actual landed position against the requested
+  landing target and blacklists mismatched teleport landings immediately.
 - Equipment recovery now uses break/resume thresholds rather than a single
   hard-coded “critical” level.
 
