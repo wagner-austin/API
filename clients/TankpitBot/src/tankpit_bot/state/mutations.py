@@ -261,12 +261,29 @@ def update_container_from_radar(
         New WorldStateDict with updated container, or unchanged state if empty fuel.
     """
     is_fuel = volume >= 0
+    key = coord_key(x, y)
+    existing = state["containers"].get(key)
 
-    # Skip empty fuel containers (volume=0), they have no contents to collect
+    # Radar explicitly reports empty fuel as volume=0. Treat that as authoritative
+    # removal for any existing fuel target at this coordinate so ghost containers
+    # do not linger in world state and get reselected by the planner.
     if is_fuel and volume == 0:
-        return state
+        if existing is None:
+            return state
+        new_containers = dict(state["containers"])
+        del new_containers[key]
+        return WorldStateDict(
+            self_state=state["self_state"],
+            tanks=state["tanks"],
+            containers=new_containers,
+            mines=state["mines"],
+            terrain=state["terrain"],
+            viewport=state["viewport"],
+            timestamp_ms=timestamp_ms,
+        )
 
     actual_volume = volume if is_fuel else 0
+    failed_pickups = existing["failed_pickups"] if existing is not None else 0
 
     new_container = make_container_state(
         x=x,
@@ -274,9 +291,9 @@ def update_container_from_radar(
         is_fuel=is_fuel,
         volume=actual_volume,
         timestamp_ms=timestamp_ms,
+        failed_pickups=failed_pickups,
     )
 
-    key = coord_key(x, y)
     new_containers = dict(state["containers"])
     new_containers[key] = new_container
 
