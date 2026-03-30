@@ -72,6 +72,9 @@ class TankStateDict(TypedDict):
         name: Player name.
         is_bot: Whether this is a bot player.
         is_self: Whether this is the player's own tank.
+        timestamp_ms: When this tank was last confirmed by the server
+            (world state, movement response, or radar). Used for
+            freshness-based combat target selection.
     """
 
     tank_id: int
@@ -83,6 +86,7 @@ class TankStateDict(TypedDict):
     name: str
     is_bot: bool
     is_self: bool
+    timestamp_ms: int
 
 
 class ContainerStateDict(TypedDict):
@@ -93,12 +97,20 @@ class ContainerStateDict(TypedDict):
         y: Y coordinate (0-255).
         is_fuel: True if fuel container, False if equipment.
         volume: Fuel amount (0 for equipment).
+        timestamp_ms: When this container was last confirmed by the
+            server (radar, viewport, or world state). Used for
+            freshness-based target selection.
+        failed_pickups: How many pickup attempts failed for this
+            container. Incremented on stall timeout, reset when the
+            container is re-confirmed by a fresh source.
     """
 
     x: int
     y: int
     is_fuel: bool
     volume: int
+    timestamp_ms: int
+    failed_pickups: int
 
 
 class MineStateDict(TypedDict):
@@ -227,6 +239,7 @@ def make_tank_state(
     name: str,
     is_bot: bool,
     is_self: bool,
+    timestamp_ms: int = 0,
 ) -> TankStateDict:
     """Create a tank state.
 
@@ -240,6 +253,7 @@ def make_tank_state(
         name: Player name.
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
+        timestamp_ms: When this tank was last confirmed.
 
     Returns:
         TankStateDict with the provided values.
@@ -254,6 +268,7 @@ def make_tank_state(
         name=name,
         is_bot=is_bot,
         is_self=is_self,
+        timestamp_ms=timestamp_ms,
     )
 
 
@@ -262,6 +277,8 @@ def make_container_state(
     y: int,
     is_fuel: bool,
     volume: int,
+    timestamp_ms: int = 0,
+    failed_pickups: int = 0,
 ) -> ContainerStateDict:
     """Create a container state.
 
@@ -270,11 +287,20 @@ def make_container_state(
         y: Y coordinate (0-255).
         is_fuel: True if fuel, False if equipment.
         volume: Fuel amount (0 for equipment).
+        timestamp_ms: When this container was confirmed.
+        failed_pickups: How many pickup attempts failed.
 
     Returns:
         ContainerStateDict with the provided values.
     """
-    return ContainerStateDict(x=x, y=y, is_fuel=is_fuel, volume=volume)
+    return ContainerStateDict(
+        x=x,
+        y=y,
+        is_fuel=is_fuel,
+        volume=volume,
+        timestamp_ms=timestamp_ms,
+        failed_pickups=failed_pickups,
+    )
 
 
 def make_mine_state(
@@ -413,6 +439,7 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "name": state["name"],
         "is_bot": state["is_bot"],
         "is_self": state["is_self"],
+        "timestamp_ms": state["timestamp_ms"],
     }
 
 
@@ -430,6 +457,8 @@ def encode_container_state(state: ContainerStateDict) -> JSONObject:
         "y": state["y"],
         "is_fuel": state["is_fuel"],
         "volume": state["volume"],
+        "timestamp_ms": state["timestamp_ms"],
+        "failed_pickups": state["failed_pickups"],
     }
 
 
@@ -552,6 +581,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
         is_self=require_bool(data, "is_self"),
+        timestamp_ms=require_int(data, "timestamp_ms"),
     )
 
 
@@ -572,6 +602,8 @@ def decode_container_state(data: JSONObject) -> ContainerStateDict:
         y=require_int(data, "y"),
         is_fuel=require_bool(data, "is_fuel"),
         volume=require_int(data, "volume"),
+        timestamp_ms=require_int(data, "timestamp_ms"),
+        failed_pickups=require_int(data, "failed_pickups"),
     )
 
 
