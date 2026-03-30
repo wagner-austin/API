@@ -58,7 +58,8 @@ class TestApplyEquipment:
     def test_disables_undesired_slots(self, fake_env: FakeEnv) -> None:
         """Disables combat slots not in desired list."""
         bot, fake_cdp = _make_bot(fake_env)
-        # All enabled by default, desired is only [5]
+        # Set all slots to enabled so we can test disabling
+        update_inventory_from_toggle([True, True, True, True, True])
         apply_equipment(bot, [5])
         # Should disable slots 1, 2, 4 (3 CDP calls)
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
@@ -95,7 +96,7 @@ class TestDispatchCommand:
     def test_dispatch_shoot(self, fake_env: FakeEnv) -> None:
         """Dispatches shoot command via bot.shoot_at."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_shoot_command(50, 60))
+        result = dispatch_command(bot, make_shoot_command(105, 103))
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
@@ -127,6 +128,8 @@ class TestExecute:
     def test_execute_applies_equipment_then_dispatches(self, fake_env: FakeEnv) -> None:
         """Execute applies equipment changes before dispatching command."""
         bot, fake_cdp = _make_bot(fake_env)
+        # Set all slots to enabled so execute needs to disable 1, 2, 4
+        update_inventory_from_toggle([True, True, True, True, True])
         behavior = make_behavior_score("HUNT", 50, 100, 200, "patrol_waypoint")
         decision = make_tick_decision(
             command=make_move_command(100, 200),
