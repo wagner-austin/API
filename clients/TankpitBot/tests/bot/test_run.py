@@ -152,7 +152,7 @@ class TestBotGameLoopStates:
     """Tests for Bot._game_loop AI-driven state handling."""
 
     def test_game_loop_ai_tick_no_self_state(self, fake_env: FakeEnv) -> None:
-        """Game loop runs _ai_tick_once which returns early without self_state."""
+        """Game loop returns early when tick-loop state has no self tank."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
         from tests.fakes import FakeCDPSession, FakePageInterrupting
@@ -169,13 +169,16 @@ class TestBotGameLoopStates:
 
         # AI state unchanged — no self_state to act on
         assert bot._ai_state["active_mode"] == "HUNT"
-        assert bot._ai_state["ticks_in_mode"] == 0
+        assert bot._ai_state["combat_phase"] == "none"
 
-    def test_game_loop_ai_tick_with_patrol(self, fake_env: FakeEnv) -> None:
-        """Game loop dispatches patrol move commands across multiple ticks.
+    def test_game_loop_ai_tick_reaches_ready_state_and_starts_equipment_search(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Game loop reaches IDLE and starts equipment-search teleport flow.
 
-        Tick loop structure: install_ws_hook + (drain + decide + execute) * N ticks.
-        Each tick sends: drain_js_messages (1 CDP) + equipment toggles + command (1 CDP).
+        Args:
+            fake_env: Installed fake environment fixture.
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
@@ -191,18 +194,14 @@ class TestBotGameLoopStates:
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = bot._state_data.copy()
-        bot._state_data["state"] = "IDLE"
+        bot._magic = "test_magic"
 
         interrupting_page = FakePageInterrupting(interrupt_after=3)
 
         with pytest.raises(KeyboardInterrupt):
             bot._game_loop(interrupting_page)
 
-        # Tick loop ran 3 ticks: install_ws_hook + per-tick (drain + equip + command)
         runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
-        # First call is install_ws_hook, remaining are tick operations
-        assert runtime_calls[0] == "Runtime.evaluate"
-        assert len(runtime_calls) >= 4  # at least install + 1 drain + equip + cmd
-        # AI state advanced from initial patrol
-        assert bot._ai_state["ticks_in_mode"] > 0
+        assert runtime_calls == ["Runtime.evaluate", "Runtime.evaluate"]
+        assert bot._ai_state["patrol_waypoint_index"] == 1
+        assert bot.get_state() == "TELEPORTING"
