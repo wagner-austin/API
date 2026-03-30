@@ -1080,7 +1080,8 @@ def _compute_viewport_offset(
 ) -> tuple[int, int]:
     """Compute viewport offset from self position.
 
-    The self tank is roughly centered in the 18x18 viewport.
+    World state stores the full 18x18 observable area. The actionable viewport
+    is the inner 16x16, and the self tank is not guaranteed to be centered.
 
     Args:
         self_x: Absolute X position of self tank.
