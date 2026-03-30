@@ -589,6 +589,8 @@ def get_merged_fuel_containers(vision_state: VisionStateDict) -> list[ContainerS
                 y=entry["y"],
                 is_fuel=is_fuel,
                 volume=entry["volume"],
+                timestamp_ms=0,
+                failed_pickups=0,
             )
 
     # Filter to fuel containers only
