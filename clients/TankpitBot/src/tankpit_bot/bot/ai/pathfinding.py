@@ -1,7 +1,8 @@
-"""Terrain-aware A* pathfinding for the AI system.
+"""Terrain-aware pathfinding helpers for the AI system.
 
-Computes paths that avoid water and rock tiles, using Manhattan distance
-as the heuristic. Paths are returned as lists of PathStepDict.
+Computes paths that avoid water and rock tiles, uses Manhattan distance
+as the heuristic, and exposes helper predicates for deciding whether the
+server can walk directly to a target or needs waypointed path-following.
 """
 
 from __future__ import annotations
@@ -97,6 +98,81 @@ def find_path(
     return []
 
 
+def is_direct_path_clear(
+    terrain: TerrainMapProtocol,
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+) -> bool:
+    """Check whether a straight server-side walk can reach the goal.
+
+    The game can move directly toward a target across open ground, but it does
+    not reliably path around obstacles. This helper traces the straight line
+    between the endpoints and requires every traversed tile except the start to
+    be passable.
+
+    Args:
+        terrain: Terrain map for passability checks.
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Goal X coordinate.
+        goal_y: Goal Y coordinate.
+
+    Returns:
+        True if the direct line is fully passable, False otherwise.
+    """
+    for x, y in _bresenham_line(start_x, start_y, goal_x, goal_y):
+        if x == start_x and y == start_y:
+            continue
+        if not terrain.is_passable(x, y):
+            return False
+    return True
+
+
+def find_path_segment_target(
+    terrain: TerrainMapProtocol,
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+) -> tuple[int, int] | None:
+    """Return the farthest directly walkable waypoint from an A* path.
+
+    When a direct server-side walk is blocked by terrain but an A* path exists,
+    the planner should walk as far along that path as the server can still
+    execute as one direct movement command. This avoids tiny first-turn
+    segments that force a full replan every 1-2 tiles while still avoiding
+    impossible final targets hidden behind terrain.
+
+    Args:
+        terrain: Terrain map for passability checks.
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Goal X coordinate.
+        goal_y: Goal Y coordinate.
+
+    Returns:
+        A waypoint tuple for the farthest directly walkable chunk, or None if
+        no path exists or the path has no progress beyond the start tile.
+    """
+    path = find_path(terrain, start_x, start_y, goal_x, goal_y)
+    if len(path) <= 1:
+        return None
+
+    best_x = path[1]["x"]
+    best_y = path[1]["y"]
+    for step in path[2:]:
+        candidate_x = step["x"]
+        candidate_y = step["y"]
+        if not is_direct_path_clear(terrain, start_x, start_y, candidate_x, candidate_y):
+            break
+        best_x = candidate_x
+        best_y = candidate_y
+
+    return (best_x, best_y)
+
+
 def _heuristic(x: int, y: int, goal_x: int, goal_y: int) -> int:
     """Manhattan distance heuristic for A*.
 
@@ -146,7 +222,48 @@ def path_length(path: list[PathStepDict]) -> int:
     return len(path)
 
 
+def _bresenham_line(
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+) -> list[tuple[int, int]]:
+    """Compute the integer line between two coordinates.
+
+    Args:
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Goal X coordinate.
+        goal_y: Goal Y coordinate.
+
+    Returns:
+        Inclusive list of integer coordinates along the line.
+    """
+    x = start_x
+    y = start_y
+    dx = abs(goal_x - start_x)
+    dy = abs(goal_y - start_y)
+    step_x = 1 if start_x < goal_x else -1
+    step_y = 1 if start_y < goal_y else -1
+    err = dx - dy
+
+    points: list[tuple[int, int]] = []
+    while True:
+        points.append((x, y))
+        if x == goal_x and y == goal_y:
+            return points
+        doubled = err * 2
+        if doubled > -dy:
+            err -= dy
+            x += step_x
+        if doubled < dx:
+            err += dx
+            y += step_y
+
+
 __all__ = [
     "find_path",
+    "find_path_segment_target",
+    "is_direct_path_clear",
     "path_length",
 ]
