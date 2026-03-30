@@ -33,6 +33,7 @@ class TestDecodeTankState:
             "name": "Test",
             "is_bot": True,
             "is_self": False,
+            "timestamp_ms": 5000,
         }
         tank = decode_tank_state(data)
 
@@ -42,6 +43,7 @@ class TestDecodeTankState:
         assert tank["team"] == 2
         assert tank["rank"] == 3
         assert tank["damage_state"] == 1
+        assert tank["timestamp_ms"] == 5000
         assert tank["name"] == "Test"
         assert tank["is_bot"] is True
         assert tank["is_self"] is False
@@ -58,13 +60,22 @@ class TestDecodeContainerState:
 
     def test_decodes_valid_data(self) -> None:
         """Decodes valid container state data."""
-        data: JSONObject = {"x": 50, "y": 75, "is_fuel": True, "volume": 300}
+        data: JSONObject = {
+            "x": 50,
+            "y": 75,
+            "is_fuel": True,
+            "volume": 300,
+            "timestamp_ms": 5000,
+            "failed_pickups": 0,
+        }
         container = decode_container_state(data)
 
         assert container["x"] == 50
         assert container["y"] == 75
         assert container["is_fuel"] is True
         assert container["volume"] == 300
+        assert container["timestamp_ms"] == 5000
+        assert container["failed_pickups"] == 0
 
 
 class TestDecodeMineState:
@@ -305,6 +316,7 @@ class TestDecodeWorldState:
                     "name": "TestTank",
                     "is_bot": False,
                     "is_self": False,
+                    "timestamp_ms": 500,
                 },
             },
             "containers": {},
@@ -319,6 +331,7 @@ class TestDecodeWorldState:
         assert tank["tank_id"] == 42
         assert tank["x"] == 100
         assert tank["name"] == "TestTank"
+        assert tank["timestamp_ms"] == 500
 
     def test_decodes_with_terrain(self) -> None:
         """Decodes world state with terrain tiles."""
