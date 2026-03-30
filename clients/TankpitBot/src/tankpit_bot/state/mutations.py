@@ -175,6 +175,7 @@ def update_tank_from_registry(
         name=name,
         is_bot=is_bot,
         is_self=is_self,
+        timestamp_ms=timestamp_ms,
     )
 
     new_tanks = dict(state["tanks"])
@@ -223,6 +224,7 @@ def update_tank_damage(
         name=existing["name"],
         is_bot=existing["is_bot"],
         is_self=existing["is_self"],
+        timestamp_ms=timestamp_ms,
     )
 
     new_tanks = dict(state["tanks"])
@@ -271,6 +273,7 @@ def update_container_from_radar(
         y=y,
         is_fuel=is_fuel,
         volume=actual_volume,
+        timestamp_ms=timestamp_ms,
     )
 
     key = coord_key(x, y)
