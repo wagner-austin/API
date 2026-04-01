@@ -106,6 +106,11 @@ TANK_UPDATE_EXTENDED_14 = bytes.fromhex("3f447950521a001b11879a3c2479")
 # Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]
 TANK_UPDATE_FULL_15 = bytes.fromhex("3f46c750541a001b11871c59642525")
 
+# Tunneled mine placement: 15 bytes
+# From capture after mine command by Artax at (131,126)
+# Structure: [0x4B][mine_type:1][tank_id:2 LE][count:1][positions: count*2]
+MINE_PLACEMENT_15 = bytes.fromhex("4b02150505837e837d847d847e847f")
+
 # Tank leave: 6 bytes with tank_id pattern (byte[3] == 0 for tank IDs < 256)
 # From capture: "7f138b004213" - Arterial (tank 139) left the game
 TANK_LEAVE_6 = bytes.fromhex("7f138b004213")

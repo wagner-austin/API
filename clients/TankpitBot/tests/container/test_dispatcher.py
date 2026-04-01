@@ -20,6 +20,7 @@ from tests.container.test_data import (
     CONTAINER_PICKUP_FUEL,
     DEACTIVATION_DEATH_7,
     DEACTIVATION_KILL_5,
+    MINE_PLACEMENT_15,
     MOVEMENT_16_SSSS,
     MOVEMENT_18_ENNNW,
     MOVEMENT_19_WWWWWW,
@@ -57,6 +58,10 @@ class TestIdentifyContainerType:
         """Correctly identifies combat hit structure."""
         assert identify_container_type(COMBAT_HIT_11_OUTGOING) == ContainerMessageType.COMBAT_HIT
         assert identify_container_type(COMBAT_HIT_11_INCOMING) == ContainerMessageType.COMBAT_HIT
+
+    def test_identifies_mine_placement(self) -> None:
+        """Correctly identifies captured tunneled mine placement."""
+        assert identify_container_type(MINE_PLACEMENT_15) == ContainerMessageType.MINE_PLACEMENT
 
     def test_identifies_tank_registry(self) -> None:
         """Correctly identifies tank registry structure."""
@@ -181,6 +186,20 @@ class TestDecodeContainerMessage:
         """Dispatches to combat hit decoder."""
         result = decode_container_message(COMBAT_HIT_11_OUTGOING)
         assert result["msg_type"] == "combat_hit"
+
+    def test_dispatches_mine_placement(self) -> None:
+        """Dispatches to tunneled mine placement decoder."""
+        result = decode_container_message(MINE_PLACEMENT_15)
+        assert result["msg_type"] == 0x4B
+        assert result["mine_type"] == 2
+        assert result["tank_id"] == 1301
+        assert result["positions"] == [
+            (131, 126),
+            (131, 125),
+            (132, 125),
+            (132, 126),
+            (132, 127),
+        ]
 
     def test_dispatches_tank_registry(self) -> None:
         """Dispatches to tank registry decoder."""

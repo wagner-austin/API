@@ -9,6 +9,7 @@ import pytest
 
 from tankpit_bot.container import (
     ContainerDecodeError,
+    MinePlacementDict,
     TankLeaveDict,
     TankRegistryDict,
     TankStatusShortDict,
@@ -24,8 +25,10 @@ from tankpit_bot.container import (
     decode_tank_update_extended,
     decode_tank_update_full,
 )
+from tankpit_bot.container.decoders.combat import decode_mine_placement
 from tankpit_bot.container.decoders.tank import _parse_tank_name
 from tests.container.test_data import (
+    MINE_PLACEMENT_15,
     TANK_LEAVE_6,
     TANK_LEAVE_LARGE_ID,
     TANK_REGISTRY_16,
@@ -107,6 +110,32 @@ class TestDecodeTankRegistry:
         result = decode_tank_registry(TANK_REGISTRY_BOT)
         assert result["is_bot"] is True
         assert result["is_container"] is False
+
+
+class TestDecodeMinePlacement:
+    """Tests for tunneled mine placement decoding."""
+
+    def test_decodes_captured_mine_placement(self) -> None:
+        """Decodes captured 15-byte tunneled mine placement correctly."""
+        result = decode_mine_placement(MINE_PLACEMENT_15)
+        assert result["msg_type"] == 0x4B
+        assert result["mine_type"] == 2
+        assert result["tank_id"] == 1301
+        assert result["positions"] == [
+            (131, 126),
+            (131, 125),
+            (132, 125),
+            (132, 126),
+            (132, 127),
+        ]
+
+    def test_mine_placement_dict_keys(self) -> None:
+        """MinePlacementDict has expected keys."""
+        result: MinePlacementDict = decode_mine_placement(MINE_PLACEMENT_15)
+        assert result["msg_type"] == 0x4B
+        assert result["mine_type"] == 2
+        assert result["tank_id"] == 1301
+        assert len(result["positions"]) == 5
         assert result["container_x"] is None
         assert result["container_y"] is None
         assert result["container_viewport_x"] is None
