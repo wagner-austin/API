@@ -21,10 +21,10 @@ class MineTracker:
     - Shooting enemy mines triggers chain reaction detonations
 
     Message Types:
-    - Mine placement confirmation: decoded signature 0x4B 'K'
-      Format: owner_id (u16 LE), positions follow
-    - Mine detonation/chain: decoded signature 0x45 'E'
-      Format: count, then (x, y) pairs for each detonated mine
+    - Mine placement confirmation: top-level 0x4B
+      Format: mine_type, owner_id (u16 LE), count, then (x, y) pairs
+    - Mine detonation/chain: top-level 0x45
+      Format: (x, y) pairs for each detonated mine
     - Mine drop command: type=4, id=98 or id=100
     """
 
@@ -72,23 +72,19 @@ class MineTracker:
         if direction == "sent" and len(body) >= 5 and body[0] == 0x21:
             return self._process_mine_command(body)
 
-        if len(body) < 3 or body[0] != 0x2E:
+        msg_type = body[0]
+        if msg_type not in (0x45, 0x4B):
             return None
 
-        decoded = bytearray(len(body) - 1)
+        decoded = bytearray(len(body))
+        decoded[0] = msg_type
         xor_table = self._xor_table
-        for i in range(len(decoded)):
-            decoded[i] = body[i + 1] ^ xor_table[i]
+        for i in range(1, len(body)):
+            decoded[i] = body[i] ^ xor_table[i - 1]
 
-        sig = decoded[0] if decoded else 0
-
-        if sig == 0x4B:
+        if msg_type == 0x4B:
             return self._parse_mine_placed(decoded)
-
-        if sig == 0x45:
-            return self._parse_mine_detonation(decoded)
-
-        return None
+        return self._parse_mine_detonation(decoded)
 
     def _process_mine_command(self, body: bytes) -> str | None:
         """Process sent mine drop command.
@@ -133,10 +129,17 @@ class MineTracker:
         self._mines_placed += 1
 
         if len(decoded) >= 5:
-            owner_id = decoded[1] | (decoded[2] << 8)
-            x = decoded[3]
-            y = decoded[4]
-            return f"[MINE:PLACED] owner={owner_id} at ({x},{y})"
+            owner_id = decoded[2] | (decoded[3] << 8)
+            count = decoded[4]
+            positions: list[str] = []
+            for i in range(count):
+                offset = 5 + i * 2
+                if offset + 1 >= len(decoded):
+                    break
+                positions.append(f"({decoded[offset]},{decoded[offset + 1]})")
+            if positions:
+                return f"[MINE:PLACED] owner={owner_id} count={count}: " + " ".join(positions)
+            return f"[MINE:PLACED] owner={owner_id} count={count}"
 
         return f"[MINE:PLACED] (total: {self._mines_placed})"
 
@@ -149,25 +152,21 @@ class MineTracker:
         Returns:
             Mine detonation string.
         """
-        if len(decoded) < 2:
+        if len(decoded) < 3:
             return "[MINE:EXPLODE]"
 
-        count = decoded[1]
+        count = (len(decoded) - 1) // 2
         self._mines_detonated += count
 
         positions = []
         for i in range(count):
-            offset = 2 + i * 2
-            if offset + 1 < len(decoded):
-                x = decoded[offset]
-                y = decoded[offset + 1]
-                positions.append(f"({x},{y})")
+            offset = 1 + i * 2
+            x = decoded[offset]
+            y = decoded[offset + 1]
+            positions.append(f"({x},{y})")
 
-        if positions:
-            chain_str = " CHAIN!" if count > 1 else ""
-            return f"[MINE:EXPLODE]{chain_str} {count} mines: {' '.join(positions)}"
-
-        return f"[MINE:EXPLODE] {count} mines"
+        chain_str = " CHAIN!" if count > 1 else ""
+        return f"[MINE:EXPLODE]{chain_str} {count} mines: {' '.join(positions)}"
 
     @property
     def mines_placed(self) -> int:
