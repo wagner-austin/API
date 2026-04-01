@@ -14,6 +14,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot.browser.accounts import resolve_account
 
 log = get_logger(__name__)
 
@@ -429,22 +430,30 @@ def _try_account_login_with_env(
     page: PageProtocol,
     cdp: CDPSessionProtocol,
 ) -> bool | None:
-    """Attempt account login using environment credentials.
+    """Attempt account login using resolved credentials.
+
+    Resolves credentials via the account registry:
+    1. TANKPIT_USERNAME + TANKPIT_PASSWORD env vars (explicit override)
+    2. TANKPIT_ACCOUNT selector + accounts.json
+    3. First account in accounts.json (default)
 
     Args:
         page: Playwright page.
         cdp: CDP session for JavaScript evaluation.
 
     Returns:
-        True if login succeeded, False if login failed, None if no credentials.
-    """
-    username = _test_hooks.get_env("TANKPIT_USERNAME")
-    password = _test_hooks.get_env("TANKPIT_PASSWORD")
+        True if login succeeded, False if login failed, None if no account configured.
 
-    if username is None or password is None:
+    Raises:
+        AccountNotFoundError: If TANKPIT_ACCOUNT selector is invalid.
+        InvalidJsonError: If accounts.json is malformed.
+        JSONTypeError: If account data is structurally invalid.
+    """
+    account = resolve_account()
+    if account is None:
         return None
 
-    account_result = handle_account_login(page, cdp, username, password)
+    account_result = handle_account_login(page, cdp, account["username"], account["password"])
     return account_result["success"]
 
 
