@@ -1,5 +1,6 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
+OUTPUT ?= capture_session.json
 
 .PHONY: lint test check install sniff probe bot decode discover analyze-viewport
 
@@ -25,7 +26,7 @@ test:
 check: lint | test
 
 sniff: install
-	poetry run tankpit-sniff
+	$$env:TANKPIT_OUTPUT = '$(OUTPUT)'; poetry run tankpit-sniff
 
 probe: install
 	poetry run tankpit-probe
