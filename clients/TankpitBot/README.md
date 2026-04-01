@@ -111,6 +111,9 @@ control architecture. The concrete refactor plan for the next step is in
 - Radar is used for local resource search, not global enemy positions.
 - World viewport state tracks the full 18x18 observable area; direct move and
   pickup commands use the inner 16x16 actionable window.
+- `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
+  authoritative for viewport origin and tile cache updates, but absence from a
+  single `0x5A` patch does not imply tank absence.
 - The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
   `scan`, `shoot`, `map_open`) and waits for completion or timeout before
   replanning.
@@ -189,7 +192,7 @@ cp .env.example .env
 | Length | Type | Description |
 |--------|------|-------------|
 | 2-3 | tank_status_sync | Heartbeat/sync |
-| 4 | player_list_short | Active players query |
+| 4 | tunneled terrain_update / legacy short subtype | Real captures include tunneled `0x4A` structure updates here |
 | 5 | deactivation_kill | You killed another tank |
 | 6 | tank_leave | Player exits game |
 | 7 | deactivation_death | You were killed |
