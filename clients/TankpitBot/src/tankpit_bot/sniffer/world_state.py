@@ -25,8 +25,8 @@ from tankpit_bot.inventory import (
 )
 from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.state import (
-    add_mine,
     WorldStateDict,
+    add_mine,
     add_mine_from_radar,
     coord_key,
     make_container_state,
@@ -1510,7 +1510,6 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
     Returns:
         True if the message was handled, False otherwise.
     """
-    global _world_state
     match decoded:
         case {
             "msg_type": 0x4B,
@@ -1518,35 +1517,7 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
             "tank_id": int(tank_id),
             "positions": list(positions),
         }:
-            self_state = _world_state["self_state"]
-            team: int | None = None
-            if self_state is not None and self_state["tank_id"] == tank_id:
-                team = self_state["team"]
-            else:
-                tank_state = _world_state["tanks"].get(str(tank_id))
-                if tank_state is not None:
-                    team = tank_state["team"]
-            if team is None:
-                return True
-            timestamp_ms = get_current_time_ms()
-            for position in positions:
-                if not (
-                    isinstance(position, tuple)
-                    and len(position) == 2
-                    and isinstance(position[0], int)
-                    and isinstance(position[1], int)
-                ):
-                    continue
-                _world_state = add_mine(
-                    _world_state,
-                    position[0],
-                    position[1],
-                    mine_type,
-                    tank_id,
-                    team,
-                    timestamp_ms,
-                )
-            return True
+            return _dispatch_mine_placement(mine_type, tank_id, positions)
         case {
             "msg_type": "tank_registry",
             "is_container": True,
@@ -1591,6 +1562,46 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
             update_world_state_from_tank_registry(tid, name, team_str, rank, is_bot, ty, tvx)
             return True
     return _dispatch_tank_event(decoded)
+
+
+def _dispatch_mine_placement(
+    mine_type: int,
+    tank_id: int,
+    positions: list[tuple[int, int]],
+) -> bool:
+    """Dispatch tunneled mine placement into world state.
+
+    Args:
+        mine_type: Mine type from protocol payload.
+        tank_id: ID of the placing tank.
+        positions: Absolute mine coordinates.
+
+    Returns:
+        True after attempting to apply the placement.
+    """
+    global _world_state
+    self_state = _world_state["self_state"]
+    team: int | None = None
+    if self_state is not None and self_state["tank_id"] == tank_id:
+        team = self_state["team"]
+    else:
+        tank_state = _world_state["tanks"].get(str(tank_id))
+        if tank_state is not None:
+            team = tank_state["team"]
+    if team is None:
+        return True
+    timestamp_ms = get_current_time_ms()
+    for x, y in positions:
+        _world_state = add_mine(
+            _world_state,
+            x,
+            y,
+            mine_type,
+            tank_id,
+            team,
+            timestamp_ms,
+        )
+    return True
 
 
 def _parse_world_state_blob(wd: bytes) -> None:
