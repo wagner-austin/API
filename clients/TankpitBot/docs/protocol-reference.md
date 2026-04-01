@@ -100,12 +100,12 @@ byte 3+: data (varies by command)
 | `I` | 0x49 | BINARY | `Xf` | Item pickup confirmation (equipment gained) | ✅ VERIFIED |
 | `g` | 0x67 | BINARY | `Wf` | Equipment gain (equipment flags) | ✅ VERIFIED |
 | `t` | 0x74 | BINARY | `Yf` | Equipment toggle (5 enabled flags) | ✅ VERIFIED |
-| `K` | 0x4B | BINARY | `Dg` | Mine placement (owner id, position x/y) | ✅ VERIFIED |
+| `K` | 0x4B | BINARY / tunneled 0x2E | `Dg` | Mine placement (owner id, counted position list) | ✅ VERIFIED |
 | `E` | 0x45 | BINARY | `dh` | Mine detonation (positions array) | ✅ VERIFIED |
 | `F` | 0x46 | BINARY | `Fg` | Radar acknowledgement | ✅ VERIFIED |
 | `M` | 0x4D | BINARY | `Qg` | Chat message (tank id, message type) | 🔍 TODO |
 | `X` | 0x58 | BINARY | `Ug` | Tank exit/disconnect (tank id) | ✅ VERIFIED |
-| `Z` | 0x5A | BINARY | `Vg` | Map update (zone x, zone y, tile data) | 🔍 TODO |
+| `Z` | 0x5A | BINARY | `Vg` | Sparse viewport tile patch (origin + tile cache/overlay/terrain) | ✅ VERIFIED |
 | `(` | 0x28 | BINARY | `Uf` | Tank entry (rank, position, name) | 🔍 TODO |
 | `)` | 0x29 | BINARY | `Vf` | Tank exit (id, eliminated flag) | 🔍 TODO |
 | `>` | 0x3E | BINARY | `Qf` | Tank status (rank, equipment, pos) | 🔍 TODO |
@@ -143,8 +143,8 @@ See `container/` for full implementation.
 | 14 | any | TANK_UPDATE_EXTENDED | tank_id + status_data | ✅ VERIFIED |
 | 15 | any | TANK_UPDATE_FULL | tank_id + status_data | ✅ VERIFIED |
 | 16-20 | any | TANK_REGISTRY | tank_id + info_bytes (name) | ✅ VERIFIED |
-| variable | 0x4F | RADAR_RESULT | Fuel/entity positions | ✅ VERIFIED |
-| variable | 0x4B | MINE_PLACED | owner_id + position | ✅ VERIFIED |
+| variable | 0x4F | RADAR_RESULT | Radar scan results (containers + revealed mines) | ✅ VERIFIED |
+| variable | 0x4B | MINE_PLACED | owner_id + counted position list | ✅ VERIFIED |
 | variable | 0x45 | MINE_EXPLODE | count + position array | ✅ VERIFIED |
 
 #### Text Messages (pipe-delimited)
