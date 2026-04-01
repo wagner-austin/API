@@ -752,6 +752,45 @@ class TestDispatchTankMessages:
         assert tile["terrain_type"] == 2
         assert tile["entity_id"] == 0
 
+    def test_dispatch_tunneled_mine_placement_adds_mines(self) -> None:
+        """Test tunneled 0x4B mine placement updates world mine state."""
+        from tankpit_bot.protocol import MovementResponseDict
+
+        dispatch_world_state_update(
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=131,
+                y=126,
+                direction=8,
+                rank=1,
+                leaderboard_position=1313,
+            )
+        )
+
+        dispatch_world_state_update(
+            {
+                "msg_type": 0x4B,
+                "mine_type": 2,
+                "tank_id": 1301,
+                "positions": [
+                    (131, 126),
+                    (131, 125),
+                    (132, 125),
+                    (132, 126),
+                    (132, 127),
+                ],
+            }
+        )
+
+        state = world_state._world_state
+        assert state["mines"]["131,126"]["team"] == 2
+        assert state["mines"]["131,126"]["tank_id"] == 1301
+        assert state["mines"]["131,126"]["mine_type"] == 2
+        assert state["mines"]["132,127"]["x"] == 132
+        assert state["mines"]["132,127"]["y"] == 127
+
     def test_dispatch_tank_status_short_updates_damage(self) -> None:
         """Test dispatch handles tank_status_short by updating damage."""
         from tankpit_bot.container import TankStatusShortDict
