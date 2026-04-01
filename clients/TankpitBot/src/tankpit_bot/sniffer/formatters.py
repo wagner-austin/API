@@ -203,7 +203,7 @@ def format_radar_details(d: protocol.BinaryMessage) -> str:
         mines = len(d["mines"])
         return f"containers={containers} mines={mines}"
     if d["msg_type"] == 0x5A:
-        return f"dir={d['direction']} entities={len(d['entities'])}"
+        return f"viewport=({d['viewport_left']},{d['viewport_top']}) entities={len(d['entities'])}"
     return ""
 
 
