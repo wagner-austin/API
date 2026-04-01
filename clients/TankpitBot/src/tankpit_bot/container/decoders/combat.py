@@ -15,6 +15,7 @@ from tankpit_bot.container.types import (
     CombatHitDict,
     DeactivationDeathDict,
     DeactivationKillDict,
+    MinePlacementDict,
 )
 
 log = get_logger(__name__)
@@ -36,6 +37,54 @@ def is_combat_hit_structure(data: bytes) -> bool:
         True if structure matches combat hit pattern.
     """
     return len(data) == 11
+
+
+def is_mine_placement_structure(data: bytes) -> bool:
+    """Check if data matches tunneled mine placement structure.
+
+    Criteria:
+    - Exactly 15 bytes
+    - First decoded byte is 0x4B
+    - Count byte at index 4 yields an exact payload length
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        True if structure matches tunneled mine placement.
+    """
+    if len(data) != 15 or data[0] != 0x4B:
+        return False
+    count = data[4]
+    return len(data) == 5 + count * 2
+
+
+def decode_mine_placement(data: bytes) -> MinePlacementDict:
+    """Decode tunneled mine placement from container body.
+
+    Structure (15 bytes):
+      [subtype:1] [mine_type:1] [tank_id:2 LE] [count:1] [positions: count*2]
+
+    Args:
+        data: Decoded container body bytes.
+
+    Returns:
+        Decoded mine placement data.
+    """
+    require_exact_length(data, 15, "MinePlacement")
+    mine_type = data[1]
+    tank_id = extract_uint16_le(data, 2, "MinePlacement.tank_id")
+    count = data[4]
+    positions: list[tuple[int, int]] = []
+    for i in range(count):
+        offset = 5 + i * 2
+        positions.append((data[offset], data[offset + 1]))
+    return MinePlacementDict(
+        msg_type=0x4B,
+        mine_type=mine_type,
+        tank_id=tank_id,
+        positions=positions,
+    )
 
 
 def decode_combat_hit(data: bytes) -> CombatHitDict:
@@ -167,7 +216,9 @@ __all__ = [
     "decode_combat_hit",
     "decode_deactivation_death",
     "decode_deactivation_kill",
+    "decode_mine_placement",
     "is_combat_hit_structure",
     "is_deactivation_death_structure",
     "is_deactivation_kill_structure",
+    "is_mine_placement_structure",
 ]
