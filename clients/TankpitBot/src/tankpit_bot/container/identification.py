@@ -11,6 +11,7 @@ from tankpit_bot.container.decoders.combat import (
     is_combat_hit_structure,
     is_deactivation_death_structure,
     is_deactivation_kill_structure,
+    is_mine_placement_structure,
 )
 from tankpit_bot.container.decoders.misc import (
     is_chunk_data_structure,
@@ -53,6 +54,9 @@ def _identify_tank_update_type(data: bytes) -> ContainerMessageType:
     # Tank update extended: exactly 14 bytes
     if is_tank_update_extended_structure(data):
         return ContainerMessageType.TANK_UPDATE_EXTENDED
+    # Tunneled mine placement: exactly 15 bytes with subtype 0x4B
+    if is_mine_placement_structure(data):
+        return ContainerMessageType.MINE_PLACEMENT
     # Tank update full: exactly 15 bytes
     if is_tank_update_full_structure(data):
         return ContainerMessageType.TANK_UPDATE_FULL

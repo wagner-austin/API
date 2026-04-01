@@ -10,9 +10,11 @@ from tankpit_bot.container.decoders.combat import (
     decode_combat_hit,
     decode_deactivation_death,
     decode_deactivation_kill,
+    decode_mine_placement,
     is_combat_hit_structure,
     is_deactivation_death_structure,
     is_deactivation_kill_structure,
+    is_mine_placement_structure,
 )
 from tankpit_bot.container.decoders.misc import (
     decode_chunk_data,
@@ -136,6 +138,8 @@ def _decode_single_type(msg_type: ContainerMessageType, data: bytes) -> Containe
     """
     if msg_type == ContainerMessageType.COMBAT_HIT:
         return decode_combat_hit(data)
+    if msg_type == ContainerMessageType.MINE_PLACEMENT:
+        return decode_mine_placement(data)
     if msg_type == ContainerMessageType.TANK_REGISTRY:
         return decode_tank_registry(data)
     if msg_type == ContainerMessageType.MOVEMENT:
@@ -231,6 +235,7 @@ __all__ = [
     "decode_container_pickup",
     "decode_deactivation_death",
     "decode_deactivation_kill",
+    "decode_mine_placement",
     "decode_movement",
     "decode_player_list_extended",
     "decode_player_list_short",
@@ -253,6 +258,7 @@ __all__ = [
     "is_container_pickup_structure",
     "is_deactivation_death_structure",
     "is_deactivation_kill_structure",
+    "is_mine_placement_structure",
     "is_movement_structure",
     "is_player_list_extended_structure",
     "is_player_list_short_structure",
