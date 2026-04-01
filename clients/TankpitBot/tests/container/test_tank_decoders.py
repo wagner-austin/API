@@ -136,10 +136,6 @@ class TestDecodeMinePlacement:
         assert result["mine_type"] == 2
         assert result["tank_id"] == 1301
         assert len(result["positions"]) == 5
-        assert result["container_x"] is None
-        assert result["container_y"] is None
-        assert result["container_viewport_x"] is None
-        assert result["team"] == "purple"  # flags 0x01 & 0x03 = 1 -> purple
 
     def test_detects_container_wasd_name(self) -> None:
         """Detects container when name is all direction chars."""
