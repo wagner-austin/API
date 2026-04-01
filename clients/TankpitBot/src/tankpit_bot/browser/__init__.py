@@ -13,6 +13,17 @@ organized into submodules:
 
 from __future__ import annotations
 
+from tankpit_bot.browser.accounts import (
+    Account,
+    AccountNotFoundError,
+    decode_account,
+    decode_account_list,
+    encode_account,
+    encode_account_list,
+    load_accounts,
+    resolve_account,
+    select_account,
+)
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
@@ -61,7 +72,9 @@ __all__ = [
     "STATIC_KEY_LENGTH",
     "STATIC_KEY_PATH",
     "TEXT_MESSAGE_TYPES",
+    "Account",
     "AccountLoginResult",
+    "AccountNotFoundError",
     "BrowserError",
     "BrowserSession",
     "DOMBarElement",
@@ -75,7 +88,11 @@ __all__ = [
     "LogCategory",
     "PlaywrightNotInstalledError",
     "cdp_timestamp_to_ms",
+    "decode_account",
+    "decode_account_list",
     "decode_game_log_entry",
+    "encode_account",
+    "encode_account_list",
     "encode_game_log_entry",
     "extract_xor_first_bytes",
     "find_best_static_byte",
@@ -83,8 +100,11 @@ __all__ = [
     "handle_account_login",
     "handle_guest_login",
     "handle_login_flow",
+    "load_accounts",
     "load_static_key",
     "probe_all",
     "reset_cdp_time_offset",
+    "resolve_account",
     "save_static_key",
+    "select_account",
 ]
