@@ -27,14 +27,16 @@ from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.state import (
     WorldStateDict,
     add_mine_from_radar,
+    coord_key,
     make_container_state,
     make_empty_world_state,
+    make_terrain_tile,
     pickup_container,
     remove_tank,
     render_world_ascii,
     set_self_fuel,
     update_container_from_radar,
-    update_self_position_and_viewport,
+    update_self_position,
     update_tank_damage,
     update_tank_from_registry,
 )
@@ -111,14 +113,6 @@ _failed_move_targets: dict[str, int] = {}
 # TTL for failed move targets (30 seconds). After this, the target is
 # eligible again in case the obstacle was transient.
 _FAILED_MOVE_TTL_MS = 30000
-
-# Buffered viewport entities — stored from ViewportUpdate (0x5A), processed
-# when MoveResponse (0x3D) provides the absolute self position needed to
-# compute viewport offset. Entity pattern from protocol analysis:
-#   entity_id == -1 (0xFFFF): equipment container
-#   entity_id > 0, not a known tank: fuel container (entity_id ≈ volume)
-#   entity_id > 0, known tank: tank (already tracked)
-_pending_viewport_entities: list[dict[str, int]] = []
 
 
 def mark_combat_hit(weapon_byte: int) -> None:
@@ -309,7 +303,7 @@ def reset_world_state() -> None:
     """Reset world state for new session (used by tests)."""
     global _world_state, _terrain_map, _room_images, _selected_room, _inventory_state
     global _got_confirmed_hit, _got_our_shot_response
-    global _killed_tank_ids, _pending_viewport_entities, _teleport_landed
+    global _killed_tank_ids, _teleport_landed
     global _radar_scan_complete
     _world_state = make_empty_world_state()
     _terrain_map = None
@@ -319,7 +313,6 @@ def reset_world_state() -> None:
     _got_confirmed_hit = False
     _got_our_shot_response = False
     _killed_tank_ids = set()
-    _pending_viewport_entities = []
     _teleport_landed = False
     _radar_scan_complete = False
     _failed_move_targets.clear()
@@ -586,7 +579,7 @@ def update_world_state_from_position(x: int, y: int) -> None:
         y: Self Y coordinate.
     """
     global _world_state
-    _world_state = update_self_position_and_viewport(_world_state, x, y, get_current_time_ms())
+    _world_state = update_self_position(_world_state, x, y, get_current_time_ms())
 
 
 def update_world_state_from_radar(
@@ -800,12 +793,6 @@ def update_world_state_from_move_response_full(
     elif self_state["tank_id"] == tank_id:
         # Update self position
         update_world_state_from_position(x, y)
-
-    # Only process viewport entities for OUR MoveResponse.
-    # ViewportUpdate only arrives when the viewport shifts (self is centered).
-    self_id = _world_state["self_state"]["tank_id"] if _world_state["self_state"] else -1
-    if tank_id == self_id:
-        _process_buffered_viewport_entities(x, y)
 
     # Update the tank in the tank list
     key = str(tank_id)
@@ -1059,38 +1046,33 @@ def render_world_state_ascii() -> str | None:
     return render_world_ascii(_world_state, terrain)
 
 
-def _update_viewport_entities(entities: list[dict[str, int]]) -> None:
-    """Buffer viewport entities for processing when MoveResponse arrives.
-
-    ViewportUpdate (0x5A) arrives BEFORE MoveResponse (0x3D). The entities
-    have viewport-relative col/row, but we need the absolute self position
-    from MoveResponse to compute the viewport offset. So we buffer here
-    and process in _process_buffered_viewport_entities.
-
-    Args:
-        entities: List of viewport entity dicts with col, row, entity_id, value, terrain_type.
-    """
-    global _pending_viewport_entities
-    _pending_viewport_entities = entities
-
-
-def _compute_viewport_offset(
-    self_x: int,
-    self_y: int,
-) -> tuple[int, int]:
-    """Compute viewport offset from self position.
-
-    World state stores the full 18x18 observable area. The actionable viewport
-    is the inner 16x16, and the self tank is not guaranteed to be centered.
+def _update_viewport_entities(
+    viewport_left: int,
+    viewport_top: int,
+    entities: list[dict[str, int]],
+) -> None:
+    """Apply a viewport update using explicit viewport origin from 0x5A.
 
     Args:
-        self_x: Absolute X position of self tank.
-        self_y: Absolute Y position of self tank.
-
-    Returns:
-        Tuple of (vp_left, vp_top).
+        viewport_left: Absolute left edge of the observable 18x18 frame.
+        viewport_top: Absolute top edge of the observable 18x18 frame.
+        entities: Viewport entity dicts with col, row, entity_id, value, terrain_type.
     """
-    return (self_x - 9, self_y - 9)
+    global _world_state
+
+    from tankpit_bot.state.types import ViewportStateDict
+
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=_world_state["terrain"],
+        viewport=ViewportStateDict(left=viewport_left, top=viewport_top, width=18, height=18),
+        timestamp_ms=_world_state["timestamp_ms"],
+    )
+
+    _add_containers_from_entities(entities, viewport_left, viewport_top)
 
 
 def _add_containers_from_entities(
@@ -1098,12 +1080,11 @@ def _add_containers_from_entities(
     vp_left: int,
     vp_top: int,
 ) -> None:
-    """Add containers from viewport entities to world state.
+    """Add containers from ``0x5A`` tile patches to world state.
 
-    Viewport entity IDs are NOT tank IDs — tanks are tracked separately.
-    entity_id > 0: fuel container (entity_id ≈ volume)
-    entity_id == -1 (0xFFFF): equipment container
-    entity_id == 0: non-container entity (ignored)
+    Client JS applies ``0x5A`` rows into tile cache fields, not tank presence.
+    ``entity_id > 0`` marks fuel on the tile, ``entity_id == -1`` marks
+    equipment, and ``entity_id == 0`` means no container cache update.
 
     Args:
         entities: Viewport entity list.
@@ -1136,79 +1117,37 @@ def _add_containers_from_entities(
             )
 
 
-def _process_buffered_viewport_entities(self_x: int, self_y: int) -> None:
-    """Process buffered viewport entities using the self position for offset.
-
-    Called from MoveResponse handler after self position is known.
-    Skips processing if self tank is not found in the entity list (cannot
-    verify viewport offset). After adding containers, invalidates tanks
-    within the viewport bounds that are absent from the entity list.
+def _update_terrain_tiles(updates: list[tuple[int, int, int]]) -> None:
+    """Apply absolute terrain/structure tile updates to world state.
 
     Args:
-        self_x: Absolute X position of self tank.
-        self_y: Absolute Y position of self tank.
+        updates: Absolute `(x, y, terrain_type)` triples from protocol 0x4A.
     """
-    global _pending_viewport_entities, _world_state
-    entities = _pending_viewport_entities
-    _pending_viewport_entities = []
+    global _world_state
 
-    if not entities:
-        return
+    new_terrain = dict(_world_state["terrain"])
+    timestamp_ms = get_current_time_ms()
 
-    vp_left, vp_top = _compute_viewport_offset(self_x, self_y)
-
-    # Update viewport in world state
-    from tankpit_bot.state.types import ViewportStateDict
+    for x, y, terrain_type in updates:
+        key = coord_key(x, y)
+        existing = new_terrain.get(key)
+        entity_id = existing["entity_id"] if existing is not None else 0
+        new_terrain[key] = make_terrain_tile(
+            x=x,
+            y=y,
+            terrain_type=terrain_type,
+            entity_id=entity_id,
+        )
 
     _world_state = WorldStateDict(
         self_state=_world_state["self_state"],
         tanks=_world_state["tanks"],
         containers=_world_state["containers"],
         mines=_world_state["mines"],
-        terrain=_world_state["terrain"],
-        viewport=ViewportStateDict(left=vp_left, top=vp_top, width=18, height=18),
-        timestamp_ms=_world_state["timestamp_ms"],
+        terrain=new_terrain,
+        viewport=_world_state["viewport"],
+        timestamp_ms=timestamp_ms,
     )
-
-    _add_containers_from_entities(entities, vp_left, vp_top)
-    _invalidate_absent_viewport_tanks(entities, vp_left, vp_top)
-
-
-def _invalidate_absent_viewport_tanks(
-    entities: list[dict[str, int]],
-    vp_left: int,
-    vp_top: int,
-) -> None:
-    """Invalidate tanks within viewport that are absent from the entity list.
-
-    Tanks within the viewport bounds but not present in the viewport entity
-    list have likely moved or been destroyed. Their positions are reset to
-    (0, 0) so the AI does not target stale locations.
-
-    Args:
-        entities: Current viewport entity list.
-        vp_left: Viewport left offset.
-        vp_top: Viewport top offset.
-    """
-    visible_ids: set[int] = set()
-    for ent in entities:
-        eid = ent.get("entity_id", 0)
-        if eid != 0:
-            visible_ids.add(eid)
-
-    vp_right = vp_left + 18
-    vp_bottom = vp_top + 18
-
-    for tank in list(_world_state["tanks"].values()):
-        tid = tank["tank_id"]
-        if tank["is_self"]:
-            continue
-        tx, ty = tank["x"], tank["y"]
-        if tx == 0 and ty == 0:
-            continue
-        in_viewport = vp_left <= tx < vp_right and vp_top <= ty < vp_bottom
-        if in_viewport and tid not in visible_ids:
-            _update_tank_position(tid, 0, 0)
 
 
 def _apply_waypoints(start_x: int, start_y: int, waypoints: str) -> tuple[int, int]:
@@ -1494,11 +1433,16 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             update_world_state_from_move_response_full(tid, x, y, team, rank)
             _render_ascii_if_available("MovementResponse")
             return True
+        case {"msg_type": 0x4A, "updates": list(updates)}:
+            _update_terrain_tiles(updates)
+            return True
         case {
             "msg_type": 0x5A,
+            "viewport_left": int(viewport_left),
+            "viewport_top": int(viewport_top),
             "entities": list(entities),
         }:
-            _update_viewport_entities(entities)
+            _update_viewport_entities(viewport_left, viewport_top, entities)
             return True
     return _dispatch_container_movement(decoded)
 
@@ -1515,9 +1459,16 @@ def _dispatch_tank_event(decoded: protocol.BinaryMessage) -> bool:
     match decoded:
         case {
             "msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full",
+            "flags": int(flags),
             "tank_id": int(tid),
             "status_data": bytes(sd),
         }:
+            # Flag 0xCD appears during obstacle pickup/drop interactions. The
+            # payload bytes correlate with structure/object coordinates rather
+            # than tank position, so treating the first two bytes as x/y
+            # pollutes tank state.
+            if flags == 0xCD:
+                return True
             if len(sd) >= 2:
                 _update_tank_position(tid, sd[0], sd[1])
             return True
