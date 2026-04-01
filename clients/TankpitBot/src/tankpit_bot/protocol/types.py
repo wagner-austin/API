@@ -343,8 +343,8 @@ class ViewportUpdateDict(TypedDict):
     """Viewport/map update (0x5A 'Z' message)."""
 
     msg_type: Literal[0x5A]
-    direction: int
-    flags: int
+    viewport_left: int
+    viewport_top: int
     entities: list[ViewportEntityDict]
 
 
