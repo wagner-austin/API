@@ -114,6 +114,9 @@ control architecture. The concrete refactor plan for the next step is in
 - `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
   authoritative for viewport origin and tile cache updates, but absence from a
   single `0x5A` patch does not imply tank absence.
+- Fresh enemy-mine reveal is currently proven through tunneled `0x2E -> 0x4F`
+  radar results, and local mine placement is proven through tunneled
+  `0x2E -> 0x4B` placement updates.
 - The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
   `scan`, `shoot`, `map_open`) and waits for completion or timeout before
   replanning.
