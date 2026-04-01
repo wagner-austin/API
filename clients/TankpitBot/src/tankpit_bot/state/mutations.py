@@ -70,15 +70,15 @@ def update_self_from_movement_response(
     )
 
 
-def update_self_position_and_viewport(
+def update_self_position(
     state: WorldStateDict,
     x: int,
     y: int,
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Update self position and center viewport around it.
+    """Update self position without changing viewport bounds.
 
-    Updates the self_state x,y coordinates and recenters the viewport.
+    Updates the self_state x,y coordinates and preserves the current viewport.
     Creates a minimal self_state if none exists.
 
     Args:
@@ -88,7 +88,7 @@ def update_self_position_and_viewport(
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with updated position and viewport.
+        New WorldStateDict with updated position.
     """
     # Get or create self_state with updated position
     if state["self_state"] is not None:
@@ -113,22 +113,13 @@ def update_self_position_and_viewport(
             leaderboard_position=0,
         )
 
-    # Center viewport on new position
-    vp = state["viewport"]
-    new_viewport = ViewportStateDict(
-        left=x - vp["width"] // 2,
-        top=y - vp["height"] // 2,
-        width=vp["width"],
-        height=vp["height"],
-    )
-
     return WorldStateDict(
         self_state=new_self,
         tanks=state["tanks"],
         containers=state["containers"],
         mines=state["mines"],
         terrain=state["terrain"],
-        viewport=new_viewport,
+        viewport=state["viewport"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -681,7 +672,7 @@ __all__ = [
     "update_container_from_radar",
     "update_self_from_movement_response",
     "update_self_fuel",
-    "update_self_position_and_viewport",
+    "update_self_position",
     "update_tank_damage",
     "update_tank_from_registry",
     "update_terrain_from_viewport",
