@@ -83,6 +83,7 @@ class WebSocketSniffer(BrowserSession):
         headless: bool = False,
         live_decode: bool = False,
         prefer_account: bool = False,
+        output_path: str | None = None,
     ) -> None:
         """Initialize the sniffer.
 
@@ -91,9 +92,11 @@ class WebSocketSniffer(BrowserSession):
             headless: Whether to run the browser in headless mode.
             live_decode: Whether to print decoded messages in real-time.
             prefer_account: Skip guest login and use account credentials directly.
+            output_path: Optional path for incremental capture autosaves.
         """
         super().__init__(target_url, headless=headless, prefer_account=prefer_account)
         self._live_decode = live_decode
+        self._output_path = Path(output_path) if output_path is not None else None
         self._game_log_entries: list[dict[str, str | int]] = []
 
     def _process_game_log_entry(self, entry: GameLogEntry) -> None:
@@ -112,8 +115,52 @@ class WebSocketSniffer(BrowserSession):
                 "category": entry["category"],
             }
         )
+        self._autosave_capture()
         # Call parent to log and process combat
         super()._process_game_log_entry(entry)
+
+    def _build_capture_session(self) -> CaptureSession:
+        """Build the current capture session snapshot.
+
+        Returns:
+            CaptureSession containing the current in-memory capture state.
+        """
+        tank_names = {str(k): v for k, v in tank_tracker.get_all_names().items()}
+
+        from tankpit_bot.types import GameLogEntryWithTimestamp
+
+        game_log: list[GameLogEntryWithTimestamp] = [
+            GameLogEntryWithTimestamp(
+                timestamp_ms=int(e["timestamp_ms"]),
+                text=str(e["text"]),
+                category=str(e["category"]),
+            )
+            for e in self._game_log_entries
+        ]
+
+        return CaptureSession(
+            session_id=self._session_id,
+            start_timestamp_ms=self._start_timestamp_ms,
+            end_timestamp_ms=get_current_time_ms(),
+            base_url=self._target_url,
+            messages=self._messages,
+            magic=self._magic,
+            game_log=game_log,
+            tank_names=tank_names,
+        )
+
+    def _autosave_capture(self) -> None:
+        """Persist the current capture snapshot if autosave is configured."""
+        if self._output_path is None:
+            return
+
+        session = self._build_capture_session()
+        encoded = encode_capture_session(session)
+        json_str = dump_json_str(encoded, compact=False, indent=2)
+        output_dir = self._output_path.parent
+        raw_path = output_dir / "raw_capture.json"
+        _test_hooks.write_text(raw_path, json_str)
+        _test_hooks.write_text(self._output_path, json_str)
 
     def _on_magic_captured(self, magic: str) -> None:
         """Initialize trackers when magic key is captured.
@@ -132,6 +179,7 @@ class WebSocketSniffer(BrowserSession):
             message: The captured message.
         """
         super()._on_message_captured(message)
+        self._autosave_capture()
 
         payload = message["payload"]
         direction = message["direction"]
@@ -263,31 +311,7 @@ class WebSocketSniffer(BrowserSession):
                 page.wait_for_timeout(float(capture_duration_ms))
                 self._cleanup(cdp, page, context, browser)
 
-        # Get tank names from tracker
-        tank_names = {str(k): v for k, v in tank_tracker.get_all_names().items()}
-
-        # Convert game log entries to proper type
-        from tankpit_bot.types import GameLogEntryWithTimestamp
-
-        game_log: list[GameLogEntryWithTimestamp] = [
-            GameLogEntryWithTimestamp(
-                timestamp_ms=int(e["timestamp_ms"]),
-                text=str(e["text"]),
-                category=str(e["category"]),
-            )
-            for e in self._game_log_entries
-        ]
-
-        return CaptureSession(
-            session_id=self._session_id,
-            start_timestamp_ms=self._start_timestamp_ms,
-            end_timestamp_ms=get_current_time_ms(),
-            base_url=self._target_url,
-            messages=self._messages,
-            magic=self._magic,
-            game_log=game_log,
-            tank_names=tank_names,
-        )
+        return self._build_capture_session()
 
 
 def run_sniffer(
@@ -316,7 +340,11 @@ def run_sniffer(
         PlaywrightNotInstalledError: If Playwright is not installed.
     """
     sniffer = WebSocketSniffer(
-        target_url, headless=headless, live_decode=live_decode, prefer_account=prefer_account
+        target_url,
+        headless=headless,
+        live_decode=live_decode,
+        prefer_account=prefer_account,
+        output_path=output_path,
     )
     session = sniffer.run(capture_duration_ms)
 
