@@ -25,6 +25,7 @@ from tankpit_bot.inventory import (
 )
 from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.state import (
+    add_mine,
     WorldStateDict,
     add_mine_from_radar,
     coord_key,
@@ -1509,7 +1510,43 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
     Returns:
         True if the message was handled, False otherwise.
     """
+    global _world_state
     match decoded:
+        case {
+            "msg_type": 0x4B,
+            "mine_type": int(mine_type),
+            "tank_id": int(tank_id),
+            "positions": list(positions),
+        }:
+            self_state = _world_state["self_state"]
+            team: int | None = None
+            if self_state is not None and self_state["tank_id"] == tank_id:
+                team = self_state["team"]
+            else:
+                tank_state = _world_state["tanks"].get(str(tank_id))
+                if tank_state is not None:
+                    team = tank_state["team"]
+            if team is None:
+                return True
+            timestamp_ms = get_current_time_ms()
+            for position in positions:
+                if not (
+                    isinstance(position, tuple)
+                    and len(position) == 2
+                    and isinstance(position[0], int)
+                    and isinstance(position[1], int)
+                ):
+                    continue
+                _world_state = add_mine(
+                    _world_state,
+                    position[0],
+                    position[1],
+                    mine_type,
+                    tank_id,
+                    team,
+                    timestamp_ms,
+                )
+            return True
         case {
             "msg_type": "tank_registry",
             "is_container": True,
