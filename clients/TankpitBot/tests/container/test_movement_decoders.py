@@ -245,6 +245,11 @@ class TestDecodePositionUpdate:
         with pytest.raises(ContainerDecodeError):
             decode_position_update(bytes([0x01] * 14))
 
+    def test_raises_on_wrong_subtype(self) -> None:
+        """Raises when a 13-byte packet lacks the position subtype."""
+        with pytest.raises(ContainerDecodeError, match="expected subtype 0x24"):
+            decode_position_update(bytes([0x45] + [0x00] * 12))
+
     def test_position_update_dict_keys(self) -> None:
         """PositionUpdateDict has expected keys."""
         result: PositionUpdateDict = decode_position_update(POSITION_UPDATE_13)

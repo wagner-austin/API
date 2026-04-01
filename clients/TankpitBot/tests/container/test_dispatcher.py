@@ -74,6 +74,11 @@ class TestIdentifyContainerType:
         """Correctly identifies position update structure."""
         assert identify_container_type(POSITION_UPDATE_13) == ContainerMessageType.POSITION_UPDATE
 
+    def test_rejects_false_positive_13_byte_packet(self) -> None:
+        """Does not classify an unrelated captured 13-byte packet as position."""
+        data = bytes.fromhex("45938292839182938191839181")
+        assert identify_container_type(data) == ContainerMessageType.UNKNOWN
+
     def test_identifies_tank_status_short(self) -> None:
         """Correctly identifies tank status short structure (9 bytes)."""
         result = identify_container_type(TANK_STATUS_SHORT_9)

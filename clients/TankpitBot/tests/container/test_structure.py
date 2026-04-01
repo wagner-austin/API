@@ -197,13 +197,22 @@ class TestIsPositionUpdateStructure:
     """Tests for position update structure detection."""
 
     def test_matches_exactly_13_bytes(self) -> None:
-        """Matches exactly 13-byte message."""
+        """Matches verified 13-byte position update message."""
         assert is_position_update_structure(POSITION_UPDATE_13) is True
 
     def test_rejects_wrong_length(self) -> None:
         """Rejects messages with wrong length."""
         assert is_position_update_structure(bytes([0x01] * 12)) is False
         assert is_position_update_structure(bytes([0x01] * 14)) is False
+
+    def test_rejects_wrong_subtype(self) -> None:
+        """Rejects 13-byte messages that do not use the position subtype."""
+        assert is_position_update_structure(bytes([0x01] * 13)) is False
+
+    def test_rejects_real_capture_false_positive(self) -> None:
+        """Rejects the captured 13-byte packet that was misread as position."""
+        data = bytes.fromhex("45938292839182938191839181")
+        assert is_position_update_structure(data) is False
 
 
 class TestIsTankStatusShortStructure:
