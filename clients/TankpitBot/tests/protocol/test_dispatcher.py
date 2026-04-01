@@ -156,6 +156,11 @@ class TestDecodeMessage:
         result = decode_message(MSG_TANK_STATS, stats_data)
         assert result["msg_type"] == "combat_hit"
 
+        # Tunneled terrain/structure tile update inside 0x2E
+        terrain_tunnel = bytes([MSG_TERRAIN_UPDATE, 8, 166, 2])
+        result = decode_message(MSG_TANK_STATS, terrain_tunnel)
+        assert result == {"msg_type": MSG_TERRAIN_UPDATE, "updates": [(8, 166, 2)]}
+
         # Tank status full
         status_header = bytes([0x42, 0x02, 0x01, 0xDE, 0xAD, 0xBE, 0xEF])
         status_lb = bytes([0x01, 0x02, 0x03, 0x04, 0x05, 0x06])
