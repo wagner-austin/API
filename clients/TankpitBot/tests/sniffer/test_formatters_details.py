@@ -323,12 +323,12 @@ class TestFormatFunctions:
         entity2 = ViewportEntityDict(col=30, row=40, entity_id=0, value=0, terrain_type=0)
         msg = ViewportUpdateDict(
             msg_type=0x5A,
-            direction=3,
-            flags=0,
+            viewport_left=3,
+            viewport_top=7,
             entities=[entity1, entity2],
         )
         result = format_radar_details(msg)
-        assert "dir=3" in result
+        assert "viewport=(3,7)" in result
         assert "entities=2" in result
 
     def test_format_radar_details_unknown(self) -> None:
