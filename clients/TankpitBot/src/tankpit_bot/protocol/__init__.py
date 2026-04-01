@@ -115,9 +115,9 @@ from tankpit_bot.protocol.decoders import (
     supervisor_is_promo_eligible,
     try_decode_binary_message,
     try_decode_message,
-    viewport_entity_is_container,
     viewport_entity_is_empty,
-    viewport_entity_is_tank,
+    viewport_entity_is_equipment,
+    viewport_entity_is_fuel,
 )
 from tankpit_bot.protocol.helpers import (
     DecodeError,
@@ -306,9 +306,9 @@ __all__ = [
     "supervisor_is_promo_eligible",
     "try_decode_binary_message",
     "try_decode_message",
-    "viewport_entity_is_container",
     "viewport_entity_is_empty",
-    "viewport_entity_is_tank",
+    "viewport_entity_is_equipment",
+    "viewport_entity_is_fuel",
     "x16",
     "x24",
 ]
