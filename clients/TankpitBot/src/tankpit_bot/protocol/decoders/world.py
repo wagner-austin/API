@@ -71,26 +71,26 @@ def decode_terrain_update(data: bytes) -> TerrainUpdateDict:
     return TerrainUpdateDict(msg_type=0x4A, updates=updates)
 
 
-def viewport_entity_is_tank(entity: ViewportEntityDict) -> bool:
-    """Check if entity is a tank.
+def viewport_entity_is_equipment(entity: ViewportEntityDict) -> bool:
+    """Check if a viewport row marks equipment.
 
     Args:
         entity: Viewport entity.
 
     Returns:
-        True if entity is a tank.
+        True if the row marks equipment on that tile.
     """
     return entity["entity_id"] == -1
 
 
-def viewport_entity_is_container(entity: ViewportEntityDict) -> bool:
-    """Check if entity is a fuel container.
+def viewport_entity_is_fuel(entity: ViewportEntityDict) -> bool:
+    """Check if a viewport row marks fuel.
 
     Args:
         entity: Viewport entity.
 
     Returns:
-        True if entity is a container.
+        True if the row marks fuel on that tile.
     """
     return entity["entity_id"] > 0
 
@@ -121,8 +121,8 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
     """
     require_min_length(data, 2, "ViewportUpdate")
 
-    direction = data[0]
-    flags = data[1]
+    viewport_left = data[0]
+    viewport_top = data[1]
     entities: list[ViewportEntityDict] = []
     col, row, t = 0, 0, 2
 
@@ -164,7 +164,12 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
                 )
             )
 
-    return ViewportUpdateDict(msg_type=0x5A, direction=direction, flags=flags, entities=entities)
+    return ViewportUpdateDict(
+        msg_type=0x5A,
+        viewport_left=viewport_left,
+        viewport_top=viewport_top,
+        entities=entities,
+    )
 
 
 def decode_supervisor(data: bytes) -> SupervisorDict:
@@ -220,7 +225,7 @@ __all__ = [
     "decode_viewport_update",
     "supervisor_has_promo_kill",
     "supervisor_is_promo_eligible",
-    "viewport_entity_is_container",
     "viewport_entity_is_empty",
-    "viewport_entity_is_tank",
+    "viewport_entity_is_equipment",
+    "viewport_entity_is_fuel",
 ]
