@@ -791,6 +791,59 @@ class TestDispatchTankMessages:
         assert state["mines"]["132,127"]["x"] == 132
         assert state["mines"]["132,127"]["y"] == 127
 
+    def test_dispatch_tunneled_mine_placement_uses_known_tank_team(self) -> None:
+        """Test tunneled 0x4B uses tracked tank team when placer is not self."""
+        from tankpit_bot.protocol import TankEntryDict, TankInfoDict
+
+        dispatch_world_state_update(
+            TankInfoDict(
+                msg_type=0x21,
+                tank_id=777,
+                name="placer",
+                team=3,
+                decoration_state=b"",
+                score=0,
+            )
+        )
+
+        dispatch_world_state_update(
+            TankEntryDict(
+                msg_type=0x28,
+                tank_id=777,
+                x=40,
+                y=41,
+                name="placer",
+            )
+        )
+
+        dispatch_world_state_update(
+            {
+                "msg_type": 0x4B,
+                "mine_type": 1,
+                "tank_id": 777,
+                "positions": [(40, 41), (40, 42)],
+            }
+        )
+
+        state = world_state._world_state
+        assert state["mines"]["40,41"]["team"] == 3
+        assert state["mines"]["40,42"]["team"] == 3
+        assert state["mines"]["40,41"]["tank_id"] == 777
+
+    def test_dispatch_tunneled_mine_placement_skips_unknown_team(self) -> None:
+        """Test tunneled 0x4B does nothing when placer team is unknown."""
+        dispatch_world_state_update(
+            {
+                "msg_type": 0x4B,
+                "mine_type": 2,
+                "tank_id": 9999,
+                "positions": [(10, 11), (11, 11)],
+            }
+        )
+
+        state = world_state._world_state
+        assert state["mines"] == {}
+
     def test_dispatch_tank_status_short_updates_damage(self) -> None:
         """Test dispatch handles tank_status_short by updating damage."""
         from tankpit_bot.container import TankStatusShortDict
