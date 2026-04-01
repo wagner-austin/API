@@ -405,8 +405,8 @@ Entity Record (4 bytes):
 
 Value interpretation (from client JS cache field):
   - Positive (0x0000-0x7FFF): fuel container with amount
-  - Negative (0x8000-0xFFFE): equipment (abs value = type?)
-  - 0xFFFF (-1): tank/entity
+  - Negative (0x8000-0xFFFE): equipment
+  - 0xFFFF (-1): equipment sentinel in tile cache paths, not tank presence
 ```
 
 **Example:** Radar at (151, 68) found 4 fuel containers:
@@ -456,6 +456,7 @@ Server sends this message whenever equipment toggle state changes (pressing R ke
 - Placing mines creates a **3x3 grid** of mines centered on player position
 - Shooting enemy mines triggers **chain reaction** detonations
 - Mine drop command: type=4, id=98 or id=100
+- Enemy mines are not inherently visible; radar is required to reveal them
 
 ### Mine Drop Command (Client → Server)
 ```
