@@ -98,7 +98,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | 0x47 | movement | 17-37 | `tank_id:u16 x:u8 y:u8 dir:u8 flag:u8 fuel:u24 waypoints:str` |
 | 0x49 | item_pickup | 8 | `show:u8 armor:u7+flag dual:u7+flag missile:u7+flag homing:u7+flag radar:u7+flag` |
 | 0x4A | terrain_update | var | `[(x:u8, y:u8, type:u8)]` - updates terrain types (e.g., ferry) |
-| 0x4B | mine_place | 20 | `type:u8 tank_id:u16 count:u8 positions:[(x:u8,y:u8)]` |
+| 0x4B | mine_place | 15 (tunneled in 0x2E) | `type:u8 tank_id:u16 count:u8 positions:[(x:u8,y:u8)]` |
 | 0x4F | radar_result | var | `count:u8 [1B] entities:[(x:u8,y:u8,value:i16)]` |
 | 0x52 | supervisor | 5 | `status:u8 reserved:u8 data:u8` |
 | 0x53 | shooting | 12 | `tank_id:u16 target_xy:u8x2 proj_xy:u8x2 fuel:u24 weapon:u8 ammo:u8 ff:u8` |
@@ -125,9 +125,10 @@ Container messages (0x2E) wrap various subtypes. After XOR decode, identified by
 | 9 | any | tank_status_short | `[subtype:1] [tank_id:2 LE] [damage:1] [rank:1] [flag:1] [lb_pos:2 LE]` |
 | 10 | any | tank_update_compact | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]` |
 | 11 | any | combat_hit | `[subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:7]` |
-| 13 | any | position_update | `[subtype:1] [flags:1] [tank_id:2 LE] [status_bytes:9]` |
+| 13 | 0x24 | position_update | `[subtype:1] [flags:1] [tank_id:2 LE] [status_bytes:9]` |
 | 14 | any | tank_update_extended | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]` |
-| 15 | any | tank_update_full | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]` |
+| 15 | 0x4B | mine_place | `[0x4B:1] [mine_type:1] [tank_id:2 LE] [count:1] [positions:count*2]` |
+| 15 | other | tank_update_full | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]` |
 | 16-20 | any | tank_registry | `[subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]` |
 
 ---
@@ -396,6 +397,10 @@ Delta-compressed map update format from JS `Vg.h` handler:
 **Important:** `0x5A` is a sparse tile patch, not a full visible-tank snapshot.
 The client applies it to tile cache/overlay/terrain fields. Tanks are tracked
 separately; omission from one `0x5A` patch does not mean the tank is absent.
+
+**Mine note:** fresh enemy-mine reveal is currently proven through tunneled
+`0x2E -> 0x4F` radar results, while local mine placement is proven through
+tunneled `0x2E -> 0x4B` with owner `tank_id` plus a counted position list.
 
 ### 0x4A Terrain Update (FULLY DECODED)
 
