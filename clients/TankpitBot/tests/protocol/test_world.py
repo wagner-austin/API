@@ -18,9 +18,9 @@ from tankpit_bot.protocol import (
     decode_sync,
     decode_terrain_update,
     decode_viewport_update,
-    viewport_entity_is_container,
     viewport_entity_is_empty,
-    viewport_entity_is_tank,
+    viewport_entity_is_equipment,
+    viewport_entity_is_fuel,
 )
 
 
@@ -147,16 +147,16 @@ class TestDecodeViewportUpdate:
 
     def test_decodes_viewport_header(self) -> None:
         """Decodes viewport update header."""
-        data = bytes([3, 0x0F])  # direction=3, flags=0x0F
+        data = bytes([3, 0x0F])  # viewport_left=3, viewport_top=15
         result = decode_viewport_update(data)
         assert result["msg_type"] == 0x5A
-        assert result["direction"] == 3
-        assert result["flags"] == 0x0F
+        assert result["viewport_left"] == 3
+        assert result["viewport_top"] == 0x0F
         assert result["entities"] == []
 
     def test_decodes_viewport_with_entities(self) -> None:
         """Decodes viewport with entity data."""
-        # direction=0, flags=0, delta=1 (col=1, row=0), entity data (3 bytes)
+        # viewport_left=0, viewport_top=0, delta=1 (col=1, row=0), entity data (3 bytes)
         # z = (entity_id << 8) | (value << 4) | terrain_type
         # Let's encode: terrain=5, value=2, entity_id=100
         # z = (100 << 8) | (2 << 4) | 5 = 0x6425
@@ -230,43 +230,43 @@ class TestDecodeViewportUpdate:
 class TestViewportEntityHelpers:
     """Tests for viewport entity helper functions."""
 
-    def test_viewport_entity_is_tank(self) -> None:
-        """Checks if entity is a tank."""
-        tank: ViewportEntityDict = {
+    def test_viewport_entity_is_equipment(self) -> None:
+        """Checks if row marks equipment."""
+        equipment: ViewportEntityDict = {
             "col": 0,
             "row": 0,
             "entity_id": -1,
             "value": 0,
             "terrain_type": 0,
         }
-        not_tank: ViewportEntityDict = {
+        not_equipment: ViewportEntityDict = {
             "col": 0,
             "row": 0,
             "entity_id": 100,
             "value": 0,
             "terrain_type": 0,
         }
-        assert viewport_entity_is_tank(tank) is True
-        assert viewport_entity_is_tank(not_tank) is False
+        assert viewport_entity_is_equipment(equipment) is True
+        assert viewport_entity_is_equipment(not_equipment) is False
 
-    def test_viewport_entity_is_container(self) -> None:
-        """Checks if entity is a container."""
-        container: ViewportEntityDict = {
+    def test_viewport_entity_is_fuel(self) -> None:
+        """Checks if row marks fuel."""
+        fuel: ViewportEntityDict = {
             "col": 0,
             "row": 0,
             "entity_id": 100,
             "value": 0,
             "terrain_type": 0,
         }
-        not_container: ViewportEntityDict = {
+        not_fuel: ViewportEntityDict = {
             "col": 0,
             "row": 0,
             "entity_id": 0,
             "value": 0,
             "terrain_type": 0,
         }
-        assert viewport_entity_is_container(container) is True
-        assert viewport_entity_is_container(not_container) is False
+        assert viewport_entity_is_fuel(fuel) is True
+        assert viewport_entity_is_fuel(not_fuel) is False
 
     def test_viewport_entity_is_empty(self) -> None:
         """Checks if tile is empty."""
