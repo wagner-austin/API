@@ -18,6 +18,7 @@ class ContainerMessageType(IntEnum):
 
     UNKNOWN = 0
     COMBAT_HIT = auto()
+    MINE_PLACEMENT = auto()
     TANK_REGISTRY = auto()
     MOVEMENT = auto()
     POSITION_UPDATE = auto()
@@ -68,6 +69,7 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.UNKNOWN: DecodeLevel.UNKNOWN,
     # Fully decoded message types (all fields understood)
     ContainerMessageType.COMBAT_HIT: DecodeLevel.FULL,
+    ContainerMessageType.MINE_PLACEMENT: DecodeLevel.FULL,
     ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
     ContainerMessageType.MOVEMENT: DecodeLevel.FULL,
     ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
@@ -158,6 +160,21 @@ class DeactivationDeathDict(TypedDict):
     flags: int
     killer_id: int
     extra_data: bytes
+
+
+class MinePlacementDict(TypedDict):
+    """Mine placement decoded from 0x2E container.
+
+    Structure (15 bytes, proven from capture):
+      [subtype:1] [mine_type:1] [tank_id:2 LE] [count:1] [positions: count*2]
+
+    This is a tunneled mine placement payload carried inside a 0x2E frame.
+    """
+
+    msg_type: Literal[0x4B]
+    mine_type: int
+    tank_id: int
+    positions: list[tuple[int, int]]
 
 
 # =============================================================================
@@ -540,6 +557,7 @@ class UnknownContainerDict(TypedDict):
 
 ContainerMessage = (
     CombatHitDict
+    | MinePlacementDict
     | TankRegistryDict
     | MovementDict
     | PositionUpdateDict
@@ -573,6 +591,7 @@ __all__ = [
     "DeactivationDeathDict",
     "DeactivationKillDict",
     "DecodeLevel",
+    "MinePlacementDict",
     "MovementDict",
     "PlayerListExtendedDict",
     "PlayerListShortDict",
