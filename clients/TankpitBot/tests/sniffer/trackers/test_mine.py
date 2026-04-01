@@ -63,6 +63,14 @@ class TestMineTracker:
         result = tracker.process_message(payload)
         assert result is None
 
+    def test_process_message_returns_none_for_short_body(self) -> None:
+        """Test process_message returns None when framed body is too short."""
+        tracker = MineTracker()
+        tracker.set_magic("kp8ffxx7muk63a0ywtqh")
+        payload = base64.b64encode(b"\x03\x00\x2e\x00\x00").decode()
+        result = tracker.process_message(payload)
+        assert result is None
+
 
 class TestMineTrackerParseMethods:
     """Tests for MineTracker._parse_* methods."""
@@ -70,17 +78,19 @@ class TestMineTrackerParseMethods:
     def test_parse_mine_placed(self) -> None:
         """Test _parse_mine_placed parses mine placement."""
         tracker = MineTracker()
-        # decoded: [0x4B, owner_id_lo, owner_id_hi, x, y, ...]
-        decoded = bytearray([0x4B, 0x64, 0x00, 0x32, 0x3C, 0x00, 0x00])
+        # decoded: [0x4B, mine_type, owner_id_lo, owner_id_hi, count, x1, y1]
+        decoded = bytearray([0x4B, 0x00, 0x64, 0x00, 0x01, 0x32, 0x3C])
         result = tracker._parse_mine_placed(decoded)
         assert "PLACED" in result
+        assert "owner=100" in result
+        assert "count=1" in result
         assert tracker.mines_placed == 1
 
     def test_parse_mine_detonation(self) -> None:
         """Test _parse_mine_detonation parses mine explosions."""
         tracker = MineTracker()
-        # decoded: [0x45, count, x1, y1, x2, y2]
-        decoded = bytearray([0x45, 0x02, 0x32, 0x3C, 0x33, 0x3D])
+        # decoded: [0x45, x1, y1, x2, y2]
+        decoded = bytearray([0x45, 0x32, 0x3C, 0x33, 0x3D])
         result = tracker._parse_mine_detonation(decoded)
         assert "EXPLODE" in result
         assert "2 mines" in result
@@ -157,10 +167,10 @@ class TestMineTrackerEdgeCases:
 
         xor_table = build_test_xor_table(static_key, magic)
 
-        # Mine placed: 0x4B owner_id(2) x y
-        decoded_data = bytes([0x4B, 0x64, 0x00, 50, 60])
+        # Mine placed: top-level 0x4B, decoded body is mine_type owner_id(2) count x y
+        decoded_data = bytes([0x00, 0x64, 0x00, 1, 50, 60])
         encoded_data = _xor_encode_bytes(decoded_data, xor_table)
-        body = bytes([0x2E]) + encoded_data
+        body = bytes([0x4B]) + encoded_data
 
         payload = _make_tracker_payload(body)
         result = tracker.process_message(payload)
@@ -181,10 +191,10 @@ class TestMineTrackerEdgeCases:
 
         xor_table = build_test_xor_table(static_key, magic)
 
-        # Mine detonation: 0x45 count positions...
-        decoded_data = bytes([0x45, 2, 10, 20, 30, 40])  # 2 mines at (10,20), (30,40)
+        # Mine detonation: top-level 0x45 with positions...
+        decoded_data = bytes([10, 20, 30, 40])  # 2 mines at (10,20), (30,40)
         encoded_data = _xor_encode_bytes(decoded_data, xor_table)
-        body = bytes([0x2E]) + encoded_data
+        body = bytes([0x45]) + encoded_data
 
         payload = _make_tracker_payload(body)
         result = tracker.process_message(payload)
@@ -202,6 +212,17 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         result = tracker._parse_mine_placed(bytearray([0x4B, 0x01, 0x02]))
         assert "total:" in result
+
+    def test_parse_mine_placed_without_readable_positions(self, fake_fs: FakeFileSystem) -> None:
+        """Test _parse_mine_placed reports count when positions are truncated."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEF" + "A" * 994
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        tracker = MineTracker()
+        result = tracker._parse_mine_placed(bytearray([0x4B, 0x00, 0x34, 0x12, 0x02]))
+        assert result == "[MINE:PLACED] owner=4660 count=2"
 
     def test_parse_mine_detonation_short(self, fake_fs: FakeFileSystem) -> None:
         """Test _parse_mine_detonation handles short decoded."""
@@ -225,7 +246,7 @@ class TestMineTrackerEdgeCases:
         tracker = MineTracker()
         tracker.set_magic(magic)
 
-        # Body not starting with 0x2E and not a command
+        # Body not starting with a mine type and not a command
         body = b"\x99" + bytes(10)
         payload = make_payload(body)
         result = tracker.process_message(payload)
@@ -244,10 +265,10 @@ class TestMineTrackerEdgeCases:
 
         xor_table = build_test_xor_table(static_key, magic)
 
-        # Build body with 0x2E prefix and decoded sig that is neither 0x4B nor 0x45
-        decoded_data = bytes([0x99, 0x01, 0x02, 0x03])  # sig=0x99
+        # Build body with unsupported top-level type
+        decoded_data = bytes([0x01, 0x02, 0x03])
         encoded_data = _xor_encode_bytes(decoded_data, xor_table)
-        body = bytes([0x2E]) + encoded_data
+        body = bytes([0x99]) + encoded_data
 
         payload = _make_tracker_payload(body)
         result = tracker.process_message(payload)
@@ -291,17 +312,38 @@ class TestMineTrackerEdgeCases:
 
         xor_table = build_test_xor_table(static_key, magic)
 
-        # Mine detonation with count=2 but not enough data for positions
-        # decoded: 0x45 count=2 (only 2 bytes, no position data)
-        decoded_data = bytes([0x45, 0x02])
+        # Mine detonation with odd position data length: one complete pair and one dangling byte
+        decoded_data = bytes([10, 20, 30])
+        encoded_data = _xor_encode_bytes(decoded_data, xor_table)
+        body = bytes([0x45]) + encoded_data
+
+        payload = _make_tracker_payload(body)
+        result = tracker.process_message(payload)
+
+        if result is None:
+            raise AssertionError("Expected non-None result from process_message")
+        assert "MINE:EXPLODE" in result
+        assert "1 mines" in result
+
+    def test_process_message_ignores_tunneled_tank_status_sync(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """Test tunneled 0x2E subtype 0x45 is not misclassified as mine detonation."""
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+        magic = "testmagic123"
+
+        tracker = MineTracker()
+        tracker.set_magic(magic)
+
+        xor_table = build_test_xor_table(static_key, magic)
+
+        decoded_data = bytes([0x45, 0x37, 0xDC])
         encoded_data = _xor_encode_bytes(decoded_data, xor_table)
         body = bytes([0x2E]) + encoded_data
 
         payload = _make_tracker_payload(body)
         result = tracker.process_message(payload)
-
-        # Should return count without positions
-        if result is None:
-            raise AssertionError("Expected non-None result from process_message")
-        assert "MINE:EXPLODE" in result
-        assert "2 mines" in result
+        assert result is None
