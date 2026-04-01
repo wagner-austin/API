@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.login import handle_login_flow
 from tests.login.conftest import FakeCDPLogin, FakePageLogin
+
+
+def _fake_path_exists_deny_all(path: Path) -> bool:
+    """Fake path_exists that always returns False.
+
+    Args:
+        path: Path to check.
+
+    Returns:
+        Always False.
+    """
+    _ = path
+    return False
+
 
 # =============================================================================
 # Basic Login Flow Tests
@@ -40,18 +56,21 @@ def test_handle_login_flow_rate_limited_no_credentials() -> None:
     )
     cdp = FakeCDPLogin(rate_limited=True)
 
-    # No credentials set
+    # No credentials: env returns None, accounts.json not found
     original_get_env = _test_hooks.get_env
+    original_path_exists = _test_hooks.path_exists
 
     def fake_get_env(key: str) -> str | None:
         _ = key
         return None
 
     _test_hooks.get_env = fake_get_env
+    _test_hooks.path_exists = _fake_path_exists_deny_all
     try:
         result = handle_login_flow(page, cdp)
     finally:
         _test_hooks.get_env = original_get_env
+        _test_hooks.path_exists = original_path_exists
 
     assert result is False
 
@@ -151,21 +170,25 @@ def test_handle_login_flow_prefer_account_success() -> None:
 
 
 def test_handle_login_flow_prefer_account_no_credentials() -> None:
-    """Login flow fails with prefer_account when credentials not set."""
+    """Login flow fails with prefer_account when no credentials configured."""
     page = FakePageLogin(start_url="https://tankpit.com/before-playing")
     cdp = FakeCDPLogin()
 
+    # No credentials: env returns None, accounts.json not found
     original_get_env = _test_hooks.get_env
+    original_path_exists = _test_hooks.path_exists
 
     def fake_get_env(key: str) -> str | None:
         _ = key
         return None
 
     _test_hooks.get_env = fake_get_env
+    _test_hooks.path_exists = _fake_path_exists_deny_all
     try:
         result = handle_login_flow(page, cdp, prefer_account=True)
     finally:
         _test_hooks.get_env = original_get_env
+        _test_hooks.path_exists = original_path_exists
 
     assert result is False
 
