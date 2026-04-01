@@ -352,8 +352,8 @@ Delta-compressed map update format from JS `Vg.h` handler:
 
 ```
 [0]    0x5A  message type 'Z'
-[1]    u8    direction (scroll direction 0-255)
-[2]    u8    flags
+[1]    u8    viewport_left
+[2]    u8    viewport_top
 [3+]   variable-length entity records
 ```
 
@@ -386,12 +386,16 @@ Delta-compressed map update format from JS `Vg.h` handler:
 | < 0 | Equipment pickup |
 | = 0 | Empty |
 
-**Entity ID:**
+**Entity ID / cache interpretation:**
 | entity_id | Meaning |
 |-----------|---------|
-| -1 (0xFFFF) | TANK present on tile |
-| 0 | No container |
-| > 0 | Fuel container ID |
+| -1 (0xFFFF) | Equipment on tile |
+| 0 | No cache update |
+| > 0 | Fuel amount on tile |
+
+**Important:** `0x5A` is a sparse tile patch, not a full visible-tank snapshot.
+The client applies it to tile cache/overlay/terrain fields. Tanks are tracked
+separately; omission from one `0x5A` patch does not mean the tank is absent.
 
 ### 0x4A Terrain Update (FULLY DECODED)
 
@@ -410,7 +414,9 @@ Updates terrain types at specific positions. Sent when terrain changes (e.g., fe
 
 **Terrain types:** Same as 0x5A viewport (0=ground, 1=rock_A, 2=rock_B, 3=rock_A+B, 5=ferry, 7=ferry+rock)
 
-**Trigger:** Sent when riding a ferry - updates both your position and the ferry tile.
+**Trigger:** Sent as direct `0x4A` world messages and also observed tunneled
+inside `0x2E` container envelopes during structure/obstacle interactions.
+These updates change terrain/structure state for specific absolute tiles.
 
 ### 0x4C World Entry (PARTIALLY DECODED)
 
