@@ -71,7 +71,7 @@ disallow_any_expr = false
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv"]
+exclude = [".venv", ".pytest_tmp"]
 
 [tool.ruff.lint]
 select = [
@@ -103,4 +103,4 @@ fail_under = 100
 pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-v -n auto --dist loadscope"
+addopts = "-v -n auto --dist loadscope --basetemp .pytest_tmp"
