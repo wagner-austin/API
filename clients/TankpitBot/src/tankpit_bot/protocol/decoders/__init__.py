@@ -95,9 +95,9 @@ from tankpit_bot.protocol.decoders.world import (
     decode_viewport_update,
     supervisor_has_promo_kill,
     supervisor_is_promo_eligible,
-    viewport_entity_is_container,
     viewport_entity_is_empty,
-    viewport_entity_is_tank,
+    viewport_entity_is_equipment,
+    viewport_entity_is_fuel,
 )
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.protocol.types import (
@@ -254,6 +254,7 @@ _TUNNELED_SUBTYPES: frozenset[int] = frozenset(
         MSG_RADAR_RESULT,  # 0x46 — RadarResult (2 bytes)
         MSG_MOVEMENT,  # 0x47 — Movement (9+ bytes)
         MSG_INVENTORY,  # 0x49 — Inventory (6 bytes)
+        MSG_TERRAIN_UPDATE,  # 0x4A — Terrain/structure tile updates
         MSG_SHOOT,  # 0x53 — ShootEvent (12 bytes)
         MSG_ACTION_DONE,  # 0x54 — ActionDone
         MSG_VIEWPORT,  # 0x56 — ViewportUpdate (2+ bytes)
@@ -537,7 +538,7 @@ __all__ = [
     "supervisor_is_promo_eligible",
     "try_decode_binary_message",
     "try_decode_message",
-    "viewport_entity_is_container",
     "viewport_entity_is_empty",
-    "viewport_entity_is_tank",
+    "viewport_entity_is_equipment",
+    "viewport_entity_is_fuel",
 ]
