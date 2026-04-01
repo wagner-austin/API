@@ -25,7 +25,12 @@ class TestIdentifyMessage:
 
     def test_position_update_13_bytes(self) -> None:
         """Test identifies 13-byte message as position_update."""
-        # 13 bytes matches position_update structure
-        data = bytes([0x01] * 13)
+        data = bytes([0x24] + [0x01] * 12)
         result = identify_message(data)
         assert result == ("position_update", 100)  # DecodeLevel.FULL = 100
+
+    def test_non_position_13_bytes_returns_none(self) -> None:
+        """Test non-position 13-byte payload is not mislabeled as position."""
+        data = bytes([0x01] * 13)
+        result = identify_message(data)
+        assert result is None
