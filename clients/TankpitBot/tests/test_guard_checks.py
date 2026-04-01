@@ -100,8 +100,9 @@ def test_main_with_unknown_arg(tmp_path: Path) -> None:
 
 def test_find_monorepo_root_impl_raises_when_not_found(tmp_path: Path) -> None:
     """_find_monorepo_root_impl raises RuntimeError when root not found."""
+    start = Path(tmp_path.anchor) / "tankpit-guard-missing-root" / "nested"
     with pytest.raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
-        _find_monorepo_root_impl(tmp_path)
+        _find_monorepo_root_impl(start)
 
 
 def test_find_monorepo_root_impl_finds_libs_dir(tmp_path: Path) -> None:
