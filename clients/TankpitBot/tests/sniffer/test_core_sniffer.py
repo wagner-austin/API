@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import base64
+from pathlib import Path
 
 import pytest
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.sniffer import SnifferError, WebSocketSniffer
+from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
 from tests.fakes import (
     fake_sync_playwright,
@@ -120,6 +123,7 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
+        sniffer._output_path = None
 
         entry = GameLogEntry(text="Player destroyed Enemy", category="combat")
 
@@ -151,6 +155,7 @@ class TestWebSocketSnifferMethods:
         sniffer = object.__new__(WebSocketSniffer)
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
+        sniffer._output_path = None
         sniffer._game_log_scraper = None
         sniffer._inventory_scraper = None
 
@@ -178,3 +183,89 @@ class TestWebSocketSnifferMethods:
 
         # Call _on_message_captured - this should hit the mine_status branch
         sniffer._on_message_captured(message)
+
+    def test_autosave_capture_no_output_path_is_noop(self) -> None:
+        """Returns immediately when autosave is not configured."""
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._output_path = None
+        sniffer._target_url = "https://tankpit.com"
+        sniffer._session_id = "noop"
+        sniffer._start_timestamp_ms = 1000
+        sniffer._messages = []
+        sniffer._magic = None
+        sniffer._game_log_entries = []
+
+        sniffer._autosave_capture()
+
+    def test_on_message_captured_autosaves_capture(self, fake_fs: FakeFileSystem) -> None:
+        """Autosaves the current capture snapshot after a message arrives."""
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._target_url = "https://tankpit.com"
+        sniffer._headless = False
+        sniffer._prefer_account = False
+        sniffer._live_decode = False
+        sniffer._output_path = Path("capture_session.json")
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._game_log_scraper = None
+        sniffer._inventory_scraper = None
+        sniffer._fuel_prober = None
+        sniffer._last_fuel_result = None
+        sniffer._session_id = "autosave-test"
+        sniffer._start_timestamp_ms = 1000
+        sniffer._messages = [
+            CapturedMessage(
+                timestamp_ms=1100,
+                direction="received",
+                payload="AAAA",
+                ws_url="wss://example.com/ws",
+            )
+        ]
+        sniffer._ws_urls = {}
+        sniffer._magic = "magic"
+        sniffer._static_key = None
+
+        sniffer._on_message_captured(sniffer._messages[0])
+
+        saved_session = decode_capture_session(
+            narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("capture_session.json"))))
+        )
+        saved_raw = decode_capture_session(
+            narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("raw_capture.json"))))
+        )
+
+        assert len(saved_session["messages"]) == 1
+        assert saved_session["messages"][0]["payload"] == "AAAA"
+        assert saved_raw == saved_session
+
+    def test_process_game_log_entry_autosaves_game_log(self, fake_fs: FakeFileSystem) -> None:
+        """Autosaves updated game log entries during capture."""
+        from tankpit_bot.browser import GameLogEntry
+
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._target_url = "https://tankpit.com"
+        sniffer._headless = False
+        sniffer._prefer_account = False
+        sniffer._live_decode = False
+        sniffer._output_path = Path("capture_session.json")
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._game_log_scraper = None
+        sniffer._inventory_scraper = None
+        sniffer._fuel_prober = None
+        sniffer._last_fuel_result = None
+        sniffer._session_id = "autosave-log-test"
+        sniffer._start_timestamp_ms = 1000
+        sniffer._messages = []
+        sniffer._ws_urls = {}
+        sniffer._magic = None
+        sniffer._static_key = None
+
+        sniffer._process_game_log_entry(GameLogEntry(text="Zoom in", category="action"))
+
+        saved_session = decode_capture_session(
+            narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("capture_session.json"))))
+        )
+
+        assert len(saved_session["game_log"]) == 1
+        assert saved_session["game_log"][0]["text"] == "Zoom in"
