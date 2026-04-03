@@ -12,15 +12,17 @@ from tankpit_bot.protocol import (
     ViewportEntityDict,
     decode_0x2e_message,
     decode_active_forces,
+    decode_cache_update,
     decode_chat_message,
-    decode_container,
+    decode_combined_tile_update,
+    decode_overlay_update,
     decode_statistics,
     decode_sync,
     decode_terrain_update,
     decode_viewport_update,
-    viewport_entity_is_empty,
-    viewport_entity_is_equipment,
-    viewport_entity_is_fuel,
+    viewport_entity_has_equipment_cache,
+    viewport_entity_has_fuel_cache,
+    viewport_entity_has_no_cache,
 )
 
 
@@ -38,22 +40,63 @@ class TestDecodeSync:
         assert result["msg_type"] == 0x3F
 
 
-class TestDecodeContainer:
-    """Tests for decode_container function."""
+class TestDecodeCacheUpdate:
+    """Tests for decode_cache_update function."""
 
-    def test_decodes_container(self) -> None:
-        """Decodes container fuel message."""
-        # container_id=0x0102, fuel=0x0304
-        data = bytes([0x02, 0x01, 0x04, 0x03])
-        result = decode_container(data)
+    def test_decodes_cache_updates(self) -> None:
+        """Decodes cache update entries."""
+        data = bytes([10, 20, 0x04, 0x03, 30, 40, 0xFF, 0xFF])
+        result = decode_cache_update(data)
         assert result["msg_type"] == 0x43
-        assert result["container_id"] == 0x0102
-        assert result["fuel"] == 0x0304
+        assert result["updates"] == [(10, 20, 0x0304), (30, 40, -1)]
 
-    def test_raises_on_short_data(self) -> None:
-        """Raises DecodeError on insufficient data."""
+    def test_raises_on_invalid_length(self) -> None:
+        """Raises DecodeError on invalid entry length."""
         with pytest.raises(DecodeError):
-            decode_container(bytes([1, 2]))
+            decode_cache_update(bytes([1, 2, 3]))
+
+
+class TestDecodeOverlayUpdate:
+    """Tests for decode_overlay_update function."""
+
+    def test_decodes_overlay_updates(self) -> None:
+        """Decodes overlay update entries."""
+        data = bytes([10, 20, 7, 30, 40, 255])
+        result = decode_overlay_update(data)
+        assert result["msg_type"] == 0x40
+        assert result["updates"] == [(10, 20, 7), (30, 40, 255)]
+
+    def test_raises_on_invalid_length(self) -> None:
+        """Raises DecodeError on invalid entry length."""
+        with pytest.raises(DecodeError):
+            decode_overlay_update(bytes([1, 2]))
+
+
+class TestDecodeCombinedTileUpdate:
+    """Tests for decode_combined_tile_update function."""
+
+    def test_decodes_combined_tile_updates(self) -> None:
+        """Decodes cache and overlay sections."""
+        data = bytes([1, 0, 10, 20, 0x04, 0x03, 30, 40, 7])
+        result = decode_combined_tile_update(data)
+        assert result["msg_type"] == 0x4F
+        assert result["cache_updates"] == [(10, 20, 0x0304)]
+        assert result["overlay_updates"] == [(30, 40, 7)]
+
+    def test_raises_on_short_header(self) -> None:
+        """Raises DecodeError on missing cache count header."""
+        with pytest.raises(DecodeError):
+            decode_combined_tile_update(bytes([1]))
+
+    def test_raises_on_truncated_cache_section(self) -> None:
+        """Raises DecodeError when cache section exceeds payload length."""
+        with pytest.raises(DecodeError):
+            decode_combined_tile_update(bytes([1, 0, 10, 20]))
+
+    def test_raises_on_invalid_overlay_length(self) -> None:
+        """Raises DecodeError when overlay section is not triplet-aligned."""
+        with pytest.raises(DecodeError):
+            decode_combined_tile_update(bytes([0, 0, 10]))
 
 
 class TestDecodeChatMessage:
@@ -157,8 +200,8 @@ class TestDecodeViewportUpdate:
     def test_decodes_viewport_with_entities(self) -> None:
         """Decodes viewport with entity data."""
         # viewport_left=0, viewport_top=0, delta=1 (col=1, row=0), entity data (3 bytes)
-        # z = (entity_id << 8) | (value << 4) | terrain_type
-        # Let's encode: terrain=5, value=2, entity_id=100
+        # z = (cache_value << 8) | (overlay_value << 4) | terrain_type
+        # Let's encode: terrain=5, overlay=2, cache=100
         # z = (100 << 8) | (2 << 4) | 5 = 0x6425
         # Big endian 3 bytes: 0x00, 0x64, 0x25
         data = bytes([0, 0, 1, 0x00, 0x64, 0x25])
@@ -168,7 +211,8 @@ class TestDecodeViewportUpdate:
         assert entity["col"] == 1
         assert entity["row"] == 0
         assert entity["terrain_type"] == 5
-        assert entity["entity_id"] == 100
+        assert entity["cache_value"] == 100
+        assert entity["overlay_value"] == 2
 
     def test_handles_skip_marker(self) -> None:
         """Handles delta 255 as skip marker."""
@@ -205,21 +249,21 @@ class TestDecodeViewportUpdate:
         # Should break early, no entities parsed
         assert result["entities"] == []
 
-    def test_handles_tank_entity_id(self) -> None:
-        """Handles special tank entity ID (65535 -> -1)."""
-        # entity_id=65535 (0xFFFF) means tank
+    def test_handles_equipment_cache_sentinel(self) -> None:
+        """Handles special cache sentinel (65535 -> -1)."""
+        # cache_value=65535 (0xFFFF) means equipment cache
         # z = (0xFFFF << 8) | 0 | 0 = 0xFFFF00
         data = bytes([0, 0, 1, 0xFF, 0xFF, 0x00])
         result = decode_viewport_update(data)
-        assert result["entities"][0]["entity_id"] == -1
+        assert result["entities"][0]["cache_value"] == -1
 
-    def test_handles_high_value(self) -> None:
-        """Handles value >= 8 becoming 255."""
-        # value = 8 -> becomes 255
+    def test_handles_high_overlay_value(self) -> None:
+        """Handles overlay nibble >= 8 becoming 255."""
+        # overlay_value = 8 -> becomes 255
         # z = (0 << 8) | (8 << 4) | 0 = 0x80
         data = bytes([0, 0, 1, 0x00, 0x00, 0x80])
         result = decode_viewport_update(data)
-        assert result["entities"][0]["value"] == 255
+        assert result["entities"][0]["overlay_value"] == 255
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
@@ -230,62 +274,62 @@ class TestDecodeViewportUpdate:
 class TestViewportEntityHelpers:
     """Tests for viewport entity helper functions."""
 
-    def test_viewport_entity_is_equipment(self) -> None:
+    def test_viewport_entity_has_equipment_cache(self) -> None:
         """Checks if row marks equipment."""
         equipment: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": -1,
-            "value": 0,
+            "cache_value": -1,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
         not_equipment: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": 100,
-            "value": 0,
+            "cache_value": 100,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
-        assert viewport_entity_is_equipment(equipment) is True
-        assert viewport_entity_is_equipment(not_equipment) is False
+        assert viewport_entity_has_equipment_cache(equipment) is True
+        assert viewport_entity_has_equipment_cache(not_equipment) is False
 
-    def test_viewport_entity_is_fuel(self) -> None:
+    def test_viewport_entity_has_fuel_cache(self) -> None:
         """Checks if row marks fuel."""
         fuel: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": 100,
-            "value": 0,
+            "cache_value": 100,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
         not_fuel: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": 0,
-            "value": 0,
+            "cache_value": 0,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
-        assert viewport_entity_is_fuel(fuel) is True
-        assert viewport_entity_is_fuel(not_fuel) is False
+        assert viewport_entity_has_fuel_cache(fuel) is True
+        assert viewport_entity_has_fuel_cache(not_fuel) is False
 
-    def test_viewport_entity_is_empty(self) -> None:
-        """Checks if tile is empty."""
+    def test_viewport_entity_has_no_cache(self) -> None:
+        """Checks if tile has no cache update."""
         empty: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": 0,
-            "value": 0,
+            "cache_value": 0,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
         not_empty: ViewportEntityDict = {
             "col": 0,
             "row": 0,
-            "entity_id": 100,
-            "value": 0,
+            "cache_value": 100,
+            "overlay_value": 0,
             "terrain_type": 0,
         }
-        assert viewport_entity_is_empty(empty) is True
-        assert viewport_entity_is_empty(not_empty) is False
+        assert viewport_entity_has_no_cache(empty) is True
+        assert viewport_entity_has_no_cache(not_empty) is False
 
 
 class TestDecode0x2eMessage:
