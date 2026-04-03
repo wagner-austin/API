@@ -3,7 +3,7 @@
 Production code uses real implementations; tests override these module-level
 symbols to inject fakes without conditionals in core logic.
 
-Each backend has its own runner hook with strongly-typed result types.
+Single unified runner hook replaces 5 per-backend runner hooks.
 Import and set hooks at application/test startup.
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
@@ -36,83 +36,73 @@ from covenant_ml.explainers.registry import (
     default_explainer_registry,
 )
 
-from covenant_radar_api.worker.optimize_cleargbm_job import (
-    ClearGBMLoadingProgressCallbackProtocol,
-    ClearGBMLoadingProgressInfo,
-    ClearGBMOptimizationResult,
-    ClearGBMPhaseCallbackProtocol,
-    ClearGBMPhaseInfo,
-    ClearGBMTrialProgressCallbackProtocol,
-    ClearGBMTrialProgressInfo,
-    run_cleargbm_optimization,
-)
-from covenant_radar_api.worker.optimize_lightgbm_job import (
-    LightGBMLoadingProgressCallbackProtocol,
-    LightGBMLoadingProgressInfo,
-    LightGBMOptimizationResult,
-    LightGBMPhaseCallbackProtocol,
-    LightGBMPhaseInfo,
-    LightGBMTrialProgressCallbackProtocol,
-    LightGBMTrialProgressInfo,
-    run_lightgbm_optimization,
-)
-from covenant_radar_api.worker.optimize_lstm_job import (
-    LSTMLoadingProgressCallbackProtocol,
-    LSTMLoadingProgressInfo,
-    LSTMOptimizationResult,
-    LSTMPhaseCallbackProtocol,
-    LSTMPhaseInfo,
-    LSTMTrialProgressCallbackProtocol,
-    LSTMTrialProgressInfo,
-    run_lstm_optimization,
-)
-from covenant_radar_api.worker.optimize_mlp_job import (
-    MLPLoadingProgressCallbackProtocol,
-    MLPLoadingProgressInfo,
-    MLPOptimizationResult,
-    MLPPhaseCallbackProtocol,
-    MLPPhaseInfo,
-    MLPTrialProgressCallbackProtocol,
-    MLPTrialProgressInfo,
-    run_mlp_optimization,
-)
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    OptimizationResult as XGBoostOptimizationResult,
-)
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    TrialProgressCallbackProtocol as XGBoostProgressCallbackProtocol,
-)
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    TrialProgressInfo as XGBoostProgressInfo,
-)
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    XGBoostLoadingProgressCallbackProtocol,
-    XGBoostLoadingProgressInfo,
-    XGBoostPhaseCallbackProtocol,
-    XGBoostPhaseInfo,
-)
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    run_optimization as run_xgboost_optimization,
+from covenant_radar_api.worker.optimize_job import run_optimization
+from covenant_radar_api.worker.optimize_types import (
+    LoadingProgressCallbackProtocol,
+    LoadingProgressInfo,
+    PhaseProgressCallbackProtocol,
+    PhaseProgressInfo,
+    TrialProgressCallbackProtocol,
+    TrialProgressInfo,
+    UnifiedOptimizationResult,
 )
 
 # =============================================================================
-# XGBoost Runner Protocol and Hook
+# Project Root Hook
 # =============================================================================
 
 
-class XGBoostRunnerProtocol(Protocol):
-    """Protocol for XGBoost optimization runner function."""
+class ProjectRootCallable(Protocol):
+    """Protocol for project root path factory function."""
+
+    def __call__(self) -> Path:
+        """Get the project root path.
+
+        Returns:
+            Path to project root directory.
+        """
+        ...
+
+
+def _default_project_root() -> Path:
+    """Default project root factory.
+
+    Returns:
+        Path to covenant-radar-api root.
+    """
+    return Path(__file__).parent.parent
+
+
+project_root_hook: ProjectRootCallable = _default_project_root
+
+
+def get_project_root() -> Path:
+    """Get project root path via hook.
+
+    Returns:
+        Path to project root directory.
+    """
+    return project_root_hook()
+
+
+# =============================================================================
+# Unified Optimization Runner Protocol and Hook
+# =============================================================================
+
+
+class OptimizationRunnerProtocol(Protocol):
+    """Protocol for unified optimization runner function."""
 
     def __call__(
         self,
         config_json: str,
         external_dir: Path,
         output_dir: Path,
-        progress_callback: XGBoostProgressCallbackProtocol | None = None,
-        phase_callback: XGBoostPhaseCallbackProtocol | None = None,
-        loading_progress_callback: XGBoostLoadingProgressCallbackProtocol | None = None,
-    ) -> XGBoostOptimizationResult:
-        """Run XGBoost hyperparameter optimization.
+        progress_callback: TrialProgressCallbackProtocol | None = None,
+        phase_callback: PhaseProgressCallbackProtocol | None = None,
+        loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+    ) -> UnifiedOptimizationResult:
+        """Run hyperparameter optimization for any backend.
 
         Args:
             config_json: JSON configuration string.
@@ -123,156 +113,12 @@ class XGBoostRunnerProtocol(Protocol):
             loading_progress_callback: Optional callback for loading progress.
 
         Returns:
-            Optimization result with best XGBoost hyperparameters.
+            Unified optimization result with best hyperparameters.
         """
         ...
 
 
-xgboost_runner: XGBoostRunnerProtocol = run_xgboost_optimization
-
-
-# =============================================================================
-# MLP Runner Protocol and Hook
-# =============================================================================
-
-
-class MLPRunnerProtocol(Protocol):
-    """Protocol for MLP optimization runner function."""
-
-    def __call__(
-        self,
-        config_json: str,
-        external_dir: Path,
-        output_dir: Path,
-        progress_callback: MLPTrialProgressCallbackProtocol | None = None,
-        phase_callback: MLPPhaseCallbackProtocol | None = None,
-        loading_progress_callback: MLPLoadingProgressCallbackProtocol | None = None,
-    ) -> MLPOptimizationResult:
-        """Run MLP hyperparameter optimization.
-
-        Args:
-            config_json: JSON configuration string.
-            external_dir: Directory with external datasets.
-            output_dir: Directory for output files.
-            progress_callback: Optional callback for trial progress updates.
-            phase_callback: Optional callback for phase transitions.
-            loading_progress_callback: Optional callback for loading progress.
-
-        Returns:
-            Optimization result with best MLP hyperparameters.
-        """
-        ...
-
-
-mlp_runner: MLPRunnerProtocol = run_mlp_optimization
-
-
-# =============================================================================
-# LightGBM Runner Protocol and Hook
-# =============================================================================
-
-
-class LightGBMRunnerProtocol(Protocol):
-    """Protocol for LightGBM optimization runner function."""
-
-    def __call__(
-        self,
-        config_json: str,
-        external_dir: Path,
-        output_dir: Path,
-        progress_callback: LightGBMTrialProgressCallbackProtocol | None = None,
-        phase_callback: LightGBMPhaseCallbackProtocol | None = None,
-        loading_progress_callback: LightGBMLoadingProgressCallbackProtocol | None = None,
-    ) -> LightGBMOptimizationResult:
-        """Run LightGBM hyperparameter optimization.
-
-        Args:
-            config_json: JSON configuration string.
-            external_dir: Directory with external datasets.
-            output_dir: Directory for output files.
-            progress_callback: Optional callback for trial progress updates.
-            phase_callback: Optional callback for phase transitions.
-            loading_progress_callback: Optional callback for loading progress.
-
-        Returns:
-            Optimization result with best LightGBM hyperparameters.
-        """
-        ...
-
-
-lightgbm_runner: LightGBMRunnerProtocol = run_lightgbm_optimization
-
-
-# =============================================================================
-# LSTM Runner Protocol and Hook
-# =============================================================================
-
-
-class LSTMRunnerProtocol(Protocol):
-    """Protocol for LSTM optimization runner function."""
-
-    def __call__(
-        self,
-        config_json: str,
-        external_dir: Path,
-        output_dir: Path,
-        progress_callback: LSTMTrialProgressCallbackProtocol | None = None,
-        phase_callback: LSTMPhaseCallbackProtocol | None = None,
-        loading_progress_callback: LSTMLoadingProgressCallbackProtocol | None = None,
-    ) -> LSTMOptimizationResult:
-        """Run LSTM hyperparameter optimization.
-
-        Args:
-            config_json: JSON configuration string.
-            external_dir: Directory with external datasets.
-            output_dir: Directory for output files.
-            progress_callback: Optional callback for trial progress updates.
-            phase_callback: Optional callback for phase transitions.
-            loading_progress_callback: Optional callback for loading progress.
-
-        Returns:
-            Optimization result with best LSTM hyperparameters.
-        """
-        ...
-
-
-lstm_runner: LSTMRunnerProtocol = run_lstm_optimization
-
-
-# =============================================================================
-# ClearGBM Runner Protocol and Hook
-# =============================================================================
-
-
-class ClearGBMRunnerProtocol(Protocol):
-    """Protocol for ClearGBM optimization runner function."""
-
-    def __call__(
-        self,
-        config_json: str,
-        external_dir: Path,
-        output_dir: Path,
-        progress_callback: ClearGBMTrialProgressCallbackProtocol | None = None,
-        phase_callback: ClearGBMPhaseCallbackProtocol | None = None,
-        loading_progress_callback: ClearGBMLoadingProgressCallbackProtocol | None = None,
-    ) -> ClearGBMOptimizationResult:
-        """Run ClearGBM hyperparameter optimization.
-
-        Args:
-            config_json: JSON configuration string.
-            external_dir: Directory with external datasets.
-            output_dir: Directory for output files.
-            progress_callback: Optional callback for trial progress updates.
-            phase_callback: Optional callback for phase transitions.
-            loading_progress_callback: Optional callback for loading progress.
-
-        Returns:
-            Optimization result with best ClearGBM hyperparameters.
-        """
-        ...
-
-
-cleargbm_runner: ClearGBMRunnerProtocol = run_cleargbm_optimization
+optimization_runner: OptimizationRunnerProtocol = run_optimization
 
 
 # =============================================================================
@@ -465,7 +311,7 @@ class BackendRegistryFactoryProtocol(Protocol):
         """Create a ClassifierRegistry with all supported backends.
 
         Returns:
-            ClassifierRegistry with xgboost, mlp, lightgbm, and lstm backends.
+            ClassifierRegistry with all registered backends.
         """
         ...
 
@@ -476,66 +322,33 @@ backend_registry_factory: BackendRegistryFactoryProtocol = default_backend_regis
 __all__ = [
     "BackendRegistryFactoryProtocol",
     "ClassifierRegistry",
-    "ClearGBMLoadingProgressCallbackProtocol",
-    "ClearGBMLoadingProgressInfo",
-    "ClearGBMOptimizationResult",
-    "ClearGBMPhaseCallbackProtocol",
-    "ClearGBMPhaseInfo",
-    "ClearGBMRunnerProtocol",
-    "ClearGBMTrialProgressCallbackProtocol",
-    "ClearGBMTrialProgressInfo",
     "DatasetConfig",
     "DatasetLoaderCallable",
     "DatasetRegistry",
     "DatasetRegistryFactoryProtocol",
     "ExplainerRegistry",
     "ExplainerRegistryFactoryProtocol",
-    "LSTMLoadingProgressCallbackProtocol",
-    "LSTMLoadingProgressInfo",
-    "LSTMOptimizationResult",
-    "LSTMPhaseCallbackProtocol",
-    "LSTMPhaseInfo",
-    "LSTMRunnerProtocol",
-    "LSTMTrialProgressCallbackProtocol",
-    "LSTMTrialProgressInfo",
-    "LightGBMLoadingProgressCallbackProtocol",
-    "LightGBMLoadingProgressInfo",
-    "LightGBMOptimizationResult",
-    "LightGBMPhaseCallbackProtocol",
-    "LightGBMPhaseInfo",
-    "LightGBMRunnerProtocol",
-    "LightGBMTrialProgressCallbackProtocol",
-    "LightGBMTrialProgressInfo",
     "LoadedDataset",
-    "MLPLoadingProgressCallbackProtocol",
-    "MLPLoadingProgressInfo",
-    "MLPOptimizationResult",
-    "MLPPhaseCallbackProtocol",
-    "MLPPhaseInfo",
-    "MLPRunnerProtocol",
-    "MLPTrialProgressCallbackProtocol",
-    "MLPTrialProgressInfo",
+    "LoadingProgressCallbackProtocol",
+    "LoadingProgressInfo",
+    "OptimizationRunnerProtocol",
+    "PhaseProgressCallbackProtocol",
+    "PhaseProgressInfo",
+    "ProjectRootCallable",
     "TimeSeriesDatasetConfig",
     "TimeSeriesDatasetRegistry",
     "TimeSeriesLoaderCallable",
     "TimeSeriesRegistryFactoryProtocol",
-    "XGBoostLoadingProgressCallbackProtocol",
-    "XGBoostLoadingProgressInfo",
-    "XGBoostOptimizationResult",
-    "XGBoostPhaseCallbackProtocol",
-    "XGBoostPhaseInfo",
-    "XGBoostProgressCallbackProtocol",
-    "XGBoostProgressInfo",
-    "XGBoostRunnerProtocol",
+    "TrialProgressCallbackProtocol",
+    "TrialProgressInfo",
+    "UnifiedOptimizationResult",
     "backend_registry_factory",
-    "cleargbm_runner",
     "dataset_loader",
     "dataset_registry_factory",
     "explainer_registry_factory",
-    "lightgbm_runner",
-    "lstm_runner",
-    "mlp_runner",
+    "get_project_root",
+    "optimization_runner",
+    "project_root_hook",
     "timeseries_loader",
     "timeseries_registry_factory",
-    "xgboost_runner",
 ]
