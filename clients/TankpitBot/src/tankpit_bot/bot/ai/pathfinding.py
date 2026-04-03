@@ -8,9 +8,11 @@ server can walk directly to a target or needs waypointed path-following.
 from __future__ import annotations
 
 import heapq
+from collections.abc import Collection
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.types import PathStepDict, make_path_step
+from tankpit_bot.state.types import coord_key
 
 # 4-directional movement: right, down, left, up
 _DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (0, 1), (-1, 0), (0, -1))
@@ -31,6 +33,7 @@ def find_path(
     start_y: int,
     goal_x: int,
     goal_y: int,
+    blocked_coords: Collection[str] | None = None,
 ) -> list[PathStepDict]:
     """Find a terrain-aware path using A* search.
 
@@ -44,6 +47,8 @@ def find_path(
         start_y: Starting Y coordinate (0-255).
         goal_x: Goal X coordinate (0-255).
         goal_y: Goal Y coordinate (0-255).
+        blocked_coords: Optional coordinate keys that should be treated as
+            impassable in addition to terrain.
 
     Returns:
         List of PathStepDict from start to goal (inclusive of both).
@@ -85,6 +90,9 @@ def find_path(
             if not terrain.is_passable(nx, ny):
                 continue
 
+            if _is_blocked_coord(blocked_coords, nx, ny):
+                continue
+
             neighbor = (nx, ny)
             tentative_g = current_g + 1
 
@@ -104,6 +112,7 @@ def is_direct_path_clear(
     start_y: int,
     goal_x: int,
     goal_y: int,
+    blocked_coords: Collection[str] | None = None,
 ) -> bool:
     """Check whether a straight server-side walk can reach the goal.
 
@@ -118,6 +127,8 @@ def is_direct_path_clear(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
+        blocked_coords: Optional coordinate keys that should be treated as
+            impassable in addition to terrain.
 
     Returns:
         True if the direct line is fully passable, False otherwise.
@@ -126,6 +137,8 @@ def is_direct_path_clear(
         if x == start_x and y == start_y:
             continue
         if not terrain.is_passable(x, y):
+            return False
+        if _is_blocked_coord(blocked_coords, x, y):
             return False
     return True
 
@@ -136,6 +149,12 @@ def find_path_segment_target(
     start_y: int,
     goal_x: int,
     goal_y: int,
+    blocked_coords: Collection[str] | None = None,
+    *,
+    min_x: int | None = None,
+    min_y: int | None = None,
+    max_x: int | None = None,
+    max_y: int | None = None,
 ) -> tuple[int, int] | None:
     """Return the farthest directly walkable waypoint from an A* path.
 
@@ -151,26 +170,53 @@ def find_path_segment_target(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
+        blocked_coords: Optional coordinate keys that should be treated as
+            impassable in addition to terrain.
+        min_x: Optional inclusive minimum X bound for a usable waypoint.
+        min_y: Optional inclusive minimum Y bound for a usable waypoint.
+        max_x: Optional inclusive maximum X bound for a usable waypoint.
+        max_y: Optional inclusive maximum Y bound for a usable waypoint.
 
     Returns:
         A waypoint tuple for the farthest directly walkable chunk, or None if
         no path exists or the path has no progress beyond the start tile.
     """
-    path = find_path(terrain, start_x, start_y, goal_x, goal_y)
+    path = find_path(
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        blocked_coords,
+    )
     if len(path) <= 1:
         return None
 
-    best_x = path[1]["x"]
-    best_y = path[1]["y"]
-    for step in path[2:]:
+    best_step: tuple[int, int] | None = None
+    for step in path[1:]:
         candidate_x = step["x"]
         candidate_y = step["y"]
-        if not is_direct_path_clear(terrain, start_x, start_y, candidate_x, candidate_y):
+        if not _is_candidate_within_bounds(
+            candidate_x,
+            candidate_y,
+            min_x=min_x,
+            min_y=min_y,
+            max_x=max_x,
+            max_y=max_y,
+        ):
+            continue
+        if not is_direct_path_clear(
+            terrain,
+            start_x,
+            start_y,
+            candidate_x,
+            candidate_y,
+            blocked_coords,
+        ):
             break
-        best_x = candidate_x
-        best_y = candidate_y
+        best_step = (candidate_x, candidate_y)
 
-    return (best_x, best_y)
+    return best_step
 
 
 def _heuristic(x: int, y: int, goal_x: int, goal_y: int) -> int:
@@ -186,6 +232,52 @@ def _heuristic(x: int, y: int, goal_x: int, goal_y: int) -> int:
         Manhattan distance to goal.
     """
     return abs(x - goal_x) + abs(y - goal_y)
+
+
+def _is_blocked_coord(blocked_coords: Collection[str] | None, x: int, y: int) -> bool:
+    """Return True when a coordinate is blocked by dynamic obstacles.
+
+    Args:
+        blocked_coords: Optional blocked coordinate keys.
+        x: Candidate X coordinate.
+        y: Candidate Y coordinate.
+
+    Returns:
+        True if the coordinate is in the blocked set.
+    """
+    if blocked_coords is None:
+        return False
+    return coord_key(x, y) in blocked_coords
+
+
+def _is_candidate_within_bounds(
+    x: int,
+    y: int,
+    *,
+    min_x: int | None,
+    min_y: int | None,
+    max_x: int | None,
+    max_y: int | None,
+) -> bool:
+    """Return True when a candidate satisfies optional inclusive bounds.
+
+    Args:
+        x: Candidate X coordinate.
+        y: Candidate Y coordinate.
+        min_x: Optional inclusive minimum X bound.
+        min_y: Optional inclusive minimum Y bound.
+        max_x: Optional inclusive maximum X bound.
+        max_y: Optional inclusive maximum Y bound.
+
+    Returns:
+        True if the candidate satisfies every provided bound.
+    """
+    return (
+        (min_x is None or x >= min_x)
+        and (min_y is None or y >= min_y)
+        and (max_x is None or x <= max_x)
+        and (max_y is None or y <= max_y)
+    )
 
 
 def _reconstruct_path(
