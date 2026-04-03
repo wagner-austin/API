@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-ExplainerName = Literal["permutation", "gradient", "integrated_gradients"]
+ExplainerName = Literal["permutation", "gradient", "integrated_gradients", "shap_tree"]
 """Supported explainer names."""
 
 ComputationalCost = Literal["low", "medium", "high"]

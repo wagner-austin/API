@@ -117,8 +117,107 @@ class FeatureExplainer(Protocol):
         ...
 
 
+class RegressorPredictorProtocol(Protocol):
+    """Protocol for regression models that predict continuous values.
+
+    Minimal interface required by regression permutation importance.
+    Any model with a predict method returning 1D array satisfies this.
+    """
+
+    def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Return predicted continuous values for input samples.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Predicted values with shape (n_samples,).
+        """
+        ...
+
+
+class RegressionGradientModelProtocol(Protocol):
+    """Protocol for differentiable regression models with gradient support.
+
+    Required by gradient-based regression explainers.
+    """
+
+    def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Return predicted continuous values for input samples.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Predicted values with shape (n_samples,).
+        """
+        ...
+
+    def compute_regression_gradients(
+        self,
+        x: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Compute gradients of regression output w.r.t. input features.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Gradients with shape (n_samples, n_features).
+        """
+        ...
+
+
+class RegressionFeatureExplainer(Protocol):
+    """Protocol for regression feature importance explainers.
+
+    Like FeatureExplainer but without target_class (regression has single output).
+    """
+
+    def explainer_name(self) -> ExplainerName:
+        """Return the name of this explainer.
+
+        Returns:
+            One of the supported explainer names.
+        """
+        ...
+
+    def capabilities(self) -> ExplainerCapabilities:
+        """Return capabilities of this explainer.
+
+        Returns:
+            TypedDict describing what the explainer requires and its cost.
+        """
+        ...
+
+    def compute_importance(
+        self,
+        *,
+        model: RegressorPredictorProtocol,
+        x_data: NDArray[np.float64],
+        feature_names: list[str],
+    ) -> list[FeatureImportanceScore]:
+        """Compute feature importance scores for a regression model.
+
+        Args:
+            model: Model implementing RegressorPredictorProtocol.
+            x_data: Input data with shape (n_samples, n_features).
+            feature_names: List of feature names matching x_data columns.
+
+        Returns:
+            List of FeatureImportanceScore, sorted by rank (most important first).
+
+        Raises:
+            ValueError: If feature_names length doesn't match x_data columns.
+        """
+        ...
+
+
 __all__ = [
     "FeatureExplainer",
     "GradientModelProtocol",
     "PredictorProtocol",
+    "RegressionFeatureExplainer",
+    "RegressionGradientModelProtocol",
+    "RegressorPredictorProtocol",
 ]

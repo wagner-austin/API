@@ -13,6 +13,9 @@ from platform_ml.explainers.protocol import (
     FeatureExplainer,
     GradientModelProtocol,
     PredictorProtocol,
+    RegressionFeatureExplainer,
+    RegressionGradientModelProtocol,
+    RegressorPredictorProtocol,
 )
 from platform_ml.explainers.types import (
     ExplainerCapabilities,
@@ -211,6 +214,190 @@ def test_feature_explainer_compute_importance() -> None:
         x_data=x,
         feature_names=feature_names,
         target_class=1,
+    )
+
+    assert len(importance) == 2
+    assert importance[0]["name"] == "feat_a"
+    assert importance[0]["importance"] == 1.0
+    assert importance[0]["rank"] == 1
+    assert importance[1]["name"] == "feat_b"
+    assert importance[1]["importance"] == 0.5
+    assert importance[1]["rank"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Regression protocol conformance tests
+# ---------------------------------------------------------------------------
+
+
+class SimpleRegressorModel:
+    """Simple regressor that implements RegressorPredictorProtocol."""
+
+    def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Return sum of features as prediction.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Predicted values with shape (n_samples,).
+        """
+        n_samples = int(x.shape[0])
+        result: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
+        for i in range(n_samples):
+            total = 0.0
+            for j in range(int(x.shape[1])):
+                total += get_float(x, i, j)
+            result[i] = total
+        return result
+
+
+class SimpleRegressionGradientModel:
+    """Simple regression gradient model implementing RegressionGradientModelProtocol."""
+
+    def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Return sum of features as prediction.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Predicted values with shape (n_samples,).
+        """
+        n_samples = int(x.shape[0])
+        result: NDArray[np.float64] = np.zeros(n_samples, dtype=np.float64)
+        for i in range(n_samples):
+            total = 0.0
+            for j in range(int(x.shape[1])):
+                total += get_float(x, i, j)
+            result[i] = total
+        return result
+
+    def compute_regression_gradients(
+        self,
+        x: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Return unit gradients (sum function gradient is all 1s).
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Gradients with shape (n_samples, n_features).
+        """
+        return np.ones_like(x, dtype=np.float64)
+
+
+class SimpleRegressionExplainer:
+    """Simple regression explainer implementing RegressionFeatureExplainer."""
+
+    def explainer_name(self) -> ExplainerName:
+        """Return explainer name.
+
+        Returns:
+            Literal "permutation".
+        """
+        return "permutation"
+
+    def capabilities(self) -> ExplainerCapabilities:
+        """Return explainer capabilities.
+
+        Returns:
+            Capabilities dict.
+        """
+        caps: ExplainerCapabilities = {
+            "requires_gradients": False,
+            "requires_background_data": False,
+            "computational_cost": "low",
+        }
+        return caps
+
+    def compute_importance(
+        self,
+        *,
+        model: RegressorPredictorProtocol,
+        x_data: NDArray[np.float64],
+        feature_names: list[str],
+    ) -> list[FeatureImportanceScore]:
+        """Compute dummy regression importance scores.
+
+        Args:
+            model: Model implementing RegressorPredictorProtocol.
+            x_data: Input data with shape (n_samples, n_features).
+            feature_names: List of feature names.
+
+        Returns:
+            List of FeatureImportanceScore.
+        """
+        _ = model.predict(x_data)
+
+        results: list[FeatureImportanceScore] = []
+        for rank, name in enumerate(feature_names):
+            score: FeatureImportanceScore = {
+                "name": name,
+                "importance": 1.0 / float(rank + 1),
+                "rank": rank + 1,
+            }
+            results.append(score)
+        return results
+
+
+def test_regressor_predictor_protocol_conformance() -> None:
+    """Verify SimpleRegressorModel conforms to RegressorPredictorProtocol."""
+    model: RegressorPredictorProtocol = SimpleRegressorModel()
+    x = make_float64_2d([[1.0, 2.0], [3.0, 4.0]])
+    preds = model.predict(x)
+
+    assert preds.shape == (2,)
+    assert get_float(preds, 0) == 3.0
+    assert get_float(preds, 1) == 7.0
+
+
+def test_regression_gradient_model_predict() -> None:
+    """Verify RegressionGradientModelProtocol.predict conformance."""
+    model: RegressionGradientModelProtocol = SimpleRegressionGradientModel()
+    x = make_float64_2d([[1.0, 2.0, 3.0]])
+    preds = model.predict(x)
+
+    assert preds.shape == (1,)
+    assert get_float(preds, 0) == 6.0
+
+
+def test_regression_gradient_model_compute_gradients() -> None:
+    """Verify RegressionGradientModelProtocol.compute_regression_gradients."""
+    model: RegressionGradientModelProtocol = SimpleRegressionGradientModel()
+    x = make_float64_2d([[1.0, 2.0, 3.0]])
+    grads = model.compute_regression_gradients(x)
+
+    assert grads.shape == (1, 3)
+    assert get_float(grads, 0, 0) == 1.0
+    assert get_float(grads, 0, 1) == 1.0
+    assert get_float(grads, 0, 2) == 1.0
+
+
+def test_regression_feature_explainer_conformance() -> None:
+    """Verify SimpleRegressionExplainer conforms to RegressionFeatureExplainer."""
+    explainer: RegressionFeatureExplainer = SimpleRegressionExplainer()
+
+    assert explainer.explainer_name() == "permutation"
+
+    caps = explainer.capabilities()
+    assert caps["requires_gradients"] is False
+    assert caps["requires_background_data"] is False
+    assert caps["computational_cost"] == "low"
+
+
+def test_regression_feature_explainer_compute_importance() -> None:
+    """Verify RegressionFeatureExplainer.compute_importance works."""
+    explainer: RegressionFeatureExplainer = SimpleRegressionExplainer()
+    model: RegressorPredictorProtocol = SimpleRegressorModel()
+    x = make_float64_2d([[1.0, 2.0], [3.0, 4.0]])
+    feature_names = ["feat_a", "feat_b"]
+
+    importance = explainer.compute_importance(
+        model=model,
+        x_data=x,
+        feature_names=feature_names,
     )
 
     assert len(importance) == 2

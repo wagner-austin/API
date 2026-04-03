@@ -44,6 +44,14 @@ from .protocol import (
     FeatureExplainer,
     GradientModelProtocol,
     PredictorProtocol,
+    RegressionFeatureExplainer,
+    RegressionGradientModelProtocol,
+    RegressorPredictorProtocol,
+)
+from .regression_permutation import (
+    REGRESSION_PERMUTATION_CAPABILITIES,
+    RegressionPermutationExplainer,
+    create_regression_permutation_explainer,
 )
 from .tree import (
     LocalExplanation,
@@ -64,6 +72,7 @@ __all__ = [
     "GRADIENT_CAPABILITIES",
     "INTEGRATED_GRADIENTS_CAPABILITIES",
     "PERMUTATION_CAPABILITIES",
+    "REGRESSION_PERMUTATION_CAPABILITIES",
     "ComputationalCost",
     "ExplainerCapabilities",
     "ExplainerName",
@@ -78,9 +87,14 @@ __all__ = [
     "PermutationConfig",
     "PermutationExplainer",
     "PredictorProtocol",
+    "RegressionFeatureExplainer",
+    "RegressionGradientModelProtocol",
+    "RegressionPermutationExplainer",
+    "RegressorPredictorProtocol",
     "ShapTreeWrapper",
     "TreeModelProtocol",
     "create_gradient_explainer",
     "create_integrated_gradients_explainer",
     "create_permutation_explainer",
+    "create_regression_permutation_explainer",
 ]
