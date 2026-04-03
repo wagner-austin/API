@@ -850,6 +850,7 @@ develop = true
 [package.dependencies]
 numpy = "^2.3.5"
 Pillow = "^11.0.0"
+platform-core = {path = "../platform_core", develop = true}
 
 [package.source]
 type = "directory"
