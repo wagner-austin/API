@@ -14,10 +14,12 @@ from numpy.typing import NDArray
 from .types import (
     ClearGBMSearchSpace,
     LightGBMSearchSpace,
+    LogRegSearchSpace,
     LSTMSearchSpace,
     MLPSearchSpace,
     OptimizationConfig,
     OptimizationSummary,
+    RandomForestSearchSpace,
     SampledFloatParams,
     SampledIntParams,
     SampledStringParams,
@@ -190,12 +192,48 @@ class ClearGBMOptimizerProtocol(Protocol):
         ...
 
 
+class LogRegOptimizerProtocol(Protocol):
+    """Protocol for Logistic Regression hyperparameter optimizers."""
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: LogRegSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        """Run hyperparameter optimization for Logistic Regression."""
+        ...
+
+
+class RandomForestOptimizerProtocol(Protocol):
+    """Protocol for Random Forest hyperparameter optimizers."""
+
+    def optimize(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        search_space: RandomForestSearchSpace,
+        config: OptimizationConfig,
+        objective: ObjectiveProtocol,
+        trial_callback: TrialCallbackProtocol | None = None,
+    ) -> OptimizationSummary:
+        """Run hyperparameter optimization for Random Forest."""
+        ...
+
+
 __all__ = [
     "ClearGBMOptimizerProtocol",
     "LSTMOptimizerProtocol",
     "LightGBMOptimizerProtocol",
+    "LogRegOptimizerProtocol",
     "MLPOptimizerProtocol",
     "ObjectiveProtocol",
+    "RandomForestOptimizerProtocol",
     "TrialCallbackProtocol",
     "XGBoostOptimizerProtocol",
 ]

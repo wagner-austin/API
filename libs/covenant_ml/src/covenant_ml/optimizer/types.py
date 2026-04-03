@@ -85,10 +85,12 @@ class SampledIntParams(TypedDict, total=False):
     batch_size: int
     num_leaves: int
     min_child_samples: int
-    # ClearGBM-specific params
+    # ClearGBM / RandomForest shared params
     min_samples_split: int
     min_samples_leaf: int
     max_bins: int
+    # LogReg-specific params
+    max_iter: int
 
 
 class SampledFloatParams(TypedDict, total=False):
@@ -110,6 +112,12 @@ class SampledFloatParams(TypedDict, total=False):
     rate_drop: float
     # LightGBM DART-specific: very low feature fraction for strong regularization
     feature_fraction: float
+    # LogReg-specific params
+    C: float
+    tol: float
+    l1_ratio: float
+    # RandomForest-specific params
+    max_features_float: float
 
 
 class SampledStringParams(TypedDict, total=False):
@@ -122,6 +130,11 @@ class SampledStringParams(TypedDict, total=False):
     boosting_type: str
     # XGBoost booster: "gbtree" or "dart"
     booster: str
+    # LogReg-specific params
+    penalty: str
+    solver: str
+    # RandomForest-specific params
+    max_features: str
 
 
 # =============================================================================
@@ -232,6 +245,55 @@ class ClearGBMSearchSpace(TypedDict, total=True):
     subsample: FloatRangeSpec | CategoricalFloatSpec
 
 
+class _LogRegSearchSpaceRequired(TypedDict, total=True):
+    """Required LogReg search space parameters.
+
+    Attributes:
+        C: Inverse regularization strength (log scale).
+        max_iter: Maximum iterations for solver convergence.
+        tol: Tolerance for stopping criteria (log scale).
+    """
+
+    C: FloatRangeSpec | CategoricalFloatSpec
+    max_iter: IntRangeSpec | CategoricalIntSpec
+    tol: FloatRangeSpec | CategoricalFloatSpec
+
+
+class LogRegSearchSpace(_LogRegSearchSpaceRequired, total=False):
+    """Search space for Logistic Regression hyperparameters.
+
+    Required params are inherited from _LogRegSearchSpaceRequired.
+    Optional params support penalty/solver selection and ElasticNet mixing.
+
+    Attributes:
+        penalty: Regularization type (l1, l2, elasticnet).
+        solver: Optimization algorithm (lbfgs, saga, liblinear).
+        l1_ratio: ElasticNet mixing parameter (only for elasticnet penalty).
+    """
+
+    penalty: CategoricalStringSpec
+    solver: CategoricalStringSpec
+    l1_ratio: FloatRangeSpec | CategoricalFloatSpec
+
+
+class RandomForestSearchSpace(TypedDict, total=True):
+    """Search space for Random Forest hyperparameters.
+
+    Attributes:
+        n_estimators: Number of trees in the forest.
+        max_depth: Maximum tree depth.
+        min_samples_split: Minimum samples to split a node.
+        min_samples_leaf: Minimum samples in a leaf.
+        max_features: Feature selection strategy (sqrt, log2).
+    """
+
+    n_estimators: IntRangeSpec | CategoricalIntSpec
+    max_depth: IntRangeSpec | CategoricalIntSpec
+    min_samples_split: IntRangeSpec | CategoricalIntSpec
+    min_samples_leaf: IntRangeSpec | CategoricalIntSpec
+    max_features: CategoricalStringSpec
+
+
 # Union of all backend-specific search spaces for generic optimizer interfaces
 SearchSpace = (
     XGBoostSearchSpace
@@ -239,6 +301,8 @@ SearchSpace = (
     | LSTMSearchSpace
     | LightGBMSearchSpace
     | ClearGBMSearchSpace
+    | LogRegSearchSpace
+    | RandomForestSearchSpace
 )
 
 
@@ -306,9 +370,11 @@ __all__ = [
     "LSTMSearchSpace",
     "LightGBMDevice",
     "LightGBMSearchSpace",
+    "LogRegSearchSpace",
     "MLPSearchSpace",
     "OptimizationConfig",
     "OptimizationSummary",
+    "RandomForestSearchSpace",
     "SampledFloatParams",
     "SampledIntParams",
     "SampledStringParams",
