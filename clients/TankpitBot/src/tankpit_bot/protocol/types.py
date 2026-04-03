@@ -227,7 +227,7 @@ class RadarMineDict(TypedDict):
 
 
 class RadarScanResultDict(TypedDict):
-    """Radar scan result (0x4F 'O' message).
+    """Radar scan result (tunneled 0x2E -> 0x4F).
 
     Contains containers (fuel/equipment) and mines discovered by radar.
 
@@ -321,21 +321,35 @@ class SyncDict(TypedDict):
     msg_type: Literal[0x3F]
 
 
-class ContainerDict(TypedDict):
-    """Container fuel update (0x43 'C' message)."""
+class CacheUpdateDict(TypedDict):
+    """Cache-only tile patch (0x43 'C' message)."""
 
     msg_type: Literal[0x43]
-    container_id: int
-    fuel: int
+    updates: list[tuple[int, int, int]]
+
+
+class OverlayUpdateDict(TypedDict):
+    """Overlay-only tile patch (0x40 '@' message)."""
+
+    msg_type: Literal[0x40]
+    updates: list[tuple[int, int, int]]
+
+
+class CombinedTileUpdateDict(TypedDict):
+    """Combined cache+overlay tile patch (0x4F 'O' message)."""
+
+    msg_type: Literal[0x4F]
+    cache_updates: list[tuple[int, int, int]]
+    overlay_updates: list[tuple[int, int, int]]
 
 
 class ViewportEntityDict(TypedDict):
-    """Single entity in viewport update."""
+    """Single tile row in viewport update."""
 
     col: int
     row: int
-    entity_id: int
-    value: int
+    cache_value: int
+    overlay_value: int
     terrain_type: int
 
 
@@ -407,8 +421,9 @@ class ActiveForcesDict(TypedDict):
 __all__ = [
     "ActionDoneDict",
     "ActiveForcesDict",
+    "CacheUpdateDict",
     "ChatMessageDict",
-    "ContainerDict",
+    "CombinedTileUpdateDict",
     "DeactivationDict",
     "EnemyDetectionDict",
     "EquipmentGainDict",
@@ -422,6 +437,7 @@ __all__ = [
     "MinePlacementDict",
     "MovementDict",
     "MovementResponseDict",
+    "OverlayUpdateDict",
     "RadarContainerDict",
     "RadarMineDict",
     "RadarResultDict",
