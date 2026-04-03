@@ -71,6 +71,15 @@ def _make_default_string_params() -> SampledStringParams:
     return SampledStringParams()
 
 
+def _make_dummy_labels(n: int) -> NDArray[np.int64]:
+    """Create dummy int64 labels for ObjectiveProtocol compatibility.
+
+    The objective ignores y_labels in __call__ (uses pre-split data from __init__).
+    This satisfies the int64 type requirement of ObjectiveProtocol.
+    """
+    return np.zeros(n, dtype=np.int64)
+
+
 # =============================================================================
 # Tests: Dynamic Import Helpers
 # =============================================================================
@@ -155,7 +164,7 @@ def test_call_returns_negative_rmse() -> None:
 
     result = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=_make_default_int_params(),
         float_params=_make_default_float_params(),
@@ -177,12 +186,12 @@ def test_call_ignores_passed_data() -> None:
     x, y, names = _make_regression_data(n_samples=100, n_features=5, seed=42)
     objective = XGBoostRegressorObjective(x, y, names, device="cpu", feature_preset="none")
 
-    x_other, y_other, names_other = _make_regression_data(n_samples=50, n_features=3, seed=99)
+    x_other, _, names_other = _make_regression_data(n_samples=50, n_features=3, seed=99)
 
     # Should not raise even though passed data has different shape
     result = objective(
         x_features=x_other,
-        y_targets=y_other,
+        y_labels=_make_dummy_labels(50),
         feature_names=names_other,
         int_params=_make_default_int_params(),
         float_params=_make_default_float_params(),
@@ -208,7 +217,7 @@ def test_call_with_different_hyperparams() -> None:
 
     result_shallow = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=int_params_shallow,
         float_params=float_params,
@@ -221,7 +230,7 @@ def test_call_with_different_hyperparams() -> None:
 
     result_deep = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=int_params_deep,
         float_params=float_params,
@@ -248,7 +257,7 @@ def test_call_deterministic() -> None:
 
     result1 = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
@@ -260,7 +269,7 @@ def test_call_deterministic() -> None:
     )
     result2 = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=int_params,
         float_params=float_params,
@@ -303,7 +312,7 @@ def test_create_callable() -> None:
 
     result = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=_make_default_int_params(),
         float_params=_make_default_float_params(),
@@ -340,7 +349,7 @@ def test_with_dart_booster() -> None:
 
     result = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=_make_default_int_params(),
         float_params=float_params,
@@ -371,7 +380,7 @@ def test_with_dart_partial_params() -> None:
 
     result = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=_make_default_int_params(),
         float_params=float_params,
@@ -402,7 +411,7 @@ def test_with_dart_skip_drop_only() -> None:
 
     result = objective(
         x_features=x,
-        y_targets=y,
+        y_labels=_make_dummy_labels(100),
         feature_names=names,
         int_params=_make_default_int_params(),
         float_params=float_params,
