@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 
 import pytest
 
@@ -15,7 +16,9 @@ from tankpit_bot.sniffer import (
     decode_plus_message,
     decode_state_message,
     decode_text_message,
+    process_received_message,
 )
+from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 from tests.conftest import FakeFileSystem
 from tests.sniffer.conftest import make_payload
 
@@ -140,6 +143,23 @@ def test_decode_message_quit() -> None:
     payload = make_payload(b"-")
     result = decode_message(payload, "sent")
     assert result == "[SENT] QUIT: -"
+
+
+def test_process_received_message_respects_protocol_frame_logging(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Protocol frame logging can be disabled for concise bot terminal output."""
+    payload = make_payload(b"$1|0")
+
+    set_protocol_frame_logging(False)
+    with caplog.at_level(logging.INFO):
+        process_received_message(payload)
+    assert not caplog.records
+
+    set_protocol_frame_logging(True)
+    with caplog.at_level(logging.INFO):
+        process_received_message(payload)
+    assert any("[RECEIVED] RESPONSE: $1|0" in record.message for record in caplog.records)
 
 
 # =============================================================================
