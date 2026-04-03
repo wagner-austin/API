@@ -13,9 +13,23 @@ from typing import TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import WorkerPoolProtocol, create_worker_pool
+from cleargbm._hooks_ensemble import predict_proba_from_raw as _predict_proba_hook
+from cleargbm._hooks_ensemble import predict_raw_ensemble as _predict_raw_hook
+from cleargbm._hooks_infra import WorkerPoolProtocol, create_worker_pool
+from cleargbm._hooks_native import (
+    NativeModel,
+)
+from cleargbm._hooks_native import (
+    predict_proba_native as _predict_proba_native_hook,
+)
+from cleargbm._hooks_native import (
+    predict_raw_native as _predict_raw_native_hook,
+)
+from cleargbm._hooks_native import (
+    train_native as _train_native_hook,
+)
 from cleargbm.histogram import precompute_feature_bins
-from cleargbm.losses import BinaryLogLoss, raw_to_proba, sigmoid
+from cleargbm.losses import BinaryLogLoss, raw_to_proba
 from cleargbm.tree import build_tree, predict_tree
 from cleargbm.types import (
     DecisionTree,
@@ -431,6 +445,8 @@ def predict_raw(
 ) -> NDArray[np.float64]:
     """Predict raw scores (log-odds) for samples.
 
+    Delegates to the active backend hook after validation.
+
     Args:
         model: Trained model.
         x: Feature matrix (n_samples, n_features).
@@ -450,18 +466,12 @@ def predict_raw(
             f"x has {n_features} features but model expects {len(model['feature_names'])}"
         )
 
-    base_prediction = model["base_prediction"]
-    learning_rate = model["learning_rate"]
-
-    # Start with base prediction
-    raw_preds: NDArray[np.float64] = np.full(n_samples, base_prediction, dtype=np.float64)
-
-    # Add contributions from each tree
-    for tree in model["trees"]:
-        tree_preds = predict_tree(tree, x)
-        raw_preds = _add_tree_predictions(raw_preds, tree_preds, learning_rate)
-
-    return raw_preds
+    return _predict_raw_hook(
+        model["trees"],
+        x,
+        model["base_prediction"],
+        model["learning_rate"],
+    )
 
 
 def predict_proba(
@@ -469,6 +479,8 @@ def predict_proba(
     x: NDArray[np.float64],
 ) -> tuple[tuple[float, float], ...]:
     """Predict class probabilities.
+
+    Delegates to the active backend hooks after validation.
 
     Args:
         model: Trained model.
@@ -482,20 +494,100 @@ def predict_proba(
         ValueError: If x is empty or has wrong number of features.
     """
     raw_preds = predict_raw(model, x)
+    return _predict_proba_hook(raw_preds)
 
-    result: list[tuple[float, float]] = []
-    n_samples: int = raw_preds.shape[0]
-    for i in range(n_samples):
-        raw_val: float = raw_preds.item(i)
-        prob_1 = sigmoid(raw_val)
-        prob_0 = 1.0 - prob_1
-        result.append((prob_0, prob_1))
 
-    return tuple(result)
+def train_gradient_boosting_native(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.int64],
+    x_val: NDArray[np.float64] | None,
+    y_val: NDArray[np.int64] | None,
+    config: GradientBoostingConfig,
+    feature_names: tuple[str, ...],
+) -> NativeModel:
+    """Train gradient boosting model using the Rust full training loop.
+
+    Runs the entire training loop in a single native call. All binning,
+    histogram building, split finding, and tree construction happen in
+    Rust with no per-iteration FFI overhead.
+
+    Requires ``use_rust_backend()`` to have been called first.
+
+    Args:
+        x_train: Training feature matrix (n_samples, n_features).
+        y_train: Training labels (0 or 1).
+        x_val: Optional validation feature matrix.
+        y_val: Optional validation labels.
+        config: Training configuration.
+        feature_names: Names for each feature.
+
+    Returns:
+        Opaque native model handle for use with ``predict_raw_native``
+        and ``predict_proba_native``.
+
+    Raises:
+        RuntimeError: If Rust backend is not active.
+        ValueError: If inputs are invalid.
+    """
+    _validate_training_inputs(x_train, y_train, feature_names)
+    return _train_native_hook(x_train, y_train, x_val, y_val, config, feature_names)
+
+
+def predict_raw_native(
+    model: NativeModel,
+    x: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Predict raw scores (log-odds) using a native model.
+
+    Delegates to the Rust model-level prediction in a single native call.
+
+    Args:
+        model: Native model handle from ``train_gradient_boosting_native``.
+        x: Feature matrix (n_samples, n_features).
+
+    Returns:
+        Raw predictions (log-odds) for each sample.
+
+    Raises:
+        RuntimeError: If Rust backend is not active.
+        ValueError: If x is empty.
+    """
+    n_samples: int = x.shape[0]
+    if n_samples == 0:
+        raise ValueError("x must not be empty")
+    return _predict_raw_native_hook(model, x)
+
+
+def predict_proba_native(
+    model: NativeModel,
+    x: NDArray[np.float64],
+) -> tuple[tuple[float, float], ...]:
+    """Predict class probabilities using a native model.
+
+    Delegates to the Rust model-level prediction in a single native call.
+
+    Args:
+        model: Native model handle from ``train_gradient_boosting_native``.
+        x: Feature matrix (n_samples, n_features).
+
+    Returns:
+        Tuple of (prob_class_0, prob_class_1) per sample.
+
+    Raises:
+        RuntimeError: If Rust backend is not active.
+        ValueError: If x is empty.
+    """
+    n_samples: int = x.shape[0]
+    if n_samples == 0:
+        raise ValueError("x must not be empty")
+    return _predict_proba_native_hook(model, x)
 
 
 __all__ = [
     "predict_proba",
+    "predict_proba_native",
     "predict_raw",
+    "predict_raw_native",
     "train_gradient_boosting",
+    "train_gradient_boosting_native",
 ]

@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
-from cleargbm import _test_hooks
+from cleargbm import _hooks_guard
 
 
 class _RunForProject(Protocol):
@@ -25,8 +25,8 @@ def _find_monorepo_root_impl(start: Path) -> Path:
 
 def _find_monorepo_root(start: Path) -> Path:
     """Find monorepo root, using hook if set."""
-    if _test_hooks.guard_find_monorepo_root is not None:
-        return _test_hooks.guard_find_monorepo_root(start)
+    if _hooks_guard.guard_find_monorepo_root is not None:
+        return _hooks_guard.guard_find_monorepo_root(start)
     return _find_monorepo_root_impl(start)
 
 
@@ -43,8 +43,8 @@ def _load_orchestrator_impl(monorepo_root: Path) -> _RunForProject:
 
 def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     """Load orchestrator, using hook if set."""
-    if _test_hooks.guard_load_orchestrator is not None:
-        return _test_hooks.guard_load_orchestrator(monorepo_root)
+    if _hooks_guard.guard_load_orchestrator is not None:
+        return _hooks_guard.guard_load_orchestrator(monorepo_root)
     return _load_orchestrator_impl(monorepo_root)
 
 

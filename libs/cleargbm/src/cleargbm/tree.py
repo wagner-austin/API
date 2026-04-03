@@ -12,11 +12,10 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import RandomStateProtocol, WorkerPoolProtocol, get_random_state
-from cleargbm._test_hooks import predict_tree as _predict_tree_hook
+from cleargbm._hooks_infra import RandomStateProtocol, WorkerPoolProtocol, get_random_state
+from cleargbm._hooks_prediction import predict_tree as _predict_tree_hook
 from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
-    FeatureBins,
     build_histogram,
     precompute_feature_bins,
     subtract_histogram,
@@ -25,6 +24,7 @@ from cleargbm.parallel import _find_best_histogram_split_with_cache
 from cleargbm.split import _compute_leaf_value, _create_leaf_node
 from cleargbm.types import (
     DecisionTree,
+    FeatureBins,
     GradientBoostingConfig,
     SplitCondition,
     TreeNode,

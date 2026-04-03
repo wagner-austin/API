@@ -15,40 +15,14 @@ from typing import Literal, NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import (
-    build_histogram as _build_histogram_hook,
-)
-from cleargbm._test_hooks import (
-    subtract_histogram as _subtract_histogram_hook,
-)
+from cleargbm._hooks_binning import precompute_feature_bins as _precompute_feature_bins_hook
+from cleargbm._hooks_histogram import build_histogram as _build_histogram_hook
+from cleargbm._hooks_histogram import subtract_histogram as _subtract_histogram_hook
 from cleargbm.buffers import HistogramBuffer
+from cleargbm.types import BinEdges, FeatureBins
 
 # NaN bin is always the last bin (index = n_regular_bins)
 NAN_BIN_OFFSET: Literal[1] = 1
-
-
-class BinEdges(NamedTuple):
-    """Bin edges for a single feature.
-
-    Args:
-        edges: Tuple of K-1 threshold values defining K bins.
-               Values <= edges[0] go to bin 0, values > edges[-1] go to bin K-1.
-    """
-
-    edges: tuple[float, ...]
-
-
-class FeatureBins(NamedTuple):
-    """Precomputed bin assignments for all samples across all features.
-
-    Args:
-        bin_edges: Bin edges for each feature.
-        sample_bins: Per-sample bin ID for each feature (2D array).
-                     sample_bins[sample_idx, feature_idx] = bin_id
-    """
-
-    bin_edges: tuple[BinEdges, ...]
-    sample_bins: NDArray[np.int64]  # Shape: (n_samples, n_features)
 
 
 class HistogramSplit(NamedTuple):
@@ -199,6 +173,8 @@ def precompute_feature_bins(
     Call once at the start of training. Subsequent split finding uses
     the precomputed bins for O(K) instead of O(n log n) per split.
 
+    Delegates to the active backend hook.
+
     Args:
         x: Feature matrix (n_samples, n_features).
         max_bins: Maximum number of bins per feature.
@@ -206,10 +182,7 @@ def precompute_feature_bins(
     Returns:
         FeatureBins containing edges and per-sample bin assignments.
     """
-    n_features = x.shape[1] if x.size > 0 else 0
-    edges = compute_bin_edges(x, n_features, max_bins)
-    sample_bins = bin_samples(x, edges)
-    return FeatureBins(bin_edges=edges, sample_bins=sample_bins)
+    return _precompute_feature_bins_hook(x, max_bins)
 
 
 def build_histogram(
@@ -498,8 +471,6 @@ def partition_by_bin(
 
 __all__ = [
     "NAN_BIN_OFFSET",
-    "BinEdges",
-    "FeatureBins",
     "HistogramBuffer",
     "HistogramSplit",
     "_check_monotonicity_constraint",

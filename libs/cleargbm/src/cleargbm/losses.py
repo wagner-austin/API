@@ -1,18 +1,24 @@
 """Loss functions with gradients and hessians for gradient boosting.
 
 Uses numpy arrays for efficient vectorized operations.
+Delegates computation to backend hooks for Rust acceleration.
 """
 
 from __future__ import annotations
 
-import math
 from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import sigmoid as _sigmoid_hook
-from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
+from cleargbm._hooks_loss import binary_log_loss as _binary_log_loss_hook
+from cleargbm._hooks_loss import binary_log_loss_gradients as _binary_log_loss_gradients_hook
+from cleargbm._hooks_loss import binary_log_loss_hessians as _binary_log_loss_hessians_hook
+from cleargbm._hooks_loss import (
+    binary_log_loss_initial_prediction as _binary_log_loss_initial_prediction_hook,
+)
+from cleargbm._hooks_sigmoid import sigmoid as _sigmoid_hook
+from cleargbm._hooks_sigmoid import sigmoid_array as _sigmoid_array_hook
 
 
 class LossFunction(Protocol):
@@ -124,6 +130,8 @@ class BinaryLogLoss:
     gradient = p - y  (derivative of loss w.r.t. raw prediction)
     hessian = p * (1-p)  (second derivative)
     initial = log(p_mean / (1 - p_mean))  (log-odds of positive class rate)
+
+    All methods delegate to backend hooks for Rust acceleration.
     """
 
     def loss(
@@ -132,6 +140,8 @@ class BinaryLogLoss:
         y_pred: NDArray[np.float64],
     ) -> float:
         """Compute mean binary cross-entropy loss.
+
+        Delegates to the active backend hook.
 
         Args:
             y_true: True labels (0 or 1).
@@ -144,25 +154,7 @@ class BinaryLogLoss:
             ValueError: If y_true and y_pred have different lengths.
             ValueError: If y_true is empty.
         """
-        n_true: int = int(y_true.shape[0])
-        n_pred: int = int(y_pred.shape[0])
-        if n_true != n_pred:
-            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
-        if n_true == 0:
-            raise ValueError("y_true must not be empty")
-
-        # Clip predictions to avoid log(0)
-        eps = 1e-15
-        p_clipped: NDArray[np.float64] = np.clip(y_pred, eps, 1.0 - eps)
-
-        # Vectorized log loss computation
-        y_float: NDArray[np.float64] = y_true.astype(np.float64)
-        losses: NDArray[np.float64] = -(
-            y_float * np.log(p_clipped) + (1.0 - y_float) * np.log(1.0 - p_clipped)
-        )
-        total_loss: float = float(np.sum(losses))
-        mean_loss: float = total_loss / n_true
-        return mean_loss
+        return _binary_log_loss_hook(y_true, y_pred)
 
     def gradients(
         self,
@@ -174,6 +166,8 @@ class BinaryLogLoss:
         The gradient of log loss with respect to the raw prediction
         (before sigmoid) is simply p - y, where p is the predicted probability.
 
+        Delegates to the active backend hook.
+
         Args:
             y_true: True labels (0 or 1).
             y_pred: Predicted probabilities in (0, 1).
@@ -184,13 +178,7 @@ class BinaryLogLoss:
         Raises:
             ValueError: If y_true and y_pred have different lengths.
         """
-        n_true: int = int(y_true.shape[0])
-        n_pred: int = int(y_pred.shape[0])
-        if n_true != n_pred:
-            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
-        y_float: NDArray[np.float64] = y_true.astype(np.float64)
-        result: NDArray[np.float64] = y_pred - y_float
-        return result
+        return _binary_log_loss_gradients_hook(y_true, y_pred)
 
     def hessians(
         self,
@@ -202,6 +190,8 @@ class BinaryLogLoss:
         The second derivative of log loss is p * (1-p), which is always
         positive and represents the curvature of the loss function.
 
+        Delegates to the active backend hook.
+
         Args:
             y_true: True labels (0 or 1).
             y_pred: Predicted probabilities in (0, 1).
@@ -212,21 +202,15 @@ class BinaryLogLoss:
         Raises:
             ValueError: If y_true and y_pred have different lengths.
         """
-        n_true: int = int(y_true.shape[0])
-        n_pred: int = int(y_pred.shape[0])
-        if n_true != n_pred:
-            raise ValueError(f"y_true and y_pred must have same length, got {n_true} and {n_pred}")
-        # Clip to avoid numerical issues at boundaries
-        eps = 1e-15
-        p_clipped: NDArray[np.float64] = np.clip(y_pred, eps, 1.0 - eps)
-        result: NDArray[np.float64] = p_clipped * (1.0 - p_clipped)
-        return result
+        return _binary_log_loss_hessians_hook(y_true, y_pred)
 
     def initial_prediction(
         self,
         y_true: NDArray[np.int64],
     ) -> float:
         """Compute initial prediction (log-odds of positive class rate).
+
+        Delegates to the active backend hook.
 
         Args:
             y_true: True labels (0 or 1).
@@ -238,22 +222,7 @@ class BinaryLogLoss:
             ValueError: If y_true is empty.
             ValueError: If all labels are the same (cannot compute log-odds).
         """
-        n_total: int = int(y_true.shape[0])
-        if n_total == 0:
-            raise ValueError("y_true must not be empty")
-
-        n_positive: int = int(np.sum(y_true))
-        p_positive: float = n_positive / n_total
-
-        # Handle edge cases where all samples are one class
-        eps = 1e-15
-        if p_positive < eps:
-            raise ValueError("Cannot compute initial prediction: all labels are 0")
-        if p_positive > 1.0 - eps:
-            raise ValueError("Cannot compute initial prediction: all labels are 1")
-
-        # Return log-odds
-        return math.log(p_positive / (1.0 - p_positive))
+        return _binary_log_loss_initial_prediction_hook(y_true)
 
 
 def compute_raw_predictions(

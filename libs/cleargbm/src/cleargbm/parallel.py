@@ -17,16 +17,15 @@ from multiprocessing import shared_memory
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import WorkerPoolProtocol
+from cleargbm._hooks_infra import WorkerPoolProtocol
 from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
     NAN_BIN_OFFSET,
-    FeatureBins,
     build_histogram,
     find_best_split_from_histogram,
     partition_by_bin,
 )
-from cleargbm.types import GradientBoostingConfig, SplitCandidate
+from cleargbm.types import FeatureBins, GradientBoostingConfig, SplitCandidate
 
 # =============================================================================
 # Worker Global State (set via pool initializer)
@@ -56,7 +55,7 @@ def _worker_initializer(
         n_features: Number of features.
     """
     global _WORKER_FEATURE_BINS
-    from cleargbm.histogram import BinEdges, FeatureBins
+    from cleargbm.types import BinEdges, FeatureBins
 
     # Reconstruct sample_bins as 2D numpy array from bytes
     sample_bins_arr: NDArray[np.int64] = np.frombuffer(sample_bins_flat, dtype=np.int64).reshape(
