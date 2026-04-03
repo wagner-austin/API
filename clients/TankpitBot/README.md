@@ -38,6 +38,12 @@ make bot
 ```
 
 The bot joins a game, captures the WebSocket, and runs the AI behavior loop autonomously.
+Each run is also saved to:
+
+- `runs/bot/latest.log`
+- `runs/bot/latest.events.jsonl`
+
+plus timestamped archive copies for both.
 
 ### Capture the Protocol
 
@@ -49,7 +55,12 @@ This will:
 1. Launch a Chromium browser
 2. Navigate to tankpit.com
 3. Capture all WebSocket messages
-4. Save the session to `capture_session.json`
+4. Save the session to `runs/sniff/latest.capture_session.json` by default
+5. Save companion files `runs/sniff/latest.raw_capture.json` and
+   `runs/sniff/latest.session_summary.json`
+
+If `TANKPIT_OUTPUT` is set, that requested output is still written, and the same
+run is mirrored into the canonical `runs/sniff/latest.*` paths.
 
 ### Probe Input Commands
 
@@ -109,8 +120,16 @@ control architecture. The concrete refactor plan for the next step is in
 
 - Combat currently uses map-open as the known fallback for global enemy refresh.
 - Radar is used for local resource search, not global enemy positions.
-- World viewport state tracks the full 18x18 observable area; direct move and
-  pickup commands use the inner 16x16 actionable window.
+- World viewport state now tracks the real visible 16x16 viewport.
+- Radar coverage is modeled separately as an 18x18 envelope extending one tile
+  beyond each visible edge.
+- Direct move and pickup commands are allowed on visible edge tiles; only tiles
+  beyond the visible viewport are treated as non-actionable.
+- The bot only trusts current-viewport fuel/equipment targets after radar has
+  confirmed that viewport. Sparse `0x5A` cache entries remain unconfirmed until
+  radar refreshes the current screen.
+- Repeated radar in the same already-confirmed viewport is intentionally
+  skipped.
 - `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
   authoritative for viewport origin and tile cache updates, but absence from a
   single `0x5A` patch does not imply tank absence.
@@ -133,6 +152,8 @@ control architecture. The concrete refactor plan for the next step is in
 - The current bot control model is documented in `docs/bot-control-model.md`.
 - The HFSM/control-architecture migration plan is in
   `docs/bot-hfsm-refactor-plan.md`.
+- Run output locations are documented in `docs/run-artifacts.md`.
+- Bot terminal/event channels are documented in `docs/bot-logging.md`.
 - The old README descriptions of `DEFEND`, `PATROL`, `DEPOSIT_FUEL`, and
   evaluator-based AI layers were stale and should not be used as the current
   architecture reference.
@@ -152,7 +173,7 @@ cp .env.example .env
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TANKPIT_URL` | `https://tankpit.com/play` | Target URL for sniffer |
-| `TANKPIT_OUTPUT` | `capture_session.json` | Output file path |
+| `TANKPIT_OUTPUT` | `runs/sniff/latest.capture_session.json` | Capture output path |
 | `TANKPIT_HEADLESS` | `true` | Run browser headlessly |
 | `TANKPIT_DURATION_MS` | `60000` | Capture duration in ms |
 | `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
@@ -223,6 +244,8 @@ make decode    # Decode captured session
 make bot       # Run bot client
 make discover  # Run command discovery
 ```
+
+Bot terminal logging is documented in [docs/bot-logging.md](docs/bot-logging.md).
 
 ### Quality Gates
 
