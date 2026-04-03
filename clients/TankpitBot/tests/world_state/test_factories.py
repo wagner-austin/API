@@ -32,14 +32,14 @@ class TestMakeEmptyWorldState:
         assert state["timestamp_ms"] == 0
 
     def test_default_viewport(self) -> None:
-        """Default viewport is 18x18 at origin."""
+        """Default viewport is 16x16 at origin."""
         state = make_empty_world_state()
         vp = state["viewport"]
 
         assert vp["left"] == 0
         assert vp["top"] == 0
-        assert vp["width"] == 18
-        assert vp["height"] == 18
+        assert vp["width"] == 16
+        assert vp["height"] == 16
 
 
 class TestMakeTankState:
@@ -126,18 +126,32 @@ class TestMakeTerrainTile:
 
     def test_creates_terrain_tile(self) -> None:
         """Creates terrain tile with all fields."""
-        tile = make_terrain_tile(x=10, y=20, terrain_type=TERRAIN_ROCK_A, entity_id=0)
+        tile = make_terrain_tile(
+            x=10,
+            y=20,
+            terrain_type=TERRAIN_ROCK_A,
+            cache_value=0,
+            overlay_value=255,
+        )
 
         assert tile["x"] == 10
         assert tile["y"] == 20
         assert tile["terrain_type"] == TERRAIN_ROCK_A
-        assert tile["entity_id"] == 0
+        assert tile["cache_value"] == 0
+        assert tile["overlay_value"] == 255
 
-    def test_tile_with_tank_entity(self) -> None:
-        """Creates tile with tank entity marker."""
-        tile = make_terrain_tile(x=15, y=25, terrain_type=TERRAIN_GROUND, entity_id=-1)
+    def test_tile_with_equipment_cache(self) -> None:
+        """Creates tile with equipment cache marker."""
+        tile = make_terrain_tile(
+            x=15,
+            y=25,
+            terrain_type=TERRAIN_GROUND,
+            cache_value=-1,
+            overlay_value=4,
+        )
 
-        assert tile["entity_id"] == -1
+        assert tile["cache_value"] == -1
+        assert tile["overlay_value"] == 4
 
 
 class TestMakeSelfState:
