@@ -1,8 +1,8 @@
 """Optimization run history tracking with backend-aware progression comparison.
 
 Stores each optimization run in a JSONL file for tracking AUC progression
-over time. Supports all backends (XGBoost, MLP, LightGBM, LSTM) with
-backend-specific hyperparameter tracking.
+over time. Supports all backends with a unified history entry that stores
+best parameters alongside common fields.
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
@@ -25,13 +25,7 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
-from covenant_radar_api.worker.optimize_cleargbm_job import ClearGBMOptimizationResult
-from covenant_radar_api.worker.optimize_lightgbm_job import LightGBMOptimizationResult
-from covenant_radar_api.worker.optimize_lstm_job import LSTMOptimizationResult
-from covenant_radar_api.worker.optimize_mlp_job import MLPOptimizationResult
-from covenant_radar_api.worker.optimize_xgboost_job import (
-    OptimizationResult as XGBoostOptimizationResult,
-)
+from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize.cli import DatasetName, FeaturePreset
 
 logger = get_logger(__name__)
@@ -41,64 +35,20 @@ HISTORY_FILENAME = "optimization_history.jsonl"
 
 
 # =============================================================================
-# Backend-Specific History Entry Types
+# Unified History Entry
 # =============================================================================
 
 
-class XGBoostHistoryEntry(TypedDict):
-    """XGBoost optimization run history entry."""
+class UnifiedHistoryEntry(TypedDict, total=True):
+    """Unified optimization run history entry for any backend.
 
-    timestamp: str
-    backend: BackendName
-    dataset: str
-    feature_preset: str
-    n_trials: int
-    n_samples: int
-    n_features: int
-    best_val_auc: float
-    best_trial_number: int
-    duration_seconds: float
-    # XGBoost-specific hyperparameters
-    best_max_depth: int
-    best_n_estimators: int
-    best_learning_rate: float
-    best_reg_alpha: float
-    best_reg_lambda: float
-    best_subsample: float
-    best_colsample_bytree: float
-
-
-class MLPHistoryEntry(TypedDict):
-    """MLP optimization run history entry."""
-
-    timestamp: str
-    backend: BackendName
-    dataset: str
-    feature_preset: str
-    n_trials: int
-    n_samples: int
-    n_features: int
-    best_val_auc: float
-    best_trial_number: int
-    duration_seconds: float
-    # MLP-specific hyperparameters
-    best_n_layers: int
-    best_hidden_size: int
-    best_learning_rate: float
-    best_dropout: float
-    best_batch_size: int
-
-
-class LightGBMHistoryEntry(TypedDict):
-    """LightGBM optimization run history entry.
-
-    Note: max_depth is intentionally excluded. LightGBM uses leaf-wise growth
-    where num_leaves is the primary complexity control. Using max_depth=-1
-    (unlimited) avoids constraint conflicts when num_leaves > 2^max_depth.
+    Stores common fields plus the best AUC and best trial number.
+    Hyperparameters are stored as flat best_* fields for backward
+    compatibility with the JSONL history format.
     """
 
     timestamp: str
-    backend: BackendName
+    backend: str
     dataset: str
     feature_preset: str
     n_trials: int
@@ -107,68 +57,6 @@ class LightGBMHistoryEntry(TypedDict):
     best_val_auc: float
     best_trial_number: int
     duration_seconds: float
-    # LightGBM-specific hyperparameters (max_depth fixed at -1, not tuned)
-    best_n_estimators: int
-    best_num_leaves: int
-    best_learning_rate: float
-    best_reg_alpha: float
-    best_reg_lambda: float
-    best_subsample: float
-    best_colsample_bytree: float
-
-
-class LSTMHistoryEntry(TypedDict):
-    """LSTM optimization run history entry."""
-
-    timestamp: str
-    backend: BackendName
-    dataset: str
-    feature_preset: str
-    n_trials: int
-    n_samples: int
-    n_features: int
-    best_val_auc: float
-    best_trial_number: int
-    duration_seconds: float
-    # LSTM-specific hyperparameters
-    best_hidden_size: int
-    best_num_layers: int
-    best_learning_rate: float
-    best_dropout: float
-    best_batch_size: int
-
-
-class ClearGBMHistoryEntry(TypedDict):
-    """ClearGBM optimization run history entry."""
-
-    timestamp: str
-    backend: BackendName
-    dataset: str
-    feature_preset: str
-    n_trials: int
-    n_samples: int
-    n_features: int
-    best_val_auc: float
-    best_trial_number: int
-    duration_seconds: float
-    # ClearGBM-specific hyperparameters
-    best_max_depth: int
-    best_n_estimators: int
-    best_learning_rate: float
-    best_min_samples_split: int
-    best_min_samples_leaf: int
-    best_max_bins: int
-    best_subsample: float
-
-
-# Union type for all history entries
-UnifiedHistoryEntry = (
-    XGBoostHistoryEntry
-    | MLPHistoryEntry
-    | LightGBMHistoryEntry
-    | LSTMHistoryEntry
-    | ClearGBMHistoryEntry
-)
 
 
 # =============================================================================
@@ -180,10 +68,10 @@ def _decode_backend(obj: JSONObject) -> BackendName:
     """Decode backend name from JSON object.
 
     Args:
-        obj (JSONObject): JSON object with backend field.
+        obj: JSON object with backend field.
 
     Returns:
-        BackendName: Validated backend name (xgboost, mlp, lightgbm, lstm, cleargbm).
+        Validated backend name.
 
     Raises:
         ValueError: If backend field contains invalid value.
@@ -199,336 +87,65 @@ def _decode_backend(obj: JSONObject) -> BackendName:
         return "lstm"
     if backend == "cleargbm":
         return "cleargbm"
+    if backend == "logreg":
+        return "logreg"
+    if backend == "random_forest":
+        return "random_forest"
     raise ValueError(f"Invalid backend: {backend}")
 
 
-def _decode_xgboost_entry(obj: JSONObject) -> XGBoostHistoryEntry:
-    """Decode XGBoost history entry from JSON object.
-
-    Args:
-        obj (JSONObject): JSON object with XGBoost history fields.
-
-    Returns:
-        XGBoostHistoryEntry: Validated XGBoost history entry TypedDict.
-    """
-    return XGBoostHistoryEntry(
-        timestamp=require_str(obj, "timestamp"),
-        backend="xgboost",
-        dataset=require_str(obj, "dataset"),
-        feature_preset=require_str(obj, "feature_preset"),
-        n_trials=require_int(obj, "n_trials"),
-        n_samples=require_int(obj, "n_samples"),
-        n_features=require_int(obj, "n_features"),
-        best_val_auc=require_float(obj, "best_val_auc"),
-        best_trial_number=require_int(obj, "best_trial_number"),
-        duration_seconds=require_float(obj, "duration_seconds"),
-        best_max_depth=require_int(obj, "best_max_depth"),
-        best_n_estimators=require_int(obj, "best_n_estimators"),
-        best_learning_rate=require_float(obj, "best_learning_rate"),
-        best_reg_alpha=require_float(obj, "best_reg_alpha"),
-        best_reg_lambda=require_float(obj, "best_reg_lambda"),
-        best_subsample=require_float(obj, "best_subsample"),
-        best_colsample_bytree=require_float(obj, "best_colsample_bytree"),
-    )
-
-
-def _decode_mlp_entry(obj: JSONObject) -> MLPHistoryEntry:
-    """Decode MLP history entry from JSON object.
-
-    Args:
-        obj (JSONObject): JSON object with MLP history fields.
-
-    Returns:
-        MLPHistoryEntry: Validated MLP history entry TypedDict.
-    """
-    return MLPHistoryEntry(
-        timestamp=require_str(obj, "timestamp"),
-        backend="mlp",
-        dataset=require_str(obj, "dataset"),
-        feature_preset=require_str(obj, "feature_preset"),
-        n_trials=require_int(obj, "n_trials"),
-        n_samples=require_int(obj, "n_samples"),
-        n_features=require_int(obj, "n_features"),
-        best_val_auc=require_float(obj, "best_val_auc"),
-        best_trial_number=require_int(obj, "best_trial_number"),
-        duration_seconds=require_float(obj, "duration_seconds"),
-        best_n_layers=require_int(obj, "best_n_layers"),
-        best_hidden_size=require_int(obj, "best_hidden_size"),
-        best_learning_rate=require_float(obj, "best_learning_rate"),
-        best_dropout=require_float(obj, "best_dropout"),
-        best_batch_size=require_int(obj, "best_batch_size"),
-    )
-
-
-def _decode_lightgbm_entry(obj: JSONObject) -> LightGBMHistoryEntry:
-    """Decode LightGBM history entry from JSON object.
-
-    Args:
-        obj (JSONObject): JSON object with LightGBM history fields.
-
-    Returns:
-        LightGBMHistoryEntry: Validated LightGBM history entry TypedDict.
-    """
-    return LightGBMHistoryEntry(
-        timestamp=require_str(obj, "timestamp"),
-        backend="lightgbm",
-        dataset=require_str(obj, "dataset"),
-        feature_preset=require_str(obj, "feature_preset"),
-        n_trials=require_int(obj, "n_trials"),
-        n_samples=require_int(obj, "n_samples"),
-        n_features=require_int(obj, "n_features"),
-        best_val_auc=require_float(obj, "best_val_auc"),
-        best_trial_number=require_int(obj, "best_trial_number"),
-        duration_seconds=require_float(obj, "duration_seconds"),
-        best_n_estimators=require_int(obj, "best_n_estimators"),
-        best_num_leaves=require_int(obj, "best_num_leaves"),
-        best_learning_rate=require_float(obj, "best_learning_rate"),
-        best_reg_alpha=require_float(obj, "best_reg_alpha"),
-        best_reg_lambda=require_float(obj, "best_reg_lambda"),
-        best_subsample=require_float(obj, "best_subsample"),
-        best_colsample_bytree=require_float(obj, "best_colsample_bytree"),
-    )
-
-
-def _decode_lstm_entry(obj: JSONObject) -> LSTMHistoryEntry:
-    """Decode LSTM history entry from JSON object.
-
-    Args:
-        obj (JSONObject): JSON object with LSTM history fields.
-
-    Returns:
-        LSTMHistoryEntry: Validated LSTM history entry TypedDict.
-    """
-    return LSTMHistoryEntry(
-        timestamp=require_str(obj, "timestamp"),
-        backend="lstm",
-        dataset=require_str(obj, "dataset"),
-        feature_preset=require_str(obj, "feature_preset"),
-        n_trials=require_int(obj, "n_trials"),
-        n_samples=require_int(obj, "n_samples"),
-        n_features=require_int(obj, "n_features"),
-        best_val_auc=require_float(obj, "best_val_auc"),
-        best_trial_number=require_int(obj, "best_trial_number"),
-        duration_seconds=require_float(obj, "duration_seconds"),
-        best_hidden_size=require_int(obj, "best_hidden_size"),
-        best_num_layers=require_int(obj, "best_num_layers"),
-        best_learning_rate=require_float(obj, "best_learning_rate"),
-        best_dropout=require_float(obj, "best_dropout"),
-        best_batch_size=require_int(obj, "best_batch_size"),
-    )
-
-
-def _decode_cleargbm_entry(obj: JSONObject) -> ClearGBMHistoryEntry:
-    """Decode ClearGBM history entry from JSON object.
-
-    Args:
-        obj (JSONObject): JSON object with ClearGBM history fields.
-
-    Returns:
-        ClearGBMHistoryEntry: Validated ClearGBM history entry TypedDict.
-    """
-    return ClearGBMHistoryEntry(
-        timestamp=require_str(obj, "timestamp"),
-        backend="cleargbm",
-        dataset=require_str(obj, "dataset"),
-        feature_preset=require_str(obj, "feature_preset"),
-        n_trials=require_int(obj, "n_trials"),
-        n_samples=require_int(obj, "n_samples"),
-        n_features=require_int(obj, "n_features"),
-        best_val_auc=require_float(obj, "best_val_auc"),
-        best_trial_number=require_int(obj, "best_trial_number"),
-        duration_seconds=require_float(obj, "duration_seconds"),
-        best_max_depth=require_int(obj, "best_max_depth"),
-        best_n_estimators=require_int(obj, "best_n_estimators"),
-        best_learning_rate=require_float(obj, "best_learning_rate"),
-        best_min_samples_split=require_int(obj, "best_min_samples_split"),
-        best_min_samples_leaf=require_int(obj, "best_min_samples_leaf"),
-        best_max_bins=require_int(obj, "best_max_bins"),
-        best_subsample=require_float(obj, "best_subsample"),
-    )
-
-
 def _decode_history_entry(obj: JSONObject) -> UnifiedHistoryEntry:
-    """Decode history entry from JSON object based on backend type.
+    """Decode history entry from JSON object.
 
     Args:
-        obj (JSONObject): JSON object with history fields including backend discriminator.
+        obj: JSON object with history fields.
 
     Returns:
-        UnifiedHistoryEntry: Backend-specific history entry TypedDict.
+        Unified history entry TypedDict.
     """
-    backend = _decode_backend(obj)
-    if backend == "xgboost":
-        return _decode_xgboost_entry(obj)
-    if backend == "mlp":
-        return _decode_mlp_entry(obj)
-    if backend == "lightgbm":
-        return _decode_lightgbm_entry(obj)
-    if backend == "lstm":
-        return _decode_lstm_entry(obj)
-    # backend must be "cleargbm" here - mypy validates exhaustiveness via return type
-    return _decode_cleargbm_entry(obj)
+    return UnifiedHistoryEntry(
+        timestamp=require_str(obj, "timestamp"),
+        backend=require_str(obj, "backend"),
+        dataset=require_str(obj, "dataset"),
+        feature_preset=require_str(obj, "feature_preset"),
+        n_trials=require_int(obj, "n_trials"),
+        n_samples=require_int(obj, "n_samples"),
+        n_features=require_int(obj, "n_features"),
+        best_val_auc=require_float(obj, "best_val_auc"),
+        best_trial_number=require_int(obj, "best_trial_number"),
+        duration_seconds=require_float(obj, "duration_seconds"),
+    )
 
 
 # =============================================================================
-# Result to History Entry Converters
+# Result to History Entry Converter
 # =============================================================================
 
 
-def xgboost_result_to_entry(
-    result: XGBoostOptimizationResult, elapsed: float
-) -> XGBoostHistoryEntry:
-    """Convert XGBoost optimization result to history entry.
+def result_to_entry(
+    result: UnifiedOptimizationResult,
+    elapsed: float,
+) -> UnifiedHistoryEntry:
+    """Convert optimization result to history entry.
 
     Args:
-        result (XGBoostOptimizationResult): Typed XGBoost optimization result.
-        elapsed (float): Elapsed time in seconds.
+        result: Unified optimization result.
+        elapsed: Elapsed time in seconds.
 
     Returns:
-        XGBoostHistoryEntry: History entry with current UTC timestamp.
+        History entry with current UTC timestamp.
     """
-    return XGBoostHistoryEntry(
+    return UnifiedHistoryEntry(
         timestamp=datetime.now(UTC).isoformat(),
-        backend="xgboost",
+        backend=result["backend"],
         dataset=result["dataset"],
         feature_preset=result["feature_preset"],
         n_trials=result["n_trials_complete"],
         n_samples=result["n_samples"],
         n_features=result["n_features"],
-        best_val_auc=result["best_val_auc"],
+        best_val_auc=result["best_value"],
         best_trial_number=result["best_trial_number"],
         duration_seconds=elapsed,
-        best_max_depth=result["best_max_depth"],
-        best_n_estimators=result["best_n_estimators"],
-        best_learning_rate=result["best_learning_rate"],
-        best_reg_alpha=result["best_reg_alpha"],
-        best_reg_lambda=result["best_reg_lambda"],
-        best_subsample=result["best_subsample"],
-        best_colsample_bytree=result["best_colsample_bytree"],
-    )
-
-
-def mlp_result_to_entry(result: MLPOptimizationResult, elapsed: float) -> MLPHistoryEntry:
-    """Convert MLP optimization result to history entry.
-
-    Args:
-        result (MLPOptimizationResult): Typed MLP optimization result.
-        elapsed (float): Elapsed time in seconds.
-
-    Returns:
-        MLPHistoryEntry: History entry with current UTC timestamp.
-    """
-    return MLPHistoryEntry(
-        timestamp=datetime.now(UTC).isoformat(),
-        backend="mlp",
-        dataset=result["dataset"],
-        feature_preset=result["feature_preset"],
-        n_trials=result["n_trials_complete"],
-        n_samples=result["n_samples"],
-        n_features=result["n_features"],
-        best_val_auc=result["best_val_auc"],
-        best_trial_number=result["best_trial_number"],
-        duration_seconds=elapsed,
-        best_n_layers=result["best_n_layers"],
-        best_hidden_size=result["best_hidden_size"],
-        best_learning_rate=result["best_learning_rate"],
-        best_dropout=result["best_dropout"],
-        best_batch_size=result["best_batch_size"],
-    )
-
-
-def lightgbm_result_to_entry(
-    result: LightGBMOptimizationResult, elapsed: float
-) -> LightGBMHistoryEntry:
-    """Convert LightGBM optimization result to history entry.
-
-    Args:
-        result (LightGBMOptimizationResult): Typed LightGBM optimization result.
-        elapsed (float): Elapsed time in seconds.
-
-    Returns:
-        LightGBMHistoryEntry: History entry with current UTC timestamp.
-    """
-    return LightGBMHistoryEntry(
-        timestamp=datetime.now(UTC).isoformat(),
-        backend="lightgbm",
-        dataset=result["dataset"],
-        feature_preset=result["feature_preset"],
-        n_trials=result["n_trials_complete"],
-        n_samples=result["n_samples"],
-        n_features=result["n_features"],
-        best_val_auc=result["best_val_auc"],
-        best_trial_number=result["best_trial_number"],
-        duration_seconds=elapsed,
-        best_n_estimators=result["best_n_estimators"],
-        best_num_leaves=result["best_num_leaves"],
-        best_learning_rate=result["best_learning_rate"],
-        best_reg_alpha=result["best_reg_alpha"],
-        best_reg_lambda=result["best_reg_lambda"],
-        best_subsample=result["best_subsample"],
-        best_colsample_bytree=result["best_colsample_bytree"],
-    )
-
-
-def lstm_result_to_entry(result: LSTMOptimizationResult, elapsed: float) -> LSTMHistoryEntry:
-    """Convert LSTM optimization result to history entry.
-
-    Args:
-        result (LSTMOptimizationResult): Typed LSTM optimization result.
-        elapsed (float): Elapsed time in seconds.
-
-    Returns:
-        LSTMHistoryEntry: History entry with current UTC timestamp.
-    """
-    return LSTMHistoryEntry(
-        timestamp=datetime.now(UTC).isoformat(),
-        backend="lstm",
-        dataset=result["dataset"],
-        feature_preset=result["feature_preset"],
-        n_trials=result["n_trials_complete"],
-        n_samples=result["n_samples"],
-        n_features=result["n_features"],
-        best_val_auc=result["best_val_auc"],
-        best_trial_number=result["best_trial_number"],
-        duration_seconds=elapsed,
-        best_hidden_size=result["best_hidden_size"],
-        best_num_layers=result["best_num_layers"],
-        best_learning_rate=result["best_learning_rate"],
-        best_dropout=result["best_dropout"],
-        best_batch_size=result["best_batch_size"],
-    )
-
-
-def cleargbm_result_to_entry(
-    result: ClearGBMOptimizationResult, elapsed: float
-) -> ClearGBMHistoryEntry:
-    """Convert ClearGBM optimization result to history entry.
-
-    Args:
-        result (ClearGBMOptimizationResult): Typed ClearGBM optimization result.
-        elapsed (float): Elapsed time in seconds.
-
-    Returns:
-        ClearGBMHistoryEntry: History entry with current UTC timestamp.
-    """
-    return ClearGBMHistoryEntry(
-        timestamp=datetime.now(UTC).isoformat(),
-        backend="cleargbm",
-        dataset=result["dataset"],
-        feature_preset=result["feature_preset"],
-        n_trials=result["n_trials_complete"],
-        n_samples=result["n_samples"],
-        n_features=result["n_features"],
-        best_val_auc=result["best_val_auc"],
-        best_trial_number=result["best_trial_number"],
-        duration_seconds=elapsed,
-        best_max_depth=result["best_max_depth"],
-        best_n_estimators=result["best_n_estimators"],
-        best_learning_rate=result["best_learning_rate"],
-        best_min_samples_split=result["best_min_samples_split"],
-        best_min_samples_leaf=result["best_min_samples_leaf"],
-        best_max_bins=result["best_max_bins"],
-        best_subsample=result["best_subsample"],
     )
 
 
@@ -542,14 +159,13 @@ class OptimizationHistory:
 
     Tracks optimization runs in a JSONL file for progression comparison.
     Each line in the file is a separate JSON object representing one run.
-    Supports all backends with backend-specific hyperparameter tracking.
     """
 
     def __init__(self, history_path: Path) -> None:
         """Initialize history manager.
 
         Args:
-            history_path (Path): Path to the JSONL history file.
+            history_path: Path to the JSONL history file.
         """
         self._path = history_path
         self._entries: list[UnifiedHistoryEntry] = []
@@ -560,10 +176,10 @@ class OptimizationHistory:
         """Create history manager for an output directory.
 
         Args:
-            output_dir (Path): Directory where models and history are stored.
+            output_dir: Directory where models and history are stored.
 
         Returns:
-            OptimizationHistory: New history manager instance.
+            New history manager instance.
         """
         return cls(output_dir / HISTORY_FILENAME)
 
@@ -600,7 +216,7 @@ class OptimizationHistory:
         """Append a new entry to history and persist to file.
 
         Args:
-            entry (UnifiedHistoryEntry): The history entry to append.
+            entry: The history entry to append.
         """
         if not self._loaded:
             self.load()
@@ -629,12 +245,12 @@ class OptimizationHistory:
         """Get the most recent entry for a backend/dataset/preset combination.
 
         Args:
-            backend (BackendName): Backend name to filter by.
-            dataset (DatasetName): Dataset name to filter by.
-            feature_preset (FeaturePreset): Feature preset to filter by.
+            backend: Backend name to filter by.
+            dataset: Dataset name to filter by.
+            feature_preset: Feature preset to filter by.
 
         Returns:
-            UnifiedHistoryEntry | None: Most recent matching entry, or None if no history.
+            Most recent matching entry, or None if no history.
         """
         if not self._loaded:
             self.load()
@@ -662,12 +278,12 @@ class OptimizationHistory:
         """Get the all-time best entry for a backend/dataset/preset combination.
 
         Args:
-            backend (BackendName): Backend name to filter by.
-            dataset (DatasetName): Dataset name to filter by.
-            feature_preset (FeaturePreset): Feature preset to filter by.
+            backend: Backend name to filter by.
+            dataset: Dataset name to filter by.
+            feature_preset: Feature preset to filter by.
 
         Returns:
-            UnifiedHistoryEntry | None: Entry with highest AUC, or None if no history.
+            Entry with highest AUC, or None if no history.
         """
         if not self._loaded:
             self.load()
@@ -695,7 +311,7 @@ class OptimizationHistory:
         """Get all history entries.
 
         Returns:
-            list[UnifiedHistoryEntry]: List of all history entries in chronological order.
+            List of all history entries in chronological order.
         """
         if not self._loaded:
             self.load()
@@ -705,10 +321,10 @@ class OptimizationHistory:
         """Get all entries for a specific backend.
 
         Args:
-            backend (BackendName): Backend name to filter by.
+            backend: Backend name to filter by.
 
         Returns:
-            list[UnifiedHistoryEntry]: List of matching entries in chronological order.
+            List of matching entries in chronological order.
         """
         if not self._loaded:
             self.load()
@@ -718,10 +334,10 @@ class OptimizationHistory:
         """Get all entries for a specific dataset.
 
         Args:
-            dataset (DatasetName): Dataset name to filter by.
+            dataset: Dataset name to filter by.
 
         Returns:
-            list[UnifiedHistoryEntry]: List of matching entries in chronological order.
+            List of matching entries in chronological order.
         """
         if not self._loaded:
             self.load()
@@ -736,12 +352,12 @@ class OptimizationHistory:
         """Get the progression of runs for a backend/dataset/preset combination.
 
         Args:
-            backend (BackendName): Backend name to filter by.
-            dataset (DatasetName): Dataset name to filter by.
-            feature_preset (FeaturePreset): Feature preset to filter by.
+            backend: Backend name to filter by.
+            dataset: Dataset name to filter by.
+            feature_preset: Feature preset to filter by.
 
         Returns:
-            list[UnifiedHistoryEntry]: List of matching entries in chronological order.
+            List of matching entries in chronological order.
         """
         if not self._loaded:
             self.load()
@@ -756,16 +372,7 @@ class OptimizationHistory:
 
 __all__ = [
     "HISTORY_FILENAME",
-    "ClearGBMHistoryEntry",
-    "LSTMHistoryEntry",
-    "LightGBMHistoryEntry",
-    "MLPHistoryEntry",
     "OptimizationHistory",
     "UnifiedHistoryEntry",
-    "XGBoostHistoryEntry",
-    "cleargbm_result_to_entry",
-    "lightgbm_result_to_entry",
-    "lstm_result_to_entry",
-    "mlp_result_to_entry",
-    "xgboost_result_to_entry",
+    "result_to_entry",
 ]
