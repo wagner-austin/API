@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, dump_json_str
-from platform_core.logging import get_logger, setup_rich_logging
+from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import (
@@ -20,9 +20,12 @@ from tankpit_bot.browser import (
     reset_cdp_time_offset,
 )
 from tankpit_bot.capture import build_session_summary
+from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
+from tankpit_bot.runtime_logging import (
+    configure_sniff_runtime_logging,
+)
 from tankpit_bot.sniffer.constants import (
     DEFAULT_CAPTURE_DURATION_MS,
-    DEFAULT_OUTPUT_PATH,
     DEFAULT_TARGET_URL,
 )
 from tankpit_bot.sniffer.decoders import decode_message, process_received_message
@@ -322,6 +325,7 @@ def run_sniffer(
     capture_duration_ms: int = 30000,
     live_decode: bool = False,
     prefer_account: bool = False,
+    runtime_artifacts: SniffRunArtifactsDict | None = None,
 ) -> CaptureSession:
     """Run the WebSocket sniffer and save results.
 
@@ -332,6 +336,8 @@ def run_sniffer(
         capture_duration_ms: How long to capture traffic in milliseconds.
         live_decode: Whether to print decoded messages in real-time.
         prefer_account: Skip guest login and use account credentials directly.
+        runtime_artifacts: Optional canonical runtime artifact bundle for
+            latest/archive mirroring.
 
     Returns:
         The completed CaptureSession.
@@ -348,25 +354,76 @@ def run_sniffer(
     )
     session = sniffer.run(capture_duration_ms)
 
-    # Save raw capture (all messages for protocol research)
-    output_dir = Path(output_path).parent
-    raw_path = output_dir / "raw_capture.json"
     encoded = encode_capture_session(session)
     json_str = dump_json_str(encoded, compact=False, indent=2)
-    _test_hooks.write_text(raw_path, json_str)
-    log.info("Saved raw capture to %s", raw_path)
-
-    # Save session summary (processed data)
-    summary_path = output_dir / "session_summary.json"
     summary = build_session_summary(session)
     summary_json = dump_json_str(encode_session_summary(summary), compact=False, indent=2)
-    _test_hooks.write_text(summary_path, summary_json)
-    log.info("Saved session summary to %s", summary_path)
-
-    # Also save to legacy path for backwards compatibility
-    _test_hooks.write_text(Path(output_path), json_str)
+    _write_capture_outputs(
+        Path(output_path),
+        json_str,
+        summary_json,
+        runtime_artifacts=runtime_artifacts,
+    )
 
     return session
+
+
+def _write_capture_outputs(
+    output_path: Path,
+    capture_json: str,
+    summary_json: str,
+    *,
+    runtime_artifacts: SniffRunArtifactsDict | None,
+) -> None:
+    """Persist requested and canonical sniffer outputs.
+
+    Args:
+        output_path: Requested capture session path.
+        capture_json: Serialized capture session JSON.
+        summary_json: Serialized session summary JSON.
+        runtime_artifacts: Optional canonical latest/archive artifact bundle.
+    """
+    output_dir = output_path.parent
+    raw_path = output_dir / "raw_capture.json"
+    summary_path = output_dir / "session_summary.json"
+    _write_capture_group(output_path, raw_path, summary_path, capture_json, summary_json)
+    if runtime_artifacts is None:
+        return
+    _write_capture_group(
+        Path(runtime_artifacts["latest_capture_path"]),
+        Path(runtime_artifacts["latest_raw_capture_path"]),
+        Path(runtime_artifacts["latest_summary_path"]),
+        capture_json,
+        summary_json,
+    )
+    _write_capture_group(
+        Path(runtime_artifacts["archive_capture_path"]),
+        Path(runtime_artifacts["archive_raw_capture_path"]),
+        Path(runtime_artifacts["archive_summary_path"]),
+        capture_json,
+        summary_json,
+    )
+
+
+def _write_capture_group(
+    capture_path: Path,
+    raw_path: Path,
+    summary_path: Path,
+    capture_json: str,
+    summary_json: str,
+) -> None:
+    """Write one complete capture/session-summary output group.
+
+    Args:
+        capture_path: Capture session JSON path.
+        raw_path: Raw capture mirror path.
+        summary_path: Session summary path.
+        capture_json: Serialized capture session JSON.
+        summary_json: Serialized session summary JSON.
+    """
+    _test_hooks.write_text(raw_path, capture_json)
+    _test_hooks.write_text(summary_path, summary_json)
+    _test_hooks.write_text(capture_path, capture_json)
 
 
 def main() -> None:
@@ -374,13 +431,16 @@ def main() -> None:
     from dotenv import load_dotenv
 
     load_dotenv()
-    setup_rich_logging(level="INFO")
+    artifacts = configure_sniff_runtime_logging()
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or DEFAULT_TARGET_URL
-    output_path = _test_hooks.get_env("TANKPIT_OUTPUT") or DEFAULT_OUTPUT_PATH
+    output_path = _test_hooks.get_env("TANKPIT_OUTPUT") or artifacts["latest_capture_path"]
+    log.info("Sniffer latest log: %s", artifacts["latest_log_path"])
+    log.info("Sniffer latest events: %s", artifacts["latest_events_path"])
+    log.info("Sniffer latest capture: %s", artifacts["latest_capture_path"])
 
     headless_str = _test_hooks.get_env("TANKPIT_HEADLESS")
     headless = headless_str is not None and headless_str.lower() in ("true", "1", "yes")
@@ -406,12 +466,14 @@ def main() -> None:
         capture_duration_ms=capture_duration_ms,
         live_decode=live_decode,
         prefer_account=prefer_account,
+        runtime_artifacts=artifacts,
     )
 
     msg_count = len(session["messages"])
     duration_sec = ((session["end_timestamp_ms"] or 0) - session["start_timestamp_ms"]) / 1000
     log.info("Captured %d WebSocket messages in %.1fs", msg_count, duration_sec)
     log.info("Saved to: %s", output_path)
+    log.info("Latest capture mirror: %s", artifacts["latest_capture_path"])
 
     unique_urls: set[str] = set()
     for msg in session["messages"]:
