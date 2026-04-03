@@ -1,20 +1,17 @@
-"""Internal test hooks for cleargbm — re-export layer.
+"""Computation backend hooks for cleargbm — re-export layer.
 
-Re-exports all hook protocols, accessor functions, and defaults from the
-focused sub-modules:
+Re-exports all hook protocols, default implementations, and public delegator
+functions from the focused sub-modules:
 
-- ``_hooks_infra`` — random state, worker pool, buffer factories
 - ``_hooks_histogram`` — build_histogram, subtract_histogram
 - ``_hooks_prediction`` — predict_tree
 - ``_hooks_sigmoid`` — sigmoid, sigmoid_array
 - ``_hooks_loss`` — binary_log_loss, gradients, hessians, initial_prediction
 - ``_hooks_binning`` — precompute_feature_bins
 - ``_hooks_ensemble`` — predict_raw_ensemble, predict_proba_from_raw
-- ``_hooks_native`` — native (Rust full-loop) training and model prediction
-- ``_hooks_guard`` — guard script hooks
 
-Mutable hook variables (``_*_backend``, ``guard_*``) must be set on their
-originating sub-module, not on this re-export module.
+Mutable hook variables (``_*_backend``) must be set on their originating
+sub-module, not on this re-export module.
 
 This module is private (underscore prefix) - not for external use.
 """
@@ -31,25 +28,11 @@ from cleargbm._hooks_ensemble import (
     predict_proba_from_raw,
     predict_raw_ensemble,
 )
-from cleargbm._hooks_guard import (
-    FindMonorepoRootProto,
-    LoadOrchestratorProto,
-    RunForProjectProto,
-)
 from cleargbm._hooks_histogram import (
     BuildHistogramBackend,
     SubtractHistogramBackend,
     build_histogram,
     subtract_histogram,
-)
-from cleargbm._hooks_infra import (
-    RandomStateProtocol,
-    WorkerPoolProtocol,
-    create_float_buffer,
-    create_histogram_buffer,
-    create_int_buffer,
-    create_worker_pool,
-    get_random_state,
 )
 from cleargbm._hooks_loss import (
     BinaryLogLossBackend,
@@ -60,15 +43,6 @@ from cleargbm._hooks_loss import (
     binary_log_loss_gradients,
     binary_log_loss_hessians,
     binary_log_loss_initial_prediction,
-)
-from cleargbm._hooks_native import (
-    NativeModel,
-    PredictProbaNativeBackend,
-    PredictRawNativeBackend,
-    TrainNativeBackend,
-    predict_proba_native,
-    predict_raw_native,
-    train_native,
 )
 from cleargbm._hooks_prediction import (
     PredictTreeBackend,
@@ -87,40 +61,23 @@ __all__ = [
     "BinaryLogLossHessiansBackend",
     "BinaryLogLossInitialPredictionBackend",
     "BuildHistogramBackend",
-    "FindMonorepoRootProto",
-    "LoadOrchestratorProto",
-    "NativeModel",
     "PrecomputeFeatureBinsBackend",
     "PredictProbaBackend",
-    "PredictProbaNativeBackend",
     "PredictRawBackend",
-    "PredictRawNativeBackend",
     "PredictTreeBackend",
-    "RandomStateProtocol",
-    "RunForProjectProto",
     "SigmoidArrayBackend",
     "SigmoidBackend",
     "SubtractHistogramBackend",
-    "TrainNativeBackend",
-    "WorkerPoolProtocol",
     "binary_log_loss",
     "binary_log_loss_gradients",
     "binary_log_loss_hessians",
     "binary_log_loss_initial_prediction",
     "build_histogram",
-    "create_float_buffer",
-    "create_histogram_buffer",
-    "create_int_buffer",
-    "create_worker_pool",
-    "get_random_state",
     "precompute_feature_bins",
     "predict_proba_from_raw",
-    "predict_proba_native",
     "predict_raw_ensemble",
-    "predict_raw_native",
     "predict_tree",
     "sigmoid",
     "sigmoid_array",
     "subtract_histogram",
-    "train_native",
 ]
