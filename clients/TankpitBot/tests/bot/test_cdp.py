@@ -369,6 +369,62 @@ class TestBotAIIntegration:
         assert bot._ai_state["active_mode"] == "HUNT"
         assert bot._ai_state["combat_phase"] == "none"
 
+    def test_tick_once_returns_if_self_state_disappears_after_sync(self, fake_env: FakeEnv) -> None:
+        """_tick_once aborts when the refreshed world loses self_state mid-tick."""
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.tick_loop import _tick_once
+        from tankpit_bot.state.types import SelfStateDict, ViewportStateDict, WorldStateDict
+
+        class FlakyWorldBot(Bot):
+            """Bot whose world state disappears on the second read."""
+
+            def __init__(self, target_url: str, *, headless: bool) -> None:
+                super().__init__(target_url, headless=headless)
+                self._world_reads = 0
+                self._state_data["state"] = "IDLE"
+
+            def get_world_state(self) -> WorldStateDict:
+                """Return a populated state once, then a state without self."""
+                self._world_reads += 1
+                if self._world_reads == 1:
+                    return WorldStateDict(
+                        self_state=SelfStateDict(
+                            tank_id=1,
+                            x=100,
+                            y=100,
+                            team=1,
+                            rank=1,
+                            fuel=800,
+                            leaderboard_position=1,
+                        ),
+                        tanks={},
+                        containers={},
+                        mines={},
+                        terrain={},
+                        viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
+                        scanned_viewports={},
+                        timestamp_ms=0,
+                    )
+                return WorldStateDict(
+                    self_state=None,
+                    tanks={},
+                    containers={},
+                    mines={},
+                    terrain={},
+                    viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
+                    scanned_viewports={},
+                    timestamp_ms=0,
+                )
+
+            def _update_state_from_world(self) -> None:
+                """Keep the bot in IDLE for this targeted tick-loop test."""
+
+        bot = FlakyWorldBot("https://test.tankpit.com/", headless=True)
+
+        _tick_once(bot)
+
+        assert bot._world_reads == 2
+
     def test_tick_once_waits_for_position_before_planning(self, fake_env: FakeEnv) -> None:
         """_tick_once does not execute AI commands while state is WAITING_FOR_POSITION."""
         from tankpit_bot.bot import Bot
@@ -1514,6 +1570,7 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
+            is_scan_viewport_failed,
             reset_world_state,
             update_world_state_from_fuel_total,
             update_world_state_from_position,
@@ -1535,6 +1592,7 @@ class TestBotEquipmentManagement:
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
+        assert is_scan_viewport_failed(0, 0, get_current_time_ms()) is True
 
     def test_stalled_move_marks_failed_move_target(self, fake_env: FakeEnv) -> None:
         """Stalled move records the destination as a failed move target."""
@@ -1659,6 +1717,34 @@ class TestBotEquipmentManagement:
         new_state = _merge_protocol_kills(bot._ai_state)
         assert "50" in new_state["killed_tank_ids"]
         assert "60" in new_state["killed_tank_ids"]
+
+    def test_merge_protocol_kills_clears_matching_shot_and_combat_target(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Kill merge clears stale shot feedback and the matching combat lock."""
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.tick_loop import _merge_protocol_kills
+        from tankpit_bot.sniffer.world_state import mark_tank_killed, reset_world_state
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 50
+        bot._ai_state["last_shot_target_name"] = "orange-8"
+        bot._ai_state["combat_target_id"] = 50
+        bot._ai_state["combat_target_x"] = 71
+        bot._ai_state["combat_target_y"] = 53
+        bot._ai_state["combat_phase"] = "engaging"
+
+        mark_tank_killed(50)
+        new_state = _merge_protocol_kills(bot._ai_state)
+
+        assert new_state["last_shot_target_id"] == -1
+        assert new_state["last_shot_target_name"] == ""
+        assert new_state["combat_target_id"] == -1
+        assert new_state["combat_target_x"] == 0
+        assert new_state["combat_target_y"] == 0
+        assert new_state["combat_phase"] == "none"
 
     def test_merge_protocol_kills_no_kills(
         self,
