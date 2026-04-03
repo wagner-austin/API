@@ -97,7 +97,7 @@ from tankpit_bot.sniffer.trackers import (
 from tankpit_bot.sniffer.viewport import (
     get_viewport_left,
     reset_viewport_tracking,
-    update_viewport_from_position_update,
+    update_viewport_origin,
 )
 from tankpit_bot.sniffer.world_state import (
     dispatch_world_state_update,
@@ -197,7 +197,7 @@ __all__ = [
     "update_inventory_from_gain",
     "update_inventory_from_protocol",
     "update_inventory_from_toggle",
-    "update_viewport_from_position_update",
+    "update_viewport_origin",
     "update_world_state_from_fuel_total",
     "update_world_state_from_position",
     "update_world_state_from_radar",
