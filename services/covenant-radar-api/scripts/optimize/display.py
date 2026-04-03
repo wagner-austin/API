@@ -1,7 +1,7 @@
 """Rich console display formatting for multi-backend optimization output.
 
-Supports all backends (XGBoost, MLP, LightGBM, LSTM) with backend-specific
-hyperparameter display and result formatting.
+Supports all 7 backends with unified hyperparameter display from
+best_int_params/best_float_params/best_string_params.
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
@@ -9,6 +9,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from covenant_ml.types import BackendName
+from platform_core.json_utils import require_float, require_int, require_str
 from platform_core.logging import (
     RichTableProtocol,
     create_rich_panel,
@@ -16,16 +17,14 @@ from platform_core.logging import (
     get_rich_console,
 )
 
-from scripts._test_hooks import (
-    ClearGBMOptimizationResult,
-    LightGBMOptimizationResult,
-    LSTMOptimizationResult,
-    MLPOptimizationResult,
-    XGBoostOptimizationResult,
+from covenant_radar_api.worker.optimize_types import (
+    _encode_sampled_float_params,
+    _encode_sampled_int_params,
+    _encode_sampled_string_params,
 )
+from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName, FeaturePreset
 from scripts.optimize.history import UnifiedHistoryEntry
-from scripts.optimize.runner import UnifiedOptimizationResult
 
 # =============================================================================
 # Backend Display Names
@@ -37,6 +36,8 @@ BACKEND_DISPLAY_NAMES: dict[BackendName, str] = {
     "lightgbm": "LightGBM",
     "lstm": "LSTM",
     "cleargbm": "ClearGBM",
+    "logreg": "Logistic Regression",
+    "random_forest": "Random Forest",
 }
 
 
@@ -53,12 +54,12 @@ def create_result_table(
     """Create a rich table for optimization results.
 
     Args:
-        backend (BackendName): Backend used for optimization.
-        result (UnifiedOptimizationResult): Optimization result from any backend.
-        elapsed (float): Elapsed time in seconds.
+        backend: Backend used for optimization.
+        result: Optimization result.
+        elapsed: Elapsed time in seconds.
 
     Returns:
-        RichTableProtocol: Rich table with result summary.
+        Rich table with result summary.
     """
     table = create_rich_table(
         title="[bold magenta]Optimization Results[/bold magenta]",
@@ -82,7 +83,7 @@ def create_result_table(
     # Key metric - highlighted prominently
     table.add_row(
         "[cyan]Best AUC[/cyan]",
-        f"[bold green on black] {result['best_val_auc']:.4f} [/bold green on black]",
+        f"[bold green on black] {result['best_value']:.4f} [/bold green on black]",
     )
     table.add_row("[cyan]Best Trial[/cyan]", f"[yellow]#{result['best_trial_number']}[/yellow]")
 
@@ -99,203 +100,53 @@ def create_result_table(
 
 
 # =============================================================================
-# Backend-Specific Hyperparameter Tables
+# Unified Hyperparameter Table
 # =============================================================================
-
-
-def _create_xgboost_hyperparams_table(result: XGBoostOptimizationResult) -> RichTableProtocol:
-    """Create hyperparameters table for XGBoost results.
-
-    Args:
-        result (XGBoostOptimizationResult): XGBoost optimization result.
-
-    Returns:
-        RichTableProtocol: Rich table with XGBoost hyperparameters.
-    """
-    table = create_rich_table(
-        title="[bold blue]Best Hyperparameters (XGBoost)[/bold blue]",
-        show_header=True,
-    )
-    table.add_column("Parameter", style="bold cyan")
-    table.add_column("Value", style="bold yellow", justify="right")
-
-    # Tree structure params
-    table.add_row("[green]max_depth[/green]", f"[bold]{result['best_max_depth']}[/bold]")
-    table.add_row("[green]n_estimators[/green]", f"[bold]{result['best_n_estimators']}[/bold]")
-
-    # Learning params
-    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.6f}")
-
-    # Regularization
-    table.add_row("[yellow]reg_alpha[/yellow]", f"{result['best_reg_alpha']:.6f}")
-    table.add_row("[yellow]reg_lambda[/yellow]", f"{result['best_reg_lambda']:.6f}")
-
-    # Sampling params
-    table.add_row("[blue]subsample[/blue]", f"{result['best_subsample']:.4f}")
-    table.add_row("[blue]colsample_bytree[/blue]", f"{result['best_colsample_bytree']:.4f}")
-
-    return table
-
-
-def _create_mlp_hyperparams_table(result: MLPOptimizationResult) -> RichTableProtocol:
-    """Create hyperparameters table for MLP results.
-
-    Args:
-        result (MLPOptimizationResult): MLP optimization result.
-
-    Returns:
-        RichTableProtocol: Rich table with MLP hyperparameters.
-    """
-    table = create_rich_table(
-        title="[bold blue]Best Hyperparameters (MLP)[/bold blue]",
-        show_header=True,
-    )
-    table.add_column("Parameter", style="bold cyan")
-    table.add_column("Value", style="bold yellow", justify="right")
-
-    # Architecture params
-    table.add_row("[green]n_layers[/green]", f"[bold]{result['best_n_layers']}[/bold]")
-    table.add_row("[green]hidden_size[/green]", f"[bold]{result['best_hidden_size']}[/bold]")
-
-    # Learning params
-    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.6f}")
-
-    # Regularization
-    table.add_row("[yellow]dropout[/yellow]", f"{result['best_dropout']:.4f}")
-
-    # Training params
-    table.add_row("[blue]batch_size[/blue]", f"[bold]{result['best_batch_size']}[/bold]")
-
-    return table
-
-
-def _create_lightgbm_hyperparams_table(
-    result: LightGBMOptimizationResult,
-) -> RichTableProtocol:
-    """Create hyperparameters table for LightGBM results.
-
-    Note: max_depth is fixed at -1 (unlimited) and not displayed. LightGBM uses
-    leaf-wise growth where num_leaves is the primary complexity control.
-
-    Args:
-        result (LightGBMOptimizationResult): LightGBM optimization result.
-
-    Returns:
-        RichTableProtocol: Rich table with LightGBM hyperparameters.
-    """
-    table = create_rich_table(
-        title="[bold blue]Best Hyperparameters (LightGBM)[/bold blue]",
-        show_header=True,
-    )
-    table.add_column("Parameter", style="bold cyan")
-    table.add_column("Value", style="bold yellow", justify="right")
-
-    # Tree structure params (max_depth fixed at -1, num_leaves controls complexity)
-    table.add_row("[green]num_leaves[/green]", f"[bold]{result['best_num_leaves']}[/bold]")
-    table.add_row("[green]n_estimators[/green]", f"[bold]{result['best_n_estimators']}[/bold]")
-
-    # Learning params
-    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.6f}")
-
-    # Regularization
-    table.add_row("[yellow]reg_alpha[/yellow]", f"{result['best_reg_alpha']:.6f}")
-    table.add_row("[yellow]reg_lambda[/yellow]", f"{result['best_reg_lambda']:.6f}")
-
-    # Sampling params
-    table.add_row("[blue]subsample[/blue]", f"{result['best_subsample']:.4f}")
-    table.add_row("[blue]colsample_bytree[/blue]", f"{result['best_colsample_bytree']:.4f}")
-
-    return table
-
-
-def _create_cleargbm_hyperparams_table(result: ClearGBMOptimizationResult) -> RichTableProtocol:
-    """Create hyperparameters table for ClearGBM results.
-
-    Args:
-        result (ClearGBMOptimizationResult): ClearGBM optimization result.
-
-    Returns:
-        RichTableProtocol: Rich table with ClearGBM hyperparameters.
-    """
-    table = create_rich_table(
-        title="[bold blue]Best Hyperparameters (ClearGBM)[/bold blue]",
-        show_header=False,
-    )
-    table.add_column("Key", style="bold cyan")
-    table.add_column("Value", style="white")
-
-    table.add_row("[green]max_depth[/green]", str(result["best_max_depth"]))
-    table.add_row("[yellow]n_estimators[/yellow]", str(result["best_n_estimators"]))
-    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.4f}")
-    table.add_row("[blue]min_samples_split[/blue]", str(result["best_min_samples_split"]))
-    table.add_row("[blue]min_samples_leaf[/blue]", str(result["best_min_samples_leaf"]))
-    table.add_row("[cyan]max_bins[/cyan]", str(result["best_max_bins"]))
-    table.add_row("[blue]subsample[/blue]", f"{result['best_subsample']:.4f}")
-
-    return table
-
-
-def _create_lstm_hyperparams_table(result: LSTMOptimizationResult) -> RichTableProtocol:
-    """Create hyperparameters table for LSTM results.
-
-    Args:
-        result (LSTMOptimizationResult): LSTM optimization result.
-
-    Returns:
-        RichTableProtocol: Rich table with LSTM hyperparameters.
-    """
-    table = create_rich_table(
-        title="[bold blue]Best Hyperparameters (LSTM)[/bold blue]",
-        show_header=True,
-    )
-    table.add_column("Parameter", style="bold cyan")
-    table.add_column("Value", style="bold yellow", justify="right")
-
-    # Architecture params
-    table.add_row("[green]num_layers[/green]", f"[bold]{result['best_num_layers']}[/bold]")
-    table.add_row("[green]hidden_size[/green]", f"[bold]{result['best_hidden_size']}[/bold]")
-
-    # Learning params
-    table.add_row("[magenta]learning_rate[/magenta]", f"{result['best_learning_rate']:.6f}")
-
-    # Regularization
-    table.add_row("[yellow]dropout[/yellow]", f"{result['best_dropout']:.4f}")
-
-    # Training params
-    table.add_row("[blue]batch_size[/blue]", f"[bold]{result['best_batch_size']}[/bold]")
-
-    return table
 
 
 def create_hyperparams_table(
     backend: BackendName,
     result: UnifiedOptimizationResult,
 ) -> RichTableProtocol:
-    """Create a rich table for best hyperparameters based on backend.
+    """Create a rich table for best hyperparameters from optimization result.
 
-    Uses discriminated union pattern - each result type has a `backend`
-    field with a Literal type that mypy uses for type narrowing.
+    Displays all parameters from best_int_params, best_float_params,
+    and best_string_params in a single table.
 
     Args:
-        backend (BackendName): Backend used for optimization.
-        result (UnifiedOptimizationResult): Optimization result with backend
-            discriminator field.
+        backend: Backend used for optimization.
+        result: Optimization result with nested best params.
 
     Returns:
-        RichTableProtocol: Rich table with backend-specific hyperparameters.
+        Rich table with hyperparameters.
     """
-    # Use backend parameter to ensure it's used (avoids unused argument warning)
-    _ = backend
-    if result["backend"] == "xgboost":
-        return _create_xgboost_hyperparams_table(result)
-    if result["backend"] == "mlp":
-        return _create_mlp_hyperparams_table(result)
-    if result["backend"] == "lightgbm":
-        return _create_lightgbm_hyperparams_table(result)
-    if result["backend"] == "lstm":
-        return _create_lstm_hyperparams_table(result)
-    # result["backend"] must be "cleargbm" here - mypy validates exhaustiveness via return type
-    return _create_cleargbm_hyperparams_table(result)
+    backend_display = BACKEND_DISPLAY_NAMES.get(backend, backend.upper())
+    table = create_rich_table(
+        title=f"[bold blue]Best Hyperparameters ({backend_display})[/bold blue]",
+        show_header=True,
+    )
+    table.add_column("Parameter", style="bold cyan")
+    table.add_column("Value", style="bold yellow", justify="right")
+
+    # Integer params — encode then extract with require_int
+    int_encoded = _encode_sampled_int_params(result["best_int_params"])
+    for name in int_encoded:
+        val = require_int(int_encoded, name)
+        table.add_row(f"[green]{name}[/green]", f"[bold]{val}[/bold]")
+
+    # Float params — encode then extract with require_float
+    float_encoded = _encode_sampled_float_params(result["best_float_params"])
+    for name in float_encoded:
+        fval = require_float(float_encoded, name)
+        table.add_row(f"[magenta]{name}[/magenta]", f"{fval:.6f}")
+
+    # String params — encode then extract with require_str
+    string_encoded = _encode_sampled_string_params(result["best_string_params"])
+    for name in string_encoded:
+        sval = require_str(string_encoded, name)
+        table.add_row(f"[blue]{name}[/blue]", sval)
+
+    return table
 
 
 # =============================================================================
@@ -311,14 +162,12 @@ def create_history_comparison_table(
     """Create a table comparing current run against previous runs.
 
     Args:
-        current_auc (float): Current run's best AUC score.
-        previous_best (UnifiedHistoryEntry | None): Previous best history entry,
-            or None if no previous runs exist.
-        all_time_best (UnifiedHistoryEntry | None): All-time best history entry,
-            or None if this is the first run.
+        current_auc: Current run's best AUC score.
+        previous_best: Previous best history entry, or None if no previous runs.
+        all_time_best: All-time best history entry, or None if first run.
 
     Returns:
-        RichTableProtocol: Rich table with run comparison.
+        Rich table with run comparison.
     """
     table = create_rich_table(
         title="[bold cyan]Run Comparison[/bold cyan]",
@@ -384,10 +233,10 @@ def _format_delta(delta: float) -> str:
     """Format AUC delta with color coding.
 
     Args:
-        delta (float): AUC delta value (current - baseline).
+        delta: AUC delta value (current - baseline).
 
     Returns:
-        str: Rich-formatted delta string with color (green positive, red negative).
+        Rich-formatted delta string with color (green positive, red negative).
     """
     if delta > 0.001:
         return f"[bold green]+{delta:.4f}[/bold green]"
@@ -411,11 +260,11 @@ def print_config(
     """Print detailed configuration before running.
 
     Args:
-        backend (BackendName): Backend to use (xgboost, mlp, lightgbm, lstm).
-        dataset (DatasetName): Dataset name (taiwan, us, polish).
-        n_trials (int): Number of Optuna trials to run.
-        feature_preset (FeaturePreset): Feature engineering preset.
-        device (str): Device for training (cuda/cpu/auto).
+        backend: Backend to use.
+        dataset: Dataset name (taiwan, us, polish).
+        n_trials: Number of Optuna trials to run.
+        feature_preset: Feature engineering preset.
+        device: Device for training (cuda/cpu/auto).
     """
     console = get_rich_console()
     config_table = create_rich_table(
@@ -485,13 +334,11 @@ def print_result(
     """Print optimization result with rich formatting and history comparison.
 
     Args:
-        backend (BackendName): Backend used for optimization.
-        result (UnifiedOptimizationResult): Optimization result from any backend.
-        elapsed (float): Elapsed time in seconds.
-        previous_best (UnifiedHistoryEntry | None): Previous best history entry,
-            or None if no previous runs exist. Defaults to None.
-        all_time_best (UnifiedHistoryEntry | None): All-time best history entry,
-            or None if this is the first run. Defaults to None.
+        backend: Backend used for optimization.
+        result: Optimization result from any backend.
+        elapsed: Elapsed time in seconds.
+        previous_best: Previous best history entry, or None.
+        all_time_best: All-time best history entry, or None.
     """
     console = get_rich_console()
     console.print()
@@ -508,7 +355,7 @@ def print_result(
 
     # History comparison
     comparison_table = create_history_comparison_table(
-        result["best_val_auc"],
+        result["best_value"],
         previous_best,
         all_time_best,
     )
@@ -516,7 +363,7 @@ def print_result(
     console.print()
 
     # Print final AUC highlight with improvement indicator
-    auc_value = result["best_val_auc"]
+    auc_value = result["best_value"]
     is_new_best = all_time_best is None or auc_value >= all_time_best["best_val_auc"]
 
     if is_new_best:
