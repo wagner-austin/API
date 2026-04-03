@@ -240,14 +240,13 @@ class TestFormatFunctions:
         result = format_resource_details(msg)
         assert "counts=" in result
 
-    def test_format_resource_details_container(self) -> None:
-        """Test format_resource_details for container (0x43)."""
-        from tankpit_bot.protocol import ContainerDict
+    def test_format_resource_details_cache_update(self) -> None:
+        """Test format_resource_details for cache update (0x43)."""
+        from tankpit_bot.protocol import CacheUpdateDict
 
-        msg = ContainerDict(msg_type=0x43, container_id=42, fuel=100)
+        msg = CacheUpdateDict(msg_type=0x43, updates=[(10, 20, 100), (30, 40, -1)])
         result = format_resource_details(msg)
-        assert "id=42" in result
-        assert "fuel=100" in result
+        assert "updates=2" in result
 
     def test_format_resource_details_unknown(self) -> None:
         """Test format_resource_details returns empty for unknown type."""
@@ -315,12 +314,36 @@ class TestFormatFunctions:
         result = format_radar_details(msg)
         assert "containers=1" in result or "entities=1" in result
 
+    def test_format_radar_details_combined_tile_update(self) -> None:
+        """Test format_radar_details for top-level combined tile update (0x4F)."""
+        from tankpit_bot.protocol import CombinedTileUpdateDict
+
+        msg = CombinedTileUpdateDict(
+            msg_type=0x4F,
+            cache_updates=[(10, 20, 300)],
+            overlay_updates=[(11, 21, 7), (12, 22, 255)],
+        )
+        result = format_radar_details(msg)
+        assert result == "cache_updates=1 overlay_updates=2"
+
     def test_format_radar_details_viewport_update(self) -> None:
         """Test format_radar_details for viewport update (0x5A)."""
         from tankpit_bot.protocol import ViewportEntityDict, ViewportUpdateDict
 
-        entity1 = ViewportEntityDict(col=10, row=20, entity_id=0, value=0, terrain_type=0)
-        entity2 = ViewportEntityDict(col=30, row=40, entity_id=0, value=0, terrain_type=0)
+        entity1 = ViewportEntityDict(
+            col=10,
+            row=20,
+            cache_value=0,
+            overlay_value=0,
+            terrain_type=0,
+        )
+        entity2 = ViewportEntityDict(
+            col=30,
+            row=40,
+            cache_value=0,
+            overlay_value=0,
+            terrain_type=0,
+        )
         msg = ViewportUpdateDict(
             msg_type=0x5A,
             viewport_left=3,
