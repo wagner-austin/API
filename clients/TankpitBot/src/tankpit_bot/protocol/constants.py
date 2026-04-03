@@ -115,10 +115,10 @@ MSG_STATISTICS = ord("V")
 MSG_ACTIVE_FORCES = ord("*")
 MSG_ACTIVE_PLAYERS = ord("/")
 MSG_TOP10 = ord("1")
-MSG_TILE_UPDATE = ord("O")
+MSG_CACHE_OVERLAY_UPDATE = ord("O")
 MSG_BUILD_PICKUP = ord("B")
 MSG_ACTION_DONE = ord("T")
-MSG_MINE_STATUS = ord("@")
+MSG_OVERLAY_UPDATE = ord("@")
 MSG_TERRAIN_UPDATE = ord("J")
 MSG_PING = ord("`")
 MSG_DISCONNECT = ord("~")
@@ -126,7 +126,7 @@ MSG_SUPERVISOR = ord("R")
 MSG_TANK_STATUS_FULL = ord(">")
 MSG_VIEWPORT = ord("Z")
 MSG_SYNC = ord("?")
-MSG_CONTAINER = ord("C")
+MSG_CACHE_UPDATE = ord("C")
 MSG_MOVE_RESPONSE = ord("=")
 
 # Supervisor status values
@@ -167,8 +167,9 @@ __all__ = [
     "MSG_ACTIVE_FORCES",
     "MSG_ACTIVE_PLAYERS",
     "MSG_BUILD_PICKUP",
+    "MSG_CACHE_OVERLAY_UPDATE",
+    "MSG_CACHE_UPDATE",
     "MSG_CHAT",
-    "MSG_CONTAINER",
     "MSG_DEACTIVATE",
     "MSG_DECORATION",
     "MSG_DISCONNECT",
@@ -181,9 +182,9 @@ __all__ = [
     "MSG_MAP_UPDATE",
     "MSG_MINE_DETONATE",
     "MSG_MINE_PLACE",
-    "MSG_MINE_STATUS",
     "MSG_MOVEMENT",
     "MSG_MOVE_RESPONSE",
+    "MSG_OVERLAY_UPDATE",
     "MSG_PING",
     "MSG_PROMOTION",
     "MSG_RADAR_RESULT",
@@ -200,7 +201,6 @@ __all__ = [
     "MSG_TANK_STATUS",
     "MSG_TANK_STATUS_FULL",
     "MSG_TERRAIN_UPDATE",
-    "MSG_TILE_UPDATE",
     "MSG_TOP10",
     "MSG_VIEWPORT",
     "RANK_FUEL",
