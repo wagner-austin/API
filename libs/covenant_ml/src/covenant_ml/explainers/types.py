@@ -147,6 +147,30 @@ class ExplainResult(TypedDict, total=True):
     duration_seconds: float
 
 
+class RegressionExplainResult(TypedDict, total=True):
+    """Result of regression feature importance computation.
+
+    Like ExplainResult but without target_class (regression has single output).
+
+    Args:
+        status: Completion status ("complete" or "failed").
+        backend: Regressor backend that was explained.
+        explainer: Explainer used.
+        n_samples_used: Actual number of samples used.
+        n_features: Number of features in the model.
+        feature_importances: Ranked list of feature importance scores.
+        duration_seconds: Time taken for computation.
+    """
+
+    status: Literal["complete", "failed"]
+    backend: str
+    explainer: SupportedExplainer
+    n_samples_used: int
+    n_features: int
+    feature_importances: list[FeatureImportanceScore]
+    duration_seconds: float
+
+
 __all__ = [
     "ComputationalCost",
     "ExplainRequestConfig",
@@ -161,6 +185,7 @@ __all__ = [
     "IntegratedGradientsExplainConfig",
     "PermutationConfig",
     "PermutationExplainConfig",
+    "RegressionExplainResult",
     "ShapTreeExplainConfig",
     "SupportedExplainer",
 ]
