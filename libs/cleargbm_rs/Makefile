@@ -44,3 +44,4 @@ test: rust-test python-test
 
 # Full check: lint, test, then Rust coverage
 check: lint test rust-cov
+	@Write-Host "`n=== ALL CHECKS PASSED ===" -ForegroundColor Green

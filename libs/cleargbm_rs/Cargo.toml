@@ -16,7 +16,6 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]
-python-bindings = []
 
 [dependencies]
 pyo3 = { version = "0.27.2" }
