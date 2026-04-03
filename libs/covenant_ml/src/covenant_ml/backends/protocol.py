@@ -12,6 +12,11 @@ from typing import Protocol, TypedDict
 import numpy as np
 from numpy.typing import NDArray
 
+from ..optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
+)
 from ..types import (
     BackendName,
     ClassifierTrainConfig,
@@ -85,6 +90,31 @@ class ClassifierBackend(Protocol):
         model: PreparedClassifier,
         feature_names: list[str] | None,
     ) -> list[FeatureImportance] | None: ...
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return the backend's default hyperparameter search space.
+
+        Returns:
+            Backend-specific SearchSpace with sensible default ranges.
+        """
+        ...
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return a narrowed search space for fine-tuning around prior best params.
+
+        Args:
+            best_int_params: Best integer params from prior optimization.
+            best_float_params: Best float params from prior optimization.
+
+        Returns:
+            Backend-specific SearchSpace with narrowed ranges.
+        """
+        ...
 
 
 __all__ = [
