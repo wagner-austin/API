@@ -3,7 +3,8 @@
 Parallel to xgboost_objective.py (classification). Key differences:
 - objective="reg:squarederror" instead of "binary:logistic"
 - eval_metric="rmse" instead of "auc"
-- y_targets: NDArray[np.float64] (continuous, not int64 binary)
+- __init__ takes y_targets: NDArray[np.float64] (continuous targets)
+- __call__ takes y_labels: NDArray[np.int64] (ObjectiveProtocol compat; ignored)
 - No scale_pos_weight (regression has no class imbalance)
 - Returns negative RMSE (Optuna maximizes; lower RMSE = better)
 - Uses regression_split instead of stratified_split
@@ -193,7 +194,7 @@ class XGBoostRegressorObjective:
     def __call__(
         self,
         x_features: NDArray[np.float64],
-        y_targets: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
         feature_names: list[str],
         int_params: SampledIntParams,
         float_params: SampledFloatParams,
@@ -205,9 +206,15 @@ class XGBoostRegressorObjective:
     ) -> float:
         """Train XGBoost regressor and return negative validation RMSE.
 
+        Conforms to ObjectiveProtocol so existing optimizer strategies can
+        call this objective unchanged. The x/y/feature_names parameters are
+        ignored — real data is pre-split in __init__. The int64 y_labels
+        type satisfies the protocol; the actual regression targets (float64)
+        are stored internally from __init__.
+
         Args:
             x_features: Ignored (uses pre-split data).
-            y_targets: Ignored (uses pre-split data).
+            y_labels: Ignored (uses pre-split data; int64 for protocol compat).
             feature_names: Ignored (uses pre-split data).
             int_params: Integer hyperparameters from sampler.
             float_params: Float hyperparameters from sampler.
@@ -220,7 +227,7 @@ class XGBoostRegressorObjective:
         Returns:
             Negative validation RMSE (higher = better for Optuna).
         """
-        _ = x_features, y_targets, feature_names
+        _ = x_features, y_labels, feature_names
         _ = train_ratio, val_ratio, test_ratio
 
         # Extract hyperparameters
