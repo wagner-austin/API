@@ -15,6 +15,7 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     make_container_state,
     make_self_state,
+    viewport_scan_key,
 )
 
 
@@ -27,6 +28,7 @@ def _empty_world() -> WorldStateDict:
         mines={},
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
+        scanned_viewports={viewport_scan_key(0, 0): 0},
         timestamp_ms=0,
     )
 
@@ -79,7 +81,7 @@ class TestShouldProactiveRadar:
         """Any visible container blocks radar (collect first)."""
         config = make_default_ai_config()
         world = _empty_world()
-        world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=True, volume=500)
+        world["containers"]["5,5"] = make_container_state(5, 5, is_fuel=True, volume=500)
         result = should_proactive_radar(400, world, 0, 10000, config)
         assert result is False
 
@@ -89,6 +91,17 @@ class TestShouldProactiveRadar:
         world = _empty_world()
         world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=False, volume=0)
         result = should_proactive_radar(400, world, 0, 10000, config)
+        assert result is True
+
+    def test_off_viewport_fuel_container_does_not_block_radar(self) -> None:
+        """Remembered off-viewport fuel does not count as visible fuel."""
+        config = make_default_ai_config()
+        world = _empty_world()
+        world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=True, volume=500)
+        world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
+
+        result = should_proactive_radar(400, world, 0, 10000, config)
+
         assert result is True
 
     def test_scan_cooldown_blocks_radar(self) -> None:
@@ -180,8 +193,8 @@ class TestShouldMapOpenForEnemies:
         world = _empty_world()
         world["tanks"]["50"] = TankStateDict(
             tank_id=50,
-            x=105,
-            y=105,
+            x=5,
+            y=5,
             team=2,
             rank=1,
             name="Enemy",
@@ -193,6 +206,29 @@ class TestShouldMapOpenForEnemies:
         self_state = _self()
         result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
         assert result is False
+
+    def test_off_viewport_enemy_does_not_block(self) -> None:
+        """Remembered off-viewport enemies do not count as visible enemies."""
+        config = make_default_ai_config()
+        world = _empty_world()
+        world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
+        world["tanks"]["50"] = TankStateDict(
+            tank_id=50,
+            x=20,
+            y=20,
+            team=2,
+            rank=1,
+            name="Enemy",
+            is_self=False,
+            is_bot=False,
+            damage_state=0,
+            timestamp_ms=0,
+        )
+        self_state = _self()
+
+        result = should_map_open_for_enemies(world, self_state, 0, 10000, config)
+
+        assert result is True
 
     def test_dead_enemy_at_origin_ignored(self) -> None:
         """Dead enemy at (0,0) does not count as visible."""
@@ -265,29 +301,34 @@ class TestComputeDesiredEquipment:
     """Tests for equipment desired-set computation."""
 
     def test_patrol_dual_and_radar(self) -> None:
-        """PATROL mode has dual shots and radar always on."""
+        """PATROL mode has dual, homing, and radar always on."""
         result = compute_desired_equipment("PATROL", 800)
-        assert result == {2, 5}
+        assert result == {2, 4, 5}
 
     def test_hunt_dual_and_radar(self) -> None:
-        """HUNT mode has dual and radar."""
+        """HUNT mode has dual, homing, and radar."""
         result = compute_desired_equipment("HUNT", 800)
-        assert result == {2, 5}
+        assert result == {2, 4, 5}
 
     def test_defend_dual_and_radar(self) -> None:
-        """DEFEND mode has dual and radar (no shields)."""
+        """DEFEND mode has dual, homing, and radar (no shields)."""
         result = compute_desired_equipment("DEFEND", 800)
-        assert result == {2, 5}
+        assert result == {2, 4, 5}
 
     def test_collect_fuel_dual_and_radar(self) -> None:
-        """COLLECT_FUEL has dual and radar regardless of fuel level."""
+        """COLLECT_FUEL has dual, homing, and radar regardless of fuel level."""
         result = compute_desired_equipment("COLLECT_FUEL", 100)
-        assert result == {2, 5}
+        assert result == {2, 4, 5}
 
     def test_dual_shots_depleted_drops_dual(self) -> None:
         """When dual shots count=0, slot 2 is not included."""
         result = compute_desired_equipment("HUNT", 800, dual_shots_count=0)
-        assert result == {5}
+        assert result == {4, 5}
+
+    def test_homing_shots_depleted_drops_homing(self) -> None:
+        """When homing shots count=0, slot 4 is not included."""
+        result = compute_desired_equipment("HUNT", 800, homing_shots_count=0)
+        assert result == {2, 5}
 
     def test_no_shields_ever(self) -> None:
         """Shields are never included in desired equipment."""
