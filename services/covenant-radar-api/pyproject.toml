@@ -38,6 +38,7 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 platform-workers = { path = "../../libs/platform_workers", develop = true }
 covenant-domain = { path = "../../libs/covenant_domain", develop = true }
 covenant-ml = { path = "../../libs/covenant_ml", develop = true }
+cleargbm-rs = { path = "../../libs/cleargbm_rs" }
 covenant-nn = { path = "../../libs/covenant_nn", develop = true }
 covenant-persistence = { path = "../../libs/covenant_persistence", develop = true }
 openpyxl = "^3.1.0"
@@ -124,3 +125,7 @@ testpaths = ["tests"]
 addopts = "-v -n auto --dist loadscope"
 timeout = 60
 timeout_method = "thread"
+filterwarnings = [
+    "ignore::sklearn.exceptions.ConvergenceWarning",
+    "ignore::ResourceWarning",
+]
