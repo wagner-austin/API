@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from covenant_ml.types import TrainConfig
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SampledStringParams
 from platform_core.logging import setup_rich_logging
-from scripts._test_hooks import XGBoostOptimizationResult
+from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize._formatters import format_loading_progress
 from scripts.optimize.cli import DatasetName, FeaturePreset
-from scripts.optimize.history import XGBoostHistoryEntry
+from scripts.optimize.history import UnifiedHistoryEntry
 from scripts.optimize.modes import (
     _print_multi_dataset_summary,
     _print_preset_comparison_summary,
@@ -24,12 +24,12 @@ def setup_logging() -> None:
 
 def _make_optimization_result(
     dataset: DatasetName = "taiwan",
-    best_val_auc: float = 0.85,
+    best_value: float = 0.85,
     n_samples: int = 1000,
     n_features: int = 100,
-) -> XGBoostOptimizationResult:
-    """Create a test XGBoostOptimizationResult."""
-    return XGBoostOptimizationResult(
+) -> UnifiedOptimizationResult:
+    """Create a test UnifiedOptimizationResult."""
+    return UnifiedOptimizationResult(
         backend="xgboost",
         status="complete",
         dataset=dataset,
@@ -40,30 +40,17 @@ def _make_optimization_result(
         n_trials_pruned=5,
         n_trials_failed=0,
         best_trial_number=25,
-        best_val_auc=best_val_auc,
-        best_max_depth=6,
-        best_n_estimators=100,
-        best_learning_rate=0.1,
-        best_reg_alpha=0.01,
-        best_reg_lambda=0.01,
-        best_subsample=0.8,
-        best_colsample_bytree=0.8,
-        duration_seconds=60.0,
-        recommended_config=TrainConfig(
-            device="cpu",
+        best_value=best_value,
+        best_int_params=SampledIntParams(max_depth=6, n_estimators=100),
+        best_float_params=SampledFloatParams(
             learning_rate=0.1,
-            max_depth=6,
-            n_estimators=100,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            random_state=42,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-            early_stopping_rounds=10,
             reg_alpha=0.01,
             reg_lambda=0.01,
+            subsample=0.8,
+            colsample_bytree=0.8,
         ),
+        best_string_params=SampledStringParams(),
+        duration_seconds=60.0,
     )
 
 
@@ -71,9 +58,9 @@ def _make_history_entry(
     dataset: str = "taiwan",
     feature_preset: str = "full",
     best_val_auc: float = 0.85,
-) -> XGBoostHistoryEntry:
-    """Create a test XGBoostHistoryEntry."""
-    return XGBoostHistoryEntry(
+) -> UnifiedHistoryEntry:
+    """Create a test UnifiedHistoryEntry."""
+    return UnifiedHistoryEntry(
         timestamp="2024-01-01T00:00:00Z",
         backend="xgboost",
         dataset=dataset,
@@ -83,13 +70,6 @@ def _make_history_entry(
         n_features=100,
         best_val_auc=best_val_auc,
         best_trial_number=25,
-        best_max_depth=6,
-        best_n_estimators=100,
-        best_learning_rate=0.1,
-        best_reg_alpha=0.01,
-        best_reg_lambda=0.01,
-        best_subsample=0.8,
-        best_colsample_bytree=0.8,
         duration_seconds=60.0,
     )
 
@@ -99,25 +79,24 @@ class TestPrintMultiDatasetSummary:
 
     def test_executes_with_no_history(self) -> None:
         """Test function executes when all_time_best is None (NEW path)."""
-        result = _make_optimization_result(dataset="taiwan", best_val_auc=0.85)
+        result = _make_optimization_result(dataset="taiwan", best_value=0.85)
         run_result: RunResult = RunResult(
             backend="xgboost",
             result=result,
             elapsed=60.0,
             previous_best=None,
-            all_time_best=None,  # No history - should show NEW
+            all_time_best=None,
             is_new_best=True,
         )
 
         dataset_name: DatasetName = "taiwan"
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
-        # Should execute without error - covers the NEW delta path
         _print_multi_dataset_summary(results)
 
     def test_executes_with_positive_delta(self) -> None:
         """Test function executes with positive delta (improvement)."""
-        result = _make_optimization_result(dataset="taiwan", best_val_auc=0.90)
+        result = _make_optimization_result(dataset="taiwan", best_value=0.90)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -132,12 +111,11 @@ class TestPrintMultiDatasetSummary:
         dataset_name: DatasetName = "taiwan"
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
-        # Should execute without error - covers positive delta path
         _print_multi_dataset_summary(results)
 
     def test_executes_with_negative_delta(self) -> None:
         """Test function executes with negative delta (regression)."""
-        result = _make_optimization_result(dataset="taiwan", best_val_auc=0.80)
+        result = _make_optimization_result(dataset="taiwan", best_value=0.80)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -152,12 +130,11 @@ class TestPrintMultiDatasetSummary:
         dataset_name: DatasetName = "taiwan"
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
-        # Should execute without error - covers negative delta path
         _print_multi_dataset_summary(results)
 
     def test_executes_with_neutral_delta(self) -> None:
         """Test function executes with neutral delta (no significant change)."""
-        result = _make_optimization_result(dataset="taiwan", best_val_auc=0.8501)
+        result = _make_optimization_result(dataset="taiwan", best_value=0.8501)
         all_time_best = _make_history_entry(best_val_auc=0.85)
 
         run_result: RunResult = RunResult(
@@ -172,14 +149,13 @@ class TestPrintMultiDatasetSummary:
         dataset_name: DatasetName = "taiwan"
         results: list[tuple[DatasetName, RunResult]] = [(dataset_name, run_result)]
 
-        # Should execute without error - covers neutral delta path
         _print_multi_dataset_summary(results)
 
     def test_executes_with_multiple_datasets(self) -> None:
         """Test function executes with multiple datasets."""
-        result_taiwan = _make_optimization_result(dataset="taiwan", best_val_auc=0.85)
-        result_us = _make_optimization_result(dataset="us", best_val_auc=0.90)
-        result_polish = _make_optimization_result(dataset="polish", best_val_auc=0.88)
+        result_taiwan = _make_optimization_result(dataset="taiwan", best_value=0.85)
+        result_us = _make_optimization_result(dataset="us", best_value=0.90)
+        result_polish = _make_optimization_result(dataset="polish", best_value=0.88)
 
         results: list[tuple[DatasetName, RunResult]] = [
             (
@@ -217,7 +193,6 @@ class TestPrintMultiDatasetSummary:
             ),
         ]
 
-        # Should execute without error
         _print_multi_dataset_summary(results)
 
 
@@ -233,7 +208,6 @@ class TestPrintPresetComparisonSummary:
             ("full", 0.88, 100, 50.0),
         ]
 
-        # Should execute without error - covers 1st, 2nd, 3rd, 4th ranking paths
         _print_preset_comparison_summary(results)
 
     def test_executes_with_tied_aucs(self) -> None:
@@ -245,7 +219,6 @@ class TestPrintPresetComparisonSummary:
             ("full", 0.85, 100, 50.0),
         ]
 
-        # Should execute without error
         _print_preset_comparison_summary(results)
 
 
@@ -263,7 +236,6 @@ class TestFormatLoadingProgress:
             elapsed=5.0,
         )
 
-        # Verify key components are in the output
         assert "taiwan" in result
         assert "reading" in result
         assert "500" in result
@@ -281,11 +253,9 @@ class TestFormatLoadingProgress:
             elapsed=10.0,
         )
 
-        # Verify key components are in the output
         assert "us" in result
         assert "parsing" in result
         assert "75.0%" in result
-        # Rows should not appear when total is 0
         assert "/[dim]" not in result
 
     def test_format_with_encoding_phase(self) -> None:
@@ -299,7 +269,6 @@ class TestFormatLoadingProgress:
             elapsed=15.0,
         )
 
-        # Verify key components are in the output
         assert "polish" in result
         assert "encoding" in result
         assert "100.0%" in result
@@ -315,14 +284,12 @@ class TestFormatLoadingProgress:
             elapsed=2.0,
         )
 
-        # Verify key components are in the output
         assert "taiwan" in result
         assert "unknown_phase" in result
         assert "25.0%" in result
 
     def test_format_elapsed_time_formatting(self) -> None:
         """Test that elapsed time is formatted correctly."""
-        # Test with seconds only
         result_seconds = format_loading_progress(
             dataset="taiwan",
             phase="reading",
@@ -333,13 +300,12 @@ class TestFormatLoadingProgress:
         )
         assert "45s" in result_seconds
 
-        # Test with minutes and seconds
         result_minutes = format_loading_progress(
             dataset="taiwan",
             phase="reading",
             percent_complete=90.0,
             rows_processed=900,
             rows_total=1000,
-            elapsed=125.0,  # 2m 05s
+            elapsed=125.0,
         )
         assert "2m" in result_minutes
