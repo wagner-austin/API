@@ -48,8 +48,14 @@ CMD_PING = 46  # 0x2e - 'F6' key - Ping server, returns latency in ms
 CMD_MOVE = 112  # 0x70 - Mouse click - Tank movement (click to move)
 # Movement payload: X (1 byte) + Y (1 byte) = target coordinates
 
-CMD_PICKUP_MOVE = 106  # 0x6a - Long press - Move to pickup fuel/equipment
+CMD_PICKUP_FUEL = 100  # 0x64 / 'd' - Long press - Get fuel
 # Pickup payload: X (1 byte) + Y (1 byte) = target coordinates
+
+CMD_PICKUP_EQUIPMENT = 106  # 0x6a / 'j' - Long press - Get equipment
+# Pickup payload: X (1 byte) + Y (1 byte) = target coordinates
+
+# Backwards compatibility for older internal naming.
+CMD_PICKUP_MOVE = CMD_PICKUP_FUEL
 
 CMD_MAP_TELEPORT = 116  # 0x74 - Map click - Teleport via map (fuel cost varies by distance)
 # Teleport payload: X (1 byte) + Y (1 byte) = destination coordinates
@@ -363,10 +369,26 @@ def build_move_command(x: int, y: int) -> bytes:
     return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
 
 
-def build_pickup_command(x: int, y: int) -> bytes:
-    """Build a PICKUP_MOVE command ready to send (with length header).
+def build_pickup_fuel_command(x: int, y: int) -> bytes:
+    """Build a fuel pickup command ready to send (with length header).
 
-    Used for moving to pick up fuel/equipment containers.
+    Format: [len_lo, len_hi] + ! + 0x24 + 0x64 + X + Y (7 bytes total)
+
+    Args:
+        x: Target X coordinate (0-255).
+        y: Target Y coordinate (0-255).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_PICKUP_FUEL, x & 0xFF, y & 0xFF])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
+def build_pickup_equipment_command(x: int, y: int) -> bytes:
+    """Build an equipment pickup command ready to send (with length header).
+
     Format: [len_lo, len_hi] + ! + 0x24 + 0x6a + X + Y (7 bytes total)
 
     Args:
@@ -376,7 +398,7 @@ def build_pickup_command(x: int, y: int) -> bytes:
     Returns:
         Framed command bytes ready to send via WebSocket.
     """
-    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_PICKUP_MOVE, x & 0xFF, y & 0xFF])
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_PICKUP_EQUIPMENT, x & 0xFF, y & 0xFF])
     length = len(body)
     return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
 
@@ -471,6 +493,8 @@ __all__ = [
     "CMD_MINE",
     "CMD_MOVE",
     "CMD_NEAREST_ENEMY",
+    "CMD_PICKUP_EQUIPMENT",
+    "CMD_PICKUP_FUEL",
     "CMD_PICKUP_MOVE",
     "CMD_PING",
     "CMD_RADAR",
@@ -500,7 +524,8 @@ __all__ = [
     "CommandType",
     "QueryCommand",
     "build_move_command",
-    "build_pickup_command",
+    "build_pickup_equipment_command",
+    "build_pickup_fuel_command",
     "build_query_command",
     "build_scope_command",
     "build_shoot_command",
