@@ -98,13 +98,20 @@ class TestDecodeTerrainTile:
 
     def test_decodes_valid_data(self) -> None:
         """Decodes valid terrain tile data."""
-        data: JSONObject = {"x": 10, "y": 20, "terrain_type": 3, "entity_id": 5}
+        data: JSONObject = {
+            "x": 10,
+            "y": 20,
+            "terrain_type": 3,
+            "cache_value": 5,
+            "overlay_value": 255,
+        }
         tile = decode_terrain_tile(data)
 
         assert tile["x"] == 10
         assert tile["y"] == 20
         assert tile["terrain_type"] == 3
-        assert tile["entity_id"] == 5
+        assert tile["cache_value"] == 5
+        assert tile["overlay_value"] == 255
 
 
 class TestDecodeViewportState:
@@ -158,6 +165,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -199,6 +207,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -223,6 +232,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": "invalid",
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         with pytest.raises(JSONTypeError, match="viewport must be an object"):
@@ -237,6 +247,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -251,6 +262,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -265,6 +277,7 @@ class TestDecodeWorldState:
             "mines": {"75,125": ["not", "a", "dict"], "25,35": True},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -279,6 +292,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {"10,20": 12345, "15,25": False},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -293,6 +307,7 @@ class TestDecodeWorldState:
             "mines": ["list", "not", "dict"],
             "terrain": None,
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -323,6 +338,7 @@ class TestDecodeWorldState:
             "mines": {},
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -341,9 +357,16 @@ class TestDecodeWorldState:
             "containers": {},
             "mines": {},
             "terrain": {
-                "10,20": {"x": 10, "y": 20, "terrain_type": 1, "entity_id": 0},
+                "10,20": {
+                    "x": 10,
+                    "y": 20,
+                    "terrain_type": 1,
+                    "cache_value": 0,
+                    "overlay_value": 255,
+                },
             },
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {"0,0": 1234},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -352,3 +375,22 @@ class TestDecodeWorldState:
         assert tile["x"] == 10
         assert tile["y"] == 20
         assert tile["terrain_type"] == 1
+        assert tile["cache_value"] == 0
+        assert tile["overlay_value"] == 255
+        assert state["scanned_viewports"] == {"0,0": 1234}
+
+    def test_raises_on_non_integer_scanned_viewport_timestamp(self) -> None:
+        """Raises JSONTypeError for non-integer scanned viewport timestamps."""
+        data: JSONObject = {
+            "self_state": None,
+            "tanks": {},
+            "containers": {},
+            "mines": {},
+            "terrain": {},
+            "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {"0,0": True},
+            "timestamp_ms": 0,
+        }
+
+        with pytest.raises(JSONTypeError, match=r"scanned_viewports\.0,0 must be an integer"):
+            decode_world_state(data)
