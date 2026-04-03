@@ -11,8 +11,9 @@ import pytest
 from tankpit_bot.protocol import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
+    MSG_CACHE_OVERLAY_UPDATE,
+    MSG_CACHE_UPDATE,
     MSG_CHAT,
-    MSG_CONTAINER,
     MSG_DEACTIVATE,
     MSG_ENEMY_DETECT,
     MSG_EQUIP_GAIN,
@@ -24,6 +25,7 @@ from tankpit_bot.protocol import (
     MSG_MINE_PLACE,
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
+    MSG_OVERLAY_UPDATE,
     MSG_PROMOTION,
     MSG_RADAR_RESULT,
     MSG_SHOOT,
@@ -37,7 +39,6 @@ from tankpit_bot.protocol import (
     MSG_TANK_STATS,
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
-    MSG_TILE_UPDATE,
     MSG_VIEWPORT,
     SUPERVISOR_STATUS_PROMO_ELIGIBLE,
     SUPERVISOR_STATUS_PROMO_KILL,
@@ -62,7 +63,7 @@ class TestIsTextMessage:
         """Returns False for binary message types."""
         assert is_text_message(MSG_SHOOT) is False
         assert is_text_message(MSG_MOVEMENT) is False
-        assert is_text_message(MSG_CONTAINER) is False
+        assert is_text_message(MSG_CACHE_UPDATE) is False
 
     def test_text_msg_types_constant(self) -> None:
         """TEXT_MSG_TYPES contains expected values."""
@@ -134,10 +135,14 @@ class TestDecodeMessage:
         result = decode_message(MSG_ENEMY_DETECT, enemy_data)
         assert result["msg_type"] == 0x48
 
-        # Tile update (radar scan result)
-        tile_data = bytes([1, 0, 10, 20, 0x34, 0x12])
-        result = decode_message(MSG_TILE_UPDATE, tile_data)
-        assert result["msg_type"] == 0x4F
+        # Combined tile update
+        tile_data = bytes([1, 0, 10, 20, 0x34, 0x12, 30, 40, 7])
+        result = decode_message(MSG_CACHE_OVERLAY_UPDATE, tile_data)
+        assert result == {
+            "msg_type": 0x4F,
+            "cache_updates": [(10, 20, 0x1234)],
+            "overlay_updates": [(30, 40, 7)],
+        }
 
     def test_dispatches_tank_messages(self) -> None:
         """Dispatches to tank message decoders."""
@@ -201,10 +206,17 @@ class TestDecodeMessage:
         result = decode_message(MSG_SYNC, sync_data)
         assert result["msg_type"] == 0x3F
 
-        # Container
-        container_data = bytes([0x02, 0x01, 0x04, 0x03])
-        result = decode_message(MSG_CONTAINER, container_data)
+        # Cache update
+        container_data = bytes([10, 20, 0x04, 0x03])
+        result = decode_message(MSG_CACHE_UPDATE, container_data)
         assert result["msg_type"] == 0x43
+        assert result["updates"] == [(10, 20, 0x0304)]
+
+        # Overlay update
+        overlay_data = bytes([11, 21, 7, 12, 22, 255])
+        result = decode_message(MSG_OVERLAY_UPDATE, overlay_data)
+        assert result["msg_type"] == 0x40
+        assert result["updates"] == [(11, 21, 7), (12, 22, 255)]
 
     def test_dispatches_misc_messages(self) -> None:
         """Dispatches to misc message decoders."""
@@ -477,7 +489,7 @@ class TestMessageConstants:
         assert ord("A") == MSG_DEACTIVATE
         assert ord("?") == MSG_SYNC
         assert ord("!") == MSG_TANK_INFO
-        assert ord("C") == MSG_CONTAINER
+        assert ord("C") == MSG_CACHE_UPDATE
         assert ord("Z") == MSG_VIEWPORT
 
     def test_supervisor_status_constants(self) -> None:
