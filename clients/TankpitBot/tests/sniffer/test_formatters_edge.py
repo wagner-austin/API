@@ -16,9 +16,8 @@ class TestFormatFunctionsEdgeCases:
 
     def test_format_tank_registry_details_container_with_viewport(self) -> None:
         """Test format_tank_registry_details for container with viewport position."""
-        # Save original and set viewport left
-        original = viewport._viewport_left
-        viewport._viewport_left = 100
+        viewport.reset_viewport_tracking()
+        viewport.update_viewport_origin(100, 200)
         try:
             result = format_tank_registry_details(
                 tid=42,
@@ -34,13 +33,11 @@ class TestFormatFunctionsEdgeCases:
             assert "container id=42" in result
             assert "pos=(110,50)" in result  # 100 + 10 = 110
         finally:
-            viewport._viewport_left = original
+            viewport.reset_viewport_tracking()
 
     def test_format_tank_registry_details_container_no_viewport(self) -> None:
         """Test format_tank_registry_details for container without viewport left."""
-        # Ensure viewport left is not set
-        original = viewport._viewport_left
-        viewport._viewport_left = None
+        viewport.reset_viewport_tracking()
         try:
             result = format_tank_registry_details(
                 tid=42,
@@ -57,7 +54,7 @@ class TestFormatFunctionsEdgeCases:
             assert "y=50" in result
             assert "vx=10" in result
         finally:
-            viewport._viewport_left = original
+            viewport.reset_viewport_tracking()
 
     def test_format_tank_registry_details_container_no_position(self) -> None:
         """Test format_tank_registry_details for container without position data."""
