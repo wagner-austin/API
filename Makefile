@@ -1,7 +1,7 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 
-.PHONY: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test check
+.PHONY: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test check
 
 # ---------------------------------------------------------------------------
 # Infrastructure
@@ -17,6 +17,9 @@ up-databank: infra
 
 up-trainer: infra
 	Set-Location services/Model-Trainer; docker compose build --progress plain; docker compose up -d
+
+up-art-trainer: infra
+	Set-Location services/Art-Trainer; docker compose build --progress plain; docker compose up -d
 
 up-handwriting: infra
 	Set-Location services/handwriting-ai; docker compose up -d --build
@@ -51,14 +54,14 @@ up-discord: infra
 # ---------------------------------------------------------------------------
 # All Services
 # ---------------------------------------------------------------------------
-up-all: infra up-databank up-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord
+up-all: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord
 	Write-Host "All services started" -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
 # Stop/Cleanup
 # ---------------------------------------------------------------------------
 down:
-	$$dirs = @("services/data-bank-api", "services/Model-Trainer", "services/handwriting-ai", "services/qr-api", "services/transcript-api", "services/turkic-api", "services/music-wrapped-api", "services/covenant-radar-api", "services/grandma-api", "services/github-stats-api", "services/opportunity-radar-api", "clients/DiscordBot"); foreach ($$d in $$dirs) { if (Test-Path "$$d/docker-compose.yml") { Push-Location $$d; docker compose down; Pop-Location } }; docker compose down
+	$$dirs = @("services/data-bank-api", "services/Model-Trainer", "services/Art-Trainer", "services/handwriting-ai", "services/qr-api", "services/transcript-api", "services/turkic-api", "services/music-wrapped-api", "services/covenant-radar-api", "services/grandma-api", "services/github-stats-api", "services/opportunity-radar-api", "clients/DiscordBot"); foreach ($$d in $$dirs) { if (Test-Path "$$d/docker-compose.yml") { Push-Location $$d; docker compose down; Pop-Location } }; docker compose down
 
 clean: down
 	docker system prune -f
