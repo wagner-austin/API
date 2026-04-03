@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import make_behavior_score, make_initial_ai_state
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.executor import apply_equipment, dispatch_command, execute
+from tankpit_bot.bot.executor import (
+    _format_desired_equipment,
+    apply_equipment,
+    dispatch_command,
+    execute,
+)
 from tankpit_bot.bot.tick_loop_types import make_tick_decision
 from tankpit_bot.bot.types import (
     make_map_open_command,
@@ -74,6 +79,18 @@ class TestApplyEquipment:
         # slot 2: in desired, already enabled → no toggle
         # slot 4: not in desired, already disabled → no toggle
         assert len(fake_cdp._sent_methods) == 0
+
+
+class TestFormatDesiredEquipment:
+    """Tests for desired-equipment log formatting."""
+
+    def test_empty_list_formats_as_none(self) -> None:
+        """Formats an empty desired-equipment list clearly."""
+        assert _format_desired_equipment([]) == "none"
+
+    def test_unknown_slot_uses_slot_fallback(self) -> None:
+        """Formats unknown slots with an explicit fallback label."""
+        assert _format_desired_equipment([2, 9]) == "dual,slot9"
 
 
 class TestDispatchCommand:
