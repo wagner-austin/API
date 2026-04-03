@@ -19,6 +19,7 @@ from covenant_ml.explainers.types import (
     IntegratedGradientsExplainConfig,
     PermutationConfig,
     PermutationExplainConfig,
+    RegressionExplainResult,
     ShapTreeExplainConfig,
     SupportedExplainer,
 )
@@ -301,3 +302,31 @@ class TestExplainerConfigUnion:
             "random_state": 42,
         }
         assert config["explainer"] == "shap_tree"
+
+
+class TestRegressionExplainResult:
+    """Tests for RegressionExplainResult TypedDict."""
+
+    def test_regression_explain_result_structure(self) -> None:
+        """RegressionExplainResult has all required fields (no target_class)."""
+        score: FeatureImportanceScore = {
+            "name": "feat1",
+            "importance": 0.5,
+            "rank": 1,
+        }
+        result: RegressionExplainResult = {
+            "status": "complete",
+            "backend": "xgboost_reg",
+            "explainer": "permutation",
+            "n_samples_used": 100,
+            "n_features": 5,
+            "feature_importances": [score],
+            "duration_seconds": 1.5,
+        }
+        assert result["status"] == "complete"
+        assert result["backend"] == "xgboost_reg"
+        assert result["explainer"] == "permutation"
+        assert result["n_samples_used"] == 100
+        assert result["n_features"] == 5
+        assert len(result["feature_importances"]) == 1
+        assert result["duration_seconds"] == 1.5
