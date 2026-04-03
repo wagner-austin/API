@@ -34,8 +34,8 @@ class ViewportEntityRowDict(TypedDict):
         abs_y: Absolute y coordinate using the viewport origin from ``0x5A``.
         col: Viewport-relative column.
         row: Viewport-relative row.
-        entity_id: Raw decoded entity id.
-        value: Raw decoded value nibble (or ``255`` sentinel).
+        cache_value: Raw decoded cache value.
+        overlay_value: Raw decoded overlay nibble (or ``255`` sentinel).
         terrain_type: Raw decoded terrain type nibble.
     """
 
@@ -43,8 +43,8 @@ class ViewportEntityRowDict(TypedDict):
     abs_y: int
     col: int
     row: int
-    entity_id: int
-    value: int
+    cache_value: int
+    overlay_value: int
     terrain_type: int
 
 
@@ -57,9 +57,9 @@ class ViewportEntityUpdateDict(TypedDict):
         viewport_left: Absolute viewport left coordinate from ``0x5A``.
         viewport_top: Absolute viewport top coordinate from ``0x5A``.
         entity_count: Number of decoded entity rows.
-        anonymous_tank_count: Count of rows with ``entity_id == -1``.
-        positive_entity_count: Count of rows with ``entity_id > 0``.
-        zero_entity_count: Count of rows with ``entity_id == 0``.
+        equipment_cache_count: Count of rows with ``cache_value == -1``.
+        positive_cache_count: Count of rows with ``cache_value > 0``.
+        zero_cache_count: Count of rows with ``cache_value == 0``.
         entities: Raw decoded rows.
     """
 
@@ -68,9 +68,9 @@ class ViewportEntityUpdateDict(TypedDict):
     viewport_left: int
     viewport_top: int
     entity_count: int
-    anonymous_tank_count: int
-    positive_entity_count: int
-    zero_entity_count: int
+    equipment_cache_count: int
+    positive_cache_count: int
+    zero_cache_count: int
     entities: list[ViewportEntityRowDict]
 
 
@@ -100,8 +100,8 @@ def encode_viewport_entity_row(row: ViewportEntityRowDict) -> JSONObject:
         "abs_y": row["abs_y"],
         "col": row["col"],
         "row": row["row"],
-        "entity_id": row["entity_id"],
-        "value": row["value"],
+        "cache_value": row["cache_value"],
+        "overlay_value": row["overlay_value"],
         "terrain_type": row["terrain_type"],
     }
 
@@ -120,8 +120,8 @@ def decode_viewport_entity_row(data: JSONObject) -> ViewportEntityRowDict:
         abs_y=require_int(data, "abs_y"),
         col=require_int(data, "col"),
         row=require_int(data, "row"),
-        entity_id=require_int(data, "entity_id"),
-        value=require_int(data, "value"),
+        cache_value=require_int(data, "cache_value"),
+        overlay_value=require_int(data, "overlay_value"),
         terrain_type=require_int(data, "terrain_type"),
     )
 
@@ -142,9 +142,9 @@ def encode_viewport_entity_update(update: ViewportEntityUpdateDict) -> JSONObjec
         "viewport_left": update["viewport_left"],
         "viewport_top": update["viewport_top"],
         "entity_count": update["entity_count"],
-        "anonymous_tank_count": update["anonymous_tank_count"],
-        "positive_entity_count": update["positive_entity_count"],
-        "zero_entity_count": update["zero_entity_count"],
+        "equipment_cache_count": update["equipment_cache_count"],
+        "positive_cache_count": update["positive_cache_count"],
+        "zero_cache_count": update["zero_cache_count"],
         "entities": entities_json,
     }
 
@@ -173,9 +173,9 @@ def decode_viewport_entity_update(data: JSONObject) -> ViewportEntityUpdateDict:
         viewport_left=require_int(data, "viewport_left"),
         viewport_top=require_int(data, "viewport_top"),
         entity_count=require_int(data, "entity_count"),
-        anonymous_tank_count=require_int(data, "anonymous_tank_count"),
-        positive_entity_count=require_int(data, "positive_entity_count"),
-        zero_entity_count=require_int(data, "zero_entity_count"),
+        equipment_cache_count=require_int(data, "equipment_cache_count"),
+        positive_cache_count=require_int(data, "positive_cache_count"),
+        zero_cache_count=require_int(data, "zero_cache_count"),
         entities=entities,
     )
 
@@ -220,25 +220,25 @@ def decode_viewport_entity_dump(data: JSONObject) -> ViewportEntityDumpDict:
 
 
 def _class_counts(entities: list[ViewportEntityRowDict]) -> tuple[int, int, int]:
-    """Count raw entity-id classes in one viewport update.
+    """Count raw cache-value classes in one viewport update.
 
     Args:
         entities: Raw entity rows.
 
     Returns:
-        Tuple of ``(anonymous_tank_count, positive_entity_count, zero_entity_count)``.
+        Tuple of ``(equipment_cache_count, positive_cache_count, zero_cache_count)``.
     """
-    anonymous_tank_count = 0
-    positive_entity_count = 0
-    zero_entity_count = 0
+    equipment_cache_count = 0
+    positive_cache_count = 0
+    zero_cache_count = 0
     for entity in entities:
-        if entity["entity_id"] == -1:
-            anonymous_tank_count += 1
-        elif entity["entity_id"] > 0:
-            positive_entity_count += 1
+        if entity["cache_value"] == -1:
+            equipment_cache_count += 1
+        elif entity["cache_value"] > 0:
+            positive_cache_count += 1
         else:
-            zero_entity_count += 1
-    return anonymous_tank_count, positive_entity_count, zero_entity_count
+            zero_cache_count += 1
+    return equipment_cache_count, positive_cache_count, zero_cache_count
 
 
 def _build_entity_rows(
@@ -264,8 +264,8 @@ def _build_entity_rows(
                 abs_y=viewport_top + raw_entity["row"],
                 col=raw_entity["col"],
                 row=raw_entity["row"],
-                entity_id=raw_entity["entity_id"],
-                value=raw_entity["value"],
+                cache_value=raw_entity["cache_value"],
+                overlay_value=raw_entity["overlay_value"],
                 terrain_type=raw_entity["terrain_type"],
             )
         )
@@ -303,16 +303,16 @@ def _decode_viewport_update(
             "entities": list(raw_entities),
         }:
             entities = _build_entity_rows(viewport_left, viewport_top, raw_entities)
-            anonymous_tank_count, positive_entity_count, zero_entity_count = _class_counts(entities)
+            equipment_cache_count, positive_cache_count, zero_cache_count = _class_counts(entities)
             return ViewportEntityUpdateDict(
                 message_index=message_index,
                 timestamp_ms=timestamp_ms,
                 viewport_left=viewport_left,
                 viewport_top=viewport_top,
                 entity_count=len(entities),
-                anonymous_tank_count=anonymous_tank_count,
-                positive_entity_count=positive_entity_count,
-                zero_entity_count=zero_entity_count,
+                equipment_cache_count=equipment_cache_count,
+                positive_cache_count=positive_cache_count,
+                zero_cache_count=zero_cache_count,
                 entities=entities,
             )
         case _:
@@ -390,13 +390,13 @@ def format_viewport_entity_dump(result: ViewportEntityDumpDict) -> str:
         lines.append("")
         lines.append(
             "[idx={message_index} ts={timestamp_ms}] viewport=({viewport_left},{viewport_top}) "
-            "entities={entity_count} anonymous_tanks={anonymous_tank_count} "
-            "positive_ids={positive_entity_count} zero_ids={zero_entity_count}".format(**update)
+            "entities={entity_count} equipment_cache={equipment_cache_count} "
+            "positive_cache={positive_cache_count} zero_cache={zero_cache_count}".format(**update)
         )
         for entity in update["entities"]:
             lines.append(
-                "  abs=({abs_x},{abs_y}) cell=({col},{row}) entity_id={entity_id} "
-                "value={value} terrain={terrain_type}".format(**entity)
+                "  abs=({abs_x},{abs_y}) cell=({col},{row}) cache_value={cache_value} "
+                "overlay_value={overlay_value} terrain={terrain_type}".format(**entity)
             )
     return "\n".join(lines)
 
