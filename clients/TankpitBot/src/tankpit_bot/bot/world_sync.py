@@ -31,7 +31,7 @@ def drain_messages(bot: BotProtocol) -> int:
         process_received_message(payload)
 
     if msgs:
-        log.info("SYNC: %d messages", len(msgs))
+        log.debug("SYNC: %d messages", len(msgs))
 
     return len(msgs)
 
