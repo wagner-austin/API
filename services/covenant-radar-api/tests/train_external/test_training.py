@@ -252,6 +252,130 @@ class TestLSTMTraining:
         assert model_path.suffix == ".pt"
 
 
+class TestClearGBMTraining:
+    """Tests for ClearGBM model training."""
+
+    def test_taiwan_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains ClearGBM model on Taiwan dataset."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _, _n_rows, _feature_names = copy_real_taiwan(external_dir)
+
+        config_json = dump_json_str(
+            {
+                "backend": "cleargbm",
+                "dataset": "taiwan",
+                "n_estimators": 5,
+                "max_depth": 3,
+                "learning_rate": 0.3,
+                "min_samples_split": 10,
+                "min_samples_leaf": 5,
+                "max_features": None,
+                "subsample": 1.0,
+                "random_state": 42,
+                "track_contributions": False,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".json"
+
+
+class TestLogRegTraining:
+    """Tests for LogReg model training."""
+
+    def test_taiwan_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains LogReg model on Taiwan dataset."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _, _n_rows, _feature_names = copy_real_taiwan(external_dir)
+
+        config_json = dump_json_str(
+            {
+                "backend": "logreg",
+                "dataset": "taiwan",
+                "solver": "saga",
+                "penalty": "l2",
+                "C": 1.0,
+                "max_iter": 100,
+                "tol": 0.001,
+                "class_weight_balanced": True,
+                "random_state": 42,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".joblib"
+
+        # LogReg should produce metadata
+        active_path = Path(str(result["active_model_path"]))
+        meta_path = active_path.parent / "active_logreg_meta.json"
+        assert meta_path.exists()
+
+
+class TestRandomForestTraining:
+    """Tests for RandomForest model training."""
+
+    def test_taiwan_produces_model(self, tmp_path: Path) -> None:
+        """run_external_training trains RF model on Taiwan dataset."""
+        external_dir = tmp_path / "external"
+        output_dir = tmp_path / "models"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _, _n_rows, _feature_names = copy_real_taiwan(external_dir)
+
+        config_json = dump_json_str(
+            {
+                "backend": "random_forest",
+                "dataset": "taiwan",
+                "n_estimators": 10,
+                "max_depth": 5,
+                "min_samples_split": 5,
+                "min_samples_leaf": 2,
+                "max_features": "sqrt",
+                "bootstrap": True,
+                "class_weight_balanced": True,
+                "random_state": 42,
+                "train_ratio": 0.6,
+                "val_ratio": 0.2,
+                "test_ratio": 0.2,
+            }
+        )
+
+        result = run_external_training(config_json, external_dir, output_dir)
+
+        assert result["status"] == "complete"
+        assert result["dataset"] == "taiwan"
+        model_path = Path(str(result["model_path"]))
+        assert model_path.exists()
+        assert model_path.suffix == ".joblib"
+
+        # RF should produce metadata
+        active_path = Path(str(result["active_model_path"]))
+        meta_path = active_path.parent / "active_rf_meta.json"
+        assert meta_path.exists()
+
+
 class TestLightGBMTraining:
     """Tests for LightGBM model training."""
 
