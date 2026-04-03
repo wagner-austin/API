@@ -1,6 +1,6 @@
 """Tests for scripts.guard entrypoint.
 
-Uses _test_hooks to inject fake orchestrator so tests don't scan the real monorepo.
+Uses _hooks_guard to inject fake orchestrator so tests don't scan the real monorepo.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from scripts.guard import _find_monorepo_root_impl, main
 
-from cleargbm import _test_hooks
+from cleargbm import _hooks_guard
 
 
 def _install_fake_guard_hooks(tmp_path: Path) -> None:
@@ -24,22 +24,22 @@ def _install_fake_guard_hooks(tmp_path: Path) -> None:
             return tmp_path
 
     class _FakeLoader:
-        def __call__(self, monorepo_root: Path) -> _test_hooks.RunForProjectProto:
+        def __call__(self, monorepo_root: Path) -> _hooks_guard.RunForProjectProto:
             def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
                 return 0
 
             return _run_for_project
 
-    _test_hooks.guard_find_monorepo_root = _FakeFindRoot()
-    _test_hooks.guard_load_orchestrator = _FakeLoader()
+    _hooks_guard.guard_find_monorepo_root = _FakeFindRoot()
+    _hooks_guard.guard_load_orchestrator = _FakeLoader()
 
 
 @pytest.fixture(autouse=True)
 def _reset_guard_hooks() -> Generator[None, None, None]:
     """Reset guard hooks after each test."""
     yield
-    _test_hooks.guard_find_monorepo_root = None
-    _test_hooks.guard_load_orchestrator = None
+    _hooks_guard.guard_find_monorepo_root = None
+    _hooks_guard.guard_load_orchestrator = None
 
 
 def test_guard_entrypoint_runs_as_main(tmp_path: Path) -> None:
@@ -115,7 +115,7 @@ def test_find_monorepo_root_uses_impl_when_hook_is_none() -> None:
     """_find_monorepo_root uses impl when hook is None (production path)."""
     from scripts.guard import _find_monorepo_root
 
-    _test_hooks.guard_find_monorepo_root = None
+    _hooks_guard.guard_find_monorepo_root = None
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     result = _find_monorepo_root(project_root)
@@ -137,7 +137,7 @@ def test_load_orchestrator_uses_impl_when_hook_is_none() -> None:
     """_load_orchestrator uses impl when hook is None (production path)."""
     from scripts.guard import _load_orchestrator
 
-    _test_hooks.guard_load_orchestrator = None
+    _hooks_guard.guard_load_orchestrator = None
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[1]
     monorepo_root = _find_monorepo_root_impl(project_root)
@@ -155,14 +155,14 @@ def test_verbose_prints_nonzero_exit_code(
             return tmp_path
 
     class _FakeLoader:
-        def __call__(self, monorepo_root: Path) -> _test_hooks.RunForProjectProto:
+        def __call__(self, monorepo_root: Path) -> _hooks_guard.RunForProjectProto:
             def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
                 return 7
 
             return _run_for_project
 
-    _test_hooks.guard_find_monorepo_root = _FakeFindRoot()
-    _test_hooks.guard_load_orchestrator = _FakeLoader()
+    _hooks_guard.guard_find_monorepo_root = _FakeFindRoot()
+    _hooks_guard.guard_load_orchestrator = _FakeLoader()
 
     rc = main(["--root", str(tmp_path), "--verbose"])
     out = capsys.readouterr().out

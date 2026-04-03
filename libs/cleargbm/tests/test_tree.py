@@ -655,7 +655,7 @@ class TestHelperFunctions:
 
     def test_get_sample_indices_full(self) -> None:
         """Full sampling should return all indices."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _get_sample_indices(10, 1.0, rng)
@@ -665,7 +665,7 @@ class TestHelperFunctions:
 
     def test_get_sample_indices_subsample(self) -> None:
         """Subsampling should return fewer indices."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _get_sample_indices(10, 0.5, rng)
@@ -678,7 +678,7 @@ class TestHelperFunctions:
 
     def test_select_features_all(self) -> None:
         """All features should be returned when max_features >= n_features."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(5, 10, rng)
@@ -687,7 +687,7 @@ class TestHelperFunctions:
 
     def test_select_features_subset(self) -> None:
         """Subset of features should be returned."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(10, 3, rng)
@@ -698,7 +698,7 @@ class TestHelperFunctions:
 
     def test_select_features_single(self) -> None:
         """max_features=1 should return exactly one feature."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(5, 1, rng)
@@ -708,7 +708,7 @@ class TestHelperFunctions:
 
     def test_select_features_exceeds_n_features(self) -> None:
         """max_features > n_features should return all features."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(3, 100, rng)
@@ -718,7 +718,7 @@ class TestHelperFunctions:
 
     def test_select_features_equals_n_features(self) -> None:
         """max_features == n_features should return all features."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(4, 4, rng)
@@ -728,7 +728,7 @@ class TestHelperFunctions:
 
     def test_select_features_deterministic(self) -> None:
         """Same seed should produce same feature selection."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng1 = get_random_state(123)
         indices1 = _select_features(10, 3, rng1)
@@ -740,7 +740,7 @@ class TestHelperFunctions:
 
     def test_select_features_different_seeds(self) -> None:
         """Different seeds should (likely) produce different selections."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng1 = get_random_state(42)
         indices1 = _select_features(10, 3, rng1)
@@ -753,7 +753,7 @@ class TestHelperFunctions:
 
     def test_select_features_no_replacement(self) -> None:
         """Selected features should be unique (no duplicates)."""
-        from cleargbm._test_hooks import get_random_state
+        from cleargbm._hooks_infra import get_random_state
 
         rng = get_random_state(42)
         indices = _select_features(10, 5, rng)

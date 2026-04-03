@@ -13,8 +13,6 @@ from numpy.typing import NDArray
 import cleargbm.parallel as parallel_module
 from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
-    BinEdges,
-    FeatureBins,
     build_histogram,
     precompute_feature_bins,
 )
@@ -28,6 +26,7 @@ from cleargbm.parallel import (
     _worker_initializer,
 )
 from cleargbm.tree import build_tree
+from cleargbm.types import BinEdges, FeatureBins
 
 from .conftest import make_config
 

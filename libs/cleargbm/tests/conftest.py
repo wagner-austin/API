@@ -71,12 +71,12 @@ def reset_test_hooks() -> Generator[None, None, None]:
     Yields:
         None (test runs during yield).
     """
-    from cleargbm import _test_hooks
+    from cleargbm import _hooks_infra
 
     # Store original factory
-    original_factory = _test_hooks._random_state_factory
+    original_factory = _hooks_infra._random_state_factory
 
     yield
 
     # Restore original factory
-    _test_hooks._random_state_factory = original_factory
+    _hooks_infra._random_state_factory = original_factory

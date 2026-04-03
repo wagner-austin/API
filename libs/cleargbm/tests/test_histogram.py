@@ -11,8 +11,6 @@ from numpy.typing import NDArray
 
 from cleargbm.buffers import HistogramBuffer
 from cleargbm.histogram import (
-    BinEdges,
-    FeatureBins,
     HistogramSplit,
     _assign_bin,
     _compute_split_gain,
@@ -23,6 +21,10 @@ from cleargbm.histogram import (
     partition_by_bin,
     precompute_feature_bins,
     subtract_histogram,
+)
+from cleargbm.types import (
+    BinEdges,
+    FeatureBins,
 )
 
 

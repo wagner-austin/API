@@ -1,22 +1,92 @@
-"""Tests for cleargbm._test_hooks module."""
+"""Tests for cleargbm hook modules (_hooks_infra, _hooks_* sub-modules, _test_hooks re-export)."""
 
 from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
 
-from cleargbm._test_hooks import (
+from cleargbm._hooks_infra import (
     RandomStateProtocol,
     _PythonRandomStateWrapper,
     create_float_buffer,
     create_histogram_buffer,
     create_int_buffer,
     get_random_state,
-    predict_tree,
-    sigmoid,
-    sigmoid_array,
 )
+from cleargbm._hooks_prediction import predict_tree
+from cleargbm._hooks_sigmoid import sigmoid, sigmoid_array
 from cleargbm.types import DecisionTree, TreeNode
+
+
+class TestReExportLayer:
+    """Tests verifying _test_hooks re-export layer exposes all names."""
+
+    def test_re_export_protocols_are_same_objects(self) -> None:
+        """_test_hooks re-exports are identical objects to sub-module originals."""
+        from cleargbm import (
+            _hooks_guard,
+            _hooks_histogram,
+            _hooks_infra,
+            _hooks_prediction,
+            _hooks_sigmoid,
+            _test_hooks,
+        )
+
+        # Histogram protocols
+        assert _test_hooks.BuildHistogramBackend is _hooks_histogram.BuildHistogramBackend
+
+        # Sigmoid protocols
+        assert _test_hooks.SigmoidBackend is _hooks_sigmoid.SigmoidBackend
+
+        # Prediction protocols
+        assert _test_hooks.PredictTreeBackend is _hooks_prediction.PredictTreeBackend
+
+        # Guard protocols
+        assert _test_hooks.FindMonorepoRootProto is _hooks_guard.FindMonorepoRootProto
+        assert _test_hooks.RunForProjectProto is _hooks_guard.RunForProjectProto
+
+        # Infra accessors
+        assert _test_hooks.get_random_state is _hooks_infra.get_random_state
+        assert _test_hooks.create_float_buffer is _hooks_infra.create_float_buffer
+
+        # Sigmoid + prediction accessors
+        assert _test_hooks.sigmoid is _hooks_sigmoid.sigmoid
+        assert _test_hooks.predict_tree is _hooks_prediction.predict_tree
+
+    def test_hooks_compute_re_export_layer(self) -> None:
+        """_hooks_compute re-export layer exposes same objects as sub-modules."""
+        from cleargbm import (
+            _hooks_binning,
+            _hooks_compute,
+            _hooks_ensemble,
+            _hooks_histogram,
+            _hooks_loss,
+            _hooks_prediction,
+            _hooks_sigmoid,
+        )
+
+        assert _hooks_compute.BuildHistogramBackend is _hooks_histogram.BuildHistogramBackend
+        assert _hooks_compute.SubtractHistogramBackend is _hooks_histogram.SubtractHistogramBackend
+        assert _hooks_compute.PredictTreeBackend is _hooks_prediction.PredictTreeBackend
+        assert _hooks_compute.SigmoidBackend is _hooks_sigmoid.SigmoidBackend
+        assert _hooks_compute.SigmoidArrayBackend is _hooks_sigmoid.SigmoidArrayBackend
+        assert _hooks_compute.BinaryLogLossBackend is _hooks_loss.BinaryLogLossBackend
+        assert (
+            _hooks_compute.PrecomputeFeatureBinsBackend
+            is _hooks_binning.PrecomputeFeatureBinsBackend
+        )
+        assert _hooks_compute.PredictRawBackend is _hooks_ensemble.PredictRawBackend
+        assert _hooks_compute.sigmoid is _hooks_sigmoid.sigmoid
+        assert _hooks_compute.predict_tree is _hooks_prediction.predict_tree
+        assert _hooks_compute.build_histogram is _hooks_histogram.build_histogram
+        assert _hooks_compute.binary_log_loss is _hooks_loss.binary_log_loss
+
+    def test_re_exported_sigmoid_delegates_correctly(self) -> None:
+        """Re-exported sigmoid function delegates to the active backend."""
+        from cleargbm import _test_hooks
+
+        result = _test_hooks.sigmoid(0.0)
+        assert abs(result - 0.5) < 1e-10
 
 
 class TestPythonRandomStateWrapper:
