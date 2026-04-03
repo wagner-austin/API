@@ -9,8 +9,10 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
+import numpy as np
+from covenant_ml.backends.protocol import ProgressCallback
 from covenant_ml.backends.registry import (
     BackendFactory,
     BackendRegistration,
@@ -30,8 +32,18 @@ from covenant_ml.datasets import (
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.explainers.registry import ExplainerRegistry, default_explainer_registry
-from covenant_ml.types import PredictorProtocol
+from covenant_ml.features import FeaturePreset
+from covenant_ml.optimizer import OptimizerStrategyRegistry, default_optimizer_registry
+from covenant_ml.optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+)
+from covenant_ml.types import BackendName, PredictorProtocol
+from numpy.typing import NDArray
 from platform_workers.rq_harness import WorkerConfig
+
+from covenant_radar_api.worker.optimize_types import UnifiedOptimizeParseResult
 
 # =============================================================================
 # Worker Runner Hook
@@ -284,6 +296,264 @@ def _real_explainer_registry() -> ExplainerRegistry:
 
 
 explainer_registry_factory: ExplainerRegistryFactoryProtocol = _real_explainer_registry
+
+
+# =============================================================================
+# Optimizer Strategy Registry Hook
+# =============================================================================
+
+
+class OptimizerRegistryFactoryProtocol(Protocol):
+    """Protocol for optimizer strategy registry factory function."""
+
+    def __call__(self) -> OptimizerStrategyRegistry:
+        """Create an OptimizerStrategyRegistry with optimization strategies.
+
+        Returns:
+            OptimizerStrategyRegistry instance.
+        """
+        ...
+
+
+def _real_optimizer_registry() -> OptimizerStrategyRegistry:
+    """Real implementation returning production optimizer strategy registry.
+
+    Returns:
+        OptimizerStrategyRegistry with all built-in strategies.
+    """
+    return default_optimizer_registry()
+
+
+optimizer_registry_factory: OptimizerRegistryFactoryProtocol = _real_optimizer_registry
+
+
+# =============================================================================
+# Objective Factory Hook
+# =============================================================================
+
+
+class ObjectiveFactoryProtocol(Protocol):
+    """Protocol for unified objective factory function.
+
+    Creates per-backend objective functions using dynamic imports.
+    The returned objective must have an n_features property.
+    """
+
+    def __call__(
+        self,
+        backend_name: BackendName,
+        x: NDArray[np.float64],
+        y: NDArray[np.int64],
+        feature_names: list[str],
+        config: UnifiedOptimizeParseResult,
+    ) -> ObjectiveWithFeatureCount:
+        """Create an objective function for the specified backend.
+
+        Args:
+            backend_name: Backend to create objective for.
+            x: Feature matrix.
+            y: Binary labels.
+            feature_names: Feature column names.
+            config: Parsed optimization config with backend-specific fields.
+
+        Returns:
+            Objective callable with n_features property.
+        """
+        ...
+
+
+class ObjectiveWithFeatureCount(Protocol):
+    """Protocol for objective functions that track engineered feature count."""
+
+    @property
+    def n_features(self) -> int:
+        """Return the actual feature count (after engineering)."""
+        ...
+
+    def __call__(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        int_params: SampledIntParams,
+        float_params: SampledFloatParams,
+        string_params: SampledStringParams,
+        train_ratio: float,
+        val_ratio: float,
+        test_ratio: float,
+        random_state: int,
+    ) -> float:
+        """Train model with given hyperparameters and return validation AUC.
+
+        Args:
+            x_features: Feature matrix.
+            y_labels: Binary labels.
+            feature_names: Feature column names.
+            int_params: Integer hyperparameters.
+            float_params: Float hyperparameters.
+            string_params: String hyperparameters.
+            train_ratio: Training data fraction.
+            val_ratio: Validation data fraction.
+            test_ratio: Test data fraction.
+            random_state: Random seed.
+
+        Returns:
+            Validation AUC score.
+        """
+        ...
+
+
+def _real_objective_factory(
+    backend_name: BackendName,
+    x: NDArray[np.float64],
+    y: NDArray[np.int64],
+    feature_names: list[str],
+    config: UnifiedOptimizeParseResult,
+) -> ObjectiveWithFeatureCount:
+    """Create per-backend objective using dynamic imports.
+
+    Dispatches to the appropriate create_*_objective factory based on
+    backend_name. Tree-based backends are in covenant_ml.optimizer,
+    neural backends are in covenant_nn.
+
+    Args:
+        backend_name: Backend to create objective for.
+        x: Feature matrix.
+        y: Binary labels.
+        feature_names: Feature column names.
+        config: Parsed optimization config.
+
+    Returns:
+        Objective callable with n_features property.
+
+    Raises:
+        ValueError: If backend_name is not recognized.
+    """
+    if backend_name == "xgboost":
+        from covenant_ml.optimizer import create_xgboost_objective
+
+        return create_xgboost_objective(
+            x,
+            y,
+            feature_names,
+            config["device"],
+            config["feature_preset"],
+        )
+
+    if backend_name == "lightgbm":
+        from covenant_ml.optimizer import create_lightgbm_objective
+
+        return create_lightgbm_objective(
+            x,
+            y,
+            feature_names,
+            config["device"],
+            config["feature_preset"],
+            early_stopping_rounds=config["early_stopping_rounds"],
+            n_jobs=config["n_jobs"],
+        )
+
+    if backend_name == "cleargbm":
+        from covenant_ml.optimizer import create_cleargbm_objective
+
+        return create_cleargbm_objective(
+            x,
+            y,
+            feature_names,
+            config["feature_preset"],
+            early_stopping_rounds=config["early_stopping_rounds"],
+        )
+
+    if backend_name == "logreg":
+        from covenant_ml.optimizer import create_logreg_objective
+
+        return create_logreg_objective(
+            x,
+            y,
+            feature_names,
+            config["feature_preset"],
+        )
+
+    if backend_name == "random_forest":
+        from covenant_ml.optimizer import create_random_forest_objective
+
+        return create_random_forest_objective(
+            x,
+            y,
+            feature_names,
+            config["feature_preset"],
+        )
+
+    if backend_name == "mlp":
+        nn_mod = __import__("covenant_nn", fromlist=["create_mlp_objective"])
+        create_mlp: _CreateMLPObjectiveProto = nn_mod.create_mlp_objective
+        return create_mlp(
+            x,
+            y,
+            feature_names,
+            config["device"],
+            config["precision"],
+            config["feature_preset"],
+            config["n_epochs"],
+            config["early_stopping_patience"],
+            optimizer_name=config["nn_optimizer"],
+        )
+
+    # backend_name == "lstm"
+    nn_mod = __import__("covenant_nn", fromlist=["create_lstm_objective"])
+    create_lstm_obj: _CreateLSTMObjectiveProto = nn_mod.create_lstm_objective
+    return create_lstm_obj(
+        x,
+        y,
+        feature_names,
+        config["device"],
+        config["precision"],
+        config["feature_preset"],
+        config["n_epochs"],
+        config["early_stopping_patience"],
+        config["sequence_length"],
+        bidirectional=config["bidirectional"],
+    )
+
+
+class _CreateMLPObjectiveProto(Protocol):
+    """Protocol for covenant_nn.create_mlp_objective."""
+
+    def __call__(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        device: Literal["cpu", "cuda", "auto"],
+        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        feature_preset: FeaturePreset,
+        n_epochs: int,
+        early_stopping_patience: int,
+        optimizer_name: Literal["adamw", "adam", "sgd"] = ...,
+        epoch_callback: ProgressCallback | None = ...,
+    ) -> ObjectiveWithFeatureCount: ...
+
+
+class _CreateLSTMObjectiveProto(Protocol):
+    """Protocol for covenant_nn.create_lstm_objective."""
+
+    def __call__(
+        self,
+        x_features: NDArray[np.float64],
+        y_labels: NDArray[np.int64],
+        feature_names: list[str],
+        device: Literal["cpu", "cuda", "auto"],
+        precision: Literal["fp32", "fp16", "bf16", "auto"],
+        feature_preset: FeaturePreset,
+        n_epochs: int,
+        early_stopping_patience: int,
+        sequence_length: int,
+        bidirectional: bool = ...,
+        epoch_callback: ProgressCallback | None = ...,
+    ) -> ObjectiveWithFeatureCount: ...
+
+
+objective_factory: ObjectiveFactoryProtocol = _real_objective_factory
 
 
 # =============================================================================
@@ -569,6 +839,9 @@ __all__ = [
     "LoadedDataset",
     "LogRegLoaderProtocol",
     "MLPLoaderProtocol",
+    "ObjectiveFactoryProtocol",
+    "ObjectiveWithFeatureCount",
+    "OptimizerRegistryFactoryProtocol",
     "PredictorProtocol",
     "ProgressCallbackProtocol",
     "RandomForestLoaderProtocol",
@@ -586,6 +859,8 @@ __all__ = [
     "logreg_loader",
     "lstm_loader",
     "mlp_loader",
+    "objective_factory",
+    "optimizer_registry_factory",
     "random_forest_loader",
     "registry_factory",
     "test_runner",
