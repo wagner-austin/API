@@ -28,6 +28,8 @@ from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_t
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import make_cleargbm_default_space, make_cleargbm_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import stratified_split
 from ...types import (
     BackendName,
@@ -479,12 +481,46 @@ class ClearGBMBackend(ClassifierBackend):
             )
         return result
 
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default ClearGBM search space.
+
+        Returns:
+            ClearGBMSearchSpace with sensible default ranges.
+        """
+        return make_cleargbm_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused ClearGBM search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads max_depth).
+            best_float_params: Best float params (reads learning_rate).
+
+        Returns:
+            ClearGBMSearchSpace with narrowed ranges.
+        """
+        return make_cleargbm_focused_space(
+            best_max_depth=best_int_params["max_depth"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
+
 
 def create_cleargbm_backend() -> ClearGBMBackend:
     """Create ClearGBM backend instance.
 
     Returns:
         ClearGBM backend.
+
+    Note:
+        Call ``cleargbm._rust_adapters.use_rust_backend()`` at application
+        startup (before creating any backends) to activate Rust acceleration
+        for all hot-path operations. Without this call, ClearGBM uses pure
+        Python implementations.
     """
     return ClearGBMBackend()
 

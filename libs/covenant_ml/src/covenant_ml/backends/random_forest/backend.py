@@ -20,6 +20,11 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import (
+    make_random_forest_default_space,
+    make_random_forest_focused_space,
+)
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import stratified_split
 from ...types import (
     BackendName,
@@ -518,6 +523,34 @@ class RandomForestBackend(ClassifierBackend):
             None (importances provided via TrainOutcome).
         """
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default Random Forest search space.
+
+        Returns:
+            RandomForestSearchSpace with sensible default ranges.
+        """
+        return make_random_forest_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused Random Forest search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads max_depth, n_estimators).
+            best_float_params: Best float params (unused for Random Forest).
+
+        Returns:
+            RandomForestSearchSpace with narrowed ranges.
+        """
+        return make_random_forest_focused_space(
+            best_max_depth=best_int_params["max_depth"],
+            best_n_estimators=best_int_params["n_estimators"],
+        )
 
 
 def create_random_forest_backend() -> RandomForestBackend:

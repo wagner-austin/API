@@ -13,6 +13,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import train_model_with_validation
 from ...types import (
     BackendName,
@@ -122,6 +124,34 @@ class XGBoostBackend(ClassifierBackend):
     ) -> list[FeatureImportance] | None:
         # Importances are provided by the higher-level outcome in the trainer path.
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default XGBoost search space with DART support.
+
+        Returns:
+            XGBoostSearchSpace with sensible default ranges.
+        """
+        return make_xgboost_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused XGBoost search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads max_depth).
+            best_float_params: Best float params (reads learning_rate).
+
+        Returns:
+            XGBoostSearchSpace with narrowed ranges.
+        """
+        return make_xgboost_focused_space(
+            best_max_depth=best_int_params["max_depth"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
 
 def create_xgboost_backend() -> ClassifierBackend:

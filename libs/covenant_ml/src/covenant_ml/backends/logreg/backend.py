@@ -19,6 +19,8 @@ from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import make_logreg_default_space, make_logreg_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import stratified_split
 from ...types import (
     BackendName,
@@ -532,6 +534,34 @@ class LogRegBackend(ClassifierBackend):
             None (importances provided via TrainOutcome).
         """
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default LogReg search space.
+
+        Returns:
+            LogRegSearchSpace with sensible default ranges.
+        """
+        return make_logreg_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused LogReg search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (unused for LogReg).
+            best_float_params: Best float params (reads C, tol).
+
+        Returns:
+            LogRegSearchSpace with narrowed ranges.
+        """
+        return make_logreg_focused_space(
+            best_c=best_float_params["C"],
+            best_tol=best_float_params["tol"],
+        )
 
 
 def create_logreg_backend() -> LogRegBackend:

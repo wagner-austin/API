@@ -18,6 +18,8 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_metrics
+from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import stratified_split
 from ...types import (
     BackendName,
@@ -442,6 +444,34 @@ class LightGBMBackend(ClassifierBackend):
     ) -> list[FeatureImportance] | None:
         # Importances are provided via TrainOutcome
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default LightGBM search space with DART support.
+
+        Returns:
+            LightGBMSearchSpace with sensible default ranges.
+        """
+        return make_lightgbm_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused LightGBM search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads num_leaves).
+            best_float_params: Best float params (reads learning_rate).
+
+        Returns:
+            LightGBMSearchSpace with narrowed ranges.
+        """
+        return make_lightgbm_focused_space(
+            best_num_leaves=best_int_params["num_leaves"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
 
 def create_lightgbm_backend() -> LightGBMBackend:
