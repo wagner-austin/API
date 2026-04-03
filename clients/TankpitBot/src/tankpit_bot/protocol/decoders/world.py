@@ -10,15 +10,18 @@ from tankpit_bot.protocol.constants import (
     SUPERVISOR_STATUS_PROMO_ELIGIBLE,
     SUPERVISOR_STATUS_PROMO_KILL,
 )
-from tankpit_bot.protocol.helpers import require_min_length, x16
+from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
-    ContainerDict,
+    CacheUpdateDict,
+    CombinedTileUpdateDict,
+    OverlayUpdateDict,
     SupervisorDict,
     SyncDict,
     TerrainUpdateDict,
     ViewportEntityDict,
     ViewportUpdateDict,
 )
+from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_WIDTH
 
 
 def decode_sync(data: bytes) -> SyncDict:
@@ -33,23 +36,112 @@ def decode_sync(data: bytes) -> SyncDict:
     return SyncDict(msg_type=0x3F)
 
 
-def decode_container(data: bytes) -> ContainerDict:
-    """Decode container from XOR-decoded data.
+def _decode_cache_value(low: int, high: int) -> int:
+    """Decode a cache value from two bytes.
+
+    Args:
+        low: Low byte.
+        high: High byte.
+
+    Returns:
+        Cache value with ``0xFFFF`` mapped to ``-1``.
+    """
+    raw_value = x16(low, high)
+    if raw_value == 0xFFFF:
+        return -1
+    return raw_value
+
+
+def decode_cache_update(data: bytes) -> CacheUpdateDict:
+    """Decode cache-only tile patch from XOR-decoded data.
 
     Args:
         data: XOR-decoded message body (without 0x43 prefix).
 
     Returns:
-        Decoded container.
+        Decoded cache update entries.
 
     Raises:
-        DecodeError: If decoding fails.
+        DecodeError: If payload length is invalid.
     """
-    require_min_length(data, 4, "Container")
-    return ContainerDict(
+    if len(data) % 4 != 0:
+        raise DecodeError(f"CacheUpdate: expected 4-byte entries, got {len(data)} bytes")
+    updates: list[tuple[int, int, int]] = []
+    for offset in range(0, len(data), 4):
+        updates.append(
+            (
+                data[offset],
+                data[offset + 1],
+                _decode_cache_value(data[offset + 2], data[offset + 3]),
+            )
+        )
+    return CacheUpdateDict(
         msg_type=0x43,
-        container_id=x16(data[0], data[1]),
-        fuel=x16(data[2], data[3]),
+        updates=updates,
+    )
+
+
+def decode_overlay_update(data: bytes) -> OverlayUpdateDict:
+    """Decode overlay-only tile patch from XOR-decoded data.
+
+    Args:
+        data: XOR-decoded message body (without 0x40 prefix).
+
+    Returns:
+        Decoded overlay update entries.
+
+    Raises:
+        DecodeError: If payload length is invalid.
+    """
+    if len(data) % 3 != 0:
+        raise DecodeError(f"OverlayUpdate: expected 3-byte entries, got {len(data)} bytes")
+    updates: list[tuple[int, int, int]] = []
+    for offset in range(0, len(data), 3):
+        updates.append((data[offset], data[offset + 1], data[offset + 2]))
+    return OverlayUpdateDict(msg_type=0x40, updates=updates)
+
+
+def decode_combined_tile_update(data: bytes) -> CombinedTileUpdateDict:
+    """Decode combined cache+overlay tile patch from XOR-decoded data.
+
+    Args:
+        data: XOR-decoded message body (without 0x4F prefix).
+
+    Returns:
+        Decoded combined cache and overlay updates.
+
+    Raises:
+        DecodeError: If payload length is invalid.
+    """
+    require_min_length(data, 2, "CombinedTileUpdate")
+    cache_count = x16(data[0], data[1])
+    cache_data_len = cache_count * 4
+    cache_data_start = 2
+    cache_data_end = cache_data_start + cache_data_len
+    if cache_data_end > len(data):
+        raise DecodeError("CombinedTileUpdate: cache section exceeds payload length")
+    remaining_overlay_len = len(data) - cache_data_end
+    if remaining_overlay_len % 3 != 0:
+        raise DecodeError("CombinedTileUpdate: overlay section must be 3-byte entries")
+
+    cache_updates: list[tuple[int, int, int]] = []
+    for offset in range(cache_data_start, cache_data_end, 4):
+        cache_updates.append(
+            (
+                data[offset],
+                data[offset + 1],
+                _decode_cache_value(data[offset + 2], data[offset + 3]),
+            )
+        )
+
+    overlay_updates: list[tuple[int, int, int]] = []
+    for offset in range(cache_data_end, len(data), 3):
+        overlay_updates.append((data[offset], data[offset + 1], data[offset + 2]))
+
+    return CombinedTileUpdateDict(
+        msg_type=0x4F,
+        cache_updates=cache_updates,
+        overlay_updates=overlay_updates,
     )
 
 
@@ -71,7 +163,7 @@ def decode_terrain_update(data: bytes) -> TerrainUpdateDict:
     return TerrainUpdateDict(msg_type=0x4A, updates=updates)
 
 
-def viewport_entity_is_equipment(entity: ViewportEntityDict) -> bool:
+def viewport_entity_has_equipment_cache(entity: ViewportEntityDict) -> bool:
     """Check if a viewport row marks equipment.
 
     Args:
@@ -80,10 +172,10 @@ def viewport_entity_is_equipment(entity: ViewportEntityDict) -> bool:
     Returns:
         True if the row marks equipment on that tile.
     """
-    return entity["entity_id"] == -1
+    return entity["cache_value"] == -1
 
 
-def viewport_entity_is_fuel(entity: ViewportEntityDict) -> bool:
+def viewport_entity_has_fuel_cache(entity: ViewportEntityDict) -> bool:
     """Check if a viewport row marks fuel.
 
     Args:
@@ -92,11 +184,11 @@ def viewport_entity_is_fuel(entity: ViewportEntityDict) -> bool:
     Returns:
         True if the row marks fuel on that tile.
     """
-    return entity["entity_id"] > 0
+    return entity["cache_value"] > 0
 
 
-def viewport_entity_is_empty(entity: ViewportEntityDict) -> bool:
-    """Check if tile is empty.
+def viewport_entity_has_no_cache(entity: ViewportEntityDict) -> bool:
+    """Check if viewport row carries no container cache value.
 
     Args:
         entity: Viewport entity.
@@ -104,7 +196,7 @@ def viewport_entity_is_empty(entity: ViewportEntityDict) -> bool:
     Returns:
         True if tile is empty.
     """
-    return entity["entity_id"] == 0
+    return entity["cache_value"] == 0
 
 
 def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
@@ -130,11 +222,11 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
         v = data[t]
         t += 1
 
-        col += v % 18
-        row += v // 18
-        while col >= 18:
+        col += v % VIEWPORT_PATCH_WIDTH
+        row += v // VIEWPORT_PATCH_WIDTH
+        while col >= VIEWPORT_PATCH_WIDTH:
             row += 1
-            col -= 18
+            col -= VIEWPORT_PATCH_WIDTH
 
         if v != 255:
             if t + 3 > len(data):
@@ -148,18 +240,18 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
 
             terrain_type = z & 0xF
             z >>= 4
-            value = z & 0xF
-            if value >= 8:
-                value = 255
+            overlay_value = z & 0xF
+            if overlay_value >= 8:
+                overlay_value = 255
             z >>= 4
-            entity_id = z if z != 65535 else -1
+            cache_value = z if z != 65535 else -1
 
             entities.append(
                 ViewportEntityDict(
                     col=col,
                     row=row,
-                    entity_id=entity_id,
-                    value=value,
+                    cache_value=cache_value,
+                    overlay_value=overlay_value,
                     terrain_type=terrain_type,
                 )
             )
@@ -218,14 +310,16 @@ def supervisor_has_promo_kill(supervisor: SupervisorDict) -> bool:
 
 
 __all__ = [
-    "decode_container",
+    "decode_cache_update",
+    "decode_combined_tile_update",
+    "decode_overlay_update",
     "decode_supervisor",
     "decode_sync",
     "decode_terrain_update",
     "decode_viewport_update",
     "supervisor_has_promo_kill",
     "supervisor_is_promo_eligible",
-    "viewport_entity_is_empty",
-    "viewport_entity_is_equipment",
-    "viewport_entity_is_fuel",
+    "viewport_entity_has_equipment_cache",
+    "viewport_entity_has_fuel_cache",
+    "viewport_entity_has_no_cache",
 ]
