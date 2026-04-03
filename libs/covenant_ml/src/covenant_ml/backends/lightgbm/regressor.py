@@ -18,6 +18,8 @@ from numpy.typing import NDArray
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_regression_metrics
+from ...optimizer.search_spaces import make_lightgbm_default_space, make_lightgbm_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import regression_split
 from ...types import (
     FeatureImportance,
@@ -146,10 +148,23 @@ class _LGBMRegressorPrepared:
     """Prepared LightGBM model for regression inference (loaded from Booster file).
 
     LightGBM Booster.predict returns raw predictions for regression models.
+    Exposes raw_model for SHAP TreeExplainer compatibility.
     """
 
     def __init__(self, booster: _BoosterProtocol) -> None:
         self._booster = booster
+
+    @property
+    def raw_model(self) -> _BoosterProtocol:
+        """Return the underlying LightGBM Booster.
+
+        Needed by SHAP TreeExplainer which requires raw tree models,
+        not wrapper objects.
+
+        Returns:
+            The raw LightGBM Booster.
+        """
+        return self._booster
 
     def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict continuous values.
@@ -467,6 +482,34 @@ class LightGBMRegressorBackend:
         """
         _ = model, feature_names
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default LightGBM search space for regression.
+
+        Returns:
+            LightGBMSearchSpace with sensible default ranges.
+        """
+        return make_lightgbm_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused LightGBM search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads num_leaves).
+            best_float_params: Best float params (reads learning_rate).
+
+        Returns:
+            LightGBMSearchSpace with narrowed ranges.
+        """
+        return make_lightgbm_focused_space(
+            best_num_leaves=best_int_params["num_leaves"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
 
 def create_lightgbm_regressor_backend() -> RegressorBackend:

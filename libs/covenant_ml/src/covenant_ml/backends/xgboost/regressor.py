@@ -14,6 +14,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ...metrics import compute_all_regression_metrics
+from ...optimizer.search_spaces import make_xgboost_default_space, make_xgboost_focused_space
+from ...optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from ...trainer import train_regression_model_with_validation
 from ...types import (
     FeatureImportance,
@@ -45,10 +47,23 @@ class _XGBRegressorPrepared:
     """Loaded XGBoost regressor model for inference.
 
     Wraps a real XGBRegressorModelProtocol loaded from file.
+    Exposes raw_model for SHAP TreeExplainer compatibility.
     """
 
     def __init__(self, model: XGBRegressorModelProtocol) -> None:
         self._model = model
+
+    @property
+    def raw_model(self) -> XGBRegressorModelProtocol:
+        """Return the underlying XGBRegressor model.
+
+        Needed by SHAP TreeExplainer which requires raw tree models,
+        not wrapper objects.
+
+        Returns:
+            The raw XGBRegressor model.
+        """
+        return self._model
 
     def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict continuous values.
@@ -237,6 +252,34 @@ class XGBoostRegressorBackend:
         """
         _ = model, feature_names
         return None
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return default XGBoost search space for regression.
+
+        Returns:
+            XGBoostSearchSpace with sensible default ranges.
+        """
+        return make_xgboost_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return focused XGBoost search space around prior best params.
+
+        Args:
+            best_int_params: Best integer params (reads max_depth).
+            best_float_params: Best float params (reads learning_rate).
+
+        Returns:
+            XGBoostSearchSpace with narrowed ranges.
+        """
+        return make_xgboost_focused_space(
+            best_max_depth=best_int_params["max_depth"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
 
 def create_xgboost_regressor_backend() -> RegressorBackend:
