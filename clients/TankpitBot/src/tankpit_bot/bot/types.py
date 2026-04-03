@@ -54,8 +54,8 @@ class RadarCommandDict(TypedDict):
     cmd_type: Literal["radar"]
 
 
-class PickupMoveCommandDict(TypedDict):
-    """Pickup move command parameters (move to container and pick it up).
+class PickupFuelCommandDict(TypedDict):
+    """Fuel pickup command parameters.
 
     Attributes:
         cmd_type: Command type identifier.
@@ -63,7 +63,21 @@ class PickupMoveCommandDict(TypedDict):
         target_y: Target Y coordinate (0-255).
     """
 
-    cmd_type: Literal["pickup_move"]
+    cmd_type: Literal["pickup_fuel"]
+    target_x: int
+    target_y: int
+
+
+class PickupEquipmentCommandDict(TypedDict):
+    """Equipment pickup command parameters.
+
+    Attributes:
+        cmd_type: Command type identifier.
+        target_x: Target X coordinate (0-255).
+        target_y: Target Y coordinate (0-255).
+    """
+
+    cmd_type: Literal["pickup_equipment"]
     target_x: int
     target_y: int
 
@@ -118,17 +132,37 @@ def make_radar_command() -> RadarCommandDict:
     return RadarCommandDict(cmd_type="radar")
 
 
-def make_pickup_move_command(target_x: int, target_y: int) -> PickupMoveCommandDict:
-    """Create a pickup move command.
+def make_pickup_fuel_command(target_x: int, target_y: int) -> PickupFuelCommandDict:
+    """Create a fuel pickup command.
 
     Args:
         target_x: Target X coordinate (0-255).
         target_y: Target Y coordinate (0-255).
 
     Returns:
-        PickupMoveCommandDict with the specified target.
+        PickupFuelCommandDict with the specified target.
     """
-    return PickupMoveCommandDict(cmd_type="pickup_move", target_x=target_x, target_y=target_y)
+    return PickupFuelCommandDict(cmd_type="pickup_fuel", target_x=target_x, target_y=target_y)
+
+
+def make_pickup_equipment_command(
+    target_x: int,
+    target_y: int,
+) -> PickupEquipmentCommandDict:
+    """Create an equipment pickup command.
+
+    Args:
+        target_x: Target X coordinate (0-255).
+        target_y: Target Y coordinate (0-255).
+
+    Returns:
+        PickupEquipmentCommandDict with the specified target.
+    """
+    return PickupEquipmentCommandDict(
+        cmd_type="pickup_equipment",
+        target_x=target_x,
+        target_y=target_y,
+    )
 
 
 class MapOpenCommandDict(TypedDict):
@@ -182,7 +216,8 @@ BotCommand = (
     MoveCommandDict
     | ShootCommandDict
     | RadarCommandDict
-    | PickupMoveCommandDict
+    | PickupFuelCommandDict
+    | PickupEquipmentCommandDict
     | MapOpenCommandDict
     | TeleportCommandDict
 )
@@ -192,13 +227,15 @@ __all__ = [
     "BotCommand",
     "MapOpenCommandDict",
     "MoveCommandDict",
-    "PickupMoveCommandDict",
+    "PickupEquipmentCommandDict",
+    "PickupFuelCommandDict",
     "RadarCommandDict",
     "ShootCommandDict",
     "TeleportCommandDict",
     "make_map_open_command",
     "make_move_command",
-    "make_pickup_move_command",
+    "make_pickup_equipment_command",
+    "make_pickup_fuel_command",
     "make_radar_command",
     "make_shoot_command",
     "make_teleport_command",
