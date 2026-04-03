@@ -21,6 +21,7 @@ from covenant_radar_api.worker._test_hooks import (
     logreg_loader,
     random_forest_loader,
 )
+from covenant_radar_api.worker.optimize_types import UnifiedOptimizeParseResult
 
 
 class TestLogRegLoaderHook:
@@ -139,6 +140,146 @@ class TestRandomForestLoaderHook:
 
         with pytest.raises(FileNotFoundError):
             _real_random_forest_loader(model_path)
+
+
+# =============================================================================
+# Tests for _real_timeseries_registry and _real_optimizer_registry
+# =============================================================================
+
+
+class TestRealTimeseriesRegistry:
+    """Tests for _real_timeseries_registry function."""
+
+    def test_returns_registry_with_kaggle_amex(self) -> None:
+        """_real_timeseries_registry returns registry containing kaggle_amex_default."""
+        from covenant_radar_api.worker._test_hooks import _real_timeseries_registry
+
+        registry = _real_timeseries_registry()
+        names = registry.list_names()
+        assert "kaggle_amex_default" in names
+
+
+class TestRealOptimizerRegistry:
+    """Tests for _real_optimizer_registry function."""
+
+    def test_returns_registry_with_optuna_tpe(self) -> None:
+        """_real_optimizer_registry returns registry containing optuna_tpe."""
+        from covenant_radar_api.worker._test_hooks import _real_optimizer_registry
+
+        registry = _real_optimizer_registry()
+        # Registry supports .get() — optuna_tpe should be registered
+        strategy = registry.get("optuna_tpe")
+        assert callable(strategy.optimize)
+
+
+# =============================================================================
+# Tests for _real_objective_factory
+# =============================================================================
+
+
+class TestRealObjectiveFactory:
+    """Tests for _real_objective_factory function with all 7 backends."""
+
+    def _make_config(self) -> UnifiedOptimizeParseResult:
+        """Create minimal config for objective factory tests.
+
+        Returns:
+            UnifiedOptimizeParseResult with default values.
+        """
+        return UnifiedOptimizeParseResult(
+            backend="xgboost",
+            dataset="taiwan",
+            n_trials=1,
+            timeout_seconds=None,
+            device="cpu",
+            feature_preset="none",
+            random_state=42,
+            early_stopping_rounds=2,
+            n_jobs=1,
+            precision="fp32",
+            nn_optimizer="adamw",
+            n_epochs=2,
+            early_stopping_patience=2,
+            sequence_length=3,
+            bidirectional=False,
+        )
+
+    def _make_data(
+        self,
+    ) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
+        """Create small test data for objective factory.
+
+        Returns:
+            Tuple of (features, labels, feature_names).
+        """
+        rng = np.random.RandomState(42)
+        x: NDArray[np.float64] = rng.randn(50, 5).astype(np.float64)
+        y: NDArray[np.int64] = rng.randint(0, 2, size=50).astype(np.int64)
+        names = [f"f{i}" for i in range(5)]
+        return x, y, names
+
+    def test_xgboost_objective(self) -> None:
+        """_real_objective_factory creates XGBoost objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("xgboost", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_lightgbm_objective(self) -> None:
+        """_real_objective_factory creates LightGBM objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("lightgbm", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_cleargbm_objective(self) -> None:
+        """_real_objective_factory creates ClearGBM objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("cleargbm", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_logreg_objective(self) -> None:
+        """_real_objective_factory creates LogReg objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("logreg", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_random_forest_objective(self) -> None:
+        """_real_objective_factory creates RandomForest objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("random_forest", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_mlp_objective(self) -> None:
+        """_real_objective_factory creates MLP objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("mlp", x, y, names, config)
+        assert obj.n_features == 5
+
+    def test_lstm_objective(self) -> None:
+        """_real_objective_factory creates LSTM objective with n_features."""
+        from covenant_radar_api.worker._test_hooks import _real_objective_factory
+
+        x, y, names = self._make_data()
+        config = self._make_config()
+        obj = _real_objective_factory("lstm", x, y, names, config)
+        assert obj.n_features == 5
 
 
 # =============================================================================
