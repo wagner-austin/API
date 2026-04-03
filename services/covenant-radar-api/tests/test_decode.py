@@ -13,10 +13,14 @@ from covenant_radar_api.api.decode import (
     parse_deal_request,
     parse_evaluate_request,
     parse_explain_request,
+    parse_external_regression_train_request,
     parse_external_train_request,
     parse_measurements_request,
     parse_optimize_request,
     parse_predict_request,
+    parse_regression_explain_request,
+    parse_regression_optimize_request,
+    parse_regression_predict_request,
     parse_train_request,
     parse_update_deal_request,
 )
@@ -904,6 +908,217 @@ class TestParseExternalTrainRequest:
         assert result["config"]["reg_alpha"] == 1.0
         assert result["config"]["reg_lambda"] == 5.0
 
+    def test_valid_cleargbm_request(self) -> None:
+        """Test parsing valid ClearGBM request."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "cleargbm",
+            "n_estimators": 100,
+            "max_depth": 6,
+            "learning_rate": 0.1,
+            "min_samples_split": 10,
+            "min_samples_leaf": 5,
+            "max_features": 0.8,
+            "subsample": 0.8,
+            "random_state": 42,
+            "track_contributions": true
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "cleargbm"
+        assert result["dataset"] == "taiwan"
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["n_estimators"] == 100
+        assert result["config"]["max_depth"] == 6
+        assert result["config"]["learning_rate"] == 0.1
+        assert result["config"]["min_samples_split"] == 10
+        assert result["config"]["min_samples_leaf"] == 5
+        assert result["config"]["max_features"] == 0.8
+        assert result["config"]["subsample"] == 0.8
+        assert result["config"]["track_contributions"] is True
+        assert result["config"]["max_bins"] == 64
+        assert result["config"]["reg_alpha"] == 0.0
+        assert result["config"]["reg_lambda"] == 1.0
+        assert result["config"]["n_jobs"] == -1
+        assert result["config"]["early_stopping_rounds"] == 10
+        assert result["config"]["train_ratio"] == 0.7
+
+    def test_cleargbm_with_monotonic_constraints(self) -> None:
+        """Test ClearGBM with monotonic constraints dict."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "cleargbm",
+            "n_estimators": 50,
+            "max_depth": 4,
+            "learning_rate": 0.05,
+            "min_samples_split": 5,
+            "min_samples_leaf": 3,
+            "max_features": null,
+            "subsample": 0.9,
+            "random_state": 7,
+            "track_contributions": false,
+            "monotonic_constraints": {"feature_a": 1, "feature_b": -1}
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "cleargbm":
+            raise AssertionError("Expected cleargbm backend")
+        assert result["config"]["max_features"] is None
+        assert result["config"]["monotonic_constraints"] == {
+            "feature_a": 1,
+            "feature_b": -1,
+        }
+        assert result["config"]["track_contributions"] is False
+
+    def test_valid_logreg_request(self) -> None:
+        """Test parsing valid LogReg request."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "logreg",
+            "solver": "saga",
+            "penalty": "elasticnet",
+            "C": 1.0,
+            "max_iter": 1000,
+            "tol": 0.0001,
+            "class_weight_balanced": true,
+            "random_state": 42,
+            "l1_ratio": 0.5
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "logreg"
+        assert result["dataset"] == "taiwan"
+        if result["backend"] != "logreg":
+            raise AssertionError("Expected logreg backend")
+        assert result["config"]["solver"] == "saga"
+        assert result["config"]["penalty"] == "elasticnet"
+        assert result["config"]["C"] == 1.0
+        assert result["config"]["max_iter"] == 1000
+        assert result["config"]["tol"] == 0.0001
+        assert result["config"]["class_weight_balanced"] is True
+        assert result["config"]["l1_ratio"] == 0.5
+        assert result["config"]["train_ratio"] == 0.7
+
+    def test_logreg_invalid_solver_raises(self) -> None:
+        """Test that invalid LogReg solver raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "logreg",
+            "solver": "invalid_solver",
+            "penalty": "l2",
+            "C": 1.0,
+            "max_iter": 100,
+            "tol": 0.001,
+            "class_weight_balanced": false,
+            "random_state": 42
+        }"""
+        with pytest.raises(JSONTypeError, match="solver must be one of"):
+            parse_external_train_request(body)
+
+    def test_logreg_invalid_penalty_raises(self) -> None:
+        """Test that invalid LogReg penalty raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "logreg",
+            "solver": "saga",
+            "penalty": "invalid_penalty",
+            "C": 1.0,
+            "max_iter": 100,
+            "tol": 0.001,
+            "class_weight_balanced": false,
+            "random_state": 42
+        }"""
+        with pytest.raises(JSONTypeError, match="penalty must be one of"):
+            parse_external_train_request(body)
+
+    def test_valid_random_forest_request(self) -> None:
+        """Test parsing valid RandomForest request."""
+        body = b"""{
+            "dataset": "polish",
+            "backend": "random_forest",
+            "n_estimators": 100,
+            "max_depth": 10,
+            "min_samples_split": 5,
+            "min_samples_leaf": 2,
+            "max_features": "sqrt",
+            "bootstrap": true,
+            "class_weight_balanced": true,
+            "random_state": 42
+        }"""
+        result = parse_external_train_request(body)
+
+        assert result["backend"] == "random_forest"
+        assert result["dataset"] == "polish"
+        if result["backend"] != "random_forest":
+            raise AssertionError("Expected random_forest backend")
+        assert result["config"]["n_estimators"] == 100
+        assert result["config"]["max_depth"] == 10
+        assert result["config"]["max_features"] == "sqrt"
+        assert result["config"]["bootstrap"] is True
+        assert result["config"]["class_weight_balanced"] is True
+        assert result["config"]["n_jobs"] == -1
+        assert result["config"]["oob_score"] is False
+        assert result["config"]["train_ratio"] == 0.7
+
+    def test_random_forest_with_null_max_depth(self) -> None:
+        """Test RF with null max_depth (unlimited)."""
+        body = b"""{
+            "dataset": "us",
+            "backend": "random_forest",
+            "n_estimators": 200,
+            "max_depth": null,
+            "min_samples_split": 10,
+            "min_samples_leaf": 5,
+            "max_features": "log2",
+            "bootstrap": true,
+            "class_weight_balanced": false,
+            "random_state": 7
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "random_forest":
+            raise AssertionError("Expected random_forest backend")
+        assert result["config"]["max_depth"] is None
+        assert result["config"]["max_features"] == "log2"
+
+    def test_random_forest_with_float_max_features(self) -> None:
+        """Test RF with float max_features."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "random_forest",
+            "n_estimators": 50,
+            "max_depth": 5,
+            "min_samples_split": 3,
+            "min_samples_leaf": 1,
+            "max_features": 0.7,
+            "bootstrap": false,
+            "class_weight_balanced": false,
+            "random_state": 99
+        }"""
+        result = parse_external_train_request(body)
+
+        if result["backend"] != "random_forest":
+            raise AssertionError("Expected random_forest backend")
+        assert result["config"]["max_features"] == 0.7
+
+    def test_random_forest_invalid_max_features_raises(self) -> None:
+        """Test that invalid RF max_features raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "random_forest",
+            "n_estimators": 50,
+            "max_depth": 5,
+            "min_samples_split": 3,
+            "min_samples_leaf": 1,
+            "max_features": "invalid",
+            "bootstrap": true,
+            "class_weight_balanced": true,
+            "random_state": 0
+        }"""
+        with pytest.raises(JSONTypeError, match="max_features must be"):
+            parse_external_train_request(body)
+
     def test_invalid_dataset_raises_value_error(self) -> None:
         """Test that invalid dataset raises ValueError."""
         body = b"""{
@@ -1036,8 +1251,102 @@ class TestParseExternalTrainRequest:
             parse_external_train_request(body)
 
 
+class TestParseExternalRegressionTrainRequest:
+    """Tests for parse_external_regression_train_request."""
+
+    def test_minimal_xgboost_reg_request(self) -> None:
+        """Minimal request defaults to xgboost_reg backend."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "learning_rate": 0.1,
+            "max_depth": 3,
+            "n_estimators": 10,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        result = parse_external_regression_train_request(body)
+
+        assert result["backend"] == "xgboost_reg"
+        assert result["dataset"] == "financial_distress"
+        assert result["config"]["learning_rate"] == 0.1
+        assert result["config"]["max_depth"] == 3
+        assert result["config"]["device"] == "auto"
+        assert result["config"]["train_ratio"] == 0.7
+
+    def test_explicit_lightgbm_reg_request(self) -> None:
+        """Explicit lightgbm_reg backend is parsed correctly."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "lightgbm_reg",
+            "device": "cpu",
+            "learning_rate": 0.05,
+            "max_depth": 5,
+            "n_estimators": 100,
+            "num_leaves": 31,
+            "min_child_samples": 20,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        result = parse_external_regression_train_request(body)
+
+        assert result["backend"] == "lightgbm_reg"
+        assert result["config"]["num_leaves"] == 31
+
+    def test_invalid_dataset_raises_value_error(self) -> None:
+        """Invalid regression dataset raises ValueError."""
+        body = b"""{
+            "dataset": "nonexistent",
+            "learning_rate": 0.1,
+            "max_depth": 3,
+            "n_estimators": 10,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        with pytest.raises(ValueError, match="dataset must be one of"):
+            parse_external_regression_train_request(body)
+
+    def test_classifier_backend_raises_value_error(self) -> None:
+        """Classifier backend name raises ValueError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost",
+            "learning_rate": 0.1,
+            "max_depth": 3,
+            "n_estimators": 10,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_external_regression_train_request(body)
+
+    def test_bad_split_ratios_raises_value_error(self) -> None:
+        """Split ratios not summing to 1.0 raises ValueError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "train_ratio": 0.5,
+            "val_ratio": 0.1,
+            "test_ratio": 0.1,
+            "learning_rate": 0.1,
+            "max_depth": 3,
+            "n_estimators": 10,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "random_state": 42
+        }"""
+        with pytest.raises(ValueError, match=r"Split ratios must sum to 1\.0"):
+            parse_external_regression_train_request(body)
+
+
 class TestParseOptimizeRequest:
-    """Tests for parse_optimize_request."""
+    """Tests for parse_optimize_request with unified API parsing.
+
+    The API edge only validates common fields. Backend-specific fields
+    (precision, optimizer, n_epochs, etc.) are parsed by the worker job.
+    """
 
     def test_valid_optimize_request_minimal(self) -> None:
         """Test parsing valid optimize request with minimal fields."""
@@ -1047,32 +1356,34 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
+        assert result["backend"] == "xgboost"
         assert result["dataset"] == "taiwan"
-        assert result["config"]["n_trials"] == 50
-        assert result["config"]["timeout_seconds"] is None
+        assert result["n_trials"] == 50
+        assert result["timeout_seconds"] is None
         assert result["device"] == "auto"
         assert result["feature_preset"] == "none"
-        assert result["config"]["random_state"] == 42
+        assert result["random_state"] == 42
 
     def test_valid_optimize_request_full(self) -> None:
-        """Test parsing valid optimize request with all fields."""
+        """Test parsing valid optimize request with all common fields."""
         body = b"""{
             "dataset": "us",
+            "backend": "xgboost",
             "n_trials": 100,
             "timeout_seconds": 3600,
             "device": "cuda",
-            "space_profile": "categorical",
             "feature_preset": "full",
             "random_state": 123
         }"""
         result = parse_optimize_request(body)
 
+        assert result["backend"] == "xgboost"
         assert result["dataset"] == "us"
-        assert result["config"]["n_trials"] == 100
-        assert result["config"]["timeout_seconds"] == 3600
+        assert result["n_trials"] == 100
+        assert result["timeout_seconds"] == 3600
         assert result["device"] == "cuda"
         assert result["feature_preset"] == "full"
-        assert result["config"]["random_state"] == 123
+        assert result["random_state"] == 123
 
     def test_valid_optimize_request_polish_dataset(self) -> None:
         """Test parsing optimize request for polish dataset."""
@@ -1083,34 +1394,7 @@ class TestParseOptimizeRequest:
         result = parse_optimize_request(body)
 
         assert result["dataset"] == "polish"
-        assert result["config"]["n_trials"] == 25
-
-    def test_valid_optimize_request_categorical_space(self) -> None:
-        """Test parsing optimize request with categorical space profile."""
-        body = b"""{
-            "dataset": "taiwan",
-            "n_trials": 50,
-            "space_profile": "categorical"
-        }"""
-        result = parse_optimize_request(body)
-
-        assert result["dataset"] == "taiwan"
-        # Verify categorical space has categorical param types
-        lr_spec = result["search_space"]["learning_rate"]
-        assert lr_spec["param_type"] == "categorical_float"
-
-    def test_valid_optimize_request_default_space(self) -> None:
-        """Test parsing optimize request with default space profile."""
-        body = b"""{
-            "dataset": "taiwan",
-            "n_trials": 50,
-            "space_profile": "default"
-        }"""
-        result = parse_optimize_request(body)
-
-        # Verify default space has float param types with log_scale
-        lr_spec = result["search_space"]["learning_rate"]
-        assert lr_spec["param_type"] == "float"
+        assert result["n_trials"] == 25
 
     def test_valid_optimize_request_cpu_device(self) -> None:
         """Test parsing optimize request with CPU device."""
@@ -1158,16 +1442,6 @@ class TestParseOptimizeRequest:
         with pytest.raises(JSONTypeError, match="device must be one of: cpu, cuda, auto"):
             parse_optimize_request(body)
 
-    def test_invalid_space_profile_raises_json_type_error(self) -> None:
-        """Test that invalid space_profile raises JSONTypeError."""
-        body = b"""{
-            "dataset": "taiwan",
-            "n_trials": 50,
-            "space_profile": "invalid"
-        }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be one of"):
-            parse_optimize_request(body)
-
     def test_invalid_timeout_type_raises_json_type_error(self) -> None:
         """Test that non-integer timeout raises JSONTypeError."""
         body = b"""{
@@ -1188,16 +1462,6 @@ class TestParseOptimizeRequest:
         with pytest.raises(JSONTypeError, match="device must be a string"):
             parse_optimize_request(body)
 
-    def test_non_string_space_profile_raises_json_type_error(self) -> None:
-        """Test that non-string space_profile raises JSONTypeError."""
-        body = b"""{
-            "dataset": "taiwan",
-            "n_trials": 50,
-            "space_profile": 123
-        }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
-            parse_optimize_request(body)
-
     def test_null_timeout_allowed(self) -> None:
         """Test that null timeout is allowed and results in None."""
         body = b"""{
@@ -1207,7 +1471,7 @@ class TestParseOptimizeRequest:
         }"""
         result = parse_optimize_request(body)
 
-        assert result["config"]["timeout_seconds"] is None
+        assert result["timeout_seconds"] is None
 
     def test_valid_feature_preset_log_only(self) -> None:
         """Test parsing optimize request with log_only feature preset."""
@@ -1273,362 +1537,287 @@ class TestParseOptimizeRequest:
 
         assert result["backend"] == "xgboost"
         assert result["dataset"] == "taiwan"
-        assert result["config"]["n_trials"] == 50
+        assert result["n_trials"] == 50
 
-    def test_mlp_backend(self) -> None:
-        """Test parsing optimize request for MLP backend."""
+    def test_all_seven_backends_accepted(self) -> None:
+        """Test all 7 backends are accepted by the API edge."""
+        backends = [
+            "xgboost",
+            "mlp",
+            "lstm",
+            "lightgbm",
+            "cleargbm",
+            "logreg",
+            "random_forest",
+        ]
+        for backend in backends:
+            body = f'{{"dataset": "taiwan", "backend": "{backend}", "n_trials": 10}}'.encode()
+            result = parse_optimize_request(body)
+            assert result["backend"] == backend
+
+    def test_invalid_backend_raises_value_error(self) -> None:
+        """Test that invalid backend raises ValueError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": "invalid_backend",
+            "n_trials": 50
+        }"""
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_optimize_request(body)
+
+    def test_non_string_backend_raises_json_type_error(self) -> None:
+        """Test that non-string backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "taiwan",
+            "backend": 123,
+            "n_trials": 50
+        }"""
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_optimize_request(body)
+
+    def test_mlp_backend_ignores_backend_specific_fields(self) -> None:
+        """Test MLP backend only returns common fields at API edge."""
         body = b"""{
             "dataset": "taiwan",
             "backend": "mlp",
             "n_trials": 50,
             "precision": "fp16",
-            "optimizer": "adam",
-            "n_epochs": 100,
-            "early_stopping_patience": 15
+            "optimizer": "adam"
         }"""
         result = parse_optimize_request(body)
 
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
+        assert result["backend"] == "mlp"
         assert result["dataset"] == "taiwan"
-        assert result["config"]["n_trials"] == 50
-        assert result["precision"] == "fp16"
-        assert result["optimizer"] == "adam"
-        assert result["n_epochs"] == 100
-        assert result["early_stopping_patience"] == 15
-        assert result["device"] == "auto"
+        assert result["n_trials"] == 50
+        # Backend-specific fields are NOT in the API parse result
+        assert "precision" not in result
+        assert "optimizer" not in result
 
-    def test_mlp_backend_defaults(self) -> None:
-        """Test MLP backend with default values."""
-        body = b"""{
-            "dataset": "us",
-            "backend": "mlp",
-            "n_trials": 25
-        }"""
-        result = parse_optimize_request(body)
-
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["precision"] == "fp32"
-        assert result["optimizer"] == "adamw"
-        assert result["n_epochs"] == 50
-        assert result["early_stopping_patience"] == 10
-
-    def test_lightgbm_backend(self) -> None:
-        """Test parsing optimize request for LightGBM backend."""
-        body = b"""{
-            "dataset": "polish",
-            "backend": "lightgbm",
-            "n_trials": 50,
-            "early_stopping_rounds": 20,
-            "device": "cuda"
-        }"""
-        result = parse_optimize_request(body)
-
-        if result["backend"] != "lightgbm":
-            raise AssertionError("Expected lightgbm backend")
-        assert result["dataset"] == "polish"
-        assert result["config"]["n_trials"] == 50
-        assert result["early_stopping_rounds"] == 20
-        assert result["device"] == "cuda"
-
-    def test_lightgbm_backend_defaults(self) -> None:
-        """Test LightGBM backend with default values."""
-        body = b"""{
-            "dataset": "taiwan",
-            "backend": "lightgbm",
-            "n_trials": 30
-        }"""
-        result = parse_optimize_request(body)
-
-        if result["backend"] != "lightgbm":
-            raise AssertionError("Expected lightgbm backend")
-        assert result["early_stopping_rounds"] == 10
-        assert result["device"] == "auto"
-
-    def test_lstm_backend(self) -> None:
-        """Test parsing optimize request for LSTM backend."""
+    def test_lstm_backend_common_fields_only(self) -> None:
+        """Test LSTM backend returns only common fields at API edge."""
         body = b"""{
             "dataset": "us",
             "backend": "lstm",
             "n_trials": 50,
-            "precision": "bf16",
-            "n_epochs": 75,
-            "early_stopping_patience": 8,
             "sequence_length": 10,
             "bidirectional": true
         }"""
         result = parse_optimize_request(body)
 
-        if result["backend"] != "lstm":
-            raise AssertionError("Expected lstm backend")
+        assert result["backend"] == "lstm"
         assert result["dataset"] == "us"
-        assert result["config"]["n_trials"] == 50
-        assert result["precision"] == "bf16"
-        assert result["n_epochs"] == 75
-        assert result["early_stopping_patience"] == 8
-        assert result["sequence_length"] == 10
-        assert result["bidirectional"] is True
+        assert result["n_trials"] == 50
+        assert "sequence_length" not in result
+        assert "bidirectional" not in result
 
-    def test_lstm_backend_defaults(self) -> None:
-        """Test LSTM backend with default values."""
+    def test_lightgbm_backend_common_fields_only(self) -> None:
+        """Test LightGBM backend returns only common fields at API edge."""
         body = b"""{
             "dataset": "polish",
-            "backend": "lstm",
-            "n_trials": 40
+            "backend": "lightgbm",
+            "n_trials": 50,
+            "early_stopping_rounds": 20
         }"""
         result = parse_optimize_request(body)
 
-        if result["backend"] != "lstm":
-            raise AssertionError("Expected lstm backend")
-        assert result["precision"] == "fp32"
-        assert result["n_epochs"] == 50
-        assert result["early_stopping_patience"] == 10
-        assert result["sequence_length"] == 5
-        assert result["bidirectional"] is False
+        assert result["backend"] == "lightgbm"
+        assert result["dataset"] == "polish"
+        assert "early_stopping_rounds" not in result
 
-    def test_invalid_backend_raises_json_type_error(self) -> None:
-        """Test that invalid backend raises JSONTypeError."""
+
+class TestParseRegressionOptimizeRequest:
+    """Tests for parse_regression_optimize_request.
+
+    The API edge validates common fields. Backend-specific fields
+    (early_stopping_rounds, n_jobs) are parsed by the worker job.
+    """
+
+    def test_valid_request_minimal(self) -> None:
+        """Test parsing valid regression optimize request with minimal fields."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "random_forest",
+            "dataset": "financial_distress",
             "n_trials": 50
         }"""
-        with pytest.raises(JSONTypeError, match="backend must be one of"):
-            parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
 
-    def test_mlp_invalid_space_profile_raises_json_type_error(self) -> None:
-        """Test that invalid space_profile for MLP raises JSONTypeError."""
+        assert result["backend"] == "xgboost_reg"
+        assert result["dataset"] == "financial_distress"
+        assert result["n_trials"] == 50
+        assert result["timeout_seconds"] is None
+        assert result["device"] == "auto"
+        assert result["feature_preset"] == "none"
+        assert result["random_state"] == 42
+
+    def test_valid_request_full(self) -> None:
+        """Test parsing valid regression optimize request with all common fields."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "space_profile": "categorical"
+            "dataset": "financial_distress",
+            "backend": "lightgbm_reg",
+            "n_trials": 100,
+            "timeout_seconds": 3600,
+            "device": "cuda",
+            "feature_preset": "full",
+            "random_state": 123
         }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
-            parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
 
-    def test_lightgbm_invalid_space_profile_raises_json_type_error(self) -> None:
-        """Test that invalid space_profile for LightGBM raises JSONTypeError."""
+        assert result["backend"] == "lightgbm_reg"
+        assert result["dataset"] == "financial_distress"
+        assert result["n_trials"] == 100
+        assert result["timeout_seconds"] == 3600
+        assert result["device"] == "cuda"
+        assert result["feature_preset"] == "full"
+        assert result["random_state"] == 123
+
+    def test_xgboost_reg_backend(self) -> None:
+        """Test parsing with explicit xgboost_reg backend."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lightgbm",
-            "n_trials": 50,
-            "space_profile": "categorical"
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "n_trials": 25
         }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
-            parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
 
-    def test_lstm_invalid_space_profile_raises_json_type_error(self) -> None:
-        """Test that invalid space_profile for LSTM raises JSONTypeError."""
+        assert result["backend"] == "xgboost_reg"
+
+    def test_all_four_regressor_backends(self) -> None:
+        """Test all 4 regressor backends are accepted."""
+        backends = ["xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg"]
+        for backend in backends:
+            body = (
+                f'{{"dataset": "financial_distress", "backend": "{backend}", "n_trials": 10}}'
+            ).encode()
+            result = parse_regression_optimize_request(body)
+            assert result["backend"] == backend
+
+    def test_invalid_dataset_raises_value_error(self) -> None:
+        """Test that invalid regression dataset raises ValueError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lstm",
-            "n_trials": 50,
-            "space_profile": "categorical"
+            "dataset": "invalid_dataset",
+            "n_trials": 50
         }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be: default"):
-            parse_optimize_request(body)
+        with pytest.raises(ValueError, match="dataset must be one of"):
+            parse_regression_optimize_request(body)
 
-    def test_mlp_invalid_precision_raises_json_type_error(self) -> None:
-        """Test that invalid precision for MLP raises JSONTypeError."""
+    def test_missing_dataset_raises_json_type_error(self) -> None:
+        """Test that missing dataset raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "precision": "fp8"
+            "n_trials": 50
         }"""
-        with pytest.raises(JSONTypeError, match="precision must be one of"):
-            parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="Missing required field 'dataset'"):
+            parse_regression_optimize_request(body)
 
-    def test_mlp_invalid_optimizer_raises_json_type_error(self) -> None:
-        """Test that invalid optimizer for MLP raises JSONTypeError."""
+    def test_missing_n_trials_raises_json_type_error(self) -> None:
+        """Test that missing n_trials raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "optimizer": "lbfgs"
+            "dataset": "financial_distress"
         }"""
-        with pytest.raises(JSONTypeError, match="optimizer must be one of"):
-            parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="Missing required field 'n_trials'"):
+            parse_regression_optimize_request(body)
 
-    def test_lstm_invalid_bidirectional_raises_json_type_error(self) -> None:
-        """Test that invalid bidirectional for LSTM raises JSONTypeError."""
+    def test_invalid_backend_raises_value_error(self) -> None:
+        """Test that invalid regressor backend raises ValueError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lstm",
-            "n_trials": 50,
-            "bidirectional": "yes"
+            "dataset": "financial_distress",
+            "backend": "xgboost",
+            "n_trials": 50
         }"""
-        with pytest.raises(JSONTypeError, match="bidirectional must be a boolean"):
-            parse_optimize_request(body)
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_regression_optimize_request(body)
 
-    def test_mlp_precision_auto(self) -> None:
-        """Test MLP with auto precision."""
+    def test_non_string_backend_raises_json_type_error(self) -> None:
+        """Test that non-string backend raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "precision": "auto"
+            "dataset": "financial_distress",
+            "backend": 123,
+            "n_trials": 50
         }"""
-        result = parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_regression_optimize_request(body)
 
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["precision"] == "auto"
-
-    def test_mlp_optimizer_sgd(self) -> None:
-        """Test MLP with SGD optimizer."""
+    def test_invalid_device_raises_json_type_error(self) -> None:
+        """Test that invalid device raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "optimizer": "sgd"
+            "device": "tpu"
         }"""
-        result = parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="device must be one of: cpu, cuda, auto"):
+            parse_regression_optimize_request(body)
 
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["optimizer"] == "sgd"
-
-    def test_lstm_precision_auto(self) -> None:
-        """Test LSTM with auto precision."""
+    def test_invalid_timeout_type_raises_json_type_error(self) -> None:
+        """Test that non-integer timeout raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lstm",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "precision": "auto"
+            "timeout_seconds": "fast"
         }"""
-        result = parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="timeout_seconds must be an integer"):
+            parse_regression_optimize_request(body)
 
-        if result["backend"] != "lstm":
-            raise AssertionError("Expected lstm backend")
-        assert result["precision"] == "auto"
-
-    def test_mlp_non_string_precision_raises_json_type_error(self) -> None:
-        """Test that non-string precision raises JSONTypeError."""
+    def test_null_timeout_allowed(self) -> None:
+        """Test that null timeout results in None."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "precision": 16
+            "timeout_seconds": null
         }"""
-        with pytest.raises(JSONTypeError, match="precision must be a string"):
-            parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
+        assert result["timeout_seconds"] is None
 
-    def test_mlp_non_string_optimizer_raises_json_type_error(self) -> None:
-        """Test that non-string optimizer raises JSONTypeError."""
+    def test_cpu_device(self) -> None:
+        """Test parsing with CPU device."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "optimizer": 123
+            "device": "cpu"
         }"""
-        with pytest.raises(JSONTypeError, match="optimizer must be a string"):
-            parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
+        assert result["device"] == "cpu"
 
-    def test_mlp_explicit_default_space_profile(self) -> None:
-        """Test MLP with explicit default space_profile."""
+    def test_feature_preset_log_only(self) -> None:
+        """Test parsing with log_only feature preset."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "space_profile": "default"
+            "feature_preset": "log_only"
         }"""
-        result = parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
+        assert result["feature_preset"] == "log_only"
 
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["space_profile"] == "default"
-
-    def test_lightgbm_explicit_default_space_profile(self) -> None:
-        """Test LightGBM with explicit default space_profile."""
+    def test_feature_preset_ratios_only(self) -> None:
+        """Test parsing with ratios_only feature preset."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lightgbm",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "space_profile": "default"
+            "feature_preset": "ratios_only"
         }"""
-        result = parse_optimize_request(body)
+        result = parse_regression_optimize_request(body)
+        assert result["feature_preset"] == "ratios_only"
 
-        if result["backend"] != "lightgbm":
-            raise AssertionError("Expected lightgbm backend")
-        assert result["space_profile"] == "default"
-
-    def test_lstm_explicit_default_space_profile(self) -> None:
-        """Test LSTM with explicit default space_profile."""
+    def test_invalid_feature_preset_raises(self) -> None:
+        """Test that invalid feature_preset raises JSONTypeError."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "lstm",
+            "dataset": "financial_distress",
             "n_trials": 50,
-            "space_profile": "default"
+            "feature_preset": "invalid"
         }"""
-        result = parse_optimize_request(body)
+        with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
+            parse_regression_optimize_request(body)
 
-        if result["backend"] != "lstm":
-            raise AssertionError("Expected lstm backend")
-        assert result["space_profile"] == "default"
-
-    def test_mlp_non_string_space_profile_raises_json_type_error(self) -> None:
-        """Test that non-string space_profile for MLP raises JSONTypeError."""
+    def test_backend_specific_fields_not_in_result(self) -> None:
+        """Backend-specific fields are NOT in the API parse result."""
         body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
+            "dataset": "financial_distress",
+            "backend": "lightgbm_reg",
             "n_trials": 50,
-            "space_profile": 123
+            "early_stopping_rounds": 20,
+            "n_jobs": 4
         }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
-            parse_optimize_request(body)
-
-    def test_lightgbm_non_string_space_profile_raises_json_type_error(self) -> None:
-        """Test that non-string space_profile for LightGBM raises JSONTypeError."""
-        body = b"""{
-            "dataset": "taiwan",
-            "backend": "lightgbm",
-            "n_trials": 50,
-            "space_profile": 456
-        }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
-            parse_optimize_request(body)
-
-    def test_lstm_non_string_space_profile_raises_json_type_error(self) -> None:
-        """Test that non-string space_profile for LSTM raises JSONTypeError."""
-        body = b"""{
-            "dataset": "taiwan",
-            "backend": "lstm",
-            "n_trials": 50,
-            "space_profile": 789
-        }"""
-        with pytest.raises(JSONTypeError, match="space_profile must be a string"):
-            parse_optimize_request(body)
-
-    def test_mlp_explicit_fp32_precision(self) -> None:
-        """Test MLP with explicit fp32 precision."""
-        body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "precision": "fp32"
-        }"""
-        result = parse_optimize_request(body)
-
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["precision"] == "fp32"
-
-    def test_mlp_explicit_adamw_optimizer(self) -> None:
-        """Test MLP with explicit adamw optimizer."""
-        body = b"""{
-            "dataset": "taiwan",
-            "backend": "mlp",
-            "n_trials": 50,
-            "optimizer": "adamw"
-        }"""
-        result = parse_optimize_request(body)
-
-        if result["backend"] != "mlp":
-            raise AssertionError("Expected mlp backend")
-        assert result["optimizer"] == "adamw"
+        result = parse_regression_optimize_request(body)
+        assert result["backend"] == "lightgbm_reg"
+        assert "early_stopping_rounds" not in result
+        assert "n_jobs" not in result
 
 
 class TestParseExplainRequest:
@@ -1701,7 +1890,15 @@ class TestParseExplainRequest:
 
     def test_all_valid_backends(self) -> None:
         """Test parsing with all valid backend types."""
-        backends = ["xgboost", "mlp", "lstm", "lightgbm"]
+        backends = [
+            "xgboost",
+            "mlp",
+            "lstm",
+            "lightgbm",
+            "cleargbm",
+            "logreg",
+            "random_forest",
+        ]
         for backend in backends:
             body = f'''{{
                 "dataset": "taiwan",
@@ -1871,3 +2068,286 @@ class TestParseExplainRequest:
 
         assert result["n_samples"] == 2000
         assert result["random_state"] == 123
+
+
+# =============================================================================
+# Regression Predict
+# =============================================================================
+
+
+class TestParseRegressionPredictRequest:
+    """Tests for parse_regression_predict_request."""
+
+    def test_valid_request(self) -> None:
+        """Test parsing valid regression predict request."""
+        body = b"""{
+            "backend": "xgboost_reg",
+            "model_path": "/models/regressor.ubj",
+            "features": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        }"""
+        result = parse_regression_predict_request(body)
+
+        assert result["backend"] == "xgboost_reg"
+        assert result["model_path"] == "/models/regressor.ubj"
+        assert result["features"] == [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+
+    def test_all_backends_accepted(self) -> None:
+        """All 4 regressor backends are accepted."""
+        for backend in ("xgboost_reg", "lightgbm_reg", "mlp_reg", "lstm_reg"):
+            body = f'{{"backend": "{backend}", "model_path": "/m", "features": [[1.0]]}}'.encode()
+            result = parse_regression_predict_request(body)
+            assert result["backend"] == backend
+
+    def test_default_backend_is_xgboost_reg(self) -> None:
+        """Missing backend defaults to xgboost_reg."""
+        body = b'{"model_path": "/m", "features": [[1.0]]}'
+        result = parse_regression_predict_request(body)
+        assert result["backend"] == "xgboost_reg"
+
+    def test_invalid_backend_raises(self) -> None:
+        """Invalid backend raises ValueError."""
+        body = b'{"backend": "invalid", "model_path": "/m", "features": [[1.0]]}'
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_regression_predict_request(body)
+
+    def test_missing_model_path_raises(self) -> None:
+        """Missing model_path raises JSONTypeError."""
+        body = b'{"backend": "xgboost_reg", "features": [[1.0]]}'
+        with pytest.raises(JSONTypeError, match="model_path"):
+            parse_regression_predict_request(body)
+
+    def test_missing_features_raises(self) -> None:
+        """Missing features raises JSONTypeError."""
+        body = b'{"backend": "xgboost_reg", "model_path": "/m"}'
+        with pytest.raises(JSONTypeError, match="features"):
+            parse_regression_predict_request(body)
+
+    def test_empty_features_raises(self) -> None:
+        """Empty features list raises JSONTypeError."""
+        body = b'{"backend": "xgboost_reg", "model_path": "/m", "features": []}'
+        with pytest.raises(JSONTypeError, match="non-empty"):
+            parse_regression_predict_request(body)
+
+    def test_non_list_feature_row_raises(self) -> None:
+        """Non-list feature row raises JSONTypeError."""
+        body = b'{"backend": "xgboost_reg", "model_path": "/m", "features": ["bad"]}'
+        with pytest.raises(JSONTypeError, match=r"features\[0\] must be a list"):
+            parse_regression_predict_request(body)
+
+    def test_non_number_feature_value_raises(self) -> None:
+        """Non-number feature value raises JSONTypeError."""
+        body = b'{"backend": "xgboost_reg", "model_path": "/m", "features": [["bad"]]}'
+        with pytest.raises(JSONTypeError, match=r"features\[0\]\[0\] must be a number"):
+            parse_regression_predict_request(body)
+
+    def test_integer_features_converted_to_float(self) -> None:
+        """Integer feature values are converted to float."""
+        body = b'{"backend": "xgboost_reg", "model_path": "/m", "features": [[1, 2, 3]]}'
+        result = parse_regression_predict_request(body)
+        assert result["features"] == [[1.0, 2.0, 3.0]]
+
+    def test_non_object_body_raises(self) -> None:
+        """Non-object JSON body raises JSONTypeError."""
+        body = b'"just a string"'
+        with pytest.raises(JSONTypeError, match="must be a JSON object"):
+            parse_regression_predict_request(body)
+
+    def test_multiple_samples(self) -> None:
+        """Multiple samples are parsed correctly."""
+        body = b"""{
+            "backend": "lightgbm_reg",
+            "model_path": "/m.txt",
+            "features": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+        }"""
+        result = parse_regression_predict_request(body)
+        assert len(result["features"]) == 3
+        assert result["features"][2] == [5.0, 6.0]
+
+
+# =============================================================================
+# Regression Explain
+# =============================================================================
+
+
+class TestParseRegressionExplainRequest:
+    """Tests for parse_regression_explain_request."""
+
+    def test_valid_request_full(self) -> None:
+        """Parse valid regression explain request with all fields."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "model_path": "/models/xgb_reg.ubj",
+            "explainer": "permutation",
+            "n_samples": 500,
+            "random_state": 99
+        }"""
+        result = parse_regression_explain_request(body)
+
+        assert result["dataset"] == "financial_distress"
+        assert result["backend"] == "xgboost_reg"
+        assert result["model_path"] == "/models/xgb_reg.ubj"
+        assert result["explainer"] == "permutation"
+        assert result["n_samples"] == 500
+        assert result["random_state"] == 99
+
+    def test_valid_request_minimal(self) -> None:
+        """Parse regression explain request with defaults."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "lightgbm_reg",
+            "model_path": "/models/lgbm_reg.txt",
+            "explainer": "shap_tree"
+        }"""
+        result = parse_regression_explain_request(body)
+
+        assert result["dataset"] == "financial_distress"
+        assert result["backend"] == "lightgbm_reg"
+        assert result["explainer"] == "shap_tree"
+        assert result["n_samples"] == 1000
+        assert result["random_state"] == 42
+
+    def test_all_backends_accepted(self) -> None:
+        """All 4 regressor backends are accepted."""
+        for backend in (
+            "xgboost_reg",
+            "lightgbm_reg",
+            "mlp_reg",
+            "lstm_reg",
+        ):
+            body = (
+                f'{{"dataset": "financial_distress", '
+                f'"backend": "{backend}", '
+                f'"model_path": "/m", '
+                f'"explainer": "permutation"}}'
+            ).encode()
+            result = parse_regression_explain_request(body)
+            assert result["backend"] == backend
+
+    def test_all_explainers_accepted(self) -> None:
+        """All 4 explainer types are accepted."""
+        for explainer in (
+            "permutation",
+            "gradient",
+            "integrated_gradients",
+            "shap_tree",
+        ):
+            body = (
+                f'{{"dataset": "financial_distress", '
+                f'"backend": "xgboost_reg", '
+                f'"model_path": "/m", '
+                f'"explainer": "{explainer}"}}'
+            ).encode()
+            result = parse_regression_explain_request(body)
+            assert result["explainer"] == explainer
+
+    def test_missing_dataset_raises(self) -> None:
+        """Missing dataset raises JSONTypeError."""
+        body = b"""{
+            "backend": "xgboost_reg",
+            "model_path": "/m",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="dataset"):
+            parse_regression_explain_request(body)
+
+    def test_missing_backend_raises(self) -> None:
+        """Missing backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "model_path": "/m",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(
+            JSONTypeError,
+            match="Missing required field 'backend'",
+        ):
+            parse_regression_explain_request(body)
+
+    def test_missing_model_path_raises(self) -> None:
+        """Missing model_path raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="model_path"):
+            parse_regression_explain_request(body)
+
+    def test_missing_explainer_raises(self) -> None:
+        """Missing explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "model_path": "/m"
+        }"""
+        with pytest.raises(
+            JSONTypeError,
+            match="Missing required field 'explainer'",
+        ):
+            parse_regression_explain_request(body)
+
+    def test_invalid_backend_raises(self) -> None:
+        """Invalid backend raises ValueError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "invalid",
+            "model_path": "/m",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_regression_explain_request(body)
+
+    def test_invalid_explainer_raises(self) -> None:
+        """Invalid explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "model_path": "/m",
+            "explainer": "invalid"
+        }"""
+        with pytest.raises(JSONTypeError, match="explainer must be one of"):
+            parse_regression_explain_request(body)
+
+    def test_non_string_backend_raises(self) -> None:
+        """Non-string backend raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": 123,
+            "model_path": "/m",
+            "explainer": "permutation"
+        }"""
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_regression_explain_request(body)
+
+    def test_non_string_explainer_raises(self) -> None:
+        """Non-string explainer raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "model_path": "/m",
+            "explainer": 123
+        }"""
+        with pytest.raises(JSONTypeError, match="explainer must be a string"):
+            parse_regression_explain_request(body)
+
+    def test_invalid_n_samples_type_raises(self) -> None:
+        """Non-numeric n_samples raises JSONTypeError."""
+        body = b"""{
+            "dataset": "financial_distress",
+            "backend": "xgboost_reg",
+            "model_path": "/m",
+            "explainer": "permutation",
+            "n_samples": "many"
+        }"""
+        with pytest.raises(
+            JSONTypeError,
+            match="Field 'n_samples' must be a number",
+        ):
+            parse_regression_explain_request(body)
+
+    def test_non_object_body_raises(self) -> None:
+        """Non-object JSON body raises JSONTypeError."""
+        body = b"[]"
+        with pytest.raises(JSONTypeError, match="must be a JSON object"):
+            parse_regression_explain_request(body)
