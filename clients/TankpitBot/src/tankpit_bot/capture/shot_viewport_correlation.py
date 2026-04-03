@@ -53,12 +53,12 @@ class ShotViewportCorrelationDict(TypedDict):
         viewport_timestamp_ms: Timestamp of the correlated viewport update.
         viewport_left: Absolute viewport left coordinate.
         viewport_top: Absolute viewport top coordinate.
-        positive_row_count: Number of positive-id rows in the viewport update.
-        anonymous_row_count: Number of ``entity_id == -1`` rows in the viewport update.
-        id_match_count: Number of positive rows matching ``target_id``.
+        positive_row_count: Number of positive-cache rows in the viewport update.
+        equipment_row_count: Number of ``cache_value == -1`` rows in the viewport update.
+        id_match_count: Number of positive-cache rows matching ``target_id``.
         coord_match_count: Number of rows matching ``target_x,target_y``.
-        positive_rows: All positive-id rows in the correlated viewport update.
-        anonymous_rows: All ``entity_id == -1`` rows in the correlated viewport update.
+        positive_rows: All positive-cache rows in the correlated viewport update.
+        equipment_rows: All ``cache_value == -1`` rows in the correlated viewport update.
         id_matches: Positive rows matching ``target_id``.
         coord_matches: Rows matching the shot coordinates.
     """
@@ -74,11 +74,11 @@ class ShotViewportCorrelationDict(TypedDict):
     viewport_left: int
     viewport_top: int
     positive_row_count: int
-    anonymous_row_count: int
+    equipment_row_count: int
     id_match_count: int
     coord_match_count: int
     positive_rows: list[ViewportEntityRowDict]
-    anonymous_rows: list[ViewportEntityRowDict]
+    equipment_rows: list[ViewportEntityRowDict]
     id_matches: list[ViewportEntityRowDict]
     coord_matches: list[ViewportEntityRowDict]
 
@@ -107,8 +107,8 @@ def encode_shot_viewport_correlation(row: ShotViewportCorrelationDict) -> JSONOb
     positive_rows_json: list[JSONValue] = [
         encode_viewport_entity_row(entry) for entry in row["positive_rows"]
     ]
-    anonymous_rows_json: list[JSONValue] = [
-        encode_viewport_entity_row(entry) for entry in row["anonymous_rows"]
+    equipment_rows_json: list[JSONValue] = [
+        encode_viewport_entity_row(entry) for entry in row["equipment_rows"]
     ]
     id_matches_json: list[JSONValue] = [
         encode_viewport_entity_row(entry) for entry in row["id_matches"]
@@ -128,11 +128,11 @@ def encode_shot_viewport_correlation(row: ShotViewportCorrelationDict) -> JSONOb
         "viewport_left": row["viewport_left"],
         "viewport_top": row["viewport_top"],
         "positive_row_count": row["positive_row_count"],
-        "anonymous_row_count": row["anonymous_row_count"],
+        "equipment_row_count": row["equipment_row_count"],
         "id_match_count": row["id_match_count"],
         "coord_match_count": row["coord_match_count"],
         "positive_rows": positive_rows_json,
-        "anonymous_rows": anonymous_rows_json,
+        "equipment_rows": equipment_rows_json,
         "id_matches": id_matches_json,
         "coord_matches": coord_matches_json,
     }
@@ -181,11 +181,11 @@ def decode_shot_viewport_correlation(data: JSONObject) -> ShotViewportCorrelatio
         viewport_left=require_int(data, "viewport_left"),
         viewport_top=require_int(data, "viewport_top"),
         positive_row_count=require_int(data, "positive_row_count"),
-        anonymous_row_count=require_int(data, "anonymous_row_count"),
+        equipment_row_count=require_int(data, "equipment_row_count"),
         id_match_count=require_int(data, "id_match_count"),
         coord_match_count=require_int(data, "coord_match_count"),
         positive_rows=_decode_entity_rows(data, "positive_rows"),
-        anonymous_rows=_decode_entity_rows(data, "anonymous_rows"),
+        equipment_rows=_decode_entity_rows(data, "equipment_rows"),
         id_matches=_decode_entity_rows(data, "id_matches"),
         coord_matches=_decode_entity_rows(data, "coord_matches"),
     )
@@ -314,18 +314,18 @@ def _build_correlation(
             viewport_left=-1,
             viewport_top=-1,
             positive_row_count=0,
-            anonymous_row_count=0,
+            equipment_row_count=0,
             id_match_count=0,
             coord_match_count=0,
             positive_rows=[],
-            anonymous_rows=[],
+            equipment_rows=[],
             id_matches=[],
             coord_matches=[],
         )
 
-    positive_rows = [row for row in last_viewport["entities"] if row["entity_id"] > 0]
-    anonymous_rows = [row for row in last_viewport["entities"] if row["entity_id"] == -1]
-    id_matches = [row for row in positive_rows if row["entity_id"] == target_id]
+    positive_rows = [row for row in last_viewport["entities"] if row["cache_value"] > 0]
+    equipment_rows = [row for row in last_viewport["entities"] if row["cache_value"] == -1]
+    id_matches = [row for row in positive_rows if row["cache_value"] == target_id]
     coord_matches = [
         row
         for row in last_viewport["entities"]
@@ -343,11 +343,11 @@ def _build_correlation(
         viewport_left=last_viewport["viewport_left"],
         viewport_top=last_viewport["viewport_top"],
         positive_row_count=len(positive_rows),
-        anonymous_row_count=len(anonymous_rows),
+        equipment_row_count=len(equipment_rows),
         id_match_count=len(id_matches),
         coord_match_count=len(coord_matches),
         positive_rows=positive_rows,
-        anonymous_rows=anonymous_rows,
+        equipment_rows=equipment_rows,
         id_matches=id_matches,
         coord_matches=coord_matches,
     )
@@ -422,17 +422,17 @@ def format_shot_viewport_correlation(result: ShotViewportCorrelationDumpDict) ->
             "target_id={target_id} viewport_found={viewport_found} "
             "viewport_idx={viewport_index} viewport=({viewport_left},{viewport_top}) "
             "id_matches={id_match_count} coord_matches={coord_match_count} "
-            "positive_rows={positive_row_count} anonymous_rows={anonymous_row_count}".format(**shot)
+            "positive_rows={positive_row_count} equipment_rows={equipment_row_count}".format(**shot)
         )
         for row in shot["id_matches"]:
             lines.append(
-                "  id_match abs=({abs_x},{abs_y}) cell=({col},{row}) entity_id={entity_id} "
-                "value={value} terrain={terrain_type}".format(**row)
+                "  id_match abs=({abs_x},{abs_y}) cell=({col},{row}) cache_value={cache_value} "
+                "overlay_value={overlay_value} terrain={terrain_type}".format(**row)
             )
         for row in shot["coord_matches"]:
             lines.append(
-                "  coord_match abs=({abs_x},{abs_y}) cell=({col},{row}) entity_id={entity_id} "
-                "value={value} terrain={terrain_type}".format(**row)
+                "  coord_match abs=({abs_x},{abs_y}) cell=({col},{row}) cache_value={cache_value} "
+                "overlay_value={overlay_value} terrain={terrain_type}".format(**row)
             )
     return "\n".join(lines)
 
