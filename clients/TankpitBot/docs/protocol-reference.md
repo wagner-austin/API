@@ -101,7 +101,7 @@ byte 3+: data (varies by command)
 | `g` | 0x67 | BINARY | `Wf` | Equipment gain (equipment flags) | ✅ VERIFIED |
 | `t` | 0x74 | BINARY | `Yf` | Equipment toggle (5 enabled flags) | ✅ VERIFIED |
 | `K` | 0x4B | BINARY / tunneled 0x2E | `Dg` | Mine placement (owner id, counted position list) | ✅ VERIFIED |
-| `E` | 0x45 | BINARY | `dh` | Mine detonation (positions array) | ✅ VERIFIED |
+| `E` | 0x45 | BINARY / tunneled 0x2E | `dh` | Mine detonation (repeated coordinate pairs) | ✅ VERIFIED |
 | `F` | 0x46 | BINARY | `Fg` | Radar acknowledgement | ✅ VERIFIED |
 | `M` | 0x4D | BINARY | `Qg` | Chat message (tank id, message type) | 🔍 TODO |
 | `X` | 0x58 | BINARY | `Ug` | Tank exit/disconnect (tank id) | ✅ VERIFIED |
@@ -145,7 +145,7 @@ See `container/` for full implementation.
 | 16-20 | any | TANK_REGISTRY | tank_id + info_bytes (name) | ✅ VERIFIED |
 | variable | 0x4F | RADAR_RESULT | Radar scan results (containers + revealed mines) | ✅ VERIFIED |
 | variable | 0x4B | MINE_PLACED | owner_id + counted position list | ✅ VERIFIED |
-| variable | 0x45 | MINE_EXPLODE | count + position array | ✅ VERIFIED |
+| variable | 0x45 | MINE_EXPLODE | repeated coordinate pairs (no count byte) | ✅ VERIFIED |
 
 #### Text Messages (pipe-delimited)
 | Char | Hex | Name | Format | Status |
@@ -483,15 +483,24 @@ Decoded (from byte 1):
 Raw: 0x2E [subtype] + data bytes
 Decoded (from byte 1):
   [0] 0x45 = 'E' (mine explosion marker)
-  [1] count = number of mines detonated
-  [2...] position pairs (2 bytes each: x, y)
+  [1...] repeated position pairs (2 bytes each: x, y)
 ```
 
-**Example:** Chain reaction of 3 mines:
+**Examples:**
 ```
-decoded: 4503 4e9f 4f9f 509f
-         E  3  (78,159) (79,159) (80,159)
+452c3b
 ```
+- solitary detonation at `(44,59)`
+
+```
+452634273526362535273627342536
+```
+- 7-tile chain reaction:
+  - `(38,52) (39,53) (38,54) (37,53) (39,54) (39,52) (37,54)`
+
+**Observed behavior:** one shot can emit multiple `0x45` packets. A full `3x3`
+wipe was captured as `count=1` for the directly hit mine plus `count=8` for the
+remaining neighboring mines, not as a single 9-mine packet.
 
 ---
 
