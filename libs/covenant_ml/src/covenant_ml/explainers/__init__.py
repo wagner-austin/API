@@ -37,6 +37,12 @@ from .registry import (
     ExplainerRegistry,
     default_explainer_registry,
 )
+from .regression_registry import (
+    RegressionExplainerFactory,
+    RegressionExplainerRegistration,
+    RegressionExplainerRegistry,
+    default_regression_explainer_registry,
+)
 from .types import (
     ComputationalCost,
     ExplainerCapabilities,
@@ -51,6 +57,7 @@ from .types import (
     IntegratedGradientsExplainConfig,
     PermutationConfig,
     PermutationExplainConfig,
+    RegressionExplainResult,
     ShapTreeExplainConfig,
     SupportedExplainer,
 )
@@ -72,7 +79,12 @@ __all__ = [
     "IntegratedGradientsExplainConfig",
     "PermutationConfig",
     "PermutationExplainConfig",
+    "RegressionExplainResult",
+    "RegressionExplainerFactory",
+    "RegressionExplainerRegistration",
+    "RegressionExplainerRegistry",
     "ShapTreeExplainConfig",
     "SupportedExplainer",
     "default_explainer_registry",
+    "default_regression_explainer_registry",
 ]
