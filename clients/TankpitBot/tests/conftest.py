@@ -86,6 +86,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_get_env = _test_hooks.get_env
     original_write_text = _test_hooks.write_text
     original_read_text = _test_hooks.read_text
+    original_append_text = _test_hooks.append_text
     original_path_exists = _test_hooks.path_exists
     original_sync_playwright = _test_hooks.sync_playwright
     original_get_sync_playwright = _test_hooks.get_sync_playwright
@@ -97,6 +98,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.get_env = original_get_env
     _test_hooks.write_text = original_write_text
     _test_hooks.read_text = original_read_text
+    _test_hooks.append_text = original_append_text
     _test_hooks.path_exists = original_path_exists
     _test_hooks.sync_playwright = original_sync_playwright
     _test_hooks.get_sync_playwright = original_get_sync_playwright
@@ -199,6 +201,17 @@ class FakeFileSystem:
             raise FileNotFoundError(f"File not found: {path}")
         return self._files[key]
 
+    def append_text(self, path: Path, content: str) -> None:
+        """Append text to a fake file.
+
+        Args:
+            path: File path.
+            content: Content to append.
+        """
+        key = str(path)
+        existing = self._files.get(key, "")
+        self._files[key] = existing + content
+
     def path_exists(self, path: Path) -> bool:
         """Check if path exists.
 
@@ -247,6 +260,7 @@ def fake_fs() -> FakeFileSystem:
     fs = FakeFileSystem()
     _test_hooks.write_text = fs.write_text
     _test_hooks.read_text = fs.read_text
+    _test_hooks.append_text = fs.append_text
     _test_hooks.path_exists = fs.path_exists
 
     # Pre-populate the static key file
