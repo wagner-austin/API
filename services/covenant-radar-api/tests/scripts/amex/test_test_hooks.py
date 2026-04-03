@@ -457,3 +457,27 @@ class TestFakeBackendFeatureImportances:
         if importances is None:
             pytest.fail("Expected non-None importances")
         assert len(importances) == 0
+
+
+class TestFakeBackendSearchSpaces:
+    """Tests for FakeBackend search space methods (not used in amex pipeline)."""
+
+    def test_get_default_search_space_raises(self, tmp_path: Path) -> None:
+        """get_default_search_space raises NotImplementedError."""
+        import pytest
+
+        backend = FakeBackend(tmp_path)
+        with pytest.raises(NotImplementedError):
+            backend.get_default_search_space()
+
+    def test_get_focused_search_space_raises(self, tmp_path: Path) -> None:
+        """get_focused_search_space raises NotImplementedError."""
+        import pytest
+        from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
+
+        backend = FakeBackend(tmp_path)
+        with pytest.raises(NotImplementedError):
+            backend.get_focused_search_space(
+                best_int_params=SampledIntParams(),
+                best_float_params=SampledFloatParams(),
+            )

@@ -12,6 +12,8 @@ from covenant_ml.backends.protocol import (
     PreparedClassifier,
     ProgressCallback,
 )
+from covenant_ml.optimizer import SearchSpace
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
@@ -243,6 +245,19 @@ class Fake2DBackend:
         """
         _ = model, feature_names
         return []
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Not used in pipeline tests."""
+        raise NotImplementedError
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Not used in pipeline tests."""
+        raise NotImplementedError
 
 
 class Fake2DRegistry:
