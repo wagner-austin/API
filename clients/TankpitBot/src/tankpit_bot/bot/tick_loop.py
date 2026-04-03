@@ -20,6 +20,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.states import InFlightActionDict, make_no_action, transition_to
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.runtime_logging import emit_ai, emit_sync
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -28,6 +29,7 @@ from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     increment_container_failed_pickups,
     mark_move_target_failed,
+    mark_scan_viewport_failed,
     peek_combat_hit,
     peek_our_shot_response,
 )
@@ -66,6 +68,14 @@ def _tick_once(bot: Bot) -> None:
     if not _is_ready_for_decision(bot):
         return
     if _has_in_flight_action(bot):
+        return
+
+    # Re-read state after sync/action resolution. In-flight handlers may
+    # mutate world state (for example marking failed pickups) before
+    # allowing replanning in the same tick.
+    world = bot.get_world_state()
+    self_state = world["self_state"]
+    if self_state is None:
         return
 
     # 4. Merge kills from protocol
@@ -147,11 +157,11 @@ def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
     if kind == "collect" and _clear_blocked_collection(bot, action):
         return False
     if kind == "move":
-        log.info("SYNC: waiting for movement to (%d,%d)", tx, ty)
+        emit_sync("waiting for movement to (%d,%d)", tx, ty)
     elif kind == "teleport":
-        log.info("SYNC: waiting for teleport to (%d,%d)", tx, ty)
+        emit_sync("waiting for teleport to (%d,%d)", tx, ty)
     else:
-        log.info("SYNC: waiting for collection at (%d,%d)", tx, ty)
+        emit_sync("waiting for collection at (%d,%d)", tx, ty)
     return True
 
 
@@ -159,7 +169,7 @@ def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
     """Return True while a radar scan is still pending."""
     if _clear_stalled_action(bot, action):
         return False
-    log.info("SYNC: waiting for radar results")
+    emit_sync("waiting for radar results")
     return True
 
 
@@ -169,7 +179,7 @@ def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
         return False
     if _clear_completed_map_open(bot, action):
         return False
-    log.info("SYNC: waiting for map open sync")
+    emit_sync("waiting for map open sync")
     return True
 
 
@@ -194,8 +204,8 @@ def _clear_stalled_action(
     if elapsed_ms < timeout_ms:
         return False
     tx, ty = action["target_x"], action["target_y"]
-    log.info(
-        "SYNC: %s to (%d,%d) stalled for %d ms, replanning",
+    emit_sync(
+        "%s to (%d,%d) stalled for %d ms, replanning",
         action["kind"],
         tx,
         ty,
@@ -203,13 +213,31 @@ def _clear_stalled_action(
     )
     if action["kind"] == "collect":
         increment_container_failed_pickups(tx, ty)
-        log.info("SYNC: marked container at (%d,%d) as failed pickup", tx, ty)
+        emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
+    if action["kind"] == "scan":
+        _mark_current_viewport_scan_failed(bot, get_current_time_ms())
     if action["kind"] in ("move", "teleport"):
         now = get_current_time_ms()
         mark_move_target_failed(tx, ty, now)
-        log.info("SYNC: marked (%d,%d) as failed %s target", tx, ty, action["kind"])
+        emit_sync("marked (%d,%d) as failed %s target", tx, ty, action["kind"])
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
+
+
+def _mark_current_viewport_scan_failed(bot: Bot, timestamp_ms: int) -> None:
+    """Record the current viewport as a failed radar target.
+
+    Args:
+        bot: Bot instance.
+        timestamp_ms: Failure timestamp in milliseconds.
+    """
+    viewport = bot.get_world_state()["viewport"]
+    mark_scan_viewport_failed(viewport["left"], viewport["top"], timestamp_ms)
+    emit_sync(
+        "marked viewport (%d,%d) as failed scan target",
+        viewport["left"],
+        viewport["top"],
+    )
 
 
 def _clear_completed_map_open(
@@ -253,14 +281,22 @@ def _clear_blocked_walk(
     Returns:
         True if the blocked walk was cleared and the tick should replan.
     """
-    self_state = bot.get_world_state()["self_state"]
+    world = bot.get_world_state()
+    self_state = world["self_state"]
     terrain = get_terrain_map()
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
-    if is_reachable(terrain, self_state["x"], self_state["y"], tx, ty):
+    if is_reachable(
+        terrain,
+        self_state["x"],
+        self_state["y"],
+        tx,
+        ty,
+        world["mines"],
+    ):
         return False
-    log.info("SYNC: movement to (%d,%d) is terrain-blocked, replanning", tx, ty)
+    emit_sync("movement to (%d,%d) is terrain-blocked, replanning", tx, ty)
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
 
@@ -290,13 +326,16 @@ def _clear_blocked_collection(
     tx, ty = action["target_x"], action["target_y"]
     if abs(self_state["x"] - tx) <= 1 and abs(self_state["y"] - ty) <= 1:
         return False
-    if is_reachable(terrain, self_state["x"], self_state["y"], tx, ty):
-        return False
-    log.info(
-        "SYNC: collection target (%d,%d) is terrain-blocked, replanning",
+    if is_reachable(
+        terrain,
+        self_state["x"],
+        self_state["y"],
         tx,
         ty,
-    )
+        world["mines"],
+    ):
+        return False
+    emit_sync("collection target (%d,%d) is terrain-blocked, replanning", tx, ty)
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
 
@@ -317,7 +356,7 @@ def _is_ready_for_decision(bot: Bot) -> bool:
     """
     state = bot.get_state()
     if state in ("INITIALIZING", "WAITING_FOR_POSITION", "DISCONNECTED"):
-        log.info("SYNC: deferring decisions while state=%s", state)
+        emit_sync("deferring decisions while state=%s", state)
         return False
     return True
 
@@ -338,8 +377,21 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
     merged = dict(ai_state["killed_tank_ids"])
     for tank_id in new_kills:
         merged[str(tank_id)] = now
-        log.info("AI: kill registered (tank_id=%d)", tank_id)
-    return AIStateDict(**{**ai_state, "killed_tank_ids": merged})
+        emit_ai("kill registered (tank_id=%d)", tank_id)
+    clear_shot_target = ai_state["last_shot_target_id"] in new_kills
+    clear_combat_target = ai_state["combat_target_id"] in new_kills
+    return AIStateDict(
+        **{
+            **ai_state,
+            "killed_tank_ids": merged,
+            "last_shot_target_id": -1 if clear_shot_target else ai_state["last_shot_target_id"],
+            "last_shot_target_name": "" if clear_shot_target else ai_state["last_shot_target_name"],
+            "combat_target_id": -1 if clear_combat_target else ai_state["combat_target_id"],
+            "combat_target_x": 0 if clear_combat_target else ai_state["combat_target_x"],
+            "combat_target_y": 0 if clear_combat_target else ai_state["combat_target_y"],
+            "combat_phase": "none" if clear_combat_target else ai_state["combat_phase"],
+        }
+    )
 
 
 def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
@@ -364,8 +416,8 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
     elapsed_ms = timestamp_ms - bot._ai_state["last_shoot_ms"]
     if elapsed_ms >= bot._ai_state["config"]["shot_feedback_timeout_ms"]:
         return False
-    log.info(
-        "SYNC: waiting for shot feedback for %s (id=%d)",
+    emit_sync(
+        "waiting for shot feedback for %s (id=%d)",
         bot._ai_state["last_shot_target_name"],
         target_id,
     )
