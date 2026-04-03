@@ -73,6 +73,7 @@ class TestUpdateSelfFromMovementResponse:
             mines=state["mines"],
             terrain=state["terrain"],
             viewport=state["viewport"],
+            scanned_viewports=state["scanned_viewports"],
             timestamp_ms=state["timestamp_ms"],
         )
 
@@ -424,22 +425,23 @@ class TestUpdateTerrainFromViewport:
         """Updates terrain from viewport entities."""
         state = make_empty_world_state()
         entities = [
-            (0, 0, TERRAIN_GROUND, 0),
-            (1, 0, TERRAIN_ROCK_A, 0),
-            (2, 0, TERRAIN_FERRY, 0),
+            (0, 0, TERRAIN_GROUND, 0, 255),
+            (1, 0, TERRAIN_ROCK_A, -1, 3),
+            (2, 0, TERRAIN_FERRY, 25, 255),
         ]
         updated = update_terrain_from_viewport(
             state, viewport_left=100, viewport_top=50, entities=entities, timestamp_ms=1000
         )
 
-        # Entities at viewport-relative coords are converted to world coords
-        assert "100,50" in updated["terrain"]
-        assert "101,50" in updated["terrain"]
-        assert "102,50" in updated["terrain"]
+        assert "99,49" in updated["terrain"]
+        assert "100,49" in updated["terrain"]
+        assert "101,49" in updated["terrain"]
 
-        assert updated["terrain"]["100,50"]["terrain_type"] == TERRAIN_GROUND
-        assert updated["terrain"]["101,50"]["terrain_type"] == TERRAIN_ROCK_A
-        assert updated["terrain"]["102,50"]["terrain_type"] == TERRAIN_FERRY
+        assert updated["terrain"]["99,49"]["terrain_type"] == TERRAIN_GROUND
+        assert updated["terrain"]["100,49"]["terrain_type"] == TERRAIN_ROCK_A
+        assert updated["terrain"]["101,49"]["terrain_type"] == TERRAIN_FERRY
+        assert updated["terrain"]["100,49"]["cache_value"] == -1
+        assert updated["terrain"]["100,49"]["overlay_value"] == 3
 
     def test_updates_viewport_position(self) -> None:
         """Updates viewport position."""
@@ -450,6 +452,16 @@ class TestUpdateTerrainFromViewport:
 
         assert updated["viewport"]["left"] == 100
         assert updated["viewport"]["top"] == 50
+
+    def test_marks_viewport_as_confirmed(self) -> None:
+        """Visible viewport updates confirm local resource coverage."""
+        state = make_empty_world_state()
+
+        updated = update_terrain_from_viewport(
+            state, viewport_left=100, viewport_top=50, entities=[], timestamp_ms=1000
+        )
+
+        assert updated["scanned_viewports"]["100,50"] == 1000
 
 
 class TestRemoveTank:
