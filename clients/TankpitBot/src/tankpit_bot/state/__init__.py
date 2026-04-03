@@ -13,6 +13,7 @@ Submodules:
 from tankpit_bot.state.mutations import (
     add_mine,
     add_mine_from_radar,
+    mark_viewport_scanned,
     pickup_container,
     remove_container,
     remove_mine,
@@ -85,6 +86,7 @@ from tankpit_bot.state.types import (
     make_tank_state,
     make_terrain_tile,
     parse_coord_key,
+    viewport_scan_key,
 )
 
 __all__ = [
@@ -143,6 +145,7 @@ __all__ = [
     "make_self_state",
     "make_tank_state",
     "make_terrain_tile",
+    "mark_viewport_scanned",
     "parse_coord_key",
     "pickup_container",
     "remove_container",
@@ -158,4 +161,5 @@ __all__ = [
     "update_tank_damage",
     "update_tank_from_registry",
     "update_terrain_from_viewport",
+    "viewport_scan_key",
 ]
