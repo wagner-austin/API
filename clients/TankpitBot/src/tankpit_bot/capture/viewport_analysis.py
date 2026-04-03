@@ -22,6 +22,7 @@ from platform_core.json_utils import (
 
 from tankpit_bot.capture.xor import decode_base64_safe, xor_decode_body
 from tankpit_bot.protocol import BinaryMessage, try_decode_binary_message
+from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_WIDTH
 from tankpit_bot.types.session import CaptureSession
 
 
@@ -438,7 +439,7 @@ def _is_absolute_position(x: int, y: int) -> bool:
         True when either coordinate lies outside the 18x18 viewport-relative
         range.
     """
-    return x >= 18 or y >= 18
+    return x >= VIEWPORT_PATCH_WIDTH or y >= VIEWPORT_PATCH_WIDTH
 
 
 def _decode_received_binary_records(
