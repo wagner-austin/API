@@ -15,7 +15,8 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.commands import (
     encode_move_command,
-    encode_pickup_move_command,
+    encode_pickup_equipment_command,
+    encode_pickup_fuel_command,
     encode_teleport_command,
 )
 from tankpit_bot.bot.states import (
@@ -30,7 +31,8 @@ from tankpit_bot.bot.states import (
 )
 from tankpit_bot.bot.types import (
     make_move_command,
-    make_pickup_move_command,
+    make_pickup_equipment_command,
+    make_pickup_fuel_command,
     make_teleport_command,
 )
 from tankpit_bot.bot.vision import (
@@ -53,6 +55,12 @@ from tankpit_bot.protocol.commands import (
     build_query_command,
     build_shoot_command,
     build_toggle_equipment_command,
+)
+from tankpit_bot.runtime_logging import (
+    configure_bot_runtime_logging,
+    emit_state,
+    emit_sync,
+    emit_wire,
 )
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.sniffer.world_state import (
@@ -179,7 +187,7 @@ class Bot(BrowserSession):
             new_state,
             in_flight_action=in_flight_action,
         )
-        log.info("State: %s -> %s", current_state, new_state)
+        emit_state("%s -> %s", current_state, new_state)
 
     # =========================================================================
     # Message Handling
@@ -208,7 +216,7 @@ class Bot(BrowserSession):
         super()._on_message_captured(message)
         if message["direction"] == "received":
             self._cdp_message_buffer.append(message["payload"])
-            log.info("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
+            log.debug("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
 
     def _maybe_transition_from_initializing(self, self_state: SelfStateDict | None) -> bool:
         """Advance startup states when required bootstrap data is available.
@@ -316,8 +324,8 @@ class Bot(BrowserSession):
             if self_state["x"] != tx or self_state["y"] != ty:
                 now = get_current_time_ms()
                 mark_move_target_failed(tx, ty, now)
-                log.info(
-                    "SYNC: teleport requested (%d,%d) but landed at (%d,%d); marked failed target",
+                emit_sync(
+                    "teleport requested (%d,%d) but landed at (%d,%d); marked failed target",
                     tx,
                     ty,
                     self_state["x"],
@@ -498,7 +506,7 @@ class Bot(BrowserSession):
             data = self._xor_encode_command(data)
 
         self._send_websocket_bytes(self._cdp, data)
-        log.info("Sent: %s", cmd_name)
+        emit_wire("%s", cmd_name)
         return True
 
     def enter_game(self) -> bool:
@@ -534,8 +542,8 @@ class Bot(BrowserSession):
         )
         return True
 
-    def pickup_move_to(self, x: int, y: int) -> bool:
-        """Send pickup move command and transition to COLLECTING state.
+    def pickup_fuel_to(self, x: int, y: int) -> bool:
+        """Send fuel pickup command and transition to COLLECTING state.
 
         Args:
             x: Target X coordinate (0-255).
@@ -544,8 +552,28 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        cmd = make_pickup_move_command(x, y)
-        if not self._send_bytes(encode_pickup_move_command(cmd), "pickup_move"):
+        cmd = make_pickup_fuel_command(x, y)
+        if not self._send_bytes(encode_pickup_fuel_command(cmd), "pickup_fuel"):
+            return False
+        now = get_current_time_ms()
+        self._transition(
+            "COLLECTING",
+            in_flight_action=make_in_flight_action("collect", x, y, now),
+        )
+        return True
+
+    def pickup_equipment_to(self, x: int, y: int) -> bool:
+        """Send equipment pickup command and transition to COLLECTING state.
+
+        Args:
+            x: Target X coordinate (0-255).
+            y: Target Y coordinate (0-255).
+
+        Returns:
+            True if command was sent.
+        """
+        cmd = make_pickup_equipment_command(x, y)
+        if not self._send_bytes(encode_pickup_equipment_command(cmd), "pickup_equipment"):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -853,7 +881,7 @@ class Bot(BrowserSession):
             self._init_game_log_scraper(cdp)
 
             log.info("Bot started, entering game loop")
-            log.info("State: %s", self.get_state())
+            emit_state("%s", self.get_state())
 
             # Game loop
             try:
@@ -875,10 +903,14 @@ class Bot(BrowserSession):
 def main() -> None:
     """Entry point for tankpit-bot command."""
     from dotenv import load_dotenv
-    from platform_core.logging import setup_rich_logging
+
+    from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
     load_dotenv()
-    setup_rich_logging(level="INFO")
+    artifacts = configure_bot_runtime_logging()
+    set_protocol_frame_logging(False)
+    log.info("Bot latest log: %s", artifacts["latest_log_path"])
+    log.info("Bot latest events: %s", artifacts["latest_events_path"])
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
