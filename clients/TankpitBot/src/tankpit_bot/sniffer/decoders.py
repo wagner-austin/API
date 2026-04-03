@@ -25,6 +25,28 @@ from tankpit_bot.sniffer.xor import xor_decode
 
 log = get_logger(__name__)
 
+_PROTOCOL_FRAME_LOGGING_ENABLED = True
+
+
+def set_protocol_frame_logging(enabled: bool) -> None:
+    """Enable or disable per-message protocol frame logging.
+
+    Args:
+        enabled: True to log decoded protocol messages, False to suppress them.
+    """
+    global _PROTOCOL_FRAME_LOGGING_ENABLED
+    _PROTOCOL_FRAME_LOGGING_ENABLED = enabled
+
+
+def _log_protocol_line(message: str) -> None:
+    """Log a decoded protocol line when protocol frame logging is enabled.
+
+    Args:
+        message: Formatted protocol log line.
+    """
+    if _PROTOCOL_FRAME_LOGGING_ENABLED:
+        log.info(message)
+
 
 def try_decode_received_text(payload: str) -> str | None:
     """Try to decode a received text message payload.
@@ -68,7 +90,7 @@ def decode_received_text_message(payload: str) -> None:
     """
     result = try_decode_received_text(payload)
     if result is not None:
-        log.info(result)
+        _log_protocol_line(result)
 
 
 def try_decode_received(payload: str) -> str | None:
@@ -143,7 +165,7 @@ def _process_single_message(body: bytes) -> None:
     if msg_type in TEXT_MESSAGE_TYPES:
         text = body.decode("utf-8", errors="replace")
         result = decode_text_message(text, len(body), "RECEIVED", body)
-        log.info(result)
+        _log_protocol_line(result)
         return
 
     # Binary messages — XOR decode, log, and dispatch
@@ -156,16 +178,11 @@ def _process_single_message(body: bytes) -> None:
     min_len = MSG_MIN_LENGTHS.get(msg_type)
     if min_len is not None and len(decoded_data) >= min_len:
         binary_decoded = protocol.decode_message(msg_type, decoded_data)
-        log.info("[RECEIVED] %s", format_decoded_message(msg_type, binary_decoded))
+        _log_protocol_line(f"[RECEIVED] {format_decoded_message(msg_type, binary_decoded)}")
         dispatch_world_state_update(binary_decoded)
         return
     msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
-    log.info(
-        "[RECEIVED] type=0x%02X '%s' len=%d",
-        msg_type,
-        msg_char,
-        len(body),
-    )
+    _log_protocol_line(f"[RECEIVED] type=0x{msg_type:02X} '{msg_char}' len={len(body)}")
 
 
 def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
@@ -216,7 +233,7 @@ def decode_and_log_binary(msg_type: int, data: bytes, _type_label: str, raw_body
         raw_body: Original raw body for length reporting.
     """
     result = try_decode_binary(msg_type, data, raw_body)
-    log.info("[RECEIVED] %s", result)
+    _log_protocol_line(f"[RECEIVED] {result}")
 
 
 def decode_8byte_state(body: bytes, tag: str) -> str:
