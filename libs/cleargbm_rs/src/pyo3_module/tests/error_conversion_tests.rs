@@ -142,6 +142,17 @@ fn test_deserialization_failed_maps_to_runtime_error() -> Result<(), ClearGbmErr
 }
 
 #[test]
+fn test_invalid_label_maps_to_value_error() -> Result<(), ClearGbmError> {
+    assert_pyerr_type(
+        ClearGbmError::InvalidLabel {
+            value: 5_u8,
+            index: 3_usize,
+        },
+        "ValueError",
+    )
+}
+
+#[test]
 fn test_pyerr_message_contains_original_error() -> Result<(), ClearGbmError> {
     pyo3::Python::initialize();
     pyo3::Python::attach(|py| {
