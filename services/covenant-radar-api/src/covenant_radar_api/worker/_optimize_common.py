@@ -24,6 +24,77 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 DatasetType = Literal["standard", "timeseries"]
 
 
+def parse_precision(raw: JSONValue | None) -> Literal["fp32", "fp16", "bf16", "auto"]:
+    """Parse precision setting, defaulting to 'fp32'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Precision literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid precision.
+    """
+    if raw is None:
+        return "fp32"
+    if not isinstance(raw, str):
+        raise JSONTypeError("precision must be a string")
+    if raw == "fp32":
+        return "fp32"
+    if raw == "fp16":
+        return "fp16"
+    if raw == "bf16":
+        return "bf16"
+    if raw == "auto":
+        return "auto"
+    raise JSONTypeError("precision must be one of: fp32, fp16, bf16, auto")
+
+
+def parse_nn_optimizer(raw: JSONValue | None) -> Literal["adamw", "adam", "sgd"]:
+    """Parse neural network optimizer, defaulting to 'adamw'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        NN optimizer literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid optimizer.
+    """
+    if raw is None:
+        return "adamw"
+    if not isinstance(raw, str):
+        raise JSONTypeError("optimizer must be a string")
+    if raw == "adamw":
+        return "adamw"
+    if raw == "adam":
+        return "adam"
+    if raw == "sgd":
+        return "sgd"
+    raise JSONTypeError("optimizer must be one of: adamw, adam, sgd")
+
+
+def parse_bidirectional(raw: JSONValue | None) -> bool:
+    """Parse bidirectional flag, defaulting to False.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        Boolean value.
+
+    Raises:
+        JSONTypeError: If value is not a boolean.
+    """
+    if raw is None:
+        return False
+    if not isinstance(raw, bool):
+        raise JSONTypeError("bidirectional must be a boolean")
+    return raw
+
+
 def optional_int(data: JSONObject, key: str, default: int) -> int:
     """Extract optional int from dict.
 
@@ -192,7 +263,13 @@ def parse_backend_name(raw: JSONValue | None) -> BackendName:
         return "lightgbm"
     if raw == "cleargbm":
         return "cleargbm"
-    raise ValueError("backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm")
+    if raw == "logreg":
+        return "logreg"
+    if raw == "random_forest":
+        return "random_forest"
+    raise ValueError(
+        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
+    )
 
 
 def load_dataset(
@@ -374,8 +451,11 @@ __all__ = [
     "load_timeseries_dataset",
     "optional_int",
     "parse_backend_name",
+    "parse_bidirectional",
     "parse_dataset_name",
     "parse_device",
     "parse_feature_preset",
+    "parse_nn_optimizer",
+    "parse_precision",
     "save_optimization_results",
 ]
