@@ -332,11 +332,14 @@ class RustManualSerializeRule:
 
 
 class RustCoverageRule:
-    """Rule enforcing 100% region coverage in Makefile.
+    """Rule enforcing 100% coverage in Makefile.
 
-    Verifies that the Makefile uses:
-    - --fail-under-lines 100
-    - --fail-under-regions 100
+    Verifies that the Makefile uses one of:
+    - Segment-based: check_segment_coverage.py --threshold 100 (preferred)
+    - Legacy: --fail-under-lines 100 AND --fail-under-regions 100
+
+    Segment-based coverage is preferred because it checks actual source line
+    coverage without false negatives from generic instantiations.
 
     Args:
         config: Guard configuration with project root.
@@ -373,23 +376,18 @@ class RustCoverageRule:
 
         content = _read_file(makefile)
 
-        if "--fail-under-lines 100" not in content:
-            violations.append(
-                Violation(
-                    file=makefile,
-                    line_no=1,
-                    kind="rust-coverage-lines",
-                    line="Makefile must include --fail-under-lines 100",
-                )
-            )
+        has_segment_coverage = "check_segment_coverage.py --threshold 100" in content
+        has_legacy_lines = "--fail-under-lines 100" in content
+        has_legacy_regions = "--fail-under-regions 100" in content
+        has_legacy_coverage = has_legacy_lines and has_legacy_regions
 
-        if "--fail-under-regions 100" not in content:
+        if not has_segment_coverage and not has_legacy_coverage:
             violations.append(
                 Violation(
                     file=makefile,
                     line_no=1,
-                    kind="rust-coverage-regions",
-                    line="Makefile must include --fail-under-regions 100",
+                    kind="rust-coverage-missing",
+                    line="Makefile must enforce 100% coverage via check_segment_coverage.py --threshold 100 or --fail-under-lines/regions 100",
                 )
             )
 

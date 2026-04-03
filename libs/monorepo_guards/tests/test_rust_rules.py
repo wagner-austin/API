@@ -443,32 +443,20 @@ class TestRustCoverageRule:
 
         assert violations == []
 
-    def test_flags_missing_coverage_lines(self, tmp_path: Path) -> None:
-        """Test that missing --fail-under-lines 100 is flagged."""
+    def test_flags_missing_coverage_enforcement(self, tmp_path: Path) -> None:
+        """Test that missing coverage enforcement is flagged."""
         _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
-        _write(tmp_path / "Makefile", "test:\n\tcargo test\n\t--fail-under-regions 100")
+        _write(tmp_path / "Makefile", "test:\n\tcargo test")
         config = _make_config(tmp_path)
         rule = RustCoverageRule(config)
 
         violations = rule.run([])
 
         kinds = {v.kind for v in violations}
-        assert "rust-coverage-lines" in kinds
+        assert "rust-coverage-missing" in kinds
 
-    def test_flags_missing_coverage_regions(self, tmp_path: Path) -> None:
-        """Test that missing --fail-under-regions 100 is flagged."""
-        _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
-        _write(tmp_path / "Makefile", "test:\n\tcargo test\n\t--fail-under-lines 100")
-        config = _make_config(tmp_path)
-        rule = RustCoverageRule(config)
-
-        violations = rule.run([])
-
-        kinds = {v.kind for v in violations}
-        assert "rust-coverage-regions" in kinds
-
-    def test_allows_proper_coverage_config(self, tmp_path: Path) -> None:
-        """Test that proper coverage configuration passes."""
+    def test_allows_legacy_coverage_config(self, tmp_path: Path) -> None:
+        """Test that legacy --fail-under-lines/regions configuration passes."""
         _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
         makefile = """
 test:
@@ -482,6 +470,35 @@ test:
         violations = rule.run([])
 
         assert violations == []
+
+    def test_allows_segment_coverage_config(self, tmp_path: Path) -> None:
+        """Test that segment-based coverage configuration passes."""
+        _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
+        makefile = """
+test:
+\tcargo test
+\tcargo llvm-cov --json --output-path coverage.json
+\tpython tools/check_segment_coverage.py --threshold 100
+"""
+        _write(tmp_path / "Makefile", makefile)
+        config = _make_config(tmp_path)
+        rule = RustCoverageRule(config)
+
+        violations = rule.run([])
+
+        assert violations == []
+
+    def test_flags_partial_legacy_config(self, tmp_path: Path) -> None:
+        """Test that partial legacy config (only lines or only regions) fails."""
+        _write(tmp_path / "Cargo.toml", '[package]\nname = "test"')
+        _write(tmp_path / "Makefile", "test:\n\tcargo llvm-cov --fail-under-lines 100")
+        config = _make_config(tmp_path)
+        rule = RustCoverageRule(config)
+
+        violations = rule.run([])
+
+        kinds = {v.kind for v in violations}
+        assert "rust-coverage-missing" in kinds
 
 
 class TestRustProptestRule:
