@@ -20,6 +20,8 @@ from tests.container.test_data import (
     CONTAINER_PICKUP_FUEL,
     DEACTIVATION_DEATH_7,
     DEACTIVATION_KILL_5,
+    MINE_DETONATION_3,
+    MINE_DETONATION_15,
     MINE_PLACEMENT_15,
     MOVEMENT_16_SSSS,
     MOVEMENT_18_ENNNW,
@@ -63,6 +65,11 @@ class TestIdentifyContainerType:
         """Correctly identifies captured tunneled mine placement."""
         assert identify_container_type(MINE_PLACEMENT_15) == ContainerMessageType.MINE_PLACEMENT
 
+    def test_identifies_mine_detonation(self) -> None:
+        """Correctly identifies captured tunneled mine detonation."""
+        assert identify_container_type(MINE_DETONATION_3) == ContainerMessageType.MINE_DETONATION
+        assert identify_container_type(MINE_DETONATION_15) == ContainerMessageType.MINE_DETONATION
+
     def test_identifies_tank_registry(self) -> None:
         """Correctly identifies tank registry structure."""
         assert identify_container_type(TANK_REGISTRY_16) == ContainerMessageType.TANK_REGISTRY
@@ -79,9 +86,9 @@ class TestIdentifyContainerType:
         """Correctly identifies position update structure."""
         assert identify_container_type(POSITION_UPDATE_13) == ContainerMessageType.POSITION_UPDATE
 
-    def test_rejects_false_positive_13_byte_packet(self) -> None:
-        """Does not classify an unrelated captured 13-byte packet as position."""
-        data = bytes.fromhex("45938292839182938191839181")
+    def test_rejects_false_positive_unknown_packet(self) -> None:
+        """Does not classify an unrelated packet as a known container subtype."""
+        data = bytes.fromhex("46938292839182938191839181")
         assert identify_container_type(data) == ContainerMessageType.UNKNOWN
 
     def test_identifies_tank_status_short(self) -> None:
@@ -199,6 +206,20 @@ class TestDecodeContainerMessage:
             (132, 125),
             (132, 126),
             (132, 127),
+        ]
+
+    def test_dispatches_mine_detonation(self) -> None:
+        """Dispatches to tunneled mine detonation decoder."""
+        result = decode_container_message(MINE_DETONATION_15)
+        assert result["msg_type"] == 0x45
+        assert result["positions"] == [
+            (38, 52),
+            (39, 53),
+            (38, 54),
+            (37, 53),
+            (39, 54),
+            (39, 52),
+            (37, 54),
         ]
 
     def test_dispatches_tank_registry(self) -> None:
