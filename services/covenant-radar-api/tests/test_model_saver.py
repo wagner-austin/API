@@ -20,7 +20,6 @@ import pytest
 import scripts._test_hooks as _hooks
 from covenant_ml.backends.protocol import (
     BackendCapabilities,
-    ClassifierBackend,
     PreparedClassifier,
     ProgressCallback,
 )
@@ -29,23 +28,40 @@ from covenant_ml.backends.registry import (
     ClassifierRegistry,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, DatasetRegistry, LoadedDataset
-from covenant_ml.testing import make_train_config
+from covenant_ml.optimizer.types import (
+    FloatRangeSpec,
+    IntRangeSpec,
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+    SearchSpace,
+    XGBoostSearchSpace,
+)
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
     EvalMetrics,
     FeatureImportance,
-    TrainConfig,
     TrainOutcome,
 )
 from numpy.typing import NDArray
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import setup_rich_logging
-from scripts._test_hooks import XGBoostOptimizationResult
+from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize.cli import DatasetName
 from scripts.optimize.model_saver import (
     MODEL_EXTENSIONS,
     SaveModelResult,
+    _build_cleargbm_config,
+    _build_lightgbm_config,
+    _build_logreg_config,
+    _build_lstm_config,
+    _build_mlp_config,
+    _build_random_forest_config,
+    _build_xgboost_config,
+    _narrow_logreg_penalty,
+    _narrow_logreg_solver,
+    build_train_config,
     load_existing_auc,
     save_best_model,
     should_save_model,
@@ -171,13 +187,11 @@ class FakeClassifierBackend:
         self._train_call_count += 1
         ext = MODEL_EXTENSIONS[self._backend_name]
 
-        # Use override filename if set, otherwise default pattern
         if self._output_filename_override is not None:
             model_path = output_dir / self._output_filename_override
         else:
             model_path = output_dir / f"model_{self._train_call_count}.{ext}"
 
-        # Write a fake model file
         model_path.write_bytes(b"fake model data")
 
         n_samples: int = int(x_features.shape[0])
@@ -195,11 +209,10 @@ class FakeClassifierBackend:
             "f1_score": 0.77,
         }
 
-        # Build feature importances
-        n_features: int = int(x_features.shape[1])
+        n_features_count: int = int(x_features.shape[1])
         fake_importances: list[FeatureImportance] = [
-            {"name": f"feature_{i}", "importance": 1.0 / n_features, "rank": i + 1}
-            for i in range(n_features)
+            {"name": f"feature_{i}", "importance": 1.0 / n_features_count, "rank": i + 1}
+            for i in range(n_features_count)
         ]
 
         train_outcome: TrainOutcome = {
@@ -292,6 +305,39 @@ class FakeClassifierBackend:
             for i, name in enumerate(feature_names)
         ]
 
+    def get_default_search_space(self) -> SearchSpace:
+        """Return fake default search space.
+
+        Returns:
+            XGBoostSearchSpace with minimal ranges.
+        """
+        return XGBoostSearchSpace(
+            max_depth=IntRangeSpec(param_type="int", low=3, high=10, log_scale=False),
+            n_estimators=IntRangeSpec(param_type="int", low=50, high=500, log_scale=False),
+            learning_rate=FloatRangeSpec(param_type="float", low=0.01, high=0.3, log_scale=True),
+            reg_alpha=FloatRangeSpec(param_type="float", low=1e-8, high=10.0, log_scale=True),
+            reg_lambda=FloatRangeSpec(param_type="float", low=1e-8, high=10.0, log_scale=True),
+            subsample=FloatRangeSpec(param_type="float", low=0.5, high=1.0, log_scale=False),
+            colsample_bytree=FloatRangeSpec(param_type="float", low=0.5, high=1.0, log_scale=False),
+        )
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return fake focused search space.
+
+        Args:
+            best_int_params: Best integer parameters from previous run.
+            best_float_params: Best float parameters from previous run.
+
+        Returns:
+            XGBoostSearchSpace with minimal ranges.
+        """
+        return self.get_default_search_space()
+
 
 def _make_fake_dataset_config(name: str = "taiwan") -> DatasetConfig:
     """Create a fake dataset config for testing.
@@ -355,55 +401,42 @@ def _make_fake_loaded_dataset(n_samples: int = 100, n_features: int = 10) -> Loa
     }
 
 
-def _make_fake_train_config() -> TrainConfig:
-    """Create a fake training configuration.
-
-    Returns:
-        TrainConfig with default values.
-    """
-    return make_train_config(
-        device="cpu",
-        learning_rate=0.1,
-        max_depth=3,
-        n_estimators=10,
-    )
-
-
 def _make_fake_optimization_result(
-    best_val_auc: float = 0.85,
+    best_value: float = 0.85,
     dataset: str = "taiwan",
-) -> XGBoostOptimizationResult:
-    """Create a fake XGBoost optimization result for testing.
+) -> UnifiedOptimizationResult:
+    """Create a fake unified optimization result for testing.
 
     Args:
-        best_val_auc: Best validation AUC.
+        best_value: Best validation AUC.
         dataset: Dataset name.
 
     Returns:
-        XGBoostOptimizationResult with specified values.
+        UnifiedOptimizationResult with specified values.
     """
-    return {
-        "backend": "xgboost",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": 100,
-        "feature_preset": "full",
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_max_depth": 6,
-        "best_n_estimators": 100,
-        "best_learning_rate": 0.1,
-        "best_reg_alpha": 0.01,
-        "best_reg_lambda": 0.01,
-        "best_subsample": 0.8,
-        "best_colsample_bytree": 0.8,
-        "duration_seconds": 10.0,
-        "recommended_config": _make_fake_train_config(),
-    }
+    return UnifiedOptimizationResult(
+        backend="xgboost",
+        status="complete",
+        dataset=dataset,
+        n_samples=1000,
+        n_features=100,
+        feature_preset="full",
+        n_trials_complete=10,
+        n_trials_pruned=2,
+        n_trials_failed=0,
+        best_trial_number=5,
+        best_value=best_value,
+        best_int_params=SampledIntParams(max_depth=6, n_estimators=100),
+        best_float_params=SampledFloatParams(
+            learning_rate=0.1,
+            reg_alpha=0.01,
+            reg_lambda=0.01,
+            subsample=0.8,
+            colsample_bytree=0.8,
+        ),
+        best_string_params=SampledStringParams(),
+        duration_seconds=10.0,
+    )
 
 
 # =============================================================================
@@ -433,7 +466,7 @@ def fake_backend_registry(fake_backend: FakeClassifierBackend) -> ClassifierRegi
     """
     registry = ClassifierRegistry()
 
-    def factory() -> ClassifierBackend:
+    def factory() -> FakeClassifierBackend:
         return fake_backend
 
     registry.register("xgboost", BackendRegistration(factory))
@@ -607,9 +640,29 @@ class TestModelExtensions:
         """Test LSTM uses .pt extension."""
         assert MODEL_EXTENSIONS["lstm"] == "pt"
 
+    def test_cleargbm_extension(self) -> None:
+        """Test ClearGBM uses .json extension."""
+        assert MODEL_EXTENSIONS["cleargbm"] == "json"
+
+    def test_logreg_extension(self) -> None:
+        """Test LogReg uses .joblib extension."""
+        assert MODEL_EXTENSIONS["logreg"] == "joblib"
+
+    def test_random_forest_extension(self) -> None:
+        """Test RandomForest uses .joblib extension."""
+        assert MODEL_EXTENSIONS["random_forest"] == "joblib"
+
     def test_all_backends_covered(self) -> None:
         """Test all backend names have extensions defined."""
-        backends: list[BackendName] = ["xgboost", "mlp", "lightgbm", "lstm"]
+        backends: list[BackendName] = [
+            "xgboost",
+            "mlp",
+            "lightgbm",
+            "lstm",
+            "cleargbm",
+            "logreg",
+            "random_forest",
+        ]
         for backend in backends:
             assert backend in MODEL_EXTENSIONS
 
@@ -628,7 +681,7 @@ class TestSaveBestModel:
         hooks_context: None,
     ) -> None:
         """Test saves model when no existing model exists."""
-        result = _make_fake_optimization_result(best_val_auc=0.85)
+        result = _make_fake_optimization_result(best_value=0.85)
 
         save_result: SaveModelResult = save_best_model(
             result=result,
@@ -639,7 +692,6 @@ class TestSaveBestModel:
 
         assert save_result["saved"] is True
         assert save_result["reason"] == "New best model"
-        # Verify paths contain expected components
         model_path = save_result["model_path"]
         meta_path = save_result["meta_path"]
         train_outcome = save_result["train_outcome"]
@@ -647,7 +699,6 @@ class TestSaveBestModel:
         assert meta_path is not None and "taiwan_xgboost_best_meta.json" in meta_path
         assert train_outcome is not None and train_outcome["best_val_auc"] == 0.88
 
-        # Verify files exist
         assert Path(model_path).exists()
         assert Path(meta_path).exists()
 
@@ -657,14 +708,13 @@ class TestSaveBestModel:
         hooks_context: None,
     ) -> None:
         """Test skips saving when existing model has better AUC."""
-        # Create existing metadata with high AUC
         output_dir = tmp_path / "models" / "xgboost"
         output_dir.mkdir(parents=True)
         meta_path = output_dir / "taiwan_xgboost_best_meta.json"
         meta_content = {"best_val_auc": 0.95}
         meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
-        result = _make_fake_optimization_result(best_val_auc=0.85)
+        result = _make_fake_optimization_result(best_value=0.85)
 
         save_result: SaveModelResult = save_best_model(
             result=result,
@@ -685,14 +735,13 @@ class TestSaveBestModel:
         hooks_context: None,
     ) -> None:
         """Test saves model when new AUC is better than existing."""
-        # Create existing metadata with low AUC
         output_dir = tmp_path / "models" / "xgboost"
         output_dir.mkdir(parents=True)
         meta_path = output_dir / "taiwan_xgboost_best_meta.json"
         meta_content = {"best_val_auc": 0.70}
         meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
-        result = _make_fake_optimization_result(best_val_auc=0.85)
+        result = _make_fake_optimization_result(best_value=0.85)
 
         save_result: SaveModelResult = save_best_model(
             result=result,
@@ -729,7 +778,6 @@ class TestSaveBestModel:
         hooks_context: None,
     ) -> None:
         """Test replaces existing model file when saving better model."""
-        # Create existing model and metadata with low AUC
         output_dir = tmp_path / "models" / "xgboost"
         output_dir.mkdir(parents=True)
 
@@ -740,7 +788,7 @@ class TestSaveBestModel:
         meta_content = {"best_val_auc": 0.50}
         meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
-        result = _make_fake_optimization_result(best_val_auc=0.85)
+        result = _make_fake_optimization_result(best_value=0.85)
 
         save_result = save_best_model(
             result=result,
@@ -751,7 +799,6 @@ class TestSaveBestModel:
 
         assert save_result["saved"] is True
 
-        # Verify model was replaced
         new_model_content = existing_model.read_bytes()
         assert new_model_content != b"old model"
 
@@ -781,25 +828,18 @@ class TestSaveBestModel:
         assert meta["backend"] == "xgboost"
         assert meta["dataset"] == "taiwan"
         assert meta["feature_preset"] == "full"
-        # Verify AUC value is reasonable
         from platform_core.json_utils import require_float, require_int, require_str
 
         best_val_auc = require_float(meta, "best_val_auc")
         assert 0.0 <= best_val_auc <= 1.0
-        # Verify saved_at is an ISO timestamp string
         saved_at = require_str(meta, "saved_at")
-        assert "T" in saved_at  # ISO format contains T
-        # Verify model_path is a string path
+        assert "T" in saved_at
         model_path_val = require_str(meta, "model_path")
         assert "xgboost" in model_path_val
-        # Verify n_features and n_samples are positive integers
         n_features = require_int(meta, "n_features")
         n_samples = require_int(meta, "n_samples")
         assert n_features > 0
         assert n_samples > 0
-        # Verify config is a dict
-        config_val = meta["config"]
-        assert config_val is not None and isinstance(config_val, dict)
 
     def test_works_with_different_datasets(
         self,
@@ -831,17 +871,15 @@ class TestSaveBestModel:
 
         This covers the branch where trained_model_path == best_model_path.
         """
-        # Create backend that writes directly to the best model path
         best_filename = "taiwan_xgboost_best.ubj"
         custom_backend = FakeClassifierBackend(
             backend_name_val="xgboost",
             output_filename_override=best_filename,
         )
 
-        # Set up hooks with custom backend
         custom_registry = ClassifierRegistry()
 
-        def factory() -> ClassifierBackend:
+        def factory() -> FakeClassifierBackend:
             return custom_backend
 
         custom_registry.register("xgboost", BackendRegistration(factory))
@@ -873,11 +911,9 @@ class TestSaveBestModel:
                 project_root=tmp_path,
             )
 
-            # Verify save succeeded
             assert save_result["saved"] is True
             assert save_result["reason"] == "New best model"
 
-            # Verify model exists at best path
             model_path = save_result["model_path"]
             assert model_path is not None and best_filename in model_path
             assert Path(model_path).exists()
@@ -901,17 +937,12 @@ class TestSaveBestModel:
             project_root=tmp_path,
         )
 
-        # Extract and verify train_outcome
         train_outcome = save_result["train_outcome"]
         assert train_outcome is not None and train_outcome["best_val_auc"] == 0.88
         outcome: TrainOutcome = train_outcome
 
-        # Verify all required TrainOutcome fields have expected values
-        # Note: model_path in train_outcome points to original temp location
-        # which was renamed to the best model path, so check saved model exists
         saved_model_path = save_result["model_path"]
         assert saved_model_path is not None and Path(saved_model_path).exists()
-        # Verify train_outcome has a valid model_path string (even if renamed)
         assert outcome["model_path"] != "" and "model" in outcome["model_path"]
         assert outcome["model_id"].startswith("fake-model-")
         assert outcome["samples_total"] == 100
@@ -950,11 +981,8 @@ class TestSaveModelResultTypedDict:
             project_root=tmp_path,
         )
 
-        # Verify saved is True for success
         assert save_result["saved"] is True
-        # Verify reason indicates success
         assert save_result["reason"] == "New best model"
-        # Verify paths are set and contain expected components
         model_path = save_result["model_path"]
         meta_path = save_result["meta_path"]
         assert model_path is not None and "taiwan_xgboost_best.ubj" in model_path
@@ -966,14 +994,13 @@ class TestSaveModelResultTypedDict:
         hooks_context: None,
     ) -> None:
         """Test skipped save result has correct None values."""
-        # Create existing high-AUC model
         output_dir = tmp_path / "models" / "xgboost"
         output_dir.mkdir(parents=True)
         meta_path = output_dir / "taiwan_xgboost_best_meta.json"
         meta_content = {"best_val_auc": 0.99}
         meta_path.write_text(dump_json_str(meta_content), encoding="utf-8")
 
-        result = _make_fake_optimization_result(best_val_auc=0.50)
+        result = _make_fake_optimization_result(best_value=0.50)
 
         save_result = save_best_model(
             result=result,
@@ -986,7 +1013,400 @@ class TestSaveModelResultTypedDict:
         assert save_result["model_path"] is None
         assert save_result["meta_path"] is None
         assert save_result["train_outcome"] is None
-        # Verify reason contains specific text about AUC comparison
         assert "not better than existing" in save_result["reason"]
-        assert "0.50" in save_result["reason"]  # New AUC
-        assert "0.99" in save_result["reason"]  # Existing AUC
+        assert "0.50" in save_result["reason"]
+        assert "0.99" in save_result["reason"]
+
+
+# =============================================================================
+# Tests for build_train_config per-backend
+# =============================================================================
+
+
+def _make_result_for_backend(
+    backend: BackendName,
+    int_params: SampledIntParams,
+    float_params: SampledFloatParams,
+    string_params: SampledStringParams | None = None,
+) -> UnifiedOptimizationResult:
+    """Create optimization result for build_train_config tests.
+
+    Args:
+        backend: Backend name.
+        int_params: Integer hyperparameters.
+        float_params: Float hyperparameters.
+        string_params: Optional string hyperparameters.
+
+    Returns:
+        UnifiedOptimizationResult with the given params.
+    """
+    return UnifiedOptimizationResult(
+        backend=backend,
+        status="complete",
+        dataset="taiwan",
+        n_samples=1000,
+        n_features=50,
+        feature_preset="none",
+        n_trials_complete=10,
+        n_trials_pruned=0,
+        n_trials_failed=0,
+        best_trial_number=5,
+        best_value=0.85,
+        best_int_params=int_params,
+        best_float_params=float_params,
+        best_string_params=string_params or SampledStringParams(),
+        duration_seconds=10.0,
+    )
+
+
+class TestBuildTrainConfigDispatch:
+    """Tests for build_train_config dispatch to all 7 backends."""
+
+    def test_dispatches_all_backends(self) -> None:
+        """Dispatch works for all 7 backends and returns valid config."""
+        backend_params: list[
+            tuple[BackendName, SampledIntParams, SampledFloatParams, SampledStringParams]
+        ] = [
+            (
+                "xgboost",
+                SampledIntParams(max_depth=6, n_estimators=100),
+                SampledFloatParams(
+                    learning_rate=0.1,
+                    reg_alpha=0.01,
+                    reg_lambda=0.01,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                ),
+                SampledStringParams(),
+            ),
+            (
+                "mlp",
+                SampledIntParams(n_layers=3, hidden_size=128, batch_size=64),
+                SampledFloatParams(learning_rate=0.001, dropout=0.2),
+                SampledStringParams(),
+            ),
+            (
+                "lstm",
+                SampledIntParams(hidden_size=64, num_layers=2, batch_size=32),
+                SampledFloatParams(learning_rate=0.001, dropout=0.3),
+                SampledStringParams(),
+            ),
+            (
+                "lightgbm",
+                SampledIntParams(
+                    max_depth=-1,
+                    n_estimators=100,
+                    num_leaves=31,
+                    min_child_samples=20,
+                ),
+                SampledFloatParams(
+                    learning_rate=0.1,
+                    reg_alpha=0.01,
+                    reg_lambda=0.01,
+                    subsample=0.8,
+                    colsample_bytree=0.8,
+                ),
+                SampledStringParams(),
+            ),
+            (
+                "cleargbm",
+                SampledIntParams(
+                    max_depth=5,
+                    n_estimators=100,
+                    min_samples_split=10,
+                    min_samples_leaf=5,
+                    max_bins=64,
+                ),
+                SampledFloatParams(
+                    learning_rate=0.1,
+                    subsample=1.0,
+                    reg_alpha=0.0,
+                    reg_lambda=1.0,
+                ),
+                SampledStringParams(),
+            ),
+            (
+                "logreg",
+                SampledIntParams(),
+                SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.5),
+                SampledStringParams(solver="saga", penalty="elasticnet"),
+            ),
+            (
+                "random_forest",
+                SampledIntParams(n_estimators=200, min_samples_split=5, min_samples_leaf=2),
+                SampledFloatParams(),
+                SampledStringParams(max_features="sqrt"),
+            ),
+        ]
+        for backend, int_p, float_p, str_p in backend_params:
+            result = _make_result_for_backend(backend, int_p, float_p, str_p)
+            config = build_train_config(backend, result)
+            # Common fields present on all config types
+            assert config["train_ratio"] == 0.7
+            assert config["val_ratio"] == 0.15
+            assert config["test_ratio"] == 0.15
+            assert config["random_state"] == 42
+
+    def test_unknown_backend_raises(self) -> None:
+        """Unknown backend raises ValueError."""
+        result = _make_result_for_backend(
+            "xgboost",
+            SampledIntParams(max_depth=6, n_estimators=100),
+            SampledFloatParams(
+                learning_rate=0.1,
+                reg_alpha=0.01,
+                reg_lambda=0.01,
+                subsample=0.8,
+                colsample_bytree=0.8,
+            ),
+        )
+        with pytest.raises(ValueError, match="Unknown backend"):
+            build_train_config("not_a_backend", result)
+
+
+class TestBuildXGBoostConfig:
+    """Tests for _build_xgboost_config."""
+
+    def test_xgboost_config(self) -> None:
+        """XGBoost config has expected fields."""
+        config = _build_xgboost_config(
+            SampledIntParams(max_depth=6, n_estimators=100),
+            SampledFloatParams(
+                learning_rate=0.1,
+                reg_alpha=0.01,
+                reg_lambda=0.01,
+                subsample=0.8,
+                colsample_bytree=0.8,
+            ),
+        )
+        assert config["learning_rate"] == 0.1
+        assert config["max_depth"] == 6
+        assert config["n_estimators"] == 100
+        assert config["subsample"] == 0.8
+        assert config["colsample_bytree"] == 0.8
+        assert config["reg_alpha"] == 0.01
+        assert config["reg_lambda"] == 0.01
+        assert config["device"] == "auto"
+        assert config["early_stopping_rounds"] == 10
+
+
+class TestBuildMLPConfig:
+    """Tests for _build_mlp_config."""
+
+    def test_mlp_config(self) -> None:
+        """MLP config has hidden_sizes tuple from n_layers and hidden_size."""
+        config = _build_mlp_config(
+            SampledIntParams(n_layers=3, hidden_size=128, batch_size=64),
+            SampledFloatParams(learning_rate=0.001, dropout=0.2),
+        )
+        assert config["hidden_sizes"] == (128, 128, 128)
+        assert config["batch_size"] == 64
+        assert config["dropout"] == 0.2
+        assert config["learning_rate"] == 0.001
+        assert config["precision"] == "fp32"
+        assert config["optimizer"] == "adamw"
+        assert config["n_epochs"] == 50
+        assert config["early_stopping_patience"] == 10
+
+
+class TestBuildLSTMConfig:
+    """Tests for _build_lstm_config."""
+
+    def test_lstm_config(self) -> None:
+        """LSTM config has hidden_size, num_layers, dropout."""
+        config = _build_lstm_config(
+            SampledIntParams(hidden_size=64, num_layers=2, batch_size=32),
+            SampledFloatParams(learning_rate=0.001, dropout=0.3),
+        )
+        assert config["hidden_size"] == 64
+        assert config["num_layers"] == 2
+        assert config["dropout"] == 0.3
+        assert config["learning_rate"] == 0.001
+        assert config["bidirectional"] is False
+        assert config["sequence_length"] == 5
+        assert config["n_epochs"] == 50
+
+
+class TestBuildLightGBMConfig:
+    """Tests for _build_lightgbm_config."""
+
+    def test_lightgbm_config(self) -> None:
+        """LightGBM config has num_leaves, min_child_samples."""
+        config = _build_lightgbm_config(
+            SampledIntParams(max_depth=-1, n_estimators=100, num_leaves=31, min_child_samples=20),
+            SampledFloatParams(
+                learning_rate=0.1,
+                reg_alpha=0.01,
+                reg_lambda=0.01,
+                subsample=0.8,
+                colsample_bytree=0.8,
+            ),
+        )
+        assert config["num_leaves"] == 31
+        assert config["min_child_samples"] == 20
+        assert config["max_depth"] == -1
+        assert config["early_stopping_rounds"] == 10
+
+
+class TestBuildClearGBMConfig:
+    """Tests for _build_cleargbm_config."""
+
+    def test_cleargbm_config(self) -> None:
+        """ClearGBM config has min_samples_split, min_samples_leaf, max_bins."""
+        config = _build_cleargbm_config(
+            SampledIntParams(
+                max_depth=5,
+                n_estimators=100,
+                min_samples_split=10,
+                min_samples_leaf=5,
+                max_bins=64,
+            ),
+            SampledFloatParams(
+                learning_rate=0.1,
+                subsample=1.0,
+                reg_alpha=0.0,
+                reg_lambda=1.0,
+            ),
+        )
+        assert config["min_samples_split"] == 10
+        assert config["min_samples_leaf"] == 5
+        assert config["max_bins"] == 64
+        assert config["track_contributions"] is False
+        assert config["monotonic_constraints"] is None
+        assert config["n_jobs"] == -1
+
+
+class TestBuildLogRegConfig:
+    """Tests for _build_logreg_config."""
+
+    def test_logreg_config(self) -> None:
+        """LogReg config has solver, penalty, C, tol, l1_ratio."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.5),
+            SampledStringParams(solver="saga", penalty="elasticnet"),
+        )
+        assert config["solver"] == "saga"
+        assert config["penalty"] == "elasticnet"
+        assert config["C"] == 1.0
+        assert config["tol"] == 0.0001
+        assert config["l1_ratio"] == 0.5
+        assert config["max_iter"] == 1000
+        assert config["class_weight_balanced"] is True
+
+    def test_l2_lbfgs(self) -> None:
+        """LogReg config with l2 penalty and lbfgs solver."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=0.5, tol=0.001, l1_ratio=0.0),
+            SampledStringParams(solver="lbfgs", penalty="l2"),
+        )
+        assert config["solver"] == "lbfgs"
+        assert config["penalty"] == "l2"
+
+    def test_l1_liblinear(self) -> None:
+        """LogReg config with l1 penalty and liblinear solver."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=10.0, tol=0.0001, l1_ratio=0.0),
+            SampledStringParams(solver="liblinear", penalty="l1"),
+        )
+        assert config["solver"] == "liblinear"
+        assert config["penalty"] == "l1"
+
+    def test_none_penalty_newton_cg(self) -> None:
+        """LogReg config with none penalty and newton-cg solver."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+            SampledStringParams(solver="newton-cg", penalty="none"),
+        )
+        assert config["solver"] == "newton-cg"
+        assert config["penalty"] == "none"
+
+    def test_newton_cholesky(self) -> None:
+        """LogReg config with newton-cholesky solver."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+            SampledStringParams(solver="newton-cholesky", penalty="l2"),
+        )
+        assert config["solver"] == "newton-cholesky"
+
+    def test_sag(self) -> None:
+        """LogReg config with sag solver."""
+        config = _build_logreg_config(
+            SampledFloatParams(C=1.0, tol=0.0001, l1_ratio=0.0),
+            SampledStringParams(solver="sag", penalty="l2"),
+        )
+        assert config["solver"] == "sag"
+
+
+class TestBuildRandomForestConfig:
+    """Tests for _build_random_forest_config."""
+
+    def test_sqrt_features(self) -> None:
+        """RandomForest config with max_features='sqrt'."""
+        config = _build_random_forest_config(
+            SampledIntParams(n_estimators=200, min_samples_split=5, min_samples_leaf=2),
+            SampledFloatParams(),
+            SampledStringParams(max_features="sqrt"),
+        )
+        assert config["max_features"] == "sqrt"
+        assert config["n_estimators"] == 200
+        assert config["min_samples_split"] == 5
+        assert config["min_samples_leaf"] == 2
+        assert config["bootstrap"] is True
+        assert config["class_weight_balanced"] is True
+
+    def test_log2_features(self) -> None:
+        """RandomForest config with max_features='log2'."""
+        config = _build_random_forest_config(
+            SampledIntParams(n_estimators=100, min_samples_split=2, min_samples_leaf=1),
+            SampledFloatParams(),
+            SampledStringParams(max_features="log2"),
+        )
+        assert config["max_features"] == "log2"
+
+    def test_float_features(self) -> None:
+        """RandomForest config with float max_features via max_features_float."""
+        config = _build_random_forest_config(
+            SampledIntParams(n_estimators=100, min_samples_split=2, min_samples_leaf=1),
+            SampledFloatParams(max_features_float=0.7),
+            SampledStringParams(),
+        )
+        assert config["max_features"] == 0.7
+
+    def test_default_features(self) -> None:
+        """RandomForest config defaults to 'sqrt' when no max_features specified."""
+        config = _build_random_forest_config(
+            SampledIntParams(n_estimators=100, min_samples_split=2, min_samples_leaf=1),
+            SampledFloatParams(),
+            SampledStringParams(),
+        )
+        assert config["max_features"] == "sqrt"
+
+
+class TestNarrowLogRegSolver:
+    """Tests for _narrow_logreg_solver."""
+
+    def test_all_valid_solvers(self) -> None:
+        """All valid solver names are narrowed correctly."""
+        solvers = ["lbfgs", "liblinear", "newton-cg", "newton-cholesky", "sag", "saga"]
+        for solver in solvers:
+            assert _narrow_logreg_solver(solver) == solver
+
+    def test_invalid_solver_raises(self) -> None:
+        """Invalid solver name raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid LogReg solver"):
+            _narrow_logreg_solver("invalid_solver")
+
+
+class TestNarrowLogRegPenalty:
+    """Tests for _narrow_logreg_penalty."""
+
+    def test_all_valid_penalties(self) -> None:
+        """All valid penalty names are narrowed correctly."""
+        penalties = ["l1", "l2", "elasticnet", "none"]
+        for penalty in penalties:
+            assert _narrow_logreg_penalty(penalty) == penalty
+
+    def test_invalid_penalty_raises(self) -> None:
+        """Invalid penalty name raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid LogReg penalty"):
+            _narrow_logreg_penalty("invalid_penalty")
