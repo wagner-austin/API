@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from covenant_ml.datasets.types import (
     DatasetConfig,
+    RegressionDatasetConfig,
+    RegressionTargetSpec,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -386,9 +388,111 @@ _VERIFIED_CONFIGS: tuple[DatasetConfig, ...] = (
 )
 
 
+class RegressionDatasetRegistry:
+    """Registry of regression dataset configurations.
+
+    Stores RegressionDatasetConfig entries for datasets with
+    continuous target values.
+
+    Immutable after construction. Thread-safe for reads.
+    """
+
+    def __init__(self, configs: tuple[RegressionDatasetConfig, ...]) -> None:
+        """Initialize with a tuple of regression dataset configs.
+
+        Args:
+            configs: Immutable tuple of RegressionDatasetConfig entries.
+
+        Raises:
+            ValueError: If duplicate dataset names found.
+        """
+        self._configs: dict[str, RegressionDatasetConfig] = {}
+        for cfg in configs:
+            name = cfg["name"]
+            if name in self._configs:
+                raise ValueError(f"Duplicate dataset name: {name}")
+            self._configs[name] = cfg
+
+    def get(self, name: str) -> RegressionDatasetConfig:
+        """Get configuration for a regression dataset by name.
+
+        Args:
+            name: Dataset name (e.g., "financial_distress").
+
+        Returns:
+            RegressionDatasetConfig for the requested dataset.
+
+        Raises:
+            KeyError: If dataset not found in registry.
+        """
+        if name not in self._configs:
+            available = ", ".join(sorted(self._configs.keys()))
+            raise KeyError(f"Regression dataset '{name}' not found. Available: {available}")
+        return self._configs[name]
+
+    def list_names(self) -> tuple[str, ...]:
+        """List all registered regression dataset names.
+
+        Returns:
+            Sorted tuple of dataset names.
+        """
+        return tuple(sorted(self._configs.keys()))
+
+    def __contains__(self, name: str) -> bool:
+        """Check if regression dataset is registered.
+
+        Args:
+            name: Dataset name to check.
+
+        Returns:
+            True if dataset is in registry.
+        """
+        return name in self._configs
+
+    def __len__(self) -> int:
+        """Get number of registered regression datasets.
+
+        Returns:
+            Number of datasets in registry.
+        """
+        return len(self._configs)
+
+
+# Verified regression dataset configurations
+_VERIFIED_REGRESSION_CONFIGS: tuple[RegressionDatasetConfig, ...] = (
+    # Financial Distress (Kaggle)
+    # 3672 observations, 83 numeric features, continuous target
+    # Excludes Company (entity ID) and Time (period index)
+    RegressionDatasetConfig(
+        name="financial_distress",
+        display_name="Financial Distress",
+        folder="kaggle_financial_distress",
+        file_name="Financial Distress.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="Financial Distress"),
+        exclude_columns=("Company", "Time"),
+        n_samples_expected=3672,
+        n_features_expected=83,
+        target_mean_expected=0.0,
+    ),
+)
+
+
+def make_default_regression_registry() -> RegressionDatasetRegistry:
+    """Create registry with verified regression dataset configurations.
+
+    Returns:
+        RegressionDatasetRegistry with production regression configs.
+    """
+    return RegressionDatasetRegistry(_VERIFIED_REGRESSION_CONFIGS)
+
+
 __all__ = [
     "DatasetRegistry",
+    "RegressionDatasetRegistry",
     "TimeSeriesDatasetRegistry",
     "make_default_registry",
+    "make_default_regression_registry",
     "make_default_timeseries_registry",
 ]
