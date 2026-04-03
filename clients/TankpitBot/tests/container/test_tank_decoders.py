@@ -9,6 +9,7 @@ import pytest
 
 from tankpit_bot.container import (
     ContainerDecodeError,
+    MineDetonationDict,
     MinePlacementDict,
     TankLeaveDict,
     TankRegistryDict,
@@ -25,9 +26,11 @@ from tankpit_bot.container import (
     decode_tank_update_extended,
     decode_tank_update_full,
 )
-from tankpit_bot.container.decoders.combat import decode_mine_placement
+from tankpit_bot.container.decoders.combat import decode_mine_detonation, decode_mine_placement
 from tankpit_bot.container.decoders.tank import _parse_tank_name
 from tests.container.test_data import (
+    MINE_DETONATION_3,
+    MINE_DETONATION_15,
     MINE_PLACEMENT_15,
     TANK_LEAVE_6,
     TANK_LEAVE_LARGE_ID,
@@ -136,6 +139,41 @@ class TestDecodeMinePlacement:
         assert result["mine_type"] == 2
         assert result["tank_id"] == 1301
         assert len(result["positions"]) == 5
+
+
+class TestDecodeMineDetonation:
+    """Tests for tunneled mine detonation decoding."""
+
+    def test_decodes_solitary_mine_detonation(self) -> None:
+        """Decodes 3-byte tunneled mine detonation correctly."""
+        result = decode_mine_detonation(MINE_DETONATION_3)
+        assert result["msg_type"] == 0x45
+        assert result["positions"] == [(44, 59)]
+
+    def test_decodes_chain_reaction_mine_detonation(self) -> None:
+        """Decodes 15-byte tunneled mine detonation correctly."""
+        result = decode_mine_detonation(MINE_DETONATION_15)
+        assert result["msg_type"] == 0x45
+        assert result["positions"] == [
+            (38, 52),
+            (39, 53),
+            (38, 54),
+            (37, 53),
+            (39, 54),
+            (39, 52),
+            (37, 54),
+        ]
+
+    def test_mine_detonation_dict_keys(self) -> None:
+        """MineDetonationDict has expected keys."""
+        result: MineDetonationDict = decode_mine_detonation(MINE_DETONATION_3)
+        assert result["msg_type"] == 0x45
+        assert result["positions"] == [(44, 59)]
+
+    def test_raises_on_invalid_mine_detonation(self) -> None:
+        """Raises on invalid tunneled mine detonation payload."""
+        with pytest.raises(ContainerDecodeError):
+            decode_mine_detonation(bytes.fromhex("442c3b"))
 
     def test_detects_container_wasd_name(self) -> None:
         """Detects container when name is all direction chars."""
