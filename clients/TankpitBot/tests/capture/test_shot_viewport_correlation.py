@@ -99,8 +99,8 @@ class TestShotViewportEncoding:
             abs_y=60,
             col=0,
             row=0,
-            entity_id=514,
-            value=255,
+            cache_value=514,
+            overlay_value=255,
             terrain_type=0,
         )
         shot = ShotViewportCorrelationDict(
@@ -115,11 +115,11 @@ class TestShotViewportEncoding:
             viewport_left=50,
             viewport_top=60,
             positive_row_count=1,
-            anonymous_row_count=0,
+            equipment_row_count=0,
             id_match_count=1,
             coord_match_count=1,
             positive_rows=[row],
-            anonymous_rows=[],
+            equipment_rows=[],
             id_matches=[row],
             coord_matches=[row],
         )
@@ -150,11 +150,11 @@ class TestShotViewportEncoding:
                     "viewport_left": -1,
                     "viewport_top": -1,
                     "positive_row_count": 0,
-                    "anonymous_row_count": 0,
+                    "equipment_row_count": 0,
                     "id_match_count": 0,
                     "coord_match_count": 0,
                     "positive_rows": [1],
-                    "anonymous_rows": [],
+                    "equipment_rows": [],
                     "id_matches": [],
                     "coord_matches": [],
                 }
@@ -280,10 +280,10 @@ class TestAnalyzeShotViewportCorrelation:
         assert shot["viewport_index"] == 0
         assert shot["target_id"] == 514
         assert shot["positive_row_count"] == 1
-        assert shot["anonymous_row_count"] == 1
+        assert shot["equipment_row_count"] == 1
         assert shot["id_match_count"] == 1
         assert shot["coord_match_count"] == 1
-        assert shot["id_matches"][0]["entity_id"] == 514
+        assert shot["id_matches"][0]["cache_value"] == 514
         assert shot["coord_matches"][0]["abs_x"] == 50
         assert shot["coord_matches"][0]["abs_y"] == 60
 
@@ -338,11 +338,11 @@ class TestAnalyzeShotViewportCorrelation:
                     "viewport_left": -1,
                     "viewport_top": -1,
                     "positive_row_count": 0,
-                    "anonymous_row_count": 0,
+                    "equipment_row_count": 0,
                     "id_match_count": 0,
                     "coord_match_count": 0,
                     "positive_rows": [],
-                    "anonymous_rows": [],
+                    "equipment_rows": [],
                     "id_matches": [],
                     "coord_matches": [],
                 }
@@ -356,8 +356,8 @@ class TestAnalyzeShotViewportCorrelation:
             abs_y=60,
             col=0,
             row=0,
-            entity_id=514,
-            value=255,
+            cache_value=514,
+            overlay_value=255,
             terrain_type=0,
         )
         dump = ShotViewportCorrelationDumpDict(
@@ -375,11 +375,11 @@ class TestAnalyzeShotViewportCorrelation:
                     viewport_left=50,
                     viewport_top=60,
                     positive_row_count=1,
-                    anonymous_row_count=0,
+                    equipment_row_count=0,
                     id_match_count=1,
                     coord_match_count=1,
                     positive_rows=[row],
-                    anonymous_rows=[],
+                    equipment_rows=[],
                     id_matches=[row],
                     coord_matches=[row],
                 )
