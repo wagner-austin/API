@@ -11,6 +11,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     require_bool,
+    require_dict,
     require_int,
     require_str,
 )
@@ -137,14 +138,16 @@ class TerrainTileDict(TypedDict):
     Attributes:
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
-        terrain_type: Terrain type (0=ground, 1-3=rock variants, 5=ferry, 7=ferry+rock).
-        entity_id: Entity ID at this position (-1=tank, 0=none, >0=container_id).
+        terrain_type: Terrain/structure type (0=ground, 1-3=rock variants, 5=ferry, 7=ferry+rock).
+        cache_value: Tile cache value (0=none, -1=equipment, >0=fuel volume).
+        overlay_value: Tile overlay value (255=clear, other values protocol-defined).
     """
 
     x: int
     y: int
     terrain_type: int
-    entity_id: int
+    cache_value: int
+    overlay_value: int
 
 
 class ViewportStateDict(TypedDict):
@@ -153,8 +156,8 @@ class ViewportStateDict(TypedDict):
     Attributes:
         left: Left edge X coordinate of viewport.
         top: Top edge Y coordinate of viewport.
-        width: Viewport width in tiles (typically 18).
-        height: Viewport height in tiles (typically 18).
+        width: Visible viewport width in tiles (typically 16).
+        height: Visible viewport height in tiles (typically 16).
     """
 
     left: int
@@ -195,6 +198,12 @@ class WorldStateDict(TypedDict):
         mines: All known mines indexed by "x,y" string key.
         terrain: Terrain tiles indexed by "x,y" string key.
         viewport: Current viewport bounds.
+        scanned_viewports: Viewport origins confirmed by authoritative local
+            resource data, indexed by "left,top" string key with
+            timestamp_ms values. Confirmation can come from a radar response
+            or a fresh visible viewport tile update. Used to distinguish
+            authoritative local resource truth from stale remembered cache
+            observations.
         timestamp_ms: Last update timestamp in milliseconds.
     """
 
@@ -204,6 +213,7 @@ class WorldStateDict(TypedDict):
     mines: dict[str, MineStateDict]
     terrain: dict[str, TerrainTileDict]
     viewport: ViewportStateDict
+    scanned_viewports: dict[str, int]
     timestamp_ms: int
 
 
@@ -224,7 +234,8 @@ def make_empty_world_state() -> WorldStateDict:
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
+        viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
+        scanned_viewports={},
         timestamp_ms=0,
     )
 
@@ -329,7 +340,8 @@ def make_terrain_tile(
     x: int,
     y: int,
     terrain_type: int,
-    entity_id: int,
+    cache_value: int,
+    overlay_value: int,
 ) -> TerrainTileDict:
     """Create a terrain tile.
 
@@ -337,12 +349,19 @@ def make_terrain_tile(
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         terrain_type: Terrain type (0-7).
-        entity_id: Entity ID (-1=tank, 0=none, >0=container).
+        cache_value: Tile cache value (0=none, -1=equipment, >0=fuel volume).
+        overlay_value: Tile overlay value (255=clear).
 
     Returns:
         TerrainTileDict with the provided values.
     """
-    return TerrainTileDict(x=x, y=y, terrain_type=terrain_type, entity_id=entity_id)
+    return TerrainTileDict(
+        x=x,
+        y=y,
+        terrain_type=terrain_type,
+        cache_value=cache_value,
+        overlay_value=overlay_value,
+    )
 
 
 def make_self_state(
@@ -413,6 +432,19 @@ def parse_coord_key(key: str) -> tuple[int, int]:
     if len(parts) != 2:
         raise ValueError(f"Invalid coord key format: {key}")
     return int(parts[0]), int(parts[1])
+
+
+def viewport_scan_key(left: int, top: int) -> str:
+    """Create a viewport-origin key string for scan coverage indexing.
+
+    Args:
+        left: Viewport left X coordinate.
+        top: Viewport top Y coordinate.
+
+    Returns:
+        String key in format "left,top".
+    """
+    return f"{left},{top}"
 
 
 # =============================================================================
@@ -493,7 +525,8 @@ def encode_terrain_tile(tile: TerrainTileDict) -> JSONObject:
         "x": tile["x"],
         "y": tile["y"],
         "terrain_type": tile["terrain_type"],
-        "entity_id": tile["entity_id"],
+        "cache_value": tile["cache_value"],
+        "overlay_value": tile["overlay_value"],
     }
 
 
@@ -550,6 +583,7 @@ def encode_world_state(state: WorldStateDict) -> JSONObject:
         "mines": {k: encode_mine_state(v) for k, v in state["mines"].items()},
         "terrain": {k: encode_terrain_tile(v) for k, v in state["terrain"].items()},
         "viewport": encode_viewport_state(state["viewport"]),
+        "scanned_viewports": dict(state["scanned_viewports"]),
         "timestamp_ms": state["timestamp_ms"],
     }
 
@@ -644,7 +678,8 @@ def decode_terrain_tile(data: JSONObject) -> TerrainTileDict:
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         terrain_type=require_int(data, "terrain_type"),
-        entity_id=require_int(data, "entity_id"),
+        cache_value=require_int(data, "cache_value"),
+        overlay_value=require_int(data, "overlay_value"),
     )
 
 
@@ -751,6 +786,12 @@ def decode_world_state(data: JSONObject) -> WorldStateDict:
     viewport_raw = data.get("viewport")
     if not isinstance(viewport_raw, dict):
         raise JSONTypeError("viewport must be an object")
+    scanned_viewports_raw = require_dict(data, "scanned_viewports")
+    scanned_viewports: dict[str, int] = {}
+    for key, value in scanned_viewports_raw.items():
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise JSONTypeError(f"scanned_viewports.{key} must be an integer")
+        scanned_viewports[key] = value
 
     return WorldStateDict(
         self_state=self_state,
@@ -759,6 +800,7 @@ def decode_world_state(data: JSONObject) -> WorldStateDict:
         mines=_decode_dict_field_mines(data.get("mines")),
         terrain=_decode_dict_field_terrain(data.get("terrain")),
         viewport=decode_viewport_state(viewport_raw),
+        scanned_viewports=scanned_viewports,
         timestamp_ms=require_int(data, "timestamp_ms"),
     )
 
@@ -822,4 +864,5 @@ __all__ = [
     "make_tank_state",
     "make_terrain_tile",
     "parse_coord_key",
+    "viewport_scan_key",
 ]
