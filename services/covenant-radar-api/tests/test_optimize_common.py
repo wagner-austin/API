@@ -1,4 +1,4 @@
-"""Tests for worker/_optimize_common.py time-series dataset support.
+"""Tests for worker/_optimize_common.py shared utilities and time-series dataset support.
 
 Tests use dependency injection via worker/_test_hooks to verify actual code paths.
 All code paths are tested with strong assertions on actual behavior.
@@ -7,6 +7,7 @@ All code paths are tested with strong assertions on actual behavior.
 from __future__ import annotations
 
 from pathlib import Path
+from shutil import copyfile
 
 import numpy as np
 import pytest
@@ -20,15 +21,22 @@ from covenant_ml.datasets import (
 )
 from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from numpy.typing import NDArray
+from platform_core.json_utils import JSONTypeError
 
 from covenant_radar_api.worker import _test_hooks as hooks
 from covenant_radar_api.worker._optimize_common import (
     DatasetType,
+    build_optimization_config,
     get_dataset_type,
     load_any_dataset,
+    load_dataset,
     load_dataset_with_progress,
     load_timeseries_dataset,
+    optional_int,
+    parse_backend_name,
     parse_dataset_name,
+    parse_device,
+    parse_feature_preset,
 )
 
 # =============================================================================
@@ -563,3 +571,298 @@ class TestWorkerTimeseriesHooks:
         assert dataset["meta"]["n_samples"] > 0
         assert dataset["meta"]["n_features"] > 0
         assert len(dataset["x"]) == len(dataset["y"])
+
+
+# =============================================================================
+# Tests for parse_device
+# =============================================================================
+
+
+class TestParseDevice:
+    """Tests for parse_device function."""
+
+    def test_parse_device_defaults_to_auto(self) -> None:
+        """None input returns 'auto'."""
+        assert parse_device(None) == "auto"
+
+    def test_parse_device_accepts_cpu(self) -> None:
+        """'cpu' is accepted."""
+        assert parse_device("cpu") == "cpu"
+
+    def test_parse_device_accepts_cuda(self) -> None:
+        """'cuda' is accepted."""
+        assert parse_device("cuda") == "cuda"
+
+    def test_parse_device_accepts_auto(self) -> None:
+        """'auto' is accepted."""
+        assert parse_device("auto") == "auto"
+
+    def test_parse_device_rejects_invalid_string(self) -> None:
+        """Invalid device string raises ValueError."""
+        with pytest.raises(ValueError, match="device must be one of"):
+            parse_device("tpu")
+
+    def test_parse_device_rejects_non_string(self) -> None:
+        """Non-string input raises JSONTypeError."""
+        with pytest.raises(JSONTypeError, match="device must be a string"):
+            parse_device(123)
+
+
+# =============================================================================
+# Tests for parse_feature_preset
+# =============================================================================
+
+
+class TestParseFeaturePreset:
+    """Tests for parse_feature_preset function."""
+
+    def test_parse_feature_preset_defaults_to_none(self) -> None:
+        """None input returns 'none'."""
+        assert parse_feature_preset(None) == "none"
+
+    def test_parse_feature_preset_accepts_none(self) -> None:
+        """'none' is accepted."""
+        assert parse_feature_preset("none") == "none"
+
+    def test_parse_feature_preset_accepts_log_only(self) -> None:
+        """'log_only' is accepted."""
+        assert parse_feature_preset("log_only") == "log_only"
+
+    def test_parse_feature_preset_accepts_ratios_only(self) -> None:
+        """'ratios_only' is accepted."""
+        assert parse_feature_preset("ratios_only") == "ratios_only"
+
+    def test_parse_feature_preset_accepts_full(self) -> None:
+        """'full' is accepted."""
+        assert parse_feature_preset("full") == "full"
+
+    def test_parse_feature_preset_rejects_invalid_string(self) -> None:
+        """Invalid feature_preset string raises JSONTypeError."""
+        with pytest.raises(JSONTypeError, match="feature_preset must be one of"):
+            parse_feature_preset("invalid")
+
+    def test_parse_feature_preset_rejects_non_string(self) -> None:
+        """Non-string input raises JSONTypeError."""
+        with pytest.raises(JSONTypeError, match="feature_preset must be a string"):
+            parse_feature_preset(123)
+
+
+# =============================================================================
+# Tests for parse_backend_name
+# =============================================================================
+
+
+class TestParseBackendName:
+    """Tests for parse_backend_name function."""
+
+    def test_parse_backend_name_defaults_to_xgboost(self) -> None:
+        """None input returns 'xgboost'."""
+        assert parse_backend_name(None) == "xgboost"
+
+    def test_parse_backend_name_accepts_xgboost(self) -> None:
+        """'xgboost' is accepted."""
+        assert parse_backend_name("xgboost") == "xgboost"
+
+    def test_parse_backend_name_accepts_mlp(self) -> None:
+        """'mlp' is accepted."""
+        assert parse_backend_name("mlp") == "mlp"
+
+    def test_parse_backend_name_accepts_lstm(self) -> None:
+        """'lstm' is accepted."""
+        assert parse_backend_name("lstm") == "lstm"
+
+    def test_parse_backend_name_accepts_lightgbm(self) -> None:
+        """'lightgbm' is accepted."""
+        assert parse_backend_name("lightgbm") == "lightgbm"
+
+    def test_parse_backend_name_accepts_cleargbm(self) -> None:
+        """'cleargbm' is accepted."""
+        assert parse_backend_name("cleargbm") == "cleargbm"
+
+    def test_parse_backend_name_accepts_logreg(self) -> None:
+        """'logreg' is accepted."""
+        assert parse_backend_name("logreg") == "logreg"
+
+    def test_parse_backend_name_accepts_random_forest(self) -> None:
+        """'random_forest' is accepted."""
+        assert parse_backend_name("random_forest") == "random_forest"
+
+    def test_parse_backend_name_rejects_invalid_string(self) -> None:
+        """Invalid backend name raises ValueError."""
+        with pytest.raises(ValueError, match="backend must be one of"):
+            parse_backend_name("invalid")
+
+    def test_parse_backend_name_rejects_non_string(self) -> None:
+        """Non-string input raises JSONTypeError."""
+        with pytest.raises(JSONTypeError, match="backend must be a string"):
+            parse_backend_name(123)
+
+
+# =============================================================================
+# Tests for optional_int
+# =============================================================================
+
+
+class TestOptionalInt:
+    """Tests for optional_int function."""
+
+    def test_optional_int_returns_default_on_missing(self) -> None:
+        """optional_int returns default when key is missing."""
+        assert optional_int({}, "missing", 10) == 10
+
+    def test_optional_int_returns_value_when_present(self) -> None:
+        """optional_int returns value when present."""
+        assert optional_int({"val": 20}, "val", 10) == 20
+
+    def test_optional_int_converts_float_to_int(self) -> None:
+        """optional_int converts float to int."""
+        assert optional_int({"val": 15.5}, "val", 0) == 15
+
+    def test_optional_int_raises_on_invalid_type(self) -> None:
+        """optional_int raises JSONTypeError on invalid type."""
+        with pytest.raises(JSONTypeError, match="must be a number"):
+            optional_int({"val": "string"}, "val", 0)
+
+
+# =============================================================================
+# Tests for build_optimization_config
+# =============================================================================
+
+
+class TestBuildOptimizationConfig:
+    """Tests for build_optimization_config function."""
+
+    def test_build_config_with_timeout(self) -> None:
+        """build_optimization_config creates config with timeout."""
+        config = build_optimization_config(
+            n_trials=50,
+            timeout_seconds=3600,
+            random_state=42,
+        )
+
+        assert config["n_trials"] == 50
+        assert config["timeout_seconds"] == 3600
+        assert config["random_state"] == 42
+
+    def test_build_config_without_timeout(self) -> None:
+        """build_optimization_config creates config without timeout."""
+        config = build_optimization_config(
+            n_trials=25,
+            timeout_seconds=None,
+            random_state=123,
+        )
+
+        assert config["n_trials"] == 25
+        assert config["timeout_seconds"] is None
+        assert config["random_state"] == 123
+
+
+# =============================================================================
+# Tests for load_dataset (standard)
+# =============================================================================
+
+
+def _copy_real_taiwan(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full Taiwan dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "taiwan_data" / "data.csv"
+    if not src.exists():
+        raise FileNotFoundError("Taiwan dataset not found in repository data")
+    dst_dir = external_root / "taiwan_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "data.csv"
+    copyfile(str(src), str(dst))
+    header = (dst.read_text(encoding="utf-8").splitlines())[0]
+    cols = [c.strip() for c in header.split(",")]
+    feature_names = cols[1:]  # all columns after label
+    n_rows = sum(1 for _ in dst.open(encoding="utf-8")) - 1
+    return dst, n_rows, feature_names
+
+
+def _copy_real_us(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full US dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "us_data" / "american_bankruptcy.csv"
+    if not src.exists():
+        raise FileNotFoundError("US dataset not found in repository data")
+    dst_dir = external_root / "us_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "american_bankruptcy.csv"
+    copyfile(str(src), str(dst))
+    header = (dst.read_text(encoding="utf-8-sig").splitlines())[0]
+    cols = [c.strip() for c in header.split(",")]
+    feature_names = [c for c in cols if c.startswith("X")]
+    n_rows = sum(1 for _ in dst.open(encoding="utf-8-sig")) - 1
+    return dst, n_rows, feature_names
+
+
+def _copy_real_polish(external_root: Path) -> tuple[Path, int, list[str]]:
+    """Copy full Polish dataset into external_root and return (path, n_rows, feature_names)."""
+    src = Path(__file__).parent.parent / "data" / "external" / "polish_data" / "1year.arff"
+    if not src.exists():
+        raise FileNotFoundError("Polish dataset not found in repository data")
+    dst_dir = external_root / "polish_data"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    dst = dst_dir / "1year.arff"
+    copyfile(str(src), str(dst))
+    lines = dst.read_text(encoding="utf-8").splitlines()
+    data_idx = -1
+    for i, line in enumerate(lines):
+        if line.strip().lower() == "@data":
+            data_idx = i
+            break
+    if data_idx < 0:
+        raise RuntimeError("ARFF file missing @data section")
+    n_rows = len(lines) - (data_idx + 1)
+    feature_names: list[str] = []
+    for line in lines[: data_idx + 1]:
+        s = line.strip()
+        if s.lower().startswith("@attribute"):
+            parts = s.split()
+            if len(parts) >= 2 and parts[1].lower() != "class":
+                feature_names.append(parts[1])
+    return dst, n_rows, feature_names
+
+
+class TestLoadDataset:
+    """Tests for load_dataset function."""
+
+    def test_load_taiwan_dataset(self, tmp_path: Path) -> None:
+        """load_dataset loads Taiwan data successfully."""
+        _, n_rows, feature_names = _copy_real_taiwan(tmp_path)
+        dataset = load_dataset("taiwan", tmp_path)
+        meta = dataset["meta"]
+
+        assert meta["n_samples"] == n_rows
+        assert meta["n_features"] == len(feature_names)
+
+    def test_load_us_dataset(self, tmp_path: Path) -> None:
+        """load_dataset loads US data successfully."""
+        _, n_rows_us, feature_names_us = _copy_real_us(tmp_path)
+        dataset = load_dataset("us", tmp_path)
+        meta = dataset["meta"]
+
+        assert meta["n_samples"] == n_rows_us
+        assert meta["n_features"] == len(feature_names_us)
+
+    def test_load_polish_dataset(self, tmp_path: Path) -> None:
+        """load_dataset loads Polish data successfully."""
+        _, n_rows_pl, feature_names_pl = _copy_real_polish(tmp_path)
+        dataset = load_dataset("polish", tmp_path)
+        meta = dataset["meta"]
+
+        assert meta["n_samples"] == n_rows_pl
+        assert meta["n_features"] == len(feature_names_pl)
+
+    def test_load_dataset_missing_taiwan(self, tmp_path: Path) -> None:
+        """load_dataset raises FileNotFoundError for missing Taiwan data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("taiwan", tmp_path)
+
+    def test_load_dataset_missing_us(self, tmp_path: Path) -> None:
+        """load_dataset raises FileNotFoundError for missing US data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("us", tmp_path)
+
+    def test_load_dataset_missing_polish(self, tmp_path: Path) -> None:
+        """load_dataset raises FileNotFoundError for missing Polish data."""
+        with pytest.raises(FileNotFoundError, match="Dataset file not found"):
+            load_dataset("polish", tmp_path)
