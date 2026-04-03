@@ -8,6 +8,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot.container.helpers import (
+    ContainerDecodeError,
     extract_uint16_le,
     require_exact_length,
 )
@@ -15,6 +16,7 @@ from tankpit_bot.container.types import (
     CombatHitDict,
     DeactivationDeathDict,
     DeactivationKillDict,
+    MineDetonationDict,
     MinePlacementDict,
 )
 
@@ -57,6 +59,23 @@ def is_mine_placement_structure(data: bytes) -> bool:
         return False
     count = data[4]
     return len(data) == 5 + count * 2
+
+
+def is_mine_detonation_structure(data: bytes) -> bool:
+    """Check if data matches tunneled mine detonation structure."""
+    return len(data) >= 3 and data[0] == 0x45 and (len(data) - 1) % 2 == 0
+
+
+def decode_mine_detonation(data: bytes) -> MineDetonationDict:
+    """Decode tunneled mine detonation from container body."""
+    if not is_mine_detonation_structure(data):
+        raise ContainerDecodeError(
+            f"MineDetonation: expected subtype 0x45 with coordinate pairs, got {data.hex()}"
+        )
+    positions: list[tuple[int, int]] = []
+    for offset in range(1, len(data), 2):
+        positions.append((data[offset], data[offset + 1]))
+    return MineDetonationDict(msg_type=0x45, positions=positions)
 
 
 def decode_mine_placement(data: bytes) -> MinePlacementDict:
@@ -216,9 +235,11 @@ __all__ = [
     "decode_combat_hit",
     "decode_deactivation_death",
     "decode_deactivation_kill",
+    "decode_mine_detonation",
     "decode_mine_placement",
     "is_combat_hit_structure",
     "is_deactivation_death_structure",
     "is_deactivation_kill_structure",
+    "is_mine_detonation_structure",
     "is_mine_placement_structure",
 ]
