@@ -18,6 +18,7 @@ class ContainerMessageType(IntEnum):
 
     UNKNOWN = 0
     COMBAT_HIT = auto()
+    MINE_DETONATION = auto()
     MINE_PLACEMENT = auto()
     TANK_REGISTRY = auto()
     MOVEMENT = auto()
@@ -69,6 +70,7 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.UNKNOWN: DecodeLevel.UNKNOWN,
     # Fully decoded message types (all fields understood)
     ContainerMessageType.COMBAT_HIT: DecodeLevel.FULL,
+    ContainerMessageType.MINE_DETONATION: DecodeLevel.FULL,
     ContainerMessageType.MINE_PLACEMENT: DecodeLevel.FULL,
     ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
     ContainerMessageType.MOVEMENT: DecodeLevel.FULL,
@@ -129,6 +131,17 @@ class CombatHitDict(TypedDict):
     attacker_id: int
     combat_data: bytes
     is_outgoing: bool
+
+
+class MineDetonationDict(TypedDict):
+    """Mine detonation decoded from 0x2E container.
+
+    Structure (proven from captures):
+      [subtype:1] [positions: repeated (x, y) bytes]
+    """
+
+    msg_type: Literal[0x45]
+    positions: list[tuple[int, int]]
 
 
 class DeactivationKillDict(TypedDict):
@@ -557,6 +570,7 @@ class UnknownContainerDict(TypedDict):
 
 ContainerMessage = (
     CombatHitDict
+    | MineDetonationDict
     | MinePlacementDict
     | TankRegistryDict
     | MovementDict
@@ -591,6 +605,7 @@ __all__ = [
     "DeactivationDeathDict",
     "DeactivationKillDict",
     "DecodeLevel",
+    "MineDetonationDict",
     "MinePlacementDict",
     "MovementDict",
     "PlayerListExtendedDict",
