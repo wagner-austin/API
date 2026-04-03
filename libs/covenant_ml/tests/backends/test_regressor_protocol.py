@@ -17,6 +17,11 @@ from covenant_ml.backends.regressor_protocol import (
     RegressorBackend,
     RegressorProgressCallback,
 )
+from covenant_ml.optimizer.search_spaces import (
+    make_xgboost_default_space,
+    make_xgboost_focused_space,
+)
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams, SearchSpace
 from covenant_ml.types import (
     FeatureImportance,
     RegressionMetrics,
@@ -151,6 +156,20 @@ class _FakeRegressorBackend:
             FeatureImportance(name=name, importance=1.0, rank=i + 1)
             for i, name in enumerate(feature_names)
         ]
+
+    def get_default_search_space(self) -> SearchSpace:
+        return make_xgboost_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        return make_xgboost_focused_space(
+            best_max_depth=best_int_params["max_depth"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
 
 def test_prepared_regressor_predict_shape() -> None:

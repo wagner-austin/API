@@ -463,6 +463,35 @@ def test_lightgbm_regressor_load_and_predict(tmp_path: Path) -> None:
     assert loss_final < loss_initial
 
 
+def test_lightgbm_regressor_raw_model_returns_booster() -> None:
+    """raw_model property returns the exact booster passed to __init__."""
+    from covenant_ml.backends.lightgbm.regressor import _LGBMRegressorPrepared
+
+    class _FakeBooster:
+        """Minimal Booster for testing raw_model property."""
+
+        @property
+        def best_iteration(self) -> int:
+            return 1
+
+        def save_model(self, filename: str) -> None:
+            _ = filename
+
+        def predict(self, data: NDArray[np.float64]) -> NDArray[np.float64]:
+            return np.ones(int(data.shape[0]), dtype=np.float64)
+
+    booster = _FakeBooster()
+    prepared = _LGBMRegressorPrepared(booster)
+
+    # raw_model returns the exact booster, not a copy
+    assert prepared.raw_model is booster
+
+    # predict delegates to the booster
+    x = np.zeros((3, 2), dtype=np.float64)
+    preds: NDArray[np.float64] = prepared.predict(x)
+    assert preds.shape == (3,)
+
+
 # =============================================================================
 # Feature Importances
 # =============================================================================
