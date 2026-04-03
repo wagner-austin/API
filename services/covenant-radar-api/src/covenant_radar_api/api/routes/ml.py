@@ -25,17 +25,19 @@ from platform_workers.rq_harness import RQClientQueue
 
 from ..decode import (
     ExplainResponse,
-    LightGBMOptimizeParseResult,
-    LSTMOptimizeParseResult,
-    MLPOptimizeParseResult,
     OptimizeResponse,
     PredictResponse,
+    RegressionExplainResponse,
+    RegressionPredictResponse,
     TrainResponse,
-    XGBoostOptimizeParseResult,
     parse_explain_request,
+    parse_external_regression_train_request,
     parse_external_train_request,
     parse_optimize_request,
     parse_predict_request,
+    parse_regression_explain_request,
+    parse_regression_optimize_request,
+    parse_regression_predict_request,
     parse_train_request,
 )
 
@@ -369,8 +371,9 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
     async def _train_external(request: Request) -> Response:
         """Train model on external bankruptcy datasets with pluggable backend.
 
-        Supports both XGBoost and MLP (neural network) backends via the 'backend'
-        field. Performs automatic feature selection using model importance.
+        Supports all 7 classifier backends via the 'backend' field:
+        xgboost, lightgbm, cleargbm, logreg, random_forest, mlp, lstm.
+        Performs automatic feature selection using model importance.
         """
         body_bytes = await request.body()
         # Validate request at the API edge to prevent bad jobs from entering the queue
@@ -408,133 +411,107 @@ def _register_train_external(router: APIRouter, get_container: ContainerProtocol
         summary="Train model on external datasets",
         description=(
             "Train on external bankruptcy datasets (taiwan, us, polish) with pluggable "
-            "ML backends. Supports XGBoost (gradient boosting with feature importance) "
-            "and MLP (neural network). GPU training supported via device parameter. "
-            "XGBoost returns ranked feature importances; MLP does not."
+            "ML backends. Supports xgboost, lightgbm, cleargbm, logreg, random_forest, "
+            "mlp, and lstm. GPU training supported via device parameter for tree "
+            "boosters and neural network backends."
         ),
         response_description="Job ID for polling status",
         responses=_TRAIN_EXTERNAL_RESPONSES,
     )
 
 
-def _build_xgboost_optimize_payload(
-    parsed: XGBoostOptimizeParseResult,
-) -> dict[str, JSONValue]:
-    """Build JSON payload for XGBoost optimization worker.
-
-    Args:
-        parsed: Parsed XGBoost optimization request.
-
-    Returns:
-        JSON-serializable payload dict.
-    """
-    payload: dict[str, JSONValue] = {
-        "dataset": parsed["dataset"],
-        "n_trials": parsed["config"]["n_trials"],
-        "device": parsed["device"],
-        "random_state": parsed["config"]["random_state"],
-        "feature_preset": parsed["feature_preset"],
-        "space_profile": parsed["space_profile"],
-    }
-    timeout_seconds = parsed["config"]["timeout_seconds"]
-    if timeout_seconds is not None:
-        payload["timeout_seconds"] = timeout_seconds
-    return payload
-
-
-def _build_mlp_optimize_payload(
-    parsed: MLPOptimizeParseResult,
-) -> dict[str, JSONValue]:
-    """Build JSON payload for MLP optimization worker.
-
-    Args:
-        parsed: Parsed MLP optimization request.
-
-    Returns:
-        JSON-serializable payload dict.
-    """
-    payload: dict[str, JSONValue] = {
-        "dataset": parsed["dataset"],
-        "n_trials": parsed["config"]["n_trials"],
-        "device": parsed["device"],
-        "random_state": parsed["config"]["random_state"],
-        "feature_preset": parsed["feature_preset"],
-        "precision": parsed["precision"],
-        "optimizer": parsed["optimizer"],
-        "n_epochs": parsed["n_epochs"],
-        "early_stopping_patience": parsed["early_stopping_patience"],
-    }
-    timeout_seconds = parsed["config"]["timeout_seconds"]
-    if timeout_seconds is not None:
-        payload["timeout_seconds"] = timeout_seconds
-    return payload
+_TRAIN_EXTERNAL_REGRESSION_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Regression training job queued",
+        "content": {
+            "application/json": {
+                "example": {"job_id": "train-reg-job-uuid", "status": "queued"},
+            },
+        },
+    },
+    400: {
+        "description": "Invalid configuration",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "Split ratios must sum to 1.0",
+                    }
+                }
+            }
+        },
+    },
+}
 
 
-def _build_lightgbm_optimize_payload(
-    parsed: LightGBMOptimizeParseResult,
-) -> dict[str, JSONValue]:
-    """Build JSON payload for LightGBM optimization worker.
+def _register_train_external_regression(
+    router: APIRouter, get_container: ContainerProtocol
+) -> None:
+    async def _train_external_regression(request: Request) -> Response:
+        """Train regressor on external regression datasets.
 
-    Args:
-        parsed: Parsed LightGBM optimization request.
+        Supports xgboost_reg and lightgbm_reg backends via the 'backend' field.
+        Performs regression training on continuous target variables.
+        """
+        body_bytes = await request.body()
+        # Validate request at the API edge
+        try:
+            _ = parse_external_regression_train_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        config_json = body_bytes.decode("utf-8")
 
-    Returns:
-        JSON-serializable payload dict.
-    """
-    payload: dict[str, JSONValue] = {
-        "dataset": parsed["dataset"],
-        "n_trials": parsed["config"]["n_trials"],
-        "device": parsed["device"],
-        "random_state": parsed["config"]["random_state"],
-        "feature_preset": parsed["feature_preset"],
-        "early_stopping_rounds": parsed["early_stopping_rounds"],
-    }
-    timeout_seconds = parsed["config"]["timeout_seconds"]
-    if timeout_seconds is not None:
-        payload["timeout_seconds"] = timeout_seconds
-    return payload
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.train_external_regression_job."
+            "process_external_regression_train_job",
+            config_json,
+            job_timeout=3600,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description="External regression data ML training",
+        )
 
+        body: dict[str, JSONValue] = {
+            "job_id": job.get_id(),
+            "status": "queued",
+        }
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
 
-def _build_lstm_optimize_payload(
-    parsed: LSTMOptimizeParseResult,
-) -> dict[str, JSONValue]:
-    """Build JSON payload for LSTM optimization worker.
-
-    Args:
-        parsed: Parsed LSTM optimization request.
-
-    Returns:
-        JSON-serializable payload dict.
-    """
-    payload: dict[str, JSONValue] = {
-        "dataset": parsed["dataset"],
-        "n_trials": parsed["config"]["n_trials"],
-        "device": parsed["device"],
-        "random_state": parsed["config"]["random_state"],
-        "feature_preset": parsed["feature_preset"],
-        "precision": parsed["precision"],
-        "n_epochs": parsed["n_epochs"],
-        "early_stopping_patience": parsed["early_stopping_patience"],
-        "sequence_length": parsed["sequence_length"],
-        "bidirectional": parsed["bidirectional"],
-    }
-    timeout_seconds = parsed["config"]["timeout_seconds"]
-    if timeout_seconds is not None:
-        payload["timeout_seconds"] = timeout_seconds
-    return payload
+    router.add_api_route(
+        "/train-external-regression",
+        _train_external_regression,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Train regressor on external datasets",
+        description=(
+            "Train on external regression datasets with pluggable "
+            "regressor backends. Supports xgboost_reg and lightgbm_reg. "
+            "Uses continuous target variables (not classification)."
+        ),
+        response_description="Job ID for polling status",
+        responses=_TRAIN_EXTERNAL_REGRESSION_RESPONSES,
+    )
 
 
 def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _optimize(request: Request) -> Response:
         """Enqueue hyperparameter optimization job using Optuna TPE.
 
-        Runs Bayesian optimization on external bankruptcy datasets to find
-        optimal hyperparameters for the selected backend. Supports XGBoost,
-        MLP, LightGBM, and LSTM backends. Results include best hyperparameters
-        and a recommended config for subsequent training.
+        Validates common fields at the API edge, then forwards the raw
+        JSON body to the unified worker job. Backend-specific fields are
+        parsed by the worker.
         """
         body_bytes = await request.body()
-        # Validate request at the API edge
+        # Validate common fields at the API edge
         try:
             parsed = parse_optimize_request(body_bytes)
         except ValueError as exc:
@@ -542,54 +519,17 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
         except JSONTypeError as exc:
             raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
 
-        # Dispatch to backend-specific worker job
+        # Forward raw JSON to unified worker job
+        config_json = body_bytes.decode("utf-8")
         queue = get_container.rq_queue()
-
-        if parsed["backend"] == "xgboost":
-            payload = _build_xgboost_optimize_payload(parsed)
-            config_json = dump_json_str(payload)
-            job = queue.enqueue(
-                "covenant_radar_api.worker.optimize_xgboost_job.process_xgboost_optimize_job",
-                config_json,
-                job_timeout=7200,
-                result_ttl=86400,
-                failure_ttl=86400,
-                description="XGBoost hyperparameter optimization with Optuna TPE",
-            )
-        elif parsed["backend"] == "mlp":
-            payload = _build_mlp_optimize_payload(parsed)
-            config_json = dump_json_str(payload)
-            job = queue.enqueue(
-                "covenant_radar_api.worker.optimize_mlp_job.process_mlp_optimize_job",
-                config_json,
-                job_timeout=7200,
-                result_ttl=86400,
-                failure_ttl=86400,
-                description="MLP hyperparameter optimization with Optuna TPE",
-            )
-        elif parsed["backend"] == "lightgbm":
-            payload = _build_lightgbm_optimize_payload(parsed)
-            config_json = dump_json_str(payload)
-            job = queue.enqueue(
-                "covenant_radar_api.worker.optimize_lightgbm_job.process_lightgbm_optimize_job",
-                config_json,
-                job_timeout=7200,
-                result_ttl=86400,
-                failure_ttl=86400,
-                description="LightGBM hyperparameter optimization with Optuna TPE",
-            )
-        else:
-            # parsed["backend"] == "lstm" - exhaustive match
-            payload = _build_lstm_optimize_payload(parsed)
-            config_json = dump_json_str(payload)
-            job = queue.enqueue(
-                "covenant_radar_api.worker.optimize_lstm_job.process_lstm_optimize_job",
-                config_json,
-                job_timeout=7200,
-                result_ttl=86400,
-                failure_ttl=86400,
-                description="LSTM hyperparameter optimization with Optuna TPE",
-            )
+        job = queue.enqueue(
+            "covenant_radar_api.worker.optimize_job.process_optimize_job",
+            config_json,
+            job_timeout=7200,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description=f"{parsed['backend']} hyperparameter optimization with Optuna TPE",
+        )
 
         response = OptimizeResponse(job_id=job.get_id(), status="queued")
         body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
@@ -613,14 +553,14 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
             "- `xgboost`: XGBoost gradient boosting (default)\n"
             "- `mlp`: Multi-layer perceptron neural network\n"
             "- `lightgbm`: LightGBM gradient boosting\n"
-            "- `lstm`: Long short-term memory recurrent network\n\n"
+            "- `lstm`: Long short-term memory recurrent network\n"
+            "- `cleargbm`: ClearGBM interpretable boosting\n"
+            "- `logreg`: Logistic regression baseline\n"
+            "- `random_forest`: Random forest ensemble\n\n"
             "**Supported Datasets:**\n"
             "- `taiwan`: Taiwan Economic Journal bankruptcy data\n"
             "- `us`: American bankruptcy dataset\n"
             "- `polish`: Polish companies dataset\n\n"
-            "**Search Space Profiles (XGBoost only):**\n"
-            "- `default`: Wide continuous ranges with log-scale for learning_rate\n"
-            "- `categorical`: Fixed choice sets for faster grid-like search\n\n"
             "**Feature Engineering Presets:**\n"
             "- `none`: Original features only (default)\n"
             "- `log_only`: Original + signed log transforms\n"
@@ -632,6 +572,67 @@ def _register_optimize(router: APIRouter, get_container: ContainerProtocol) -> N
             "- Validation AUC achieved\n"
             "- Feature preset used\n"
             "- Recommended config for use with /train-external\n\n"
+            "Poll /ml/jobs/{job_id} for status and results."
+        ),
+        response_description="Job ID for polling status",
+        responses=_OPTIMIZE_RESPONSES,
+    )
+
+
+def _register_optimize_regression(router: APIRouter, get_container: ContainerProtocol) -> None:
+    async def _optimize_regression(request: Request) -> Response:
+        """Enqueue regression hyperparameter optimization job using Optuna TPE.
+
+        Validates common fields at the API edge, then forwards the raw
+        JSON body to the regression worker job.
+        """
+        body_bytes = await request.body()
+        try:
+            parsed = parse_regression_optimize_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+
+        config_json = body_bytes.decode("utf-8")
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.optimize_regression_job.process_regression_optimize_job",
+            config_json,
+            job_timeout=7200,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description=f"{parsed['backend']} regression HPO with Optuna TPE",
+        )
+
+        response = OptimizeResponse(job_id=job.get_id(), status="queued")
+        body: dict[str, JSONValue] = {"job_id": response["job_id"], "status": response["status"]}
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
+    router.add_api_route(
+        "/optimize-regression",
+        _optimize_regression,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Optimize regression hyperparameters with Optuna TPE",
+        description=(
+            "Run Bayesian hyperparameter optimization using Optuna's Tree-structured "
+            "Parzen Estimator (TPE) on regression datasets.\n\n"
+            "**Supported Backends:**\n"
+            "- `xgboost_reg`: XGBoost regressor (default)\n"
+            "- `lightgbm_reg`: LightGBM regressor\n\n"
+            "**Supported Datasets:**\n"
+            "- `financial_distress`: Financial distress regression dataset\n\n"
+            "**Job Result:**\n"
+            "When complete, the job result includes:\n"
+            "- Best hyperparameters found\n"
+            "- Negative RMSE achieved (higher = better)\n"
+            "- Feature preset used\n\n"
             "Poll /ml/jobs/{job_id} for status and results."
         ),
         response_description="Job ID for polling status",
@@ -757,14 +758,220 @@ def _register_job_status(router: APIRouter, get_container: ContainerProtocol) ->
     )
 
 
+_PREDICT_REGRESSION_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    200: {
+        "description": "Successful regression prediction",
+        "content": {
+            "application/json": {
+                "example": {
+                    "backend": "xgboost_reg",
+                    "predictions": [0.45, 0.82, 0.12],
+                    "n_samples": 3,
+                },
+            },
+        },
+    },
+    400: {
+        "description": "Invalid request",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "backend must be one of: xgboost_reg, lightgbm_reg, "
+                        "mlp_reg, lstm_reg",
+                    }
+                }
+            }
+        },
+    },
+}
+
+
+def _register_predict_regression(router: APIRouter, get_container: ContainerProtocol) -> None:
+    async def _predict_regression(request: Request) -> Response:
+        """Predict continuous values using a trained regressor model.
+
+        Loads the specified regressor model from disk and runs inference
+        on the provided feature matrix. Returns predicted continuous values.
+        """
+        import numpy as np
+        from numpy.typing import NDArray
+
+        from covenant_radar_api.worker import _regression_hooks as hooks
+
+        body_bytes = await request.body()
+        try:
+            req = parse_regression_predict_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+        except JSONTypeError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+
+        # Load the regressor backend and model
+        registry = hooks.regressor_registry_factory()
+        backend = registry.get(req["backend"])
+        model = backend.load(path=req["model_path"])
+
+        # Convert features to numpy array and run inference
+        x: NDArray[np.float64] = np.array(req["features"], dtype=np.float64)
+        predictions_array: NDArray[np.float64] = model.predict(x)
+        predictions: list[float] = predictions_array.tolist()
+        preds_json: list[JSONValue] = [float(v) for v in predictions]
+
+        response = RegressionPredictResponse(
+            backend=req["backend"],
+            predictions=predictions,
+            n_samples=len(predictions),
+        )
+
+        body: dict[str, JSONValue] = {
+            "backend": response["backend"],
+            "predictions": preds_json,
+            "n_samples": response["n_samples"],
+        }
+        return Response(content=dump_json_str(body), media_type="application/json")
+
+    router.add_api_route(
+        "/predict-regression",
+        _predict_regression,
+        methods=["POST"],
+        response_model=None,
+        summary="Predict with regressor model",
+        description=(
+            "Predict continuous values using a trained regressor model. "
+            "Provide the backend, model path, and feature matrix. "
+            "Supports xgboost_reg, lightgbm_reg, mlp_reg, and lstm_reg backends."
+        ),
+        response_description="Predictions with continuous values",
+        responses=_PREDICT_REGRESSION_RESPONSES,
+    )
+
+
+_EXPLAIN_REGRESSION_RESPONSES: dict[int | str, dict[str, JSONValue]] = {
+    202: {
+        "description": "Regression explanation job queued",
+        "content": {
+            "application/json": {
+                "example": {
+                    "job_id": "explain-reg-job-uuid",
+                    "status": "queued",
+                },
+            },
+        },
+    },
+    400: {
+        "description": "Invalid configuration",
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "explainer must be one of: permutation, "
+                        "gradient, integrated_gradients, shap_tree",
+                    }
+                }
+            }
+        },
+    },
+}
+
+
+def _register_explain_regression(
+    router: APIRouter,
+    get_container: ContainerProtocol,
+) -> None:
+    async def _explain_regression(request: Request) -> Response:
+        """Enqueue regression feature importance explanation job.
+
+        Computes feature importances for trained regressor models.
+        Supports permutation, gradient, integrated_gradients, and
+        shap_tree explainers depending on backend.
+        """
+        body_bytes = await request.body()
+        try:
+            parsed = parse_regression_explain_request(body_bytes)
+        except ValueError as exc:
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=str(exc),
+                http_status=400,
+            ) from exc
+        except JSONTypeError as exc:
+            raise AppError(
+                code=ErrorCode.INVALID_INPUT,
+                message=str(exc),
+                http_status=400,
+            ) from exc
+
+        config_json = body_bytes.decode("utf-8")
+
+        queue = get_container.rq_queue()
+        job = queue.enqueue(
+            "covenant_radar_api.worker.explain_regression_job.process_regression_explain_job",
+            config_json,
+            job_timeout=3600,
+            result_ttl=86400,
+            failure_ttl=86400,
+            description=(f"Regression feature importance ({parsed['explainer']})"),
+        )
+
+        response = RegressionExplainResponse(
+            job_id=job.get_id(),
+            status="queued",
+        )
+        body: dict[str, JSONValue] = {
+            "job_id": response["job_id"],
+            "status": response["status"],
+        }
+        return Response(
+            content=dump_json_str(body),
+            media_type="application/json",
+            status_code=202,
+        )
+
+    router.add_api_route(
+        "/explain-regression",
+        _explain_regression,
+        methods=["POST"],
+        response_model=None,
+        status_code=202,
+        summary="Compute regression feature importance explanations",
+        description=(
+            "Compute feature importances for a trained regressor model "
+            "using pluggable explainers. Supported explainers depend on "
+            "the backend:\n\n"
+            "**XGBoost_reg/LightGBM_reg backends:**\n"
+            "- `permutation`: Feature permutation (MSE change)\n"
+            "- `shap_tree`: TreeSHAP values (fast, exact)\n\n"
+            "**MLP_reg/LSTM_reg backends:**\n"
+            "- `gradient`: Input gradients (fast)\n"
+            "- `integrated_gradients`: Path-integrated gradients\n"
+            "- `permutation`: Feature permutation (model-agnostic)\n\n"
+            "**Job Result:**\n"
+            "When complete, the job result includes:\n"
+            "- Ranked feature importance scores\n"
+            "- Number of samples used\n"
+            "- Computation time\n\n"
+            "Poll /ml/jobs/{job_id} for status and results."
+        ),
+        response_description="Job ID for polling status",
+        responses=_EXPLAIN_REGRESSION_RESPONSES,
+    )
+
+
 def build_router(get_container: ContainerProtocol) -> APIRouter:
     """Build FastAPI router for ML operations."""
     router = APIRouter(prefix="/ml", tags=["ml"])
     _register_predict(router, get_container)
+    _register_predict_regression(router, get_container)
     _register_train(router, get_container)
     _register_train_external(router, get_container)
+    _register_train_external_regression(router, get_container)
     _register_optimize(router, get_container)
+    _register_optimize_regression(router, get_container)
     _register_explain(router, get_container)
+    _register_explain_regression(router, get_container)
     _register_model_info(router, get_container)
     _register_job_status(router, get_container)
     return router
