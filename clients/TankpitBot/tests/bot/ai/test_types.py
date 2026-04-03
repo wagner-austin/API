@@ -175,7 +175,7 @@ class TestAIConfig:
     def test_make_default_ai_config(self) -> None:
         """Default config has sensible values."""
         config = make_default_ai_config()
-        assert config["fuel_critical_threshold"] == 400
+        assert config["fuel_critical_threshold"] == 500
         assert config["fuel_low_threshold"] == 500
         assert config["fuel_full_threshold"] == 1200
         assert config["hunt_min_fuel"] == 100
@@ -187,8 +187,6 @@ class TestAIConfig:
         assert len(config["patrol_waypoints"]) == 4
         assert config["dual_break_threshold"] == 12
         assert config["dual_resume_threshold"] == 20
-        assert config["radar_break_threshold"] == 8
-        assert config["radar_resume_threshold"] == 12
         assert config["equip_search_hop_distance"] == 15
         assert config["equip_search_max_failures"] == 3
 
@@ -202,7 +200,7 @@ class TestAIConfig:
     def test_decode_invalid_waypoints_not_list_raises(self) -> None:
         """Decode rejects non-list patrol_waypoints."""
         data: JSONObject = {
-            "fuel_critical_threshold": 400,
+            "fuel_critical_threshold": 500,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -216,8 +214,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 12,
             "dual_resume_threshold": 20,
-            "radar_break_threshold": 8,
-            "radar_resume_threshold": 12,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": "not_a_list",
@@ -228,7 +224,7 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_format_raises(self) -> None:
         """Decode rejects waypoints that are not [x, y] pairs."""
         data: JSONObject = {
-            "fuel_critical_threshold": 400,
+            "fuel_critical_threshold": 500,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -242,8 +238,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 12,
             "dual_resume_threshold": 20,
-            "radar_break_threshold": 8,
-            "radar_resume_threshold": 12,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": [[1, 2, 3]],
@@ -254,7 +248,7 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_type_raises(self) -> None:
         """Decode rejects waypoints with non-int coordinates."""
         data: JSONObject = {
-            "fuel_critical_threshold": 400,
+            "fuel_critical_threshold": 500,
             "fuel_low_threshold": 500,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -268,8 +262,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 12,
             "dual_resume_threshold": 20,
-            "radar_break_threshold": 8,
-            "radar_resume_threshold": 12,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": [["a", "b"]],
@@ -301,7 +293,7 @@ class TestAIState:
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
         assert state["combat_phase"] == "none"
-        assert state["config"]["fuel_critical_threshold"] == 400
+        assert state["config"]["fuel_critical_threshold"] == 500
         assert state["config"]["fuel_low_threshold"] == 500
 
     def test_make_initial_ai_state_custom_config(self) -> None:
@@ -324,8 +316,6 @@ class TestAIState:
             map_open_cooldown_ms=config["map_open_cooldown_ms"],
             dual_break_threshold=config["dual_break_threshold"],
             dual_resume_threshold=config["dual_resume_threshold"],
-            radar_break_threshold=config["radar_break_threshold"],
-            radar_resume_threshold=config["radar_resume_threshold"],
             equip_search_hop_distance=config["equip_search_hop_distance"],
             equip_search_max_failures=config["equip_search_max_failures"],
             patrol_waypoints=config["patrol_waypoints"],
