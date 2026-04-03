@@ -83,13 +83,20 @@ class TestEncodeTerrainTile:
 
     def test_encodes_all_fields(self) -> None:
         """Encodes all terrain tile fields."""
-        tile = make_terrain_tile(x=10, y=20, terrain_type=3, entity_id=5)
+        tile = make_terrain_tile(
+            x=10,
+            y=20,
+            terrain_type=3,
+            cache_value=5,
+            overlay_value=255,
+        )
         encoded = encode_terrain_tile(tile)
 
         assert encoded["x"] == 10
         assert encoded["y"] == 20
         assert encoded["terrain_type"] == 3
-        assert encoded["entity_id"] == 5
+        assert encoded["cache_value"] == 5
+        assert encoded["overlay_value"] == 255
 
 
 class TestEncodeViewportState:
@@ -145,8 +152,8 @@ class TestEncodeWorldState:
             raise AssertionError("viewport should be a dict")
         assert viewport["left"] == 0
         assert viewport["top"] == 0
-        assert viewport["width"] == 18
-        assert viewport["height"] == 18
+        assert viewport["width"] == 16
+        assert viewport["height"] == 16
 
     def test_encodes_populated_state(self) -> None:
         """Encodes world state with data."""
