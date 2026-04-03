@@ -16,6 +16,8 @@ from covenant_ml.datasets.loaders.parquet_cache import (
 from covenant_ml.datasets.types import (
     DatasetConfig,
     LoadedDataset,
+    RegressionDatasetConfig,
+    RegressionTargetSpec,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -303,3 +305,62 @@ class TestCreateDatasetLoader:
 
         assert result["meta"]["n_samples"] == 3
         assert result["meta"]["n_features"] == 2
+
+
+# ---- Regression helpers ----
+
+
+def _make_regression_config() -> RegressionDatasetConfig:
+    """Create a regression dataset config for the fixture."""
+    return RegressionDatasetConfig(
+        name="test_regression",
+        display_name="Test Regression",
+        folder="regression_csv",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="target_value"),
+        exclude_columns=("entity_id",),
+        n_samples_expected=5,
+        n_features_expected=3,
+        target_mean_expected=0.86,
+    )
+
+
+class TestDatasetLoaderRegression:
+    """Tests for DatasetLoader regression loading."""
+
+    def test_load_regression_csv(self) -> None:
+        """load_regression loads CSV regression data correctly."""
+        loader = DatasetLoader()
+        config = _make_regression_config()
+        fixtures_dir = _get_fixtures_dir()
+
+        result = loader.load_regression(config, fixtures_dir)
+
+        assert result["meta"]["name"] == "test_regression"
+        assert result["meta"]["n_samples"] == 5
+        assert result["meta"]["n_features"] == 3
+        assert result["x"].shape == (5, 3)
+        assert result["y"].shape == (5,)
+
+    def test_load_regression_unsupported_format_raises(self) -> None:
+        """load_regression raises ValueError for non-CSV format."""
+        loader = DatasetLoader()
+        config = RegressionDatasetConfig(
+            name="test_excel",
+            display_name="Test Excel",
+            folder="regression_csv",
+            file_name="data.xlsx",
+            file_format="excel",
+            encoding="utf-8",
+            target=RegressionTargetSpec(column_name="target_value"),
+            exclude_columns=(),
+            n_samples_expected=5,
+            n_features_expected=3,
+            target_mean_expected=0.0,
+        )
+        fixtures_dir = _get_fixtures_dir()
+
+        with pytest.raises(ValueError, match="not yet implemented for format 'excel'"):
+            loader.load_regression(config, fixtures_dir)

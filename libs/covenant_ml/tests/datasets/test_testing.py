@@ -12,7 +12,12 @@ from covenant_ml.datasets.testing import (
     create_fake_dataset_loader,
     create_fake_regression_dataset_loader,
 )
-from covenant_ml.datasets.types import DatasetConfig, TargetColumnSpec
+from covenant_ml.datasets.types import (
+    DatasetConfig,
+    RegressionDatasetConfig,
+    RegressionTargetSpec,
+    TargetColumnSpec,
+)
 
 
 def _make_test_config(name: str = "test") -> DatasetConfig:
@@ -188,13 +193,37 @@ class TestCreateFakeDatasetLoader:
 # =============================================================================
 
 
+def _make_regression_test_config(name: str = "test") -> RegressionDatasetConfig:
+    """Create a test regression dataset config.
+
+    Args:
+        name: Dataset name.
+
+    Returns:
+        RegressionDatasetConfig for testing.
+    """
+    return RegressionDatasetConfig(
+        name=name,
+        display_name=f"Test {name}",
+        folder=f"{name}_folder",
+        file_name="data.csv",
+        file_format="csv",
+        encoding="utf-8",
+        target=RegressionTargetSpec(column_name="target"),
+        exclude_columns=(),
+        n_samples_expected=100,
+        n_features_expected=10,
+        target_mean_expected=0.0,
+    )
+
+
 class TestFakeRegressionDatasetLoader:
     """Tests for FakeRegressionDatasetLoader class."""
 
     def test_init_with_defaults(self) -> None:
         """FakeRegressionDatasetLoader initializes with default parameters."""
         loader = FakeRegressionDatasetLoader()
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["n_samples"] == 100
@@ -207,7 +236,7 @@ class TestFakeRegressionDatasetLoader:
             n_features=5,
             random_state=123,
         )
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["n_samples"] == 50
@@ -216,7 +245,7 @@ class TestFakeRegressionDatasetLoader:
     def test_load_returns_correct_shapes(self) -> None:
         """Load returns arrays with correct shapes."""
         loader = FakeRegressionDatasetLoader(n_samples=100, n_features=10)
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["x"].shape == (100, 10)
@@ -225,7 +254,7 @@ class TestFakeRegressionDatasetLoader:
     def test_load_returns_float64_targets(self) -> None:
         """Load returns float64 targets (continuous, not int64 labels)."""
         loader = FakeRegressionDatasetLoader()
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["x"].dtype == np.float64
@@ -234,7 +263,7 @@ class TestFakeRegressionDatasetLoader:
     def test_load_uses_config_name(self) -> None:
         """Load uses name from config in metadata."""
         loader = FakeRegressionDatasetLoader()
-        config = _make_test_config("regression_data")
+        config = _make_regression_test_config("regression_data")
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["name"] == "regression_data"
@@ -242,7 +271,7 @@ class TestFakeRegressionDatasetLoader:
     def test_load_generates_feature_names(self) -> None:
         """Load generates feature names based on n_features."""
         loader = FakeRegressionDatasetLoader(n_features=3)
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["feature_names"] == (
@@ -254,7 +283,7 @@ class TestFakeRegressionDatasetLoader:
     def test_load_produces_continuous_targets(self) -> None:
         """Load generates non-trivial continuous target values."""
         loader = FakeRegressionDatasetLoader(n_samples=50, n_features=5)
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         # Targets should not all be the same (non-trivial regression)
@@ -265,7 +294,7 @@ class TestFakeRegressionDatasetLoader:
         """Load produces identical results with same random_state."""
         loader1 = FakeRegressionDatasetLoader(random_state=42)
         loader2 = FakeRegressionDatasetLoader(random_state=42)
-        config = _make_test_config()
+        config = _make_regression_test_config()
 
         result1 = loader1.load(config, Path("/fake"))
         result2 = loader2.load(config, Path("/fake"))
@@ -277,22 +306,54 @@ class TestFakeRegressionDatasetLoader:
         """Load produces different results with different random_state."""
         loader1 = FakeRegressionDatasetLoader(random_state=42)
         loader2 = FakeRegressionDatasetLoader(random_state=99)
-        config = _make_test_config()
+        config = _make_regression_test_config()
 
         result1 = loader1.load(config, Path("/fake"))
         result2 = loader2.load(config, Path("/fake"))
 
         assert not np.array_equal(result1["x"], result2["x"])
 
-    def test_load_meta_has_zero_positive_ratio(self) -> None:
-        """Regression meta sets n_positive=0 and positive_ratio=0.0."""
+    def test_load_meta_has_target_stats(self) -> None:
+        """Regression meta has target distribution statistics."""
         loader = FakeRegressionDatasetLoader()
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
-        assert result["meta"]["n_positive"] == 0
-        assert result["meta"]["n_negative"] == 100
-        assert result["meta"]["positive_ratio"] == 0.0
+        meta = result["meta"]
+        assert meta["target_min"] <= meta["target_mean"] <= meta["target_max"]
+        assert meta["target_std"] >= 0.0
+
+    def test_load_meta_target_stats_correct(self) -> None:
+        """Regression meta target stats match generated y array."""
+        loader = FakeRegressionDatasetLoader(n_samples=50, n_features=3)
+        config = _make_regression_test_config()
+        result = loader.load(config, Path("/fake"))
+
+        y = result["y"]
+        meta = result["meta"]
+
+        # Compute expected stats using explicit sum/len to avoid Any from np.mean
+        n = 50
+        y_sum = float(np.sum(y))
+        expected_mean = y_sum / n
+        y_sq_diff_sum = float(np.sum((y - expected_mean) ** 2))
+        expected_std: float = (y_sq_diff_sum / n) ** 0.5
+        expected_min = float(np.min(y))
+        expected_max = float(np.max(y))
+
+        assert abs(meta["target_mean"] - expected_mean) < 1e-10
+        assert abs(meta["target_std"] - expected_std) < 1e-10
+        assert abs(meta["target_min"] - expected_min) < 1e-10
+        assert abs(meta["target_max"] - expected_max) < 1e-10
+
+    def test_load_meta_target_min_less_than_max(self) -> None:
+        """Target min is strictly less than target max (non-trivial data)."""
+        loader = FakeRegressionDatasetLoader(n_samples=50, n_features=5)
+        config = _make_regression_test_config()
+        result = loader.load(config, Path("/fake"))
+
+        meta = result["meta"]
+        assert meta["target_min"] < meta["target_max"]
 
 
 class TestCreateFakeRegressionDatasetLoader:
@@ -301,7 +362,7 @@ class TestCreateFakeRegressionDatasetLoader:
     def test_creates_loader_with_defaults(self) -> None:
         """Factory creates regression loader with default parameters."""
         loader = create_fake_regression_dataset_loader()
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["n_samples"] == 100
@@ -315,7 +376,7 @@ class TestCreateFakeRegressionDatasetLoader:
             n_features=20,
             random_state=99,
         )
-        config = _make_test_config()
+        config = _make_regression_test_config()
         result = loader.load(config, Path("/fake"))
 
         assert result["meta"]["n_samples"] == 200
