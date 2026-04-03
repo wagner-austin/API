@@ -11,6 +11,7 @@ from tankpit_bot.container.decoders.combat import (
     is_combat_hit_structure,
     is_deactivation_death_structure,
     is_deactivation_kill_structure,
+    is_mine_detonation_structure,
     is_mine_placement_structure,
 )
 from tankpit_bot.container.decoders.misc import (
@@ -143,6 +144,9 @@ def _identify_subtype_specific(data: bytes) -> ContainerMessageType:
     Returns:
         Identified type, or UNKNOWN if not matched.
     """
+    # Mine detonation: 0x45 subtype with repeated coordinate pairs
+    if is_mine_detonation_structure(data):
+        return ContainerMessageType.MINE_DETONATION
     # Container pickup: exactly 5 bytes with 0x43 subtype
     if is_container_pickup_structure(data):
         return ContainerMessageType.CONTAINER_PICKUP
