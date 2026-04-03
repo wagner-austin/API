@@ -12,13 +12,51 @@ from types import ModuleType
 
 import pytest
 import scripts._test_hooks as _hooks
+from covenant_ml.types import BackendName
 from scripts._test_hooks import (
-    LightGBMOptimizationResult,
-    XGBoostOptimizationResult,
+    LoadingProgressCallbackProtocol,
+    PhaseProgressCallbackProtocol,
+    TrialProgressCallbackProtocol,
+    TrialProgressInfo,
+    UnifiedOptimizationResult,
 )
 from scripts.optimize import main
 
 from .conftest import make_fake_lightgbm_result, make_fake_result
+
+
+def _make_trial_info(
+    trial_number: int = 1,
+    n_trials_total: int = 5,
+    current_value: float = 0.80,
+    best_value: float = 0.80,
+    best_trial: int = 1,
+    is_best: bool = True,
+    backend: BackendName = "xgboost",
+) -> TrialProgressInfo:
+    """Create a unified TrialProgressInfo for testing.
+
+    Args:
+        trial_number: Current trial number.
+        n_trials_total: Total trials.
+        current_value: Current trial AUC.
+        best_value: Best AUC so far.
+        best_trial: Best trial number.
+        is_best: Whether current is best.
+        backend: Backend name.
+
+    Returns:
+        TrialProgressInfo dict.
+    """
+    return TrialProgressInfo(
+        backend=backend,
+        trial_number=trial_number,
+        n_trials_total=n_trials_total,
+        current_value=current_value,
+        best_value=best_value,
+        best_trial=best_trial,
+        is_best=is_best,
+    )
 
 
 class TestMain:
@@ -33,54 +71,33 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count, callback_calls
             call_count += 1
-            _ = phase_callback  # Available for phase reporting
-            # Simulate calling progress callback as real runner would
+            _ = phase_callback
             if progress_callback is not None:
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.1,
-                        "best_max_depth": 6,
-                        "best_n_estimators": 100,
-                    }
-                )
+                progress_callback(_make_trial_info(trial_number=1, is_best=True))
                 callback_calls += 1
                 progress_callback(
-                    {
-                        "trial_number": 2,
-                        "n_trials_total": 5,
-                        "current_auc": 0.75,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": False,
-                        "best_learning_rate": 0.1,
-                        "best_max_depth": 6,
-                        "best_n_estimators": 100,
-                    }
+                    _make_trial_info(
+                        trial_number=2, current_value=0.75, is_best=False, best_trial=1
+                    )
                 )
                 callback_calls += 1
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
-            exit_code: int = main(["-n", "5", "--no-save-model"])  # Small n_trials for test
+            exit_code: int = main(["-n", "5", "--no-save-model"])
             assert exit_code == 0
             assert call_count == 1
-            assert callback_calls == 2  # Progress callback was invoked
+            assert callback_calls == 2
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_with_compare_presets(self) -> None:
         """Test main with -c runs compare presets."""
@@ -90,24 +107,22 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code: int = main(["-c", "-n", "5", "--no-save-model"])
             assert exit_code == 0
             assert call_count == 4  # All four presets
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_with_all_datasets(self) -> None:
         """Test main with -a runs all datasets."""
@@ -117,24 +132,22 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code: int = main(["-a", "-n", "5", "--no-save-model"])
             assert exit_code == 0
             assert call_count == 3  # All three datasets
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_with_verbose(self) -> None:
         """Test main with -v sets debug logging."""
@@ -144,24 +157,22 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code: int = main(["-v", "-n", "5", "--no-save-model"])
             assert exit_code == 0
             assert call_count == 1
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_with_all_options(self) -> None:
         """Test main with multiple options."""
@@ -171,15 +182,15 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             configs_received.append(config_json)
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code: int = main(
                 ["-d", "us", "-n", "25", "-f", "log_only", "--device", "cpu", "--no-save-model"]
@@ -192,7 +203,7 @@ class TestMain:
             assert "log_only" in config
             assert "cpu" in config
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_with_timeout(self) -> None:
         """Test main with timeout option."""
@@ -202,17 +213,15 @@ class TestMain:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             configs_received.append(config_json)
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code: int = main(["-n", "5", "-t", "120", "--no-save-model"])
             assert exit_code == 0
@@ -220,7 +229,7 @@ class TestMain:
             assert "timeout_seconds" in configs_received[0]
             assert "120" in configs_received[0]
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_main_help_exits_zero(self) -> None:
         """Test main with --help exits with code 0."""
@@ -236,8 +245,6 @@ class TestModuleEntry:
         """Test __main__ entry point via runpy."""
         import runpy
 
-        # Clear module from sys.modules to avoid runpy warning about
-        # module already being imported
         modules_to_clear = [k for k in sys.modules if k.startswith("scripts.optimize")]
         saved_modules: dict[str, ModuleType] = {}
         for mod in modules_to_clear:
@@ -251,56 +258,39 @@ class TestModuleEntry:
             assert exc_info.value.code == 0
         finally:
             sys.argv = original_argv
-            # Restore modules
             sys.modules.update(saved_modules)
 
     def test_dunder_main_module_import_does_not_execute_main(self) -> None:
-        """Test importing __main__.py directly doesn't execute main (covers False branch)."""
+        """Test importing __main__.py directly doesn't execute main."""
         import importlib
 
-        # Clear the module from cache if present
         mod_name = "scripts.optimize.__main__"
         if mod_name in sys.modules:
             del sys.modules[mod_name]
 
-        # Import the module - this covers the False branch of if __name__ == "__main__"
         module: ModuleType = importlib.import_module(mod_name)
-
-        # Verify the module was imported but main wasn't called (no SystemExit)
-        # The module should have the name "scripts.optimize.__main__", not "__main__"
         assert module.__name__ == mod_name
-        # If we got here without SystemExit, the if __name__ == "__main__" was False
 
     def test_main_with_multiple_backends(self) -> None:
         """Test main with multiple backends runs multi-backend mode."""
         backends_called: list[str] = []
 
-        def fake_xgboost_runner(
+        def fake_runner(
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            backends_called.append("xgboost")
-            return make_fake_result(dataset="taiwan", best_val_auc=0.85)
-
-        def fake_lightgbm_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> LightGBMOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
+            if '"xgboost"' in config_json:
+                backends_called.append("xgboost")
+                return make_fake_result(dataset="taiwan", best_value=0.85)
             backends_called.append("lightgbm")
-            return make_fake_lightgbm_result(dataset="taiwan", best_val_auc=0.90)
+            return make_fake_lightgbm_result(dataset="taiwan", best_value=0.90)
 
-        original_xgb = _hooks.xgboost_runner
-        original_lgb = _hooks.lightgbm_runner
-        _hooks.xgboost_runner = fake_xgboost_runner
-        _hooks.lightgbm_runner = fake_lightgbm_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             exit_code = main(["-b", "xgboost,lightgbm", "-n", "5", "--no-save-model"])
             assert exit_code == 0
@@ -308,8 +298,7 @@ class TestModuleEntry:
             assert "xgboost" in backends_called
             assert "lightgbm" in backends_called
         finally:
-            _hooks.xgboost_runner = original_xgb
-            _hooks.lightgbm_runner = original_lgb
+            _hooks.optimization_runner = original
 
 
 class TestKeyboardInterrupt:
@@ -324,26 +313,20 @@ class TestKeyboardInterrupt:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            _ = config_json  # Unused
-            _ = external_dir  # Unused
-            _ = output_dir  # Unused
-            _ = progress_callback  # Unused
-            _ = phase_callback  # Unused
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             raise KeyboardInterrupt()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = raising_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = raising_runner
         try:
             exit_code: int = main(["-n", "1", "--no-save-model"])
             assert exit_code == 130
 
-            # Verify output
             captured = capsys.readouterr()
             output = captured.out + captured.err
             assert "Process Interrupted by User" in output
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
