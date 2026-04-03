@@ -5,38 +5,39 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import pytest
+import scripts._test_hooks as _hooks_module
 from covenant_ml.backends.protocol import (
     BackendCapabilities,
     PreparedClassifier,
     ProgressCallback,
 )
 from covenant_ml.datasets import DatasetConfig, DatasetMeta, LoadedDataset
+from covenant_ml.optimizer.types import (
+    FloatRangeSpec,
+    IntRangeSpec,
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+    SearchSpace,
+    XGBoostSearchSpace,
+)
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
-    ClearGBMConfig,
     EvalMetrics,
     FeatureImportance,
-    LightGBMConfig,
-    LSTMConfig,
-    MLPConfig,
-    TrainConfig,
     TrainOutcome,
 )
 from numpy.typing import NDArray
 from platform_core.logging import setup_rich_logging
-from scripts._test_hooks import (
-    ClearGBMOptimizationResult,
-    LightGBMOptimizationResult,
-    LSTMOptimizationResult,
-    MLPOptimizationResult,
-    XGBoostOptimizationResult,
-)
+
+from covenant_radar_api.worker.optimize_types import UnifiedOptimizationResult
 
 FeaturePresetLiteral = Literal["none", "log_only", "ratios_only", "full"]
 
@@ -52,245 +53,234 @@ def _setup_rich_logging_for_tests() -> None:
     setup_rich_logging(level="WARNING", show_time=False)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_project_root(tmp_path: Path) -> Generator[None, None, None]:
+    """Isolate tests from real project root to prevent history file corruption.
+
+    Overrides the project_root_hook so that all optimize tests use a temporary
+    directory instead of the real project root. This prevents xdist race
+    conditions on the shared optimization_history.jsonl file.
+
+    Args:
+        tmp_path: Pytest temporary directory unique to each test.
+
+    Yields:
+        None after setting up hook, restores after test.
+    """
+    (tmp_path / "models").mkdir(exist_ok=True)
+    (tmp_path / "data" / "external").mkdir(parents=True, exist_ok=True)
+
+    original = _hooks_module.project_root_hook
+
+    def _test_project_root() -> Path:
+        return tmp_path
+
+    _hooks_module.project_root_hook = _test_project_root
+    yield
+    _hooks_module.project_root_hook = original
+
+
 # =============================================================================
 # Fake Result Factories
 # =============================================================================
 
 
-def make_fake_train_config() -> TrainConfig:
-    """Create a fake TrainConfig for testing."""
-    return TrainConfig(
-        device="cpu",
-        learning_rate=0.1,
-        max_depth=6,
-        n_estimators=100,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        train_ratio=0.7,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        early_stopping_rounds=10,
-        reg_alpha=0.01,
-        reg_lambda=0.01,
-    )
-
-
 def make_fake_result(
+    backend: BackendName = "xgboost",
     dataset: str = "taiwan",
     feature_preset: FeaturePresetLiteral = "full",
-    best_val_auc: float = 0.85,
+    best_value: float = 0.85,
     n_features: int = 100,
-) -> XGBoostOptimizationResult:
-    """Create a fake optimization result for testing."""
-    return {
-        "backend": "xgboost",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": n_features,
-        "feature_preset": feature_preset,
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_max_depth": 6,
-        "best_n_estimators": 100,
-        "best_learning_rate": 0.1,
-        "best_reg_alpha": 0.01,
-        "best_reg_lambda": 0.01,
-        "best_subsample": 0.8,
-        "best_colsample_bytree": 0.8,
-        "duration_seconds": 10.0,
-        "recommended_config": make_fake_train_config(),
-    }
+    best_int_params: SampledIntParams | None = None,
+    best_float_params: SampledFloatParams | None = None,
+    best_string_params: SampledStringParams | None = None,
+) -> UnifiedOptimizationResult:
+    """Create a fake optimization result for testing.
 
+    Args:
+        backend: Backend name.
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+        n_features: Number of features.
+        best_int_params: Optional int params override.
+        best_float_params: Optional float params override.
+        best_string_params: Optional string params override.
 
-def make_fake_mlp_result(
-    dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
-    best_val_auc: float = 0.85,
-) -> MLPOptimizationResult:
-    """Create a fake MLP optimization result for testing."""
-    return {
-        "backend": "mlp",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": 100,
-        "feature_preset": feature_preset,
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_n_layers": 3,
-        "best_hidden_size": 128,
-        "best_learning_rate": 0.001,
-        "best_dropout": 0.2,
-        "best_batch_size": 64,
-        "duration_seconds": 10.0,
-        "recommended_config": MLPConfig(
-            device="cpu",
-            precision="fp32",
-            optimizer="adamw",
-            hidden_sizes=(128, 64),
-            learning_rate=0.001,
-            dropout=0.2,
-            batch_size=64,
-            n_epochs=100,
-            early_stopping_patience=10,
-            random_state=42,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-        ),
-    }
-
-
-def make_fake_lightgbm_result(
-    dataset: str = "taiwan",
-    feature_preset: FeaturePresetLiteral = "full",
-    best_val_auc: float = 0.85,
-) -> LightGBMOptimizationResult:
-    """Create a fake LightGBM optimization result for testing.
-
-    Note: best_max_depth is always -1 (unlimited) because LightGBM uses
-    num_leaves as the primary complexity control, not max_depth.
+    Returns:
+        UnifiedOptimizationResult with test values.
     """
-    return {
-        "backend": "lightgbm",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": 100,
-        "feature_preset": feature_preset,
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_max_depth": -1,  # Fixed: unlimited depth, num_leaves controls complexity
-        "best_n_estimators": 100,
-        "best_num_leaves": 31,
-        "best_learning_rate": 0.1,
-        "best_reg_alpha": 0.01,
-        "best_reg_lambda": 0.01,
-        "best_subsample": 0.8,
-        "best_colsample_bytree": 0.8,
-        "duration_seconds": 10.0,
-        "recommended_config": LightGBMConfig(
-            device="cpu",
-            max_depth=-1,  # Fixed: unlimited depth, num_leaves controls complexity
-            n_estimators=100,
-            num_leaves=31,
-            min_child_samples=20,
+    if best_int_params is None:
+        best_int_params = SampledIntParams(max_depth=6, n_estimators=100)
+    if best_float_params is None:
+        best_float_params = SampledFloatParams(
             learning_rate=0.1,
             reg_alpha=0.01,
             reg_lambda=0.01,
             subsample=0.8,
             colsample_bytree=0.8,
-            random_state=42,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-            early_stopping_rounds=10,
+        )
+    if best_string_params is None:
+        best_string_params = SampledStringParams()
+
+    return UnifiedOptimizationResult(
+        backend=backend,
+        status="complete",
+        dataset=dataset,
+        n_samples=1000,
+        n_features=n_features,
+        feature_preset=feature_preset,
+        n_trials_complete=10,
+        n_trials_pruned=2,
+        n_trials_failed=0,
+        best_trial_number=5,
+        best_value=best_value,
+        best_int_params=best_int_params,
+        best_float_params=best_float_params,
+        best_string_params=best_string_params,
+        duration_seconds=10.0,
+    )
+
+
+def make_fake_xgboost_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_value: float = 0.85,
+) -> UnifiedOptimizationResult:
+    """Create a fake XGBoost optimization result for testing.
+
+    Args:
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+
+    Returns:
+        UnifiedOptimizationResult for xgboost backend.
+    """
+    return make_fake_result(
+        backend="xgboost",
+        dataset=dataset,
+        feature_preset=feature_preset,
+        best_value=best_value,
+        best_int_params=SampledIntParams(max_depth=6, n_estimators=100),
+        best_float_params=SampledFloatParams(
+            learning_rate=0.1,
+            reg_alpha=0.01,
+            reg_lambda=0.01,
+            subsample=0.8,
+            colsample_bytree=0.8,
         ),
-    }
+    )
+
+
+def make_fake_mlp_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_value: float = 0.85,
+) -> UnifiedOptimizationResult:
+    """Create a fake MLP optimization result for testing.
+
+    Args:
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+
+    Returns:
+        UnifiedOptimizationResult for mlp backend.
+    """
+    return make_fake_result(
+        backend="mlp",
+        dataset=dataset,
+        feature_preset=feature_preset,
+        best_value=best_value,
+        best_int_params=SampledIntParams(n_layers=3, hidden_size=128, batch_size=64),
+        best_float_params=SampledFloatParams(learning_rate=0.001, dropout=0.2),
+    )
+
+
+def make_fake_lightgbm_result(
+    dataset: str = "taiwan",
+    feature_preset: FeaturePresetLiteral = "full",
+    best_value: float = 0.85,
+) -> UnifiedOptimizationResult:
+    """Create a fake LightGBM optimization result for testing.
+
+    Args:
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+
+    Returns:
+        UnifiedOptimizationResult for lightgbm backend.
+    """
+    return make_fake_result(
+        backend="lightgbm",
+        dataset=dataset,
+        feature_preset=feature_preset,
+        best_value=best_value,
+        best_int_params=SampledIntParams(
+            max_depth=-1, n_estimators=100, num_leaves=31, min_child_samples=20
+        ),
+        best_float_params=SampledFloatParams(
+            learning_rate=0.1,
+            reg_alpha=0.01,
+            reg_lambda=0.01,
+            subsample=0.8,
+            colsample_bytree=0.8,
+        ),
+    )
 
 
 def make_fake_lstm_result(
     dataset: str = "taiwan",
     feature_preset: FeaturePresetLiteral = "full",
-    best_val_auc: float = 0.85,
-) -> LSTMOptimizationResult:
-    """Create a fake LSTM optimization result for testing."""
-    return {
-        "backend": "lstm",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": 100,
-        "feature_preset": feature_preset,
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_hidden_size": 64,
-        "best_num_layers": 2,
-        "best_learning_rate": 0.001,
-        "best_dropout": 0.2,
-        "best_batch_size": 32,
-        "duration_seconds": 10.0,
-        "recommended_config": LSTMConfig(
-            device="cpu",
-            precision="fp32",
-            hidden_size=64,
-            num_layers=2,
-            learning_rate=0.001,
-            dropout=0.2,
-            batch_size=32,
-            n_epochs=100,
-            early_stopping_patience=10,
-            sequence_length=10,
-            bidirectional=False,
-            random_state=42,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-        ),
-    }
+    best_value: float = 0.85,
+) -> UnifiedOptimizationResult:
+    """Create a fake LSTM optimization result for testing.
+
+    Args:
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+
+    Returns:
+        UnifiedOptimizationResult for lstm backend.
+    """
+    return make_fake_result(
+        backend="lstm",
+        dataset=dataset,
+        feature_preset=feature_preset,
+        best_value=best_value,
+        best_int_params=SampledIntParams(hidden_size=64, num_layers=2, batch_size=32),
+        best_float_params=SampledFloatParams(learning_rate=0.001, dropout=0.2),
+    )
 
 
 def make_fake_cleargbm_result(
     dataset: str = "taiwan",
     feature_preset: FeaturePresetLiteral = "full",
-    best_val_auc: float = 0.85,
-) -> ClearGBMOptimizationResult:
-    """Create a fake ClearGBM optimization result for testing."""
-    return {
-        "backend": "cleargbm",
-        "status": "complete",
-        "dataset": dataset,
-        "n_samples": 1000,
-        "n_features": 100,
-        "feature_preset": feature_preset,
-        "n_trials_complete": 10,
-        "n_trials_pruned": 2,
-        "n_trials_failed": 0,
-        "best_trial_number": 5,
-        "best_val_auc": best_val_auc,
-        "best_max_depth": 5,
-        "best_n_estimators": 100,
-        "best_learning_rate": 0.1,
-        "best_min_samples_split": 10,
-        "best_min_samples_leaf": 5,
-        "best_max_bins": 64,
-        "best_subsample": 1.0,
-        "duration_seconds": 10.0,
-        "recommended_config": ClearGBMConfig(
-            n_estimators=100,
-            max_depth=5,
-            learning_rate=0.1,
-            min_samples_split=10,
-            min_samples_leaf=5,
-            max_features=None,
-            max_bins=64,
-            subsample=1.0,
-            random_state=42,
-            track_contributions=True,
-            monotonic_constraints=None,
-            reg_alpha=0.0,
-            reg_lambda=0.0,
-            n_jobs=1,
-            train_ratio=0.7,
-            val_ratio=0.15,
-            test_ratio=0.15,
-            early_stopping_rounds=10,
+    best_value: float = 0.85,
+) -> UnifiedOptimizationResult:
+    """Create a fake ClearGBM optimization result for testing.
+
+    Args:
+        dataset: Dataset name.
+        feature_preset: Feature preset.
+        best_value: Best validation AUC.
+
+    Returns:
+        UnifiedOptimizationResult for cleargbm backend.
+    """
+    return make_fake_result(
+        backend="cleargbm",
+        dataset=dataset,
+        feature_preset=feature_preset,
+        best_value=best_value,
+        best_int_params=SampledIntParams(
+            max_depth=5, n_estimators=100, min_samples_split=10, min_samples_leaf=5, max_bins=64
         ),
-    }
+        best_float_params=SampledFloatParams(learning_rate=0.1, subsample=1.0),
+    )
 
 
 # =============================================================================
@@ -415,6 +405,27 @@ class FakeSaveModelBackend:
             for i, n in enumerate(feature_names)
         ]
 
+    def get_default_search_space(self) -> SearchSpace:
+        """Return fake default search space."""
+        return XGBoostSearchSpace(
+            max_depth=IntRangeSpec(param_type="int", low=3, high=10, log_scale=False),
+            n_estimators=IntRangeSpec(param_type="int", low=50, high=500, log_scale=False),
+            learning_rate=FloatRangeSpec(param_type="float", low=0.01, high=0.3, log_scale=True),
+            reg_alpha=FloatRangeSpec(param_type="float", low=1e-8, high=10.0, log_scale=True),
+            reg_lambda=FloatRangeSpec(param_type="float", low=1e-8, high=10.0, log_scale=True),
+            subsample=FloatRangeSpec(param_type="float", low=0.5, high=1.0, log_scale=False),
+            colsample_bytree=FloatRangeSpec(param_type="float", low=0.5, high=1.0, log_scale=False),
+        )
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return fake focused search space."""
+        return self.get_default_search_space()
+
 
 # =============================================================================
 # Fake Dataset Factories
@@ -473,5 +484,5 @@ __all__ = [
     "make_fake_lstm_result",
     "make_fake_mlp_result",
     "make_fake_result",
-    "make_fake_train_config",
+    "make_fake_xgboost_result",
 ]
