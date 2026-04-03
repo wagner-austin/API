@@ -6,14 +6,20 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from covenant_ml.optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SampledStringParams,
+)
 from scripts.optimize.display import (
     _format_delta,
+    create_history_comparison_table,
     create_hyperparams_table,
     create_result_table,
     print_config,
     print_result,
 )
-from scripts.optimize.history import XGBoostHistoryEntry
+from scripts.optimize.history import UnifiedHistoryEntry
 
 from .conftest import (
     make_fake_cleargbm_result,
@@ -31,7 +37,6 @@ class TestCreateResultTable:
         """Test table is created with result data."""
         result = make_fake_result()
         table = create_result_table("xgboost", result, 15.5)
-        # Verify table has the expected protocol methods
         assert callable(table.add_column)
         assert callable(table.add_row)
 
@@ -74,13 +79,31 @@ class TestCreateHyperparamsTable:
         assert callable(table.add_column)
         assert callable(table.add_row)
 
+    def test_creates_logreg_table_with_string_params(self) -> None:
+        """Test table is created for LogReg with string params."""
+        result = make_fake_result(
+            backend="logreg",
+            best_int_params=SampledIntParams(),
+            best_float_params=SampledFloatParams(
+                C=1.0,
+                tol=0.0001,
+                l1_ratio=0.5,
+            ),
+            best_string_params=SampledStringParams(
+                solver="saga",
+                penalty="elasticnet",
+            ),
+        )
+        table = create_hyperparams_table("logreg", result)
+        assert callable(table.add_column)
+        assert callable(table.add_row)
+
 
 class TestPrintConfig:
     """Tests for print_config function."""
 
     def test_prints_without_error(self) -> None:
         """Test print_config runs without error."""
-        # Just verify it doesn't raise
         print_config("xgboost", "taiwan", 50, "full", "cuda")
 
 
@@ -98,31 +121,56 @@ class TestPrintResultNotNewBest:
 
     def test_prints_not_new_best_when_all_time_best_is_higher(self) -> None:
         """Test print_result shows 'Best AUC' (not NEW BEST) when AUC is lower."""
-        result = make_fake_result(best_val_auc=0.80)
+        result = make_fake_result(best_value=0.80)
 
-        # Create an all_time_best with higher AUC
-        all_time_best: XGBoostHistoryEntry = {
-            "backend": "xgboost",
-            "timestamp": "2024-01-01T00:00:00Z",
-            "dataset": "taiwan",
-            "feature_preset": "full",
-            "n_trials": 50,
-            "n_samples": 1000,
-            "n_features": 100,
-            "best_val_auc": 0.90,  # Higher than current 0.80
-            "best_trial_number": 25,
-            "best_max_depth": 6,
-            "best_n_estimators": 100,
-            "best_learning_rate": 0.1,
-            "best_reg_alpha": 0.01,
-            "best_reg_lambda": 0.01,
-            "best_subsample": 0.8,
-            "best_colsample_bytree": 0.8,
-            "duration_seconds": 60.0,
-        }
+        all_time_best = UnifiedHistoryEntry(
+            backend="xgboost",
+            timestamp="2024-01-01T00:00:00Z",
+            dataset="taiwan",
+            feature_preset="full",
+            n_trials=50,
+            n_samples=1000,
+            n_features=100,
+            best_val_auc=0.90,
+            best_trial_number=25,
+            duration_seconds=60.0,
+        )
 
-        # Should not raise, and should hit the else branch (line 494)
         print_result("xgboost", result, 10.5, all_time_best=all_time_best)
+
+
+class TestCreateHistoryComparisonTable:
+    """Tests for create_history_comparison_table function."""
+
+    def test_with_previous_best(self) -> None:
+        """Test table includes previous best row."""
+        previous_best = UnifiedHistoryEntry(
+            backend="xgboost",
+            timestamp="2024-06-15T10:00:00Z",
+            dataset="taiwan",
+            feature_preset="full",
+            n_trials=50,
+            n_samples=1000,
+            n_features=100,
+            best_val_auc=0.82,
+            best_trial_number=25,
+            duration_seconds=60.0,
+        )
+        table = create_history_comparison_table(
+            current_auc=0.85,
+            previous_best=previous_best,
+            all_time_best=None,
+        )
+        assert callable(table.add_row)
+
+    def test_without_previous_best(self) -> None:
+        """Test table shows N/A when no previous best."""
+        table = create_history_comparison_table(
+            current_auc=0.85,
+            previous_best=None,
+            all_time_best=None,
+        )
+        assert callable(table.add_row)
 
 
 class TestFormatElapsed:
