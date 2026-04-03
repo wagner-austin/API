@@ -26,7 +26,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x3D: "MoveResponse",
     0x3E: "TankStatus",
     0x41: "Deactivation",
-    0x43: "Container",
+    0x43: "CacheUpdate",
     0x44: "FuelDeposit",
     0x45: "MineDetonate",
     0x46: "RadarAck",
@@ -37,7 +37,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x4B: "MinePlace",
     0x4C: "WorldEntry",
     0x4D: "PlayerList",
-    0x4F: "RadarResult",
+    0x4F: "CombinedTileUpdate",
     0x52: "Supervisor",
     0x53: "Shooting",
     0x54: "ActionDone",
@@ -52,7 +52,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
 # Message type categories for formatting dispatch
 COMBAT_MSG_TYPES: frozenset[int] = frozenset({0x53, 0x41})
 TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x58, 0x2E, 0x3E, 0x21, 0x47, 0x3D, 0x48})
-RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49, 0x43})
+RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
 MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D})
@@ -73,7 +73,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("t"): 5,  # EquipmentToggle
     ord("F"): 2,  # RadarResult
     ord("H"): 6,  # EnemyDetection
-    ord("O"): 2,  # RadarScanResult
+    ord("O"): 2,  # CombinedTileUpdate
     ord("("): 10,  # TankEntry
     ord("X"): 2,  # TankExit
     ord("."): 1,  # 0x2E container (TankStatusSync or tunneled message)
@@ -84,7 +84,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("Z"): 2,  # ViewportUpdate
     ord("J"): 0,  # TerrainUpdate (no minimum)
     ord("?"): 0,  # Sync (no minimum)
-    ord("C"): 4,  # Container
+    ord("C"): 0,  # CacheUpdate
     ord("M"): 3,  # ChatMessage
     ord("V"): 16,  # Statistics
     ord("*"): 4,  # ActiveForces
@@ -119,9 +119,9 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x3D: ("movement", "FULL"),
     0x3E: ("tank_status", "PARTIAL"),
     0x3F: ("position", "FULL"),
-    0x40: ("mine_status", "IDENTIFIED"),  # '@' MSG_MINE_STATUS
+    0x40: ("overlay_update", "IDENTIFIED"),
     0x41: ("kill", "FULL"),
-    0x43: ("container", "FULL"),
+    0x43: ("cache_update", "FULL"),
     0x45: ("mine_detonate", "FULL"),
     0x46: ("radar_ack", "FULL"),
     0x47: ("shooting", "FULL"),
@@ -130,7 +130,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x4B: ("mine_place", "FULL"),
     0x4C: ("tank_entry", "PARTIAL"),
     0x4D: ("player_list", "IDENTIFIED"),
-    0x4F: ("deactivation", "FULL"),
+    0x4F: ("combined_tile_update", "FULL"),
     0x52: ("supervisor", "PARTIAL"),
     0x53: ("tank_move", "FULL"),
     0x54: ("tank_shoot", "FULL"),
