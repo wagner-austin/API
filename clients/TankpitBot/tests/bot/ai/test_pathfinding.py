@@ -88,6 +88,14 @@ class TestFindPath:
         for step in path:
             assert (step["x"], step["y"]) not in rock_tiles
 
+    def test_avoids_blocked_mine_coordinates(self) -> None:
+        """Path routes around mine coordinates when provided as dynamic blockers."""
+        terrain = FakeTerrainMap()
+        path = find_path(terrain, 10, 10, 14, 10, {"12,10"})
+        assert len(path) > 5
+        for step in path:
+            assert not (step["x"] == 12 and step["y"] == 10)
+
     def test_no_path_returns_empty(self) -> None:
         """Returns empty list when completely blocked."""
         # Surround goal with water
@@ -189,6 +197,11 @@ class TestDirectPathHelpers:
         terrain = FakeTerrainMap({(12, 12): "#"})
         assert is_direct_path_clear(terrain, 10, 10, 15, 15) is False
 
+    def test_is_direct_path_clear_detects_mine_blocker(self) -> None:
+        """Direct path is blocked when a known mine sits on the line."""
+        terrain = FakeTerrainMap()
+        assert is_direct_path_clear(terrain, 10, 10, 15, 10, {"12,10"}) is False
+
     def test_find_path_segment_target_returns_straight_goal(self) -> None:
         """Waypoint helper returns the goal when the first segment stays straight."""
         terrain = FakeTerrainMap()
@@ -198,6 +211,11 @@ class TestDirectPathHelpers:
         """Waypoint helper returns the farthest directly-reachable tile on the A* detour."""
         terrain = FakeTerrainMap({(12, 10): "#"})
         assert find_path_segment_target(terrain, 10, 10, 14, 10) == (13, 11)
+
+    def test_find_path_segment_target_avoids_mined_detour(self) -> None:
+        """Waypoint helper excludes mined tiles from the direct path segment."""
+        terrain = FakeTerrainMap({(12, 10): "#"})
+        assert find_path_segment_target(terrain, 10, 10, 14, 10, {"13,11"}) == (13, 9)
 
     def test_find_path_segment_target_returns_none_when_no_path(self) -> None:
         """Waypoint helper returns None when no path exists."""
@@ -209,3 +227,47 @@ class TestDirectPathHelpers:
         }
         terrain = FakeTerrainMap(blocked)
         assert find_path_segment_target(terrain, 10, 10, 15, 10) is None
+
+    def test_find_path_segment_target_respects_action_bounds(self) -> None:
+        """Waypoint helper returns the farthest direct step inside supplied bounds."""
+        terrain = FakeTerrainMap({(12, 10): "#"})
+        result = find_path_segment_target(
+            terrain,
+            10,
+            10,
+            14,
+            10,
+            min_x=10,
+            min_y=10,
+            max_x=12,
+            max_y=12,
+        )
+        assert result == (12, 11)
+
+    def test_find_path_segment_target_returns_none_when_min_x_excludes_progress(self) -> None:
+        """Waypoint helper rejects candidates left of the supplied min_x bound."""
+        terrain = FakeTerrainMap()
+        result = find_path_segment_target(
+            terrain,
+            10,
+            10,
+            12,
+            10,
+            min_x=11,
+            max_x=10,
+        )
+        assert result is None
+
+    def test_find_path_segment_target_returns_none_when_min_y_excludes_progress(self) -> None:
+        """Waypoint helper rejects candidates above the supplied min_y bound."""
+        terrain = FakeTerrainMap()
+        result = find_path_segment_target(
+            terrain,
+            10,
+            10,
+            10,
+            12,
+            min_y=11,
+            max_y=10,
+        )
+        assert result is None
