@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from covenant_ml.datasets.loaders._regression_csv import RegressionCSVLoader
 from covenant_ml.datasets.loaders.arff_loader import ARFFLoader
 from covenant_ml.datasets.loaders.csv_loader import CSVLoader
 from covenant_ml.datasets.loaders.timeseries_csv_loader import TimeSeriesCSVLoader
@@ -24,6 +25,8 @@ from covenant_ml.datasets.protocol import ProgressCallbackProtocol
 from covenant_ml.datasets.types import (
     DatasetConfig,
     LoadedDataset,
+    RegressionDatasetConfig,
+    RegressionLoadedDataset,
     TimeSeriesDatasetConfig,
 )
 
@@ -37,6 +40,7 @@ class DatasetLoader:
     Methods:
         load(): For standard DatasetConfig (CSV, ARFF files)
         load_timeseries(): For TimeSeriesDatasetConfig (time-series CSV)
+        load_regression(): For RegressionDatasetConfig (regression CSV)
 
     The separation ensures proper typing without runtime type checking.
     Users should use the method matching their config type.
@@ -47,6 +51,7 @@ class DatasetLoader:
         self._csv_loader = CSVLoader()
         self._arff_loader = ARFFLoader()
         self._timeseries_csv_loader = TimeSeriesCSVLoader()
+        self._regression_csv_loader = RegressionCSVLoader()
 
     def load(
         self,
@@ -103,6 +108,38 @@ class DatasetLoader:
             ValueError: If data invalid or parsing fails.
         """
         return self._timeseries_csv_loader.load(config, external_dir, progress_callback)
+
+    def load_regression(
+        self,
+        config: RegressionDatasetConfig,
+        external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
+    ) -> RegressionLoadedDataset:
+        """Load regression dataset with continuous float64 targets.
+
+        Handles CSV regression datasets. Produces RegressionLoadedDataset
+        with RegressionDatasetMeta (target distribution stats).
+
+        Args:
+            config: Regression dataset configuration.
+            external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for loading progress updates.
+
+        Returns:
+            RegressionLoadedDataset with features, continuous targets, and metadata.
+
+        Raises:
+            FileNotFoundError: If dataset file doesn't exist.
+            ValueError: If format unsupported or data invalid.
+        """
+        file_format = config["file_format"]
+
+        if file_format == "csv":
+            return self._regression_csv_loader.load(config, external_dir, progress_callback)
+        raise ValueError(
+            f"Regression loading not yet implemented for format '{file_format}'"
+            f" (dataset '{config['name']}')"
+        )
 
 
 def create_dataset_loader() -> DatasetLoader:
