@@ -1,6 +1,6 @@
 """Tests for scripts/optimize runner functions.
 
-Tests backend-specific optimization runners (XGBoost, MLP, LightGBM, LSTM).
+Tests unified run_backend function for all backends.
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
 
@@ -10,362 +10,165 @@ from pathlib import Path
 
 import scripts._test_hooks as _hooks
 from scripts._test_hooks import (
-    ClearGBMOptimizationResult,
-    LightGBMOptimizationResult,
-    LSTMOptimizationResult,
-    MLPOptimizationResult,
-    XGBoostOptimizationResult,
+    LoadingProgressCallbackProtocol,
+    PhaseProgressCallbackProtocol,
+    TrialProgressCallbackProtocol,
+    UnifiedOptimizationResult,
 )
 from scripts.optimize.runner import (
     get_project_root,
-    run_cleargbm,
-    run_lightgbm,
-    run_lstm,
-    run_mlp,
-    run_xgboost,
+    run_backend,
 )
 
-from .conftest import (
-    make_fake_cleargbm_result,
-    make_fake_lightgbm_result,
-    make_fake_lstm_result,
-    make_fake_mlp_result,
-    make_fake_result,
-)
+from .conftest import make_fake_result
 
 
 class TestGetProjectRoot:
     """Tests for get_project_root function."""
 
     def test_returns_parent_of_scripts(self) -> None:
-        """Test project root is parent of scripts directory."""
-        root: Path = get_project_root()
+        """Test default project root hook returns parent of scripts directory."""
+        from scripts._test_hooks import _default_project_root
+
+        root: Path = _default_project_root()
         assert root.name == "covenant-radar-api"
         assert (root / "scripts").exists()
 
+    def test_hook_is_used(self, tmp_path: Path) -> None:
+        """Test get_project_root delegates to project_root_hook."""
+        root: Path = get_project_root()
+        assert root == tmp_path
 
-class TestRunXGBoost:
-    """Tests for run_xgboost function."""
 
-    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
-        """Test run_xgboost uses the xgboost_runner hook."""
+class TestRunBackend:
+    """Tests for unified run_backend function."""
+
+    def _make_fake_runner(
+        self,
+        result: UnifiedOptimizationResult,
+        call_args: list[tuple[str, Path, Path]],
+    ) -> _hooks.OptimizationRunnerProtocol:
+        """Create a fake runner that records calls.
+
+        Args:
+            result: Result to return.
+            call_args: List to append (config_json, external_dir, output_dir).
+
+        Returns:
+            Fake runner matching OptimizationRunnerProtocol.
+        """
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
+            _ = progress_callback
+            _ = phase_callback
+            _ = loading_progress_callback
+            call_args.append((config_json, external_dir, output_dir))
+            return result
+
+        return fake_runner
+
+    def test_runs_xgboost_with_hook(self) -> None:
+        """Test run_backend for xgboost uses optimization_runner hook."""
         fake_result = make_fake_result()
         call_args: list[tuple[str, Path, Path]] = []
 
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            result: XGBoostOptimizationResult = run_xgboost("taiwan", 10, "full", "cpu", None)
+            result = run_backend("xgboost", "taiwan", 10, "full", "cpu", None)
             assert result == fake_result
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
             assert "taiwan" in config_json
             assert "10" in config_json
             assert "full" in config_json
+            assert '"xgboost"' in config_json
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
-    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
-        """Test run_xgboost includes timeout in config when provided."""
+    def test_runs_mlp_with_hook(self) -> None:
+        """Test run_backend for mlp uses optimization_runner hook."""
+        fake_result = make_fake_result(backend="mlp")
+        call_args: list[tuple[str, Path, Path]] = []
+
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
+        try:
+            result = run_backend("mlp", "taiwan", 10, "full", "cpu", None)
+            assert result == fake_result
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert '"mlp"' in config_json
+        finally:
+            _hooks.optimization_runner = original
+
+    def test_runs_lightgbm_with_hook(self) -> None:
+        """Test run_backend for lightgbm uses optimization_runner hook."""
+        fake_result = make_fake_result(backend="lightgbm")
+        call_args: list[tuple[str, Path, Path]] = []
+
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
+        try:
+            result = run_backend("lightgbm", "taiwan", 10, "full", "cpu", None)
+            assert result == fake_result
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert '"lightgbm"' in config_json
+        finally:
+            _hooks.optimization_runner = original
+
+    def test_runs_lstm_with_hook(self) -> None:
+        """Test run_backend for lstm uses optimization_runner hook."""
+        fake_result = make_fake_result(backend="lstm")
+        call_args: list[tuple[str, Path, Path]] = []
+
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
+        try:
+            result = run_backend("lstm", "taiwan", 10, "full", "cpu", None)
+            assert result == fake_result
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert '"lstm"' in config_json
+        finally:
+            _hooks.optimization_runner = original
+
+    def test_runs_cleargbm_with_hook(self) -> None:
+        """Test run_backend for cleargbm uses optimization_runner hook."""
+        fake_result = make_fake_result(backend="cleargbm")
+        call_args: list[tuple[str, Path, Path]] = []
+
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
+        try:
+            result = run_backend("cleargbm", "taiwan", 10, "full", "cpu", None)
+            assert result == fake_result
+            assert len(call_args) == 1
+            config_json, _, _ = call_args[0]
+            assert '"cleargbm"' in config_json
+        finally:
+            _hooks.optimization_runner = original
+
+    def test_includes_timeout_when_provided(self) -> None:
+        """Test run_backend includes timeout in config when provided."""
         fake_result = make_fake_result()
         call_args: list[tuple[str, Path, Path]] = []
 
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = self._make_fake_runner(fake_result, call_args)
         try:
-            run_xgboost("taiwan", 10, "full", "cpu", 60)
+            run_backend("xgboost", "taiwan", 10, "full", "cpu", 60)
             assert len(call_args) == 1
             config_json, _, _ = call_args[0]
             assert "timeout_seconds" in config_json
             assert "60" in config_json
         finally:
-            _hooks.xgboost_runner = original
-
-
-class TestRunMLP:
-    """Tests for run_mlp function."""
-
-    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
-        """Test run_mlp uses the mlp_runner hook."""
-        fake_result = make_fake_mlp_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.MLPTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.MLPPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.MLPLoadingProgressCallbackProtocol | None = None,
-        ) -> MLPOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.mlp_runner
-        _hooks.mlp_runner = fake_runner
-        try:
-            result: MLPOptimizationResult = run_mlp("taiwan", 10, "full", "cpu", None)
-            assert result == fake_result
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "taiwan" in config_json
-            assert "10" in config_json
-            assert "full" in config_json
-            # MLP-specific config
-            assert "precision" in config_json
-            assert "adamw" in config_json
-        finally:
-            _hooks.mlp_runner = original
-
-    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
-        """Test run_mlp includes timeout in config when provided."""
-        fake_result = make_fake_mlp_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.MLPTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.MLPPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.MLPLoadingProgressCallbackProtocol | None = None,
-        ) -> MLPOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.mlp_runner
-        _hooks.mlp_runner = fake_runner
-        try:
-            run_mlp("taiwan", 10, "full", "cpu", 60)
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "timeout_seconds" in config_json
-            assert "60" in config_json
-        finally:
-            _hooks.mlp_runner = original
-
-
-class TestRunLightGBM:
-    """Tests for run_lightgbm function."""
-
-    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
-        """Test run_lightgbm uses the lightgbm_runner hook."""
-        fake_result = make_fake_lightgbm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> LightGBMOptimizationResult:
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.lightgbm_runner
-        _hooks.lightgbm_runner = fake_runner
-        try:
-            result: LightGBMOptimizationResult = run_lightgbm("taiwan", 10, "full", "cpu", None)
-            assert result == fake_result
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "taiwan" in config_json
-            assert "10" in config_json
-            assert "full" in config_json
-            # LightGBM-specific config
-            assert "early_stopping_rounds" in config_json
-        finally:
-            _hooks.lightgbm_runner = original
-
-    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
-        """Test run_lightgbm includes timeout in config when provided."""
-        fake_result = make_fake_lightgbm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> LightGBMOptimizationResult:
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.lightgbm_runner
-        _hooks.lightgbm_runner = fake_runner
-        try:
-            run_lightgbm("taiwan", 10, "full", "cpu", 60)
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "timeout_seconds" in config_json
-            assert "60" in config_json
-        finally:
-            _hooks.lightgbm_runner = original
-
-
-class TestRunLSTM:
-    """Tests for run_lstm function."""
-
-    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
-        """Test run_lstm uses the lstm_runner hook."""
-        fake_result = make_fake_lstm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.LSTMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LSTMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LSTMLoadingProgressCallbackProtocol | None = None,
-        ) -> LSTMOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.lstm_runner
-        _hooks.lstm_runner = fake_runner
-        try:
-            result: LSTMOptimizationResult = run_lstm("taiwan", 10, "full", "cpu", None)
-            assert result == fake_result
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "taiwan" in config_json
-            assert "10" in config_json
-            assert "full" in config_json
-            # LSTM-specific config
-            assert "precision" in config_json
-            assert "sequence_length" in config_json
-            assert "bidirectional" in config_json
-        finally:
-            _hooks.lstm_runner = original
-
-    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
-        """Test run_lstm includes timeout in config when provided."""
-        fake_result = make_fake_lstm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.LSTMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LSTMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LSTMLoadingProgressCallbackProtocol | None = None,
-        ) -> LSTMOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.lstm_runner
-        _hooks.lstm_runner = fake_runner
-        try:
-            run_lstm("taiwan", 10, "full", "cpu", 60)
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "timeout_seconds" in config_json
-            assert "60" in config_json
-        finally:
-            _hooks.lstm_runner = original
-
-
-class TestRunClearGBM:
-    """Tests for run_cleargbm function."""
-
-    def test_runs_optimization_with_hook(self, tmp_path: Path) -> None:
-        """Test run_cleargbm uses the cleargbm_runner hook."""
-        fake_result = make_fake_cleargbm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> ClearGBMOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.cleargbm_runner
-        _hooks.cleargbm_runner = fake_runner
-        try:
-            result: ClearGBMOptimizationResult = run_cleargbm("taiwan", 10, "full", "cpu", None)
-            assert result == fake_result
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "taiwan" in config_json
-            assert "10" in config_json
-            assert "full" in config_json
-            # ClearGBM-specific config
-            assert "early_stopping_rounds" in config_json
-        finally:
-            _hooks.cleargbm_runner = original
-
-    def test_includes_timeout_when_provided(self, tmp_path: Path) -> None:
-        """Test run_cleargbm includes timeout in config when provided."""
-        fake_result = make_fake_cleargbm_result()
-        call_args: list[tuple[str, Path, Path]] = []
-
-        def fake_runner(
-            config_json: str,
-            external_dir: Path,
-            output_dir: Path,
-            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> ClearGBMOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
-            call_args.append((config_json, external_dir, output_dir))
-            return fake_result
-
-        original = _hooks.cleargbm_runner
-        _hooks.cleargbm_runner = fake_runner
-        try:
-            run_cleargbm("taiwan", 10, "full", "cpu", 60)
-            assert len(call_args) == 1
-            config_json, _, _ = call_args[0]
-            assert "timeout_seconds" in config_json
-            assert "60" in config_json
-        finally:
-            _hooks.cleargbm_runner = original
+            _hooks.optimization_runner = original
