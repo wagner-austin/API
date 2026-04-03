@@ -396,6 +396,12 @@ class AIConfigDict(TypedDict):
         kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
         map_open_cooldown_ms: Minimum milliseconds between map open commands.
         patrol_waypoints: Circuit of waypoints for PATROL behavior.
+        dual_break_threshold: Emergency restock threshold for combat reserves.
+            Applies to dual shots, homing shots, and extra radar.
+        dual_resume_threshold: Minimum healthy reserve to leave emergency
+            restock mode. Applies to dual shots, homing shots, and extra radar.
+        equip_search_hop_distance: Teleport hop distance for local equipment search.
+        equip_search_max_failures: Maximum consecutive equipment-search hops.
     """
 
     fuel_critical_threshold: int
@@ -413,8 +419,6 @@ class AIConfigDict(TypedDict):
     patrol_waypoints: list[tuple[int, int]]
     dual_break_threshold: int
     dual_resume_threshold: int
-    radar_break_threshold: int
-    radar_resume_threshold: int
     equip_search_hop_distance: int
     equip_search_max_failures: int
 
@@ -426,7 +430,7 @@ def make_default_ai_config() -> AIConfigDict:
         AIConfigDict with default values suitable for lieutenant rank.
     """
     return AIConfigDict(
-        fuel_critical_threshold=400,
+        fuel_critical_threshold=500,
         fuel_low_threshold=500,
         fuel_full_threshold=1200,
         hunt_min_fuel=100,
@@ -441,9 +445,7 @@ def make_default_ai_config() -> AIConfigDict:
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
         dual_break_threshold=12,
         dual_resume_threshold=20,
-        radar_break_threshold=8,
-        radar_resume_threshold=12,
-        equip_search_hop_distance=15,
+        equip_search_hop_distance=30,
         equip_search_max_failures=3,
     )
 
@@ -474,8 +476,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "patrol_waypoints": waypoints,
         "dual_break_threshold": config["dual_break_threshold"],
         "dual_resume_threshold": config["dual_resume_threshold"],
-        "radar_break_threshold": config["radar_break_threshold"],
-        "radar_resume_threshold": config["radar_resume_threshold"],
         "equip_search_hop_distance": config["equip_search_hop_distance"],
         "equip_search_max_failures": config["equip_search_max_failures"],
     }
@@ -537,8 +537,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         patrol_waypoints=_decode_patrol_waypoints(data),
         dual_break_threshold=require_int(data, "dual_break_threshold"),
         dual_resume_threshold=require_int(data, "dual_resume_threshold"),
-        radar_break_threshold=require_int(data, "radar_break_threshold"),
-        radar_resume_threshold=require_int(data, "radar_resume_threshold"),
         equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
         equip_search_max_failures=require_int(data, "equip_search_max_failures"),
     )
@@ -570,6 +568,11 @@ class AIStateDict(TypedDict):
             Expired by the same TTL as killed_tank_ids.
         last_shot_target_id: Tank ID we shot at last tick (-1 if none).
         last_shot_target_name: Name of tank we shot at last tick.
+        resource_target_kind: Locked resource target kind ("", "fuel", or
+            "equipment"). Used to continue an in-progress pickup plan across
+            teleports and viewport recentering.
+        resource_target_x: X coordinate of the locked resource target.
+        resource_target_y: Y coordinate of the locked resource target.
     """
 
     config: AIConfigDict
@@ -587,6 +590,9 @@ class AIStateDict(TypedDict):
     last_shot_target_id: int
     last_shot_target_name: str
     equipment_search_failures: int
+    resource_target_kind: str
+    resource_target_x: int
+    resource_target_y: int
 
 
 def make_initial_ai_state(
@@ -616,6 +622,9 @@ def make_initial_ai_state(
         last_shot_target_id=-1,
         last_shot_target_name="",
         equipment_search_failures=0,
+        resource_target_kind="",
+        resource_target_x=0,
+        resource_target_y=0,
     )
 
 
@@ -645,6 +654,9 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "last_shot_target_id": state["last_shot_target_id"],
         "last_shot_target_name": state["last_shot_target_name"],
         "equipment_search_failures": state["equipment_search_failures"],
+        "resource_target_kind": state["resource_target_kind"],
+        "resource_target_x": state["resource_target_x"],
+        "resource_target_y": state["resource_target_y"],
     }
 
 
@@ -719,6 +731,9 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),
         equipment_search_failures=require_int(data, "equipment_search_failures"),
+        resource_target_kind=require_str(data, "resource_target_kind"),
+        resource_target_x=require_int(data, "resource_target_x"),
+        resource_target_y=require_int(data, "resource_target_y"),
     )
 
 
