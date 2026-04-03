@@ -86,10 +86,18 @@ def _decode_bot_command(data: JSONObject) -> BotCommand:
             target_y=target_y,
             target_id=target_id,
         )
-    if cmd_type == "pickup_move":
-        from tankpit_bot.bot.types import PickupMoveCommandDict
+    if cmd_type == "pickup_fuel":
+        from tankpit_bot.bot.types import PickupFuelCommandDict
 
-        return PickupMoveCommandDict(cmd_type="pickup_move", target_x=target_x, target_y=target_y)
+        return PickupFuelCommandDict(cmd_type="pickup_fuel", target_x=target_x, target_y=target_y)
+    if cmd_type == "pickup_equipment":
+        from tankpit_bot.bot.types import PickupEquipmentCommandDict
+
+        return PickupEquipmentCommandDict(
+            cmd_type="pickup_equipment",
+            target_x=target_x,
+            target_y=target_y,
+        )
     if cmd_type == "teleport":
         from tankpit_bot.bot.types import TeleportCommandDict
 
