@@ -231,7 +231,9 @@ pub(crate) fn shape_err(got: String) -> PyErr {
 /// # Errors
 ///
 /// Returns [`ClearGbmError::EmptyInput`] if the array has zero rows.
-fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, ClearGbmError> {
+pub(crate) fn extract_rows(
+    features: &PyReadonlyArray2<'_, f64>,
+) -> Result<Vec<Vec<f64>>, ClearGbmError> {
     let shape = features.shape();
     let n_rows = shape[0_usize];
     let n_cols = shape[1_usize];

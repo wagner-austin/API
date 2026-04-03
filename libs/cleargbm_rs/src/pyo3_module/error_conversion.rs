@@ -24,6 +24,7 @@ use crate::error::ClearGbmError;
 /// | `EmptyInput` | `ValueError` |
 /// | `InvalidParameter` | `ValueError` |
 /// | `IntegerConversion` | `ValueError` |
+/// | `InvalidLabel` | `ValueError` |
 /// | `TreeConstructionFailed` | `RuntimeError` |
 /// | `SerializationFailed` | `RuntimeError` |
 /// | `DeserializationFailed` | `RuntimeError` |
@@ -41,7 +42,8 @@ impl From<ClearGbmError> for PyErr {
             ClearGbmError::ShapeMismatch { .. }
             | ClearGbmError::EmptyInput { .. }
             | ClearGbmError::InvalidParameter { .. }
-            | ClearGbmError::IntegerConversion { .. } => PyValueError::new_err(message),
+            | ClearGbmError::IntegerConversion { .. }
+            | ClearGbmError::InvalidLabel { .. } => PyValueError::new_err(message),
 
             // Internal/construction errors → RuntimeError
             ClearGbmError::TreeConstructionFailed { .. }
