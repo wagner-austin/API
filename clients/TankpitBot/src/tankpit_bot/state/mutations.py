@@ -10,7 +10,6 @@ from tankpit_bot.state.types import (
     DAMAGE_FULL,
     SelfStateDict,
     TankStateDict,
-    ViewportStateDict,
     WorldStateDict,
     coord_key,
     make_container_state,
@@ -18,6 +17,11 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_tank_state,
     make_terrain_tile,
+    viewport_scan_key,
+)
+from tankpit_bot.state.viewport_geometry import (
+    make_visible_viewport_state,
+    viewport_patch_world_coords,
 )
 
 # =============================================================================
@@ -66,6 +70,7 @@ def update_self_from_movement_response(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -120,6 +125,7 @@ def update_self_position(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -179,6 +185,7 @@ def update_tank_from_registry(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -228,6 +235,7 @@ def update_tank_damage(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -270,6 +278,7 @@ def update_container_from_radar(
             mines=state["mines"],
             terrain=state["terrain"],
             viewport=state["viewport"],
+            scanned_viewports=state["scanned_viewports"],
             timestamp_ms=timestamp_ms,
         )
 
@@ -295,6 +304,7 @@ def update_container_from_radar(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -330,6 +340,7 @@ def remove_container(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -370,6 +381,7 @@ def add_mine(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -406,6 +418,7 @@ def add_mine_from_radar(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -441,6 +454,7 @@ def remove_mine(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -449,38 +463,38 @@ def update_terrain_from_viewport(
     state: WorldStateDict,
     viewport_left: int,
     viewport_top: int,
-    entities: list[tuple[int, int, int, int]],
+    entities: list[tuple[int, int, int, int, int]],
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Update terrain from ViewportUpdate message.
+    """Update terrain from a visible viewport update.
 
     Args:
         state: Current world state.
         viewport_left: Viewport left X coordinate.
         viewport_top: Viewport top Y coordinate.
-        entities: List of (col, row, terrain_type, entity_id) tuples.
+        entities: List of ``0x5A`` patch-grid
+            ``(col, row, terrain_type, cache_value, overlay_value)`` tuples.
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with updated terrain and viewport.
+        New WorldStateDict with updated terrain, viewport, and confirmed
+        local-resource coverage for that viewport origin.
     """
     new_terrain = dict(state["terrain"])
-    new_viewport = ViewportStateDict(
-        left=viewport_left,
-        top=viewport_top,
-        width=18,
-        height=18,
-    )
+    new_viewport = make_visible_viewport_state(viewport_left, viewport_top)
+    key = viewport_scan_key(viewport_left, viewport_top)
+    new_scanned_viewports = dict(state["scanned_viewports"])
+    new_scanned_viewports[key] = timestamp_ms
 
-    for col, row, terrain_type, entity_id in entities:
-        x = viewport_left + col
-        y = viewport_top + row
+    for col, row, terrain_type, cache_value, overlay_value in entities:
+        x, y = viewport_patch_world_coords(viewport_left, viewport_top, col, row)
         key = coord_key(x, y)
         new_terrain[key] = make_terrain_tile(
             x=x,
             y=y,
             terrain_type=terrain_type,
-            entity_id=entity_id,
+            cache_value=cache_value,
+            overlay_value=overlay_value,
         )
 
     return WorldStateDict(
@@ -490,6 +504,7 @@ def update_terrain_from_viewport(
         mines=state["mines"],
         terrain=new_terrain,
         viewport=new_viewport,
+        scanned_viewports=new_scanned_viewports,
         timestamp_ms=timestamp_ms,
     )
 
@@ -530,6 +545,7 @@ def update_self_fuel(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -569,6 +585,7 @@ def set_self_fuel(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -620,6 +637,7 @@ def pickup_container(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -653,6 +671,39 @@ def remove_tank(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def mark_viewport_scanned(
+    state: WorldStateDict,
+    viewport_left: int,
+    viewport_top: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Record that a viewport origin has authoritative local-resource coverage.
+
+    Args:
+        state: Current world state.
+        viewport_left: Viewport left X coordinate.
+        viewport_top: Viewport top Y coordinate.
+        timestamp_ms: Scan completion timestamp.
+
+    Returns:
+        New WorldStateDict with updated viewport confirmation metadata.
+    """
+    key = viewport_scan_key(viewport_left, viewport_top)
+    new_scanned_viewports = dict(state["scanned_viewports"])
+    new_scanned_viewports[key] = timestamp_ms
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=new_scanned_viewports,
         timestamp_ms=timestamp_ms,
     )
 
@@ -664,6 +715,7 @@ def remove_tank(
 __all__ = [
     "add_mine",
     "add_mine_from_radar",
+    "mark_viewport_scanned",
     "pickup_container",
     "remove_container",
     "remove_mine",
