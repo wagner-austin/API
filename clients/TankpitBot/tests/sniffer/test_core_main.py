@@ -72,7 +72,9 @@ def test_main_with_defaults(
     captured = capsys.readouterr()
     output = captured.out
     assert "Captured 8 WebSocket messages in" in output
-    assert "Saved to: capture_session.json" in output
+    assert "Saved to: runs\\sniff\\latest.capture_session.json" in output
+    assert "Sniffer latest capture:" in output
+    assert "runs\\sniff\\latest.capture_session.json" in output
 
 
 def test_main_with_custom_env(
@@ -92,6 +94,8 @@ def test_main_with_custom_env(
     captured = capsys.readouterr()
     output = captured.out
     assert "Saved to: custom_output.json" in output
+    assert "Latest capture mirror:" in output
+    assert "runs\\sniff\\latest.capture_session.json" in output
 
 
 def test_main_headless_variations(
