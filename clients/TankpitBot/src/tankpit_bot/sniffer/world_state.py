@@ -23,8 +23,11 @@ from tankpit_bot.inventory import (
     ItemType,
     diff_inventory,
 )
-from tankpit_bot.sniffer.viewport import get_viewport_left
+from tankpit_bot.runtime_logging import emit_world
+from tankpit_bot.sniffer.viewport import get_viewport_left, update_viewport_origin
 from tankpit_bot.state import (
+    ContainerStateDict,
+    MineStateDict,
     WorldStateDict,
     add_mine,
     add_mine_from_radar,
@@ -32,7 +35,9 @@ from tankpit_bot.state import (
     make_container_state,
     make_empty_world_state,
     make_terrain_tile,
+    mark_viewport_scanned,
     pickup_container,
+    remove_mine,
     remove_tank,
     render_world_ascii,
     set_self_fuel,
@@ -40,6 +45,14 @@ from tankpit_bot.state import (
     update_self_position,
     update_tank_damage,
     update_tank_from_registry,
+    viewport_scan_key,
+)
+from tankpit_bot.state.viewport_geometry import (
+    VIEWPORT_PATCH_WIDTH,
+    make_visible_viewport_state,
+    viewport_patch_world_coords,
+    viewport_radar_bounds,
+    viewport_visible_bounds,
 )
 
 log = get_logger(__name__)
@@ -105,6 +118,20 @@ _teleport_landed: bool = False
 # finds zero containers.
 _radar_scan_complete: bool = False
 
+# Some radar scans arrive as a differential cache refresh (0x4F CombinedTileUpdate)
+# followed by a RadarAck instead of an explicit RadarResponse. Track the most
+# recent combined-tile refresh so RadarAck can promote it to authoritative
+# container truth for the current viewport.
+_pending_radar_cache_refresh_ms: int = 0
+_RADAR_CACHE_REFRESH_WINDOW_MS = 2000
+
+# Some tunneled 0x2E -> 0x4F radar packets are also differential snapshots with
+# zero container/mine deltas. In that form, RadarAck(found=True) means "there
+# are still radar resources in this viewport, but nothing changed since last
+# known state". Track the empty differential so RadarAck can preserve existing
+# authoritative resource state instead of clearing it.
+_pending_radar_empty_delta_ms: int = 0
+
 # Failed move targets — coordinates where a move stalled and timed out.
 # Maps "x,y" key to timestamp_ms of the failure. Cleared on radar refresh
 # and session reset. The planner rejects these coordinates until they expire
@@ -114,6 +141,15 @@ _failed_move_targets: dict[str, int] = {}
 # TTL for failed move targets (30 seconds). After this, the target is
 # eligible again in case the obstacle was transient.
 _FAILED_MOVE_TTL_MS = 30000
+
+# Failed scan viewports — viewport origins where radar stalled and timed out.
+# Maps "left,top" key to timestamp_ms of the failure. Cleared when the viewport
+# later receives authoritative local confirmation.
+_failed_scan_viewports: dict[str, int] = {}
+
+# TTL for failed scan viewports (30 seconds). During this window the planner
+# should avoid reissuing radar for the same viewport.
+_FAILED_SCAN_VIEWPORT_TTL_MS = 30000
 
 
 def mark_combat_hit(weapon_byte: int) -> None:
@@ -260,6 +296,40 @@ def mark_radar_scan_complete() -> None:
     _radar_scan_complete = True
 
 
+def _mark_pending_radar_cache_refresh() -> None:
+    """Record that a recent combined-tile update may belong to a radar scan."""
+    global _pending_radar_cache_refresh_ms
+    _pending_radar_cache_refresh_ms = get_current_time_ms()
+
+
+def _consume_pending_radar_cache_refresh() -> bool:
+    """Return True if a recent combined-tile update should count as radar."""
+    global _pending_radar_cache_refresh_ms
+    if _pending_radar_cache_refresh_ms <= 0:
+        return False
+    now = get_current_time_ms()
+    recent = now - _pending_radar_cache_refresh_ms <= _RADAR_CACHE_REFRESH_WINDOW_MS
+    _pending_radar_cache_refresh_ms = 0
+    return recent
+
+
+def _mark_pending_radar_empty_delta() -> None:
+    """Record that a zero-delta tunneled radar result was observed."""
+    global _pending_radar_empty_delta_ms
+    _pending_radar_empty_delta_ms = get_current_time_ms()
+
+
+def _consume_pending_radar_empty_delta() -> bool:
+    """Return True if a recent zero-delta tunneled radar result is pending."""
+    global _pending_radar_empty_delta_ms
+    if _pending_radar_empty_delta_ms <= 0:
+        return False
+    now = get_current_time_ms()
+    recent = now - _pending_radar_empty_delta_ms <= _RADAR_CACHE_REFRESH_WINDOW_MS
+    _pending_radar_empty_delta_ms = 0
+    return recent
+
+
 def check_and_clear_radar_scan_complete() -> bool:
     """Check if a radar scan completed since last check, then clear.
 
@@ -305,7 +375,7 @@ def reset_world_state() -> None:
     global _world_state, _terrain_map, _room_images, _selected_room, _inventory_state
     global _got_confirmed_hit, _got_our_shot_response
     global _killed_tank_ids, _teleport_landed
-    global _radar_scan_complete
+    global _radar_scan_complete, _pending_radar_cache_refresh_ms, _pending_radar_empty_delta_ms
     _world_state = make_empty_world_state()
     _terrain_map = None
     _room_images = {}
@@ -316,7 +386,10 @@ def reset_world_state() -> None:
     _killed_tank_ids = set()
     _teleport_landed = False
     _radar_scan_complete = False
+    _pending_radar_cache_refresh_ms = 0
+    _pending_radar_empty_delta_ms = 0
     _failed_move_targets.clear()
+    _failed_scan_viewports.clear()
 
 
 def get_world_state() -> WorldStateDict:
@@ -593,10 +666,16 @@ def update_world_state_from_radar(
         containers: List of containers from radar.
         mines: List of mines from radar.
     """
-    global _world_state
+    global _world_state, _pending_radar_cache_refresh_ms, _pending_radar_empty_delta_ms
     ts = get_current_time_ms()
+    _pending_radar_cache_refresh_ms = 0
+    _pending_radar_empty_delta_ms = 0
     mark_radar_scan_complete()
     clear_failed_move_targets()
+    _reconcile_radar_viewport_resources(containers, mines)
+    viewport = _world_state["viewport"]
+    clear_failed_scan_viewport(viewport["left"], viewport["top"])
+    _world_state = mark_viewport_scanned(_world_state, viewport["left"], viewport["top"], ts)
 
     # Add containers
     for c in containers:
@@ -607,34 +686,155 @@ def update_world_state_from_radar(
         _world_state = add_mine_from_radar(_world_state, m["x"], m["y"], m["team"], ts)
 
 
+def _containers_from_current_radar_cache() -> list[RadarContainerDict]:
+    """Synthesize authoritative radar containers from current terrain cache."""
+    left, top, right, bottom = _radar_bounds(_world_state)
+    containers: list[RadarContainerDict] = []
+    for tile in _world_state["terrain"].values():
+        x = tile["x"]
+        y = tile["y"]
+        if not (left <= x <= right and top <= y <= bottom):
+            continue
+        cache_value = tile["cache_value"]
+        if cache_value == -1:
+            containers.append(RadarContainerDict(x=x, y=y, volume=-1))
+        elif cache_value > 0:
+            containers.append(RadarContainerDict(x=x, y=y, volume=cache_value))
+    return containers
+
+
+def update_world_state_from_radar_cache() -> None:
+    """Promote a differential radar cache refresh to authoritative containers.
+
+    Some radar scans refresh the current viewport through a combined tile/cache
+    update plus ``RadarAck`` instead of an explicit ``radar_response`` packet.
+    In that case, the terrain cache already contains the latest fuel/equipment
+    truth for the radar envelope; use it to rebuild authoritative containers for
+    the current viewport.
+    """
+    global _world_state
+    ts = get_current_time_ms()
+    containers = _containers_from_current_radar_cache()
+    mark_radar_scan_complete()
+    clear_failed_move_targets()
+    _reconcile_radar_viewport_resources(containers, None)
+    viewport = _world_state["viewport"]
+    clear_failed_scan_viewport(viewport["left"], viewport["top"])
+    _world_state = mark_viewport_scanned(_world_state, viewport["left"], viewport["top"], ts)
+    for container in containers:
+        _world_state = update_container_from_radar(
+            _world_state,
+            container["x"],
+            container["y"],
+            container["volume"],
+            ts,
+        )
+    emit_world(
+        "Radar cache refresh: promoted %d containers from combined tile update",
+        len(containers),
+    )
+
+
+def update_world_state_from_radar_known_resources() -> None:
+    """Confirm a zero-delta differential radar without discarding known resources.
+
+    Some radar scans only confirm that already-known resources still exist in
+    the current viewport. Those scans arrive as an empty tunneled 0x4F result
+    followed by RadarAck(found=True). Preserve existing authoritative
+    containers inside the radar bounds instead of treating the scan as empty.
+    Do not re-promote terrain cache here: stale cache entries can linger for
+    already-picked containers until a later tile update clears them.
+    """
+    global _world_state
+    ts = get_current_time_ms()
+    left, top, right, bottom = _radar_bounds(_world_state)
+    containers_by_key: dict[str, RadarContainerDict] = {}
+
+    for container in _world_state["containers"].values():
+        x = container["x"]
+        y = container["y"]
+        if left <= x <= right and top <= y <= bottom:
+            containers_by_key[coord_key(x, y)] = RadarContainerDict(
+                x=x,
+                y=y,
+                volume=container["volume"],
+            )
+
+    containers = list(containers_by_key.values())
+    mark_radar_scan_complete()
+    clear_failed_move_targets()
+    viewport = _world_state["viewport"]
+    clear_failed_scan_viewport(viewport["left"], viewport["top"])
+    _world_state = mark_viewport_scanned(_world_state, viewport["left"], viewport["top"], ts)
+    for container in containers:
+        _world_state = update_container_from_radar(
+            _world_state,
+            container["x"],
+            container["y"],
+            container["volume"],
+            ts,
+        )
+    emit_world(
+        "Radar differential refresh: preserved %d known containers in viewport",
+        len(containers),
+    )
+
+
+def _clear_container_tile_cache(x: int, y: int) -> None:
+    """Clear cached resource data for a tile without changing terrain."""
+    global _world_state
+    key = coord_key(x, y)
+    existing = _world_state["terrain"].get(key)
+    if existing is None:
+        return
+    new_terrain = dict(_world_state["terrain"])
+    new_terrain[key] = make_terrain_tile(
+        x=x,
+        y=y,
+        terrain_type=existing["terrain_type"],
+        cache_value=0,
+        overlay_value=existing["overlay_value"],
+    )
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=new_terrain,
+        viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
+        timestamp_ms=_world_state["timestamp_ms"],
+    )
+
+
 def update_world_state_from_tank_registry_container(
     container_y: int,
     container_viewport_x: int,
 ) -> None:
-    """Update world state with container from tank_registry message.
+    """Ignore non-radar container registry hints for planning state.
 
-    Tank registry containers have viewport-relative x coordinate.
-    Absolute x = viewport_left + container_viewport_x.
+    Tank registry container entries expose coarse location hints but do not
+    provide trustworthy resource truth. Container planning is radar-driven, so
+    these messages must not populate ``world["containers"]``.
 
     Args:
         container_y: Absolute Y coordinate.
         container_viewport_x: Viewport-relative X coordinate.
     """
-    global _world_state
-    # Use sniffer's viewport tracking which is updated from position_update messages
     viewport_left = get_viewport_left()
     if viewport_left is None:
         log.info(
-            "Cannot add container: viewport_left not yet known (y=%d, vx=%d)",
+            "Ignoring tank_registry container: viewport_left not yet known (y=%d, vx=%d)",
             container_y,
             container_viewport_x,
         )
         return
     container_x = viewport_left + container_viewport_x
-    ts = get_current_time_ms()
-    # Volume unknown from tank_registry, use 1 as placeholder (is_fuel=True)
-    _world_state = update_container_from_radar(_world_state, container_x, container_y, 1, ts)
-    log.debug("Added container from tank_registry: (%d, %d)", container_x, container_y)
+    log.debug(
+        "Ignoring tank_registry container hint at (%d, %d); radar is authoritative",
+        container_x,
+        container_y,
+    )
 
 
 def update_world_state_from_tank_entry(tank_id: int, x: int, y: int, name: str) -> None:
@@ -729,9 +929,16 @@ def update_world_state_from_tank_registry(
     # Convert team string to int
     team = TEAM_NAMES.index(team_str) if team_str in TEAM_NAMES else 0
 
-    # Compute absolute x from viewport
     viewport_left = get_viewport_left()
-    tank_x = viewport_left + tank_viewport_x if viewport_left is not None else tank_viewport_x
+    if viewport_left is None:
+        log.info(
+            "Cannot add tank_registry tank: viewport_left not yet known (tank=%d, y=%d, vx=%d)",
+            tank_id,
+            tank_y,
+            tank_viewport_x,
+        )
+        return
+    tank_x = viewport_left + tank_viewport_x
 
     ts = get_current_time_ms()
     _world_state = update_tank_from_registry(
@@ -789,6 +996,7 @@ def update_world_state_from_move_response_full(
             mines=_world_state["mines"],
             terrain=_world_state["terrain"],
             viewport=_world_state["viewport"],
+            scanned_viewports=_world_state["scanned_viewports"],
             timestamp_ms=ts,
         )
     elif self_state["tank_id"] == tank_id:
@@ -907,7 +1115,7 @@ def update_world_state_from_fuel_total(fuel_total: int) -> None:
     old_fuel = _world_state["self_state"]["fuel"] if _world_state["self_state"] is not None else 0
     _world_state = set_self_fuel(_world_state, fuel_total, ts)
     delta = fuel_total - old_fuel
-    log.info("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
+    emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
 
 
 def update_world_state_from_container_pickup(x: int, y: int) -> None:
@@ -922,7 +1130,8 @@ def update_world_state_from_container_pickup(x: int, y: int) -> None:
     global _world_state
     ts = get_current_time_ms()
     _world_state = pickup_container(_world_state, x, y, ts)
-    log.info("Picked up container at (%d, %d)", x, y)
+    _clear_container_tile_cache(x, y)
+    emit_world("Picked up container at (%d, %d)", x, y)
 
 
 def remove_container_at(x: int, y: int) -> None:
@@ -946,8 +1155,10 @@ def remove_container_at(x: int, y: int) -> None:
             mines=_world_state["mines"],
             terrain=_world_state["terrain"],
             viewport=_world_state["viewport"],
+            scanned_viewports=_world_state["scanned_viewports"],
             timestamp_ms=_world_state["timestamp_ms"],
         )
+        _clear_container_tile_cache(x, y)
         log.info("Removed unreachable container at (%d, %d)", x, y)
 
 
@@ -985,6 +1196,7 @@ def increment_container_failed_pickups(x: int, y: int) -> None:
         mines=_world_state["mines"],
         terrain=_world_state["terrain"],
         viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
         timestamp_ms=_world_state["timestamp_ms"],
     )
     log.info(
@@ -1012,6 +1224,52 @@ def mark_move_target_failed(x: int, y: int, timestamp_ms: int) -> None:
     log.info("MOVE: marked (%d,%d) as failed target", x, y)
 
 
+def mark_scan_viewport_failed(viewport_left: int, viewport_top: int, timestamp_ms: int) -> None:
+    """Record a viewport whose radar scan stalled and timed out.
+
+    Args:
+        viewport_left: Failed viewport left X coordinate.
+        viewport_top: Failed viewport top Y coordinate.
+        timestamp_ms: When the failure was detected.
+    """
+    key = viewport_scan_key(viewport_left, viewport_top)
+    _failed_scan_viewports[key] = timestamp_ms
+    log.info(
+        "SCAN: marked viewport (%d,%d) as failed target",
+        viewport_left,
+        viewport_top,
+    )
+
+
+def is_scan_viewport_failed(viewport_left: int, viewport_top: int, now_ms: int) -> bool:
+    """Check whether a viewport recently had a stalled radar scan.
+
+    Args:
+        viewport_left: Viewport left X coordinate.
+        viewport_top: Viewport top Y coordinate.
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        True if radar recently stalled for that viewport.
+    """
+    key = viewport_scan_key(viewport_left, viewport_top)
+    failed_ms = _failed_scan_viewports.get(key)
+    if failed_ms is None:
+        return False
+    return (now_ms - failed_ms) < _FAILED_SCAN_VIEWPORT_TTL_MS
+
+
+def clear_failed_scan_viewport(viewport_left: int, viewport_top: int) -> None:
+    """Clear a failed-scan mark for a specific viewport origin.
+
+    Args:
+        viewport_left: Viewport left X coordinate.
+        viewport_top: Viewport top Y coordinate.
+    """
+    key = viewport_scan_key(viewport_left, viewport_top)
+    _failed_scan_viewports.pop(key, None)
+
+
 def is_move_target_failed(x: int, y: int, now_ms: int) -> bool:
     """Check if a move target was recently marked as failed.
 
@@ -1035,6 +1293,88 @@ def clear_failed_move_targets() -> None:
     _failed_move_targets.clear()
 
 
+def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
+    """Return inclusive visible viewport bounds.
+
+    Args:
+        world: Current world state.
+
+    Returns:
+        Inclusive ``(left, top, right, bottom)`` viewport bounds.
+    """
+    return viewport_visible_bounds(world["viewport"])
+
+
+def _radar_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
+    """Return inclusive current radar coverage bounds.
+
+    Args:
+        world: Current world state.
+
+    Returns:
+        Inclusive ``(left, top, right, bottom)`` radar bounds.
+    """
+    return viewport_radar_bounds(world["viewport"])
+
+
+def _reconcile_radar_viewport_resources(
+    containers: list[RadarContainerDict],
+    mines: list[RadarMineDict] | None,
+) -> None:
+    """Make current viewport resources match an authoritative radar scan.
+
+    Radar covers the full visible viewport. Any tracked container or mine
+    inside the current viewport that is absent from the radar response is
+    stale and must be removed before adding the freshly scanned results.
+
+    Args:
+        containers: Containers returned by radar.
+        mines: Mines returned by radar. ``None`` skips mine reconciliation for
+            differential radar cache refreshes that only encode containers.
+    """
+    global _world_state
+    left, top, right, bottom = _radar_bounds(_world_state)
+    radar_container_keys = {coord_key(item["x"], item["y"]) for item in containers}
+    radar_mine_keys = (
+        {coord_key(item["x"], item["y"]) for item in mines}
+        if mines is not None
+        else None
+    )
+
+    new_containers: dict[str, ContainerStateDict] | None = None
+    for key, container in _world_state["containers"].items():
+        x = container["x"]
+        y = container["y"]
+        if left <= x <= right and top <= y <= bottom and key not in radar_container_keys:
+            if new_containers is None:
+                new_containers = dict(_world_state["containers"])
+            del new_containers[key]
+
+    new_mines: dict[str, MineStateDict] | None = None
+    if radar_mine_keys is not None:
+        for key, mine in _world_state["mines"].items():
+            x = mine["x"]
+            y = mine["y"]
+            if left <= x <= right and top <= y <= bottom and key not in radar_mine_keys:
+                if new_mines is None:
+                    new_mines = dict(_world_state["mines"])
+                del new_mines[key]
+
+    if new_containers is None and new_mines is None:
+        return
+
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"] if new_containers is None else new_containers,
+        mines=_world_state["mines"] if new_mines is None else new_mines,
+        terrain=_world_state["terrain"],
+        viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
+        timestamp_ms=get_current_time_ms(),
+    )
+
+
 def render_world_state_ascii() -> str | None:
     """Render current world state as ASCII.
 
@@ -1052,16 +1392,16 @@ def _update_viewport_entities(
     viewport_top: int,
     entities: list[dict[str, int]],
 ) -> None:
-    """Apply a viewport update using explicit viewport origin from 0x5A.
+    """Apply a visible viewport update using explicit viewport origin from 0x5A.
 
     Args:
-        viewport_left: Absolute left edge of the observable 18x18 frame.
-        viewport_top: Absolute top edge of the observable 18x18 frame.
+        viewport_left: Absolute left edge of the visible 16x16 viewport.
+        viewport_top: Absolute top edge of the visible 16x16 viewport.
         entities: Viewport entity dicts with col, row, entity_id, value, terrain_type.
     """
     global _world_state
 
-    from tankpit_bot.state.types import ViewportStateDict
+    update_viewport_origin(viewport_left, viewport_top)
 
     _world_state = WorldStateDict(
         self_state=_world_state["self_state"],
@@ -1069,23 +1409,26 @@ def _update_viewport_entities(
         containers=_world_state["containers"],
         mines=_world_state["mines"],
         terrain=_world_state["terrain"],
-        viewport=ViewportStateDict(left=viewport_left, top=viewport_top, width=18, height=18),
+        viewport=make_visible_viewport_state(viewport_left, viewport_top),
+        scanned_viewports=_world_state["scanned_viewports"],
         timestamp_ms=_world_state["timestamp_ms"],
     )
 
-    _add_containers_from_entities(entities, viewport_left, viewport_top)
+    _update_viewport_tiles(entities, viewport_left, viewport_top)
+    clear_failed_scan_viewport(viewport_left, viewport_top)
 
 
-def _add_containers_from_entities(
+def _update_viewport_tiles(
     entities: list[dict[str, int]],
     vp_left: int,
     vp_top: int,
 ) -> None:
-    """Add containers from ``0x5A`` tile patches to world state.
+    """Apply ``0x5A`` tile patches to viewport terrain and visual cache only.
 
-    Client JS applies ``0x5A`` rows into tile cache fields, not tank presence.
-    ``entity_id > 0`` marks fuel on the tile, ``entity_id == -1`` marks
-    equipment, and ``entity_id == 0`` means no container cache update.
+    Client JS applies ``0x5A`` rows into per-tile cache, overlay, and terrain
+    fields. For bot planning, however, resource truth is radar-driven: these
+    passive viewport patches must not add/remove actionable fuel or equipment
+    targets in ``world["containers"]``.
 
     Args:
         entities: Viewport entity list.
@@ -1094,28 +1437,107 @@ def _add_containers_from_entities(
     """
     global _world_state
     ts = get_current_time_ms()
+    new_terrain = dict(_world_state["terrain"])
 
     for ent in entities:
-        eid = ent.get("entity_id", -1)
-        abs_x = vp_left + ent["col"]
-        abs_y = vp_top + ent["row"]
+        abs_x, abs_y = viewport_patch_world_coords(
+            vp_left,
+            vp_top,
+            ent["col"],
+            ent["row"],
+        )
+        cache_value = ent["cache_value"]
+        overlay_value = ent["overlay_value"]
+        terrain_type = ent["terrain_type"]
+        key = coord_key(abs_x, abs_y)
+        new_terrain[key] = make_terrain_tile(
+            x=abs_x,
+            y=abs_y,
+            terrain_type=terrain_type,
+            cache_value=cache_value,
+            overlay_value=overlay_value,
+        )
 
-        if eid == -1:
-            _world_state = update_container_from_radar(
-                _world_state,
-                abs_x,
-                abs_y,
-                -1,
-                ts,
-            )
-        elif eid > 0:
-            _world_state = update_container_from_radar(
-                _world_state,
-                abs_x,
-                abs_y,
-                eid,
-                ts,
-            )
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=new_terrain,
+        viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
+        timestamp_ms=ts,
+    )
+
+
+def _update_cache_tiles(updates: list[tuple[int, int, int]]) -> None:
+    """Apply absolute cache-only tile updates to terrain/visual cache only.
+
+    Args:
+        updates: Absolute `(x, y, cache_value)` triples.
+    """
+    global _world_state
+
+    new_terrain = dict(_world_state["terrain"])
+    timestamp_ms = get_current_time_ms()
+    for x, y, cache_value in updates:
+        key = coord_key(x, y)
+        existing = new_terrain.get(key)
+        terrain_type = existing["terrain_type"] if existing is not None else 0
+        overlay_value = existing["overlay_value"] if existing is not None else 255
+        new_terrain[key] = make_terrain_tile(
+            x=x,
+            y=y,
+            terrain_type=terrain_type,
+            cache_value=cache_value,
+            overlay_value=overlay_value,
+        )
+
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=new_terrain,
+        viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def _update_overlay_tiles(updates: list[tuple[int, int, int]]) -> None:
+    """Apply absolute overlay-only tile updates to world state.
+
+    Args:
+        updates: Absolute `(x, y, overlay_value)` triples.
+    """
+    global _world_state
+
+    new_terrain = dict(_world_state["terrain"])
+    timestamp_ms = get_current_time_ms()
+    for x, y, overlay_value in updates:
+        key = coord_key(x, y)
+        existing = new_terrain.get(key)
+        terrain_type = existing["terrain_type"] if existing is not None else 0
+        cache_value = existing["cache_value"] if existing is not None else 0
+        new_terrain[key] = make_terrain_tile(
+            x=x,
+            y=y,
+            terrain_type=terrain_type,
+            cache_value=cache_value,
+            overlay_value=overlay_value,
+        )
+
+    _world_state = WorldStateDict(
+        self_state=_world_state["self_state"],
+        tanks=_world_state["tanks"],
+        containers=_world_state["containers"],
+        mines=_world_state["mines"],
+        terrain=new_terrain,
+        viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
+        timestamp_ms=timestamp_ms,
+    )
 
 
 def _update_terrain_tiles(updates: list[tuple[int, int, int]]) -> None:
@@ -1132,12 +1554,14 @@ def _update_terrain_tiles(updates: list[tuple[int, int, int]]) -> None:
     for x, y, terrain_type in updates:
         key = coord_key(x, y)
         existing = new_terrain.get(key)
-        entity_id = existing["entity_id"] if existing is not None else 0
+        cache_value = existing["cache_value"] if existing is not None else 0
+        overlay_value = existing["overlay_value"] if existing is not None else 255
         new_terrain[key] = make_terrain_tile(
             x=x,
             y=y,
             terrain_type=terrain_type,
-            entity_id=entity_id,
+            cache_value=cache_value,
+            overlay_value=overlay_value,
         )
 
     _world_state = WorldStateDict(
@@ -1147,6 +1571,7 @@ def _update_terrain_tiles(updates: list[tuple[int, int, int]]) -> None:
         mines=_world_state["mines"],
         terrain=new_terrain,
         viewport=_world_state["viewport"],
+        scanned_viewports=_world_state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -1182,8 +1607,9 @@ def _is_absolute_position(x: int, y: int) -> bool:
     - Absolute world coordinates (after join/teleport): x,y >= 18
     - Viewport-relative coordinates (during movement): x,y < 18
 
-    The viewport is 18x18, so coordinates within that range are viewport-relative
-    and don't represent actual world position.
+    Position updates use the same 18x18 patch envelope as ``0x5A`` viewport
+    rows, so coordinates within that range are viewport-relative and do not
+    represent absolute world position.
 
     Args:
         x: X coordinate from position_update.
@@ -1192,8 +1618,7 @@ def _is_absolute_position(x: int, y: int) -> bool:
     Returns:
         True if coordinates are absolute world coordinates.
     """
-    viewport_size = 18
-    return x >= viewport_size or y >= viewport_size
+    return x >= VIEWPORT_PATCH_WIDTH or y >= VIEWPORT_PATCH_WIDTH
 
 
 def _render_ascii_if_available(event: str) -> None:
@@ -1204,7 +1629,7 @@ def _render_ascii_if_available(event: str) -> None:
     """
     ascii_view = render_world_state_ascii()
     if ascii_view is not None:
-        log.info("[WorldState %s]\n%s", event, ascii_view)
+        emit_world("[WorldState %s]\n%s", event, ascii_view)
 
 
 def _dispatch_resource_update(decoded: protocol.BinaryMessage) -> bool:
@@ -1235,8 +1660,16 @@ def _dispatch_resource_update(decoded: protocol.BinaryMessage) -> bool:
         case {"msg_type": 0x74, "enabled": list(enabled)}:
             update_inventory_from_toggle(enabled)
             return True
-        case {"msg_type": 0x46}:
-            mark_radar_scan_complete()
+        case {"msg_type": 0x46, "found": bool(found)}:
+            if _consume_pending_radar_cache_refresh():
+                update_world_state_from_radar_cache()
+            elif _consume_pending_radar_empty_delta():
+                if found:
+                    update_world_state_from_radar_known_resources()
+                else:
+                    update_world_state_from_radar([], [])
+            else:
+                mark_radar_scan_complete()
             return True
     return False
 
@@ -1380,6 +1813,99 @@ def _dispatch_container_movement(decoded: protocol.BinaryMessage) -> bool:
     return False
 
 
+def _dispatch_binary_position_update(
+    flags: int,
+    tank_id: int,
+    x: int,
+    y: int,
+) -> bool:
+    """Dispatch one decoded ``position_update`` message.
+
+    Args:
+        flags: Position-update flags.
+        tank_id: Tank identifier.
+        x: Reported x coordinate.
+        y: Reported y coordinate.
+
+    Returns:
+        True after handling the position update.
+    """
+    is_self = (flags & 0x02) != 0
+    if is_self and _is_absolute_position(x, y):
+        update_world_state_from_position(x, y)
+        _render_ascii_if_available("Enter/Teleport")
+    elif not is_self and _is_absolute_position(x, y):
+        _update_tank_position(tank_id, x, y)
+    return True
+
+
+def _dispatch_protocol_movement_update(
+    tank_id: int,
+    start_x: int,
+    start_y: int,
+    waypoints: list[tuple[int, int]],
+) -> bool:
+    """Dispatch one decoded protocol ``0x47`` movement message.
+
+    Args:
+        tank_id: Moving tank id.
+        start_x: Absolute movement start x.
+        start_y: Absolute movement start y.
+        waypoints: Absolute waypoint tuples from the protocol decoder.
+
+    Returns:
+        True after handling the movement.
+    """
+    self_state = _world_state["self_state"]
+    is_self = self_state is not None and tank_id == self_state["tank_id"]
+    if is_self:
+        final_x, final_y = _resolve_waypoint_destination(start_x, start_y, waypoints)
+        update_world_state_from_position(final_x, final_y)
+        _render_ascii_if_available("SelfMovement")
+    else:
+        _handle_waypoint_movement(start_x, start_y, waypoints)
+    return True
+
+
+def _dispatch_tile_patch_update(decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch tile patch updates for cache, overlay, terrain, and viewport.
+
+    Args:
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True if the message was handled, False otherwise.
+    """
+    match decoded:
+        case {"msg_type": 0x4A, "updates": list(updates)}:
+            _update_terrain_tiles(updates)
+            return True
+        case {"msg_type": 0x40, "updates": list(updates)}:
+            _update_overlay_tiles(updates)
+            return True
+        case {"msg_type": 0x43, "updates": list(updates)}:
+            _update_cache_tiles(updates)
+            return True
+        case {
+            "msg_type": 0x4F,
+            "cache_updates": list(cache_updates),
+            "overlay_updates": list(overlay_updates),
+        }:
+            _update_cache_tiles(cache_updates)
+            _update_overlay_tiles(overlay_updates)
+            _mark_pending_radar_cache_refresh()
+            return True
+        case {
+            "msg_type": 0x5A,
+            "viewport_left": int(viewport_left),
+            "viewport_top": int(viewport_top),
+            "entities": list(entities),
+        }:
+            _update_viewport_entities(viewport_left, viewport_top, entities)
+            return True
+    return False
+
+
 def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
     """Dispatch position and movement messages to update world state.
 
@@ -1400,13 +1926,7 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             "x": int(x),
             "y": int(y),
         }:
-            is_self = (flags & 0x02) != 0
-            if is_self and _is_absolute_position(x, y):
-                update_world_state_from_position(x, y)
-                _render_ascii_if_available("Enter/Teleport")
-            elif not is_self and _is_absolute_position(x, y):
-                _update_tank_position(tid, x, y)
-            return True
+            return _dispatch_binary_position_update(flags, tid, x, y)
         case {
             "msg_type": 0x47,
             "tank_id": int(tid),
@@ -1414,15 +1934,7 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             "start_y": int(sy),
             "waypoints": list(wps),
         }:
-            self_state = _world_state["self_state"]
-            is_self = self_state is not None and tid == self_state["tank_id"]
-            if is_self:
-                final_x, final_y = _resolve_waypoint_destination(sx, sy, wps)
-                update_world_state_from_position(final_x, final_y)
-                _render_ascii_if_available("SelfMovement")
-            else:
-                _handle_waypoint_movement(sx, sy, wps)
-            return True
+            return _dispatch_protocol_movement_update(tid, sx, sy, wps)
         case {
             "msg_type": 0x3D,
             "tank_id": int(tid),
@@ -1434,17 +1946,9 @@ def _dispatch_position_update(decoded: protocol.BinaryMessage) -> bool:
             update_world_state_from_move_response_full(tid, x, y, team, rank)
             _render_ascii_if_available("MovementResponse")
             return True
-        case {"msg_type": 0x4A, "updates": list(updates)}:
-            _update_terrain_tiles(updates)
-            return True
-        case {
-            "msg_type": 0x5A,
-            "viewport_left": int(viewport_left),
-            "viewport_top": int(viewport_top),
-            "entities": list(entities),
-        }:
-            _update_viewport_entities(viewport_left, viewport_top, entities)
-            return True
+        case _:
+            if _dispatch_tile_patch_update(decoded):
+                return True
     return _dispatch_container_movement(decoded)
 
 
@@ -1518,6 +2022,8 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
             "positions": list(positions),
         }:
             return _dispatch_mine_placement(mine_type, tank_id, positions)
+        case {"msg_type": 0x45, "positions": list(positions)}:
+            return _dispatch_mine_detonation(positions)
         case {
             "msg_type": "tank_registry",
             "is_container": True,
@@ -1531,7 +2037,7 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
             update_world_state_from_container_pickup(x, y)
             return True
         case {"msg_type": "teleport_landed"}:
-            log.info("TELEPORT_LANDED: server confirmed teleport")
+            emit_world("TELEPORT_LANDED: server confirmed teleport")
             mark_teleport_landed()
             return True
         case {
@@ -1601,6 +2107,24 @@ def _dispatch_mine_placement(
             team,
             timestamp_ms,
         )
+    return True
+
+
+def _dispatch_mine_detonation(
+    positions: list[tuple[int, int]],
+) -> bool:
+    """Dispatch tunneled mine detonation into world state.
+
+    Args:
+        positions: Absolute mine coordinates removed by the detonation.
+
+    Returns:
+        True after applying the removals.
+    """
+    global _world_state
+    timestamp_ms = get_current_time_ms()
+    for x, y in positions:
+        _world_state = remove_mine(_world_state, x, y, timestamp_ms)
     return True
 
 
@@ -1695,6 +2219,17 @@ def dispatch_world_state_update(decoded: protocol.BinaryMessage) -> None:
         case {"msg_type": "world_state", "world_data": bytes(wd)}:
             _parse_world_state_blob(wd)
             return
+        case {"msg_type": 0x4F, "containers": list(containers), "mines": list(mines)}:
+            # Tunneled 0x2E -> 0x4F radar scan results can be differential.
+            # Non-empty lists are authoritative immediately. Empty lists need
+            # the following RadarAck(found=...) to distinguish "no resources"
+            # from "no deltas, keep existing viewport resources".
+            if not containers and not mines:
+                _mark_pending_radar_empty_delta()
+            else:
+                update_world_state_from_radar(containers, mines)
+                _render_ascii_if_available("Radar")
+            return
         case {"msg_type": "radar_response", "containers": list(containers), "mines": list(mines)}:
             update_world_state_from_radar(containers, mines)
             _render_ascii_if_available("Radar")
@@ -1713,9 +2248,11 @@ __all__ = [
     "get_world_state",
     "increment_container_failed_pickups",
     "is_move_target_failed",
+    "is_scan_viewport_failed",
     "mark_combat_hit",
     "mark_move_target_failed",
     "mark_radar_scan_complete",
+    "mark_scan_viewport_failed",
     "mark_tank_killed",
     "mark_teleport_landed",
     "peek_combat_hit",
