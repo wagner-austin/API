@@ -158,6 +158,15 @@ export interface WebmMuxerInterface {
 }
 
 /**
+ * Location interface for hostname detection.
+ */
+export interface LocationInterface {
+  readonly hostname: string;
+  readonly protocol: string;
+  readonly port: string;
+}
+
+/**
  * All hooks bundled together.
  */
 export interface Hooks {
@@ -167,6 +176,7 @@ export interface Hooks {
   readonly storage: StorageInterface;
   readonly document: DocumentInterface;
   readonly webmMuxer: WebmMuxerInterface;
+  readonly location: LocationInterface;
 }
 
 // ============================================================================
@@ -314,6 +324,7 @@ function createDefaultHooks(): Hooks {
     storage: globalThis.localStorage,
     document: globalThis.document,
     webmMuxer: createRealWebmMuxer(),
+    location: globalThis.location,
   };
 }
 
@@ -420,6 +431,16 @@ export function getDocument(): DocumentInterface {
  */
 export function getWebmMuxer(): WebmMuxerInterface {
   return getHooks().webmMuxer;
+}
+
+/**
+ * Get the location hook.
+ *
+ * Returns:
+ *   Location interface
+ */
+export function getLocation(): LocationInterface {
+  return getHooks().location;
 }
 
 /**

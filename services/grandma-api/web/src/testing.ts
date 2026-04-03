@@ -25,6 +25,7 @@ import {
   EBMLElement,
   CueInfo,
   WebmProcessResult,
+  LocationInterface,
 } from "./_test_hooks.js";
 
 // ============================================================================
@@ -489,6 +490,7 @@ export interface FakeHooksConfig {
   readonly elements?: Map<string, HTMLElement>;
   readonly documentReadyState?: DocumentReadyState;
   readonly webmMuxerConfig?: FakeWebmMuxerConfig;
+  readonly locationHostname?: string;
 }
 
 /**
@@ -591,6 +593,13 @@ export function createFakeHooks(config: FakeHooksConfig = {}): FakeHooksResult {
     getMakeSeekableInputs: getWebmMuxerMakeSeekableInputs,
   } = createFakeWebmMuxer(config.webmMuxerConfig);
 
+  // Location
+  const fakeLocation: LocationInterface = {
+    hostname: config.locationHostname ?? "localhost",
+    protocol: "https:",
+    port: "8091",
+  };
+
   const hooks: Hooks = {
     fetch: fakeFetch,
     getUserMedia: fakeGetUserMedia,
@@ -598,6 +607,7 @@ export function createFakeHooks(config: FakeHooksConfig = {}): FakeHooksResult {
     storage,
     document: fakeDocument,
     webmMuxer: fakeWebmMuxer,
+    location: fakeLocation,
   };
 
   return {

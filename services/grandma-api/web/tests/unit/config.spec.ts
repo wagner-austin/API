@@ -17,6 +17,7 @@ describe("config", () => {
     it("loads config from config.json", async () => {
       const { hooks, getFetchCalls } = createFakeHooks({
         fetchResponses: [createFakeResponse({ API_BASE_URL: "https://api.example.com" })],
+        locationHostname: "api.example.com", // Non-local hostname to skip auto-detection
       });
       setHooks(hooks);
 
@@ -30,6 +31,7 @@ describe("config", () => {
     it("caches config after first load", async () => {
       const { hooks, getFetchCalls } = createFakeHooks({
         fetchResponses: [createFakeResponse({ API_BASE_URL: "https://api.example.com" })],
+        locationHostname: "api.example.com",
       });
       setHooks(hooks);
 
@@ -81,6 +83,7 @@ describe("config", () => {
     it("resets cache allowing fresh fetch", async () => {
       const { hooks: hooks1, getFetchCalls: getCalls1 } = createFakeHooks({
         fetchResponses: [createFakeResponse({ API_BASE_URL: "https://first.com" })],
+        locationHostname: "first.com",
       });
       setHooks(hooks1);
 
@@ -92,6 +95,7 @@ describe("config", () => {
 
       const { hooks: hooks2, getFetchCalls: getCalls2 } = createFakeHooks({
         fetchResponses: [createFakeResponse({ API_BASE_URL: "https://second.com" })],
+        locationHostname: "second.com",
       });
       setHooks(hooks2);
 

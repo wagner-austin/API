@@ -75,6 +75,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       };
 
       setHooks(customHooks);
@@ -103,6 +104,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       };
 
       setHooks(customHooks);
@@ -135,6 +137,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       expect(getFetch()).toBe(customFetch);
@@ -161,6 +164,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       expect(getGetUserMedia()).toBe(customGetUserMedia);
@@ -183,6 +187,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       const Ctor = getMediaRecorderConstructor();
@@ -206,6 +211,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       expect(getStorage()).toBe(storage);
@@ -230,6 +236,7 @@ describe("_test_hooks", () => {
         storage,
         document: customDocument,
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       expect(getDocument()).toBe(customDocument);
@@ -253,6 +260,7 @@ describe("_test_hooks", () => {
           addEventListener: () => {},
         },
         webmMuxer: muxer,
+        location: { hostname: "localhost", protocol: "https:", port: "8091" },
       });
 
       expect(getWebmMuxer()).toBe(muxer);
