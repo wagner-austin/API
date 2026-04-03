@@ -28,6 +28,8 @@ from covenant_ml.ensemble.types import (
     OptimizationConfig,
     OptimizationResult,
 )
+from covenant_ml.optimizer import SearchSpace
+from covenant_ml.optimizer.types import SampledFloatParams, SampledIntParams
 from covenant_ml.types import (
     BackendName,
     ClassifierTrainConfig,
@@ -406,6 +408,19 @@ class FakeBackend:
         """
         _ = model
         return _make_fake_importances(feature_names)
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Not used in amex pipeline."""
+        raise NotImplementedError
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Not used in amex pipeline."""
+        raise NotImplementedError
 
 
 def _make_fake_importances(
