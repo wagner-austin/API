@@ -15,6 +15,10 @@ from covenant_ml.datasets.loader import (
     DatasetLoader,
     create_dataset_loader,
 )
+from covenant_ml.datasets.loaders._regression_csv import (
+    RegressionCSVLoader,
+    create_regression_csv_loader,
+)
 from covenant_ml.datasets.loaders.timeseries_csv_loader import (
     TimeSeriesCSVLoader,
     create_timeseries_csv_loader,
@@ -22,11 +26,15 @@ from covenant_ml.datasets.loaders.timeseries_csv_loader import (
 from covenant_ml.datasets.protocol import (
     DatasetLoaderProtocol,
     DatasetValidatorProtocol,
+    RegressionDatasetLoaderProtocol,
+    RegressionDatasetLoaderWithProgressProtocol,
 )
 from covenant_ml.datasets.registry import (
     DatasetRegistry,
+    RegressionDatasetRegistry,
     TimeSeriesDatasetRegistry,
     make_default_registry,
+    make_default_regression_registry,
     make_default_timeseries_registry,
 )
 from covenant_ml.datasets.testing import (
@@ -44,7 +52,10 @@ from covenant_ml.datasets.types import (
     FileFormat,
     LabelType,
     LoadedDataset,
+    RegressionDatasetConfig,
+    RegressionDatasetMeta,
     RegressionLoadedDataset,
+    RegressionTargetSpec,
     TargetColumnSpec,
     TimeSeriesDatasetConfig,
     TimeSeriesSpec,
@@ -65,7 +76,14 @@ __all__ = [
     "FileFormat",
     "LabelType",
     "LoadedDataset",
+    "RegressionCSVLoader",
+    "RegressionDatasetConfig",
+    "RegressionDatasetLoaderProtocol",
+    "RegressionDatasetLoaderWithProgressProtocol",
+    "RegressionDatasetMeta",
+    "RegressionDatasetRegistry",
     "RegressionLoadedDataset",
+    "RegressionTargetSpec",
     "TargetColumnSpec",
     "TimeSeriesCSVLoader",
     "TimeSeriesDatasetConfig",
@@ -74,7 +92,9 @@ __all__ = [
     "create_dataset_loader",
     "create_fake_dataset_loader",
     "create_fake_regression_dataset_loader",
+    "create_regression_csv_loader",
     "create_timeseries_csv_loader",
     "make_default_registry",
+    "make_default_regression_registry",
     "make_default_timeseries_registry",
 ]
