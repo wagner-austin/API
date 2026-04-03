@@ -94,6 +94,15 @@ pub enum ClearGbmError {
         /// Reason for the deserialization failure.
         reason: String,
     },
+
+    /// Invalid label value (expected 0 or 1).
+    #[error("invalid label {value} at index {index} (expected 0 or 1)")]
+    InvalidLabel {
+        /// The invalid label value that was provided.
+        value: u8,
+        /// The index of the invalid label.
+        index: usize,
+    },
 }
 
 #[cfg(test)]
@@ -199,6 +208,16 @@ mod tests {
             context: "i64 to usize".to_string(),
         };
         assert_eq!(err.to_string(), "integer conversion failed: i64 to usize");
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_display_invalid_label() -> Result<(), ClearGbmError> {
+        let err = ClearGbmError::InvalidLabel { value: 5, index: 3 };
+        assert_eq!(
+            err.to_string(),
+            "invalid label 5 at index 3 (expected 0 or 1)"
+        );
         Ok(())
     }
 
