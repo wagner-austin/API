@@ -6,17 +6,35 @@ equipment slot toggling and command sending.
 
 from __future__ import annotations
 
-from platform_core.logging import get_logger
-
 from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
-
-log = get_logger(__name__)
+from tankpit_bot.runtime_logging import emit_ai
 
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
 _COMBAT_SLOTS: list[int] = [1, 2, 4]
+_EQUIPMENT_LABELS: dict[int, str] = {
+    1: "armor",
+    2: "dual",
+    3: "missile",
+    4: "homing",
+    5: "radar",
+}
+
+
+def _format_desired_equipment(desired: list[int]) -> str:
+    """Return a readable equipment summary for log output.
+
+    Args:
+        desired: Sorted list of desired equipment slots.
+
+    Returns:
+        Comma-separated equipment names, or ``none`` if empty.
+    """
+    if not desired:
+        return "none"
+    return ",".join(_EQUIPMENT_LABELS.get(slot, f"slot{slot}") for slot in desired)
 
 
 def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
@@ -55,8 +73,10 @@ def dispatch_command(bot: BotProtocol, command: BotCommand) -> bool:
     """
     if command["cmd_type"] == "move":
         return bot.move_to(command["target_x"], command["target_y"])
-    if command["cmd_type"] == "pickup_move":
-        return bot.pickup_move_to(command["target_x"], command["target_y"])
+    if command["cmd_type"] == "pickup_fuel":
+        return bot.pickup_fuel_to(command["target_x"], command["target_y"])
+    if command["cmd_type"] == "pickup_equipment":
+        return bot.pickup_equipment_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "shoot":
         return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
     if command["cmd_type"] == "radar":
@@ -78,16 +98,19 @@ def execute(bot: BotProtocol, decision: TickDecisionDict) -> None:
     apply_equipment(bot, decision["desired_equipment"])
 
     behavior = decision["behavior"]
-    log.info(
-        "AI: %s score=%d target=(%d,%d) reason=%s",
+    command = decision["command"]
+    emit_ai(
+        "%s score=%d target=(%d,%d) cmd=%s equip=%s reason=%s",
         behavior["mode"],
         behavior["score"],
         behavior["target_x"],
         behavior["target_y"],
+        command["cmd_type"],
+        _format_desired_equipment(decision["desired_equipment"]),
         behavior["reason"],
     )
 
-    dispatch_command(bot, decision["command"])
+    dispatch_command(bot, command)
 
 
 __all__ = [
