@@ -90,14 +90,14 @@ This will:
 1. Launch a Chromium browser via Playwright
 2. Navigate to tankpit.com
 3. Capture all WebSocket frames for 60 seconds (configurable)
-4. Save results to `capture_session.json`
+4. Save results to `runs/sniff/latest.capture_session.json` by default
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TANKPIT_URL` | `https://tankpit.com` | Target URL |
-| `TANKPIT_OUTPUT` | `capture_session.json` | Output file |
+| `TANKPIT_OUTPUT` | `runs/sniff/latest.capture_session.json` | Output file |
 | `TANKPIT_HEADLESS` | `false` | Run headlessly |
 | `TANKPIT_DURATION_MS` | `60000` | Capture duration |
 | `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
@@ -196,7 +196,7 @@ The `magic` field contains the session-specific XOR key captured from `tankpit.m
 
 1. **Run Sniffer**: `make sniff`
 2. **Play the Game**: Log in and play in the browser window
-3. **Analyze Capture**: Review `capture_session.json`
+3. **Analyze Capture**: Review `runs/sniff/latest.capture_session.json`
 4. **Identify Patterns**: Look for:
    - Authentication handshake
    - Game join/leave messages
