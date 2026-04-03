@@ -72,6 +72,19 @@ class ReadTextProtocol(Protocol):
         ...
 
 
+class AppendTextProtocol(Protocol):
+    """Protocol for appending text to a file."""
+
+    def __call__(self, path: Path, content: str) -> None:
+        """Append text content to a file.
+
+        Args:
+            path: File path to append to.
+            content: Text content to append.
+        """
+        ...
+
+
 class PathExistsProtocol(Protocol):
     """Protocol for checking if a path exists."""
 
@@ -113,6 +126,18 @@ def _real_read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _real_append_text(path: Path, content: str) -> None:
+    """Real implementation using append mode.
+
+    Args:
+        path: File path to append to.
+        content: Text content to append.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(content)
+
+
 def _real_path_exists(path: Path) -> bool:
     """Real implementation using Path.exists().
 
@@ -127,6 +152,7 @@ def _real_path_exists(path: Path) -> bool:
 
 write_text: WriteTextProtocol = _real_write_text
 read_text: ReadTextProtocol = _real_read_text
+append_text: AppendTextProtocol = _real_append_text
 path_exists: PathExistsProtocol = _real_path_exists
 
 
@@ -635,8 +661,20 @@ class BotProtocol(Protocol):
         """
         ...
 
-    def pickup_move_to(self, x: int, y: int) -> bool:
-        """Send pickup move command.
+    def pickup_fuel_to(self, x: int, y: int) -> bool:
+        """Send fuel pickup command.
+
+        Args:
+            x: Target X coordinate (0-255).
+            y: Target Y coordinate (0-255).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
+    def pickup_equipment_to(self, x: int, y: int) -> bool:
+        """Send equipment pickup command.
 
         Args:
             x: Target X coordinate (0-255).
@@ -757,6 +795,7 @@ get_sync_playwright: Callable[[], SyncPlaywrightFactoryProtocol] = _real_get_syn
 
 
 __all__ = [
+    "AppendTextProtocol",
     "BotProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
@@ -775,6 +814,7 @@ __all__ = [
     "SyncPlaywrightFactoryProtocol",
     "TerrainMapProtocol",
     "WriteTextProtocol",
+    "append_text",
     "find_best_static_byte",
     "get_argv",
     "get_env",
