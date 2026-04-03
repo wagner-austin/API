@@ -119,8 +119,18 @@ poetry run python -m platform_email.cli list --folder sent --count 20
 poetry run python -m platform_email.cli read 1
 poetry run python -m platform_email.cli read 3
 
-# Send an email
-poetry run python -m platform_email.cli send --to recipient@example.com --subject "Hello" --body "Message body"
+# Send an email (body must be in a file to prevent shell truncation)
+poetry run python -m platform_email.cli send recipient@example.com "Subject" body.txt
+poetry run python -m platform_email.cli send recipient@example.com "Subject" body.txt --cc a@b.com,c@d.com
+poetry run python -m platform_email.cli send recipient@example.com "Subject" body.html --html --bcc secret@x.com
+
+# Send with file attachments (repeatable)
+poetry run python -m platform_email.cli send recipient@example.com "Subject" body.txt --attach report.pdf
+poetry run python -m platform_email.cli send recipient@example.com "Subject" body.txt --attach file1.pdf --attach file2.zip
+
+# Search emails by keyword
+poetry run python -m platform_email.cli search "TU+11"
+poetry run python -m platform_email.cli search "invoice" -n 20
 ```
 
 ### CLI Configuration
@@ -350,7 +360,8 @@ The `HooksContainer` provides dependency injection for all external dependencies
 | `load_gmail_credentials` | `LoadGmailCredentialsHook` | Load Gmail OAuth credentials |
 | `open_browser` | `OpenBrowserHook` | Open browser for OAuth |
 | `current_time` | `CurrentTimeHook` | Get current timestamp |
-| `read_file` | `ReadFileHook` | Read file contents |
+| `read_file` | `ReadFileHook` | Read file contents (text) |
+| `read_file_bytes` | `ReadFileBytesHook` | Read file contents (binary) |
 | `write_file` | `WriteFileHook` | Write file contents |
 | `file_exists` | `FileExistsHook` | Check file existence |
 | `console_output` | `ConsoleOutputHook` | Console output |
@@ -420,9 +431,10 @@ The `HooksContainer` provides dependency injection for all external dependencies
 |---------|-------------|
 | `auth` | Authenticate with Outlook |
 | `folders` | List email folders |
-| `list` | List recent emails (--folder, --count options) |
+| `list` | List recent emails (-f/--folder, -n/--count) |
 | `read <index>` | Read email by index from list |
-| `send` | Send an email (--to, --subject, --body options) |
+| `send <to> <subject> <body_file>` | Send an email (--cc, --bcc, --html, --attach) |
+| `search <query>` | Search emails by keyword (-n/--count) |
 
 ### Error Handling
 

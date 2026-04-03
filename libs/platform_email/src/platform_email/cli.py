@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import mimetypes
+import os.path
 import secrets
 import urllib.parse
 from datetime import datetime
 from typing import TypedDict
 
-from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import JSONObject, JSONValue, load_json_str, narrow_json_to_dict
 
 from platform_email.config.outlook import (
     OUTLOOK_EMAIL_SCOPES,
@@ -451,6 +453,87 @@ def _api_post(access_token: str, path: str, body: JSONObject) -> JSONObject:
 
 
 # =============================================================================
+# Display Helpers
+# =============================================================================
+
+
+def _format_recipients(addresses: str) -> list[JSONValue]:
+    """Convert comma-separated email addresses to Graph API recipient format.
+
+    Args:
+        addresses: Comma-separated email addresses (e.g. "a@b.com,c@d.com").
+            Empty string produces an empty list.
+
+    Returns:
+        List of recipient objects for the Graph API.
+    """
+    if not addresses:
+        return []
+    return [
+        {"emailAddress": {"address": addr.strip()}} for addr in addresses.split(",") if addr.strip()
+    ]
+
+
+def _build_attachments(paths: tuple[str, ...]) -> list[JSONValue]:
+    """Build Graph API attachment objects from file paths.
+
+    Reads each file, base64-encodes its contents, and guesses its MIME type.
+    Files must exist (validated via hooks.file_exists before calling).
+
+    Args:
+        paths: Tuple of file paths to attach.
+
+    Returns:
+        List of fileAttachment objects for the Graph API.
+    """
+    attachments: list[JSONValue] = []
+    for path in paths:
+        raw_bytes = hooks.read_file_bytes(path)
+        encoded = base64.b64encode(raw_bytes).decode("ascii")
+        content_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
+        filename = os.path.basename(path)
+        att: JSONObject = {
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            "name": filename,
+            "contentType": content_type,
+            "contentBytes": encoded,
+        }
+        attachments.append(att)
+    return attachments
+
+
+def _display_message_rows(messages: list[JSONObject]) -> None:
+    """Render email message rows to console.
+
+    Args:
+        messages: List of Graph API message objects (pre-validated as dicts).
+    """
+    for i, msg in enumerate(messages, 1):
+        is_read_raw = msg.get("isRead")
+        is_read = is_read_raw if isinstance(is_read_raw, bool) else True
+        subject_raw = msg.get("subject")
+        subject = subject_raw if isinstance(subject_raw, str) else "(no subject)"
+        from_email = ""
+        from_data = msg.get("from")
+        if isinstance(from_data, dict):
+            email_addr = from_data.get("emailAddress")
+            if isinstance(email_addr, dict):
+                addr_raw = email_addr.get("address")
+                from_email = addr_raw if isinstance(addr_raw, str) else ""
+
+        received_raw = msg.get("receivedDateTime")
+        received = received_raw if isinstance(received_raw, str) else ""
+        date_str = received[:10] if received else ""
+
+        style = STYLE_UNREAD if not is_read else STYLE_READ
+        unread_marker = "*" if not is_read else " "
+
+        subject_display = subject[:50] if len(subject) > 50 else subject
+        _print(f"  {unread_marker}[{STYLE_DIM}]{i:2}.[/] [{style}]{subject_display}[/]")
+        _print(f"      [{STYLE_FROM}]{from_email}[/] - [{STYLE_DATE}]{date_str}[/]")
+
+
+# =============================================================================
 # Commands
 # =============================================================================
 
@@ -591,36 +674,13 @@ def cmd_list(folder: str = "inbox", count: int = 10) -> None:
         _print(f"[{STYLE_ERROR}]Invalid response[/]")
         return
 
+    validated: list[JSONObject] = [m for m in messages if isinstance(m, dict)]
+
     _print("")
     _print(f"[{STYLE_HEADER}]Recent Emails ({folder}):[/]")
     _print("")
 
-    for i, msg in enumerate(messages, 1):
-        if not isinstance(msg, dict):
-            continue
-
-        is_read_raw = msg.get("isRead")
-        is_read = is_read_raw if isinstance(is_read_raw, bool) else True
-        subject_raw = msg.get("subject")
-        subject = subject_raw if isinstance(subject_raw, str) else "(no subject)"
-        from_email = ""
-        from_data = msg.get("from")
-        if isinstance(from_data, dict):
-            email_addr = from_data.get("emailAddress")
-            if isinstance(email_addr, dict):
-                addr_raw = email_addr.get("address")
-                from_email = addr_raw if isinstance(addr_raw, str) else ""
-
-        received_raw = msg.get("receivedDateTime")
-        received = received_raw if isinstance(received_raw, str) else ""
-        date_str = received[:10] if received else ""  # YYYY-MM-DD
-
-        style = STYLE_UNREAD if not is_read else STYLE_READ
-        unread_marker = "*" if not is_read else " "
-
-        subject_display = subject[:50] if len(subject) > 50 else subject
-        _print(f"  {unread_marker}[{STYLE_DIM}]{i:2}.[/] [{style}]{subject_display}[/]")
-        _print(f"      [{STYLE_FROM}]{from_email}[/] - [{STYLE_DATE}]{date_str}[/]")
+    _display_message_rows(validated)
 
 
 def cmd_read(index: int) -> None:
@@ -699,38 +759,112 @@ def cmd_read(index: int) -> None:
         _print(f"\n[{STYLE_DIM}]... (truncated)[/]")
 
 
-def cmd_send(to: str, subject: str, body: str) -> None:
-    """Send an email.
+def cmd_send(
+    to: str,
+    subject: str,
+    body_file: str,
+    *,
+    cc: str = "",
+    bcc: str = "",
+    html: bool = False,
+    attachments: tuple[str, ...] = (),
+) -> None:
+    """Send an email with body read from a file.
 
     Args:
         to: Recipient email address.
         subject: Email subject.
-        body: Email body text.
+        body_file: Path to file containing email body.
+        cc: Comma-separated CC email addresses.
+        bcc: Comma-separated BCC email addresses.
+        html: If True, send as HTML with body wrapped in <pre> tags.
+        attachments: Tuple of file paths to attach.
     """
     token = _get_token()
     if not token:
         _print(f"[{STYLE_ERROR}]Not authenticated. Run 'email auth' first.[/]")
         return
 
-    message: JSONObject = {
-        "message": {
-            "subject": subject,
-            "body": {
-                "contentType": "Text",
-                "content": body,
-            },
-            "toRecipients": [
-                {
-                    "emailAddress": {
-                        "address": to,
-                    }
-                }
-            ],
-        }
+    if not hooks.file_exists(body_file):
+        _print(f"[{STYLE_ERROR}]Body file not found: {body_file}[/]")
+        return
+
+    for att_path in attachments:
+        if not hooks.file_exists(att_path):
+            _print(f"[{STYLE_ERROR}]Attachment not found: {att_path}[/]")
+            return
+
+    body = hooks.read_file(body_file)
+
+    # Determine content type and format body
+    if html:
+        content_type = "HTML"
+        content = f'<pre style="font-family: inherit;">{body}</pre>'
+    else:
+        content_type = "Text"
+        content = body
+
+    msg_body: JSONObject = {
+        "subject": subject,
+        "body": {
+            "contentType": content_type,
+            "content": content,
+        },
+        "toRecipients": _format_recipients(to),
+        "ccRecipients": _format_recipients(cc),
+        "bccRecipients": _format_recipients(bcc),
     }
 
+    if attachments:
+        msg_body["attachments"] = _build_attachments(attachments)
+
+    message: JSONObject = {"message": msg_body}
+
     _api_post(token, "/me/sendMail", message)
-    _print(f"[{STYLE_SUCCESS}]Email sent to {to}[/]")
+
+    parts = [f"Email sent to {to}"]
+    if cc:
+        parts.append(f"CC: {cc}")
+    if bcc:
+        parts.append(f"BCC: {bcc}")
+    if attachments:
+        filenames = [os.path.basename(p) for p in attachments]
+        parts.append(f"Attachments: {', '.join(filenames)}")
+    _print(f"[{STYLE_SUCCESS}]{' | '.join(parts)}[/]")
+
+
+def cmd_search(query: str, count: int = 10) -> None:
+    """Search emails by keyword.
+
+    Args:
+        query: Search query string (uses Microsoft Graph KQL syntax).
+        count: Maximum number of results to return.
+    """
+    token = _get_token()
+    if not token:
+        _print(f"[{STYLE_ERROR}]Not authenticated. Run 'email auth' first.[/]")
+        return
+
+    encoded_query = urllib.parse.quote(query)
+    path = f'/me/messages?$search="{encoded_query}"&$top={count}'
+    data = _api_get(token, path)
+    messages = data.get("value", [])
+
+    if not isinstance(messages, list):
+        _print(f"[{STYLE_ERROR}]Invalid response[/]")
+        return
+
+    validated: list[JSONObject] = [m for m in messages if isinstance(m, dict)]
+
+    _print("")
+    _print(f'[{STYLE_HEADER}]Search Results for "{query}":[/]')
+    _print("")
+
+    if not validated:
+        _print(f"  [{STYLE_DIM}]No results found[/]")
+        return
+
+    _display_message_rows(validated)
 
 
 # =============================================================================
@@ -756,7 +890,18 @@ class SendArgs(TypedDict):
 
     to: str
     subject: str
-    body: str
+    body_file: str
+    cc: str
+    bcc: str
+    html: bool
+    attachments: tuple[str, ...]
+
+
+class SearchArgs(TypedDict):
+    """Arguments for search command."""
+
+    query: str
+    count: int
 
 
 def _extract_str(ns: argparse.Namespace, key: str, default: str) -> str:
@@ -802,12 +947,83 @@ def decode_read_args(args: argparse.Namespace) -> ReadArgs:
     return ReadArgs(index=_extract_int(args, "index", 1))
 
 
+def _extract_str_tuple(ns: argparse.Namespace, key: str) -> tuple[str, ...]:
+    """Extract a tuple of strings from namespace (for argparse append actions).
+
+    Args:
+        ns: Namespace to extract from.
+        key: Attribute name.
+
+    Returns:
+        Tuple of strings, empty if not found or wrong type.
+    """
+    val: str | int | bool | list[str] | None = getattr(ns, key, None)
+    if isinstance(val, list):
+        return tuple(v for v in val if isinstance(v, str))
+    return ()
+
+
+def _extract_optional_str(ns: argparse.Namespace, key: str) -> str | None:
+    """Extract optional string attribute from namespace.
+
+    Args:
+        ns: Namespace to extract from.
+        key: Attribute name.
+
+    Returns:
+        String value if present and is a string, None otherwise.
+    """
+    val: str | int | bool | None = getattr(ns, key, None)
+    return val if isinstance(val, str) else None
+
+
+def _extract_bool(ns: argparse.Namespace, key: str, default: bool) -> bool:
+    """Extract bool attribute from namespace.
+
+    Args:
+        ns: Namespace to extract from.
+        key: Attribute name.
+        default: Default value if not found or wrong type.
+
+    Returns:
+        Bool value or default.
+    """
+    val: str | int | bool | None = getattr(ns, key, default)
+    return val if isinstance(val, bool) else default
+
+
 def decode_send_args(args: argparse.Namespace) -> SendArgs:
-    """Decode send arguments."""
+    """Decode send arguments.
+
+    Args:
+        args: Parsed argparse namespace.
+
+    Returns:
+        SendArgs with to, subject, body_file, cc, bcc, and html fields.
+    """
     return SendArgs(
         to=_extract_str(args, "to", ""),
         subject=_extract_str(args, "subject", ""),
-        body=_extract_str(args, "body", ""),
+        body_file=_extract_str(args, "body_file", ""),
+        cc=_extract_str(args, "cc", ""),
+        bcc=_extract_str(args, "bcc", ""),
+        html=_extract_bool(args, "html", False),
+        attachments=_extract_str_tuple(args, "attach"),
+    )
+
+
+def decode_search_args(args: argparse.Namespace) -> SearchArgs:
+    """Decode search arguments.
+
+    Args:
+        args: Parsed argparse namespace.
+
+    Returns:
+        SearchArgs with query and count fields.
+    """
+    return SearchArgs(
+        query=_extract_str(args, "query", ""),
+        count=_extract_int(args, "count", 10),
     )
 
 
@@ -840,7 +1056,26 @@ def _build_parser() -> argparse.ArgumentParser:
     send_parser = subparsers.add_parser("send", help="Send an email")
     send_parser.add_argument("to", help="Recipient email")
     send_parser.add_argument("subject", help="Email subject")
-    send_parser.add_argument("body", help="Email body")
+    send_parser.add_argument("body_file", help="Path to file containing email body")
+    send_parser.add_argument("--cc", default="", help="Comma-separated CC recipients")
+    send_parser.add_argument("--bcc", default="", help="Comma-separated BCC recipients")
+    send_parser.add_argument(
+        "--html",
+        action="store_true",
+        default=False,
+        help="Send as HTML with <pre> formatting to preserve whitespace",
+    )
+    send_parser.add_argument(
+        "--attach",
+        action="append",
+        default=None,
+        help="File to attach (can be repeated for multiple files)",
+    )
+
+    # search
+    search_parser = subparsers.add_parser("search", help="Search emails")
+    search_parser.add_argument("query", help="Search query")
+    search_parser.add_argument("-n", "--count", type=int, default=10, help="Max results")
 
     return parser
 
@@ -865,9 +1100,26 @@ def _dispatch_command(command_str: str, args: argparse.Namespace) -> None:
     elif command_str == "send":
         send_args = decode_send_args(args)
         if not send_args["to"] or not send_args["subject"]:
-            _print(f"[{STYLE_ERROR}]Missing required arguments[/]")
+            _print(f"[{STYLE_ERROR}]Missing required arguments: to and subject are required[/]")
             return
-        cmd_send(send_args["to"], send_args["subject"], send_args["body"])
+        if not send_args["body_file"]:
+            _print(f"[{STYLE_ERROR}]Missing required argument: body_file[/]")
+            return
+        cmd_send(
+            send_args["to"],
+            send_args["subject"],
+            send_args["body_file"],
+            cc=send_args["cc"],
+            bcc=send_args["bcc"],
+            html=send_args["html"],
+            attachments=send_args["attachments"],
+        )
+    elif command_str == "search":
+        search_args = decode_search_args(args)
+        if not search_args["query"]:
+            _print(f"[{STYLE_ERROR}]Missing required argument: query[/]")
+            return
+        cmd_search(search_args["query"], search_args["count"])
     else:
         # Default: show inbox
         cmd_list("inbox", 10)

@@ -29,6 +29,7 @@ from platform_email.testing import (
     _prod_outlook_credentials_path,
     _prod_outlook_tokens_path,
     _prod_read_file,
+    _prod_read_file_bytes,
     _prod_write_file,
     reset_hooks,
 )
@@ -77,6 +78,14 @@ class TestProdFileOperations:
         path = str(tmp_path / "nested" / "dir" / "test.txt")
         _prod_write_file(path, "Content")
         assert _prod_file_exists(path) is True
+
+    def test_read_file_bytes(self, tmp_path: Path) -> None:
+        """Test reading a file as raw bytes."""
+        file_path = tmp_path / "binary.dat"
+        binary_content = b"\x89PNG\r\n\x1a\n\x00\x01"
+        file_path.write_bytes(binary_content)
+        result = _prod_read_file_bytes(str(file_path))
+        assert result == binary_content
 
 
 class TestProdConsoleOperations:

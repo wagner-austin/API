@@ -296,6 +296,7 @@ LoadGmailCredentialsHook = Callable[[], OAuthCredentials]
 OpenBrowserHook = Callable[[str], None]
 CurrentTimeHook = Callable[[], int]
 ReadFileHook = Callable[[str], str]
+ReadFileBytesHook = Callable[[str], bytes]
 WriteFileHook = Callable[[str, str], None]
 FileExistsHook = Callable[[str], bool]
 ConsoleOutputHook = Callable[[str], None]
@@ -329,6 +330,7 @@ class HooksContainer:
     open_browser: OpenBrowserHook
     current_time: CurrentTimeHook
     read_file: ReadFileHook
+    read_file_bytes: ReadFileBytesHook
     write_file: WriteFileHook
     file_exists: FileExistsHook
     console_output: ConsoleOutputHook
@@ -577,6 +579,20 @@ def _prod_read_file(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
+def _prod_read_file_bytes(path: str) -> bytes:
+    """Production binary file reader.
+
+    Args:
+        path: Path to the file.
+
+    Returns:
+        Raw bytes of the file.
+    """
+    from pathlib import Path
+
+    return Path(path).read_bytes()
+
+
 def _prod_write_file(path: str, content: str) -> None:
     """Production file writer."""
     from pathlib import Path
@@ -709,6 +725,7 @@ def _init_production_hooks() -> None:
     hooks.open_browser = _prod_open_browser
     hooks.current_time = _prod_current_time
     hooks.read_file = _prod_read_file
+    hooks.read_file_bytes = _prod_read_file_bytes
     hooks.write_file = _prod_write_file
     hooks.file_exists = _prod_file_exists
     hooks.console_output = _prod_console_output
@@ -1633,6 +1650,7 @@ __all__ = [
     "LoadOutlookConfigHook",
     "LoadOutlookTokensHook",
     "OpenBrowserHook",
+    "ReadFileBytesHook",
     "ReadFileHook",
     "SaveGmailTokensHook",
     "SaveOutlookTokensHook",
