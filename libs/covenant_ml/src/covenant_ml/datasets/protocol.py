@@ -14,6 +14,8 @@ from covenant_ml.datasets.types import (
     DatasetValidationResult,
     LoadedDataset,
     LoadProgress,
+    RegressionDatasetConfig,
+    RegressionLoadedDataset,
     TimeSeriesDatasetConfig,
 )
 
@@ -142,10 +144,68 @@ class TimeSeriesLoaderWithProgressProtocol(Protocol):
         ...
 
 
+class RegressionDatasetLoaderProtocol(Protocol):
+    """Protocol for regression dataset loaders.
+
+    Implementations load datasets from disk into RegressionLoadedDataset format.
+    """
+
+    def load(
+        self,
+        config: RegressionDatasetConfig,
+        external_dir: Path,
+    ) -> RegressionLoadedDataset:
+        """Load a regression dataset from disk.
+
+        Args:
+            config: Regression dataset configuration specifying file, format, target.
+            external_dir: Root directory containing dataset folders.
+
+        Returns:
+            RegressionLoadedDataset with features, continuous targets, and metadata.
+
+        Raises:
+            FileNotFoundError: If dataset file doesn't exist.
+            ValueError: If data doesn't match expected format.
+        """
+        ...
+
+
+class RegressionDatasetLoaderWithProgressProtocol(Protocol):
+    """Protocol for regression dataset loaders with progress reporting.
+
+    Extends RegressionDatasetLoaderProtocol with optional progress callback.
+    """
+
+    def load(
+        self,
+        config: RegressionDatasetConfig,
+        external_dir: Path,
+        progress_callback: ProgressCallbackProtocol | None = None,
+    ) -> RegressionLoadedDataset:
+        """Load a regression dataset with optional progress reporting.
+
+        Args:
+            config: Regression dataset configuration specifying file, format, target.
+            external_dir: Root directory containing dataset folders.
+            progress_callback: Optional callback for progress updates.
+
+        Returns:
+            RegressionLoadedDataset with features, continuous targets, and metadata.
+
+        Raises:
+            FileNotFoundError: If dataset file doesn't exist.
+            ValueError: If data doesn't match expected format.
+        """
+        ...
+
+
 __all__ = [
     "DatasetLoaderProtocol",
     "DatasetLoaderWithProgressProtocol",
     "DatasetValidatorProtocol",
     "ProgressCallbackProtocol",
+    "RegressionDatasetLoaderProtocol",
+    "RegressionDatasetLoaderWithProgressProtocol",
     "TimeSeriesLoaderWithProgressProtocol",
 ]
