@@ -10,8 +10,9 @@ from tankpit_bot.container.types import ContainerMessage
 from tankpit_bot.protocol.constants import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
+    MSG_CACHE_OVERLAY_UPDATE,
+    MSG_CACHE_UPDATE,
     MSG_CHAT,
-    MSG_CONTAINER,
     MSG_DEACTIVATE,
     MSG_ENEMY_DETECT,
     MSG_EQUIP_GAIN,
@@ -23,6 +24,7 @@ from tankpit_bot.protocol.constants import (
     MSG_MINE_PLACE,
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
+    MSG_OVERLAY_UPDATE,
     MSG_RADAR_RESULT,
     MSG_SHOOT,
     MSG_STATISTICS,
@@ -34,7 +36,6 @@ from tankpit_bot.protocol.constants import (
     MSG_TANK_STATS,
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
-    MSG_TILE_UPDATE,
     MSG_VIEWPORT,
 )
 from tankpit_bot.protocol.decoders.combat import (
@@ -88,23 +89,26 @@ from tankpit_bot.protocol.decoders.text import (
     decode_world_info,
 )
 from tankpit_bot.protocol.decoders.world import (
-    decode_container,
+    decode_cache_update,
+    decode_combined_tile_update,
+    decode_overlay_update,
     decode_supervisor,
     decode_sync,
     decode_terrain_update,
     decode_viewport_update,
     supervisor_has_promo_kill,
     supervisor_is_promo_eligible,
-    viewport_entity_is_empty,
-    viewport_entity_is_equipment,
-    viewport_entity_is_fuel,
+    viewport_entity_has_equipment_cache,
+    viewport_entity_has_fuel_cache,
+    viewport_entity_has_no_cache,
 )
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.protocol.types import (
     ActionDoneDict,
     ActiveForcesDict,
+    CacheUpdateDict,
     ChatMessageDict,
-    ContainerDict,
+    CombinedTileUpdateDict,
     DeactivationDict,
     EnemyDetectionDict,
     EquipmentGainDict,
@@ -117,6 +121,7 @@ from tankpit_bot.protocol.types import (
     MinePlacementDict,
     MovementDict,
     MovementResponseDict,
+    OverlayUpdateDict,
     RadarResultDict,
     RadarScanResultDict,
     ShootEventDict,
@@ -154,7 +159,9 @@ BinaryMessage = (
     | TankInfoDict
     | MovementResponseDict
     | SyncDict
-    | ContainerDict
+    | CacheUpdateDict
+    | OverlayUpdateDict
+    | CombinedTileUpdateDict
     | TankEntryDict
     | TankExitDict
     | ActionDoneDict
@@ -231,8 +238,6 @@ def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_radar_result(data)
     if msg_type == MSG_ENEMY_DETECT:
         return decode_enemy_detection(data)
-    if msg_type == MSG_TILE_UPDATE:
-        return decode_radar_scan_result(data)
     return None
 
 
@@ -288,6 +293,15 @@ def _try_unwrap_0x2e(data: bytes) -> BinaryMessage | None:
         if len(data) >= 9:
             return decode_tank_status_sync(data[1:])
         return None
+    if subtype == MSG_CACHE_OVERLAY_UPDATE:
+        # 0x2E -> 0x4F is not a normal combined tile update here.
+        # Radar scan results are tunneled inside the 0x2E envelope using the
+        # inner 0x4F subtype, which collides with the standalone combined tile
+        # patch opcode. Decode the tunneled form as radar first.
+        try:
+            return decode_radar_scan_result(data[1:])
+        except DecodeError:
+            return None
     if subtype not in _TUNNELED_SUBTYPES:
         return None
     try:
@@ -355,10 +369,14 @@ def _decode_world_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_viewport_update(data)
     if msg_type == MSG_TERRAIN_UPDATE:
         return decode_terrain_update(data)
+    if msg_type == MSG_CACHE_UPDATE:
+        return decode_cache_update(data)
+    if msg_type == MSG_OVERLAY_UPDATE:
+        return decode_overlay_update(data)
+    if msg_type == MSG_CACHE_OVERLAY_UPDATE:
+        return decode_combined_tile_update(data)
     if msg_type == MSG_SYNC:
         return decode_sync(data)
-    if msg_type == MSG_CONTAINER:
-        return decode_container(data)
     return None
 
 
@@ -495,8 +513,9 @@ __all__ = [
     "decode_0x2e_message",
     "decode_action_done",
     "decode_active_forces",
+    "decode_cache_update",
     "decode_chat_message",
-    "decode_container",
+    "decode_combined_tile_update",
     "decode_deactivation",
     "decode_enemy_detection",
     "decode_equipment_gain",
@@ -511,6 +530,7 @@ __all__ = [
     "decode_mine_placement",
     "decode_movement",
     "decode_movement_response",
+    "decode_overlay_update",
     "decode_radar_container",
     "decode_radar_mine",
     "decode_radar_result",
@@ -538,7 +558,7 @@ __all__ = [
     "supervisor_is_promo_eligible",
     "try_decode_binary_message",
     "try_decode_message",
-    "viewport_entity_is_empty",
-    "viewport_entity_is_equipment",
-    "viewport_entity_is_fuel",
+    "viewport_entity_has_equipment_cache",
+    "viewport_entity_has_fuel_cache",
+    "viewport_entity_has_no_cache",
 ]
