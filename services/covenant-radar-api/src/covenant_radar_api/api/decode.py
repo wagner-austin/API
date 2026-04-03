@@ -24,24 +24,9 @@ from covenant_domain import (
 )
 from covenant_ml import FeaturePreset
 from covenant_ml.explainers.types import SupportedExplainer
-from covenant_ml.optimizer import (
-    LightGBMSearchSpace,
-    LSTMSearchSpace,
-    MLPSearchSpace,
-    OptimizationConfig,
-    XGBoostSearchSpace,
-    make_default_optimization_config,
-    make_lightgbm_default_space,
-    make_lstm_default_space,
-    make_mlp_default_space,
-    make_xgboost_categorical_space,
-    make_xgboost_default_space,
-)
 from covenant_ml.types import (
     BackendName,
-    LightGBMConfig,
-    LSTMConfig,
-    MLPConfig,
+    RegressorBackendName,
     TrainConfig,
 )
 from platform_core.json_utils import (
@@ -53,6 +38,19 @@ from platform_core.json_utils import (
     require_int,
     require_list,
     require_str,
+)
+
+from covenant_radar_api.worker._train_external_parsers import (
+    ParseResult as ExternalTrainParseResult,
+)
+from covenant_radar_api.worker._train_external_parsers import (
+    parse_external_train_config,
+)
+from covenant_radar_api.worker._train_external_regression_parsers import (
+    RegressionParseResult as ExternalRegressionTrainParseResult,
+)
+from covenant_radar_api.worker._train_external_regression_parsers import (
+    parse_external_regression_train_config,
 )
 
 
@@ -340,89 +338,26 @@ def parse_train_request(body: bytes) -> TrainConfig:
 
 
 # --- External Training Request Parsing ---
+# Delegates to shared parsers in worker/_train_external_parsers.py.
+# ExternalTrainParseResult is imported from there (no duplication).
 
 
 DatasetName = Literal["taiwan", "us", "polish"]
 
 
-class XGBoostParseResult(TypedDict, total=True):
-    """Result of parsing XGBoost config from external train request."""
-
-    backend: Literal["xgboost"]
-    config: TrainConfig
-    dataset: DatasetName
-
-
-class MLPParseResult(TypedDict, total=True):
-    """Result of parsing MLP config from external train request."""
-
-    backend: Literal["mlp"]
-    config: MLPConfig
-    dataset: DatasetName
-
-
-class LSTMParseResult(TypedDict, total=True):
-    """Result of parsing LSTM config from external train request."""
-
-    backend: Literal["lstm"]
-    config: LSTMConfig
-    dataset: DatasetName
-
-
-class LightGBMParseResult(TypedDict, total=True):
-    """Result of parsing LightGBM config from external train request."""
-
-    backend: Literal["lightgbm"]
-    config: LightGBMConfig
-    dataset: DatasetName
-
-
-ExternalTrainParseResult = (
-    XGBoostParseResult | MLPParseResult | LSTMParseResult | LightGBMParseResult
-)
-
-
-def _parse_mlp_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse and validate MLP precision field."""
-    precision_val = raw.get("precision")
-    if precision_val == "fp32":
-        return "fp32"
-    if precision_val == "fp16":
-        return "fp16"
-    if precision_val == "bf16":
-        return "bf16"
-    if precision_val == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
-
-
-def _parse_mlp_optimizer(raw: JSONObject) -> Literal["adamw", "adam", "sgd"]:
-    """Parse and validate MLP optimizer field."""
-    optimizer_val = raw.get("optimizer")
-    if optimizer_val == "adamw":
-        return "adamw"
-    if optimizer_val == "adam":
-        return "adam"
-    if optimizer_val == "sgd":
-        return "sgd"
-    raise JSONTypeError("optimizer must be adamw, adam, or sgd")
-
-
-def _parse_mlp_hidden_sizes(raw: JSONObject) -> tuple[int, ...]:
-    """Parse and validate hidden_sizes as tuple of ints."""
-    hidden_sizes_val = raw.get("hidden_sizes")
-    if not isinstance(hidden_sizes_val, list):
-        raise JSONTypeError("hidden_sizes must be list of ints for mlp")
-    result: list[int] = []
-    for item in hidden_sizes_val:
-        if not isinstance(item, int):
-            raise JSONTypeError("hidden_sizes must be list of ints for mlp")
-        result.append(item)
-    return tuple(result)
-
-
 def _parse_dataset_name(raw: JSONObject) -> DatasetName:
-    """Parse and validate dataset name."""
+    """Parse and validate dataset name.
+
+    Args:
+        raw: JSON object containing the dataset field.
+
+    Returns:
+        Validated DatasetName literal.
+
+    Raises:
+        JSONTypeError: If dataset field is missing.
+        ValueError: If dataset is not a valid name.
+    """
     dataset = require_str(raw, "dataset")
     if dataset == "taiwan":
         return "taiwan"
@@ -433,220 +368,74 @@ def _parse_dataset_name(raw: JSONObject) -> DatasetName:
     raise ValueError(f"dataset must be one of: taiwan, us, polish (got {dataset})")
 
 
-def _parse_mlp_config(
-    raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
-    train_ratio: float,
-    val_ratio: float,
-    test_ratio: float,
-) -> MLPConfig:
-    """Parse MLP backend config from JSON object."""
-    return {
-        "device": device,
-        "precision": _parse_mlp_precision(raw),
-        "optimizer": _parse_mlp_optimizer(raw),
-        "hidden_sizes": _parse_mlp_hidden_sizes(raw),
-        "learning_rate": require_float(raw, "learning_rate"),
-        "batch_size": require_int(raw, "batch_size"),
-        "n_epochs": require_int(raw, "n_epochs"),
-        "dropout": require_float(raw, "dropout"),
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "random_state": require_int(raw, "random_state"),
-        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
-    }
-
-
-def _parse_lstm_precision(raw: JSONObject) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse and validate LSTM precision field."""
-    precision_val = raw.get("precision")
-    if precision_val == "fp32":
-        return "fp32"
-    if precision_val == "fp16":
-        return "fp16"
-    if precision_val == "bf16":
-        return "bf16"
-    if precision_val == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be fp32, fp16, bf16, or auto")
-
-
-def _parse_lstm_config(
-    raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
-    train_ratio: float,
-    val_ratio: float,
-    test_ratio: float,
-) -> LSTMConfig:
-    """Parse LSTM backend config from JSON object."""
-    bidirectional_val = raw.get("bidirectional")
-    if not isinstance(bidirectional_val, bool):
-        raise JSONTypeError("bidirectional must be a boolean")
-    return {
-        "device": device,
-        "precision": _parse_lstm_precision(raw),
-        "hidden_size": require_int(raw, "hidden_size"),
-        "num_layers": require_int(raw, "num_layers"),
-        "dropout": require_float(raw, "dropout"),
-        "bidirectional": bidirectional_val,
-        "sequence_length": require_int(raw, "sequence_length"),
-        "learning_rate": require_float(raw, "learning_rate"),
-        "batch_size": require_int(raw, "batch_size"),
-        "n_epochs": require_int(raw, "n_epochs"),
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "random_state": require_int(raw, "random_state"),
-        "early_stopping_patience": require_int(raw, "early_stopping_patience"),
-    }
-
-
-def _parse_lightgbm_config(
-    raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
-    train_ratio: float,
-    val_ratio: float,
-    test_ratio: float,
-) -> LightGBMConfig:
-    """Parse LightGBM backend config from JSON object."""
-    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
-    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
-    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
-    return {
-        "device": device,
-        "learning_rate": require_float(raw, "learning_rate"),
-        "max_depth": require_int(raw, "max_depth"),
-        "n_estimators": require_int(raw, "n_estimators"),
-        "num_leaves": require_int(raw, "num_leaves"),
-        "min_child_samples": require_int(raw, "min_child_samples"),
-        "subsample": require_float(raw, "subsample"),
-        "colsample_bytree": require_float(raw, "colsample_bytree"),
-        "reg_alpha": reg_alpha,
-        "reg_lambda": reg_lambda,
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "random_state": require_int(raw, "random_state"),
-        "early_stopping_rounds": early_stopping_rounds,
-    }
-
-
-def _parse_xgboost_external_config(
-    raw: JSONObject,
-    device: Literal["cpu", "cuda", "auto"],
-    train_ratio: float,
-    val_ratio: float,
-    test_ratio: float,
-) -> TrainConfig:
-    """Parse XGBoost backend config from JSON object for external training."""
-    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
-    reg_alpha = _optional_float(raw, "reg_alpha", 0.0)
-    reg_lambda = _optional_float(raw, "reg_lambda", 1.0)
-    xgb_cfg: TrainConfig = {
-        "device": device,
-        "learning_rate": require_float(raw, "learning_rate"),
-        "max_depth": require_int(raw, "max_depth"),
-        "n_estimators": require_int(raw, "n_estimators"),
-        "subsample": require_float(raw, "subsample"),
-        "colsample_bytree": require_float(raw, "colsample_bytree"),
-        "random_state": require_int(raw, "random_state"),
-        "train_ratio": train_ratio,
-        "val_ratio": val_ratio,
-        "test_ratio": test_ratio,
-        "early_stopping_rounds": early_stopping_rounds,
-        "reg_alpha": reg_alpha,
-        "reg_lambda": reg_lambda,
-    }
-    scale_pos_weight_raw = raw.get("scale_pos_weight")
-    if isinstance(scale_pos_weight_raw, (int, float)):
-        xgb_cfg["scale_pos_weight"] = float(scale_pos_weight_raw)
-    elif scale_pos_weight_raw is not None:
-        raise JSONTypeError("scale_pos_weight must be a number")
-    return xgb_cfg
-
-
-def parse_external_train_request(body: bytes) -> ExternalTrainParseResult:
+def parse_external_train_request(
+    body: bytes,
+) -> ExternalTrainParseResult:
     """Parse request body for external training into backend-specific config.
 
-    Supports XGBoost, MLP, LSTM, and LightGBM backends via the 'backend' field.
+    Delegates to shared parsers in worker/_train_external_parsers.py.
+    Supports all 7 classifier backends via the 'backend' field.
     Default backend is 'xgboost' if not specified.
 
+    Args:
+        body: Raw HTTP request body bytes.
+
     Returns:
-        ExternalTrainParseResult with backend type, config, and dataset name.
+        ExternalTrainParseResult with backend type, config, and dataset.
 
     Raises:
         JSONTypeError: Missing required field or invalid field type.
         ValueError: Invalid dataset name or split ratios don't sum to 1.0.
     """
-    raw = _parse_body_as_dict(body)
+    config_json = body.decode("utf-8")
+    return parse_external_train_config(config_json)
 
-    # Dataset selection (required)
-    dataset_name = _parse_dataset_name(raw)
 
-    # Common split defaults
-    train_ratio = _optional_float(raw, "train_ratio", 0.7)
-    val_ratio = _optional_float(raw, "val_ratio", 0.15)
-    test_ratio = _optional_float(raw, "test_ratio", 0.15)
+def parse_external_regression_train_request(
+    body: bytes,
+) -> ExternalRegressionTrainParseResult:
+    """Parse request body for external regression training.
 
-    # Validate ratios sum to 1.0
-    total = train_ratio + val_ratio + test_ratio
-    if abs(total - 1.0) > 0.01:
-        raise ValueError(
-            f"Split ratios must sum to 1.0, got {total:.3f} "
-            f"(train={train_ratio}, val={val_ratio}, test={test_ratio})"
-        )
+    Delegates to shared parsers in worker/_train_external_regression_parsers.py.
+    Supports xgboost_reg and lightgbm_reg backends.
+    Default backend is 'xgboost_reg' if not specified.
 
-    device = _parse_device(raw.get("device"))
+    Args:
+        body: Raw HTTP request body bytes.
 
-    # Backend selection (optional; default xgboost)
-    backend_val = raw.get("backend")
-    if backend_val == "mlp":
-        mlp_result: MLPParseResult = {
-            "backend": "mlp",
-            "config": _parse_mlp_config(raw, device, train_ratio, val_ratio, test_ratio),
-            "dataset": dataset_name,
-        }
-        return mlp_result
-    if backend_val == "lstm":
-        lstm_result: LSTMParseResult = {
-            "backend": "lstm",
-            "config": _parse_lstm_config(raw, device, train_ratio, val_ratio, test_ratio),
-            "dataset": dataset_name,
-        }
-        return lstm_result
-    if backend_val == "lightgbm":
-        lgbm_result: LightGBMParseResult = {
-            "backend": "lightgbm",
-            "config": _parse_lightgbm_config(raw, device, train_ratio, val_ratio, test_ratio),
-            "dataset": dataset_name,
-        }
-        return lgbm_result
-    xgb_result: XGBoostParseResult = {
-        "backend": "xgboost",
-        "config": _parse_xgboost_external_config(raw, device, train_ratio, val_ratio, test_ratio),
-        "dataset": dataset_name,
-    }
-    return xgb_result
+    Returns:
+        ExternalRegressionTrainParseResult with backend type, config,
+        and regression dataset name.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset name or split ratios don't sum to 1.0.
+    """
+    config_json = body.decode("utf-8")
+    return parse_external_regression_train_config(config_json)
 
 
 # --- Optimization Request Parsing ---
 
 
-XGBoostSpaceProfile = Literal["default", "categorical"]
-MLPSpaceProfile = Literal["default"]
-LightGBMSpaceProfile = Literal["default"]
-LSTMSpaceProfile = Literal["default"]
-
-
 class OptimizeRequest(TypedDict, total=True):
-    """Request body for hyperparameter optimization."""
+    """Request body for hyperparameter optimization.
 
+    Args:
+        backend: ML backend name (all 7 backends supported).
+        dataset: Dataset name for optimization.
+        n_trials: Number of Optuna trials.
+        timeout_seconds: Optional timeout in seconds.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+        random_state: Random seed for reproducibility.
+    """
+
+    backend: BackendName
     dataset: DatasetName
     n_trials: int
     timeout_seconds: int | None
     device: Literal["cpu", "cuda", "auto"]
-    space_profile: XGBoostSpaceProfile
     feature_preset: FeaturePreset
     random_state: int
 
@@ -658,210 +447,70 @@ class OptimizeResponse(TypedDict, total=True):
     status: Literal["queued"]
 
 
-class XGBoostOptimizeParseResult(TypedDict, total=True):
-    """Parsed XGBoost optimization request.
+class UnifiedOptimizeApiParseResult(TypedDict, total=True):
+    """Parsed optimization request at the API edge.
+
+    Only validates common fields. Backend-specific fields (precision,
+    optimizer, n_epochs, etc.) are parsed by the worker job from the
+    raw JSON body.
 
     Args:
-        backend: Backend identifier literal "xgboost".
+        backend: ML backend name.
         dataset: Dataset name for optimization.
-        config: Optimization configuration.
-        search_space: XGBoost-specific search space.
-        space_profile: Search space profile used.
+        n_trials: Number of Optuna trials.
+        timeout_seconds: Optional timeout in seconds.
         device: Compute device.
         feature_preset: Feature engineering preset.
+        random_state: Random seed for reproducibility.
     """
 
-    backend: Literal["xgboost"]
+    backend: BackendName
     dataset: DatasetName
-    config: OptimizationConfig
-    search_space: XGBoostSearchSpace
-    space_profile: XGBoostSpaceProfile
+    n_trials: int
+    timeout_seconds: int | None
     device: Literal["cpu", "cuda", "auto"]
     feature_preset: FeaturePreset
+    random_state: int
 
 
-class MLPOptimizeParseResult(TypedDict, total=True):
-    """Parsed MLP optimization request.
-
-    Args:
-        backend: Backend identifier literal "mlp".
-        dataset: Dataset name for optimization.
-        config: Optimization configuration.
-        search_space: MLP-specific search space.
-        space_profile: Search space profile used.
-        device: Compute device.
-        feature_preset: Feature engineering preset.
-        precision: Floating-point precision.
-        optimizer: Optimizer name.
-        n_epochs: Number of training epochs per trial.
-        early_stopping_patience: Early stopping patience.
-    """
-
-    backend: Literal["mlp"]
-    dataset: DatasetName
-    config: OptimizationConfig
-    search_space: MLPSearchSpace
-    space_profile: MLPSpaceProfile
-    device: Literal["cpu", "cuda", "auto"]
-    feature_preset: FeaturePreset
-    precision: Literal["fp32", "fp16", "bf16", "auto"]
-    optimizer: Literal["adamw", "adam", "sgd"]
-    n_epochs: int
-    early_stopping_patience: int
-
-
-class LightGBMOptimizeParseResult(TypedDict, total=True):
-    """Parsed LightGBM optimization request.
-
-    Args:
-        backend: Backend identifier literal "lightgbm".
-        dataset: Dataset name for optimization.
-        config: Optimization configuration.
-        search_space: LightGBM-specific search space.
-        space_profile: Search space profile used.
-        device: Compute device.
-        feature_preset: Feature engineering preset.
-        early_stopping_rounds: Early stopping rounds per trial.
-    """
-
-    backend: Literal["lightgbm"]
-    dataset: DatasetName
-    config: OptimizationConfig
-    search_space: LightGBMSearchSpace
-    space_profile: LightGBMSpaceProfile
-    device: Literal["cpu", "cuda", "auto"]
-    feature_preset: FeaturePreset
-    early_stopping_rounds: int
-
-
-class LSTMOptimizeParseResult(TypedDict, total=True):
-    """Parsed LSTM optimization request.
-
-    Args:
-        backend: Backend identifier literal "lstm".
-        dataset: Dataset name for optimization.
-        config: Optimization configuration.
-        search_space: LSTM-specific search space.
-        space_profile: Search space profile used.
-        device: Compute device.
-        feature_preset: Feature engineering preset.
-        precision: Floating-point precision.
-        n_epochs: Number of training epochs per trial.
-        early_stopping_patience: Early stopping patience.
-        sequence_length: Sequence length for LSTM.
-        bidirectional: Whether LSTM is bidirectional.
-    """
-
-    backend: Literal["lstm"]
-    dataset: DatasetName
-    config: OptimizationConfig
-    search_space: LSTMSearchSpace
-    space_profile: LSTMSpaceProfile
-    device: Literal["cpu", "cuda", "auto"]
-    feature_preset: FeaturePreset
-    precision: Literal["fp32", "fp16", "bf16", "auto"]
-    n_epochs: int
-    early_stopping_patience: int
-    sequence_length: int
-    bidirectional: bool
-
-
-OptimizeParseResult = (
-    XGBoostOptimizeParseResult
-    | MLPOptimizeParseResult
-    | LightGBMOptimizeParseResult
-    | LSTMOptimizeParseResult
-)
-
-
-def _parse_xgboost_space_profile(raw: JSONValue | None) -> XGBoostSpaceProfile:
-    """Parse XGBoost space profile, defaulting to 'default'.
+def _parse_optimize_backend(raw: JSONValue | None) -> BackendName:
+    """Parse optimize backend name, defaulting to 'xgboost'.
 
     Args:
         raw: Raw JSON value.
 
     Returns:
-        XGBoostSpaceProfile literal.
+        BackendName literal.
 
     Raises:
-        JSONTypeError: If value is not a valid profile.
+        JSONTypeError: If value is not a string.
+        ValueError: If value is not a valid backend.
     """
     if raw is None:
-        return "default"
+        return "xgboost"
     if not isinstance(raw, str):
-        raise JSONTypeError("space_profile must be a string")
-    if raw == "default":
-        return "default"
-    if raw == "categorical":
-        return "categorical"
-    raise JSONTypeError("space_profile must be one of: default, categorical")
+        raise JSONTypeError("backend must be a string")
+    if raw == "xgboost":
+        return "xgboost"
+    if raw == "mlp":
+        return "mlp"
+    if raw == "lstm":
+        return "lstm"
+    if raw == "lightgbm":
+        return "lightgbm"
+    if raw == "cleargbm":
+        return "cleargbm"
+    if raw == "logreg":
+        return "logreg"
+    if raw == "random_forest":
+        return "random_forest"
+    raise ValueError(
+        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
+    )
 
 
-def _parse_mlp_space_profile(raw: JSONValue | None) -> MLPSpaceProfile:
-    """Parse MLP space profile, defaulting to 'default'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        MLPSpaceProfile literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid profile.
-    """
-    if raw is None:
-        return "default"
-    if not isinstance(raw, str):
-        raise JSONTypeError("space_profile must be a string")
-    if raw == "default":
-        return "default"
-    raise JSONTypeError("space_profile must be: default (mlp backend)")
-
-
-def _parse_lightgbm_space_profile(raw: JSONValue | None) -> LightGBMSpaceProfile:
-    """Parse LightGBM space profile, defaulting to 'default'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        LightGBMSpaceProfile literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid profile.
-    """
-    if raw is None:
-        return "default"
-    if not isinstance(raw, str):
-        raise JSONTypeError("space_profile must be a string")
-    if raw == "default":
-        return "default"
-    raise JSONTypeError("space_profile must be: default (lightgbm backend)")
-
-
-def _parse_lstm_space_profile(raw: JSONValue | None) -> LSTMSpaceProfile:
-    """Parse LSTM space profile, defaulting to 'default'.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        LSTMSpaceProfile literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid profile.
-    """
-    if raw is None:
-        return "default"
-    if not isinstance(raw, str):
-        raise JSONTypeError("space_profile must be a string")
-    if raw == "default":
-        return "default"
-    raise JSONTypeError("space_profile must be: default (lstm backend)")
-
-
-def _parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
-    """Parse feature preset, defaulting to 'none'.
+def _parse_optimize_feature_preset(raw: JSONValue | None) -> FeaturePreset:
+    """Parse feature preset for optimization, defaulting to 'none'.
 
     Args:
         raw: Raw JSON value.
@@ -887,106 +536,43 @@ def _parse_feature_preset(raw: JSONValue | None) -> FeaturePreset:
     raise JSONTypeError("feature_preset must be one of: none, log_only, ratios_only, full")
 
 
-def _parse_optimize_precision(raw: JSONValue | None) -> Literal["fp32", "fp16", "bf16", "auto"]:
-    """Parse precision for neural network optimization.
+def parse_optimize_request(body: bytes) -> UnifiedOptimizeApiParseResult:
+    """Parse request body for hyperparameter optimization.
+
+    Validates common fields at the API edge. Backend-specific fields
+    (precision, optimizer, n_epochs, etc.) are parsed by the worker job.
+    All 7 classifier backends are supported.
+
+    Request format:
+        {
+            "dataset": "taiwan" | "us" | "polish",  // required
+            "backend": "xgboost",  // optional, default "xgboost"
+            "n_trials": 50,  // required
+            "timeout_seconds": 3600,  // optional, null for no timeout
+            "device": "auto",  // optional, default "auto"
+            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
+            "random_state": 42  // optional, default 42
+        }
+
+    Backend-specific fields (forwarded to worker, not validated here):
+        XGBoost/ClearGBM/LightGBM: early_stopping_rounds, n_jobs
+        MLP: precision, optimizer, n_epochs, early_stopping_patience
+        LSTM: precision, n_epochs, early_stopping_patience, sequence_length, bidirectional
+        LogReg/RandomForest: (no extra fields)
 
     Args:
-        raw: Raw JSON value.
+        body: Raw request body bytes.
 
     Returns:
-        Precision literal.
+        UnifiedOptimizeApiParseResult with common parameters.
 
     Raises:
-        JSONTypeError: If value is not a valid precision.
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset or backend name.
     """
-    if raw is None:
-        return "fp32"
-    if not isinstance(raw, str):
-        raise JSONTypeError("precision must be a string")
-    if raw == "fp32":
-        return "fp32"
-    if raw == "fp16":
-        return "fp16"
-    if raw == "bf16":
-        return "bf16"
-    if raw == "auto":
-        return "auto"
-    raise JSONTypeError("precision must be one of: fp32, fp16, bf16, auto")
+    raw = _parse_body_as_dict(body)
 
-
-def _parse_optimize_nn_optimizer(raw: JSONValue | None) -> Literal["adamw", "adam", "sgd"]:
-    """Parse optimizer for neural network optimization.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        Optimizer literal.
-
-    Raises:
-        JSONTypeError: If value is not a valid optimizer.
-    """
-    if raw is None:
-        return "adamw"
-    if not isinstance(raw, str):
-        raise JSONTypeError("optimizer must be a string")
-    if raw == "adamw":
-        return "adamw"
-    if raw == "adam":
-        return "adam"
-    if raw == "sgd":
-        return "sgd"
-    raise JSONTypeError("optimizer must be one of: adamw, adam, sgd")
-
-
-def _parse_bidirectional(raw: JSONValue | None) -> bool:
-    """Parse bidirectional flag for LSTM optimization.
-
-    Args:
-        raw: Raw JSON value.
-
-    Returns:
-        Boolean value.
-
-    Raises:
-        JSONTypeError: If value is not a boolean.
-    """
-    if raw is None:
-        return False
-    if not isinstance(raw, bool):
-        raise JSONTypeError("bidirectional must be a boolean")
-    return raw
-
-
-def _get_xgboost_search_space(profile: XGBoostSpaceProfile) -> XGBoostSearchSpace:
-    """Get XGBoost search space based on profile name.
-
-    Args:
-        profile: Search space profile name.
-
-    Returns:
-        XGBoostSearchSpace with appropriate ranges.
-    """
-    if profile == "default":
-        return make_xgboost_default_space()
-    return make_xgboost_categorical_space()
-
-
-def _parse_common_optimize_fields(
-    raw: JSONObject,
-) -> tuple[DatasetName, OptimizationConfig, Literal["cpu", "cuda", "auto"], FeaturePreset]:
-    """Parse common optimization fields shared by all backends.
-
-    Args:
-        raw: Parsed JSON object.
-
-    Returns:
-        Tuple of (dataset, config, device, feature_preset).
-
-    Raises:
-        JSONTypeError: If required fields are missing or invalid.
-        ValueError: If dataset name is invalid.
-    """
+    backend = _parse_optimize_backend(raw.get("backend"))
     dataset_name = _parse_dataset_name(raw)
     n_trials = require_int(raw, "n_trials")
 
@@ -998,220 +584,18 @@ def _parse_common_optimize_fields(
         timeout_seconds = timeout_raw
 
     device = _parse_device(raw.get("device"))
-    feature_preset = _parse_feature_preset(raw.get("feature_preset"))
+    feature_preset = _parse_optimize_feature_preset(raw.get("feature_preset"))
     random_state = _optional_int(raw, "random_state", 42)
 
-    config = make_default_optimization_config(
+    return UnifiedOptimizeApiParseResult(
+        backend=backend,
+        dataset=dataset_name,
         n_trials=n_trials,
         timeout_seconds=timeout_seconds,
+        device=device,
+        feature_preset=feature_preset,
         random_state=random_state,
     )
-
-    return dataset_name, config, device, feature_preset
-
-
-def _parse_xgboost_optimize(raw: JSONObject) -> XGBoostOptimizeParseResult:
-    """Parse XGBoost-specific optimization request.
-
-    Args:
-        raw: Parsed JSON object.
-
-    Returns:
-        XGBoostOptimizeParseResult with all parameters.
-
-    Raises:
-        JSONTypeError: If fields are invalid.
-        ValueError: If dataset name is invalid.
-    """
-    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
-    space_profile = _parse_xgboost_space_profile(raw.get("space_profile"))
-    search_space = _get_xgboost_search_space(space_profile)
-
-    return XGBoostOptimizeParseResult(
-        backend="xgboost",
-        dataset=dataset_name,
-        config=config,
-        search_space=search_space,
-        space_profile=space_profile,
-        device=device,
-        feature_preset=feature_preset,
-    )
-
-
-def _parse_mlp_optimize(raw: JSONObject) -> MLPOptimizeParseResult:
-    """Parse MLP-specific optimization request.
-
-    Args:
-        raw: Parsed JSON object.
-
-    Returns:
-        MLPOptimizeParseResult with all parameters.
-
-    Raises:
-        JSONTypeError: If fields are invalid.
-        ValueError: If dataset name is invalid.
-    """
-    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
-    space_profile = _parse_mlp_space_profile(raw.get("space_profile"))
-    precision = _parse_optimize_precision(raw.get("precision"))
-    optimizer = _parse_optimize_nn_optimizer(raw.get("optimizer"))
-    n_epochs = _optional_int(raw, "n_epochs", 50)
-    early_stopping_patience = _optional_int(raw, "early_stopping_patience", 10)
-
-    return MLPOptimizeParseResult(
-        backend="mlp",
-        dataset=dataset_name,
-        config=config,
-        search_space=make_mlp_default_space(),
-        space_profile=space_profile,
-        device=device,
-        feature_preset=feature_preset,
-        precision=precision,
-        optimizer=optimizer,
-        n_epochs=n_epochs,
-        early_stopping_patience=early_stopping_patience,
-    )
-
-
-def _parse_lightgbm_optimize(raw: JSONObject) -> LightGBMOptimizeParseResult:
-    """Parse LightGBM-specific optimization request.
-
-    Args:
-        raw: Parsed JSON object.
-
-    Returns:
-        LightGBMOptimizeParseResult with all parameters.
-
-    Raises:
-        JSONTypeError: If fields are invalid.
-        ValueError: If dataset name is invalid.
-    """
-    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
-    space_profile = _parse_lightgbm_space_profile(raw.get("space_profile"))
-    early_stopping_rounds = _optional_int(raw, "early_stopping_rounds", 10)
-
-    return LightGBMOptimizeParseResult(
-        backend="lightgbm",
-        dataset=dataset_name,
-        config=config,
-        search_space=make_lightgbm_default_space(),
-        space_profile=space_profile,
-        device=device,
-        feature_preset=feature_preset,
-        early_stopping_rounds=early_stopping_rounds,
-    )
-
-
-def _parse_lstm_optimize(raw: JSONObject) -> LSTMOptimizeParseResult:
-    """Parse LSTM-specific optimization request.
-
-    Args:
-        raw: Parsed JSON object.
-
-    Returns:
-        LSTMOptimizeParseResult with all parameters.
-
-    Raises:
-        JSONTypeError: If fields are invalid.
-        ValueError: If dataset name is invalid.
-    """
-    dataset_name, config, device, feature_preset = _parse_common_optimize_fields(raw)
-    space_profile = _parse_lstm_space_profile(raw.get("space_profile"))
-    precision = _parse_optimize_precision(raw.get("precision"))
-    n_epochs = _optional_int(raw, "n_epochs", 50)
-    early_stopping_patience = _optional_int(raw, "early_stopping_patience", 10)
-    sequence_length = _optional_int(raw, "sequence_length", 5)
-    bidirectional = _parse_bidirectional(raw.get("bidirectional"))
-
-    return LSTMOptimizeParseResult(
-        backend="lstm",
-        dataset=dataset_name,
-        config=config,
-        search_space=make_lstm_default_space(),
-        space_profile=space_profile,
-        device=device,
-        feature_preset=feature_preset,
-        precision=precision,
-        n_epochs=n_epochs,
-        early_stopping_patience=early_stopping_patience,
-        sequence_length=sequence_length,
-        bidirectional=bidirectional,
-    )
-
-
-def parse_optimize_request(body: bytes) -> OptimizeParseResult:
-    """Parse request body for hyperparameter optimization.
-
-    Supports XGBoost, MLP, LightGBM, and LSTM backends via the 'backend' field.
-    Default backend is 'xgboost' if not specified.
-
-    Request format (XGBoost):
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "xgboost",  // optional, default "xgboost"
-            "n_trials": 50,  // required
-            "timeout_seconds": 3600,  // optional, null for no timeout
-            "device": "auto",  // optional, default "auto"
-            "space_profile": "default",  // optional: default, categorical
-            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
-            "random_state": 42  // optional, default 42
-        }
-
-    Request format (MLP):
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "mlp",
-            "n_trials": 50,
-            "precision": "fp32",  // optional: fp32, fp16, bf16, auto
-            "optimizer": "adamw",  // optional: adamw, adam, sgd
-            "n_epochs": 50,  // optional, default 50
-            "early_stopping_patience": 10  // optional, default 10
-        }
-
-    Request format (LightGBM):
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "lightgbm",
-            "n_trials": 50,
-            "early_stopping_rounds": 10  // optional, default 10
-        }
-
-    Request format (LSTM):
-        {
-            "dataset": "taiwan" | "us" | "polish",
-            "backend": "lstm",
-            "n_trials": 50,
-            "precision": "fp32",
-            "n_epochs": 50,
-            "early_stopping_patience": 10,
-            "sequence_length": 5,  // optional, default 5
-            "bidirectional": false  // optional, default false
-        }
-
-    Args:
-        body: Raw request body bytes.
-
-    Returns:
-        OptimizeParseResult union with backend-specific parameters.
-
-    Raises:
-        JSONTypeError: Missing required field or invalid field type.
-        ValueError: Invalid dataset name.
-    """
-    raw = _parse_body_as_dict(body)
-
-    # Backend selection (optional; default xgboost)
-    backend_val = raw.get("backend")
-    if backend_val == "mlp":
-        return _parse_mlp_optimize(raw)
-    if backend_val == "lightgbm":
-        return _parse_lightgbm_optimize(raw)
-    if backend_val == "lstm":
-        return _parse_lstm_optimize(raw)
-    # Default to xgboost (including explicit "xgboost" or None)
-    if backend_val is not None and backend_val != "xgboost":
-        raise JSONTypeError("backend must be one of: xgboost, mlp, lightgbm, lstm")
-    return _parse_xgboost_optimize(raw)
 
 
 # --- Explain Request Parsing ---
@@ -1317,7 +701,15 @@ def _parse_backend_name(raw: JSONValue) -> BackendName:
         return "lstm"
     if raw == "lightgbm":
         return "lightgbm"
-    raise JSONTypeError("backend must be one of: xgboost, mlp, lstm, lightgbm")
+    if raw == "cleargbm":
+        return "cleargbm"
+    if raw == "logreg":
+        return "logreg"
+    if raw == "random_forest":
+        return "random_forest"
+    raise JSONTypeError(
+        "backend must be one of: xgboost, mlp, lstm, lightgbm, cleargbm, logreg, random_forest"
+    )
 
 
 def parse_explain_request(body: bytes) -> ExplainParseResult:
@@ -1374,6 +766,315 @@ def parse_explain_request(body: bytes) -> ExplainParseResult:
     )
 
 
+# --- Regression Optimization Request Parsing ---
+
+
+class RegressionOptimizeApiParseResult(TypedDict, total=True):
+    """Parsed regression optimization request at the API edge.
+
+    Only validates common fields. Backend-specific fields are parsed
+    by the worker job from the raw JSON body.
+
+    Args:
+        backend: Regressor backend name.
+        dataset: Regression dataset name.
+        n_trials: Number of Optuna trials.
+        timeout_seconds: Optional timeout in seconds.
+        device: Compute device.
+        feature_preset: Feature engineering preset.
+        random_state: Random seed for reproducibility.
+    """
+
+    backend: RegressorBackendName
+    dataset: str
+    n_trials: int
+    timeout_seconds: int | None
+    device: Literal["cpu", "cuda", "auto"]
+    feature_preset: FeaturePreset
+    random_state: int
+
+
+def _parse_regressor_backend(raw: JSONValue | None) -> RegressorBackendName:
+    """Parse regressor backend name, defaulting to 'xgboost_reg'.
+
+    Args:
+        raw: Raw JSON value.
+
+    Returns:
+        RegressorBackendName literal.
+
+    Raises:
+        JSONTypeError: If value is not a string.
+        ValueError: If value is not a valid regressor backend.
+    """
+    if raw is None:
+        return "xgboost_reg"
+    if not isinstance(raw, str):
+        raise JSONTypeError("backend must be a string")
+    if raw == "xgboost_reg":
+        return "xgboost_reg"
+    if raw == "lightgbm_reg":
+        return "lightgbm_reg"
+    if raw == "mlp_reg":
+        return "mlp_reg"
+    if raw == "lstm_reg":
+        return "lstm_reg"
+    raise ValueError("backend must be one of: xgboost_reg, lightgbm_reg, mlp_reg, lstm_reg")
+
+
+def _parse_regression_dataset_name(raw: JSONObject) -> str:
+    """Parse and validate regression dataset name.
+
+    Args:
+        raw: JSON object containing the dataset field.
+
+    Returns:
+        Validated regression dataset name.
+
+    Raises:
+        JSONTypeError: If dataset field is missing.
+        ValueError: If dataset is not in the regression registry.
+    """
+    from covenant_radar_api.worker._optimize_regression_common import (
+        parse_regression_dataset_name,
+    )
+
+    dataset = require_str(raw, "dataset")
+    return parse_regression_dataset_name(dataset)
+
+
+def parse_regression_optimize_request(body: bytes) -> RegressionOptimizeApiParseResult:
+    """Parse request body for regression hyperparameter optimization.
+
+    Validates common fields at the API edge. Backend-specific fields
+    (early_stopping_rounds, n_jobs) are parsed by the worker job.
+
+    Request format:
+        {
+            "dataset": "financial_distress",  // required, regression dataset
+            "backend": "xgboost_reg",  // optional, default "xgboost_reg"
+            "n_trials": 50,  // required
+            "timeout_seconds": 3600,  // optional, null for no timeout
+            "device": "auto",  // optional, default "auto"
+            "feature_preset": "none",  // optional: none, log_only, ratios_only, full
+            "random_state": 42  // optional, default 42
+        }
+
+    Args:
+        body: Raw request body bytes.
+
+    Returns:
+        RegressionOptimizeApiParseResult with common parameters.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset or backend name.
+    """
+    raw = _parse_body_as_dict(body)
+
+    backend = _parse_regressor_backend(raw.get("backend"))
+    dataset_name = _parse_regression_dataset_name(raw)
+    n_trials = require_int(raw, "n_trials")
+
+    timeout_raw = raw.get("timeout_seconds")
+    timeout_seconds: int | None = None
+    if timeout_raw is not None:
+        if not isinstance(timeout_raw, int):
+            raise JSONTypeError("timeout_seconds must be an integer or null")
+        timeout_seconds = timeout_raw
+
+    device = _parse_device(raw.get("device"))
+    feature_preset = _parse_optimize_feature_preset(raw.get("feature_preset"))
+    random_state = _optional_int(raw, "random_state", 42)
+
+    return RegressionOptimizeApiParseResult(
+        backend=backend,
+        dataset=dataset_name,
+        n_trials=n_trials,
+        timeout_seconds=timeout_seconds,
+        device=device,
+        feature_preset=feature_preset,
+        random_state=random_state,
+    )
+
+
+class RegressionPredictRequest(TypedDict, total=True):
+    """Parsed request for regression prediction.
+
+    Attributes:
+        backend: Regressor backend used for the model.
+        model_path: Path to the trained regressor model file.
+        features: 2D list of feature values (each inner list is one sample).
+    """
+
+    backend: RegressorBackendName
+    model_path: str
+    features: list[list[float]]
+
+
+class RegressionPredictResponse(TypedDict, total=True):
+    """Response body for regression prediction.
+
+    Attributes:
+        backend: Regressor backend used.
+        predictions: Predicted continuous values (one per sample).
+        n_samples: Number of samples predicted.
+    """
+
+    backend: RegressorBackendName
+    predictions: list[float]
+    n_samples: int
+
+
+def parse_regression_predict_request(body: bytes) -> RegressionPredictRequest:
+    """Parse request body for regression prediction.
+
+    Request format:
+        {
+            "backend": "xgboost_reg" | "lightgbm_reg" | "mlp_reg" | "lstm_reg",
+            "model_path": "/path/to/model",
+            "features": [[1.0, 2.0, ...], [3.0, 4.0, ...]]
+        }
+
+    Args:
+        body: Raw request bytes.
+
+    Returns:
+        RegressionPredictRequest with validated fields.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid backend name.
+    """
+    data = _parse_body_as_dict(body)
+
+    backend = _parse_regressor_backend(data.get("backend"))
+    model_path = require_str(data, "model_path")
+
+    features_raw = require_list(data, "features")
+    if len(features_raw) == 0:
+        raise JSONTypeError("'features' must be a non-empty list of sample arrays")
+
+    features: list[list[float]] = []
+    for i, sample in enumerate(features_raw):
+        if not isinstance(sample, list):
+            raise JSONTypeError(f"features[{i}] must be a list of numbers")
+        row: list[float] = []
+        for j, val in enumerate(sample):
+            if not isinstance(val, (int, float)):
+                raise JSONTypeError(f"features[{i}][{j}] must be a number")
+            row.append(float(val))
+        features.append(row)
+
+    return RegressionPredictRequest(
+        backend=backend,
+        model_path=model_path,
+        features=features,
+    )
+
+
+# --- Regression Explain Request Parsing ---
+
+
+class RegressionExplainRequest(TypedDict, total=True):
+    """Request body for regression feature importance explanation.
+
+    Args:
+        dataset: Regression dataset name for loading data.
+        backend: Regressor backend used for the model.
+        model_path: Path to the trained regressor model file.
+        explainer: Which explainer to use.
+        n_samples: Number of samples to use for explanation.
+        random_state: Random seed for reproducibility.
+    """
+
+    dataset: str
+    backend: RegressorBackendName
+    model_path: str
+    explainer: SupportedExplainer
+    n_samples: int
+    random_state: int
+
+
+class RegressionExplainResponse(TypedDict, total=True):
+    """Response body for regression explain job submission."""
+
+    job_id: str
+    status: Literal["queued"]
+
+
+class RegressionExplainParseResult(TypedDict, total=True):
+    """Parsed regression explanation request for the worker job.
+
+    Args:
+        dataset: Regression dataset name for loading data.
+        backend: Regressor backend used for the model.
+        model_path: Path to the trained regressor model file.
+        explainer: Which explainer to use.
+        n_samples: Number of samples to use for explanation.
+        random_state: Random seed for reproducibility.
+    """
+
+    dataset: str
+    backend: RegressorBackendName
+    model_path: str
+    explainer: SupportedExplainer
+    n_samples: int
+    random_state: int
+
+
+def parse_regression_explain_request(body: bytes) -> RegressionExplainParseResult:
+    """Parse request body for regression feature importance explanation.
+
+    Request format:
+        {
+            "dataset": "financial_distress",  // required, regression dataset
+            "backend": "xgboost_reg" | ...,  // required
+            "model_path": "/path/to/model.ubj",  // required
+            "explainer": "permutation" | ...,  // required
+            "n_samples": 1000,  // optional, default 1000
+            "random_state": 42  // optional, default 42
+        }
+
+    Args:
+        body: Raw request body bytes.
+
+    Returns:
+        RegressionExplainParseResult with all explanation parameters.
+
+    Raises:
+        JSONTypeError: Missing required field or invalid field type.
+        ValueError: Invalid dataset or backend name.
+    """
+    raw = _parse_body_as_dict(body)
+
+    dataset_name = _parse_regression_dataset_name(raw)
+
+    backend_raw = raw.get("backend")
+    if backend_raw is None:
+        raise JSONTypeError("Missing required field 'backend'")
+    backend = _parse_regressor_backend(backend_raw)
+
+    model_path = require_str(raw, "model_path")
+
+    explainer_raw = raw.get("explainer")
+    if explainer_raw is None:
+        raise JSONTypeError("Missing required field 'explainer'")
+    explainer = _parse_explainer(explainer_raw)
+
+    n_samples = _optional_int(raw, "n_samples", 1000)
+    random_state = _optional_int(raw, "random_state", 42)
+
+    return RegressionExplainParseResult(
+        dataset=dataset_name,
+        backend=backend,
+        model_path=model_path,
+        explainer=explainer,
+        n_samples=n_samples,
+        random_state=random_state,
+    )
+
+
 __all__ = [
     "AddMeasurementsRequest",
     "CreateCovenantRequest",
@@ -1383,36 +1084,35 @@ __all__ = [
     "ExplainParseResult",
     "ExplainRequest",
     "ExplainResponse",
+    "ExternalRegressionTrainParseResult",
     "ExternalTrainParseResult",
-    "LSTMOptimizeParseResult",
-    "LSTMParseResult",
-    "LSTMSpaceProfile",
-    "LightGBMOptimizeParseResult",
-    "LightGBMParseResult",
-    "LightGBMSpaceProfile",
-    "MLPOptimizeParseResult",
-    "MLPParseResult",
-    "MLPSpaceProfile",
-    "OptimizeParseResult",
     "OptimizeRequest",
     "OptimizeResponse",
     "PredictRequest",
     "PredictResponse",
+    "RegressionExplainParseResult",
+    "RegressionExplainRequest",
+    "RegressionExplainResponse",
+    "RegressionOptimizeApiParseResult",
+    "RegressionPredictRequest",
+    "RegressionPredictResponse",
     "TrainResponse",
+    "UnifiedOptimizeApiParseResult",
     "UpdateDealRequest",
-    "XGBoostOptimizeParseResult",
-    "XGBoostParseResult",
-    "XGBoostSpaceProfile",
     "parse_covenant_id_request",
     "parse_covenant_request",
     "parse_deal_id_request",
     "parse_deal_request",
     "parse_evaluate_request",
     "parse_explain_request",
+    "parse_external_regression_train_request",
     "parse_external_train_request",
     "parse_measurements_request",
     "parse_optimize_request",
     "parse_predict_request",
+    "parse_regression_explain_request",
+    "parse_regression_optimize_request",
+    "parse_regression_predict_request",
     "parse_train_request",
     "parse_update_deal_request",
 ]
