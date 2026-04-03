@@ -156,6 +156,9 @@ libs/
     └── src/
         ├── lib.rs               # Module exports
         ├── error.rs             # ClearGbmError enum (with inline tests)
+        ├── binning/             # Precompute feature bins (with inline tests)
+        ├── losses/              # Loss functions: binary log loss + gradients/hessians
+        ├── training/            # Training loop: fit_ensemble (with inline tests)
         ├── types/               # TreeNode, HistogramBuffer, SplitConfig (with inline tests)
         ├── histogram/           # build_histogram, subtract_histogram (with inline tests)
         ├── split/               # Split finding (with inline tests)
@@ -164,7 +167,7 @@ libs/
             ├── mod.rs           # sigmoid, predict_single, predict_tree, predict_ensemble, predict_proba
             └── tests/           # 57 unit tests across 5 test files
     └── tests/
-        └── integration_tests.rs # 17 end-to-end integration tests
+        └── integration_tests/   # End-to-end integration tests
 ```
 
 **Note:** Tests are inline in each module (`#[cfg(test)] mod tests { ... }`) following Rust convention.
@@ -183,7 +186,7 @@ Integration tests are in `tests/integration_tests.rs`.
 | 5 | Tree Construction | **COMPLETED** |
 | 6 | Prediction/Inference | **COMPLETED** |
 | 7 | PyO3 Bindings | **COMPLETED** |
-| 8 | Python Integration | PENDING |
+| 8 | Python Integration | **COMPLETED** |
 | 9 | Benchmarking and Optimization | PENDING |
 
 **Current Status:** `make check` passes (1122 tests, clippy clean, fmt clean, 100% segment coverage). All lints at `forbid`.
@@ -931,12 +934,26 @@ src/pyo3_module/
 
 ---
 
-## Phase 8: Python Integration (IN PROGRESS)
+## Phase 8: Python Integration (COMPLETED)
 
 ### Approach
 
-All hot-path operations are wired through `_test_hooks.py` module-level hooks.
-Each hook follows a three-part pattern:
+All hot-path operations are wired through module-level hooks. The hooks system
+is split across focused sub-modules by concern:
+
+- `_hooks_infra.py` — random state, worker pool, buffer factories
+- `_hooks_histogram.py` — build_histogram, subtract_histogram
+- `_hooks_prediction.py` — predict_tree (single-tree traversal)
+- `_hooks_sigmoid.py` — sigmoid (scalar + array)
+- `_hooks_loss.py` — binary_log_loss, gradients, hessians, initial_prediction
+- `_hooks_binning.py` — precompute_feature_bins
+- `_hooks_ensemble.py` — predict_raw_ensemble, predict_proba_from_raw
+- `_hooks_native.py` — train_native, predict_raw_native, predict_proba_native (no Python default)
+- `_hooks_compute.py` — re-export layer for compute hook protocols + public functions
+- `_hooks_guard.py` — guard script hook protocols
+- `_test_hooks.py` — thin re-export layer (all immutable names from all sub-modules)
+
+Each hook follows a four-part pattern:
 
 1. **Protocol** — typed callable interface (e.g., `PredictTreeBackend`)
 2. **Default implementation** — pure Python function (e.g., `_default_predict_tree`)
@@ -944,58 +961,124 @@ Each hook follows a three-part pattern:
 4. **Public accessor** — calls the hook directly (e.g., `predict_tree()`)
 
 No `try/except`, no auto-detection, no `_get_default_backend()`. Production sets hooks
-to Rust implementations at startup. Tests call through the Python defaults or inject fakes.
+to Rust implementations at startup via `_rust_adapters.use_rust_backend()`. Tests call
+through the Python defaults or inject fakes.
+
+**Important:** Mutable hook variables live in their originating sub-module (e.g.
+`_hooks_histogram`, `_hooks_sigmoid`, `_hooks_loss`), NOT in `_hooks_compute.py` or
+`_test_hooks.py`. Code that reads or writes hooks must reference the originating
+sub-module directly to avoid binding drift.
 
 ### Hook Inventory
 
-| Hook Variable | Protocol | Default | Caller Module |
-|---|---|---|---|
-| `_random_state_factory` | `Callable[[int], RandomStateProtocol]` | `_default_random_state_factory` | `tree.py` |
-| `_pool_factory` | `Callable[..., WorkerPoolProtocol]` | `_default_pool_factory` | `tree.py` |
-| `_float_buffer_factory` | `Callable[[int], FloatBuffer]` | `_default_float_buffer_factory` | (internal) |
-| `_int_buffer_factory` | `Callable[[int], IntBuffer]` | `_default_int_buffer_factory` | (internal) |
-| `_histogram_buffer_factory` | `Callable[[int], HistogramBuffer]` | `_default_histogram_buffer_factory` | (internal) |
-| `_build_histogram_backend` | `BuildHistogramBackend` | `_default_build_histogram` | `histogram.py` |
-| `_subtract_histogram_backend` | `SubtractHistogramBackend` | `_default_subtract_histogram` | `histogram.py` |
-| `_predict_tree_backend` | `PredictTreeBackend` | `_default_predict_tree` | `tree.py` |
-| `_sigmoid_backend` | `SigmoidBackend` | `_default_sigmoid` | `losses.py` |
-| `_sigmoid_array_backend` | `SigmoidArrayBackend` | `_default_sigmoid_array` | `losses.py` |
-| `guard_find_monorepo_root` | `FindMonorepoRootProto \| None` | `None` | `scripts/guard.py` |
-| `guard_load_orchestrator` | `LoadOrchestratorProto \| None` | `None` | `scripts/guard.py` |
+| Hook Variable | Module | Protocol | Default | Caller Module |
+|---|---|---|---|---|
+| `_random_state_factory` | `_hooks_infra` | `Callable[[int], RandomStateProtocol]` | `_default_random_state_factory` | `tree.py` |
+| `_pool_factory` | `_hooks_infra` | `Callable[..., WorkerPoolProtocol]` | `_default_pool_factory` | `tree.py` |
+| `_float_buffer_factory` | `_hooks_infra` | `Callable[[int], FloatBuffer]` | `_default_float_buffer_factory` | (internal) |
+| `_int_buffer_factory` | `_hooks_infra` | `Callable[[int], IntBuffer]` | `_default_int_buffer_factory` | (internal) |
+| `_histogram_buffer_factory` | `_hooks_infra` | `Callable[[int], HistogramBuffer]` | `_default_histogram_buffer_factory` | (internal) |
+| `_build_histogram_backend` | `_hooks_histogram` | `BuildHistogramBackend` | `_default_build_histogram` | `histogram.py` |
+| `_subtract_histogram_backend` | `_hooks_histogram` | `SubtractHistogramBackend` | `_default_subtract_histogram` | `histogram.py` |
+| `_predict_tree_backend` | `_hooks_prediction` | `PredictTreeBackend` | `_default_predict_tree` | `tree.py` |
+| `_sigmoid_backend` | `_hooks_sigmoid` | `SigmoidBackend` | `_default_sigmoid` | `losses.py` |
+| `_sigmoid_array_backend` | `_hooks_sigmoid` | `SigmoidArrayBackend` | `_default_sigmoid_array` | `losses.py` |
+| `_binary_log_loss_backend` | `_hooks_loss` | `BinaryLogLossBackend` | `_default_binary_log_loss` | `losses.py` |
+| `_binary_log_loss_gradients_backend` | `_hooks_loss` | `BinaryLogLossGradientsBackend` | `_default_binary_log_loss_gradients` | `losses.py` |
+| `_binary_log_loss_hessians_backend` | `_hooks_loss` | `BinaryLogLossHessiansBackend` | `_default_binary_log_loss_hessians` | `losses.py` |
+| `_binary_log_loss_initial_prediction_backend` | `_hooks_loss` | `BinaryLogLossInitialPredictionBackend` | `_default_binary_log_loss_initial_prediction` | `losses.py` |
+| `_precompute_feature_bins_backend` | `_hooks_binning` | `PrecomputeFeatureBinsBackend` | `_default_precompute_feature_bins` | `histogram.py` |
+| `_predict_raw_backend` | `_hooks_ensemble` | `PredictRawBackend` | `_default_predict_raw` | `ensemble.py` |
+| `_predict_proba_backend` | `_hooks_ensemble` | `PredictProbaBackend` | `_default_predict_proba` | `ensemble.py` |
+| `_train_native_backend` | `_hooks_native` | `TrainNativeBackend \| None` | `None` | `ensemble.py` |
+| `_predict_raw_native_backend` | `_hooks_native` | `PredictRawNativeBackend \| None` | `None` | `ensemble.py` |
+| `_predict_proba_native_backend` | `_hooks_native` | `PredictProbaNativeBackend \| None` | `None` | `ensemble.py` |
+| `guard_find_monorepo_root` | `_hooks_guard` | `FindMonorepoRootProto \| None` | `None` | `scripts/guard.py` |
+| `guard_load_orchestrator` | `_hooks_guard` | `LoadOrchestratorProto \| None` | `None` | `scripts/guard.py` |
 
 ### Caller Wiring
 
-Each caller imports the public accessor and delegates to it:
+Each caller imports from the specific sub-module where the hook lives:
 
 ```python
 # histogram.py
-from cleargbm._test_hooks import build_histogram as _build_histogram_hook
-from cleargbm._test_hooks import subtract_histogram as _subtract_histogram_hook
+from cleargbm._hooks_histogram import build_histogram, subtract_histogram
+from cleargbm._hooks_binning import precompute_feature_bins
 
 # tree.py
-from cleargbm._test_hooks import predict_tree as _predict_tree_hook
+from cleargbm._hooks_prediction import predict_tree
+from cleargbm._hooks_infra import get_random_state, WorkerPoolProtocol
 
 # losses.py
-from cleargbm._test_hooks import sigmoid as _sigmoid_hook
-from cleargbm._test_hooks import sigmoid_array as _sigmoid_array_hook
+from cleargbm._hooks_loss import binary_log_loss, binary_log_loss_gradients, ...
+from cleargbm._hooks_sigmoid import sigmoid, sigmoid_array
+
+# ensemble.py
+from cleargbm._hooks_ensemble import predict_proba_from_raw, predict_raw_ensemble
+from cleargbm._hooks_native import train_native, predict_raw_native, predict_proba_native
+from cleargbm._hooks_infra import create_worker_pool, WorkerPoolProtocol
+
+# scripts/guard.py
+from cleargbm import _hooks_guard
 ```
+
+### Rust Adapter Wiring
+
+Two adapter modules bridge Python types to `cleargbm_rs` Rust functions:
+
+- `_rust_adapters.py` — 12 per-operation adapters (histogram, sigmoid, loss, etc.)
+- `_rust_native_adapters.py` — 3 native adapters (full training loop, model predict)
+
+```python
+# Explicit switch — no auto-detection, no try/except
+from cleargbm._rust_adapters import use_rust_backend, use_python_backend
+
+use_rust_backend()   # Sets all 12 compute + 3 native hooks to Rust
+use_python_backend() # Restores 12 compute to Python defaults, clears 3 native
+```
+
+`use_rust_backend()` sets hooks on sub-modules directly (not on re-export layers):
+
+```python
+def use_rust_backend() -> None:
+    from cleargbm import _hooks_histogram, _hooks_sigmoid, ...
+    _hooks_histogram._build_histogram_backend = _rust_build_histogram
+    # ... all 12 per-operation hooks on their owning sub-modules
+    wire_native_hooks()  # sets 3 native training hooks on _hooks_native
+```
+
+Key adapter conversions:
+- `DecisionTree` TypedDict → `PyTree` via JSON serialization
+- `HistogramBuffer` ↔ `(grad_sums, hess_sums, counts)` numpy arrays
+- `u64` counts (Rust) ↔ `int64` counts (Python) via `astype()`
+- `GradientBoostingConfig` → Rust dict (12 keys, excluding Python-only fields)
 
 ### Stats
 
-- **488 tests**, all passing
-- **2057 statements, 592 branches — 100.00% coverage**
+- **549 tests**, all passing
+- **2444 statements, 608 branches — 100.00% coverage**
 - No `Any`, no `cast()`, no `type: ignore`
-- All hooks tested directly in `test_test_hooks.py`
+- All hooks tested in `test_test_hooks.py`
+- Per-operation Rust adapter equivalence in `test_rust_adapters.py`
+- Native Rust training loop + model prediction in `test_rust_native_adapters.py`
 
-### Remaining Work
+### Types Sub-Module Split
 
-- **Rust adapter functions**: Wrapper functions that accept Python types (e.g., `DecisionTree`
-  TypedDict) and call `cleargbm_rs` functions (which use `PyTree` opaque wrapper)
-- **Production startup wiring**: Code that sets `_test_hooks._predict_tree_backend = rust_adapter`
-  when the Rust extension is available
-- **Type bridge**: Converting between Python `DecisionTree` TypedDict and Rust `PyTree`
-  (via JSON or direct field mapping)
-- **`maturin develop`** verification: Build Rust extension and verify `import cleargbm_rs` works
+The monolithic `types.py` (1643 lines) was split into focused sub-modules:
+
+| Module | Lines | Domain |
+|---|---|---|
+| `_types_json.py` | ~330 | JSON aliases, validators, extractors |
+| `_types_tree.py` | ~390 | BinEdges, FeatureBins, tree structures, SplitCandidate |
+| `_types_model.py` | ~380 | Config, model, training progress |
+| `_types_explain.py` | ~245 | Contributions, explanations, rules |
+| `_types_tuning.py` | ~215 | Timing, tuning report |
+| `_types_buffer.py` | ~310 | Buffer serialization |
+| `types.py` | ~100 | Thin re-export layer |
+
+Dependency graph: `_types_json` ← `_types_tree` ← `_types_model` ← `_types_tuning`,
+`_types_json` ← `_types_tree` ← `_types_explain`, `_types_json` ← `_types_buffer`.
+No circular dependencies. No mutable module-level variables, so re-export is safe.
 
 ---
 
@@ -1151,15 +1234,21 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 - [x] All public items have doc comments (`missing_docs = "forbid"`)
 - [x] All error variants documented
 
-### Code Quality (Python Integration) - IN PROGRESS
-- [x] `make check` passes in cleargbm (488 tests, 100.00% coverage)
-- [x] 100% test coverage maintained (2057 statements, 592 branches)
+### Code Quality (Python Integration) - COMPLETED
+- [x] `make check` passes in cleargbm (549 tests, 100.00% coverage)
+- [x] 100% test coverage maintained (2444 statements, 608 branches)
 - [x] No `Any`, `cast()`, or `type: ignore`
-- [x] `_test_hooks.py` pattern used for DI (12 hooks, all Protocol-typed)
-- [x] All hot-path callers wired through hooks (histogram, predict_tree, sigmoid, sigmoid_array)
-- [ ] Rust adapter functions (convert Python types to Rust types)
-- [ ] Production startup wiring (set hooks to Rust implementations)
-- [ ] `maturin develop` builds and `import cleargbm_rs` works
+- [x] Hooks split into 10 focused sub-modules by concern
+- [x] `_hooks_compute.py` and `_test_hooks.py` are re-export layers for immutable names only
+- [x] Types split into 6 focused sub-modules (`_types_json`, `_types_tree`, `_types_model`, `_types_explain`, `_types_tuning`, `_types_buffer`)
+- [x] `types.py` is re-export layer for all TypedDicts/encode/decode
+- [x] All hot-path callers wired through hooks (21 hooks, all Protocol-typed)
+- [x] Per-operation Rust adapters in `_rust_adapters.py` (12 compute adapters)
+- [x] Native Rust training adapters in `_rust_native_adapters.py` (3 native adapters)
+- [x] Production startup wiring via `use_rust_backend()` / `use_python_backend()`
+- [x] `maturin develop` builds and `import cleargbm_rs` works
+- [x] Native training loop: `train_gradient_boosting_native()` → single Rust call
+- [x] Native model prediction: `predict_raw_native()`, `predict_proba_native()`
 
 ### Performance - PENDING
 - [ ] Benchmark shows 10x+ improvement over Python
@@ -1188,7 +1277,7 @@ Will use criterion with safe integer conversions (`f64::from(u32)` instead of `a
 5. **Phase 5**: Tree construction ✅ COMPLETED
 6. **Phase 6**: Prediction/inference ✅ COMPLETED
 7. **Phase 7**: PyO3 bindings (PyCFunction::new_closure, manual extraction) ✅ COMPLETED
-8. **Phase 8**: Python integration with _test_hooks ⏳ IN PROGRESS (hooks wired, adapters pending)
+8. **Phase 8**: Python integration with hooks + Rust adapters ✅ COMPLETED
 9. **Phase 9**: Final benchmarking and optimization
 
 Each phase must pass `make check` before proceeding.

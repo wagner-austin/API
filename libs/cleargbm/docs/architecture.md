@@ -26,19 +26,37 @@ libs/cleargbm/
 │   └── autotune.py          # Grid search for optimal n_jobs/max_bins
 ├── src/cleargbm/
 │   ├── __init__.py          # Public exports
-│   ├── types.py             # TypedDicts, Protocols, encode/decode
+│   ├── types.py             # Re-export layer for all TypedDicts/encode/decode
+│   ├── _types_json.py       # JSON aliases, validators, extractors
+│   ├── _types_tree.py       # BinEdges, FeatureBins, tree structures, SplitCandidate
+│   ├── _types_model.py      # GradientBoostingConfig, GradientBoostingModel, TrainingProgress
+│   ├── _types_explain.py    # FeatureContribution, PredictionExplanation, Rule
+│   ├── _types_tuning.py     # TimingResult, TuningReport
+│   ├── _types_buffer.py     # FloatBufferData, IntBufferData, HistogramBufferData
 │   ├── losses.py            # Loss functions with gradients/hessians
 │   ├── histogram.py         # LightGBM-style histogram binning
 │   ├── buffers.py           # Mutable numpy buffer classes
 │   ├── split.py             # Split computation, leaf values, gain
 │   ├── parallel.py          # Parallel histogram building with shared memory
 │   ├── tree.py              # Decision tree building and prediction
-│   ├── ensemble.py          # Gradient boosting ensemble
+│   ├── ensemble.py          # Gradient boosting ensemble + native training API
 │   ├── explain.py           # Rule extraction, contributions
-│   └── _test_hooks.py       # Internal hooks for DI (private)
+│   ├── _test_hooks.py       # Re-export layer for all hook protocols/accessors
+│   ├── _hooks_infra.py      # Hooks: random state, worker pool, buffer factories
+│   ├── _hooks_histogram.py  # Hooks: build_histogram, subtract_histogram
+│   ├── _hooks_prediction.py # Hooks: predict_tree (single-tree traversal)
+│   ├── _hooks_sigmoid.py    # Hooks: sigmoid (scalar + array)
+│   ├── _hooks_loss.py       # Hooks: binary_log_loss, gradients, hessians, initial
+│   ├── _hooks_binning.py    # Hooks: precompute_feature_bins
+│   ├── _hooks_ensemble.py   # Hooks: predict_raw_ensemble, predict_proba_from_raw
+│   ├── _hooks_compute.py    # Re-export layer for all compute hooks
+│   ├── _hooks_native.py     # Hooks: native (Rust full-loop) training + model predict
+│   ├── _hooks_guard.py      # Hooks: guard script protocols
+│   ├── _rust_adapters.py    # Per-operation Rust adapters + use_rust_backend()
+│   └── _rust_native_adapters.py # Full-loop Rust training + model predict adapters
 └── tests/
     ├── __init__.py
-    ├── conftest.py          # Shared fixtures (make_config helper)
+    ├── conftest.py              # Shared fixtures (make_config helper)
     ├── test_types.py
     ├── test_losses.py
     ├── test_histogram.py
@@ -48,12 +66,29 @@ libs/cleargbm/
     ├── test_tree.py
     ├── test_ensemble.py
     ├── test_explain.py
-    └── test_test_hooks.py
+    ├── test_test_hooks.py
+    ├── test_rust_adapters.py
+    └── test_rust_native_adapters.py
 ```
 
-## Core Types (types.py)
+## Core Types (types.py — re-export layer)
 
-All structures are immutable TypedDicts with encode/decode functions.
+All structures are immutable TypedDicts with encode/decode functions. The
+`types.py` module is a thin re-export layer; actual definitions live in focused
+sub-modules:
+
+- `_types_json.py` — JSON aliases (`JSONValue`, `JSONDict`), `JSONTypeError`,
+  validation helpers (`require_positive_int`, etc.), raw dict extractors
+- `_types_tree.py` — `BinEdges`, `FeatureBins`, `SplitCondition`, `TreeNode`,
+  `DecisionTree`, `TreePredictionExplanation`, `SplitCandidate`
+- `_types_model.py` — `GradientBoostingConfig`, `GradientBoostingModel`,
+  `TrainingProgress`
+- `_types_explain.py` — `FeatureContribution`, `PredictionExplanation`, `Rule`
+- `_types_tuning.py` — `TimingResult`, `TuningReport`
+- `_types_buffer.py` — `FloatBufferData`, `IntBufferData`, `HistogramBufferData`
+
+No mutable module-level variables exist in these modules, so re-export via
+`from module import name` is safe. Consumers import from `cleargbm.types`.
 
 ### Array Types
 
@@ -286,11 +321,28 @@ def train_gradient_boosting(
     feature_names: tuple[str, ...],
     progress_callback: Callable[[TrainingProgress], None] | None = None,
 ) -> GradientBoostingModel:
-    """Train gradient boosting classifier."""
+    """Train gradient boosting classifier (Python orchestration)."""
+
+def train_gradient_boosting_native(
+    x_train: NDArray[np.float64],
+    y_train: NDArray[np.int64],
+    x_val: NDArray[np.float64] | None,
+    y_val: NDArray[np.int64] | None,
+    config: GradientBoostingConfig,
+    feature_names: tuple[str, ...],
+) -> NativeModel:
+    """Train via Rust full training loop (single native call)."""
 
 def predict_proba(model: GradientBoostingModel, x: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Predict class probabilities."""
+    """Predict class probabilities (Python model)."""
+
+def predict_proba_native(model: NativeModel, x: NDArray[np.float64]) -> tuple[tuple[float, float], ...]:
+    """Predict class probabilities (Rust native model)."""
 ```
+
+**Two training paths:**
+- `train_gradient_boosting` — Python orchestrates the training loop; individual operations (histogram, sigmoid, loss) delegate to active hooks (Python or Rust). Compatible with per-tree progress callbacks.
+- `train_gradient_boosting_native` — Entire training loop runs in a single Rust call via `cleargbm_rs.train_gradient_boosting_rs`. Maximum speed, no per-iteration FFI overhead.
 
 ## Design Decisions
 
@@ -326,27 +378,57 @@ Shared memory eliminates pickle overhead for gradients/hessians. The autotune sc
 - `n_jobs=1` wins for datasets < 10K samples (pool overhead dominates)
 - Speedup from multiprocessing is modest (1.1-1.3x)
 
-## Testing Strategy (_test_hooks.py)
+## Testing Strategy (hooks pattern)
 
-### Hooks Pattern
+### Hooks Architecture
 
-Production code calls hooks directly. Production sets real implementations at startup. Tests set fakes.
+Hook definitions are split across focused sub-modules by concern:
+
+- `_hooks_infra.py` — random state, worker pool, buffer factories
+- `_hooks_histogram.py` — build_histogram, subtract_histogram
+- `_hooks_prediction.py` — predict_tree (single-tree traversal)
+- `_hooks_sigmoid.py` — sigmoid (scalar + array)
+- `_hooks_loss.py` — binary_log_loss, gradients, hessians, initial_prediction
+- `_hooks_binning.py` — precompute_feature_bins
+- `_hooks_ensemble.py` — predict_raw_ensemble, predict_proba_from_raw
+- `_hooks_native.py` — train_native, predict_raw_native, predict_proba_native
+- `_hooks_guard.py` — guard script hook protocols
+
+**Re-export layers:**
+- `_hooks_compute.py` — re-exports all compute hook protocols + public functions
+- `_test_hooks.py` — re-exports all hook protocols/accessors from all sub-modules
+
+Mutable hook variables (`_*_backend`) live in their originating sub-module and
+must be referenced there directly. Re-export modules only export immutable names
+(Protocol classes, public delegator functions, default implementations).
+
+### Rust Backend Wiring
 
 ```python
-# _test_hooks.py
-_random_state_factory: Callable[[int], RandomStateProtocol] = _default_random_state_factory
-_pool_factory: PoolFactoryProtocol = _default_pool_factory
+# _hooks_histogram.py (sub-module owns the mutable hook)
+_build_histogram_backend: BuildHistogramBackend = _default_build_histogram
 
-def get_random_state(seed: int) -> RandomStateProtocol:
-    return _random_state_factory(seed)
+def build_histogram(...) -> HistogramBuffer:
+    return _build_histogram_backend(...)
 
-def create_worker_pool(...) -> WorkerPoolProtocol:
-    return _pool_factory(...)
+# _rust_adapters.py (sets hooks on sub-modules directly)
+def use_rust_backend() -> None:
+    from cleargbm import _hooks_histogram, _hooks_sigmoid, ...
+    _hooks_histogram._build_histogram_backend = _rust_build_histogram
+    # ... all 12 per-operation hooks
+    wire_native_hooks()  # sets 3 native training hooks
 
-def set_random_state_factory(factory: Callable[[int], RandomStateProtocol]) -> None:
-    global _random_state_factory
-    _random_state_factory = factory
+def use_python_backend() -> None:
+    from cleargbm import _hooks_histogram, _hooks_sigmoid, ...
+    _hooks_histogram._build_histogram_backend = _hooks_histogram._default_build_histogram
+    # ... all 12 per-operation hooks
+    unwire_native_hooks()  # clears 3 native training hooks
 ```
+
+**Important:** Code that reads or writes mutable hook variables must reference
+the sub-module directly (e.g. `_hooks_histogram`, `_hooks_sigmoid`), not the
+re-export layers, because `from x import _mutable_var` creates a local binding
+copy that doesn't track mutations on the source module.
 
 ### Fake Implementations (in tests)
 
@@ -385,13 +467,16 @@ from cleargbm.explain import explain_prediction, extract_rules
 
 ## Test Coverage
 
-- 488 tests passing
-- 100% statement and branch coverage required
+- 549 tests passing
+- 100% statement and branch coverage required (2444 statements, 608 branches)
 - Tests for each encode/decode pair with round-trip validation
 - Tests for parallel equivalence (n_jobs=1 vs n_jobs=2 produce identical results)
 - Tests for NaN handling in all paths
 - Tests for regularization (L1 soft threshold, L2 shrinkage)
-- No mocks - explicit fakes via `_test_hooks`
+- Tests for Rust adapter equivalence (Rust vs Python produce identical results)
+- Tests for native Rust training loop (train, predict_raw, predict_proba)
+- Tests for re-export layer identity (re-exported names are same objects)
+- No mocks - explicit fakes via hooks
 
 ## Scripts
 

@@ -157,5 +157,5 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture and [
 
 - Python 3.11+
 - numpy ^2.3.5
-- 100% test coverage enforced
+- 524 tests, 100% statement + branch coverage enforced
 - Strict mypy typing (disallow_any_expr = true)
