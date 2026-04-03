@@ -93,7 +93,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | 0x3F | sync | 3 | Heartbeat (no data) |
 | 0x41 | deactivation | 8 | `victim_id:u16 killer_id:u16 rank:u8 [2B] points:u16` |
 | 0x43 | container_fuel | 6 | `container_id:u16 fuel:u16` |
-| 0x45 | mine_detonate | var | `count:u8 positions:[(x:u8,y:u8)]` |
+| 0x45 | mine_detonate | var (tunneled in 0x2E) | `positions:[(x:u8,y:u8)]` |
 | 0x46 | radar_ack | 4 | `ack:u8 status:u8` |
 | 0x47 | movement | 17-37 | `tank_id:u16 x:u8 y:u8 dir:u8 flag:u8 fuel:u24 waypoints:str` |
 | 0x49 | item_pickup | 8 | `show:u8 armor:u7+flag dual:u7+flag missile:u7+flag homing:u7+flag radar:u7+flag` |
@@ -127,6 +127,7 @@ Container messages (0x2E) wrap various subtypes. After XOR decode, identified by
 | 11 | any | combat_hit | `[subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:7]` |
 | 13 | 0x24 | position_update | `[subtype:1] [flags:1] [tank_id:2 LE] [status_bytes:9]` |
 | 14 | any | tank_update_extended | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]` |
+| 3+ odd | 0x45 | mine_detonate | `[0x45:1] [positions:(x:u8,y:u8)*]` |
 | 15 | 0x4B | mine_place | `[0x4B:1] [mine_type:1] [tank_id:2 LE] [count:1] [positions:count*2]` |
 | 15 | other | tank_update_full | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]` |
 | 16-20 | any | tank_registry | `[subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]` |
@@ -401,6 +402,9 @@ separately; omission from one `0x5A` patch does not mean the tank is absent.
 **Mine note:** fresh enemy-mine reveal is currently proven through tunneled
 `0x2E -> 0x4F` radar results, while local mine placement is proven through
 tunneled `0x2E -> 0x4B` with owner `tank_id` plus a counted position list.
+Mine detonation is proven through tunneled `0x2E -> 0x45` with repeated
+coordinate pairs and no count byte. One shot can emit multiple `0x45` packets;
+for example, a full `3x3` wipe was observed as `1 + 8`, not a single `9`.
 
 ### 0x4A Terrain Update (FULLY DECODED)
 
@@ -614,11 +618,10 @@ container_x = 136 + 8 = 144 ✓ (matches known container at (144,143))
 [PositionUpdate] tank=638 pos=(3,3) flags=0x02 data=002e8708000404      <- RELATIVE
 ```
 
-**Key insight:** The viewport is FIXED (moves with arrow keys, not player).
-The player can be anywhere within the 16x16 actionable viewport. Radar
-reveals 1 extra tile beyond each edge (18x18 observable area). Move and
-pickup commands only work within the inner 16x16. The viewport recenters
-when the player walks to the edge (with a 1-tick delay).
+**Key insight:** The visible viewport is 16x16. Radar reveals 1 extra tile
+beyond each edge, giving an 18x18 radar envelope. Move and pickup commands
+work on visible edge tiles, and the viewport recenters when the player walks
+to those visible edges (with a 1-tick delay).
 
 **For self-tank absolute position, use:**
 1. First PositionUpdate message after join/teleport (has absolute coords)
