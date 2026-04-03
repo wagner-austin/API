@@ -6,25 +6,30 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from shutil import copyfile
 
 import scripts._test_hooks as _hooks
 from covenant_ml.datasets import TimeSeriesDatasetConfig
 from scripts._test_hooks import (
-    LightGBMOptimizationResult,
-    LSTMOptimizationResult,
-    MLPOptimizationResult,
-    XGBoostOptimizationResult,
+    LoadingProgressCallbackProtocol,
+    LoadingProgressInfo,
+    PhaseProgressCallbackProtocol,
+    TrialProgressCallbackProtocol,
+    UnifiedOptimizationResult,
 )
-from scripts.optimize.modes import run_single_with_progress
+from scripts.optimize._runners import run_single_with_progress
 
 from .conftest import (
+    make_fake_cleargbm_result,
     make_fake_lightgbm_result,
     make_fake_lstm_result,
     make_fake_mlp_result,
     make_fake_result,
 )
+
+ResultFactory = Callable[[], UnifiedOptimizationResult]
 
 
 class TestRealDatasetHooks:
@@ -134,28 +139,61 @@ class TestRealTimeseriesHooks:
         assert len(dataset["x"]) == len(dataset["y"])
 
 
+def _make_unified_fake_runner(
+    result_factory: ResultFactory,
+    loading_info: LoadingProgressInfo | None = None,
+) -> _hooks.OptimizationRunnerProtocol:
+    """Create a fake runner that optionally invokes the loading progress callback.
+
+    Args:
+        result_factory: Callable returning UnifiedOptimizationResult.
+        loading_info: Optional loading progress info to pass to callback.
+
+    Returns:
+        Fake runner matching OptimizationRunnerProtocol.
+    """
+
+    def fake_runner(
+        config_json: str,
+        external_dir: Path,
+        output_dir: Path,
+        progress_callback: TrialProgressCallbackProtocol | None = None,
+        phase_callback: PhaseProgressCallbackProtocol | None = None,
+        loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+    ) -> UnifiedOptimizationResult:
+        _ = config_json
+        _ = external_dir
+        _ = output_dir
+        _ = progress_callback
+        _ = phase_callback
+        if loading_progress_callback is not None and loading_info is not None:
+            loading_progress_callback(loading_info)
+        return result_factory()
+
+    return fake_runner
+
+
 class TestLoadingProgressCallbacks:
     """Tests for loading progress callback coverage in all backends.
 
-    These tests ensure the loading_progress_callback functions defined inside
-    _run_*_with_progress are exercised by having fake runners invoke them.
+    These tests ensure the loading_progress_callback is exercised
+    by having fake runners invoke it with the unified callback type.
     """
 
     def test_xgboost_loading_progress_callback_is_invoked(self) -> None:
         """Test XGBoost loading progress callback is called and formats correctly."""
-        loading_callback_calls: list[_hooks.XGBoostLoadingProgressInfo] = []
+        loading_callback_calls: list[LoadingProgressInfo] = []
 
         def fake_runner(
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            # Exercise the loading progress callback
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             if loading_progress_callback is not None:
-                info: _hooks.XGBoostLoadingProgressInfo = {
+                info: LoadingProgressInfo = {
                     "dataset": "taiwan",
                     "phase": "reading",
                     "percent_complete": 50.0,
@@ -167,8 +205,8 @@ class TestLoadingProgressCallbacks:
                 loading_callback_calls.append(info)
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "xgboost", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -179,23 +217,22 @@ class TestLoadingProgressCallbacks:
             assert loading_callback_calls[0]["phase"] == "reading"
             assert loading_callback_calls[0]["percent_complete"] == 50.0
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_mlp_loading_progress_callback_is_invoked(self) -> None:
         """Test MLP loading progress callback is called and formats correctly."""
-        loading_callback_calls: list[_hooks.MLPLoadingProgressInfo] = []
+        loading_callback_calls: list[LoadingProgressInfo] = []
 
         def fake_runner(
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.MLPTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.MLPPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.MLPLoadingProgressCallbackProtocol | None = None,
-        ) -> MLPOptimizationResult:
-            # Exercise the loading progress callback
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             if loading_progress_callback is not None:
-                info: _hooks.MLPLoadingProgressInfo = {
+                info: LoadingProgressInfo = {
                     "dataset": "taiwan",
                     "phase": "parsing",
                     "percent_complete": 75.0,
@@ -207,8 +244,8 @@ class TestLoadingProgressCallbacks:
                 loading_callback_calls.append(info)
             return make_fake_mlp_result()
 
-        original = _hooks.mlp_runner
-        _hooks.mlp_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "mlp", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -219,23 +256,22 @@ class TestLoadingProgressCallbacks:
             assert loading_callback_calls[0]["phase"] == "parsing"
             assert loading_callback_calls[0]["percent_complete"] == 75.0
         finally:
-            _hooks.mlp_runner = original
+            _hooks.optimization_runner = original
 
     def test_lightgbm_loading_progress_callback_is_invoked(self) -> None:
-        """Test LightGBM loading progress callback is called and formats correctly."""
-        loading_callback_calls: list[_hooks.LightGBMLoadingProgressInfo] = []
+        """Test LightGBM loading progress callback is called."""
+        loading_callback_calls: list[LoadingProgressInfo] = []
 
         def fake_runner(
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> LightGBMOptimizationResult:
-            # Exercise the loading progress callback
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             if loading_progress_callback is not None:
-                info: _hooks.LightGBMLoadingProgressInfo = {
+                info: LoadingProgressInfo = {
                     "dataset": "taiwan",
                     "phase": "encoding",
                     "percent_complete": 100.0,
@@ -247,8 +283,8 @@ class TestLoadingProgressCallbacks:
                 loading_callback_calls.append(info)
             return make_fake_lightgbm_result()
 
-        original = _hooks.lightgbm_runner
-        _hooks.lightgbm_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "lightgbm", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -259,23 +295,22 @@ class TestLoadingProgressCallbacks:
             assert loading_callback_calls[0]["phase"] == "encoding"
             assert loading_callback_calls[0]["percent_complete"] == 100.0
         finally:
-            _hooks.lightgbm_runner = original
+            _hooks.optimization_runner = original
 
     def test_lstm_loading_progress_callback_is_invoked(self) -> None:
-        """Test LSTM loading progress callback is called and formats correctly."""
-        loading_callback_calls: list[_hooks.LSTMLoadingProgressInfo] = []
+        """Test LSTM loading progress callback is called."""
+        loading_callback_calls: list[LoadingProgressInfo] = []
 
         def fake_runner(
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.LSTMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LSTMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LSTMLoadingProgressCallbackProtocol | None = None,
-        ) -> LSTMOptimizationResult:
-            # Exercise the loading progress callback
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             if loading_progress_callback is not None:
-                info: _hooks.LSTMLoadingProgressInfo = {
+                info: LoadingProgressInfo = {
                     "dataset": "taiwan",
                     "phase": "reading",
                     "percent_complete": 25.0,
@@ -287,8 +322,8 @@ class TestLoadingProgressCallbacks:
                 loading_callback_calls.append(info)
             return make_fake_lstm_result()
 
-        original = _hooks.lstm_runner
-        _hooks.lstm_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "lstm", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -299,4 +334,42 @@ class TestLoadingProgressCallbacks:
             assert loading_callback_calls[0]["phase"] == "reading"
             assert loading_callback_calls[0]["percent_complete"] == 25.0
         finally:
-            _hooks.lstm_runner = original
+            _hooks.optimization_runner = original
+
+    def test_cleargbm_loading_progress_callback_is_invoked(self) -> None:
+        """Test ClearGBM loading progress callback is called."""
+        loading_callback_calls: list[LoadingProgressInfo] = []
+
+        def fake_runner(
+            config_json: str,
+            external_dir: Path,
+            output_dir: Path,
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
+            if loading_progress_callback is not None:
+                info: LoadingProgressInfo = {
+                    "dataset": "taiwan",
+                    "phase": "reading",
+                    "percent_complete": 100.0,
+                    "rows_processed": 1000,
+                    "rows_total": 1000,
+                    "message": "Loaded 1000 rows",
+                }
+                loading_progress_callback(info)
+                loading_callback_calls.append(info)
+            return make_fake_cleargbm_result()
+
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
+        try:
+            result = run_single_with_progress(
+                "cleargbm", "taiwan", 5, "full", "cpu", None, save_model=False
+            )
+            assert result["backend"] == "cleargbm"
+            assert len(loading_callback_calls) == 1
+            assert loading_callback_calls[0]["dataset"] == "taiwan"
+            assert loading_callback_calls[0]["percent_complete"] == 100.0
+        finally:
+            _hooks.optimization_runner = original
