@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 from covenant_domain import Deal, DealId, Measurement
@@ -16,12 +17,23 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     require_bool,
     require_float,
+    require_int,
+    require_list,
     require_str,
 )
 
 from covenant_radar_api.api.routes.ml import build_router
+from covenant_radar_api.worker import _regression_hooks as regression_hooks
 
 from .conftest import ContainerAndStore
+
+
+class _XGBRegressorProto(Protocol):
+    """Protocol for XGBRegressor interface used in test helpers."""
+
+    def fit(self, x: NDArray[np.float64], y: NDArray[np.float64]) -> _XGBRegressorProto: ...
+
+    def save_model(self, fname: str) -> None: ...
 
 
 def _create_test_client(cas: ContainerAndStore) -> TestClient:
@@ -419,11 +431,114 @@ class TestTrainExternalEndpoint:
         assert response.status_code == 500
 
 
+class TestTrainExternalRegressionEndpoint:
+    """Tests for POST /ml/train-external-regression."""
+
+    def test_enqueues_regression_train_job(self, container_with_store: ContainerAndStore) -> None:
+        """Regression train-external job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "learning_rate": 0.1,
+                "max_depth": 3,
+                "n_estimators": 10,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "random_state": 42
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
+
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_external_regression_train_job" in enqueued.func
+
+    def test_lightgbm_reg_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
+        """LightGBM regressor training job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "lightgbm_reg",
+                "device": "cpu",
+                "learning_rate": 0.05,
+                "max_depth": 5,
+                "n_estimators": 100,
+                "num_leaves": 31,
+                "min_child_samples": 20,
+                "subsample": 0.8,
+                "colsample_bytree": 0.8,
+                "random_state": 42
+            }""",
+        )
+
+        assert response.status_code == 202
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_external_regression_train_job" in enqueued.func
+
+    def test_passes_raw_json_to_worker(self, container_with_store: ContainerAndStore) -> None:
+        """Raw JSON is forwarded to the worker job."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=(
+                b'{"dataset":"financial_distress","learning_rate":0.2,'
+                b'"max_depth":4,"n_estimators":50,"subsample":0.9,'
+                b'"colsample_bytree":0.9,"random_state":99}'
+            ),
+        )
+
+        assert response.status_code == 202
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "financial_distress" in str(enqueued.args[0])
+
+    def test_invalid_dataset_returns_500(self, container_with_store: ContainerAndStore) -> None:
+        """Invalid regression dataset triggers edge validation error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=(
+                b'{"dataset":"nonexistent","learning_rate":0.1,'
+                b'"max_depth":3,"n_estimators":10,"subsample":0.8,'
+                b'"colsample_bytree":0.8,"random_state":42}'
+            ),
+        )
+        assert response.status_code == 500
+
+    def test_invalid_backend_returns_500(self, container_with_store: ContainerAndStore) -> None:
+        """Invalid regressor backend triggers edge validation error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=(
+                b'{"dataset":"financial_distress","backend":"xgboost",'
+                b'"learning_rate":0.1,"max_depth":3,"n_estimators":10,'
+                b'"subsample":0.8,"colsample_bytree":0.8,"random_state":42}'
+            ),
+        )
+        assert response.status_code == 500
+
+    def test_non_object_json_returns_500(self, container_with_store: ContainerAndStore) -> None:
+        """Non-object JSON triggers JSONTypeError edge validation."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/train-external-regression",
+            content=b'"just a string"',
+        )
+        assert response.status_code == 500
+
+
 class TestOptimizeEndpoint:
     """Tests for POST /ml/optimize."""
 
     def test_optimize_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
-        """Test optimization job is enqueued."""
+        """Test optimization job is enqueued with unified worker."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/optimize",
@@ -438,12 +553,12 @@ class TestOptimizeEndpoint:
         assert require_str(data, "status") == "queued"
         assert require_str(data, "job_id") == "test-job-id"
 
-        # Verify job was enqueued with correct function
+        # Verify job was enqueued with unified function
         enqueued = container_with_store.queue.jobs[-1]
-        assert "process_xgboost_optimize_job" in enqueued.func
+        assert "process_optimize_job" in enqueued.func
 
     def test_optimize_with_all_options(self, container_with_store: ContainerAndStore) -> None:
-        """Test optimization with all options specified."""
+        """Test optimization with all common options specified."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/optimize",
@@ -452,7 +567,6 @@ class TestOptimizeEndpoint:
                 "n_trials": 100,
                 "timeout_seconds": 3600,
                 "device": "cuda",
-                "space_profile": "categorical",
                 "feature_preset": "log_only",
                 "random_state": 123
             }""",
@@ -462,7 +576,7 @@ class TestOptimizeEndpoint:
         data = narrow_json_to_dict(load_json_str(response.text))
         assert require_str(data, "status") == "queued"
 
-        # Verify job payload
+        # Verify raw JSON body is forwarded to worker
         enqueued = container_with_store.queue.jobs[-1]
         config_str = str(enqueued.args[0])
         assert "us" in config_str
@@ -526,10 +640,10 @@ class TestOptimizeEndpoint:
         # AppError is unhandled in these route tests, so FastAPI returns 500
         assert response.status_code == 500
 
-    def test_optimize_mlp_backend_enqueues_correct_job(
+    def test_optimize_mlp_backend_enqueues_unified_job(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test MLP optimization enqueues correct worker job."""
+        """Test MLP optimization enqueues unified worker job with raw JSON."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/optimize",
@@ -538,9 +652,7 @@ class TestOptimizeEndpoint:
                 "backend": "mlp",
                 "n_trials": 50,
                 "precision": "fp16",
-                "optimizer": "adam",
-                "n_epochs": 100,
-                "early_stopping_patience": 15
+                "optimizer": "adam"
             }""",
         )
 
@@ -548,20 +660,19 @@ class TestOptimizeEndpoint:
         data = narrow_json_to_dict(load_json_str(response.text))
         assert require_str(data, "status") == "queued"
 
-        # Verify MLP job was enqueued
+        # Verify unified job was enqueued
         enqueued = container_with_store.queue.jobs[-1]
-        assert "process_mlp_optimize_job" in enqueued.func
+        assert "process_optimize_job" in enqueued.func
 
-        # Verify payload contains MLP-specific fields
+        # Verify raw JSON body is forwarded (backend-specific fields included)
         config_str = str(enqueued.args[0])
-        assert '"precision":"fp16"' in config_str
-        assert '"optimizer":"adam"' in config_str
-        assert '"n_epochs":100' in config_str
+        assert "mlp" in config_str
+        assert "fp16" in config_str
 
-    def test_optimize_lightgbm_backend_enqueues_correct_job(
+    def test_optimize_lightgbm_backend_enqueues_unified_job(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test LightGBM optimization enqueues correct worker job."""
+        """Test LightGBM optimization enqueues unified worker job."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/optimize",
@@ -569,192 +680,199 @@ class TestOptimizeEndpoint:
                 "dataset": "polish",
                 "backend": "lightgbm",
                 "n_trials": 30,
-                "early_stopping_rounds": 20,
                 "device": "cuda"
             }""",
         )
 
         assert response.status_code == 202
-        data = narrow_json_to_dict(load_json_str(response.text))
-        assert require_str(data, "status") == "queued"
 
-        # Verify LightGBM job was enqueued
+        # Verify unified job was enqueued
         enqueued = container_with_store.queue.jobs[-1]
-        assert "process_lightgbm_optimize_job" in enqueued.func
+        assert "process_optimize_job" in enqueued.func
 
-        # Verify payload contains LightGBM-specific fields
-        config_str = str(enqueued.args[0])
-        assert '"early_stopping_rounds":20' in config_str
-        assert '"device":"cuda"' in config_str
-
-    def test_optimize_lstm_backend_enqueues_correct_job(
+    def test_optimize_lstm_backend_enqueues_unified_job(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test LSTM optimization enqueues correct worker job."""
+        """Test LSTM optimization enqueues unified worker job."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/optimize",
             content=b"""{
                 "dataset": "us",
                 "backend": "lstm",
-                "n_trials": 25,
-                "precision": "bf16",
-                "n_epochs": 75,
-                "early_stopping_patience": 8,
-                "sequence_length": 10,
-                "bidirectional": true
+                "n_trials": 25
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify unified job was enqueued
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_optimize_job" in enqueued.func
+
+    def test_optimize_all_backends_enqueue_unified_job(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test all 7 backends enqueue the same unified worker job."""
+        client = _create_test_client(container_with_store)
+        backends = [
+            "xgboost",
+            "mlp",
+            "lstm",
+            "lightgbm",
+            "cleargbm",
+            "logreg",
+            "random_forest",
+        ]
+        for backend in backends:
+            body = f'{{"dataset": "taiwan", "backend": "{backend}", "n_trials": 10}}'.encode()
+            response = client.post("/ml/optimize", content=body)
+            assert response.status_code == 202
+
+            enqueued = container_with_store.queue.jobs[-1]
+            assert "process_optimize_job" in enqueued.func
+
+    def test_optimize_forwards_raw_json_body(self, container_with_store: ContainerAndStore) -> None:
+        """Test raw JSON body is forwarded to worker unchanged."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize",
+            content=b"""{
+                "dataset": "taiwan",
+                "backend": "mlp",
+                "n_trials": 50,
+                "timeout_seconds": 3600,
+                "precision": "fp16",
+                "optimizer": "adam",
+                "n_epochs": 100
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        # Verify raw body is forwarded (worker parses backend-specific fields)
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert "taiwan" in config_str
+        assert "mlp" in config_str
+        assert "fp16" in config_str
+        assert "3600" in config_str
+
+
+class TestOptimizeRegressionEndpoint:
+    """Tests for POST /ml/optimize-regression."""
+
+    def test_optimize_regression_enqueues_job(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Test regression optimization job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "n_trials": 50
             }""",
         )
 
         assert response.status_code == 202
         data = narrow_json_to_dict(load_json_str(response.text))
         assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
 
-        # Verify LSTM job was enqueued
         enqueued = container_with_store.queue.jobs[-1]
-        assert "process_lstm_optimize_job" in enqueued.func
+        assert "process_regression_optimize_job" in enqueued.func
 
-        # Verify payload contains LSTM-specific fields
-        config_str = str(enqueued.args[0])
-        assert '"precision":"bf16"' in config_str
-        assert '"sequence_length":10' in config_str
-        assert '"bidirectional":true' in config_str
-
-    def test_optimize_mlp_backend_with_defaults(
+    def test_optimize_regression_with_all_options(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test MLP optimization with default values."""
+        """Test regression optimization with all common options."""
         client = _create_test_client(container_with_store)
         response = client.post(
-            "/ml/optimize",
+            "/ml/optimize-regression",
             content=b"""{
-                "dataset": "taiwan",
-                "backend": "mlp",
+                "dataset": "financial_distress",
+                "backend": "lightgbm_reg",
+                "n_trials": 100,
+                "timeout_seconds": 3600,
+                "device": "cuda",
+                "feature_preset": "log_only",
+                "random_state": 123
+            }""",
+        )
+
+        assert response.status_code == 202
+
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert "financial_distress" in config_str
+        assert "lightgbm_reg" in config_str
+        assert "cuda" in config_str
+
+    def test_optimize_regression_invalid_dataset_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid regression dataset triggers error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize-regression",
+            content=b"""{
+                "dataset": "invalid",
                 "n_trials": 50
             }""",
         )
+        assert response.status_code == 500
 
-        assert response.status_code == 202
-
-        # Verify default values in payload
-        enqueued = container_with_store.queue.jobs[-1]
-        config_str = str(enqueued.args[0])
-        assert '"precision":"fp32"' in config_str
-        assert '"optimizer":"adamw"' in config_str
-        assert '"n_epochs":50' in config_str
-        assert '"early_stopping_patience":10' in config_str
-
-    def test_optimize_lightgbm_backend_with_defaults(
+    def test_optimize_regression_missing_n_trials_returns_500(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test LightGBM optimization with default values."""
+        """Missing n_trials triggers JSONTypeError."""
         client = _create_test_client(container_with_store)
         response = client.post(
-            "/ml/optimize",
+            "/ml/optimize-regression",
             content=b"""{
-                "dataset": "taiwan",
-                "backend": "lightgbm",
+                "dataset": "financial_distress"
+            }""",
+        )
+        assert response.status_code == 500
+
+    def test_optimize_regression_invalid_backend_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid regressor backend triggers error."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/optimize-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "xgboost",
                 "n_trials": 50
             }""",
         )
+        assert response.status_code == 500
 
-        assert response.status_code == 202
-
-        # Verify default values in payload
-        enqueued = container_with_store.queue.jobs[-1]
-        config_str = str(enqueued.args[0])
-        assert '"early_stopping_rounds":10' in config_str
-        assert '"device":"auto"' in config_str
-
-    def test_optimize_lstm_backend_with_defaults(
+    def test_optimize_regression_forwards_raw_json_body(
         self, container_with_store: ContainerAndStore
     ) -> None:
-        """Test LSTM optimization with default values."""
+        """Raw JSON body is forwarded to regression worker."""
         client = _create_test_client(container_with_store)
         response = client.post(
-            "/ml/optimize",
+            "/ml/optimize-regression",
             content=b"""{
-                "dataset": "taiwan",
-                "backend": "lstm",
-                "n_trials": 50
-            }""",
-        )
-
-        assert response.status_code == 202
-
-        # Verify default values in payload
-        enqueued = container_with_store.queue.jobs[-1]
-        config_str = str(enqueued.args[0])
-        assert '"precision":"fp32"' in config_str
-        assert '"n_epochs":50' in config_str
-        assert '"sequence_length":5' in config_str
-        assert '"bidirectional":false' in config_str
-
-    def test_optimize_mlp_backend_with_timeout(
-        self, container_with_store: ContainerAndStore
-    ) -> None:
-        """Test MLP optimization with timeout specified."""
-        client = _create_test_client(container_with_store)
-        response = client.post(
-            "/ml/optimize",
-            content=b"""{
-                "dataset": "taiwan",
-                "backend": "mlp",
+                "dataset": "financial_distress",
+                "backend": "xgboost_reg",
                 "n_trials": 50,
-                "timeout_seconds": 3600
+                "early_stopping_rounds": 20,
+                "n_jobs": 4
             }""",
         )
 
         assert response.status_code == 202
 
-        # Verify timeout in payload
         enqueued = container_with_store.queue.jobs[-1]
         config_str = str(enqueued.args[0])
-        assert '"timeout_seconds":3600' in config_str
-
-    def test_optimize_lightgbm_backend_with_timeout(
-        self, container_with_store: ContainerAndStore
-    ) -> None:
-        """Test LightGBM optimization with timeout specified."""
-        client = _create_test_client(container_with_store)
-        response = client.post(
-            "/ml/optimize",
-            content=b"""{
-                "dataset": "taiwan",
-                "backend": "lightgbm",
-                "n_trials": 50,
-                "timeout_seconds": 1800
-            }""",
-        )
-
-        assert response.status_code == 202
-
-        # Verify timeout in payload
-        enqueued = container_with_store.queue.jobs[-1]
-        config_str = str(enqueued.args[0])
-        assert '"timeout_seconds":1800' in config_str
-
-    def test_optimize_lstm_backend_with_timeout(
-        self, container_with_store: ContainerAndStore
-    ) -> None:
-        """Test LSTM optimization with timeout specified."""
-        client = _create_test_client(container_with_store)
-        response = client.post(
-            "/ml/optimize",
-            content=b"""{
-                "dataset": "taiwan",
-                "backend": "lstm",
-                "n_trials": 50,
-                "timeout_seconds": 7200
-            }""",
-        )
-
-        assert response.status_code == 202
-
-        # Verify timeout in payload
-        enqueued = container_with_store.queue.jobs[-1]
-        config_str = str(enqueued.args[0])
-        assert '"timeout_seconds":7200' in config_str
+        assert "financial_distress" in config_str
+        assert "xgboost_reg" in config_str
 
 
 class TestExplainEndpoint:
@@ -886,4 +1004,225 @@ class TestExplainEndpoint:
             content=b"[]",
         )
         # AppError is unhandled in these route tests, so FastAPI returns 500
+        assert response.status_code == 500
+
+
+# =============================================================================
+# Predict Regression Endpoint
+# =============================================================================
+
+
+def _create_and_save_xgb_regressor(model_path: Path) -> None:
+    """Create and save a real XGBoost regressor model for testing.
+
+    Args:
+        model_path: Path to save the model (.ubj format).
+    """
+    xgb_mod = __import__("xgboost")
+    regressor: _XGBRegressorProto = xgb_mod.XGBRegressor(
+        n_estimators=10, max_depth=3, learning_rate=0.3, random_state=42
+    )
+
+    x_train: NDArray[np.float64] = np.arange(1.0, 13.0, dtype=np.float64).reshape(4, 3)
+    y_train: NDArray[np.float64] = np.arange(1.5, 5.5, 1.0, dtype=np.float64)
+
+    regressor.fit(x_train, y_train)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    regressor.save_model(str(model_path))
+
+
+class TestPredictRegressionEndpoint:
+    """Tests for POST /ml/predict-regression."""
+
+    def setup_method(self) -> None:
+        """Save original regression hooks."""
+        self._orig_regressor_registry = regression_hooks.regressor_registry_factory
+
+    def teardown_method(self) -> None:
+        """Restore original regression hooks."""
+        regression_hooks.regressor_registry_factory = self._orig_regressor_registry
+
+    def test_predict_regression_returns_predictions(
+        self, container_with_store: ContainerAndStore, tmp_path: Path
+    ) -> None:
+        """Predict-regression returns predicted continuous values."""
+        model_path = tmp_path / "model.ubj"
+        _create_and_save_xgb_regressor(model_path)
+
+        client = _create_test_client(container_with_store)
+        body = (
+            '{"backend": "xgboost_reg",'
+            f' "model_path": "{model_path.as_posix()}",'
+            ' "features": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]}'
+        )
+        response = client.post(
+            "/ml/predict-regression",
+            content=body.encode(),
+        )
+
+        assert response.status_code == 200
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "backend") == "xgboost_reg"
+        assert require_int(data, "n_samples") == 2
+        preds = require_list(data, "predictions")
+        assert len(preds) == 2
+        assert all(require_float({"v": v}, "v") > -1e10 for v in preds)
+
+    def test_predict_regression_invalid_backend_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid backend triggers ValueError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/predict-regression",
+            content=b'{"backend": "invalid", "model_path": "/tmp/m.ubj", "features": [[1.0]]}',
+        )
+        assert response.status_code == 500
+
+    def test_predict_regression_missing_features_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Missing features field triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/predict-regression",
+            content=b'{"backend": "xgboost_reg", "model_path": "/tmp/m.ubj"}',
+        )
+        assert response.status_code == 500
+
+    def test_predict_regression_empty_features_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Empty features list triggers JSONTypeError in decoder."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/predict-regression",
+            content=b'{"backend": "xgboost_reg", "model_path": "/tmp/m.ubj", "features": []}',
+        )
+        assert response.status_code == 500
+
+    def test_predict_regression_non_object_json_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Non-object JSON triggers JSONTypeError."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/predict-regression",
+            content=b'"just a string"',
+        )
+        assert response.status_code == 500
+
+
+# =============================================================================
+# Explain Regression Endpoint
+# =============================================================================
+
+
+class TestExplainRegressionEndpoint:
+    """Tests for POST /ml/explain-regression."""
+
+    def test_explain_regression_enqueues_job(self, container_with_store: ContainerAndStore) -> None:
+        """Regression explanation job is enqueued."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "xgboost_reg",
+                "model_path": "/models/xgb_reg.ubj",
+                "explainer": "permutation"
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+        assert require_str(data, "job_id") == "test-job-id"
+
+        enqueued = container_with_store.queue.jobs[-1]
+        assert "process_regression_explain_job" in enqueued.func
+
+    def test_explain_regression_with_all_options(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Regression explanation with all options specified."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "lightgbm_reg",
+                "model_path": "/models/lgbm_reg.txt",
+                "explainer": "shap_tree",
+                "n_samples": 500,
+                "random_state": 123
+            }""",
+        )
+
+        assert response.status_code == 202
+        data = narrow_json_to_dict(load_json_str(response.text))
+        assert require_str(data, "status") == "queued"
+
+        enqueued = container_with_store.queue.jobs[-1]
+        config_str = str(enqueued.args[0])
+        assert "financial_distress" in config_str
+        assert "lightgbm_reg" in config_str
+        assert "shap_tree" in config_str
+
+    def test_explain_regression_invalid_backend_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid backend triggers error at API edge."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "invalid",
+                "model_path": "/m",
+                "explainer": "permutation"
+            }""",
+        )
+        assert response.status_code == 500
+
+    def test_explain_regression_invalid_explainer_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Invalid explainer triggers JSONTypeError at API edge."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "xgboost_reg",
+                "model_path": "/m",
+                "explainer": "invalid"
+            }""",
+        )
+        assert response.status_code == 500
+
+    def test_explain_regression_missing_explainer_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Missing explainer triggers JSONTypeError at API edge."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"""{
+                "dataset": "financial_distress",
+                "backend": "xgboost_reg",
+                "model_path": "/m"
+            }""",
+        )
+        assert response.status_code == 500
+
+    def test_explain_regression_non_object_json_returns_500(
+        self, container_with_store: ContainerAndStore
+    ) -> None:
+        """Non-object JSON triggers error at API edge."""
+        client = _create_test_client(container_with_store)
+        response = client.post(
+            "/ml/explain-regression",
+            content=b"[]",
+        )
         assert response.status_code == 500
