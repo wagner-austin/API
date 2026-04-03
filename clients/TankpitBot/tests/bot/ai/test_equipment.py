@@ -12,11 +12,13 @@ from tankpit_bot.bot.ai.equipment import (
     is_reachable,
 )
 from tankpit_bot.state.types import (
+    MineStateDict,
     SelfStateDict,
     ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_self_state,
+    viewport_scan_key,
 )
 from tests.fakes import FakeTerrainMap
 
@@ -38,6 +40,7 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
         mines={},
         terrain={},
         viewport=ViewportStateDict(left=x - 9, top=y - 9, width=18, height=18),
+        scanned_viewports={viewport_scan_key(x - 9, y - 9): 100000},
         timestamp_ms=0,
     )
     state = make_self_state(
@@ -76,6 +79,21 @@ class TestIsReachable:
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain = FakeTerrainMap(terrain_data=wall)
         assert is_reachable(terrain, 10, 10, 15, 10) is False
+
+    def test_blocked_by_mines(self) -> None:
+        """Returns False when known mines block the only route."""
+        terrain = FakeTerrainMap()
+        blocked_mines: dict[str, MineStateDict] = {
+            f"12,{y}": {
+                "x": 12,
+                "y": y,
+                "mine_type": 0,
+                "tank_id": -1,
+                "team": 1,
+            }
+            for y in range(256)
+        }
+        assert is_reachable(terrain, 10, 10, 15, 10, blocked_mines) is False
 
 
 class TestFindTeleportLandingTile:
@@ -119,6 +137,23 @@ class TestFindTeleportLandingTile:
         result = find_teleport_landing_tile(terrain, 10, 10, 0, 0)
 
         assert result == (1, 0)
+
+    def test_skips_mined_adjacent_tiles(self) -> None:
+        """Known mines are excluded from teleport landing candidates."""
+        terrain = FakeTerrainMap()
+        blocked_mines: dict[str, MineStateDict] = {
+            "129,126": {
+                "x": 129,
+                "y": 126,
+                "mine_type": 0,
+                "tank_id": -1,
+                "team": 1,
+            }
+        }
+
+        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126, blocked_mines)
+
+        assert result == (128, 125)
 
 
 # =============================================================================
@@ -309,6 +344,20 @@ class TestFindNearestFuel:
         )
         world["containers"]["101,100"] = old
         assert find_nearest_fuel(world, state, now_ms=0) == old
+
+    def test_unscanned_viewport_does_not_change_raw_fuel_selection(self) -> None:
+        """find_nearest_fuel stays a pure viewport selector without radar policy."""
+        world, state = _world_and_self()
+        world["scanned_viewports"] = {}
+        expected = make_container_state(
+            x=101,
+            y=100,
+            is_fuel=True,
+            volume=500,
+        )
+        world["containers"]["101,100"] = expected
+
+        assert find_nearest_fuel(world, state) == expected
 
 
 # =============================================================================
@@ -635,6 +684,30 @@ class TestDescribeContainerSearch:
         assert result == (
             "equipment: total=1 nearby=1 actionable=0 blocked=0 "
             "no_landing=0 low_volume=0 nearest=(101,100) failed_pickup"
+        )
+
+    def test_reports_unconfirmed_viewport_when_radar_has_not_scanned_here(self) -> None:
+        """Summary explains that current viewport containers are not radar-confirmed."""
+        world, state = _world_and_self()
+        world["scanned_viewports"] = {}
+        world["containers"]["101,100"] = make_container_state(
+            x=101,
+            y=100,
+            is_fuel=False,
+            volume=0,
+        )
+
+        result = describe_container_search(
+            world,
+            state,
+            None,
+            want_fuel=False,
+            allow_unreachable=True,
+        )
+
+        assert result == (
+            "equipment: total=1 nearby=1 actionable=0 blocked=0 "
+            "no_landing=0 low_volume=0 nearest=(101,100) unconfirmed_viewport"
         )
 
     def test_with_terrain_skips_unreachable(self) -> None:
