@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from tankpit_bot.bot.types import (
     MoveCommandDict,
-    PickupMoveCommandDict,
+    PickupEquipmentCommandDict,
+    PickupFuelCommandDict,
     RadarCommandDict,
     ShootCommandDict,
     TeleportCommandDict,
@@ -16,7 +17,8 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.protocol.commands import (
     CMD_RADAR,
     build_move_command,
-    build_pickup_command,
+    build_pickup_equipment_command,
+    build_pickup_fuel_command,
     build_query_command,
     build_shoot_command,
     build_teleport_command,
@@ -35,16 +37,28 @@ def encode_move_command(command: MoveCommandDict) -> bytes:
     return build_move_command(command["target_x"], command["target_y"])
 
 
-def encode_pickup_move_command(command: PickupMoveCommandDict) -> bytes:
-    """Encode a pickup move command to wire-format bytes.
+def encode_pickup_fuel_command(command: PickupFuelCommandDict) -> bytes:
+    """Encode a fuel pickup command to wire-format bytes.
 
     Args:
-        command: The pickup move command to encode.
+        command: The fuel pickup command to encode.
 
     Returns:
         Framed command bytes ready to send via WebSocket.
     """
-    return build_pickup_command(command["target_x"], command["target_y"])
+    return build_pickup_fuel_command(command["target_x"], command["target_y"])
+
+
+def encode_pickup_equipment_command(command: PickupEquipmentCommandDict) -> bytes:
+    """Encode an equipment pickup command to wire-format bytes.
+
+    Args:
+        command: The equipment pickup command to encode.
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    return build_pickup_equipment_command(command["target_x"], command["target_y"])
 
 
 def encode_shoot_command(command: ShootCommandDict) -> bytes:
@@ -86,7 +100,8 @@ def encode_teleport_command(command: TeleportCommandDict) -> bytes:
 
 __all__ = [
     "encode_move_command",
-    "encode_pickup_move_command",
+    "encode_pickup_equipment_command",
+    "encode_pickup_fuel_command",
     "encode_radar_command",
     "encode_shoot_command",
     "encode_teleport_command",
