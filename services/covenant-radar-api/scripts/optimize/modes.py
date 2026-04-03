@@ -1,7 +1,6 @@
 """Run modes for optimization: single, preset comparison, multi-dataset, and multi-backend.
 
-Supports all backends (XGBoost, MLP, LightGBM, LSTM) with backend-specific
-progress display and history tracking.
+Supports all 7 backends with unified progress display and history tracking.
 
 Strict typing only: no Any, no casts, no type: ignore, no stubs.
 """
@@ -19,11 +18,7 @@ from platform_core.logging import (
 )
 
 from scripts.optimize._runners import (
-    _run_cleargbm_with_progress,
-    _run_lightgbm_with_progress,
-    _run_lstm_with_progress,
-    _run_mlp_with_progress,
-    _run_xgboost_with_progress,
+    _run_backend_with_progress,
     run_single_with_progress,
 )
 from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName, FeaturePreset
@@ -49,13 +44,13 @@ def compare_presets(
     """Run all presets for all backends and compare AUC performance.
 
     Args:
-        backends: Tuple of backends to use (xgboost, mlp, lightgbm, lstm, cleargbm).
-        dataset (DatasetName): Dataset to optimize on (taiwan, us, polish).
-        n_trials (int): Number of Optuna trials per preset.
-        device (str): Device for training (cuda/cpu/auto).
-        timeout (int | None): Optional timeout in seconds per preset, or None.
-        save_model (bool): If True, save the best model for each preset if it improves.
-        project_root (Path | None): Project root directory. If None, uses default.
+        backends: Tuple of backends to use.
+        dataset: Dataset to optimize on (taiwan, us, polish).
+        n_trials: Number of Optuna trials per preset.
+        device: Device for training (cuda/cpu/auto).
+        timeout: Optional timeout in seconds per preset, or None.
+        save_model: If True, save the best model for each preset if it improves.
+        project_root: Project root directory. If None, uses default.
     """
     if project_root is None:
         project_root = get_project_root()
@@ -97,27 +92,16 @@ def compare_presets(
                 )
                 progress.update(task, description=desc)
 
-                if backend == "xgboost":
-                    result, elapsed, _ = _run_xgboost_with_progress(
-                        dataset, n_trials, preset, device, timeout, history, progress
-                    )
-                elif backend == "mlp":
-                    result, elapsed, _ = _run_mlp_with_progress(
-                        dataset, n_trials, preset, device, timeout, history, progress
-                    )
-                elif backend == "lightgbm":
-                    result, elapsed, _ = _run_lightgbm_with_progress(
-                        dataset, n_trials, preset, device, timeout, history, progress
-                    )
-                elif backend == "lstm":
-                    result, elapsed, _ = _run_lstm_with_progress(
-                        dataset, n_trials, preset, device, timeout, history, progress
-                    )
-                else:
-                    # backend must be "cleargbm" here
-                    result, elapsed, _ = _run_cleargbm_with_progress(
-                        dataset, n_trials, preset, device, timeout, history, progress
-                    )
+                result, elapsed, _ = _run_backend_with_progress(
+                    backend,
+                    dataset,
+                    n_trials,
+                    preset,
+                    device,
+                    timeout,
+                    history,
+                    progress,
+                )
 
                 # Save best model for this preset if requested
                 if save_model:
@@ -132,7 +116,7 @@ def compare_presets(
                     (
                         backend,
                         preset,
-                        result["best_val_auc"],
+                        result["best_value"],
                         result["n_features"],
                         elapsed,
                     )
@@ -148,8 +132,7 @@ def _print_preset_comparison_summary(
     """Print the preset comparison summary table.
 
     Args:
-        results (list[tuple[FeaturePreset, float, int, float]]): List of
-            (preset, auc, n_features, elapsed_seconds) tuples.
+        results: List of (preset, auc, n_features, elapsed_seconds) tuples.
     """
     console = get_rich_console()
 
@@ -273,12 +256,12 @@ def run_all_datasets(
     """Run optimization on all three datasets (taiwan, us, polish).
 
     Args:
-        backend (BackendName): Backend to use (xgboost, mlp, lightgbm, lstm).
-        n_trials (int): Number of Optuna trials per dataset.
-        feature_preset (FeaturePreset): Feature engineering preset.
-        device (str): Device for training (cuda/cpu/auto).
-        timeout (int | None): Optional timeout in seconds per dataset, or None.
-        save_model (bool): If True, save the best model for each dataset if it improves.
+        backend: Backend to use.
+        n_trials: Number of Optuna trials per dataset.
+        feature_preset: Feature engineering preset.
+        device: Device for training (cuda/cpu/auto).
+        timeout: Optional timeout in seconds per dataset, or None.
+        save_model: If True, save the best model for each dataset if it improves.
     """
     console = get_rich_console()
     datasets: list[DatasetName] = ["taiwan", "us", "polish"]
@@ -322,10 +305,10 @@ def _print_multi_dataset_config(
     """Print multi-dataset configuration panel.
 
     Args:
-        backend (BackendName): Backend being used (xgboost, mlp, lightgbm, lstm).
-        n_trials (int): Number of Optuna trials per dataset.
-        feature_preset (FeaturePreset): Feature engineering preset.
-        device (str): Device for training (cuda/cpu/auto).
+        backend: Backend being used.
+        n_trials: Number of Optuna trials per dataset.
+        feature_preset: Feature engineering preset.
+        device: Device for training (cuda/cpu/auto).
     """
     console = get_rich_console()
 
@@ -380,8 +363,7 @@ def _print_multi_dataset_summary(
     """Print final multi-dataset summary table.
 
     Args:
-        all_results (list[tuple[DatasetName, RunResult]]): List of
-            (dataset_name, run_result) tuples from each dataset run.
+        all_results: List of (dataset_name, run_result) tuples from each dataset run.
     """
     console = get_rich_console()
 
@@ -397,10 +379,10 @@ def _print_multi_dataset_summary(
     table.add_column("Features", style="blue", justify="right")
     table.add_column("Time", style="dim", justify="right")
 
-    best_auc = max(r[1]["result"]["best_val_auc"] for r in all_results)
+    best_auc = max(r[1]["result"]["best_value"] for r in all_results)
 
     for dataset, run_result in all_results:
-        auc = run_result["result"]["best_val_auc"]
+        auc = run_result["result"]["best_value"]
         if auc == best_auc:
             auc_str = f"[bold green on black] {auc:.4f} [/bold green on black]"
         else:
@@ -430,12 +412,12 @@ def _print_multi_dataset_summary(
     console.print()
 
     def _get_result_auc(item: tuple[DatasetName, RunResult]) -> float:
-        return item[1]["result"]["best_val_auc"]
+        return item[1]["result"]["best_value"]
 
     best_result = max(all_results, key=_get_result_auc)
     console.print(
         f"[bold white on green] Best: {best_result[0].upper()} "
-        f"with AUC {best_result[1]['result']['best_val_auc']:.4f} [/bold white on green]"
+        f"with AUC {best_result[1]['result']['best_value']:.4f} [/bold white on green]"
     )
     console.print()
 
@@ -458,7 +440,7 @@ def run_multiple_backends(
     """Run optimization on multiple backends sequentially.
 
     Args:
-        backends: Tuple of backends to run (e.g., ("lightgbm", "xgboost")).
+        backends: Tuple of backends to run.
         dataset: Dataset to optimize on.
         n_trials: Number of Optuna trials per backend.
         feature_preset: Feature engineering preset.
@@ -542,12 +524,12 @@ def _print_multi_backend_summary(
     table.add_column("Time", style="dim", justify="right")
 
     def _get_auc(item: tuple[BackendName, RunResult]) -> float:
-        return item[1]["result"]["best_val_auc"]
+        return item[1]["result"]["best_value"]
 
     sorted_results = sorted(all_results, key=_get_auc, reverse=True)
 
     for i, (backend, run_result) in enumerate(sorted_results):
-        auc = run_result["result"]["best_val_auc"]
+        auc = run_result["result"]["best_value"]
         if i == 0:
             rank = "[bold yellow]1st[/bold yellow]"
             auc_str = f"[bold green on black] {auc:.4f} [/bold green on black]"
@@ -575,7 +557,7 @@ def _print_multi_backend_summary(
     winner = sorted_results[0]
     console.print(
         f"[bold white on green] Winner: {winner[0].upper()} "
-        f"with AUC {winner[1]['result']['best_val_auc']:.4f} [/bold white on green]"
+        f"with AUC {winner[1]['result']['best_value']:.4f} [/bold white on green]"
     )
     console.print()
 
