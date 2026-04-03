@@ -25,7 +25,7 @@ from tankpit_bot.sniffer.player_tracking import (
     register_tank_name,
     resolve_movement_tank,
 )
-from tankpit_bot.sniffer.viewport import get_viewport_left, update_viewport_from_position_update
+from tankpit_bot.sniffer.viewport import get_viewport_left
 
 
 def rank_name(rank: int) -> str:
@@ -167,7 +167,7 @@ def format_resource_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x49:
         return f"counts={d['counts']}"
     if d["msg_type"] == 0x43:
-        return f"id={d['container_id']} fuel={d['fuel']}"
+        return f"updates={len(d['updates'])}"
     return ""
 
 
@@ -198,10 +198,15 @@ def format_radar_details(d: protocol.BinaryMessage) -> str:
     """
     if d["msg_type"] == 0x46:
         return f"type={d['detection_type']} found={d['found']}"
-    if d["msg_type"] == 0x4F:
-        containers = len(d["containers"])
-        mines = len(d["mines"])
-        return f"containers={containers} mines={mines}"
+    match d:
+        case {"msg_type": 0x4F, "containers": list(containers), "mines": list(mines)}:
+            return f"containers={len(containers)} mines={len(mines)}"
+        case {
+            "msg_type": 0x4F,
+            "cache_updates": list(cache_updates),
+            "overlay_updates": list(overlay_updates),
+        }:
+            return f"cache_updates={len(cache_updates)} overlay_updates={len(overlay_updates)}"
     if d["msg_type"] == 0x5A:
         return f"viewport=({d['viewport_left']},{d['viewport_top']}) entities={len(d['entities'])}"
     return ""
@@ -339,7 +344,6 @@ def format_position_update(tid: int, x: int, y: int, f: int, ed: bytes) -> str:
         Formatted position update string.
     """
     record_movement_response(tank_id=tid, x=x, y=y)
-    update_viewport_from_position_update(tid, x, y, ed)
     return f"tank={tid} pos=({x},{y}) flags=0x{f:02X} data={ed.hex()}"
 
 
