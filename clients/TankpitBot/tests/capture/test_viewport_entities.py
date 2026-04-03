@@ -112,8 +112,8 @@ class TestViewportEntityEncoding:
             abs_y=20,
             col=1,
             row=0,
-            entity_id=-1,
-            value=255,
+            cache_value=-1,
+            overlay_value=255,
             terrain_type=0,
         )
         update = ViewportEntityUpdateDict(
@@ -122,9 +122,9 @@ class TestViewportEntityEncoding:
             viewport_left=10,
             viewport_top=20,
             entity_count=1,
-            anonymous_tank_count=1,
-            positive_entity_count=0,
-            zero_entity_count=0,
+            equipment_cache_count=1,
+            positive_cache_count=0,
+            zero_cache_count=0,
             entities=[row],
         )
         dump = ViewportEntityDumpDict(update_count=1, updates=[update])
@@ -146,9 +146,9 @@ class TestViewportEntityEncoding:
                     "viewport_left": 10,
                     "viewport_top": 20,
                     "entity_count": 1,
-                    "anonymous_tank_count": 0,
-                    "positive_entity_count": 1,
-                    "zero_entity_count": 0,
+                    "equipment_cache_count": 0,
+                    "positive_cache_count": 1,
+                    "zero_cache_count": 0,
                     "entities": [1],
                 }
             )
@@ -258,21 +258,21 @@ class TestAnalyzeViewportEntities:
         assert update["viewport_left"] == 10
         assert update["viewport_top"] == 20
         assert update["entity_count"] == 3
-        assert update["anonymous_tank_count"] == 1
-        assert update["positive_entity_count"] == 1
-        assert update["zero_entity_count"] == 1
+        assert update["equipment_cache_count"] == 1
+        assert update["positive_cache_count"] == 1
+        assert update["zero_cache_count"] == 1
         assert update["entities"][0] == {
             "abs_x": 11,
             "abs_y": 20,
             "col": 1,
             "row": 0,
-            "entity_id": -1,
-            "value": 255,
+            "cache_value": -1,
+            "overlay_value": 255,
             "terrain_type": 0,
         }
-        assert update["entities"][1]["entity_id"] == 777
-        assert update["entities"][2]["entity_id"] == 0
-        assert update["entities"][2]["value"] == 2
+        assert update["entities"][1]["cache_value"] == 777
+        assert update["entities"][2]["cache_value"] == 0
+        assert update["entities"][2]["overlay_value"] == 2
 
     def test_formats_entity_dump(self) -> None:
         """Formats the raw dump for terminal inspection."""
@@ -285,17 +285,17 @@ class TestAnalyzeViewportEntities:
                     viewport_left=10,
                     viewport_top=20,
                     entity_count=1,
-                    anonymous_tank_count=1,
-                    positive_entity_count=0,
-                    zero_entity_count=0,
+                    equipment_cache_count=1,
+                    positive_cache_count=0,
+                    zero_cache_count=0,
                     entities=[
                         ViewportEntityRowDict(
                             abs_x=11,
                             abs_y=20,
                             col=1,
                             row=0,
-                            entity_id=-1,
-                            value=255,
+                            cache_value=-1,
+                            overlay_value=255,
                             terrain_type=0,
                         )
                     ],
@@ -307,9 +307,9 @@ class TestAnalyzeViewportEntities:
 
         assert "viewport_updates=1" in formatted
         assert "viewport=(10,20)" in formatted
-        assert "anonymous_tanks=1" in formatted
+        assert "equipment_cache=1" in formatted
         assert "abs=(11,20)" in formatted
-        assert "entity_id=-1" in formatted
+        assert "cache_value=-1" in formatted
 
     def test_raises_for_missing_magic_or_static_key(self) -> None:
         """Raises explicit errors for missing prerequisites."""
