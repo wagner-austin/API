@@ -25,6 +25,7 @@
 #   - 8008:  grandma-api
 #   - 8009:  github-stats-api
 #   - 8010:  opportunity-radar-api
+#   - 8011:  Art-Trainer
 # =============================================================================
 
 services:
