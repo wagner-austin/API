@@ -11,7 +11,15 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.bot.ai.threats import manhattan_distance
-from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
+from tankpit_bot.state.types import (
+    ContainerStateDict,
+    MineStateDict,
+    SelfStateDict,
+    WorldStateDict,
+    coord_key,
+    viewport_scan_key,
+)
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 log = get_logger(__name__)
 
@@ -58,6 +66,7 @@ def describe_container_search(
     nearest_desc = "none"
     nearest_dist = _MAX_DIST
     left, top, right, bottom = _viewport_bounds(world)
+    viewport_scanned = is_current_viewport_scanned(world)
 
     for container in world["containers"].values():
         if container["is_fuel"] != want_fuel:
@@ -68,17 +77,25 @@ def describe_container_search(
             continue
         nearby += 1
         dist = manhattan_distance(sx, sy, cx, cy)
-        reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
-            _describe_candidate_reason(
-                container,
-                sx,
-                sy,
-                terrain,
-                want_fuel=want_fuel,
-                allow_unreachable=allow_unreachable,
-                minimum_volume=minimum_volume,
+        if not viewport_scanned:
+            reason = "unconfirmed_viewport"
+            is_actionable = False
+            is_blocked = False
+            missing_landing = False
+            low_volume_target = False
+        else:
+            reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
+                _describe_candidate_reason(
+                    container,
+                    sx,
+                    sy,
+                    terrain,
+                    want_fuel=want_fuel,
+                    allow_unreachable=allow_unreachable,
+                    minimum_volume=minimum_volume,
+                    blocked_mines=world["mines"],
+                )
             )
-        )
         if is_blocked:
             blocked += 1
         if missing_landing:
@@ -105,6 +122,7 @@ def is_reachable(
     start_y: int,
     goal_x: int,
     goal_y: int,
+    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> bool:
     """Check if a target is reachable via terrain-aware pathfinding.
 
@@ -117,11 +135,19 @@ def is_reachable(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
+        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
         True if a path exists, False if blocked by terrain.
     """
-    path = find_path(terrain, start_x, start_y, goal_x, goal_y)
+    path = find_path(
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        blocked_mines.keys() if blocked_mines is not None else None,
+    )
     return len(path) > 0
 
 
@@ -131,13 +157,13 @@ def find_teleport_landing_tile(
     start_y: int,
     goal_x: int,
     goal_y: int,
+    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> tuple[int, int] | None:
-    """Find a passable adjacent tile to use as a teleport landing point.
+    """Find a legal teleport landing point for a container target.
 
-    For terrain-locked fuel and equipment containers, the bot must teleport
-    beside the target rather than onto the blocked container tile itself.
-    This helper inspects the four cardinally adjacent tiles and returns the
-    closest passable landing tile relative to the current position.
+    Containers may be teleported onto directly when the container tile itself
+    is passable land and not mined. When the target tile is not directly
+    landable, fall back to the nearest passable cardinally adjacent tile.
 
     Args:
         terrain: Terrain map for passability checks.
@@ -145,10 +171,16 @@ def find_teleport_landing_tile(
         start_y: Bot Y coordinate before teleporting.
         goal_x: Target container X coordinate.
         goal_y: Target container Y coordinate.
+        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
-        Tuple of landing coordinates, or None if no passable adjacent tile exists.
+        Tuple of landing coordinates, or None if no safe landing tile exists.
     """
+    if terrain.is_passable(goal_x, goal_y):
+        target_key = coord_key(goal_x, goal_y)
+        if blocked_mines is None or target_key not in blocked_mines:
+            return (goal_x, goal_y)
+
     best_tile: tuple[int, int] | None = None
     best_dist = _MAX_DIST
 
@@ -158,6 +190,8 @@ def find_teleport_landing_tile(
         if not (_MAP_MIN <= nx <= _MAP_MAX and _MAP_MIN <= ny <= _MAP_MAX):
             continue
         if not terrain.is_passable(nx, ny):
+            continue
+        if blocked_mines is not None and coord_key(nx, ny) in blocked_mines:
             continue
         dist = manhattan_distance(start_x, start_y, nx, ny)
         if dist < best_dist:
@@ -213,6 +247,7 @@ def find_nearest_fuel(
                 cx,
                 cy,
                 allow_unreachable=allow_unreachable,
+                blocked_mines=world["mines"],
             ):
                 continue
             best_dist = dist
@@ -245,9 +280,39 @@ def find_nearest_equipment(
     Returns:
         Nearest reachable equipment ContainerStateDict, or None if none visible.
     """
-    best: ContainerStateDict | None = None
-    best_dist = _MAX_DIST
+    candidates = find_equipment_candidates(
+        world,
+        self_state,
+        terrain,
+        allow_unreachable=allow_unreachable,
+        now_ms=now_ms,
+    )
+    if not candidates:
+        return None
+    return candidates[0]
 
+
+def find_equipment_candidates(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None = None,
+    *,
+    allow_unreachable: bool = False,
+    now_ms: int = 0,
+) -> list[ContainerStateDict]:
+    """Return visible equipment candidates ordered nearest-first.
+
+    Args:
+        world: Current world state with container positions.
+        self_state: Player's own state for position.
+        terrain: Optional terrain map for reachability checks.
+        allow_unreachable: Whether teleport fallback is allowed.
+        now_ms: Current timestamp for freshness filtering. 0 disables.
+
+    Returns:
+        List of visible equipment containers ordered by Manhattan distance.
+    """
+    candidates: list[tuple[int, ContainerStateDict]] = []
     sx, sy = self_state["x"], self_state["y"]
     for container in world["containers"].values():
         if not _is_visible_candidate(
@@ -258,21 +323,19 @@ def find_nearest_equipment(
         ):
             continue
         cx, cy = container["x"], container["y"]
-        dist = manhattan_distance(sx, sy, cx, cy)
-        if dist < best_dist:
-            if not _is_actionable_with_terrain(
-                terrain,
-                sx,
-                sy,
-                cx,
-                cy,
-                allow_unreachable=allow_unreachable,
-            ):
-                continue
-            best_dist = dist
-            best = container
-
-    return best
+        if not _is_actionable_with_terrain(
+            terrain,
+            sx,
+            sy,
+            cx,
+            cy,
+            allow_unreachable=allow_unreachable,
+            blocked_mines=world["mines"],
+        ):
+            continue
+        candidates.append((manhattan_distance(sx, sy, cx, cy), container))
+    candidates.sort(key=_equipment_candidate_distance)
+    return [container for _, container in candidates]
 
 
 def find_best_fuel(
@@ -325,6 +388,7 @@ def find_best_fuel(
             cx,
             cy,
             allow_unreachable=allow_unreachable,
+            blocked_mines=world["mines"],
         ):
             continue
         # Score: volume is more important than proximity (teleport handles terrain)
@@ -382,6 +446,18 @@ def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
     return age > _CONTAINER_FRESHNESS_TTL_MS
 
 
+def _equipment_candidate_distance(item: tuple[int, ContainerStateDict]) -> int:
+    """Return the distance component of an equipment candidate tuple.
+
+    Args:
+        item: ``(distance, container)`` tuple.
+
+    Returns:
+        The distance value used for nearest-first ordering.
+    """
+    return item[0]
+
+
 def _describe_candidate_reason(
     container: ContainerStateDict,
     start_x: int,
@@ -391,13 +467,21 @@ def _describe_candidate_reason(
     want_fuel: bool,
     allow_unreachable: bool,
     minimum_volume: int,
+    blocked_mines: dict[str, MineStateDict],
 ) -> tuple[str, bool, bool, bool, bool]:
     """Describe whether a visible candidate is actionable for diagnostics."""
     if container["failed_pickups"] > 0:
         return ("failed_pickup", False, False, False, False)
     if want_fuel and container["volume"] < minimum_volume:
         return ("low_volume", False, False, False, True)
-    if terrain is None or is_reachable(terrain, start_x, start_y, container["x"], container["y"]):
+    if terrain is None or is_reachable(
+        terrain,
+        start_x,
+        start_y,
+        container["x"],
+        container["y"],
+        blocked_mines,
+    ):
         return ("actionable", True, False, False, False)
     if not allow_unreachable:
         return ("blocked_walk", False, True, False, False)
@@ -407,6 +491,7 @@ def _describe_candidate_reason(
         start_y,
         container["x"],
         container["y"],
+        blocked_mines,
     )
     if landing is None:
         return ("blocked_no_landing", False, True, True, False)
@@ -432,14 +517,24 @@ def _is_visible_candidate(
     return left <= cx <= right and top <= cy <= bottom
 
 
+def is_current_viewport_scanned(world: WorldStateDict) -> bool:
+    """Return True when the current viewport has authoritative local coverage.
+
+    Args:
+        world: Current world state.
+
+    Returns:
+        True if the current viewport origin has been confirmed by fresh radar
+        data or a fresh visible viewport update.
+    """
+    viewport = world["viewport"]
+    key = viewport_scan_key(viewport["left"], viewport["top"])
+    return key in world["scanned_viewports"]
+
+
 def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
     """Return inclusive observable viewport bounds from world state."""
-    viewport = world["viewport"]
-    left = viewport["left"]
-    top = viewport["top"]
-    right = left + viewport["width"] - 1
-    bottom = top + viewport["height"] - 1
-    return (left, top, right, bottom)
+    return viewport_visible_bounds(world["viewport"])
 
 
 def _is_actionable_with_terrain(
@@ -450,23 +545,36 @@ def _is_actionable_with_terrain(
     goal_y: int,
     *,
     allow_unreachable: bool,
+    blocked_mines: dict[str, MineStateDict],
 ) -> bool:
     """Return True when walkable directly or via teleport fallback."""
     if terrain is None:
         return True
-    if is_reachable(terrain, start_x, start_y, goal_x, goal_y):
+    if is_reachable(terrain, start_x, start_y, goal_x, goal_y, blocked_mines):
         return True
     if not allow_unreachable:
         return False
-    return find_teleport_landing_tile(terrain, start_x, start_y, goal_x, goal_y) is not None
+    return (
+        find_teleport_landing_tile(
+            terrain,
+            start_x,
+            start_y,
+            goal_x,
+            goal_y,
+            blocked_mines,
+        )
+        is not None
+    )
 
 
 __all__ = [
     "describe_container_search",
     "find_best_fuel",
+    "find_equipment_candidates",
     "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_teleport_landing_tile",
+    "is_current_viewport_scanned",
     "is_reachable",
 ]
