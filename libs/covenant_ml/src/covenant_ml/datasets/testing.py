@@ -8,7 +8,7 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-import math
+import math as _math
 from pathlib import Path
 from typing import TypedDict
 
@@ -19,6 +19,8 @@ from covenant_ml.datasets.types import (
     DatasetConfig,
     DatasetMeta,
     LoadedDataset,
+    RegressionDatasetConfig,
+    RegressionDatasetMeta,
     RegressionLoadedDataset,
 )
 
@@ -147,13 +149,13 @@ class FakeRegressionDatasetLoader:
 
     def load(
         self,
-        config: DatasetConfig,
+        config: RegressionDatasetConfig,
         external_dir: Path,
     ) -> RegressionLoadedDataset:
         """Generate a synthetic regression dataset based on config.
 
         Args:
-            config: Dataset configuration (used for metadata).
+            config: Regression dataset configuration (used for metadata).
             external_dir: Ignored for fake loader.
 
         Returns:
@@ -178,15 +180,25 @@ class FakeRegressionDatasetLoader:
                 + 2.0
             )
 
+        # Compute target statistics using explicit sum/len to avoid Any from np.mean
+        n = self._n_samples
+        y_sum = float(np.sum(y_array))
+        target_mean = y_sum / n
+        y_sq_diff_sum = float(np.sum((y_array - target_mean) ** 2))
+        target_std = _math.sqrt(y_sq_diff_sum / n)
+        target_min = float(np.min(y_array))
+        target_max = float(np.max(y_array))
+
         feature_names = tuple(f"feature_{i}" for i in range(self._n_features))
 
-        meta = DatasetMeta(
+        meta = RegressionDatasetMeta(
             name=config["name"],
             n_samples=self._n_samples,
             n_features=self._n_features,
-            n_positive=0,
-            n_negative=self._n_samples,
-            positive_ratio=0.0,
+            target_mean=target_mean,
+            target_std=target_std,
+            target_min=target_min,
+            target_max=target_max,
             feature_names=feature_names,
             categorical_encodings=(),
         )
@@ -351,13 +363,13 @@ def _build_seasonal_signal(
         k = k_idx + 1
         angle_values: list[float] = []
         for i in range(n_total_days):
-            angle_values.append(2.0 * math.pi * k * float(doy_float.flat[i]) / n_days_per_year)
+            angle_values.append(2.0 * _math.pi * k * float(doy_float.flat[i]) / n_days_per_year)
         angle: NDArray[np.float64] = np.array(angle_values, dtype=np.float64)
         cos_vals = np.zeros(n_total_days, dtype=np.float64)
         sin_vals = np.zeros(n_total_days, dtype=np.float64)
         for i in range(n_total_days):
-            cos_vals[i] = math.cos(float(angle.flat[i]))
-            sin_vals[i] = math.sin(float(angle.flat[i]))
+            cos_vals[i] = _math.cos(float(angle.flat[i]))
+            sin_vals[i] = _math.sin(float(angle.flat[i]))
         for j in range(n_locations):
             daily_values[:, j] += cos_coeffs[k_idx][j] * cos_vals + sin_coeffs[k_idx][j] * sin_vals
     return daily_values
