@@ -72,50 +72,27 @@ class TestSnifferCoverageBranches:
         result = xor.xor_decode(body)
         assert len(result) == 5
 
-    def test_update_viewport_short_extra_data(self) -> None:
-        """Test update_viewport_from_position_update with empty extra_data."""
+    def test_update_viewport_origin_sets_both_edges(self) -> None:
+        """Test viewport origin storage uses explicit left/top values."""
         from tankpit_bot.sniffer import viewport
 
-        viewport._viewport_left = None
-        viewport._self_tank_id = None
+        viewport.reset_viewport_tracking()
 
-        # Empty extra_data should return early
-        viewport.update_viewport_from_position_update(100, 50, 60, b"")
-        assert viewport._viewport_left is None
+        viewport.update_viewport_origin(34, 52)
 
-    def test_update_viewport_relative_position(self) -> None:
-        """Test update_viewport_from_position_update skips (3,3) viewport-relative."""
+        assert viewport.get_viewport_left() == 34
+        assert viewport.get_viewport_top() == 52
+
+    def test_reset_viewport_tracking_clears_origin(self) -> None:
+        """Test viewport reset clears stored origin."""
         from tankpit_bot.sniffer import viewport
 
-        viewport._viewport_left = None
-        viewport._self_tank_id = None
+        viewport.update_viewport_origin(34, 52)
 
-        # Position (3,3) is viewport-relative, should skip
-        viewport.update_viewport_from_position_update(100, 3, 3, b"\x05")
-        assert viewport._viewport_left is None
+        viewport.reset_viewport_tracking()
 
-    def test_update_viewport_different_tank(self) -> None:
-        """Test update_viewport_from_position_update ignores other tanks."""
-        from tankpit_bot.sniffer import viewport
-
-        viewport._viewport_left = None
-        viewport._self_tank_id = 100  # Set self tank ID
-
-        # Different tank ID should not update viewport
-        viewport.update_viewport_from_position_update(200, 50, 60, b"\x10")
-        assert viewport._viewport_left is None
-
-    def test_update_viewport_self_tank(self) -> None:
-        """Test update_viewport_from_position_update updates for self tank."""
-        from tankpit_bot.sniffer import viewport
-
-        viewport._viewport_left = None
-        viewport._self_tank_id = 100
-
-        # Self tank with absolute position
-        viewport.update_viewport_from_position_update(100, 50, 60, b"\x10")
-        # viewport_left = x - player_viewport_x = 50 - 16 = 34
-        assert viewport._viewport_left == 34
+        assert viewport.get_viewport_left() is None
+        assert viewport.get_viewport_top() is None
 
     def test_format_container_simple_container_pickup(self) -> None:
         """Test format_container_simple for container_pickup message."""
