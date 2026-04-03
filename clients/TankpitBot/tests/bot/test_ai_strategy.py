@@ -13,11 +13,16 @@ from tankpit_bot.bot.ai_strategy import (
     _combat_landing_tile,
     _compute_equipment,
     _DecideCtx,
+    _direct_move_command,
     _expire_kills,
     _filter_killed_tanks,
     _is_occupied_by_enemy,
     _local_equipment_search_hop,
     _require_command,
+    _select_equipment_target_command,
+    _select_exploration_command,
+    _try_search_critical_equipment,
+    _viewport_exploration_candidates,
     _walk_or_teleport,
     _waypoint_move_command,
     decide,
@@ -25,15 +30,19 @@ from tankpit_bot.bot.ai_strategy import (
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import (
     mark_move_target_failed,
+    mark_scan_viewport_failed,
     reset_world_state,
 )
 from tankpit_bot.state.types import (
     ContainerStateDict,
+    MineStateDict,
     SelfStateDict,
     TankStateDict,
     ViewportStateDict,
     WorldStateDict,
     make_container_state,
+    make_mine_state,
+    viewport_scan_key,
 )
 from tests.fakes import FakeTerrainMap
 
@@ -75,6 +84,7 @@ def _make_world(
     fuel: int = 800,
     containers: dict[str, ContainerStateDict] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
+    scanned: bool = True,
 ) -> tuple[WorldStateDict, SelfStateDict]:
     """Create world and self state for testing.
 
@@ -90,7 +100,10 @@ def _make_world(
         fuel=fuel,
         leaderboard_position=5,
     )
-    viewport = ViewportStateDict(left=self_x - 9, top=self_y - 9, width=18, height=18)
+    viewport = ViewportStateDict(left=self_x - 8, top=self_y - 8, width=16, height=16)
+    scanned_viewports = (
+        {viewport_scan_key(viewport["left"], viewport["top"]): 100000} if scanned else {}
+    )
     world = WorldStateDict(
         self_state=self_state,
         tanks=tanks or {},
@@ -98,6 +111,7 @@ def _make_world(
         mines={},
         terrain={},
         viewport=viewport,
+        scanned_viewports=scanned_viewports,
         timestamp_ms=0,
     )
     return world, self_state
@@ -181,7 +195,7 @@ class TestDecideTeleportFuelGuard:
             patrol_waypoint_index=0,
             last_scan_ms=99500,
             last_shoot_ms=0,
-            last_map_open_ms=99500,
+            last_map_open_ms=94000,
             combat_target_id=-1,
             combat_target_x=0,
             combat_target_y=0,
@@ -337,6 +351,62 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["command"]["cmd_type"] == "map_open"
 
+    def test_critical_homing_shots_interrupts_for_equipment(self) -> None:
+        """Critical homing depletion uses the same emergency rule as dual and radar."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        containers: dict[str, ContainerStateDict] = {
+            "106,106": _c(106, 106, 30, False),
+        }
+        world, self_state = _make_world(fuel=800, tanks=tanks, containers=containers)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["homing_shots"]["count"] = 5
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["reason"] == "equipment_critical"
+        assert decision["command"]["cmd_type"] == "pickup_move"
+
+    def test_homing_at_break_threshold_is_not_critical(self) -> None:
+        """Homing at the shared break threshold does not enter emergency mode."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        world, self_state = _make_world(fuel=800, tanks=tanks)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["homing_shots"]["count"] = 12
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["command"]["cmd_type"] == "map_open"
+
     def test_active_combat_interrupted_by_critical_equipment(self) -> None:
         """Critical equipment recovery preempts a locked combat engagement."""
         tanks: dict[str, TankStateDict] = {
@@ -383,8 +453,8 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["reason"] == "equipment_critical"
         assert decision["command"]["cmd_type"] == "pickup_move"
 
-    def test_active_combat_not_interrupted_by_noncritical_fuel(self) -> None:
-        """Locked combat does not switch to ordinary low-fuel collection mid-fight."""
+    def test_active_combat_with_subcritical_fuel_interrupts_for_collection(self) -> None:
+        """Fuel below the critical threshold interrupts combat for fuel collection."""
         tanks: dict[str, TankStateDict] = {
             "50": TankStateDict(
                 tank_id=50,
@@ -425,8 +495,8 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["command"]["cmd_type"] == "pickup_move"
 
     def test_blocked_equipment_teleports_to_adjacent_passable_tile(self) -> None:
         """Blocked equipment targets use a safe adjacent landing tile for teleport."""
@@ -455,7 +525,13 @@ class TestDecideEquipmentDepletion:
         containers: dict[str, ContainerStateDict] = {
             "128,126": _c(128, 126, 0, False),
         }
-        world, self_state = _make_world(self_x=130, self_y=124, fuel=800, containers=containers)
+        world, self_state = _make_world(
+            self_x=130,
+            self_y=124,
+            fuel=800,
+            containers=containers,
+            scanned=False,
+        )
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain_data: dict[tuple[int, int], str] = {
@@ -491,8 +567,8 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["command"]["cmd_type"] == "pickup_move"
 
-    def test_locked_combat_with_low_fuel_stays_in_combat(self) -> None:
-        """Noncritical low fuel does not interrupt a locked combat phase."""
+    def test_locked_combat_with_critical_fuel_collects_fuel(self) -> None:
+        """Fuel at the critical threshold interrupts a locked combat phase."""
         tanks: dict[str, TankStateDict] = {
             "50": TankStateDict(
                 tank_id=50,
@@ -533,11 +609,11 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["command"]["cmd_type"] == "pickup_move"
 
-    def test_critical_equipment_beats_noncritical_low_fuel(self) -> None:
-        """Critical dual/radar depletion outranks ordinary low-fuel collection."""
+    def test_critical_fuel_beats_critical_equipment(self) -> None:
+        """Critical fuel outranks even critical equipment depletion."""
         containers: dict[str, ContainerStateDict] = {
             "101,100": _c(101, 100, 700, True),
             "102,100": _c(102, 100, 0, False),
@@ -549,14 +625,31 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["behavior"]["reason"] == "equipment_critical"
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "fuel=700"
         assert decision["command"]["cmd_type"] == "pickup_move"
 
     def test_critical_equipment_search_uses_radar_when_ready(self) -> None:
         """Critical equipment depletion scans before relocating when radar is ready."""
-        world, self_state = _make_world(fuel=800)
+        world, self_state = _make_world(fuel=800, scanned=False)
         ai_state = _scanned_ai_state()
+        inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=30)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["reason"] == "radar_for_equipment"
+        assert decision["command"]["cmd_type"] == "radar"
+
+    def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
+        """Critical equipment recovery radars immediately in a new viewport."""
+        world, self_state = _make_world(fuel=800, scanned=False)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "last_scan_ms": 99999,
+            }
+        )
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
@@ -575,7 +668,7 @@ class TestDecideEquipmentDepletion:
             patrol_waypoint_index=2,
             last_scan_ms=99500,
             last_shoot_ms=0,
-            last_map_open_ms=99500,
+            last_map_open_ms=94000,
             combat_target_id=-1,
             combat_target_x=0,
             combat_target_y=0,
@@ -609,7 +702,7 @@ class TestDecideEquipmentDepletion:
             patrol_waypoint_index=0,
             last_scan_ms=99500,
             last_shoot_ms=0,
-            last_map_open_ms=99500,
+            last_map_open_ms=94000,
             combat_target_id=-1,
             combat_target_x=0,
             combat_target_y=0,
@@ -699,7 +792,7 @@ class TestDecideEquipmentDepletion:
 
     def test_low_fuel_without_targets_uses_radar(self) -> None:
         """Low fuel uses radar when no actionable fuel target exists and cooldown elapsed."""
-        world, self_state = _make_world(fuel=300)
+        world, self_state = _make_world(fuel=300, scanned=False)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
@@ -708,6 +801,53 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
         assert decision["behavior"]["reason"] == "radar_for_fuel"
         assert decision["command"]["cmd_type"] == "radar"
+
+    def test_low_fuel_cache_only_target_in_unscanned_viewport_uses_radar(self) -> None:
+        """Cache-only fuel in a fresh viewport does not bypass radar confirmation."""
+        containers: dict[str, ContainerStateDict] = {
+            "104,100": _c(104, 100, 700, True),
+        }
+        world, self_state = _make_world(fuel=300, containers=containers)
+        world["scanned_viewports"] = {}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "radar_for_fuel"
+        assert decision["command"]["cmd_type"] == "radar"
+
+    def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
+        """A newly entered unconfirmed viewport should radar immediately."""
+        world, self_state = _make_world(fuel=300, scanned=False)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "last_scan_ms": 99999,
+            }
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "radar_for_fuel"
+        assert decision["command"]["cmd_type"] == "radar"
+
+    def test_low_fuel_recent_failed_scan_walks_instead_of_repeating_radar(self) -> None:
+        """A recently stalled viewport scan suppresses immediate radar retry."""
+        world, self_state = _make_world(fuel=300, scanned=False)
+        viewport = world["viewport"]
+        mark_scan_viewport_failed(viewport["left"], viewport["top"], 100000)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "edge_for_fuel"
+        assert decision["command"]["cmd_type"] == "move"
 
     def test_low_fuel_blocked_search_with_visible_threats_falls_back_to_map(self) -> None:
         """Visible threats reach the hunt fallback when fuel search cannot execute."""
@@ -728,20 +868,51 @@ class TestDecideEquipmentDepletion:
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
-        # Block actionable viewport edge target (107,107) and all its neighbors
-        terrain_data: dict[tuple[int, int], str] = {
-            (107, 107): "W",
-            (108, 107): "W",
-            (106, 107): "W",
-            (107, 108): "#",
-            (107, 106): "#",
-        }
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        terrain_data: dict[tuple[int, int], str] = dict.fromkeys(
+            _viewport_exploration_candidates(ctx),
+            "W",
+        )
+        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+            terrain_data[(candidate_x - 1, candidate_y)] = "#"
+            terrain_data[(candidate_x + 1, candidate_y)] = "#"
+            terrain_data[(candidate_x, candidate_y - 1)] = "#"
+            terrain_data[(candidate_x, candidate_y + 1)] = "#"
         terrain = FakeTerrainMap(terrain_data=terrain_data)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["command"]["cmd_type"] == "map_open"
+
+    def test_exploration_candidates_omit_self_and_duplicates(self) -> None:
+        """Exploration candidates drop the current tile and repeated entries."""
+        world, self_state = _make_world(self_x=107, self_y=100, fuel=800)
+        world["viewport"] = ViewportStateDict(left=92, top=92, width=16, height=16)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        candidates = _viewport_exploration_candidates(ctx)
+
+        assert (107, 100) not in candidates
+        assert len(candidates) == len(set(candidates))
+
+    def test_exploration_skips_teleport_when_search_fuel_too_low(self) -> None:
+        """Exploration rejects teleport search when fuel cannot cover the reserve floor."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=550)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap(terrain_data={(107, 107): "W"})
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        exploration = _select_exploration_command(ctx)
+
+        if exploration is None:
+            raise AssertionError("expected exploration command")
+        candidate_x, candidate_y, command = exploration
+        assert (candidate_x, candidate_y) != (107, 107)
+        assert command["cmd_type"] == "move"
 
     def test_locked_combat_with_zero_dual_releases_to_equipment(self) -> None:
         """Dual depletion releases combat lock so equipment recovery starts."""
@@ -847,6 +1018,48 @@ class TestDecideEquipmentDepletion:
         # Fuel=400 < 500 threshold → should collect fuel, not reacquire.
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
+    def test_new_target_selection_skips_recently_killed_enemy(self) -> None:
+        """New combat acquisition does not immediately retarget a killed enemy."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=103,
+                y=103,
+                team=2,
+                rank=1,
+                name="DeadEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+            "60": TankStateDict(
+                tank_id=60,
+                x=104,
+                y=103,
+                team=2,
+                rank=1,
+                name="LiveEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = _make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "killed_tank_ids": {"50": 99900},
+            }
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["behavior"]["reason"] == "find LiveEnemy"
+
 
 class TestHelpers:
     """Tests for internal helper functions."""
@@ -856,16 +1069,16 @@ class TestHelpers:
         reset_world_state()
 
     def test_compute_equipment_collect_fuel(self) -> None:
-        """_compute_equipment returns [2, 5] for COLLECT_FUEL mode."""
+        """_compute_equipment returns [2, 4, 5] for stocked combat gear."""
         inventory = _make_inventory()
         result = _compute_equipment(800, inventory)
-        assert result == [2, 5]
+        assert result == [2, 4, 5]
 
     def test_compute_equipment_hunt(self) -> None:
-        """_compute_equipment returns [2, 5] for HUNT mode."""
+        """_compute_equipment returns [2, 4, 5] for stocked combat gear."""
         inventory = _make_inventory()
         result = _compute_equipment(800, inventory)
-        assert result == [2, 5]
+        assert result == [2, 4, 5]
 
     def test_compute_equipment_no_shields(self) -> None:
         """_compute_equipment never includes shields."""
@@ -877,7 +1090,14 @@ class TestHelpers:
         """_compute_equipment drops dual when count is 0."""
         inventory = _make_inventory(dual_count=0)
         result = _compute_equipment(800, inventory)
-        assert result == [5]
+        assert result == [4, 5]
+
+    def test_compute_equipment_homing_depleted(self) -> None:
+        """_compute_equipment drops homing when count is 0."""
+        inventory = _make_inventory()
+        inventory["homing_shots"]["count"] = 0
+        result = _compute_equipment(800, inventory)
+        assert result == [2, 5]
 
     def test_local_equipment_search_hop_rotates_cardinal(self) -> None:
         """Local search hop rotates through cardinal directions."""
@@ -996,6 +1216,38 @@ class TestHelpers:
         with pytest.raises(ValueError, match="No executable command for fuel target"):
             _require_command(None, 10, 20, "fuel")
 
+    def test_try_search_critical_equipment_returns_none_when_fuel_low(self) -> None:
+        """Critical equipment search does not burn fuel once fuel is already low."""
+        world, self_state = _make_world(fuel=450)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=0)
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = _try_search_critical_equipment(ctx)
+
+        assert result is None
+
+    def test_select_equipment_target_command_returns_none_when_all_candidates_blocked(self) -> None:
+        """Equipment selection returns None when every visible candidate is blocked."""
+        containers: dict[str, ContainerStateDict] = {
+            "103,100": _c(103, 100, 0, False),
+            "104,100": _c(104, 100, 0, False),
+        }
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=800, containers=containers)
+        world["mines"] = {
+            "103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1),
+            "104,100": make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1),
+        }
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["missile_shots"]["count"] = 5
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _select_equipment_target_command(ctx, allow_unreachable=True)
+
+        assert result is None
+
     def test_walk_or_teleport_returns_none_when_no_landing_exists(self) -> None:
         """_walk_or_teleport rejects blocked targets with no legal landing tile."""
         containers: dict[str, ContainerStateDict] = {
@@ -1050,10 +1302,35 @@ class TestHelpers:
         assert result["target_x"] == 107
         assert result["target_y"] == 100
 
-    def test_walk_or_teleport_approaches_outer_ring_pickup_before_collecting(self) -> None:
-        """Outer-ring radar targets are approached before pickup_move is used."""
+    def test_walk_or_teleport_rejects_mined_pickup_with_terrain(self) -> None:
+        """Terrain routing rejects pickup targets that sit on known mines."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _walk_or_teleport(ctx, 107, 100, pickup=True)
+
+        assert result is None
+
+    def test_walk_or_teleport_rejects_mined_pickup_without_terrain(self) -> None:
+        """Occupancy-only routing rejects pickup targets that sit on known mines."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = _walk_or_teleport(ctx, 107, 100, pickup=True)
+
+        assert result is None
+
+    def test_walk_or_teleport_picks_up_visible_edge_target(self) -> None:
+        """Visible edge pickup targets are actionable without an approach step."""
         containers: dict[str, ContainerStateDict] = {
-            "72,63": _c(72, 63, 0, False),
+            "71,63": _c(71, 63, 0, False),
         }
         world, self_state = _make_world(self_x=64, self_y=64, fuel=300, containers=containers)
         ai_state = _scanned_ai_state()
@@ -1061,18 +1338,64 @@ class TestHelpers:
         terrain = FakeTerrainMap()
         ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 72, 63, pickup=True)
+        result = _walk_or_teleport(ctx, 71, 63, pickup=True)
 
         if result is None:
-            raise AssertionError("Expected approach move command")
+            raise AssertionError("Expected pickup_move command")
+        assert result["cmd_type"] == "pickup_move"
+        assert result["target_x"] == 71
+        assert result["target_y"] == 63
+
+    def test_walk_or_teleport_moves_to_visible_edge_target(self) -> None:
+        """Visible edge movement targets are actionable without an approach step."""
+        world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _walk_or_teleport(ctx, 71, 63, pickup=False)
+
+        if result is None:
+            raise AssertionError("Expected direct edge move command")
         assert result["cmd_type"] == "move"
         assert result["target_x"] == 71
         assert result["target_y"] == 63
 
-    def test_decide_approaches_outer_ring_equipment_before_pickup(self) -> None:
-        """Visible outer-ring equipment becomes an approach move, not pickup_move."""
+    def test_walk_or_teleport_without_terrain_moves_to_visible_edge_target(self) -> None:
+        """Visible edge movement works without a terrain map."""
+        world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = _walk_or_teleport(ctx, 71, 63, pickup=False)
+
+        if result is None:
+            raise AssertionError("Expected direct edge move command")
+        assert result["cmd_type"] == "move"
+        assert result["target_x"] == 71
+        assert result["target_y"] == 63
+
+    def test_walk_or_teleport_without_terrain_approaches_off_viewport_target(self) -> None:
+        """Off-viewport movement without terrain clamps to the visible edge."""
+        world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = _walk_or_teleport(ctx, 72, 63, pickup=False)
+
+        if result is None:
+            raise AssertionError("Expected off-viewport move to clamp to edge")
+        assert result["cmd_type"] == "move"
+        assert result["target_x"] == 71
+        assert result["target_y"] == 63
+
+    def test_decide_picks_up_visible_edge_equipment(self) -> None:
+        """Visible edge equipment is actionable without an approach step."""
         containers: dict[str, ContainerStateDict] = {
-            "72,63": _c(72, 63, 0, False),
+            "71,63": _c(71, 63, 0, False),
         }
         world, self_state = _make_world(self_x=64, self_y=64, fuel=800, containers=containers)
         ai_state = _scanned_ai_state()
@@ -1084,7 +1407,7 @@ class TestHelpers:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["command"]["cmd_type"] == "move"
+        assert decision["command"]["cmd_type"] == "pickup_move"
         assert decision["command"]["target_x"] == 71
         assert decision["command"]["target_y"] == 63
 
@@ -1106,8 +1429,133 @@ class TestHelpers:
         assert decision["behavior"]["reason"] == "equipment_low"
         assert decision["command"]["cmd_type"] == "pickup_move"
 
+    def test_normal_equipment_low_skips_unexecutable_equipment_target(self) -> None:
+        """Non-critical equipment recovery skips blocked targets without crashing."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        containers: dict[str, ContainerStateDict] = {
+            "107,107": _c(107, 107, 0, False),
+        }
+        world, self_state = _make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers=containers,
+            tanks=tanks,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["missile_shots"]["count"] = 5
+        terrain_data: dict[tuple[int, int], str] = {
+            (107, 107): "W",
+            (108, 107): "W",
+            (106, 107): "W",
+            (107, 108): "#",
+            (107, 106): "#",
+        }
+        terrain = FakeTerrainMap(terrain_data=terrain_data)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["command"]["cmd_type"] == "map_open"
+
+    def test_normal_equipment_low_skips_bad_nearest_and_uses_next_target(self) -> None:
+        """Equipment selection does not stop at the first non-executable candidate."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=103,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        containers: dict[str, ContainerStateDict] = {
+            "103,100": _c(103, 100, 0, False),
+            "106,100": _c(106, 100, 0, False),
+        }
+        world, self_state = _make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers=containers,
+            tanks=tanks,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["missile_shots"]["count"] = 5
+        terrain = FakeTerrainMap()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["target_x"] == 106
+        assert decision["command"]["target_y"] == 100
+
+    def test_normal_equipment_low_skips_outer_ring_target_with_blocked_approach(self) -> None:
+        """Outer-ring equipment is skipped when its inner approach tile is not executable."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=0,
+            ),
+        }
+        containers: dict[str, ContainerStateDict] = {
+            "129,184": _c(129, 184, 0, False),
+        }
+        world, self_state = _make_world(
+            self_x=138,
+            self_y=192,
+            fuel=800,
+            containers=containers,
+            tanks=tanks,
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=30)
+        inventory["missile_shots"]["count"] = 5
+        terrain_data: dict[tuple[int, int], str] = {
+            (130, 184): "W",
+            (131, 184): "W",
+            (129, 184): "W",
+            (130, 185): "#",
+            (130, 183): "#",
+        }
+        terrain = FakeTerrainMap(terrain_data=terrain_data)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["command"]["cmd_type"] == "map_open"
+
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
-        """A* waypoint outside the viewport is clamped to viewport edge."""
+        """A* waypoint never produces a move outside the visible viewport."""
         # Place a wall that forces A* to route around and produce an off-viewport waypoint.
         # Bot at (100,100), target at (91,91) (viewport corner).
         # viewport: left=91, top=91, right=108, bottom=108
@@ -1124,8 +1572,8 @@ class TestHelpers:
 
         result = _walk_or_teleport(ctx, 91, 91, pickup=False)
 
-        # Should either clamp the waypoint to viewport or fall through to teleport,
-        # but never issue a move to coordinates outside the viewport.
+        # Should either choose an in-bounds waypoint or fall through to
+        # teleport, but never issue a move outside the visible viewport.
         if result is not None and result["cmd_type"] == "move":
             viewport = ctx.world["viewport"]
             left = viewport["left"]
@@ -1219,6 +1667,18 @@ class TestHelpers:
 
         assert result is None
 
+    def test_direct_move_command_rejects_off_viewport_target(self) -> None:
+        """Direct move helper refuses targets outside the visible viewport."""
+        world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _direct_move_command(ctx, 72, 63, pickup=False)
+
+        assert result is None
+
     def test_walk_or_teleport_rejects_enemy_occupied_waypoint(self) -> None:
         """_walk_or_teleport falls back to teleport when A* waypoint is occupied."""
         from tankpit_bot.bot.ai.pathfinding import find_path_segment_target
@@ -1271,6 +1731,19 @@ class TestHelpers:
             raise AssertionError("expected teleport fallback when waypoint is occupied")
         assert result["cmd_type"] == "teleport"
 
+    def test_walk_or_teleport_rejects_mine_occupied_waypoint(self) -> None:
+        """Waypoint commands reject candidate tiles occupied by mines."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"103,99": make_mine_state(x=103, y=99, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap({(102, 100): "#"})
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _waypoint_move_command(ctx, 104, 100, (103, 99))
+
+        assert result is None
+
     def test_walk_or_teleport_rejects_occupied_move_without_terrain(self) -> None:
         """_walk_or_teleport rejects occupied target even without terrain map."""
         tanks: dict[str, TankStateDict] = {
@@ -1300,6 +1773,62 @@ class TestHelpers:
         result = _walk_or_teleport(ctx, 107, 100, pickup=False)
 
         assert result is None
+
+    def test_walk_or_teleport_rejects_mined_move_without_terrain(self) -> None:
+        """Without terrain, mine-occupied move destinations are rejected."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+
+        assert result is None
+
+    def test_direct_move_command_rejects_mined_pickup(self) -> None:
+        """Direct pickup commands reject targets that are occupied by mines."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _direct_move_command(ctx, 107, 100, pickup=True)
+
+        assert result is None
+
+    def test_direct_move_command_rejects_mined_move(self) -> None:
+        """Direct move commands reject targets that are occupied by mines."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _direct_move_command(ctx, 107, 100, pickup=False)
+
+        assert result is None
+
+    def test_walk_or_teleport_teleports_when_mine_blocks_direct_route(self) -> None:
+        """Known mines block the direct line but still allow a safe detour move."""
+        world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
+        mines: dict[str, MineStateDict] = {
+            "103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)
+        }
+        world["mines"] = mines
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(default_count=5)
+        terrain = FakeTerrainMap()
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+
+        if result is None:
+            raise AssertionError("expected mine-blocked route to produce a safe command")
+        assert result["cmd_type"] == "move"
 
     def test_is_occupied_by_enemy_returns_true_for_enemy_tile(self) -> None:
         """_is_occupied_by_enemy detects a tank on the given tile."""
@@ -1431,7 +1960,7 @@ class TestDecideCombatFeedback:
                 **ai_state,
                 "last_shot_target_id": 50,
                 "last_shot_target_name": "Enemy",
-                "last_map_open_ms": 99000,
+                "last_map_open_ms": 94000,
             }
         )
         inventory = _make_inventory()
@@ -1529,7 +2058,7 @@ class TestDecideMapOpen:
 
     def test_fallback_uses_radar_when_map_on_cooldown(self) -> None:
         """Fallback uses radar instead of map_open when cooldown active."""
-        world, self_state = _make_world(fuel=800)
+        world, self_state = _make_world(fuel=800, scanned=False)
         config = make_default_ai_config()
         ai_state = AIStateDict(
             config=config,
@@ -1583,6 +2112,34 @@ class TestDecideMapOpen:
         assert decision["command"]["cmd_type"] == "move"
         assert decision["behavior"]["reason"] == "edge_for_enemies"
 
+    def test_fallback_does_not_repeat_radar_in_already_scanned_viewport(self) -> None:
+        """Fallback walks instead of rescanning when the current viewport is already confirmed."""
+        world, self_state = _make_world(fuel=800)
+        config = make_default_ai_config()
+        ai_state = AIStateDict(
+            config=config,
+            active_mode="HUNT",
+            patrol_waypoint_index=0,
+            last_scan_ms=1,
+            last_shoot_ms=0,
+            last_map_open_ms=99000,
+            combat_target_id=-1,
+            combat_target_x=0,
+            combat_target_y=0,
+            combat_phase="none",
+            killed_tank_ids={},
+            blocked_combat_targets={},
+            last_shot_target_id=-1,
+            last_shot_target_name="",
+            equipment_search_failures=0,
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "move"
+        assert decision["behavior"]["reason"] == "edge_for_enemies"
+
     def test_fallback_opens_map_when_edge_walk_blocked(self) -> None:
         """Fallback opens map when map+radar on cooldown and edge blocked."""
         world, self_state = _make_world(fuel=800)
@@ -1605,18 +2162,15 @@ class TestDecideMapOpen:
             equipment_search_failures=0,
         )
         inventory = _make_inventory()
-        # Block edge target (107,107) and its neighbors so walk fails.
-        # _viewport_edge_target picks the inner actionable right/bottom edge (107,107)
-        # because the player at (100,100) is in the lower-left half of the map.
-        terrain = FakeTerrainMap(
-            terrain_data={
-                (107, 107): "#",
-                (106, 107): "#",
-                (108, 107): "#",
-                (107, 106): "#",
-                (107, 108): "#",
-            }
-        )
+        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        terrain_data: dict[tuple[int, int], str] = {}
+        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+            terrain_data[(candidate_x, candidate_y)] = "W"
+            terrain_data[(candidate_x - 1, candidate_y)] = "#"
+            terrain_data[(candidate_x + 1, candidate_y)] = "#"
+            terrain_data[(candidate_x, candidate_y - 1)] = "#"
+            terrain_data[(candidate_x, candidate_y + 1)] = "#"
+        terrain = FakeTerrainMap(terrain_data=terrain_data)
 
         decision = decide(
             world,
@@ -1974,7 +2528,7 @@ class TestDecideTeleportToFarTarget:
             patrol_waypoint_index=0,
             last_scan_ms=99500,
             last_shoot_ms=0,
-            last_map_open_ms=99500,
+            last_map_open_ms=94000,
             combat_target_id=-1,
             combat_target_x=0,
             combat_target_y=0,
@@ -1990,6 +2544,51 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
+        assert decision["updated_ai_state"]["combat_phase"] == "closing"
+
+    def test_recent_map_intel_teleports_without_reopening_map(self) -> None:
+        """Fresh map intel should promote directly into the teleport phase."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="MappedEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = _make_world(fuel=800, tanks=tanks)
+        config = make_default_ai_config()
+        ai_state = AIStateDict(
+            config=config,
+            active_mode="HUNT",
+            patrol_waypoint_index=0,
+            last_scan_ms=99500,
+            last_shoot_ms=0,
+            last_map_open_ms=99000,
+            combat_target_id=-1,
+            combat_target_x=0,
+            combat_target_y=0,
+            combat_phase="none",
+            killed_tank_ids={},
+            blocked_combat_targets={},
+            last_shot_target_id=-1,
+            last_shot_target_name="",
+            equipment_search_failures=0,
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["behavior"]["target_x"] == 119
+        assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
         assert decision["updated_ai_state"]["combat_phase"] == "closing"
 
@@ -2195,7 +2794,7 @@ class TestDecideTeleportToFarTarget:
             patrol_waypoint_index=0,
             last_scan_ms=99500,
             last_shoot_ms=0,
-            last_map_open_ms=99500,
+            last_map_open_ms=94000,
             combat_target_id=50,
             combat_target_x=110,
             combat_target_y=100,
@@ -2212,6 +2811,50 @@ class TestDecideTeleportToFarTarget:
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_target_id"] == 60
+
+    def test_stale_killed_target_is_not_reacquired_from_old_sighting(self) -> None:
+        """Killed targets stay suppressed until a newer sighting exists."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="KilledEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=90000,
+            ),
+        }
+        world, _ = _make_world(fuel=800, tanks=tanks)
+
+        filtered = _filter_killed_tanks(world, {"50": 95000})
+
+        assert "50" not in filtered["tanks"]
+
+    def test_killed_target_can_return_after_newer_sighting(self) -> None:
+        """A newer post-kill sighting can re-enter the threat set."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="RespawnedEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=96000,
+            ),
+        }
+        world, _ = _make_world(fuel=800, tanks=tanks)
+
+        filtered = _filter_killed_tanks(world, {"50": 95000})
+
+        assert "50" in filtered["tanks"]
 
     def test_no_teleport_when_fuel_too_low(self) -> None:
         """decide() skips teleport when fuel can't cover cost + critical."""
@@ -2355,6 +2998,53 @@ class TestDecideBlockedCombatTargets:
         # Target 50 should be in blocked_combat_targets
         blocked = decision["updated_ai_state"]["blocked_combat_targets"]
         assert "50" in blocked
+
+    def test_failed_combat_landing_is_not_retried(self) -> None:
+        """A previously failed combat landing blocks the target instead of looping teleport."""
+        tanks: dict[str, TankStateDict] = {
+            "50": TankStateDict(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="FailedLanding",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+            "60": TankStateDict(
+                tank_id=60,
+                x=103,
+                y=100,
+                team=2,
+                rank=1,
+                name="Reachable",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = _make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "combat_target_id": 50,
+                "combat_target_x": 120,
+                "combat_target_y": 100,
+                "combat_phase": "closing",
+            }
+        )
+        inventory = _make_inventory()
+        mark_move_target_failed(119, 100, 99000)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "map_open"
+        assert "Reachable" in decision["behavior"]["reason"]
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
     def test_no_landing_tile_blocks_target_with_no_alternatives(self) -> None:
         """When landing fails and no other threats exist, falls back to generic search."""
@@ -2582,20 +3272,86 @@ class TestDecideBlockedEdgeSearch:
         """Reset world state before each test."""
         reset_world_state()
 
+    def _blocked_exploration_terrain(
+        self,
+        world: WorldStateDict,
+        self_state: SelfStateDict,
+    ) -> FakeTerrainMap:
+        """Build terrain that blocks every exploration candidate and landing tile.
+
+        Args:
+            world: World state under test.
+            self_state: Player state under test.
+
+        Returns:
+            FakeTerrainMap with all exploration targets and their adjacent
+            teleport landing tiles blocked.
+        """
+        ctx = _DecideCtx(
+            world,
+            self_state,
+            _scanned_ai_state(),
+            _make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        terrain_data: dict[tuple[int, int], str] = {}
+        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+            terrain_data[(candidate_x, candidate_y)] = "W"
+            terrain_data[(candidate_x - 1, candidate_y)] = "#"
+            terrain_data[(candidate_x + 1, candidate_y)] = "#"
+            terrain_data[(candidate_x, candidate_y - 1)] = "#"
+            terrain_data[(candidate_x, candidate_y + 1)] = "#"
+        return FakeTerrainMap(terrain_data=terrain_data)
+
+    def test_fallback_uses_alternate_edge_when_preferred_candidate_blocked(self) -> None:
+        """Fallback tries more than one exploration candidate before reopening map."""
+        world, self_state = _make_world(fuel=800)
+        config = make_default_ai_config()
+        ai_state = AIStateDict(
+            config=config,
+            active_mode="HUNT",
+            patrol_waypoint_index=0,
+            last_scan_ms=99000,
+            last_shoot_ms=0,
+            last_map_open_ms=99000,
+            combat_target_id=-1,
+            combat_target_x=0,
+            combat_target_y=0,
+            combat_phase="none",
+            killed_tank_ids={},
+            blocked_combat_targets={},
+            last_shot_target_id=-1,
+            last_shot_target_name="",
+            equipment_search_failures=0,
+        )
+        inventory = _make_inventory()
+        terrain = FakeTerrainMap(
+            terrain_data={
+                (107, 107): "#",
+                (106, 107): "#",
+                (108, 107): "#",
+                (107, 106): "#",
+                (107, 108): "#",
+            }
+        )
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["command"]["cmd_type"] == "move"
+        assert decision["behavior"]["reason"] == "edge_for_enemies"
+        assert (
+            decision["behavior"]["target_x"],
+            decision["behavior"]["target_y"],
+        ) != (107, 107)
+
     def test_low_fuel_blocked_edge_search_falls_through(self) -> None:
         """Blocked edge scouting with no landing tile falls through to hunt fallback."""
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
-        # Block actionable viewport edge target (107,107) and all its neighbors
-        terrain_data: dict[tuple[int, int], str] = {
-            (107, 107): "W",
-            (108, 107): "W",
-            (106, 107): "W",
-            (107, 108): "#",
-            (107, 106): "#",
-        }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = self._blocked_exploration_terrain(world, self_state)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
