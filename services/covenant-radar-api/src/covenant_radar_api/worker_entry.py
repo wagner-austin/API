@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from covenant_ml.optimizer import use_real_optuna
 from platform_core.config import _require_env_str
 from platform_core.job_events import default_events_channel
 from platform_core.logging import get_logger, setup_logging
@@ -12,9 +11,6 @@ from platform_core.queues import COVENANT_QUEUE
 from platform_workers.rq_harness import WorkerConfig, run_rq_worker
 
 from covenant_radar_api import _test_hooks
-
-# Wire real Optuna at module load for hyperparameter optimization
-use_real_optuna()
 
 
 class LoggerProtocol(Protocol):
@@ -83,6 +79,12 @@ def main(
         logger: Logger instance. If None, uses default logger after setup.
         runner: Worker runner function. If None, uses _get_default_runner().
     """
+    from cleargbm._rust_adapters import use_rust_backend
+    from covenant_ml.optimizer import use_real_optuna
+
+    use_real_optuna()
+    use_rust_backend()
+
     setup_logging(
         level="INFO",
         format_mode="json",
