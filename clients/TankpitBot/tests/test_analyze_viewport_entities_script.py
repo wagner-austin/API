@@ -134,8 +134,8 @@ class TestAnalyzeViewportEntitiesScript:
         output = capsys.readouterr().out
         assert "viewport_updates=1" in output
         assert "viewport=(10,20)" in output
-        assert "anonymous_tanks=1" in output
-        assert "entity_id=-1" in output
+        assert "equipment_cache=1" in output
+        assert "cache_value=-1" in output
 
     def test_exits_when_file_missing(self, _fake_fs: FakeFileSystem) -> None:
         """Exits with code 1 when the capture session does not exist."""
