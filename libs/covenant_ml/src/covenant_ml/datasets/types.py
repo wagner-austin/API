@@ -102,6 +102,52 @@ class TargetColumnSpec(TypedDict, total=True):
     negative_values: tuple[str | int, ...]
 
 
+class RegressionTargetSpec(TypedDict, total=True):
+    """Specification for the continuous target column in a regression dataset.
+
+    Defines how to identify the target column. No label encoding needed
+    because the target is a continuous float value.
+
+    Attributes:
+        column_name: Name of the target column in the dataset.
+    """
+
+    column_name: str
+
+
+class RegressionDatasetConfig(TypedDict, total=True):
+    """Configuration for loading a regression dataset.
+
+    Parallel to DatasetConfig (classification). Key difference:
+    no positive/negative label encoding — target is continuous.
+
+    Attributes:
+        name: Unique identifier (e.g., "financial_distress").
+        display_name: Human-readable name for display.
+        folder: Subfolder under data/external/.
+        file_name: Primary data file name.
+        file_format: File format (csv, arff, excel).
+        encoding: File encoding (utf-8, utf-8-sig, etc.).
+        target: Regression target column specification.
+        exclude_columns: Columns to drop (IDs, dates, names).
+        n_samples_expected: Expected sample count for validation.
+        n_features_expected: Expected feature count for validation.
+        target_mean_expected: Expected target mean for validation.
+    """
+
+    name: str
+    display_name: str
+    folder: str
+    file_name: str
+    file_format: FileFormat
+    encoding: FileEncoding
+    target: RegressionTargetSpec
+    exclude_columns: tuple[str, ...]
+    n_samples_expected: int
+    n_features_expected: int
+    target_mean_expected: float
+
+
 class DatasetConfig(TypedDict, total=True):
     """Configuration for loading a single dataset.
 
@@ -204,6 +250,36 @@ class DatasetMeta(TypedDict, total=True):
     categorical_encodings: tuple[CategoricalEncoding, ...]
 
 
+class RegressionDatasetMeta(TypedDict, total=True):
+    """Metadata about a loaded regression dataset.
+
+    Parallel to DatasetMeta (classification). No n_positive/n_negative/
+    positive_ratio — instead has target distribution statistics.
+
+    Attributes:
+        name: Dataset identifier.
+        n_samples: Total number of samples.
+        n_features: Number of feature columns.
+        target_mean: Mean of target values.
+        target_std: Standard deviation of target values.
+        target_min: Minimum target value.
+        target_max: Maximum target value.
+        feature_names: Ordered tuple of feature column names.
+        categorical_encodings: Tuple of encodings for categorical columns.
+            Empty tuple if no categorical columns were encoded.
+    """
+
+    name: str
+    n_samples: int
+    n_features: int
+    target_mean: float
+    target_std: float
+    target_min: float
+    target_max: float
+    feature_names: tuple[str, ...]
+    categorical_encodings: tuple[CategoricalEncoding, ...]
+
+
 class LoadedDataset(TypedDict, total=True):
     """A fully loaded and validated dataset ready for ML.
 
@@ -223,17 +299,17 @@ class LoadedDataset(TypedDict, total=True):
 class RegressionLoadedDataset(TypedDict, total=True):
     """A fully loaded dataset with continuous regression targets.
 
-    Parallel to LoadedDataset (classification). The key difference is
-    y: NDArray[np.float64] (continuous targets) instead of NDArray[np.int64]
-    (binary labels).
+    Parallel to LoadedDataset (classification). Uses RegressionDatasetMeta
+    with target distribution statistics instead of classification-specific
+    fields (n_positive, n_negative, positive_ratio).
 
     Attributes:
-        meta: Dataset metadata with statistics.
+        meta: Regression dataset metadata with target statistics.
         x: Feature matrix of shape (n_samples, n_features).
         y: Continuous target values of shape (n_samples,).
     """
 
-    meta: DatasetMeta
+    meta: RegressionDatasetMeta
     x: NDArray[np.float64]
     y: NDArray[np.float64]
 
@@ -1226,7 +1302,10 @@ __all__ = [
     "MetricTrendResult",
     "RankTrendConfig",
     "RankTrendResult",
+    "RegressionDatasetConfig",
+    "RegressionDatasetMeta",
     "RegressionLoadedDataset",
+    "RegressionTargetSpec",
     "SeasonDefinition",
     "SeasonalCycleCoefficients",
     "TailThresholds",
