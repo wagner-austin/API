@@ -1,4 +1,4 @@
-"""Tests for scripts/optimize/_runners.py - backend-specific runners with progress.
+"""Tests for scripts/optimize/_runners.py - unified runner with progress.
 
 Tests run_single_with_progress function that handles optimization with
 progress bar integration and history tracking.
@@ -13,12 +13,15 @@ from pathlib import Path
 import scripts._test_hooks as _hooks
 from covenant_ml.backends.registry import BackendRegistration, ClassifierRegistry
 from covenant_ml.datasets import DatasetRegistry
+from covenant_ml.types import BackendName
 from scripts._test_hooks import (
-    ClearGBMOptimizationResult,
-    LightGBMOptimizationResult,
-    LSTMOptimizationResult,
-    MLPOptimizationResult,
-    XGBoostOptimizationResult,
+    LoadingProgressCallbackProtocol,
+    LoadingProgressInfo,
+    PhaseProgressCallbackProtocol,
+    PhaseProgressInfo,
+    TrialProgressCallbackProtocol,
+    TrialProgressInfo,
+    UnifiedOptimizationResult,
 )
 from scripts.optimize._runners import run_single_with_progress
 
@@ -34,6 +37,71 @@ from .conftest import (
 )
 
 
+def _make_phase_infos(
+    backend: BackendName,
+    dataset: str = "taiwan",
+) -> list[PhaseProgressInfo]:
+    """Create the four standard phase progress infos.
+
+    Args:
+        backend: Backend name.
+        dataset: Dataset name.
+
+    Returns:
+        List of PhaseProgressInfo for all four phases.
+    """
+    return [
+        {
+            "phase": "loading_data",
+            "backend": backend,
+            "dataset": dataset,
+            "n_samples": 0,
+            "n_features": 0,
+        },
+        {
+            "phase": "feature_engineering",
+            "backend": backend,
+            "dataset": dataset,
+            "n_samples": 1000,
+            "n_features": 100,
+        },
+        {
+            "phase": "optimizing",
+            "backend": backend,
+            "dataset": dataset,
+            "n_samples": 1000,
+            "n_features": 150,
+        },
+        {
+            "phase": "saving",
+            "backend": backend,
+            "dataset": dataset,
+            "n_samples": 1000,
+            "n_features": 150,
+        },
+    ]
+
+
+def _make_trial_info(backend: BackendName) -> TrialProgressInfo:
+    """Create a standard trial progress info.
+
+    Args:
+        backend: Backend name.
+
+    Returns:
+        TrialProgressInfo for a single trial.
+    """
+    return {
+        "backend": backend,
+        "trial_number": 1,
+        "n_trials_total": 5,
+        "current_value": 0.80,
+        "best_value": 0.80,
+        "best_trial": 1,
+        "is_best": True,
+    }
+
+
 class TestRunSingleWithProgress:
     """Tests for run_single_with_progress function."""
 
@@ -45,64 +113,21 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            # Exercise the phase callback if provided
             if phase_callback is not None:
-                phase_callback(
-                    {
-                        "phase": "loading_data",
-                        "dataset": "taiwan",
-                        "n_samples": 0,
-                        "n_features": 0,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "feature_engineering",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "optimizing",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "saving",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
+                for info in _make_phase_infos("xgboost"):
+                    phase_callback(info)
             if progress_callback is not None:
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.1,
-                        "best_max_depth": 6,
-                        "best_n_estimators": 100,
-                    }
-                )
+                progress_callback(_make_trial_info("xgboost"))
             return make_fake_result()
 
-        original = _hooks.xgboost_runner
-        _hooks.xgboost_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "xgboost", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -111,7 +136,7 @@ class TestRunSingleWithProgress:
             assert result["backend"] == "xgboost"
             assert result["result"]["backend"] == "xgboost"
         finally:
-            _hooks.xgboost_runner = original
+            _hooks.optimization_runner = original
 
     def test_runs_mlp_backend(self) -> None:
         """Test run_single_with_progress uses MLP backend correctly."""
@@ -121,65 +146,21 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.MLPTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.MLPPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.MLPLoadingProgressCallbackProtocol | None = None,
-        ) -> MLPOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            # Exercise the phase callback if provided
             if phase_callback is not None:
-                phase_callback(
-                    {
-                        "phase": "loading_data",
-                        "dataset": "taiwan",
-                        "n_samples": 0,
-                        "n_features": 0,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "feature_engineering",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "optimizing",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "saving",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
+                for info in _make_phase_infos("mlp"):
+                    phase_callback(info)
             if progress_callback is not None:
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.001,
-                        "best_n_layers": 3,
-                        "best_hidden_size": 128,
-                        "best_dropout": 0.2,
-                    }
-                )
+                progress_callback(_make_trial_info("mlp"))
             return make_fake_mlp_result()
 
-        original = _hooks.mlp_runner
-        _hooks.mlp_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "mlp", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -188,7 +169,7 @@ class TestRunSingleWithProgress:
             assert result["backend"] == "mlp"
             assert result["result"]["backend"] == "mlp"
         finally:
-            _hooks.mlp_runner = original
+            _hooks.optimization_runner = original
 
     def test_runs_lightgbm_backend(self) -> None:
         """Test run_single_with_progress uses LightGBM backend correctly."""
@@ -199,67 +180,22 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.LightGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LightGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LightGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> LightGBMOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            # Exercise the phase callback if provided
             if phase_callback is not None:
-                phase_callback(
-                    {
-                        "phase": "loading_data",
-                        "dataset": "taiwan",
-                        "n_samples": 0,
-                        "n_features": 0,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "feature_engineering",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 24,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "optimizing",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "saving",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
+                for info in _make_phase_infos("lightgbm"):
+                    phase_callback(info)
                 phase_calls.append("called")
             if progress_callback is not None:
-                # Note: LightGBM progress info doesn't include best_max_depth
-                # because it's fixed at -1 (num_leaves controls complexity)
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.1,
-                        "best_n_estimators": 100,
-                        "best_num_leaves": 31,
-                    }
-                )
+                progress_callback(_make_trial_info("lightgbm"))
             return make_fake_lightgbm_result()
 
-        original = _hooks.lightgbm_runner
-        _hooks.lightgbm_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "lightgbm", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -267,9 +203,9 @@ class TestRunSingleWithProgress:
             assert call_count == 1
             assert result["backend"] == "lightgbm"
             assert result["result"]["backend"] == "lightgbm"
-            assert len(phase_calls) == 1  # Phase callback was called
+            assert len(phase_calls) == 1
         finally:
-            _hooks.lightgbm_runner = original
+            _hooks.optimization_runner = original
 
     def test_runs_lstm_backend(self) -> None:
         """Test run_single_with_progress uses LSTM backend correctly."""
@@ -279,65 +215,21 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.LSTMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.LSTMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.LSTMLoadingProgressCallbackProtocol | None = None,
-        ) -> LSTMOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            # Exercise the phase callback if provided
             if phase_callback is not None:
-                phase_callback(
-                    {
-                        "phase": "loading_data",
-                        "dataset": "taiwan",
-                        "n_samples": 0,
-                        "n_features": 0,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "feature_engineering",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "optimizing",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "saving",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
+                for info in _make_phase_infos("lstm"):
+                    phase_callback(info)
             if progress_callback is not None:
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.001,
-                        "best_num_layers": 2,
-                        "best_hidden_size": 64,
-                        "best_dropout": 0.2,
-                    }
-                )
+                progress_callback(_make_trial_info("lstm"))
             return make_fake_lstm_result()
 
-        original = _hooks.lstm_runner
-        _hooks.lstm_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "lstm", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -346,7 +238,7 @@ class TestRunSingleWithProgress:
             assert result["backend"] == "lstm"
             assert result["result"]["backend"] == "lstm"
         finally:
-            _hooks.lstm_runner = original
+            _hooks.optimization_runner = original
 
     def test_runs_cleargbm_backend(self) -> None:
         """Test run_single_with_progress uses ClearGBM backend correctly."""
@@ -356,75 +248,31 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.ClearGBMTrialProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.ClearGBMPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.ClearGBMLoadingProgressCallbackProtocol | None = None,
-        ) -> ClearGBMOptimizationResult:
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
             nonlocal call_count
             call_count += 1
-            # Exercise the phase callback if provided
             if phase_callback is not None:
-                phase_callback(
-                    {
-                        "phase": "loading_data",
-                        "dataset": "taiwan",
-                        "n_samples": 0,
-                        "n_features": 0,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "feature_engineering",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 100,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "optimizing",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
-                phase_callback(
-                    {
-                        "phase": "saving",
-                        "dataset": "taiwan",
-                        "n_samples": 1000,
-                        "n_features": 150,
-                    }
-                )
+                for info in _make_phase_infos("cleargbm"):
+                    phase_callback(info)
             if progress_callback is not None:
-                progress_callback(
-                    {
-                        "trial_number": 1,
-                        "n_trials_total": 5,
-                        "current_auc": 0.80,
-                        "best_auc": 0.80,
-                        "best_trial": 1,
-                        "is_best": True,
-                        "best_learning_rate": 0.1,
-                        "best_max_depth": 5,
-                        "best_n_estimators": 100,
-                    }
-                )
+                progress_callback(_make_trial_info("cleargbm"))
             if loading_progress_callback is not None:
-                loading_progress_callback(
-                    {
-                        "dataset": "taiwan",
-                        "phase": "reading",
-                        "percent_complete": 100.0,
-                        "rows_processed": 1000,
-                        "rows_total": 1000,
-                        "message": "Loaded 1000 rows",
-                    }
-                )
+                loading_info: LoadingProgressInfo = {
+                    "dataset": "taiwan",
+                    "phase": "reading",
+                    "percent_complete": 100.0,
+                    "rows_processed": 1000,
+                    "rows_total": 1000,
+                    "message": "Loaded 1000 rows",
+                }
+                loading_progress_callback(loading_info)
             return make_fake_cleargbm_result()
 
-        original = _hooks.cleargbm_runner
-        _hooks.cleargbm_runner = fake_runner
+        original = _hooks.optimization_runner
+        _hooks.optimization_runner = fake_runner
         try:
             result = run_single_with_progress(
                 "cleargbm", "taiwan", 5, "full", "cpu", None, save_model=False
@@ -433,21 +281,19 @@ class TestRunSingleWithProgress:
             assert result["backend"] == "cleargbm"
             assert result["result"]["backend"] == "cleargbm"
         finally:
-            _hooks.cleargbm_runner = original
+            _hooks.optimization_runner = original
 
     def test_run_single_with_save_model_true(self, tmp_path: Path) -> None:
         """Test run_single_with_progress with save_model=True.
 
-        This covers the save_model branch in run_single_backend (modes.py line 363).
+        This covers the save_model branch in run_single_with_progress.
         """
-        # Set up fake registries using shared classes
         fake_backend = FakeSaveModelBackend()
         fake_registry = ClassifierRegistry()
         fake_registry.register("xgboost", BackendRegistration(lambda: fake_backend))
         fake_dataset_reg = DatasetRegistry((make_fake_dataset_config("taiwan"),))
 
-        # Store originals
-        orig_runner = _hooks.xgboost_runner
+        orig_runner = _hooks.optimization_runner
         orig_backend_reg = _hooks.backend_registry_factory
         orig_dataset_reg = _hooks.dataset_registry_factory
         orig_loader = _hooks.dataset_loader
@@ -456,38 +302,34 @@ class TestRunSingleWithProgress:
             config_json: str,
             external_dir: Path,
             output_dir: Path,
-            progress_callback: _hooks.XGBoostProgressCallbackProtocol | None = None,
-            phase_callback: _hooks.XGBoostPhaseCallbackProtocol | None = None,
-            loading_progress_callback: _hooks.XGBoostLoadingProgressCallbackProtocol | None = None,
-        ) -> XGBoostOptimizationResult:
-            _ = progress_callback  # Available for progress reporting
-            _ = phase_callback  # Available for phase reporting
+            progress_callback: TrialProgressCallbackProtocol | None = None,
+            phase_callback: PhaseProgressCallbackProtocol | None = None,
+            loading_progress_callback: LoadingProgressCallbackProtocol | None = None,
+        ) -> UnifiedOptimizationResult:
+            _ = progress_callback
+            _ = phase_callback
             return make_fake_result()
 
-        _hooks.xgboost_runner = fake_runner
+        _hooks.optimization_runner = fake_runner
         _hooks.backend_registry_factory = lambda: fake_registry
         _hooks.dataset_registry_factory = lambda: fake_dataset_reg
         _hooks.dataset_loader = lambda cfg, ext_dir: make_fake_loaded_dataset()
 
         try:
-            # Create necessary directories
             (tmp_path / "data" / "external").mkdir(parents=True, exist_ok=True)
             (tmp_path / "models").mkdir(parents=True, exist_ok=True)
 
-            # Run with save_model=True
             result = run_single_with_progress(
                 "xgboost", "taiwan", 5, "full", "cpu", None, save_model=True, project_root=tmp_path
             )
 
-            # Verify the result is returned correctly
             assert result["backend"] == "xgboost"
             assert result["result"]["backend"] == "xgboost"
 
-            # Verify model was saved
             model_dir = tmp_path / "models" / "xgboost"
             assert model_dir.exists()
         finally:
-            _hooks.xgboost_runner = orig_runner
+            _hooks.optimization_runner = orig_runner
             _hooks.backend_registry_factory = orig_backend_reg
             _hooks.dataset_registry_factory = orig_dataset_reg
             _hooks.dataset_loader = orig_loader
