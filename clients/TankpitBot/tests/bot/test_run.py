@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import FakeEnv
+from tests.conftest import FakeEnv, FakeFileSystem
 
 
 class TestBotGameLoop:
@@ -74,7 +74,7 @@ class TestBotRunMethod:
 class TestBotBaseMain:
     """Tests for bot.base.main function."""
 
-    def test_main_creates_and_runs_bot(self, fake_env: FakeEnv) -> None:
+    def test_main_creates_and_runs_bot(self, fake_env: FakeEnv, fake_fs: FakeFileSystem) -> None:
         """Test main() creates Bot and calls run()."""
         from tankpit_bot import _test_hooks
         from tankpit_bot._test_hooks import SyncPlaywrightContextManagerProtocol
@@ -103,8 +103,17 @@ class TestBotBaseMain:
 
         if not factory_called:
             raise AssertionError("Expected sync_playwright factory to be called")
+        written_files = fake_fs.get_written_files()
+        if "runs\\bot\\latest.log" not in written_files:
+            raise AssertionError("Expected bot runtime latest log artifact")
+        if "runs\\bot\\latest.events.jsonl" not in written_files:
+            raise AssertionError("Expected bot runtime latest events artifact")
 
-    def test_main_sets_sync_playwright_when_none(self, fake_env: FakeEnv) -> None:
+    def test_main_sets_sync_playwright_when_none(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
         """Test main() sets sync_playwright when it is None.
 
         This covers line 672 where sync_playwright is set from get_sync_playwright().
@@ -146,6 +155,9 @@ class TestBotBaseMain:
 
         if not get_called:
             raise AssertionError("Expected get_sync_playwright to be called")
+        written_files = fake_fs.get_written_files()
+        if "runs\\bot\\latest.log" not in written_files:
+            raise AssertionError("Expected bot runtime latest log artifact")
 
 
 class TestBotGameLoopStates:
