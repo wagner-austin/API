@@ -23,7 +23,9 @@ systems:
 - execution state in `src/tankpit_bot/bot/states.py`
 - in-flight action lifecycle in `src/tankpit_bot/bot/states.py`
 - AI memory in `src/tankpit_bot/bot/ai/types.py`
-- strategic arbitration in `src/tankpit_bot/bot/ai_strategy.py`
+- strategic arbitration in `src/tankpit_bot/bot/ai_strategy.py` (orchestration),
+  `src/tankpit_bot/bot/ai/context.py` (shared state),
+  `src/tankpit_bot/bot/ai/movement.py`, `src/tankpit_bot/bot/ai/combat_strategy.py`
 
 That creates these concrete problems:
 
@@ -162,10 +164,13 @@ Make target trust explicit enough that stale actions can be blocked.
 ### Files
 
 - `src/tankpit_bot/state/types.py`
-- `src/tankpit_bot/sniffer/world_state.py`
+- `src/tankpit_bot/sniffer/world_state.py` (core state)
+- `src/tankpit_bot/sniffer/world_state_radar.py` (radar freshness)
+- `src/tankpit_bot/sniffer/world_state_containers.py` (container freshness)
+- `src/tankpit_bot/sniffer/world_state_tanks.py` (tank freshness)
 - `src/tankpit_bot/bot/ai/threats.py`
 - `src/tankpit_bot/bot/executor.py`
-- tests in `tests/world_state/` and `tests/bot/`
+- tests in `tests/world_state/`, `tests/sniffer/`, and `tests/bot/`
 
 ### Deliverables
 
@@ -227,8 +232,10 @@ one shot.
 ### Files
 
 - `src/tankpit_bot/bot/ai/types.py`
-- `src/tankpit_bot/bot/ai_strategy.py`
+- `src/tankpit_bot/bot/ai/context.py` (DecideCtx gains mode fields)
+- `src/tankpit_bot/bot/ai_strategy.py` (mode-lock migration rule)
 - `tests/bot/ai/test_types.py`
+- `tests/bot/ai/test_context.py`
 - `tests/bot/test_ai_strategy.py`
 
 ### Deliverables
@@ -271,10 +278,11 @@ Turn equipment recovery into the first real HFSM mode.
 
 ### Files
 
-- `src/tankpit_bot/bot/ai_strategy.py`
+- `src/tankpit_bot/bot/ai_strategy.py` (equipment recovery mode entry)
+- `src/tankpit_bot/bot/ai/context.py` (mode state helpers)
 - `src/tankpit_bot/bot/ai/types.py`
 - possibly `src/tankpit_bot/bot/executor.py`
-- tests in `tests/bot/test_ai_strategy.py`
+- tests in `tests/bot/test_ai_strategy.py` and `tests/bot/ai/test_strategy_coverage.py`
 
 ### Deliverables
 
@@ -315,9 +323,10 @@ Turn fuel recovery into the second real HFSM mode.
 
 ### Files
 
-- `src/tankpit_bot/bot/ai_strategy.py`
+- `src/tankpit_bot/bot/ai_strategy.py` (fuel recovery mode entry)
+- `src/tankpit_bot/bot/ai/movement.py` (durable navigation goals)
 - `src/tankpit_bot/bot/ai/pathfinding.py`
-- tests in `tests/bot/`
+- tests in `tests/bot/` and `tests/bot/ai/`
 
 ### Deliverables
 
@@ -350,9 +359,10 @@ Move combat into a durable HFSM mode.
 
 ### Files
 
-- `src/tankpit_bot/bot/ai_strategy.py`
+- `src/tankpit_bot/bot/ai/combat_strategy.py` (combat mode substates)
+- `src/tankpit_bot/bot/ai_strategy.py` (hunt mode entry)
 - `src/tankpit_bot/bot/executor.py`
-- tests in `tests/bot/`
+- tests in `tests/bot/` and `tests/bot/ai/test_combat_strategy.py`
 
 ### Deliverables
 
@@ -387,7 +397,10 @@ Remove obsolete flat-priority branches once equivalent HFSM modes are stable.
 ### Files
 
 - `src/tankpit_bot/bot/ai_strategy.py`
-- tests in `tests/bot/`
+- `src/tankpit_bot/bot/ai/context.py`
+- `src/tankpit_bot/bot/ai/movement.py`
+- `src/tankpit_bot/bot/ai/combat_strategy.py`
+- tests in `tests/bot/` and `tests/bot/ai/`
 - docs
 
 ### Deliverables
