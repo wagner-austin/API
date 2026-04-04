@@ -27,7 +27,8 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
-from tankpit_bot.sniffer.world_state import get_world_state, render_world_state_ascii
+from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 from tankpit_bot.state import ContainerStateDict, coord_key
 
 log = get_logger(__name__)
