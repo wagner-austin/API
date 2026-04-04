@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tests.conftest import FakeEnv
 
 
@@ -45,7 +47,6 @@ class TestBotWithWorldState:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -63,7 +64,6 @@ class TestBotWithWorldState:
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
@@ -83,7 +83,6 @@ class TestBotWithWorldState:
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
