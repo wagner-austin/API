@@ -22,17 +22,19 @@ from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_logging import emit_ai, emit_sync
 from tankpit_bot.sniffer.world_state import (
+    get_terrain_map,
+    mark_move_target_failed,
+    mark_scan_viewport_failed,
+)
+from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
     drain_killed_tank_ids,
-    get_inventory_state,
-    get_terrain_map,
-    increment_container_failed_pickups,
-    mark_move_target_failed,
-    mark_scan_viewport_failed,
     peek_combat_hit,
     peek_our_shot_response,
 )
+from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
+from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
 
