@@ -8,7 +8,8 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 from tankpit_bot.protocol.commands import (
     CMD_MAP_TELEPORT,
     CMD_MOVE,
-    CMD_PICKUP_MOVE,
+    CMD_PICKUP_EQUIPMENT,
+    CMD_PICKUP_FUEL,
     CMD_RADAR,
     CMD_SCOPE,
     CMD_SHOOT,
@@ -22,7 +23,8 @@ from tankpit_bot.protocol.commands import (
     ActionCommand,
     QueryCommand,
     build_move_command,
-    build_pickup_command,
+    build_pickup_equipment_command,
+    build_pickup_fuel_command,
     build_query_command,
     build_scope_command,
     build_shoot_command,
@@ -402,22 +404,41 @@ class TestBuildMoveCommand:
         assert result[6] == 1  # 257 & 0xFF
 
 
-class TestBuildPickupCommand:
-    """Tests for build_pickup_command."""
+class TestBuildPickupFuelCommand:
+    """Tests for build_pickup_fuel_command."""
 
     def test_builds_correct_format(self) -> None:
-        """Test pickup command has correct wire format."""
-        result = build_pickup_command(50, 60)
+        """Test fuel pickup command has correct wire format."""
+        result = build_pickup_fuel_command(50, 60)
 
         assert result[2] == COMMAND_PREFIX
         assert result[3] == TYPE_MOVEMENT
-        assert result[4] == CMD_PICKUP_MOVE
+        assert result[4] == CMD_PICKUP_FUEL
         assert result[5] == 50
         assert result[6] == 60
 
     def test_total_length_is_7(self) -> None:
-        """Test pickup command is 7 bytes total."""
-        result = build_pickup_command(0, 0)
+        """Test fuel pickup command is 7 bytes total."""
+        result = build_pickup_fuel_command(0, 0)
+        assert len(result) == 7
+
+
+class TestBuildPickupEquipmentCommand:
+    """Tests for build_pickup_equipment_command."""
+
+    def test_builds_correct_format(self) -> None:
+        """Test equipment pickup command has correct wire format."""
+        result = build_pickup_equipment_command(50, 60)
+
+        assert result[2] == COMMAND_PREFIX
+        assert result[3] == TYPE_MOVEMENT
+        assert result[4] == CMD_PICKUP_EQUIPMENT
+        assert result[5] == 50
+        assert result[6] == 60
+
+    def test_total_length_is_7(self) -> None:
+        """Test equipment pickup command is 7 bytes total."""
+        result = build_pickup_equipment_command(0, 0)
         assert len(result) == 7
 
 
