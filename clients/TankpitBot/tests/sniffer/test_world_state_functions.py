@@ -247,7 +247,7 @@ class TestContainerUpdate:
     def test_update_world_state_from_tank_registry_container_no_viewport(self) -> None:
         """Tank-registry container hints are ignored when viewport is unknown."""
         from tankpit_bot.sniffer import viewport
-        from tankpit_bot.sniffer.world_state import (
+        from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_tank_registry_container,
         )
 
@@ -261,7 +261,7 @@ class TestContainerUpdate:
     def test_update_world_state_from_tank_registry_container_with_viewport(self) -> None:
         """Tank-registry container hints are ignored even when viewport is known."""
         from tankpit_bot.sniffer import viewport
-        from tankpit_bot.sniffer.world_state import (
+        from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_tank_registry_container,
         )
 
@@ -288,7 +288,7 @@ class TestFuelUpdate:
 
     def test_update_world_state_from_fuel_total(self) -> None:
         """Test fuel total sets self_state fuel to absolute value."""
-        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_total
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         # First set up a position to create self_state
         update_world_state_from_position(100, 100)
@@ -303,7 +303,7 @@ class TestFuelUpdate:
 
     def test_update_world_state_from_fuel_total_no_self_state(self) -> None:
         """Test fuel total does nothing when self_state is None."""
-        from tankpit_bot.sniffer.world_state import update_world_state_from_fuel_total
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         # Reset to ensure no self_state
         reset_world_state()
@@ -333,7 +333,7 @@ class TestContainerPickup:
     def test_update_world_state_from_container_pickup(self) -> None:
         """Test container pickup removes container and adds fuel."""
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
-        from tankpit_bot.sniffer.world_state import (
+        from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_container_pickup,
         )
 
