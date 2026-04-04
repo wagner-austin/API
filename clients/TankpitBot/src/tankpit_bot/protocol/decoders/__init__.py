@@ -269,6 +269,51 @@ _TUNNELED_SUBTYPES: frozenset[int] = frozenset(
     }
 )
 
+# Minimum inner-payload lengths for tunneled subtypes. When a 0x2E envelope
+# contains a known subtype, the inner data (after stripping the subtype byte)
+# must meet this minimum before decode is attempted. Subtypes absent from
+# this map have no minimum (e.g. Sync, TerrainUpdate).
+_TUNNELED_MIN_LENGTHS: dict[int, int] = {
+    MSG_TANK_INFO: 10,
+    MSG_TANK_ENTRY: 10,
+    MSG_MOVE_RESPONSE: 11,
+    MSG_TANK_STATUS_FULL: 13,
+    MSG_DEACTIVATE: 7,
+    MSG_FUEL_GAIN: 3,
+    MSG_RADAR_RESULT: 2,
+    MSG_MOVEMENT: 9,
+    MSG_INVENTORY: 6,
+    MSG_SHOOT: 12,
+    MSG_VIEWPORT: 2,
+    MSG_FUEL_DEPOSIT: 2,
+    MSG_EQUIP_GAIN: 6,
+    MSG_EQUIP_TOGGLE: 5,
+}
+
+
+def _is_tunneled_radar_scan_structure(data: bytes) -> bool:
+    """Check if inner 0x4F payload has valid radar scan result structure.
+
+    The tunneled 0x2E -> 0x4F form is a radar scan result with a container
+    count byte, a flags byte, 4-byte container entries, then 3-byte mine
+    entries. This structural check prevents DecodeError when the payload
+    is actually a combined tile update that happens to share the 0x4F subtype.
+
+    Args:
+        data: Inner payload (after stripping the 0x4F subtype byte).
+
+    Returns:
+        True if the data structurally matches the radar scan result format.
+    """
+    if len(data) < 2:
+        return False
+    container_count = data[0]
+    expected_container_bytes = container_count * 4
+    if 2 + expected_container_bytes > len(data):
+        return False
+    remaining = len(data) - 2 - expected_container_bytes
+    return remaining % 3 == 0
+
 
 def _try_unwrap_0x2e(data: bytes) -> BinaryMessage | None:
     """Try to decode a tunneled protocol message from inside a 0x2E envelope.
@@ -297,17 +342,18 @@ def _try_unwrap_0x2e(data: bytes) -> BinaryMessage | None:
         # 0x2E -> 0x4F is not a normal combined tile update here.
         # Radar scan results are tunneled inside the 0x2E envelope using the
         # inner 0x4F subtype, which collides with the standalone combined tile
-        # patch opcode. Decode the tunneled form as radar first.
-        try:
-            return decode_radar_scan_result(data[1:])
-        except DecodeError:
-            return None
+        # patch opcode. Validate structure before decoding.
+        inner = data[1:]
+        if _is_tunneled_radar_scan_structure(inner):
+            return decode_radar_scan_result(inner)
+        return None
     if subtype not in _TUNNELED_SUBTYPES:
         return None
-    try:
-        return try_decode_binary_message(subtype, data[1:])
-    except DecodeError:
+    inner = data[1:]
+    min_len = _TUNNELED_MIN_LENGTHS.get(subtype)
+    if min_len is not None and len(inner) < min_len:
         return None
+    return try_decode_binary_message(subtype, inner)
 
 
 def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
