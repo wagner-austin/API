@@ -299,13 +299,16 @@ TankpitBot/
 │   │   ├── types.py          # Command TypedDicts
 │   │   ├── vision.py         # Vision/world-state fallback helpers
 │   │   ├── world_sync.py     # CDP buffer drain into decoder pipeline
-│   │   └── ai/               # AI helper modules
-│   │       ├── __init__.py   # Re-exports AI helper modules
-│   │       ├── types.py      # AI config/state/behavior types
-│   │       ├── equipment.py  # Fuel/equipment target selection
-│   │       ├── threats.py    # Enemy analysis from world state
-│   │       ├── pathfinding.py# Terrain-aware path helpers
-│   │       └── tactics.py    # Equipment/radar helper logic
+│   │   └── ai/                      # AI decision modules
+│   │       ├── __init__.py          # Re-exports
+│   │       ├── types.py             # AI config/state/behavior types
+│   │       ├── context.py           # DecideCtx and shared helpers
+│   │       ├── movement.py          # Walk/teleport/exploration planning
+│   │       ├── combat_strategy.py   # Combat phases and targeting
+│   │       ├── equipment.py         # Fuel/equipment target selection
+│   │       ├── threats.py           # Enemy analysis from world state
+│   │       ├── pathfinding.py       # Terrain-aware path helpers
+│   │       └── tactics.py           # Equipment/radar helper logic
 │   │
 │   ├── browser/              # Browser automation package
 │   │   ├── __init__.py
@@ -373,14 +376,22 @@ TankpitBot/
 │   │   ├── player_tracking.py# Player tracking
 │   │   ├── trackers.py       # Tracker coordination
 │   │   ├── viewport.py       # Viewport handling
-│   │   ├── world_state.py    # World state management
-│   │   └── xor.py            # XOR utilities for sniffer
+│   │   ├── world_state.py           # Core state, accessors, reset
+│   │   ├── world_state_combat.py    # Combat hit and kill tracking
+│   │   ├── world_state_containers.py# Container and fuel updates
+│   │   ├── world_state_dispatch.py  # Protocol message routing
+│   │   ├── world_state_inventory.py # Inventory sync/gain/toggle
+│   │   ├── world_state_radar.py     # Radar scan and cache promotion
+│   │   ├── world_state_tanks.py     # Tank state mutations
+│   │   ├── world_state_tiles.py     # Viewport and tile patches
+│   │   └── xor.py                   # XOR utilities for sniffer
 │   │
-│   ├── state/                # Game state package
+│   ├── state/                       # Game state package
 │   │   ├── __init__.py
-│   │   ├── mutations.py      # Immutable state mutations
-│   │   ├── renderer.py       # ASCII state rendering
-│   │   └── types.py          # State TypedDicts (WorldState, SelfState, etc.)
+│   │   ├── mutations.py             # Immutable state mutations
+│   │   ├── renderer.py              # ASCII state rendering
+│   │   ├── types.py                 # State TypedDicts (WorldState, SelfState, etc.)
+│   │   └── viewport_geometry.py     # Viewport dimension constants and helpers
 │   │
 │   └── types/                # Shared types package
 │       ├── __init__.py       # Re-exports all types
@@ -453,7 +464,7 @@ The codebase is organized into focused packages:
 | Package | Purpose |
 |---------|---------|
 | `bot/` | Bot client, state machine, command dispatch |
-| `bot/ai/` | AI behavior system (evaluators, pathfinding, tactics) |
+| `bot/ai/` | AI decision system (context, movement, combat, pathfinding, tactics) |
 | `browser/` | Playwright automation, CDP setup, login flows |
 | `protocol/` | XOR codec, framing, command encoding |
 | `capture/` | Message capture, trackers, statistics |
