@@ -112,7 +112,7 @@ This is especially important for:
 After decode, messages are fed into:
 
 - `dispatch_world_state_update()` in
-  `src/tankpit_bot/sniffer/world_state.py`
+  `src/tankpit_bot/sniffer/world_state_dispatch.py`
 
 This is the central mutation router for:
 
@@ -168,7 +168,7 @@ After sync, the live bot executes:
   - tick orchestration
   - sync / readiness / stall handling
 
-- `ai_strategy.py`
+- `ai_strategy.py` + `ai/context.py` + `ai/movement.py` + `ai/combat_strategy.py`
   - choose one action for the tick
 
 - `executor.py`
@@ -209,7 +209,7 @@ Current behavior:
 - command ID is `CMD_RADAR`
 - sent via `use_radar()`
 - completion is driven by radar ack/result handling in
-  `src/tankpit_bot/sniffer/world_state.py`
+  `src/tankpit_bot/sniffer/world_state_radar.py`
 
 ### Teleport
 
@@ -252,7 +252,9 @@ If you are debugging the protocol/control path, start here:
 1. `src/tankpit_bot/bot/tick_loop.py`
 2. `src/tankpit_bot/bot/world_sync.py`
 3. `src/tankpit_bot/sniffer/decoders.py`
-4. `src/tankpit_bot/sniffer/world_state.py`
-5. `src/tankpit_bot/bot/ai_strategy.py`
-6. `src/tankpit_bot/bot/executor.py`
-7. `src/tankpit_bot/protocol/commands.py`
+4. `src/tankpit_bot/sniffer/world_state_dispatch.py` (protocol routing)
+5. `src/tankpit_bot/sniffer/world_state.py` (core state)
+6. `src/tankpit_bot/bot/ai_strategy.py` (decision orchestration)
+7. `src/tankpit_bot/bot/ai/context.py` (decision context)
+8. `src/tankpit_bot/bot/executor.py`
+9. `src/tankpit_bot/protocol/commands.py`
