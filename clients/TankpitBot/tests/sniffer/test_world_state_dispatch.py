@@ -13,6 +13,20 @@ from tankpit_bot.sniffer import (
     update_world_state_from_radar,
     world_state,
 )
+from tankpit_bot.sniffer.world_state_combat import (
+    check_and_clear_combat_hit,
+    check_and_clear_our_shot_response,
+    check_and_clear_teleport_landed,
+    drain_killed_tank_ids,
+    mark_combat_hit,
+    mark_teleport_landed,
+    peek_combat_hit,
+    peek_our_shot_response,
+)
+from tankpit_bot.sniffer.world_state_inventory import (
+    get_inventory_state,
+    update_inventory_from_protocol,
+)
 from tests.fakes import FakeTerrainMap
 
 
@@ -99,6 +113,48 @@ class TestDispatchRadar:
         dispatch_world_state_update(msg)
 
         assert check_and_clear_radar_scan_complete() is True
+
+
+class TestDispatchRadarEmptyDelta:
+    """Tests for tunneled 0x4F empty radar delta dispatch."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_empty_tunneled_radar_marks_pending_delta(self) -> None:
+        """Dispatching an empty tunneled 0x4F marks a pending radar empty delta."""
+        from tankpit_bot.protocol.types import RadarScanResultDict
+
+        update_world_state_from_position(100, 100)
+        msg = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[])
+
+        dispatch_world_state_update(msg)
+
+        # The empty delta is pending; a RadarAck(found=True) should preserve
+        from tankpit_bot.sniffer.world_state import _consume_pending_radar_empty_delta
+
+        assert _consume_pending_radar_empty_delta() is True
+
+    def test_nonempty_tunneled_radar_processes_immediately(self) -> None:
+        """Dispatching a non-empty tunneled 0x4F processes containers immediately."""
+        from tankpit_bot.protocol.types import RadarScanResultDict
+
+        update_world_state_from_position(100, 100)
+        containers = [RadarContainerDict(x=98, y=98, volume=500)]
+        msg = RadarScanResultDict(msg_type=0x4F, containers=containers, mines=[])
+
+        dispatch_world_state_update(msg)
+
+        from tankpit_bot.sniffer.world_state import _consume_pending_radar_empty_delta
+
+        assert _consume_pending_radar_empty_delta() is False
+        result = world_state.get_world_state()
+        assert "98,98" in result["containers"]
 
 
 class TestDispatchMovement:
@@ -1074,7 +1130,7 @@ class TestWorldStateBlobParsing:
 
     def test_preserves_existing_tank_names(self) -> None:
         """Blob update preserves existing name and is_bot fields."""
-        from tankpit_bot.sniffer.world_state import update_world_state_from_tank_info
+        from tankpit_bot.sniffer.world_state_tanks import update_world_state_from_tank_info
 
         update_world_state_from_tank_info(500, team=1, name="EnemyBot")
 
@@ -1347,7 +1403,6 @@ class TestDispatchProtocolMovement:
     def test_dispatch_deactivate_invalidates_position(self) -> None:
         """Dispatch 0x41 invalidates position and records the kill."""
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
-        from tankpit_bot.sniffer.world_state import drain_killed_tank_ids
 
         entry = TankEntryDict(msg_type=0x28, tank_id=700, x=100, y=100, name="Victim")
         dispatch_world_state_update(entry)
@@ -1733,7 +1788,7 @@ class TestViewportContainerExtraction:
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
         from tankpit_bot.protocol.types import ViewportEntityDict
-        from tankpit_bot.sniffer.world_state import update_world_state_from_radar
+        from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
         dispatch_world_state_update(
             MovementResponseDict(
@@ -1939,7 +1994,7 @@ class TestDispatchTilePatchUpdates:
         """A 0x43 cache clear does not erase radar-confirmed container truth."""
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.protocol import CacheUpdateDict, MovementResponseDict
-        from tankpit_bot.sniffer.world_state import update_world_state_from_radar
+        from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
         dispatch_world_state_update(
             MovementResponseDict(
@@ -2029,7 +2084,7 @@ class TestDispatchContainerCombatEvents:
         dispatch_world_state_update(msg)
 
         # Verify mark_combat_hit was called
-        assert world_state.check_and_clear_combat_hit() is True
+        assert check_and_clear_combat_hit() is True
 
     def test_dispatch_combat_hit_ignores_other_attacker(self) -> None:
         """Dispatch combat_hit does not mark hit when attacker is not self."""
@@ -2060,7 +2115,7 @@ class TestDispatchContainerCombatEvents:
         dispatch_world_state_update(msg)
 
         # No hit recorded for self
-        assert world_state.check_and_clear_combat_hit() is False
+        assert check_and_clear_combat_hit() is False
 
     def test_dispatch_deactivation_kill_invalidates_victim(self) -> None:
         """Dispatch deactivation_kill invalidates victim tank position."""
@@ -2106,121 +2161,96 @@ class TestCombatHitTracking:
 
     def test_check_and_clear_returns_false_by_default(self) -> None:
         """check_and_clear_combat_hit returns False when no hit recorded."""
-        assert world_state.check_and_clear_combat_hit() is False
+        assert check_and_clear_combat_hit() is False
 
     def test_mark_and_check_returns_true(self) -> None:
         """mark_combat_hit sets flag, check_and_clear returns True then False."""
-        world_state.mark_combat_hit(weapon_byte=1)
-        assert world_state.check_and_clear_combat_hit() is True
+        mark_combat_hit(weapon_byte=1)
+        assert check_and_clear_combat_hit() is True
         # Second call returns False (cleared)
-        assert world_state.check_and_clear_combat_hit() is False
+        assert check_and_clear_combat_hit() is False
 
     def test_mark_with_zero_weapon_byte_is_miss(self) -> None:
         """mark_combat_hit with weapon_byte=0 does not set hit flag."""
-        world_state.mark_combat_hit(weapon_byte=0)
-        assert world_state.check_and_clear_combat_hit() is False
+        mark_combat_hit(weapon_byte=0)
+        assert check_and_clear_combat_hit() is False
 
     def test_zero_weapon_byte_sets_our_shot_response(self) -> None:
         """mark_combat_hit with weapon_byte=0 still sets the shot response flag."""
-        world_state.mark_combat_hit(weapon_byte=0)
-        assert world_state.peek_our_shot_response() is True
-        assert world_state.check_and_clear_our_shot_response() is True
-        assert world_state.check_and_clear_our_shot_response() is False
+        mark_combat_hit(weapon_byte=0)
+        assert peek_our_shot_response() is True
+        assert check_and_clear_our_shot_response() is True
+        assert check_and_clear_our_shot_response() is False
 
     def test_nonzero_weapon_byte_sets_our_shot_response(self) -> None:
         """mark_combat_hit with weapon_byte>0 sets both hit and response flags."""
-        world_state.mark_combat_hit(weapon_byte=1)
-        assert world_state.peek_our_shot_response() is True
-        assert world_state.peek_combat_hit() is True
+        mark_combat_hit(weapon_byte=1)
+        assert peek_our_shot_response() is True
+        assert peek_combat_hit() is True
 
     def test_our_shot_response_default_false(self) -> None:
         """check_and_clear_our_shot_response returns False by default."""
-        assert world_state.check_and_clear_our_shot_response() is False
-        assert world_state.peek_our_shot_response() is False
+        assert check_and_clear_our_shot_response() is False
+        assert peek_our_shot_response() is False
 
     def test_dual_hit_decrements_dual_count(self) -> None:
         """mark_combat_hit with weapon_byte=1 decrements dual_shots count."""
-        from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            update_inventory_from_protocol,
-        )
-
         update_inventory_from_protocol(
             [0, 7, 0, 0, 10],
             [False, True, False, False, True],
         )
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 6
         assert get_inventory_state()["dual_shots"]["enabled"] is True
 
     def test_missile_hit_decrements_missile_count(self) -> None:
         """mark_combat_hit with weapon_byte=2 decrements missile_shots count."""
-        from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            update_inventory_from_protocol,
-        )
-
         update_inventory_from_protocol(
             [0, 0, 5, 0, 10],
             [False, False, True, False, True],
         )
-        world_state.mark_combat_hit(weapon_byte=2)
+        mark_combat_hit(weapon_byte=2)
         assert get_inventory_state()["missile_shots"]["count"] == 4
 
     def test_homing_hit_decrements_homing_count(self) -> None:
         """mark_combat_hit with weapon_byte=3 decrements homing_shots count."""
-        from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            update_inventory_from_protocol,
-        )
-
         update_inventory_from_protocol(
             [0, 0, 0, 3, 10],
             [False, False, False, True, True],
         )
-        world_state.mark_combat_hit(weapon_byte=3)
+        mark_combat_hit(weapon_byte=3)
         assert get_inventory_state()["homing_shots"]["count"] == 2
 
     def test_hit_decrement_does_not_go_below_zero(self) -> None:
         """mark_combat_hit does not decrement below zero."""
-        from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            update_inventory_from_protocol,
-        )
-
         update_inventory_from_protocol(
             [0, 0, 0, 0, 10],
             [False, True, False, False, True],
         )
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 0
 
     def test_consecutive_hits_deplete_dual(self) -> None:
         """Multiple dual hits decrement count to zero progressively."""
-        from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            update_inventory_from_protocol,
-        )
-
         update_inventory_from_protocol(
             [0, 3, 0, 0, 10],
             [False, True, False, False, True],
         )
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 2
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 1
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 0
         # Fourth hit: already at zero, stays at zero
-        world_state.mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(weapon_byte=1)
         assert get_inventory_state()["dual_shots"]["count"] == 0
 
     def test_reset_clears_our_shot_response(self) -> None:
         """reset_world_state clears the our_shot_response flag."""
-        world_state.mark_combat_hit(weapon_byte=0)
+        mark_combat_hit(weapon_byte=0)
         reset_world_state()
-        assert world_state.peek_our_shot_response() is False
+        assert peek_our_shot_response() is False
 
 
 class TestIncrementContainerFailedPickups:
@@ -2236,9 +2266,7 @@ class TestIncrementContainerFailedPickups:
 
     def test_increments_failed_pickups(self) -> None:
         """Incrementing raises the failed_pickups counter by 1."""
-        from tankpit_bot.sniffer.world_state import (
-            increment_container_failed_pickups,
-        )
+        from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
 
         update_world_state_from_radar(
             [RadarContainerDict(x=50, y=60, volume=100)],
@@ -2252,9 +2280,7 @@ class TestIncrementContainerFailedPickups:
 
     def test_noop_for_missing_container(self) -> None:
         """Incrementing a missing container is a no-op."""
-        from tankpit_bot.sniffer.world_state import (
-            increment_container_failed_pickups,
-        )
+        from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
 
         increment_container_failed_pickups(99, 99)
         assert len(world_state._world_state["containers"]) == 0
@@ -2273,13 +2299,13 @@ class TestTeleportLandedTracking:
 
     def test_check_returns_false_by_default(self) -> None:
         """check_and_clear_teleport_landed returns False with no teleport."""
-        assert world_state.check_and_clear_teleport_landed() is False
+        assert check_and_clear_teleport_landed() is False
 
     def test_mark_and_check_returns_true(self) -> None:
         """mark_teleport_landed sets flag, check returns True then False."""
-        world_state.mark_teleport_landed()
-        assert world_state.check_and_clear_teleport_landed() is True
-        assert world_state.check_and_clear_teleport_landed() is False
+        mark_teleport_landed()
+        assert check_and_clear_teleport_landed() is True
+        assert check_and_clear_teleport_landed() is False
 
     def test_dispatch_teleport_landed_sets_flag(self) -> None:
         """Container message with msg_type=teleport_landed marks landing."""
@@ -2287,13 +2313,13 @@ class TestTeleportLandedTracking:
 
         msg = TeleportLandedDict(msg_type="teleport_landed", subtype=0)
         dispatch_world_state_update(msg)
-        assert world_state.check_and_clear_teleport_landed() is True
+        assert check_and_clear_teleport_landed() is True
 
     def test_reset_clears_teleport_flag(self) -> None:
         """reset_world_state clears the teleport landed flag."""
-        world_state.mark_teleport_landed()
+        mark_teleport_landed()
         reset_world_state()
-        assert world_state.check_and_clear_teleport_landed() is False
+        assert check_and_clear_teleport_landed() is False
 
 
 class TestRemoveContainerAt:
@@ -2309,7 +2335,7 @@ class TestRemoveContainerAt:
 
     def test_removes_existing_container(self) -> None:
         """remove_container_at removes a container at the given coordinates."""
-        from tankpit_bot.sniffer.world_state import remove_container_at
+        from tankpit_bot.sniffer.world_state_containers import remove_container_at
 
         update_world_state_from_radar(
             [RadarContainerDict(x=50, y=60, volume=100)],
@@ -2321,7 +2347,7 @@ class TestRemoveContainerAt:
 
     def test_noop_for_missing_container(self) -> None:
         """remove_container_at is a no-op when container doesn't exist."""
-        from tankpit_bot.sniffer.world_state import remove_container_at
+        from tankpit_bot.sniffer.world_state_containers import remove_container_at
 
         remove_container_at(99, 99)
         assert len(world_state._world_state["containers"]) == 0
