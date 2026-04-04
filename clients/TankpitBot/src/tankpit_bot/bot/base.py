@@ -65,11 +65,11 @@ from tankpit_bot.runtime_logging import (
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
-    check_and_clear_teleport_landed,
-    get_inventory_state,
     get_world_state,
     mark_move_target_failed,
 )
+from tankpit_bot.sniffer.world_state_combat import check_and_clear_teleport_landed
+from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
