@@ -362,7 +362,7 @@ class TestMergeFunctions:
 
     def test_get_merged_fuel_containers_world_state_wins(self) -> None:
         from tankpit_bot.container import RadarContainerDict
-        from tankpit_bot.sniffer.world_state import update_world_state_from_radar
+        from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
         # Add container at (50,75) to world state with volume 500
         radar_containers: list[RadarContainerDict] = [
@@ -380,10 +380,8 @@ class TestMergeFunctions:
         assert containers[0]["volume"] == 500
 
     def test_get_merged_fuel_with_world_state(self) -> None:
-        from tankpit_bot.sniffer.world_state import (
-            update_world_state_from_fuel_total,
-            update_world_state_from_position,
-        )
+        from tankpit_bot.sniffer.world_state import update_world_state_from_position
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         update_world_state_from_position(100, 100)
         update_world_state_from_fuel_total(1400)
