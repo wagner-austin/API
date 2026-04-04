@@ -26,17 +26,34 @@ Primary files:
 
 - `src/tankpit_bot/bot/tick_loop.py`
 - `src/tankpit_bot/bot/base.py`
-- `src/tankpit_bot/bot/ai_strategy.py`
+- `src/tankpit_bot/bot/ai_strategy.py` (orchestration)
+- `src/tankpit_bot/bot/ai/context.py` (shared decision context and helpers)
+- `src/tankpit_bot/bot/ai/movement.py` (walk/teleport/exploration)
+- `src/tankpit_bot/bot/ai/combat_strategy.py` (combat phases and targeting)
 - `src/tankpit_bot/bot/executor.py`
-- `src/tankpit_bot/sniffer/world_state.py`
+- `src/tankpit_bot/sniffer/world_state.py` (core state and accessors)
+- `src/tankpit_bot/sniffer/world_state_dispatch.py` (protocol message routing)
+- `src/tankpit_bot/sniffer/world_state_radar.py` (radar scan and cache promotion)
+- `src/tankpit_bot/sniffer/world_state_tanks.py` (tank state updates)
+- `src/tankpit_bot/sniffer/world_state_tiles.py` (viewport and tile patches)
+- `src/tankpit_bot/sniffer/world_state_containers.py` (container and fuel updates)
+- `src/tankpit_bot/sniffer/world_state_inventory.py` (inventory tracking)
+- `src/tankpit_bot/sniffer/world_state_combat.py` (combat hit and kill tracking)
 
 ## Layers
 
 ### 1. World-State Layer
 
-File:
+Files:
 
-- `src/tankpit_bot/sniffer/world_state.py`
+- `src/tankpit_bot/sniffer/world_state.py` (core state, accessors, reset)
+- `src/tankpit_bot/sniffer/world_state_dispatch.py` (protocol message routing)
+- `src/tankpit_bot/sniffer/world_state_radar.py` (radar and resource reconciliation)
+- `src/tankpit_bot/sniffer/world_state_tanks.py` (tank state mutations)
+- `src/tankpit_bot/sniffer/world_state_tiles.py` (viewport and tile patches)
+- `src/tankpit_bot/sniffer/world_state_containers.py` (container CRUD)
+- `src/tankpit_bot/sniffer/world_state_inventory.py` (inventory tracking)
+- `src/tankpit_bot/sniffer/world_state_combat.py` (combat hit and kill tracking)
 
 Responsibility:
 
@@ -113,6 +130,7 @@ Important point:
 Files:
 
 - `src/tankpit_bot/bot/ai/types.py`
+- `src/tankpit_bot/bot/ai/context.py`
 - `src/tankpit_bot/bot/ai_strategy.py`
 
 This is the strategic memory used by the planner.
