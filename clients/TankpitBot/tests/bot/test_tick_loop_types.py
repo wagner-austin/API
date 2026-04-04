@@ -14,7 +14,8 @@ from tankpit_bot.bot.tick_loop_types import (
 from tankpit_bot.bot.types import (
     make_map_open_command,
     make_move_command,
-    make_pickup_move_command,
+    make_pickup_equipment_command,
+    make_pickup_fuel_command,
     make_radar_command,
     make_teleport_command,
 )
@@ -97,12 +98,22 @@ class TestEncodeDecodeRoundTrip:
         decoded = decode_tick_decision(encoded)
         assert decoded == original
 
-    def test_roundtrip_pickup_move(self) -> None:
-        """Encode then decode produces identical TickDecisionDict with pickup_move."""
-        cmd = make_pickup_move_command(80, 90)
+    def test_roundtrip_pickup_fuel(self) -> None:
+        """Encode then decode produces identical TickDecisionDict with pickup_fuel."""
+        cmd = make_pickup_fuel_command(80, 90)
         behavior = make_behavior_score("COLLECT_FUEL", 600, 80, 90, "low fuel")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [1, 5])
+        encoded = encode_tick_decision(original)
+        decoded = decode_tick_decision(encoded)
+        assert decoded == original
+
+    def test_roundtrip_pickup_equipment(self) -> None:
+        """Encode then decode produces identical TickDecisionDict with pickup_equipment."""
+        cmd = make_pickup_equipment_command(60, 70)
+        behavior = make_behavior_score("COLLECT_EQUIPMENT", 800, 60, 70, "equipment_low")
+        ai_state = make_initial_ai_state()
+        original = make_tick_decision(cmd, behavior, ai_state, [2, 5])
         encoded = encode_tick_decision(original)
         decoded = decode_tick_decision(encoded)
         assert decoded == original
