@@ -11,6 +11,15 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
     make_no_action,
 )
+from tankpit_bot.sniffer.world_state_combat import (
+    mark_teleport_landed,
+)
+from tankpit_bot.sniffer.world_state_containers import (
+    update_world_state_from_fuel_total as _sm_update_fuel,
+)
+from tankpit_bot.sniffer.world_state_radar import (
+    update_world_state_from_radar,
+)
 from tests.conftest import FakeEnv
 
 
@@ -255,9 +264,7 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
@@ -265,7 +272,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _sm_update_fuel(1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
         from tankpit_bot.container import RadarContainerDict
@@ -286,9 +293,7 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
@@ -296,7 +301,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _sm_update_fuel(1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
         update_world_state_from_radar([], [])
@@ -312,7 +317,6 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -321,7 +325,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _sm_update_fuel(1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 50, 50)
         bot._update_state_from_world()
@@ -335,7 +339,6 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -344,7 +347,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(1400)
+        _sm_update_fuel(1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 100, 100)
         bot._update_state_from_world()
@@ -359,10 +362,10 @@ class TestBotStateUpdates:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_container_pickup,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
+        )
+        from tankpit_bot.sniffer.world_state_containers import (
+            update_world_state_from_container_pickup,
         )
 
         reset_world_state()
@@ -370,7 +373,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(206, 83)
-        update_world_state_from_fuel_total(1100)
+        _sm_update_fuel(1100)
         bot._update_state_from_world()
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=205, y=82, volume=-1),
@@ -389,9 +392,7 @@ class TestBotStateUpdates:
         """TELEPORTING completes when the server confirms landing."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
-            mark_teleport_landed,
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -400,7 +401,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(196, 85)
-        update_world_state_from_fuel_total(582)
+        _sm_update_fuel(582)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
         mark_teleport_landed()
@@ -416,9 +417,7 @@ class TestBotStateUpdates:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
-            mark_teleport_landed,
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -427,7 +426,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(196, 85)
-        update_world_state_from_fuel_total(582)
+        _sm_update_fuel(582)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
 
@@ -446,7 +445,6 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -455,7 +453,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(100)
+        _sm_update_fuel(100)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 60, 70)
         bot._state_data["fuel_threshold"] = 200
@@ -471,9 +469,7 @@ class TestBotStateUpdates:
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
@@ -481,7 +477,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(100)
+        _sm_update_fuel(100)
         update_world_state_from_radar(
             [RadarContainerDict(x=55, y=55, volume=500)],
             [],
@@ -500,7 +496,6 @@ class TestBotStateUpdates:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -509,7 +504,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(100)
+        _sm_update_fuel(100)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
         bot._state_data["fuel_threshold"] = 200
@@ -523,9 +518,7 @@ class TestBotStateUpdates:
         """TELEPORTING completes to IDLE even when fuel is below threshold."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
-            mark_teleport_landed,
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -534,7 +527,7 @@ class TestBotStateUpdates:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(100)
+        _sm_update_fuel(100)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 50, 50)
         bot._state_data["fuel_threshold"] = 200
@@ -577,7 +570,6 @@ class TestBotStateUpdateBranches:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -586,7 +578,7 @@ class TestBotStateUpdateBranches:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _sm_update_fuel(1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "MOVING", "move", 100, 100)
         bot._update_state_from_world()
@@ -600,7 +592,6 @@ class TestBotStateUpdateBranches:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
@@ -609,7 +600,7 @@ class TestBotStateUpdateBranches:
         bot._magic = "test_magic"
         bot._update_state_from_world()
         update_world_state_from_position(196, 85)
-        update_world_state_from_fuel_total(582)
+        _sm_update_fuel(582)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "TELEPORTING", "teleport", 196, 86)
         bot._update_state_from_world()
