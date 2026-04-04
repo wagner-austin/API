@@ -14,17 +14,18 @@ from tankpit_bot.bot.tick_loop_types import make_tick_decision
 from tankpit_bot.bot.types import (
     make_map_open_command,
     make_move_command,
-    make_pickup_move_command,
+    make_pickup_equipment_command,
+    make_pickup_fuel_command,
     make_radar_command,
     make_shoot_command,
     make_teleport_command,
 )
 from tankpit_bot.sniffer.world_state import (
     reset_world_state,
-    update_inventory_from_toggle,
-    update_world_state_from_fuel_total,
     update_world_state_from_position,
 )
+from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 from tests.conftest import FakeEnv
 from tests.fakes import FakeCDPSession
 
@@ -47,7 +48,7 @@ class TestApplyEquipment:
 
     def test_enables_desired_slots(self, fake_env: FakeEnv) -> None:
         """Enables desired combat slots that have stock."""
-        from tankpit_bot.sniffer.world_state import update_inventory_from_gain
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_gain
 
         bot, fake_cdp = _make_bot(fake_env)
         # Give slot 2 (dual) stock so _has_equipment_stock returns True
@@ -103,10 +104,17 @@ class TestDispatchCommand:
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
-    def test_dispatch_pickup_move(self, fake_env: FakeEnv) -> None:
-        """Dispatches pickup_move command via bot.pickup_move_to."""
+    def test_dispatch_pickup_fuel(self, fake_env: FakeEnv) -> None:
+        """Dispatches pickup_fuel command via bot.pickup_fuel_to."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_pickup_move_command(80, 90))
+        result = dispatch_command(bot, make_pickup_fuel_command(80, 90))
+        assert result is True
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_pickup_equipment(self, fake_env: FakeEnv) -> None:
+        """Dispatches pickup_equipment command via bot.pickup_equipment_to."""
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(bot, make_pickup_equipment_command(80, 90))
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
