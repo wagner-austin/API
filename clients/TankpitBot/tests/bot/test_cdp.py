@@ -9,6 +9,22 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
 )
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.sniffer.world_state_combat import (
+    check_and_clear_teleport_landed,
+    mark_combat_hit,
+    mark_tank_killed,
+    mark_teleport_landed,
+)
+from tankpit_bot.sniffer.world_state_containers import (
+    update_world_state_from_fuel_total as _update_fuel_total,
+)
+from tankpit_bot.sniffer.world_state_inventory import (
+    get_inventory_state,
+    update_inventory_from_protocol,
+)
+from tankpit_bot.sniffer.world_state_radar import (
+    update_world_state_from_radar as _update_radar,
+)
 from tests.conftest import FakeEnv
 
 
@@ -139,8 +155,8 @@ class TestBotWithCDP:
         assert result is True
         assert bot.get_state() == "MOVING"
 
-    def test_pickup_move_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.pickup_move_to succeeds with CDP session."""
+    def test_pickup_fuel_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.pickup_fuel_to succeeds with CDP session."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -155,7 +171,7 @@ class TestBotWithCDP:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        result = bot.pickup_move_to(100, 100)
+        result = bot.pickup_fuel_to(100, 100)
         assert result is True
         assert bot.get_state() == "COLLECTING"
 
@@ -184,8 +200,6 @@ class TestBotWithCDP:
         """A new teleport drains any stale TeleportLanded ack before sending."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
-            check_and_clear_teleport_landed,
-            mark_teleport_landed,
             reset_world_state,
             update_world_state_from_position,
         )
@@ -431,15 +445,13 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(209, 79)
-        update_world_state_from_fuel_total(345)
+        _update_fuel_total(345)
         update_inventory_from_protocol([25, 25, 25, 25, 11], [False, True, False, False, True])
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -458,15 +470,13 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -488,8 +498,6 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tankpit_bot.state.mutations import update_tank_from_registry
@@ -498,7 +506,7 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
 
         # Add a close, damaged enemy to trigger HUNT mode
@@ -545,15 +553,13 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -588,11 +594,11 @@ class TestBotAIIntegration:
         dispatch_command(bot, make_move_command(100, 100))
         assert bot.get_state() == "MOVING"
 
-    def test_dispatch_command_pickup_move(self, fake_env: FakeEnv) -> None:
-        """executor.dispatch_command dispatches pickup_move to pickup_move_to."""
+    def test_dispatch_command_pickup_fuel(self, fake_env: FakeEnv) -> None:
+        """executor.dispatch_command dispatches pickup_fuel to pickup_fuel_to."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.executor import dispatch_command
-        from tankpit_bot.bot.types import make_pickup_move_command
+        from tankpit_bot.bot.types import make_pickup_fuel_command
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -606,7 +612,7 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_pickup_move_command(100, 100))
+        dispatch_command(bot, make_pickup_fuel_command(100, 100))
         assert bot.get_state() == "COLLECTING"
 
     def test_dispatch_command_shoot(self, fake_env: FakeEnv) -> None:
@@ -683,7 +689,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -703,7 +708,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -723,7 +727,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -743,7 +746,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -763,7 +765,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -783,7 +784,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -803,7 +803,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -824,7 +823,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
         from tests.fakes import FakeCDPSession
 
@@ -841,7 +839,8 @@ class TestBotEquipmentManagement:
     def test_is_equipment_enabled_all_slots(self, fake_env: FakeEnv) -> None:
         """is_equipment_enabled returns correct state for all 5 slots."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
         update_inventory_from_toggle([True, False, True, False, True])
@@ -867,7 +866,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
 
         reset_world_state()
@@ -890,15 +888,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(300)
+        _update_fuel_total(300)
         update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -918,15 +914,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(300)
+        _update_fuel_total(300)
         update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -950,15 +944,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession, FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(200, 70)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
         ws._terrain_map = FakeTerrainMap()
 
@@ -978,15 +970,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(196, 85)
-        update_world_state_from_fuel_total(582)
+        _update_fuel_total(582)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1007,20 +997,17 @@ class TestBotEquipmentManagement:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
         from tests.fakes import FakeCDPSession, FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(205, 79)
-        update_world_state_from_fuel_total(580)
+        _update_fuel_total(580)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=82, volume=-1)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        _update_radar(containers, mines)
         ws._terrain_map = FakeTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1040,15 +1027,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1075,14 +1060,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1105,8 +1089,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tankpit_bot.state.mutations import update_tank_from_registry
@@ -1115,7 +1097,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([0, 10, 0, 10, 10], [False, True, False, True, True])
 
         import tankpit_bot.sniffer.world_state as ws
@@ -1180,15 +1162,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1214,14 +1194,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1243,14 +1222,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1287,18 +1265,16 @@ class TestBotEquipmentManagement:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
         from tests.fakes import FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        update_world_state_from_fuel_total(400)
+        _update_fuel_total(400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        _update_radar(containers, mines)
         ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1321,18 +1297,16 @@ class TestBotEquipmentManagement:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
         from tests.fakes import FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        update_world_state_from_fuel_total(400)
+        _update_fuel_total(400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        _update_radar(containers, mines)
         ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1352,13 +1326,12 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1380,17 +1353,15 @@ class TestBotEquipmentManagement:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
 
         reset_world_state()
         update_world_state_from_position(64, 64)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=72, y=63, volume=-1)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        _update_radar(containers, mines)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1411,13 +1382,12 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(64, 64)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1458,14 +1428,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tankpit_bot.state.types import WorldStateDict
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         started_ms = get_current_time_ms()
@@ -1486,14 +1455,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tankpit_bot.state.types import WorldStateDict
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(800)
+        _update_fuel_total(800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         started_ms = get_current_time_ms()
@@ -1509,13 +1477,12 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _update_fuel_total(1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1572,13 +1539,12 @@ class TestBotEquipmentManagement:
         from tankpit_bot.sniffer.world_state import (
             is_scan_viewport_failed,
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _update_fuel_total(1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1602,13 +1568,12 @@ class TestBotEquipmentManagement:
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        update_world_state_from_fuel_total(1400)
+        _update_fuel_total(1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1632,18 +1597,16 @@ class TestBotEquipmentManagement:
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
-            update_world_state_from_radar,
         )
         from tests.fakes import FakeTerrainMap
 
         reset_world_state()
         update_world_state_from_position(14, 10)
-        update_world_state_from_fuel_total(400)
+        _update_fuel_total(400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        _update_radar(containers, mines)
         ws._terrain_map = FakeTerrainMap({(15, 10): "#"})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1680,15 +1643,13 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(300)
+        _update_fuel_total(300)
         update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1708,7 +1669,7 @@ class TestBotEquipmentManagement:
         """_merge_protocol_kills adds Deactivation kills to AI killed_tank_ids."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
-        from tankpit_bot.sniffer.world_state import mark_tank_killed, reset_world_state
+        from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1725,7 +1686,7 @@ class TestBotEquipmentManagement:
         """Kill merge clears stale shot feedback and the matching combat lock."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
-        from tankpit_bot.sniffer.world_state import mark_tank_killed, reset_world_state
+        from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1769,7 +1730,6 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_inventory_from_protocol,
         )
 
         reset_world_state()
@@ -1803,7 +1763,8 @@ class TestBotEquipmentManagement:
         """_get_combat_feedback returns 'hit' when CombatHit was received."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
-        from tankpit_bot.sniffer.world_state import mark_combat_hit, reset_world_state
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1885,7 +1846,8 @@ class TestBotEquipmentManagement:
         """_has_pending_shot_feedback yields to feedback when a hit is already buffered."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import mark_combat_hit, reset_world_state
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1921,7 +1883,8 @@ class TestBotEquipmentManagement:
         """_has_pending_shot_feedback ends when weapon_byte=0 response arrives."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
-        from tankpit_bot.sniffer.world_state import mark_combat_hit, reset_world_state
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1940,9 +1903,7 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
-            mark_combat_hit,
             reset_world_state,
-            update_inventory_from_protocol,
         )
 
         reset_world_state()
@@ -1965,9 +1926,7 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
-            mark_combat_hit,
             reset_world_state,
-            update_inventory_from_protocol,
         )
 
         reset_world_state()
@@ -1990,10 +1949,7 @@ class TestBotEquipmentManagement:
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
-            get_inventory_state,
-            mark_combat_hit,
             reset_world_state,
-            update_inventory_from_protocol,
         )
 
         reset_world_state()
