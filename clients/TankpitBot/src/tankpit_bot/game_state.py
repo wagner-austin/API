@@ -39,7 +39,7 @@ from tankpit_bot.inventory import (
     decode_inventory_state,
     encode_inventory_state,
 )
-from tankpit_bot.sniffer.world_state import get_inventory_state
+from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
 
