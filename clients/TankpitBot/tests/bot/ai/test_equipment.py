@@ -130,6 +130,7 @@ class TestFindTeleportLandingTile:
     def test_skips_out_of_bounds_adjacent_tiles(self) -> None:
         """Ignores adjacent coordinates that fall outside the map bounds."""
         terrain_data: dict[tuple[int, int], str] = {
+            (0, 0): "W",
             (0, 1): "W",
         }
         terrain = FakeTerrainMap(terrain_data=terrain_data)
@@ -142,13 +143,20 @@ class TestFindTeleportLandingTile:
         """Known mines are excluded from teleport landing candidates."""
         terrain = FakeTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
+            "128,126": {
+                "x": 128,
+                "y": 126,
+                "mine_type": 0,
+                "tank_id": -1,
+                "team": 1,
+            },
             "129,126": {
                 "x": 129,
                 "y": 126,
                 "mine_type": 0,
                 "tank_id": -1,
                 "team": 1,
-            }
+            },
         }
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126, blocked_mines)
