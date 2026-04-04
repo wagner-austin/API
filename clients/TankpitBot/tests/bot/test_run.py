@@ -195,9 +195,9 @@ class TestBotGameLoopStates:
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
-            update_world_state_from_fuel_total,
             update_world_state_from_position,
         )
+        from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
         from tests.fakes import FakeCDPSession, FakePageInterrupting
 
         reset_world_state()
