@@ -17,10 +17,10 @@ from tankpit_bot.protocol.constants import RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_state import (
-    dispatch_world_state_update,
     register_room_image,
     set_selected_room,
 )
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.xor import xor_decode
 
 log = get_logger(__name__)
