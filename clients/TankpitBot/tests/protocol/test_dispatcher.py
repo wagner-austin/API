@@ -478,6 +478,36 @@ class TestUnwrap0x2e:
         result = decode_message(MSG_TANK_STATS, data)
         assert result["msg_type"] == "tank_status_sync"
 
+    def test_tunneled_0x4f_with_bad_structure_falls_through(self) -> None:
+        """Tunneled 0x4F with invalid radar scan structure falls through."""
+        # 0x4F subtype but inner data has container_count=1 and only 3 bytes
+        # (needs at least 2 + 4 = 6). Structural check fails → falls through
+        # to container identification which matches it as player_list_short.
+        data = bytes([0x4F, 0x01, 0x00, 0xAA])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] != "radar_response"
+
+    def test_tunneled_0x4f_with_valid_radar_structure_decodes(self) -> None:
+        """Tunneled 0x4F with valid radar scan structure decodes as radar."""
+        # 0x4F subtype, container_count=0, flags=0, no mines → valid empty radar
+        data = bytes([0x4F, 0x00, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == 0x4F
+
+    def test_tunneled_0x4f_with_bad_remaining_bytes_falls_through(self) -> None:
+        """Tunneled 0x4F with remaining bytes not divisible by 3 falls through."""
+        # container_count=0, flags=0, then 2 extra bytes (not divisible by 3)
+        data = bytes([0x4F, 0x00, 0x00, 0xAA, 0xBB])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] != 0x4F
+
+    def test_tunneled_0x4f_too_short_falls_through(self) -> None:
+        """Tunneled 0x4F with insufficient data falls through to container."""
+        # 0x4F subtype but only 1 inner byte — too short for structural check.
+        data = bytes([0x4F, 0x00])
+        result = decode_message(MSG_TANK_STATS, data)
+        assert result["msg_type"] == "tank_status_sync"
+
 
 class TestMessageConstants:
     """Tests for message type constants."""
