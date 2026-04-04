@@ -6,7 +6,7 @@ Authoritative implementations live in:
 
 - `src/tankpit_bot/protocol/decoders/`
 - `src/tankpit_bot/container/decoders/`
-- `src/tankpit_bot/sniffer/world_state.py`
+- `src/tankpit_bot/sniffer/world_state_dispatch.py`
 
 If a status note here disagrees with the current decoder code, the code wins.
 
