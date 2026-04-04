@@ -187,7 +187,7 @@ class TestAIConfig:
         assert len(config["patrol_waypoints"]) == 4
         assert config["dual_break_threshold"] == 12
         assert config["dual_resume_threshold"] == 20
-        assert config["equip_search_hop_distance"] == 15
+        assert config["equip_search_hop_distance"] == 30
         assert config["equip_search_max_failures"] == 3
 
     def test_encode_decode_roundtrip(self) -> None:
