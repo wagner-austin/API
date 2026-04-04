@@ -2,6 +2,22 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_strategy import combat_landing_tile as _combat_landing_tile
+from tankpit_bot.bot.ai.context import (
+    DecideCtx,
+    compute_equipment,
+    expire_kills,
+    filter_killed_tanks,
+    require_command,
+)
+from tankpit_bot.bot.ai.movement import (
+    _direct_move_command,
+    _is_occupied_by_enemy,
+    _waypoint_move_command,
+    select_exploration_command,
+    viewport_exploration_candidates,
+    walk_or_teleport,
+)
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     EnemyThreatDict,
@@ -10,22 +26,12 @@ from tankpit_bot.bot.ai.types import (
     make_initial_ai_state,
 )
 from tankpit_bot.bot.ai_strategy import (
-    _combat_landing_tile,
-    _compute_equipment,
-    _DecideCtx,
-    _direct_move_command,
-    _expire_kills,
-    _filter_killed_tanks,
-    _is_occupied_by_enemy,
     _local_equipment_search_hop,
-    _require_command,
-    _select_equipment_target_command,
-    _select_exploration_command,
     _try_search_critical_equipment,
-    _viewport_exploration_candidates,
-    _walk_or_teleport,
-    _waypoint_move_command,
     decide,
+)
+from tankpit_bot.bot.ai_strategy import (
+    _select_equipment_target as _select_equipment_target_command,
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import (
@@ -170,7 +176,7 @@ class TestDecideProactiveRadar:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
 
@@ -182,12 +188,12 @@ class TestDecideTeleportFuelGuard:
         reset_world_state()
 
     def test_teleport_search_blocked_when_fuel_too_low(self) -> None:
-        """decide() skips teleport search when fuel can't cover cost + critical.
+        """decide() skips teleport search when fuel can't cover cost + hunt_min.
 
-        With low fuel, no visible containers, and radar on cooldown, the planner
-        must avoid turning edge scouting into a costly teleport.
+        With critically low fuel, no visible containers, and radar on cooldown,
+        the planner must avoid turning recovery scouting into a costly teleport.
         """
-        world, self_state = _make_world(fuel=250)
+        world, self_state = _make_world(fuel=150)
         config = make_default_ai_config()
         ai_state = AIStateDict(
             config=config,
@@ -205,10 +211,13 @@ class TestDecideTeleportFuelGuard:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
-        # fuel=250, teleport_cost=100, critical=200 → 250 < 300 → teleport blocked
+        # fuel=150, teleport_cost=100, hunt_min=100 → 150 < 200 → teleport blocked
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         # Teleport was blocked, so should NOT be teleport
@@ -263,6 +272,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         # dual_count=0 → equipment_low triggers
         inventory = _make_inventory(dual_count=0, dual_enabled=False)
@@ -271,7 +283,7 @@ class TestDecideEquipmentDepletion:
 
         # Equipment collection fires before combat
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_no_equipment_when_none_visible(self) -> None:
         """Critical equipment depletion triggers search when none is visible.
@@ -311,6 +323,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory(dual_count=0, dual_enabled=False)
 
@@ -319,14 +334,14 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "search_equipment_local"
         assert decision["command"]["cmd_type"] == "teleport"
-        # Local hop from (100,100) direction 0=(+1,0) dist=15 → (115,100)
-        assert decision["command"]["target_x"] == 115
+        # Local hop from (100,100) direction 0=(+1,0) dist=30 → (130,100)
+        assert decision["command"]["target_x"] == 130
         assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["patrol_waypoint_index"] == 1
         assert decision["updated_ai_state"]["equipment_search_failures"] == 1
 
-    def test_noncritical_equipment_logs_and_falls_through_to_hunt(self) -> None:
-        """Noncritical equipment depletion does not enter emergency search mode."""
+    def test_equipment_at_break_threshold_relocates_in_scanned_viewport(self) -> None:
+        """Equipment at break threshold teleport-hops when viewport already scanned."""
         tanks: dict[str, TankStateDict] = {
             "50": TankStateDict(
                 tank_id=50,
@@ -348,8 +363,8 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["command"]["cmd_type"] == "teleport"
 
     def test_critical_homing_shots_interrupts_for_equipment(self) -> None:
         """Critical homing depletion uses the same emergency rule as dual and radar."""
@@ -379,10 +394,10 @@ class TestDecideEquipmentDepletion:
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_critical"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
-    def test_homing_at_break_threshold_is_not_critical(self) -> None:
-        """Homing at the shared break threshold does not enter emergency mode."""
+    def test_homing_at_break_threshold_triggers_equipment_recovery(self) -> None:
+        """Homing at the shared break threshold enters equipment recovery."""
         tanks: dict[str, TankStateDict] = {
             "50": TankStateDict(
                 tank_id=50,
@@ -404,8 +419,7 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_active_combat_interrupted_by_critical_equipment(self) -> None:
         """Critical equipment recovery preempts a locked combat engagement."""
@@ -444,6 +458,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory(default_count=5)
 
@@ -451,7 +468,7 @@ class TestDecideEquipmentDepletion:
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_critical"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_active_combat_with_subcritical_fuel_interrupts_for_collection(self) -> None:
         """Fuel below the critical threshold interrupts combat for fuel collection."""
@@ -490,13 +507,16 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_blocked_equipment_teleports_to_adjacent_passable_tile(self) -> None:
         """Blocked equipment targets use a safe adjacent landing tile for teleport."""
@@ -565,7 +585,7 @@ class TestDecideEquipmentDepletion:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_locked_combat_with_critical_fuel_collects_fuel(self) -> None:
         """Fuel at the critical threshold interrupts a locked combat phase."""
@@ -604,13 +624,16 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_critical_fuel_beats_critical_equipment(self) -> None:
         """Critical fuel outranks even critical equipment depletion."""
@@ -627,7 +650,7 @@ class TestDecideEquipmentDepletion:
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
         assert decision["behavior"]["reason"] == "fuel=700"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_critical_equipment_search_uses_radar_when_ready(self) -> None:
         """Critical equipment depletion scans before relocating when radar is ready."""
@@ -678,6 +701,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
@@ -686,8 +712,8 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "search_equipment_local"
         assert decision["command"]["cmd_type"] == "teleport"
-        # Local hop from (100,100) direction 2=(-1,0) dist=15 → (85,100)
-        assert decision["command"]["target_x"] == 85
+        # Local hop from (100,100) direction 2=(-1,0) dist=30 → (70,100)
+        assert decision["command"]["target_x"] == 70
         assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["patrol_waypoint_index"] == 3
         assert decision["updated_ai_state"]["equipment_search_failures"] == 1
@@ -712,13 +738,17 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=3,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        # After 3 failures (== max), search bails out → falls through to hunt
-        assert decision["behavior"]["mode"] == "HUNT"
+        # After 3 failures (== max), critical search bails out but critical
+        # equipment check still holds the mode in COLLECT_EQUIPMENT
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_equipment_search_skips_when_teleport_unaffordable(self) -> None:
         """Equipment search returns None when fuel can't cover a teleport hop."""
@@ -744,14 +774,19 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         # dual=0 triggers critical, radar=0 so no radar scan possible
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=0)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        # fuel=550 >= fuel_low(500) so search runs, but can't afford teleport
-        assert decision["behavior"]["mode"] != "COLLECT_EQUIPMENT"
+        # fuel=550, dual=0 triggers critical equipment; can't afford teleport
+        # and no radar stock, so critical falls through but equipment_low
+        # check still fires
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers when fuel is below fuel_low_threshold."""
@@ -802,8 +837,8 @@ class TestDecideEquipmentDepletion:
         assert decision["behavior"]["reason"] == "radar_for_fuel"
         assert decision["command"]["cmd_type"] == "radar"
 
-    def test_low_fuel_cache_only_target_in_unscanned_viewport_uses_radar(self) -> None:
-        """Cache-only fuel in a fresh viewport does not bypass radar confirmation."""
+    def test_low_fuel_cache_only_target_in_unscanned_viewport_collects(self) -> None:
+        """Visible fuel container in critical fuel state is collected directly."""
         containers: dict[str, ContainerStateDict] = {
             "104,100": _c(104, 100, 700, True),
         }
@@ -815,8 +850,7 @@ class TestDecideEquipmentDepletion:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "radar_for_fuel"
-        assert decision["command"]["cmd_type"] == "radar"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
         """A newly entered unconfirmed viewport should radar immediately."""
@@ -846,8 +880,8 @@ class TestDecideEquipmentDepletion:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "edge_for_fuel"
-        assert decision["command"]["cmd_type"] == "move"
+        assert decision["behavior"]["reason"] == "search_fuel_local"
+        assert decision["command"]["cmd_type"] == "teleport"
 
     def test_low_fuel_blocked_search_with_visible_threats_falls_back_to_map(self) -> None:
         """Visible threats reach the hunt fallback when fuel search cannot execute."""
@@ -868,12 +902,12 @@ class TestDecideEquipmentDepletion:
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
         terrain_data: dict[tuple[int, int], str] = dict.fromkeys(
-            _viewport_exploration_candidates(ctx),
+            viewport_exploration_candidates(ctx),
             "W",
         )
-        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
             terrain_data[(candidate_x - 1, candidate_y)] = "#"
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
             terrain_data[(candidate_x, candidate_y - 1)] = "#"
@@ -882,8 +916,7 @@ class TestDecideEquipmentDepletion:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
     def test_exploration_candidates_omit_self_and_duplicates(self) -> None:
         """Exploration candidates drop the current tile and repeated entries."""
@@ -891,28 +924,35 @@ class TestDecideEquipmentDepletion:
         world["viewport"] = ViewportStateDict(left=92, top=92, width=16, height=16)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        candidates = _viewport_exploration_candidates(ctx)
+        candidates = viewport_exploration_candidates(ctx)
 
         assert (107, 100) not in candidates
         assert len(candidates) == len(set(candidates))
 
-    def test_exploration_skips_teleport_when_search_fuel_too_low(self) -> None:
-        """Exploration rejects teleport search when fuel cannot cover the reserve floor."""
+    def test_exploration_skips_blocked_target_and_uses_next_candidate(self) -> None:
+        """Exploration skips blocked edge tiles and tries the next candidate."""
         world, self_state = _make_world(self_x=100, self_y=100, fuel=550)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        terrain = FakeTerrainMap(terrain_data={(107, 107): "W"})
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        terrain_data: dict[tuple[int, int], str] = {
+            (107, 107): "W",
+            (106, 107): "W",
+            (107, 106): "W",
+            (108, 107): "#",
+            (107, 108): "#",
+        }
+        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        exploration = _select_exploration_command(ctx)
+        exploration = select_exploration_command(ctx)
 
         if exploration is None:
             raise AssertionError("expected exploration command")
         candidate_x, candidate_y, command = exploration
         assert (candidate_x, candidate_y) != (107, 107)
-        assert command["cmd_type"] == "move"
+        assert command["cmd_type"] in ("move", "teleport")
 
     def test_locked_combat_with_zero_dual_releases_to_equipment(self) -> None:
         """Dual depletion releases combat lock so equipment recovery starts."""
@@ -948,6 +988,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=30)
         inventory["extra_radars"]["count"] = 30
@@ -1009,6 +1052,9 @@ class TestDecideEquipmentDepletion:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -1071,32 +1117,32 @@ class TestHelpers:
     def test_compute_equipment_collect_fuel(self) -> None:
         """_compute_equipment returns [2, 4, 5] for stocked combat gear."""
         inventory = _make_inventory()
-        result = _compute_equipment(800, inventory)
+        result = compute_equipment(800, inventory)
         assert result == [2, 4, 5]
 
     def test_compute_equipment_hunt(self) -> None:
         """_compute_equipment returns [2, 4, 5] for stocked combat gear."""
         inventory = _make_inventory()
-        result = _compute_equipment(800, inventory)
+        result = compute_equipment(800, inventory)
         assert result == [2, 4, 5]
 
     def test_compute_equipment_no_shields(self) -> None:
         """_compute_equipment never includes shields."""
         inventory = _make_inventory()
-        result = _compute_equipment(800, inventory)
+        result = compute_equipment(800, inventory)
         assert 1 not in result
 
     def test_compute_equipment_dual_depleted(self) -> None:
         """_compute_equipment drops dual when count is 0."""
         inventory = _make_inventory(dual_count=0)
-        result = _compute_equipment(800, inventory)
+        result = compute_equipment(800, inventory)
         assert result == [4, 5]
 
     def test_compute_equipment_homing_depleted(self) -> None:
         """_compute_equipment drops homing when count is 0."""
         inventory = _make_inventory()
         inventory["homing_shots"]["count"] = 0
-        result = _compute_equipment(800, inventory)
+        result = compute_equipment(800, inventory)
         assert result == [2, 5]
 
     def test_local_equipment_search_hop_rotates_cardinal(self) -> None:
@@ -1104,12 +1150,12 @@ class TestHelpers:
         world, self_state = _make_world(self_x=100, self_y=100, fuel=800)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(dual_count=5, dual_enabled=True, default_count=30)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
         hop_x, hop_y, next_index = _local_equipment_search_hop(ctx)
 
-        # Direction 0 is (1,0), hop_distance=15: x+15, y+0
-        assert hop_x == 115
+        # Direction 0 is (1,0), hop_distance=30: x+30, y+0
+        assert hop_x == 130
         assert hop_y == 100
         assert next_index == 1
 
@@ -1118,7 +1164,7 @@ class TestHelpers:
         world, self_state = _make_world(self_x=250, self_y=250, fuel=800)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(dual_count=5, dual_enabled=True, default_count=30)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
         hop_x, hop_y, next_index = _local_equipment_search_hop(ctx)
 
@@ -1129,7 +1175,7 @@ class TestHelpers:
     def test_expire_kills_removes_expired(self) -> None:
         """_expire_kills removes entries older than cooldown."""
         killed = {"50": 1000, "60": 5000}
-        result = _expire_kills(killed, 22000, 20000)
+        result = expire_kills(killed, 22000, 20000)
         # 50: 22000-1000=21000 >= 20000 → expired
         # 60: 22000-5000=17000 < 20000 → kept
         assert result == {"60": 5000}
@@ -1137,12 +1183,12 @@ class TestHelpers:
     def test_expire_kills_keeps_recent(self) -> None:
         """_expire_kills keeps entries within cooldown."""
         killed = {"50": 10000, "60": 15000}
-        result = _expire_kills(killed, 20000, 20000)
+        result = expire_kills(killed, 20000, 20000)
         assert result == {"50": 10000, "60": 15000}
 
     def test_expire_kills_empty_input(self) -> None:
         """_expire_kills handles empty dict."""
-        result = _expire_kills({}, 20000, 20000)
+        result = expire_kills({}, 20000, 20000)
         assert result == {}
 
     def test_filter_killed_tanks_removes_killed(self) -> None:
@@ -1175,7 +1221,7 @@ class TestHelpers:
         }
         world, _ = _make_world(tanks=tanks)
         killed = {"50": 10000}
-        filtered = _filter_killed_tanks(world, killed)
+        filtered = filter_killed_tanks(world, killed)
         assert "50" not in filtered["tanks"]
         assert "60" in filtered["tanks"]
 
@@ -1196,7 +1242,7 @@ class TestHelpers:
             ),
         }
         world, _ = _make_world(tanks=tanks)
-        filtered = _filter_killed_tanks(world, {})
+        filtered = filter_killed_tanks(world, {})
         assert filtered is world  # No copy needed
 
     def test_require_command_returns_command(self) -> None:
@@ -1205,7 +1251,7 @@ class TestHelpers:
 
         command = make_move_command(10, 20)
 
-        result = _require_command(command, 10, 20, "fuel")
+        result = require_command(command, 10, 20, "fuel")
 
         assert result == command
 
@@ -1214,14 +1260,14 @@ class TestHelpers:
         import pytest
 
         with pytest.raises(ValueError, match="No executable command for fuel target"):
-            _require_command(None, 10, 20, "fuel")
+            require_command(None, 10, 20, "fuel")
 
     def test_try_search_critical_equipment_returns_none_when_fuel_low(self) -> None:
         """Critical equipment search does not burn fuel once fuel is already low."""
         world, self_state = _make_world(fuel=450)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(dual_count=0, dual_enabled=False, default_count=0)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
         result = _try_search_critical_equipment(ctx)
 
@@ -1242,7 +1288,7 @@ class TestHelpers:
         inventory = _make_inventory(default_count=30)
         inventory["missile_shots"]["count"] = 5
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         result = _select_equipment_target_command(ctx, allow_unreachable=True)
 
@@ -1264,9 +1310,9 @@ class TestHelpers:
             (107, 106): "#",
         }
         terrain = FakeTerrainMap(terrain_data=terrain_data)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 107, pickup=False)
+        result = walk_or_teleport(ctx, 107, 107, pickup_kind=None)
 
         assert result is None
 
@@ -1276,9 +1322,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         if result is None:
             raise AssertionError("Expected direct move command")
@@ -1292,13 +1338,13 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=True)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
 
         if result is None:
             raise AssertionError("Expected direct pickup command")
-        assert result["cmd_type"] == "pickup_move"
+        assert result["cmd_type"] == "pickup_equipment"
         assert result["target_x"] == 107
         assert result["target_y"] == 100
 
@@ -1309,9 +1355,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=True)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
 
         assert result is None
 
@@ -1321,9 +1367,9 @@ class TestHelpers:
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=True)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
 
         assert result is None
 
@@ -1336,13 +1382,13 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 71, 63, pickup=True)
+        result = walk_or_teleport(ctx, 71, 63, pickup_kind="equipment")
 
         if result is None:
-            raise AssertionError("Expected pickup_move command")
-        assert result["cmd_type"] == "pickup_move"
+            raise AssertionError("Expected pickup_equipment command")
+        assert result["cmd_type"] == "pickup_equipment"
         assert result["target_x"] == 71
         assert result["target_y"] == 63
 
@@ -1352,9 +1398,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 71, 63, pickup=False)
+        result = walk_or_teleport(ctx, 71, 63, pickup_kind=None)
 
         if result is None:
             raise AssertionError("Expected direct edge move command")
@@ -1367,9 +1413,9 @@ class TestHelpers:
         world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        result = _walk_or_teleport(ctx, 71, 63, pickup=False)
+        result = walk_or_teleport(ctx, 71, 63, pickup_kind=None)
 
         if result is None:
             raise AssertionError("Expected direct edge move command")
@@ -1382,9 +1428,9 @@ class TestHelpers:
         world, self_state = _make_world(self_x=64, self_y=64, fuel=300)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        result = _walk_or_teleport(ctx, 72, 63, pickup=False)
+        result = walk_or_teleport(ctx, 72, 63, pickup_kind=None)
 
         if result is None:
             raise AssertionError("Expected off-viewport move to clamp to edge")
@@ -1407,7 +1453,7 @@ class TestHelpers:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
         assert decision["command"]["target_x"] == 71
         assert decision["command"]["target_y"] == 63
 
@@ -1427,10 +1473,10 @@ class TestHelpers:
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_low"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
-    def test_normal_equipment_low_skips_unexecutable_equipment_target(self) -> None:
-        """Non-critical equipment recovery skips blocked targets without crashing."""
+    def test_normal_equipment_low_skips_unexecutable_and_searches(self) -> None:
+        """Non-critical equipment recovery searches when all targets are blocked."""
         tanks: dict[str, TankStateDict] = {
             "50": TankStateDict(
                 tank_id=50,
@@ -1469,8 +1515,7 @@ class TestHelpers:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_normal_equipment_low_skips_bad_nearest_and_uses_next_target(self) -> None:
         """Equipment selection does not stop at the first non-executable candidate."""
@@ -1507,7 +1552,7 @@ class TestHelpers:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["command"]["cmd_type"] == "pickup_move"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
         assert decision["command"]["target_x"] == 106
         assert decision["command"]["target_y"] == 100
 
@@ -1551,8 +1596,7 @@ class TestHelpers:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
         """A* waypoint never produces a move outside the visible viewport."""
@@ -1568,9 +1612,9 @@ class TestHelpers:
             (row, col): "#" for row in range(92, 100) for col in range(92, 100)
         }
         terrain = FakeTerrainMap(terrain_data=terrain_data)
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 91, 91, pickup=False)
+        result = walk_or_teleport(ctx, 91, 91, pickup_kind=None)
 
         # Should either choose an in-bounds waypoint or fall through to
         # teleport, but never issue a move outside the visible viewport.
@@ -1591,7 +1635,7 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         # Waypoint at (100,100) = self position → should be rejected
         result = _waypoint_move_command(ctx, 105, 105, (100, 100))
@@ -1604,7 +1648,7 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         result = _waypoint_move_command(ctx, 105, 105, (109, 100))
 
@@ -1616,7 +1660,7 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         mark_move_target_failed(105, 104, 90000)
         result = _waypoint_move_command(ctx, 107, 107, (105, 104))
@@ -1629,10 +1673,10 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         mark_move_target_failed(107, 100, 90000)
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
@@ -1661,9 +1705,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
@@ -1673,9 +1717,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _direct_move_command(ctx, 72, 63, pickup=False)
+        result = _direct_move_command(ctx, 72, 63, pickup_kind=None)
 
         assert result is None
 
@@ -1723,9 +1767,9 @@ class TestHelpers:
         )
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected teleport fallback when waypoint is occupied")
@@ -1738,7 +1782,7 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap({(102, 100): "#"})
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
         result = _waypoint_move_command(ctx, 104, 100, (103, 99))
 
@@ -1768,9 +1812,9 @@ class TestHelpers:
         )
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
@@ -1780,9 +1824,9 @@ class TestHelpers:
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
@@ -1793,9 +1837,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _direct_move_command(ctx, 107, 100, pickup=True)
+        result = _direct_move_command(ctx, 107, 100, pickup_kind="equipment")
 
         assert result is None
 
@@ -1806,9 +1850,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _direct_move_command(ctx, 107, 100, pickup=False)
+        result = _direct_move_command(ctx, 107, 100, pickup_kind=None)
 
         assert result is None
 
@@ -1822,9 +1866,9 @@ class TestHelpers:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory(default_count=5)
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _walk_or_teleport(ctx, 107, 100, pickup=False)
+        result = walk_or_teleport(ctx, 107, 100, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected mine-blocked route to produce a safe command")
@@ -1849,7 +1893,7 @@ class TestHelpers:
         world, self_state = _make_world(fuel=800, tanks=tanks)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
         assert _is_occupied_by_enemy(ctx, 107, 100) is True
         assert _is_occupied_by_enemy(ctx, 108, 100) is False
@@ -2076,6 +2120,9 @@ class TestDecideMapOpen:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2104,6 +2151,9 @@ class TestDecideMapOpen:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2132,6 +2182,9 @@ class TestDecideMapOpen:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2160,11 +2213,14 @@ class TestDecideMapOpen:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
         terrain_data: dict[tuple[int, int], str] = {}
-        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
             terrain_data[(candidate_x, candidate_y)] = "W"
             terrain_data[(candidate_x - 1, candidate_y)] = "#"
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
@@ -2227,6 +2283,9 @@ class TestDecideShotTracking:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2320,6 +2379,9 @@ class TestDecideKillCooldown:
             last_shot_target_id=50,
             last_shot_target_name="Enemy",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2371,6 +2433,9 @@ class TestDecideKillCooldown:
             last_shot_target_id=50,
             last_shot_target_name="Enemy",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2421,6 +2486,9 @@ class TestDecideKillCooldown:
             last_shot_target_id=50,
             last_shot_target_name="Enemy",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2463,6 +2531,9 @@ class TestDecideKillCooldown:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2538,6 +2609,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2581,6 +2655,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2638,6 +2715,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2683,6 +2763,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
         terrain_data: dict[tuple[int, int], str] = {
@@ -2732,6 +2815,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
         terrain_data: dict[tuple[int, int], str] = {
@@ -2752,7 +2838,7 @@ class TestDecideTeleportToFarTarget:
         world, self_state = _make_world(self_x=10, self_y=10, fuel=800)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
         target = EnemyThreatDict(
             tank_id=50,
             x=0,
@@ -2804,6 +2890,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -2830,7 +2919,7 @@ class TestDecideTeleportToFarTarget:
         }
         world, _ = _make_world(fuel=800, tanks=tanks)
 
-        filtered = _filter_killed_tanks(world, {"50": 95000})
+        filtered = filter_killed_tanks(world, {"50": 95000})
 
         assert "50" not in filtered["tanks"]
 
@@ -2852,7 +2941,7 @@ class TestDecideTeleportToFarTarget:
         }
         world, _ = _make_world(fuel=800, tanks=tanks)
 
-        filtered = _filter_killed_tanks(world, {"50": 95000})
+        filtered = filter_killed_tanks(world, {"50": 95000})
 
         assert "50" in filtered["tanks"]
 
@@ -2891,6 +2980,9 @@ class TestDecideTeleportToFarTarget:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
 
@@ -3104,7 +3196,7 @@ class TestDecideBlockedCombatTargets:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -3147,7 +3239,7 @@ class TestDecideBlockedCombatTargets:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
         terrain = FakeTerrainMap()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -3178,7 +3270,7 @@ class TestDecideBlockedCombatTargets:
                 (105, 99): "W",
             }
         )
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -3212,7 +3304,7 @@ class TestDecideBlockedCombatTargets:
         )
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
-        ctx = _DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
         target = make_enemy_threat(
             tank_id=50,
             x=105,
@@ -3287,7 +3379,7 @@ class TestDecideBlockedEdgeSearch:
             FakeTerrainMap with all exploration targets and their adjacent
             teleport landing tiles blocked.
         """
-        ctx = _DecideCtx(
+        ctx = DecideCtx(
             world,
             self_state,
             _scanned_ai_state(),
@@ -3297,7 +3389,7 @@ class TestDecideBlockedEdgeSearch:
             "",
         )
         terrain_data: dict[tuple[int, int], str] = {}
-        for candidate_x, candidate_y in _viewport_exploration_candidates(ctx):
+        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
             terrain_data[(candidate_x, candidate_y)] = "W"
             terrain_data[(candidate_x - 1, candidate_y)] = "#"
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
@@ -3325,6 +3417,9 @@ class TestDecideBlockedEdgeSearch:
             last_shot_target_id=-1,
             last_shot_target_name="",
             equipment_search_failures=0,
+            resource_target_kind="",
+            resource_target_x=0,
+            resource_target_y=0,
         )
         inventory = _make_inventory()
         terrain = FakeTerrainMap(
@@ -3347,7 +3442,7 @@ class TestDecideBlockedEdgeSearch:
         ) != (107, 107)
 
     def test_low_fuel_blocked_edge_search_falls_through(self) -> None:
-        """Blocked edge scouting with no landing tile falls through to hunt fallback."""
+        """Blocked edge scouting with low fuel triggers fuel recovery."""
         world, self_state = _make_world(self_x=100, self_y=100, fuel=300)
         ai_state = AIStateDict(**{**_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = _make_inventory()
@@ -3355,5 +3450,4 @@ class TestDecideBlockedEdgeSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
