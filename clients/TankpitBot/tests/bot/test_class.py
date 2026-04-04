@@ -118,12 +118,20 @@ class TestBotCommandsWithoutCDP:
         result = bot.move_to(100, 100)
         assert result is False
 
-    def test_pickup_move_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.pickup_move_to returns False when CDP not available."""
+    def test_pickup_fuel_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.pickup_fuel_to returns False when CDP not available."""
         from tankpit_bot.bot import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.pickup_move_to(100, 100)
+        result = bot.pickup_fuel_to(100, 100)
+        assert result is False
+
+    def test_pickup_equipment_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.pickup_equipment_to returns False when CDP not available."""
+        from tankpit_bot.bot import Bot
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        result = bot.pickup_equipment_to(100, 100)
         assert result is False
 
     def test_teleport_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
@@ -228,7 +236,8 @@ class TestBotEquipmentState:
     def test_is_equipment_enabled_reads_from_inventory(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled reads from server inventory state."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state, update_inventory_from_toggle
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -243,10 +252,8 @@ class TestBotEquipmentState:
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import (
-            reset_world_state,
-            update_inventory_from_toggle,
-        )
+        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
