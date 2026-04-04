@@ -18,7 +18,7 @@ from tankpit_bot.sniffer import (
     update_world_state_from_radar,
     world_state,
 )
-from tankpit_bot.sniffer.world_state import dispatch_world_state_update
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.fakes import FakeTerrainMap
 
 
