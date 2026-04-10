@@ -3,8 +3,8 @@
 from pathlib import Path
 
 import pytest
-from PIL import Image
 
+from tankpit_bot._pillow import load_pillow_image_module
 from tankpit_bot.state import (
     ASCII_ALLY,
     ASCII_ENEMY,
@@ -33,6 +33,8 @@ from tankpit_bot.state import (
     update_tank_from_registry,
 )
 from tankpit_bot.terrain import TerrainMap
+
+_IMAGE = load_pillow_image_module()
 
 
 class TestTerrainToAscii:
@@ -65,7 +67,7 @@ class TestTerrainToAscii:
 def terrain_map(tmp_path: Path) -> TerrainMap:
     """Create a test TerrainMap with uniform ground."""
     gif_path = tmp_path / "test.gif"
-    img = Image.new("RGB", (256, 256), (60, 129, 85))  # Dark green = ground
+    img = _IMAGE.new("RGB", (256, 256), (60, 129, 85))  # Dark green = ground
     img.save(gif_path)
     return TerrainMap(gif_path)
 
@@ -139,6 +141,7 @@ class TestRenderWorldAscii:
             is_bot=False,
             x=5,
             y=5,
+            source="viewport",
             timestamp_ms=1000,
         )
         output = render_world_ascii(state, terrain_map)
@@ -167,6 +170,7 @@ class TestRenderWorldAscii:
             is_bot=False,
             x=5,
             y=5,
+            source="viewport",
             timestamp_ms=1000,
         )
         output = render_world_ascii(state, terrain_map)
@@ -222,6 +226,7 @@ class TestRenderWorldAscii:
             is_bot=False,
             x=5,
             y=5,
+            source="viewport",
             timestamp_ms=600,
         )
         state = update_tank_from_registry(
@@ -233,6 +238,7 @@ class TestRenderWorldAscii:
             is_bot=False,
             x=6,
             y=6,
+            source="viewport",
             timestamp_ms=700,
         )
         output = render_world_ascii(state, terrain_map)
