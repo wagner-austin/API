@@ -20,7 +20,9 @@ Game coordinates map directly to image pixel coordinates:
 from pathlib import Path
 from typing import ClassVar
 
-from PIL import Image
+from tankpit_bot._pillow import load_pillow_image_module
+
+_IMAGE = load_pillow_image_module()
 
 
 class TerrainMap:
@@ -56,7 +58,7 @@ class TerrainMap:
         Args:
             gif_path: Path to field##_r.gif minimap file.
         """
-        img = Image.open(gif_path).convert("RGB")
+        img = _IMAGE.open(gif_path).convert("RGB")
         if img.size != (256, 256):
             raise ValueError(f"Expected 256x256 image, got {img.size}")
         # Pre-load all pixel data for type-safe access
