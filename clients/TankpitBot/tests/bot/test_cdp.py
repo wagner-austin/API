@@ -380,8 +380,7 @@ class TestBotAIIntegration:
         bot = Bot("https://test.tankpit.com/", headless=True)
         _tick_once(bot)
         # AI state unchanged — no self_state to act on
-        assert bot._ai_state["active_mode"] == "HUNT"
-        assert bot._ai_state["combat_phase"] == "none"
+        assert bot._ai_state["mode"] == "UNSET"
 
     def test_tick_once_returns_if_self_state_disappears_after_sync(self, fake_env: FakeEnv) -> None:
         """_tick_once aborts when the refreshed world loses self_state mid-tick."""
@@ -489,7 +488,7 @@ class TestBotAIIntegration:
         bot._ai_state = AIStateDict(**{**bot._ai_state, "last_scan_ms": 1})
         _tick_once(bot)
         # No enemies, no containers → map_open to find enemies
-        assert bot._ai_state["active_mode"] == "HUNT"
+        assert bot._ai_state["mode"] == "HUNT"
         assert bot._ai_state["last_map_open_ms"] > 0
 
     def test_tick_once_hunt_with_enemy(self, fake_env: FakeEnv) -> None:
@@ -521,6 +520,7 @@ class TestBotAIIntegration:
             is_bot=True,
             x=110,
             y=100,
+            source="viewport",
             timestamp_ms=0,
         )
         # Set damage to critical so homing gets enabled
@@ -545,7 +545,7 @@ class TestBotAIIntegration:
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
         _tick_once(bot)
-        assert bot._ai_state["active_mode"] == "HUNT"
+        assert bot._ai_state["mode"] == "HUNT"
 
     def test_tick_once_updates_ai_state(self, fake_env: FakeEnv) -> None:
         """_tick_once persists updated AI state after tick."""
@@ -949,7 +949,7 @@ class TestBotEquipmentManagement:
         from tests.fakes import FakeCDPSession, FakeTerrainMap
 
         reset_world_state()
-        update_world_state_from_position(200, 70)
+        update_world_state_from_position(10, 10)
         _update_fuel_total(800)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
         ws._terrain_map = FakeTerrainMap()
@@ -957,7 +957,7 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "MOVING", "move", 206, 83)
+        bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
 
         _tick_once(bot)
 
@@ -1005,7 +1005,7 @@ class TestBotEquipmentManagement:
         update_world_state_from_position(205, 79)
         _update_fuel_total(580)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
-        containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=82, volume=-1)]
+        containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=80, volume=-1)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
         ws._terrain_map = FakeTerrainMap()
@@ -1013,7 +1013,7 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
-        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 205, 82)
+        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 205, 80)
 
         _tick_once(bot)
 
@@ -1051,11 +1051,101 @@ class TestBotEquipmentManagement:
         assert fake_cdp._sent_methods == []
         assert bot.get_state() == "IDLE"
 
-    def test_tick_once_dispatches_open_map_then_teleport(
+    def test_tick_once_rejected_shoot_does_not_persist_pending_shot_state(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_tick_once sends open_map and teleport for a teleport decision."""
+        """Rejected shoots do not leak speculative feedback state into AI memory."""
+        import tankpit_bot.bot.ai_strategy as ai_strategy_mod
+        import tankpit_bot.sniffer.world_state as ws
+        from tankpit_bot._test_hooks import TerrainMapProtocol
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
+        from tankpit_bot.bot.combat_feedback import CombatFeedback
+        from tankpit_bot.bot.tick_loop import _tick_once
+        from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
+        from tankpit_bot.bot.types import make_shoot_command
+        from tankpit_bot.inventory import InventoryState
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
+        from tankpit_bot.state import update_tank_from_registry
+        from tankpit_bot.state.types import SelfStateDict, WorldStateDict
+        from tests.fakes import FakeCDPSession
+
+        reset_world_state()
+        update_world_state_from_position(100, 100)
+        _update_fuel_total(800)
+        update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        ws._world_state = update_tank_from_registry(
+            ws._world_state,
+            tank_id=10,
+            team=2,
+            name="enemy",
+            rank=1,
+            is_bot=False,
+            x=101,
+            y=100,
+            source="radar",
+            timestamp_ms=1000,
+        )
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._magic = "test_magic"
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "IDLE"
+        original_state = AIStateDict(**bot._ai_state)
+        rejected_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "last_shoot_ms": 12345,
+                "last_shot_target_id": 10,
+                "last_shot_target_name": "enemy",
+                "combat_target_id": 10,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+            }
+        )
+        decision = make_tick_decision(
+            command=make_shoot_command(101, 100, 10),
+            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot enemy", target_id=10),
+            updated_ai_state=rejected_state,
+            desired_equipment=[],
+        )
+
+        def fake_decide(
+            world: WorldStateDict,
+            self_state: SelfStateDict,
+            ai_state: AIStateDict,
+            inventory: InventoryState,
+            timestamp_ms: int,
+            terrain: TerrainMapProtocol | None,
+            combat_feedback: CombatFeedback = "",
+        ) -> TickDecisionDict:
+            _ = (world, self_state, ai_state, inventory, timestamp_ms, terrain, combat_feedback)
+            return decision
+
+        original_decide = ai_strategy_mod.decide
+        try:
+            ai_strategy_mod.decide = fake_decide
+            _tick_once(bot)
+        finally:
+            ai_strategy_mod.decide = original_decide
+
+        assert bot._ai_state == original_state
+        assert bot._ai_state["last_shot_target_id"] == -1
+        assert bot._ai_state["combat_target_id"] == -1
+        assert len(fake_cdp._sent_methods) == 1
+
+    def test_tick_once_dispatches_regular_radar_before_search_hop(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """_tick_once scans first when regular radar is available at zero extra stock."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
@@ -1077,8 +1167,8 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        assert fake_cdp._sent_methods == ["Runtime.evaluate", "Runtime.evaluate"]
-        assert bot.get_state() == "TELEPORTING"
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
+        assert bot.get_state() == "SCANNING"
 
     def test_tick_once_critical_equipment_preempts_combat(
         self,
@@ -1111,6 +1201,7 @@ class TestBotEquipmentManagement:
             is_bot=True,
             x=106,
             y=100,
+            source="viewport",
             timestamp_ms=0,
         )
         enemy = make_tank_state(
@@ -1141,7 +1232,6 @@ class TestBotEquipmentManagement:
                 "combat_target_id": 10,
                 "combat_target_x": 106,
                 "combat_target_y": 100,
-                "combat_phase": "engaging",
             }
         )
 
@@ -1152,11 +1242,11 @@ class TestBotEquipmentManagement:
         assert "Input.dispatchKeyEvent" not in fake_cdp._sent_methods
         assert bot.get_state() == "SCANNING"
 
-    def test_tick_once_replans_when_pending_shot_target_was_killed(
+    def test_tick_once_replans_with_regular_radar_when_pending_shot_target_was_killed(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_tick_once does not wait on pending feedback once the target is already dead."""
+        """Killed-target replanning uses regular radar before broader search movement."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.browser import get_current_time_ms
@@ -1184,8 +1274,8 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        assert fake_cdp._sent_methods == ["Runtime.evaluate", "Runtime.evaluate"]
-        assert bot.get_state() == "TELEPORTING"
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
+        assert bot.get_state() == "SCANNING"
 
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked walking clears MOVING so the bot can replan."""
@@ -1288,6 +1378,41 @@ class TestBotEquipmentManagement:
 
         assert cleared is True
         assert bot.get_state() == "IDLE"
+
+    def test_clear_blocked_collection_returns_false_when_viewport_path_exists(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Reachable collection remains in flight when the viewport path is valid."""
+        import tankpit_bot.sniffer.world_state as ws
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.tick_loop import _clear_blocked_collection
+        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_position,
+        )
+        from tests.fakes import FakeTerrainMap
+
+        reset_world_state()
+        update_world_state_from_position(10, 10)
+        _update_fuel_total(580)
+        containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
+        mines: list[RadarMineDict] = []
+        _update_radar(containers, mines)
+        ws._terrain_map = FakeTerrainMap()
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        bot._update_state_from_world()
+        bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 12, 10)
+        action = bot._state_data["in_flight_action"]
+
+        cleared = _clear_blocked_collection(bot, action)
+
+        assert cleared is False
+        assert bot.get_state() == "COLLECTING"
 
     def test_has_in_flight_action_clears_blocked_collection(self, fake_env: FakeEnv) -> None:
         """Blocked collection returns False from the in-flight gate after clearing state."""
@@ -1695,7 +1820,6 @@ class TestBotEquipmentManagement:
         bot._ai_state["combat_target_id"] = 50
         bot._ai_state["combat_target_x"] = 71
         bot._ai_state["combat_target_y"] = 53
-        bot._ai_state["combat_phase"] = "engaging"
 
         mark_tank_killed(50)
         new_state = _merge_protocol_kills(bot._ai_state)
@@ -1705,7 +1829,6 @@ class TestBotEquipmentManagement:
         assert new_state["combat_target_id"] == -1
         assert new_state["combat_target_x"] == 0
         assert new_state["combat_target_y"] == 0
-        assert new_state["combat_phase"] == "none"
 
     def test_merge_protocol_kills_no_kills(
         self,
