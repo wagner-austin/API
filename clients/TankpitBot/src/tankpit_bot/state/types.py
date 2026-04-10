@@ -6,6 +6,8 @@ along with factory functions and JSON encode/decode functions.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -54,6 +56,39 @@ ASCII_ENEMY = "T"
 ASCII_ALLY = "A"
 ASCII_UNKNOWN = "?"
 
+# Explicit entity observation sources.
+ENTITY_SOURCES: tuple[str, ...] = (
+    "viewport",
+    "radar",
+    "world_state",
+)
+
+
+def _require_entity_source(
+    data: JSONObject,
+    key: str,
+) -> Literal["viewport", "radar", "world_state"]:
+    """Validate and extract an entity source from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated entity source value.
+
+    Raises:
+        JSONTypeError: If the value is not a supported entity source.
+    """
+    raw = require_str(data, key)
+    if raw == "viewport":
+        return "viewport"
+    if raw == "radar":
+        return "radar"
+    if raw == "world_state":
+        return "world_state"
+    raise JSONTypeError(f"{key} must be one of {ENTITY_SOURCES}, got {raw!r}")
+
 
 # =============================================================================
 # TypedDicts for World State Elements
@@ -73,6 +108,7 @@ class TankStateDict(TypedDict):
         name: Player name.
         is_bot: Whether this is a bot player.
         is_self: Whether this is the player's own tank.
+        source: Which observed source most recently confirmed this tank.
         timestamp_ms: When this tank was last confirmed by the server
             (world state, movement response, or radar). Used for
             freshness-based combat target selection.
@@ -87,6 +123,7 @@ class TankStateDict(TypedDict):
     name: str
     is_bot: bool
     is_self: bool
+    source: Literal["viewport", "radar", "world_state"]
     timestamp_ms: int
 
 
@@ -98,6 +135,7 @@ class ContainerStateDict(TypedDict):
         y: Y coordinate (0-255).
         is_fuel: True if fuel container, False if equipment.
         volume: Fuel amount (0 for equipment).
+        source: Which observed source most recently confirmed this container.
         timestamp_ms: When this container was last confirmed by the
             server (radar, viewport, or world state). Used for
             freshness-based target selection.
@@ -110,6 +148,7 @@ class ContainerStateDict(TypedDict):
     y: int
     is_fuel: bool
     volume: int
+    source: Literal["viewport", "radar", "world_state"]
     timestamp_ms: int
     failed_pickups: int
 
@@ -123,6 +162,8 @@ class MineStateDict(TypedDict):
         mine_type: Type of mine (from protocol). 0 if unknown (radar-discovered).
         tank_id: ID of tank that placed the mine. -1 if unknown (radar-discovered).
         team: Team that owns the mine (0=red, 1=purple, 2=blue, 3=orange).
+        source: Which observed source most recently confirmed this mine.
+        timestamp_ms: When this mine was last confirmed by the server.
     """
 
     x: int
@@ -130,6 +171,8 @@ class MineStateDict(TypedDict):
     mine_type: int
     tank_id: int
     team: int
+    source: Literal["viewport", "radar", "world_state"]
+    timestamp_ms: int
 
 
 class TerrainTileDict(TypedDict):
@@ -250,6 +293,7 @@ def make_tank_state(
     name: str,
     is_bot: bool,
     is_self: bool,
+    source: Literal["viewport", "radar", "world_state"] = "viewport",
     timestamp_ms: int = 0,
 ) -> TankStateDict:
     """Create a tank state.
@@ -264,6 +308,7 @@ def make_tank_state(
         name: Player name.
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
+        source: Which observed source confirmed this tank.
         timestamp_ms: When this tank was last confirmed.
 
     Returns:
@@ -279,6 +324,7 @@ def make_tank_state(
         name=name,
         is_bot=is_bot,
         is_self=is_self,
+        source=source,
         timestamp_ms=timestamp_ms,
     )
 
@@ -288,6 +334,7 @@ def make_container_state(
     y: int,
     is_fuel: bool,
     volume: int,
+    source: Literal["viewport", "radar", "world_state"] = "radar",
     timestamp_ms: int = 0,
     failed_pickups: int = 0,
 ) -> ContainerStateDict:
@@ -298,6 +345,7 @@ def make_container_state(
         y: Y coordinate (0-255).
         is_fuel: True if fuel, False if equipment.
         volume: Fuel amount (0 for equipment).
+        source: Which observed source confirmed this container.
         timestamp_ms: When this container was confirmed.
         failed_pickups: How many pickup attempts failed.
 
@@ -309,6 +357,7 @@ def make_container_state(
         y=y,
         is_fuel=is_fuel,
         volume=volume,
+        source=source,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
     )
@@ -320,6 +369,8 @@ def make_mine_state(
     mine_type: int,
     tank_id: int,
     team: int,
+    source: Literal["viewport", "radar", "world_state"] = "viewport",
+    timestamp_ms: int = 0,
 ) -> MineStateDict:
     """Create a mine state.
 
@@ -329,11 +380,21 @@ def make_mine_state(
         mine_type: Type of mine. 0 if unknown (radar-discovered).
         tank_id: ID of placing tank. -1 if unknown (radar-discovered).
         team: Team that owns the mine (0=red, 1=purple, 2=blue, 3=orange).
+        source: Which observed source confirmed this mine.
+        timestamp_ms: When this mine was confirmed.
 
     Returns:
         MineStateDict with the provided values.
     """
-    return MineStateDict(x=x, y=y, mine_type=mine_type, tank_id=tank_id, team=team)
+    return MineStateDict(
+        x=x,
+        y=y,
+        mine_type=mine_type,
+        tank_id=tank_id,
+        team=team,
+        source=source,
+        timestamp_ms=timestamp_ms,
+    )
 
 
 def make_terrain_tile(
@@ -471,6 +532,7 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "name": state["name"],
         "is_bot": state["is_bot"],
         "is_self": state["is_self"],
+        "source": state["source"],
         "timestamp_ms": state["timestamp_ms"],
     }
 
@@ -489,6 +551,7 @@ def encode_container_state(state: ContainerStateDict) -> JSONObject:
         "y": state["y"],
         "is_fuel": state["is_fuel"],
         "volume": state["volume"],
+        "source": state["source"],
         "timestamp_ms": state["timestamp_ms"],
         "failed_pickups": state["failed_pickups"],
     }
@@ -509,6 +572,8 @@ def encode_mine_state(state: MineStateDict) -> JSONObject:
         "mine_type": state["mine_type"],
         "tank_id": state["tank_id"],
         "team": state["team"],
+        "source": state["source"],
+        "timestamp_ms": state["timestamp_ms"],
     }
 
 
@@ -615,6 +680,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
         is_self=require_bool(data, "is_self"),
+        source=_require_entity_source(data, "source"),
         timestamp_ms=require_int(data, "timestamp_ms"),
     )
 
@@ -636,6 +702,7 @@ def decode_container_state(data: JSONObject) -> ContainerStateDict:
         y=require_int(data, "y"),
         is_fuel=require_bool(data, "is_fuel"),
         volume=require_int(data, "volume"),
+        source=_require_entity_source(data, "source"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         failed_pickups=require_int(data, "failed_pickups"),
     )
@@ -659,6 +726,8 @@ def decode_mine_state(data: JSONObject) -> MineStateDict:
         mine_type=require_int(data, "mine_type"),
         tank_id=require_int(data, "tank_id"),
         team=require_int(data, "team"),
+        source=_require_entity_source(data, "source"),
+        timestamp_ms=require_int(data, "timestamp_ms"),
     )
 
 
@@ -825,6 +894,7 @@ __all__ = [
     "DAMAGE_FULL",
     "DAMAGE_LIGHT",
     "DAMAGE_MEDIUM",
+    "ENTITY_SOURCES",
     "TEAM_BLUE",
     "TEAM_ORANGE",
     "TEAM_PURPLE",
