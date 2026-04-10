@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot._test_hooks import BotProtocol
+from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.sniffer.decoders import process_received_message
 
 log = get_logger(__name__)
 
 
-def drain_messages(bot: BotProtocol) -> int:
+def drain_messages(bot: BufferedMessageSourceProtocol) -> int:
     """Drain CDP message buffer and decode to update world state.
 
     Args:
