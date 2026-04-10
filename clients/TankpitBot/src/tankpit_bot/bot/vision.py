@@ -29,7 +29,7 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
-from tankpit_bot.state import ContainerStateDict, coord_key
+from tankpit_bot.state import ContainerStateDict, coord_key, make_container_state
 
 log = get_logger(__name__)
 
@@ -585,11 +585,12 @@ def get_merged_fuel_containers(vision_state: VisionStateDict) -> list[ContainerS
     for key, entry in vision_state["container_cache"].items():
         if key not in merged:
             is_fuel = entry["volume"] > 0
-            merged[key] = ContainerStateDict(
+            merged[key] = make_container_state(
                 x=entry["x"],
                 y=entry["y"],
                 is_fuel=is_fuel,
                 volume=entry["volume"],
+                source="world_state",
                 timestamp_ms=0,
                 failed_pickups=0,
             )
