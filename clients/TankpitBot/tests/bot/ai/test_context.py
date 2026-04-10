@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import (
+    DecideCtx,
+    can_afford_teleport,
+    can_afford_teleport_search,
     locked_resource_target,
     normalize_resource_target,
     set_resource_target,
+    teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.inventory import InventoryItem, InventoryState
@@ -24,7 +28,16 @@ def _world_with_container(
     return WorldStateDict(
         self_state=None,
         tanks={},
-        containers={key: make_container_state(x, y, is_fuel, volume, 0, failed_pickups)},
+        containers={
+            key: make_container_state(
+                x=x,
+                y=y,
+                is_fuel=is_fuel,
+                volume=volume,
+                timestamp_ms=0,
+                failed_pickups=failed_pickups,
+            )
+        },
         mines={},
         terrain={},
         viewport={"left": 0, "top": 0, "width": 16, "height": 16},
@@ -89,6 +102,32 @@ class TestNormalizeResourceTarget:
 
 class TestLockedResourceTarget:
     """Tests for locked_resource_target via DecideCtx."""
+
+    def test_ctx_exposes_durable_mode_fields(self) -> None:
+        """DecideCtx exposes the durable top-level mode and substate."""
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai.types import AIStateDict
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+        world = _world_with_container(10, 20, True, 500)
+        self_state = _self_state()
+        world["self_state"] = self_state
+        ai_state = AIStateDict(
+            **{
+                **make_initial_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ACQUIRE",
+                "mode_started_ms": 999,
+            }
+        )
+
+        ctx = DecideCtx(world, self_state, ai_state, _dummy_inventory(), 100000, None, "")
+
+        assert ctx.mode == "HUNT"
+        assert ctx.mode_state == "ACQUIRE"
+        assert ctx.mode_started_ms == 999
+        reset_world_state()
 
     def test_returns_none_for_wrong_kind(self) -> None:
         """Locked target returns None when kind doesn't match."""
@@ -225,3 +264,108 @@ def _dummy_inventory() -> InventoryState:
         homing_shots=item,
         extra_radars=item,
     )
+
+
+class TestTeleportFuelHelpers:
+    """Tests for teleport fuel cost and affordability helpers."""
+
+    def test_reports_exact_axis_aligned_teleport_cost(self) -> None:
+        """Teleport helper returns the exact cost for an axis-aligned jump."""
+        world = _world_with_container(10, 20, True, 100)
+        self_state = SelfStateDict(
+            tank_id=1,
+            x=93,
+            y=106,
+            team=1,
+            rank=0,
+            fuel=800,
+            leaderboard_position=0,
+        )
+        world["self_state"] = self_state
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_initial_ai_state(),
+            _dummy_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert teleport_fuel_cost_to(ctx, 3, 106) == 540
+
+    def test_reports_exact_diagonal_teleport_cost(self) -> None:
+        """Teleport helper matches the sniffed long diagonal sample."""
+        world = _world_with_container(10, 20, True, 100)
+        self_state = SelfStateDict(
+            tank_id=1,
+            x=6,
+            y=172,
+            team=1,
+            rank=0,
+            fuel=1100,
+            leaderboard_position=0,
+        )
+        world["self_state"] = self_state
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_initial_ai_state(),
+            _dummy_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert teleport_fuel_cost_to(ctx, 86, 90) == 687
+
+    def test_can_afford_teleport_uses_exact_cost(self) -> None:
+        """Exact affordability accepts only when current fuel covers the jump."""
+        world = _world_with_container(10, 20, True, 100)
+        self_state = SelfStateDict(
+            tank_id=1,
+            x=96,
+            y=95,
+            team=1,
+            rank=0,
+            fuel=12,
+            leaderboard_position=0,
+        )
+        world["self_state"] = self_state
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_initial_ai_state(),
+            _dummy_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert can_afford_teleport(ctx, 96, 97) is True
+        assert can_afford_teleport(ctx, 94, 107) is False
+
+    def test_can_afford_teleport_search_applies_operating_reserve(self) -> None:
+        """Search affordability includes the configured post-teleport reserve."""
+        world = _world_with_container(10, 20, True, 100)
+        self_state = SelfStateDict(
+            tank_id=1,
+            x=100,
+            y=100,
+            team=1,
+            rank=0,
+            fuel=279,
+            leaderboard_position=0,
+        )
+        world["self_state"] = self_state
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_initial_ai_state(),
+            _dummy_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert can_afford_teleport_search(ctx, 130, 100) is False
