@@ -10,11 +10,11 @@ from tankpit_bot.bot.ai.tactics import (
 from tankpit_bot.bot.ai.types import make_default_ai_config
 from tankpit_bot.state.types import (
     SelfStateDict,
-    TankStateDict,
     ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_self_state,
+    make_tank_state,
     viewport_scan_key,
 )
 
@@ -118,7 +118,7 @@ class TestShouldProactiveRadar:
         world = _empty_world()
         world["self_state"] = _self()
         # Self tank — skipped by is_self check
-        world["tanks"]["1"] = TankStateDict(
+        world["tanks"]["1"] = make_tank_state(
             tank_id=1,
             x=100,
             y=100,
@@ -131,7 +131,7 @@ class TestShouldProactiveRadar:
             timestamp_ms=0,
         )
         # Same-team tank — skipped by team check
-        world["tanks"]["2"] = TankStateDict(
+        world["tanks"]["2"] = make_tank_state(
             tank_id=2,
             x=120,
             y=120,
@@ -144,7 +144,7 @@ class TestShouldProactiveRadar:
             timestamp_ms=0,
         )
         # Enemy at (0,0) — skipped as invalidated position
-        world["tanks"]["50"] = TankStateDict(
+        world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=0,
             y=0,
@@ -191,7 +191,7 @@ class TestShouldMapOpenForEnemies:
         """Live enemy tank visible prevents triggering."""
         config = make_default_ai_config()
         world = _empty_world()
-        world["tanks"]["50"] = TankStateDict(
+        world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=5,
             y=5,
@@ -212,7 +212,7 @@ class TestShouldMapOpenForEnemies:
         config = make_default_ai_config()
         world = _empty_world()
         world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
-        world["tanks"]["50"] = TankStateDict(
+        world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=20,
             y=20,
@@ -234,7 +234,7 @@ class TestShouldMapOpenForEnemies:
         """Dead enemy at (0,0) does not count as visible."""
         config = make_default_ai_config()
         world = _empty_world()
-        world["tanks"]["50"] = TankStateDict(
+        world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=0,
             y=0,
@@ -255,7 +255,7 @@ class TestShouldMapOpenForEnemies:
         config = make_default_ai_config()
         world = _empty_world()
         # Same team (team=0) as _self()
-        world["tanks"]["50"] = TankStateDict(
+        world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=105,
             y=105,
@@ -275,7 +275,7 @@ class TestShouldMapOpenForEnemies:
         """Self tank does not count as visible enemy."""
         config = make_default_ai_config()
         world = _empty_world()
-        world["tanks"]["1"] = TankStateDict(
+        world["tanks"]["1"] = make_tank_state(
             tank_id=1,
             x=100,
             y=100,
