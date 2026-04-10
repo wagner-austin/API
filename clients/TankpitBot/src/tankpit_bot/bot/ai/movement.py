@@ -1,7 +1,7 @@
 """Movement and exploration planning for AI strategy.
 
-Handles walk, waypoint, teleport, and exploration commands. All functions
-operate on a ``DecideCtx`` and return ``BotCommand | None``.
+Handles walk, teleport, and exploration commands. All functions operate on a
+``DecideCtx`` and return ``BotCommand | None``.
 """
 
 from __future__ import annotations
@@ -9,11 +9,16 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
+    can_afford_teleport,
     can_afford_teleport_search,
     local_actionable_bounds,
+    teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.equipment import find_teleport_landing_tile
-from tankpit_bot.bot.ai.pathfinding import find_path_segment_target, is_direct_path_clear
+from tankpit_bot.bot.ai.reachability import (
+    is_collection_reachable_in_viewport,
+    is_move_reachable_in_viewport,
+)
 from tankpit_bot.bot.types import (
     BotCommand,
     make_move_command,
@@ -22,8 +27,8 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import is_move_target_failed
-from tankpit_bot.state.types import MineStateDict
+from tankpit_bot.sniffer.world_state import is_move_target_failed, is_scan_viewport_failed
+from tankpit_bot.state.types import MineStateDict, viewport_scan_key
 
 
 def walk_or_teleport(
@@ -33,13 +38,12 @@ def walk_or_teleport(
     *,
     pickup_kind: str | None = "equipment",
 ) -> BotCommand | None:
-    """Plan a direct walk, waypointed walk, or teleport for a target.
+    """Plan a direct walk or teleport for a target.
 
     The game can walk directly across clear ground, but does not reliably path
     around terrain obstacles. This helper therefore prefers:
-    1. direct move/pickup when the straight route is clear
-    2. a terrain-aware waypoint along the first A* segment
-    3. teleport fallback when no walk route exists
+    1. direct move/pickup when the current viewport can execute the path
+    2. teleport fallback when no viewport-contained walk route exists
 
     Rejects move destinations that are occupied by enemy tanks or that
     recently failed (stalled and timed out).
@@ -79,7 +83,11 @@ def is_pickup_target_actionable(ctx: DecideCtx, tx: int, ty: int) -> bool:
     return left <= tx <= right and top <= ty <= bottom
 
 
-def select_exploration_command(ctx: DecideCtx) -> tuple[int, int, BotCommand] | None:
+def select_exploration_command(
+    ctx: DecideCtx,
+    *,
+    candidate_offset: int = 0,
+) -> tuple[int, int, BotCommand] | None:
     """Return the first executable exploration step inside the current viewport.
 
     Exploration is used when the bot wants fresh information but map/radar
@@ -89,16 +97,24 @@ def select_exploration_command(ctx: DecideCtx) -> tuple[int, int, BotCommand] | 
 
     Args:
         ctx: Decision context with viewport, terrain, and fuel state.
+        candidate_offset: Rotation offset into the ordered candidate list.
 
     Returns:
         Tuple of ``(x, y, command)`` for the first executable exploration
         target, or ``None`` when no exploration command can be executed.
     """
-    for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
+    for candidate_x, candidate_y in viewport_exploration_candidates(
+        ctx,
+        candidate_offset=candidate_offset,
+    ):
         command = walk_or_teleport(ctx, candidate_x, candidate_y, pickup_kind=None)
         if command is None:
             continue
-        if command["cmd_type"] == "teleport" and not can_afford_teleport_search(ctx):
+        if command["cmd_type"] == "teleport" and not can_afford_teleport_search(
+            ctx,
+            candidate_x,
+            candidate_y,
+        ):
             emit_ai(
                 "skipping exploration teleport to (%d,%d) - fuel too low (%d)",
                 candidate_x,
@@ -111,7 +127,11 @@ def select_exploration_command(ctx: DecideCtx) -> tuple[int, int, BotCommand] | 
     return None
 
 
-def viewport_exploration_candidates(ctx: DecideCtx) -> list[tuple[int, int]]:
+def viewport_exploration_candidates(
+    ctx: DecideCtx,
+    *,
+    candidate_offset: int = 0,
+) -> list[tuple[int, int]]:
     """Return ordered exploration targets on the visible viewport boundary.
 
     Uses the actual viewport bounds rather than assuming the player is
@@ -122,6 +142,7 @@ def viewport_exploration_candidates(ctx: DecideCtx) -> list[tuple[int, int]]:
 
     Args:
         ctx: Decision context with viewport and self position.
+        candidate_offset: Rotation offset into the ordered candidate list.
 
     Returns:
         Ordered unique candidate coordinates inside the visible viewport.
@@ -161,7 +182,15 @@ def viewport_exploration_candidates(ctx: DecideCtx) -> list[tuple[int, int]]:
             continue
         seen.add(candidate)
         candidates.append(candidate)
-    return candidates
+    if not candidates:
+        return candidates
+    ranked_candidates = [
+        (_candidate_priority_for_ctx(ctx, candidate), candidate) for candidate in candidates
+    ]
+    ranked_candidates.sort(key=_ranked_exploration_key)
+    candidates = [candidate for _, candidate in ranked_candidates]
+    offset = candidate_offset % len(candidates)
+    return candidates[offset:] + candidates[:offset]
 
 
 # =============================================================================
@@ -186,8 +215,58 @@ def _approach_target(ctx: DecideCtx, tx: int, ty: int) -> tuple[int, int]:
     return (approach_x, approach_y)
 
 
+def _predicted_viewport_origin_for_target(
+    ctx: DecideCtx,
+    target_x: int,
+    target_y: int,
+) -> tuple[int, int]:
+    """Return the viewport origin likely after reaching a target tile."""
+    viewport = ctx.world["viewport"]
+    max_left = max(0, 256 - viewport["width"])
+    max_top = max(0, 256 - viewport["height"])
+    return (
+        min(max(target_x - (viewport["width"] // 2), 0), max_left),
+        min(max(target_y - (viewport["height"] // 2), 0), max_top),
+    )
+
+
+def _exploration_priority(
+    ctx: DecideCtx,
+    target_x: int,
+    target_y: int,
+) -> tuple[bool, bool, bool, int]:
+    """Rank exploration targets by how much fresh scan space they expose."""
+    next_left, next_top = _predicted_viewport_origin_for_target(ctx, target_x, target_y)
+    current_viewport = ctx.world["viewport"]
+    current_key = viewport_scan_key(current_viewport["left"], current_viewport["top"])
+    next_key = viewport_scan_key(next_left, next_top)
+    is_current = next_key == current_key
+    is_failed = is_scan_viewport_failed(next_left, next_top, ctx.timestamp_ms)
+    is_scanned = next_key in ctx.world["scanned_viewports"]
+    reveal_distance = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
+    return (is_current, is_failed, is_scanned, -reveal_distance)
+
+
+def _candidate_priority_for_ctx(
+    ctx: DecideCtx,
+    candidate: tuple[int, int],
+) -> tuple[bool, bool, bool, int]:
+    """Return a typed sort key wrapper for exploration candidates."""
+    return _exploration_priority(ctx, candidate[0], candidate[1])
+
+
+def _ranked_exploration_key(
+    item: tuple[tuple[bool, bool, bool, int], tuple[int, int]],
+) -> tuple[bool, bool, bool, int]:
+    """Return the priority part of a ranked exploration candidate."""
+    return item[0]
+
+
 def _is_occupied_by_enemy(ctx: DecideCtx, x: int, y: int) -> bool:
     """Return True when a tile is occupied by an enemy tank.
+
+    Only considers tanks that are actually enemies (different team, not self).
+    Allies and the bot's own tank record do not block movement or pickup.
 
     Args:
         ctx: Decision context with current world state.
@@ -197,7 +276,11 @@ def _is_occupied_by_enemy(ctx: DecideCtx, x: int, y: int) -> bool:
     Returns:
         True if the tile is occupied by an enemy.
     """
-    return any(tank["x"] == x and tank["y"] == y for tank in ctx.filtered["tanks"].values())
+    self_team = ctx.self_state["team"]
+    return any(
+        tank["x"] == x and tank["y"] == y and not tank["is_self"] and tank["team"] != self_team
+        for tank in ctx.filtered["tanks"].values()
+    )
 
 
 def _is_occupied_by_mine(ctx: DecideCtx, x: int, y: int) -> bool:
@@ -214,26 +297,6 @@ def _is_occupied_by_mine(ctx: DecideCtx, x: int, y: int) -> bool:
     return f"{x},{y}" in ctx.world["mines"]
 
 
-def _pickup_target_is_blocked(ctx: DecideCtx, x: int, y: int) -> bool:
-    """Return True when a pickup target cannot be occupied safely.
-
-    Args:
-        ctx: Decision context.
-        x: Target X coordinate.
-        y: Target Y coordinate.
-
-    Returns:
-        True if the target is blocked by an enemy or mine.
-    """
-    if _is_occupied_by_enemy(ctx, x, y):
-        emit_ai("pickup target (%d,%d) is occupied by enemy", x, y)
-        return True
-    if _is_occupied_by_mine(ctx, x, y):
-        emit_ai("pickup target (%d,%d) is occupied by mine", x, y)
-        return True
-    return False
-
-
 def _walk_or_teleport_with_terrain(
     ctx: DecideCtx,
     tx: int,
@@ -246,34 +309,32 @@ def _walk_or_teleport_with_terrain(
     """Resolve movement when terrain/pathfinding is available."""
     terrain = ctx.terrain
     assert terrain is not None  # caller guarantees this
-    blocked_coords = ctx.world["mines"].keys()
-    if pickup_kind is not None and _pickup_target_is_blocked(ctx, tx, ty):
-        return None
     if pickup_kind is not None and abs(sx - tx) <= 1 and abs(sy - ty) <= 1:
         emit_ai("adjacent to pickup target at (%d,%d)", tx, ty)
         return _make_pickup_command(pickup_kind, tx, ty)
     if not is_pickup_target_actionable(ctx, tx, ty):
         return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
-    if is_direct_path_clear(terrain, sx, sy, tx, ty, blocked_coords):
-        return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
-    left, top, right, bottom = local_actionable_bounds(ctx)
-    waypoint = find_path_segment_target(
+    if pickup_kind is not None and is_collection_reachable_in_viewport(
+        ctx.world,
         terrain,
         sx,
         sy,
         tx,
         ty,
-        blocked_coords,
-        min_x=left,
-        min_y=top,
-        max_x=right,
-        max_y=bottom,
-    )
-    if waypoint is not None:
-        move_cmd = _waypoint_move_command(ctx, tx, ty, waypoint)
-        if move_cmd is not None:
-            return move_cmd
-    return _teleport_fallback_command(terrain, sx, sy, tx, ty, ctx.world["mines"])
+        ctx.world["mines"],
+    ):
+        return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
+    if pickup_kind is None and is_move_reachable_in_viewport(
+        ctx.world,
+        terrain,
+        sx,
+        sy,
+        tx,
+        ty,
+        ctx.world["mines"],
+    ):
+        return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
+    return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
 
 
 def _walk_or_teleport_without_terrain(
@@ -287,8 +348,6 @@ def _walk_or_teleport_without_terrain(
     if not is_pickup_target_actionable(ctx, tx, ty):
         return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
     if pickup_kind is not None:
-        if _pickup_target_is_blocked(ctx, tx, ty):
-            return None
         return _make_pickup_command(pickup_kind, tx, ty)
     if _is_occupied_by_enemy(ctx, tx, ty):
         emit_ai("move target (%d,%d) is occupied by enemy", tx, ty)
@@ -332,8 +391,6 @@ def _direct_move_command(
         emit_ai("direct target (%d,%d) is outside viewport", tx, ty)
         return None
     if pickup_kind is not None:
-        if _pickup_target_is_blocked(ctx, tx, ty):
-            return None
         return _make_pickup_command(pickup_kind, tx, ty)
     if _is_occupied_by_enemy(ctx, tx, ty):
         emit_ai("move target (%d,%d) is occupied by enemy", tx, ty)
@@ -365,46 +422,8 @@ def _make_pickup_command(kind: str, tx: int, ty: int) -> BotCommand:
     raise ValueError(f"Unknown pickup kind: {kind}")
 
 
-def _waypoint_move_command(
-    ctx: DecideCtx,
-    tx: int,
-    ty: int,
-    waypoint: tuple[int, int],
-) -> BotCommand | None:
-    """Return an A*-derived waypoint move when the waypoint is usable."""
-    left, top, right, bottom = local_actionable_bounds(ctx)
-    wx, wy = waypoint
-    if not (left <= wx <= right and top <= wy <= bottom):
-        emit_ai(
-            "waypoint (%d,%d) for (%d,%d) is outside viewport (%d,%d)-(%d,%d)",
-            wx,
-            wy,
-            tx,
-            ty,
-            left,
-            top,
-            right,
-            bottom,
-        )
-        return None
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    if wx == sx and wy == sy:
-        emit_ai("waypoint is self position, skipping")
-        return None
-    if is_move_target_failed(wx, wy, ctx.timestamp_ms):
-        emit_ai("waypoint (%d,%d) recently failed, skipping", wx, wy)
-        return None
-    if _is_occupied_by_enemy(ctx, wx, wy):
-        emit_ai("waypoint (%d,%d) is occupied by enemy", wx, wy)
-        return None
-    if _is_occupied_by_mine(ctx, wx, wy):
-        emit_ai("waypoint (%d,%d) is occupied by mine", wx, wy)
-        return None
-    emit_ai("walking toward (%d,%d) via (%d,%d)", tx, ty, wx, wy)
-    return make_move_command(wx, wy)
-
-
 def _teleport_fallback_command(
+    ctx: DecideCtx,
     terrain: TerrainMapProtocol,
     sx: int,
     sy: int,
@@ -418,6 +437,17 @@ def _teleport_fallback_command(
         emit_ai("blocked target at (%d,%d) has no passable landing tile", tx, ty)
         return None
     lx, ly = landing
+    if not can_afford_teleport(ctx, lx, ly):
+        emit_ai(
+            "cannot afford teleport fallback to (%d,%d) for (%d,%d) (fuel=%d cost=%d)",
+            lx,
+            ly,
+            tx,
+            ty,
+            ctx.fuel,
+            teleport_fuel_cost_to(ctx, lx, ly),
+        )
+        return None
     emit_ai("terrain blocked, teleporting near target to (%d,%d)", lx, ly)
     return make_teleport_command(lx, ly)
 
