@@ -58,6 +58,24 @@ That creates these concrete problems:
   expose source/freshness metadata.
 - This refactor does not remove the existing execution FSM in one shot.
 
+## Forward Constraint: Future Multi-Bot Coordination
+
+Multi-bot coordination is still out of scope for this refactor, but the
+single-bot HFSM work must not block it later.
+
+The architecture constraint is:
+
+1. Each bot keeps a bot-local HFSM and executor.
+2. Shared observations must live in a separate typed intel layer.
+3. Coordination must publish goals and fresh observations, not reach into
+   another bot's executor or planner internals.
+
+That means the current refactor should continue to preserve:
+
+- explicit `source` and `timestamp_ms` metadata on world facts
+- bot-local planning against a world snapshot instead of hidden global intent
+- clear separation between world modeling, behavior control, and execution
+
 ## Desired End State
 
 ### Control Layers
@@ -250,14 +268,15 @@ one shot.
 
 3. Implement the mode-lock migration rule:
    - if `mode != "UNSET"`, the HFSM mode owns planning for that tick
-   - the old flat priority chain runs only when `mode == "UNSET"`
-   - if the active mode reaches an invalid or unrecoverable state, it clears
-     to `"UNSET"` and the old planner runs as fallback
+   - if `mode == "UNSET"`, orchestration selects the correct durable owner for
+     the tick and immediately persists it
+   - if the active mode reaches an invalid state, orchestration ignores it and
+     reselects the correct owner from current state
 
    This rule is the migration contract. It means:
    - new HFSM modes can be introduced one at a time
-   - the old planner is never deleted until all modes are stable
    - both paths never run in the same tick
+   - top-level ownership stays explicit even during migration
 
 ### Acceptance Criteria
 
@@ -315,6 +334,19 @@ Turn equipment recovery into the first real HFSM mode.
 - bot does not use old cross-map sector teleports
 - replay fixture for the old radar/teleport loop now passes
 
+### Current Slice Status
+
+As of April 5, 2026:
+
+- durable `RECOVER_EQUIPMENT` ownership has landed
+- mode entry, persistence, and exit are now explicit
+- route helpers were extracted into dedicated recovery modules
+- top-level orchestration no longer re-runs a legacy flat equipment branch
+
+This phase is structurally complete. Replay fixtures still exist to drive route
+quality improvements, but the owner model itself is now the active production
+path.
+
 ## Phase 4: Implement `RECOVER_FUEL`
 
 ### Scope
@@ -351,6 +383,26 @@ Turn fuel recovery into the second real HFSM mode.
 - fuel collection no longer depends on repeated 1-2 tile replans for ordinary
   pathing cases
 
+### Current Slice Status
+
+As of April 5, 2026:
+
+- durable `RECOVER_FUEL` ownership has landed
+- mode entry, persistence, and exit are now explicit
+- route helpers were extracted into a dedicated recovery module
+- exact teleport fuel cost is now part of fuel recovery affordability checks
+- top-level orchestration no longer re-runs a legacy flat fuel branch
+
+This phase is structurally complete. The replayed bad fuel loop still exists as
+a regression fixture, but route behavior can now be improved entirely inside
+the durable owner path.
+
+As of April 6, 2026, two additional route-contract fixes are in:
+
+- `RECOVER_FUEL` clears stale combat target locks when it takes ownership
+- the default `fuel_full_threshold` is `1100`, matching the observed live tank
+  fuel cap so fuel recovery can actually release control after a full refill
+
 ## Phase 5: Implement `HUNT`
 
 ### Scope
@@ -373,7 +425,7 @@ Move combat into a durable HFSM mode.
    - `ENGAGE`
    - `CONFIRM_KILL`
 
-2. Replace ad hoc `combat_phase` behavior with explicit state transitions.
+2. Replace ad hoc combat-phase behavior with explicit state transitions.
 
 3. Add target freshness rules:
    - viewport-fresh target can be shot
@@ -387,6 +439,19 @@ Move combat into a durable HFSM mode.
 - miss/reacquire loop is simpler and more deterministic
 - post-kill recovery transition is explicit
 - stale enemy positions do not directly produce blind shots
+
+### Current Slice Status
+
+As of April 5, 2026:
+
+- durable `HUNT` ownership has been extracted into a dedicated owner module
+- explicit `HUNT` substates now route acquire, refresh, close, engage, and
+  confirm-kill behavior
+- top-level orchestration now selects `HUNT` directly instead of re-entering a
+  legacy flat combat path
+
+This phase is structurally complete. Combat ownership now lives in the durable
+`HUNT` owner and replay-driven cleanup can continue entirely inside that route.
 
 ## Phase 6: Retire Old Arbitration Paths
 
@@ -413,6 +478,19 @@ Remove obsolete flat-priority branches once equivalent HFSM modes are stable.
 
 - no duplicated legacy and HFSM logic for the same behavior path
 - README and docs match the actual code
+
+### Current Slice Status
+
+As of April 5, 2026:
+
+- `ai_strategy.py` now selects exactly one durable top-level owner per tick
+- the old flat arbitration chain has been removed from top-level orchestration
+- route-specific tests have been split out of the former `test_ai_strategy.py`
+  monolith
+
+This phase is in progress because route modules still carry some older helper
+names and compatibility state, but the top-level duplicated arbitration path is
+gone.
 
 ## Documentation Cleanup Plan
 
@@ -455,6 +533,15 @@ Remove obsolete flat-priority branches once equivalent HFSM modes are stable.
 6. Add executor-side stale-action rejection.
 7. Introduce persistent top-level AI mode with mode-lock migration rule.
 8. Implement `RECOVER_EQUIPMENT` as the first HFSM mode.
+
+All items above are complete.
+
+## Immediate Next Actions After Phase 6 Cleanup
+
+1. Use the replay fixtures to eliminate the remaining `RECOVER_FUEL` loop behavior.
+2. Continue removing the last pieces of migration glue that assume pre-HFSM
+   combat state.
+3. Keep tightening docs and helper naming so the route-owned structure stays explicit.
 
 ## Definition of Done
 
