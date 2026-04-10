@@ -6,6 +6,8 @@ new state objects (immutable update pattern).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from tankpit_bot.state.types import (
     DAMAGE_FULL,
     SelfStateDict,
@@ -139,6 +141,7 @@ def update_tank_from_registry(
     is_bot: bool,
     x: int,
     y: int,
+    source: Literal["viewport", "radar", "world_state"],
     timestamp_ms: int,
 ) -> WorldStateDict:
     """Update tank state from TankRegistry message.
@@ -152,6 +155,7 @@ def update_tank_from_registry(
         is_bot: Whether this is a bot.
         x: X coordinate.
         y: Y coordinate.
+        source: Source that confirmed this tank.
         timestamp_ms: Message timestamp.
 
     Returns:
@@ -172,6 +176,7 @@ def update_tank_from_registry(
         name=name,
         is_bot=is_bot,
         is_self=is_self,
+        source=source,
         timestamp_ms=timestamp_ms,
     )
 
@@ -222,6 +227,7 @@ def update_tank_damage(
         name=existing["name"],
         is_bot=existing["is_bot"],
         is_self=existing["is_self"],
+        source=existing["source"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -290,6 +296,7 @@ def update_container_from_radar(
         y=y,
         is_fuel=is_fuel,
         volume=actual_volume,
+        source="radar",
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
     )
@@ -368,7 +375,15 @@ def add_mine(
     Returns:
         New WorldStateDict with mine added.
     """
-    new_mine = make_mine_state(x=x, y=y, mine_type=mine_type, tank_id=tank_id, team=team)
+    new_mine = make_mine_state(
+        x=x,
+        y=y,
+        mine_type=mine_type,
+        tank_id=tank_id,
+        team=team,
+        source="viewport",
+        timestamp_ms=timestamp_ms,
+    )
 
     key = coord_key(x, y)
     new_mines = dict(state["mines"])
@@ -405,7 +420,15 @@ def add_mine_from_radar(
     Returns:
         New WorldStateDict with mine added.
     """
-    new_mine = make_mine_state(x=x, y=y, mine_type=0, tank_id=-1, team=team)
+    new_mine = make_mine_state(
+        x=x,
+        y=y,
+        mine_type=0,
+        tank_id=-1,
+        team=team,
+        source="radar",
+        timestamp_ms=timestamp_ms,
+    )
 
     key = coord_key(x, y)
     new_mines = dict(state["mines"])
