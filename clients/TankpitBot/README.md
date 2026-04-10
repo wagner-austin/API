@@ -130,6 +130,8 @@ control architecture. The concrete refactor plan for the next step is in
   radar refreshes the current screen.
 - Repeated radar in the same already-confirmed viewport is intentionally
   skipped.
+- Teleport affordability now uses the exact in-game fuel formula
+  `floor(6 * sqrt(dx^2 + dy^2))` rather than a flat estimated cost.
 - `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
   authoritative for viewport origin and tile cache updates, but absence from a
   single `0x5A` patch does not imply tank absence.
