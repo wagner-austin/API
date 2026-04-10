@@ -10,6 +10,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import find_path
+from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.state.types import (
     ContainerStateDict,
@@ -66,8 +67,6 @@ def describe_container_search(
     nearest_desc = "none"
     nearest_dist = _MAX_DIST
     left, top, right, bottom = _viewport_bounds(world)
-    viewport_scanned = is_current_viewport_scanned(world)
-
     for container in world["containers"].values():
         if container["is_fuel"] != want_fuel:
             continue
@@ -77,25 +76,19 @@ def describe_container_search(
             continue
         nearby += 1
         dist = manhattan_distance(sx, sy, cx, cy)
-        if not viewport_scanned:
-            reason = "unconfirmed_viewport"
-            is_actionable = False
-            is_blocked = False
-            missing_landing = False
-            low_volume_target = False
-        else:
-            reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
-                _describe_candidate_reason(
-                    container,
-                    sx,
-                    sy,
-                    terrain,
-                    want_fuel=want_fuel,
-                    allow_unreachable=allow_unreachable,
-                    minimum_volume=minimum_volume,
-                    blocked_mines=world["mines"],
-                )
+        reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
+            _describe_candidate_reason(
+                world,
+                container,
+                sx,
+                sy,
+                terrain,
+                want_fuel=want_fuel,
+                allow_unreachable=allow_unreachable,
+                minimum_volume=minimum_volume,
+                blocked_mines=world["mines"],
             )
+        )
         if is_blocked:
             blocked += 1
         if missing_landing:
@@ -241,6 +234,7 @@ def find_nearest_fuel(
         dist = manhattan_distance(sx, sy, cx, cy)
         if dist < best_dist:
             if not _is_actionable_with_terrain(
+                world,
                 terrain,
                 sx,
                 sy,
@@ -324,6 +318,7 @@ def find_equipment_candidates(
             continue
         cx, cy = container["x"], container["y"]
         if not _is_actionable_with_terrain(
+            world,
             terrain,
             sx,
             sy,
@@ -345,6 +340,7 @@ def find_best_fuel(
     *,
     allow_unreachable: bool = False,
     now_ms: int = 0,
+    minimum_volume: int = 100,
 ) -> ContainerStateDict | None:
     """Find the best fuel container, prioritizing volume over distance.
 
@@ -361,6 +357,7 @@ def find_best_fuel(
         terrain: Optional terrain map for reachability checks.
         allow_unreachable: Whether teleport fallback is allowed.
         now_ms: Current timestamp for freshness filtering. 0 disables.
+        minimum_volume: Minimum fuel volume that counts as actionable.
 
     Returns:
         Best fuel ContainerStateDict, or None if none visible.
@@ -377,11 +374,12 @@ def find_best_fuel(
             now_ms=now_ms,
         ):
             continue
-        if container["volume"] < 100:
+        if container["volume"] < minimum_volume:
             continue
         cx, cy = container["x"], container["y"]
         dist = manhattan_distance(sx, sy, cx, cy)
         if not _is_actionable_with_terrain(
+            world,
             terrain,
             sx,
             sy,
@@ -398,6 +396,64 @@ def find_best_fuel(
             best = container
 
     return best
+
+
+def find_known_fuel_candidates(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    *,
+    now_ms: int = 0,
+    minimum_volume: int = 100,
+) -> list[ContainerStateDict]:
+    """Return known fuel containers ordered best-first across the full registry.
+
+    Args:
+        world: Current world state with tracked containers.
+        self_state: Player state used for distance scoring.
+        now_ms: Current timestamp for freshness filtering. ``0`` disables TTL.
+        minimum_volume: Minimum fuel volume worth pursuing.
+
+    Returns:
+        Known fuel containers ordered by ``volume - distance`` descending.
+    """
+    sx, sy = self_state["x"], self_state["y"]
+    scored: list[tuple[int, int, ContainerStateDict]] = []
+    for container in world["containers"].values():
+        if not _is_known_candidate(container, want_fuel=True, now_ms=now_ms):
+            continue
+        if container["volume"] < minimum_volume:
+            continue
+        dist = manhattan_distance(sx, sy, container["x"], container["y"])
+        scored.append((container["volume"] - dist, dist, container))
+    scored.sort(key=_known_fuel_candidate_key)
+    return [container for _, _, container in scored]
+
+
+def find_known_equipment_candidates(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    *,
+    now_ms: int = 0,
+) -> list[ContainerStateDict]:
+    """Return known equipment containers ordered nearest-first.
+
+    Args:
+        world: Current world state with tracked containers.
+        self_state: Player state used for distance ordering.
+        now_ms: Current timestamp for freshness filtering. ``0`` disables TTL.
+
+    Returns:
+        Known equipment containers ordered by Manhattan distance.
+    """
+    sx, sy = self_state["x"], self_state["y"]
+    candidates: list[tuple[int, ContainerStateDict]] = []
+    for container in world["containers"].values():
+        if not _is_known_candidate(container, want_fuel=False, now_ms=now_ms):
+            continue
+        dist = manhattan_distance(sx, sy, container["x"], container["y"])
+        candidates.append((dist, container))
+    candidates.sort(key=_equipment_candidate_distance)
+    return [container for _, container in candidates]
 
 
 def find_nearest_deposit(
@@ -458,7 +514,13 @@ def _equipment_candidate_distance(item: tuple[int, ContainerStateDict]) -> int:
     return item[0]
 
 
+def _known_fuel_candidate_key(item: tuple[int, int, ContainerStateDict]) -> tuple[int, int]:
+    """Return a stable best-first sort key for known fuel candidates."""
+    return (-item[0], item[1])
+
+
 def _describe_candidate_reason(
+    world: WorldStateDict,
     container: ContainerStateDict,
     start_x: int,
     start_y: int,
@@ -474,7 +536,8 @@ def _describe_candidate_reason(
         return ("failed_pickup", False, False, False, False)
     if want_fuel and container["volume"] < minimum_volume:
         return ("low_volume", False, False, False, True)
-    if terrain is None or is_reachable(
+    if terrain is None or is_collection_reachable_in_viewport(
+        world,
         terrain,
         start_x,
         start_y,
@@ -517,6 +580,20 @@ def _is_visible_candidate(
     return left <= cx <= right and top <= cy <= bottom
 
 
+def _is_known_candidate(
+    container: ContainerStateDict,
+    *,
+    want_fuel: bool,
+    now_ms: int,
+) -> bool:
+    """Return True when a tracked container is worth pursuing at all."""
+    if container["is_fuel"] != want_fuel:
+        return False
+    if container["failed_pickups"] > 0:
+        return False
+    return not (now_ms > 0 and _is_stale(container, now_ms))
+
+
 def is_current_viewport_scanned(world: WorldStateDict) -> bool:
     """Return True when the current viewport has authoritative local coverage.
 
@@ -538,6 +615,7 @@ def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
 
 
 def _is_actionable_with_terrain(
+    world: WorldStateDict,
     terrain: TerrainMapProtocol | None,
     start_x: int,
     start_y: int,
@@ -550,7 +628,15 @@ def _is_actionable_with_terrain(
     """Return True when walkable directly or via teleport fallback."""
     if terrain is None:
         return True
-    if is_reachable(terrain, start_x, start_y, goal_x, goal_y, blocked_mines):
+    if is_collection_reachable_in_viewport(
+        world,
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        blocked_mines,
+    ):
         return True
     if not allow_unreachable:
         return False
@@ -571,6 +657,8 @@ __all__ = [
     "describe_container_search",
     "find_best_fuel",
     "find_equipment_candidates",
+    "find_known_equipment_candidates",
+    "find_known_fuel_candidates",
     "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",
