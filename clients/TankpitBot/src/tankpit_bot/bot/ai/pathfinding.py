@@ -34,6 +34,11 @@ def find_path(
     goal_x: int,
     goal_y: int,
     blocked_coords: Collection[str] | None = None,
+    *,
+    min_x: int | None = None,
+    min_y: int | None = None,
+    max_x: int | None = None,
+    max_y: int | None = None,
 ) -> list[PathStepDict]:
     """Find a terrain-aware path using A* search.
 
@@ -49,11 +54,26 @@ def find_path(
         goal_y: Goal Y coordinate (0-255).
         blocked_coords: Optional coordinate keys that should be treated as
             impassable in addition to terrain.
+        min_x: Optional inclusive minimum X bound for traversable tiles.
+        min_y: Optional inclusive minimum Y bound for traversable tiles.
+        max_x: Optional inclusive maximum X bound for traversable tiles.
+        max_y: Optional inclusive maximum Y bound for traversable tiles.
 
     Returns:
         List of PathStepDict from start to goal (inclusive of both).
         Empty list if no path found.
     """
+    if not _endpoints_within_bounds(
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+    ):
+        return []
     if start_x == goal_x and start_y == goal_y:
         return [make_path_step(start_x, start_y)]
 
@@ -81,19 +101,17 @@ def find_path(
         cx, cy = current
         current_g = g_score[current]
 
-        for dx, dy in _DIRECTIONS:
-            nx, ny = cx + dx, cy + dy
-
-            if not (_MAP_MIN <= nx <= _MAP_MAX and _MAP_MIN <= ny <= _MAP_MAX):
-                continue
-
-            if not terrain.is_passable(nx, ny):
-                continue
-
-            if _is_blocked_coord(blocked_coords, nx, ny):
-                continue
-
-            neighbor = (nx, ny)
+        for neighbor in _iter_reachable_neighbors(
+            terrain,
+            cx,
+            cy,
+            blocked_coords,
+            min_x=min_x,
+            min_y=min_y,
+            max_x=max_x,
+            max_y=max_y,
+        ):
+            nx, ny = neighbor
             tentative_g = current_g + 1
 
             if tentative_g < g_score.get(neighbor, _MAX_ITERATIONS + 1):
@@ -104,6 +122,51 @@ def find_path(
                 counter += 1
 
     return []
+
+
+def path_exists(
+    terrain: TerrainMapProtocol,
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+    blocked_coords: Collection[str] | None = None,
+    *,
+    min_x: int | None = None,
+    min_y: int | None = None,
+    max_x: int | None = None,
+    max_y: int | None = None,
+) -> bool:
+    """Return True when A* can find a path within optional bounds.
+
+    Args:
+        terrain: Terrain map for passability checks.
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Goal X coordinate.
+        goal_y: Goal Y coordinate.
+        blocked_coords: Optional coordinate keys treated as impassable.
+        min_x: Optional inclusive minimum X bound for traversable tiles.
+        min_y: Optional inclusive minimum Y bound for traversable tiles.
+        max_x: Optional inclusive maximum X bound for traversable tiles.
+        max_y: Optional inclusive maximum Y bound for traversable tiles.
+
+    Returns:
+        True if a path exists, False otherwise.
+    """
+    path = find_path(
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        blocked_coords,
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+    )
+    return len(path) > 0
 
 
 def is_direct_path_clear(
@@ -188,6 +251,10 @@ def find_path_segment_target(
         goal_x,
         goal_y,
         blocked_coords,
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
     )
     if len(path) <= 1:
         return None
@@ -196,15 +263,6 @@ def find_path_segment_target(
     for step in path[1:]:
         candidate_x = step["x"]
         candidate_y = step["y"]
-        if not _is_candidate_within_bounds(
-            candidate_x,
-            candidate_y,
-            min_x=min_x,
-            min_y=min_y,
-            max_x=max_x,
-            max_y=max_y,
-        ):
-            continue
         if not is_direct_path_clear(
             terrain,
             start_x,
@@ -217,6 +275,98 @@ def find_path_segment_target(
         best_step = (candidate_x, candidate_y)
 
     return best_step
+
+
+def _endpoints_within_bounds(
+    start_x: int,
+    start_y: int,
+    goal_x: int,
+    goal_y: int,
+    *,
+    min_x: int | None = None,
+    min_y: int | None = None,
+    max_x: int | None = None,
+    max_y: int | None = None,
+) -> bool:
+    """Return True when both endpoints lie inside the optional bounds.
+
+    Args:
+        start_x: Starting X coordinate.
+        start_y: Starting Y coordinate.
+        goal_x: Goal X coordinate.
+        goal_y: Goal Y coordinate.
+        min_x: Optional inclusive minimum X bound.
+        min_y: Optional inclusive minimum Y bound.
+        max_x: Optional inclusive maximum X bound.
+        max_y: Optional inclusive maximum Y bound.
+
+    Returns:
+        True if both endpoints are within every provided bound.
+    """
+    return _is_candidate_within_bounds(
+        start_x,
+        start_y,
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+    ) and _is_candidate_within_bounds(
+        goal_x,
+        goal_y,
+        min_x=min_x,
+        min_y=min_y,
+        max_x=max_x,
+        max_y=max_y,
+    )
+
+
+def _iter_reachable_neighbors(
+    terrain: TerrainMapProtocol,
+    current_x: int,
+    current_y: int,
+    blocked_coords: Collection[str] | None = None,
+    *,
+    min_x: int | None = None,
+    min_y: int | None = None,
+    max_x: int | None = None,
+    max_y: int | None = None,
+) -> list[tuple[int, int]]:
+    """Return walkable 4-connected neighbors for an A* expansion step.
+
+    Args:
+        terrain: Terrain map for passability checks.
+        current_x: Current X coordinate.
+        current_y: Current Y coordinate.
+        blocked_coords: Optional blocked coordinate keys.
+        min_x: Optional inclusive minimum X bound.
+        min_y: Optional inclusive minimum Y bound.
+        max_x: Optional inclusive maximum X bound.
+        max_y: Optional inclusive maximum Y bound.
+
+    Returns:
+        Reachable neighbor coordinates in deterministic iteration order.
+    """
+    neighbors: list[tuple[int, int]] = []
+    for dx, dy in _DIRECTIONS:
+        nx = current_x + dx
+        ny = current_y + dy
+        if not (_MAP_MIN <= nx <= _MAP_MAX and _MAP_MIN <= ny <= _MAP_MAX):
+            continue
+        if not _is_candidate_within_bounds(
+            nx,
+            ny,
+            min_x=min_x,
+            min_y=min_y,
+            max_x=max_x,
+            max_y=max_y,
+        ):
+            continue
+        if not terrain.is_passable(nx, ny):
+            continue
+        if _is_blocked_coord(blocked_coords, nx, ny):
+            continue
+        neighbors.append((nx, ny))
+    return neighbors
 
 
 def _heuristic(x: int, y: int, goal_x: int, goal_y: int) -> int:
@@ -357,5 +507,6 @@ __all__ = [
     "find_path",
     "find_path_segment_target",
     "is_direct_path_clear",
+    "path_exists",
     "path_length",
 ]
