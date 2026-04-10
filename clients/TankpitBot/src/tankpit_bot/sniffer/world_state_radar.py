@@ -20,7 +20,6 @@ from tankpit_bot.state import (
     mark_viewport_scanned,
     update_container_from_radar,
 )
-from tankpit_bot.state.viewport_geometry import viewport_radar_bounds
 
 
 def update_world_state_from_radar(
@@ -40,13 +39,14 @@ def update_world_state_from_radar(
     _ws.clear_failed_move_targets()
     reconcile_radar_viewport_resources(containers, mines)
     viewport = _ws._world_state["viewport"]
-    _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-    _ws._world_state = mark_viewport_scanned(
-        _ws._world_state,
-        viewport["left"],
-        viewport["top"],
-        ts,
-    )
+    if _ws.current_radar_uses_extra():
+        _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
+        _ws._world_state = mark_viewport_scanned(
+            _ws._world_state,
+            viewport["left"],
+            viewport["top"],
+            ts,
+        )
 
     for c in containers:
         _ws._world_state = update_container_from_radar(
@@ -100,13 +100,14 @@ def update_world_state_from_radar_cache() -> None:
     _ws.clear_failed_move_targets()
     reconcile_radar_viewport_resources(containers, None)
     viewport = _ws._world_state["viewport"]
-    _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-    _ws._world_state = mark_viewport_scanned(
-        _ws._world_state,
-        viewport["left"],
-        viewport["top"],
-        ts,
-    )
+    if _ws.current_radar_uses_extra():
+        _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
+        _ws._world_state = mark_viewport_scanned(
+            _ws._world_state,
+            viewport["left"],
+            viewport["top"],
+            ts,
+        )
     for container in containers:
         _ws._world_state = update_container_from_radar(
             _ws._world_state,
@@ -144,13 +145,14 @@ def update_world_state_from_radar_known_resources() -> None:
     _ws.mark_radar_scan_complete()
     _ws.clear_failed_move_targets()
     viewport = _ws._world_state["viewport"]
-    _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-    _ws._world_state = mark_viewport_scanned(
-        _ws._world_state,
-        viewport["left"],
-        viewport["top"],
-        ts,
-    )
+    if _ws.current_radar_uses_extra():
+        _ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
+        _ws._world_state = mark_viewport_scanned(
+            _ws._world_state,
+            viewport["left"],
+            viewport["top"],
+            ts,
+        )
     for rc in radar_containers:
         _ws._world_state = update_container_from_radar(
             _ws._world_state,
@@ -258,7 +260,7 @@ def _radar_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
     Returns:
         Inclusive ``(left, top, right, bottom)`` radar bounds.
     """
-    return viewport_radar_bounds(world["viewport"])
+    return _ws._radar_bounds(world)
 
 
 def handle_radar_ack(found: bool) -> None:
@@ -281,7 +283,10 @@ def handle_radar_ack(found: bool) -> None:
         update_world_state_from_radar_cache()
     elif _ws._consume_pending_radar_empty_delta():
         if found:
-            update_world_state_from_radar_known_resources()
+            if containers_from_current_radar_cache():
+                update_world_state_from_radar_cache()
+            else:
+                update_world_state_from_radar_known_resources()
         else:
             update_world_state_from_radar([], [])
     else:
