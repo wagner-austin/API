@@ -124,6 +124,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=50,
             y=75,
+            source="viewport",
             timestamp_ms=1000,
         )
 
@@ -149,6 +150,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=50,
             y=50,
+            source="viewport",
             timestamp_ms=500,
         )
         updated = update_tank_from_registry(
@@ -160,6 +162,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=60,
             y=70,
+            source="viewport",
             timestamp_ms=1000,
         )
 
@@ -180,6 +183,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=50,
             y=50,
+            source="viewport",
             timestamp_ms=500,
         )
         state = update_tank_damage(state, tank_id=42, damage_state=DAMAGE_MEDIUM, timestamp_ms=750)
@@ -192,6 +196,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=60,
             y=70,
+            source="viewport",
             timestamp_ms=1000,
         )
 
@@ -219,6 +224,7 @@ class TestUpdateTankFromRegistry:
             is_bot=False,
             x=100,
             y=100,
+            source="viewport",
             timestamp_ms=1000,
         )
 
@@ -240,6 +246,7 @@ class TestUpdateTankDamage:
             is_bot=False,
             x=50,
             y=50,
+            source="viewport",
             timestamp_ms=500,
         )
         updated = update_tank_damage(
@@ -479,6 +486,7 @@ class TestRemoveTank:
             is_bot=False,
             x=50,
             y=50,
+            source="viewport",
             timestamp_ms=500,
         )
         updated = remove_tank(state, tank_id=42, timestamp_ms=1000)
