@@ -33,6 +33,7 @@ class TestDecodeTankState:
             "name": "Test",
             "is_bot": True,
             "is_self": False,
+            "source": "viewport",
             "timestamp_ms": 5000,
         }
         tank = decode_tank_state(data)
@@ -44,6 +45,7 @@ class TestDecodeTankState:
         assert tank["rank"] == 3
         assert tank["damage_state"] == 1
         assert tank["timestamp_ms"] == 5000
+        assert tank["source"] == "viewport"
         assert tank["name"] == "Test"
         assert tank["is_bot"] is True
         assert tank["is_self"] is False
@@ -52,6 +54,24 @@ class TestDecodeTankState:
         """Raises JSONTypeError for missing field."""
         data: JSONObject = {"tank_id": 42}  # Missing other fields
         with pytest.raises(JSONTypeError):
+            decode_tank_state(data)
+
+    def test_invalid_source_raises(self) -> None:
+        """Raises JSONTypeError for an unsupported tank source."""
+        data: JSONObject = {
+            "tank_id": 42,
+            "x": 100,
+            "y": 150,
+            "team": 2,
+            "rank": 3,
+            "damage_state": 1,
+            "name": "Test",
+            "is_bot": True,
+            "is_self": False,
+            "source": "invalid",
+            "timestamp_ms": 5000,
+        }
+        with pytest.raises(JSONTypeError, match="source must be one of"):
             decode_tank_state(data)
 
 
@@ -65,6 +85,7 @@ class TestDecodeContainerState:
             "y": 75,
             "is_fuel": True,
             "volume": 300,
+            "source": "radar",
             "timestamp_ms": 5000,
             "failed_pickups": 0,
         }
@@ -74,6 +95,7 @@ class TestDecodeContainerState:
         assert container["y"] == 75
         assert container["is_fuel"] is True
         assert container["volume"] == 300
+        assert container["source"] == "radar"
         assert container["timestamp_ms"] == 5000
         assert container["failed_pickups"] == 0
 
@@ -83,7 +105,15 @@ class TestDecodeMineState:
 
     def test_decodes_valid_data(self) -> None:
         """Decodes valid mine state data."""
-        data: JSONObject = {"x": 25, "y": 35, "mine_type": 2, "tank_id": 99, "team": 1}
+        data: JSONObject = {
+            "x": 25,
+            "y": 35,
+            "mine_type": 2,
+            "tank_id": 99,
+            "team": 1,
+            "source": "world_state",
+            "timestamp_ms": 5000,
+        }
         mine = decode_mine_state(data)
 
         assert mine["x"] == 25
@@ -91,6 +121,8 @@ class TestDecodeMineState:
         assert mine["mine_type"] == 2
         assert mine["tank_id"] == 99
         assert mine["team"] == 1
+        assert mine["source"] == "world_state"
+        assert mine["timestamp_ms"] == 5000
 
 
 class TestDecodeTerrainTile:
@@ -331,6 +363,7 @@ class TestDecodeWorldState:
                     "name": "TestTank",
                     "is_bot": False,
                     "is_self": False,
+                    "source": "viewport",
                     "timestamp_ms": 500,
                 },
             },
@@ -347,6 +380,7 @@ class TestDecodeWorldState:
         assert tank["tank_id"] == 42
         assert tank["x"] == 100
         assert tank["name"] == "TestTank"
+        assert tank["source"] == "viewport"
         assert tank["timestamp_ms"] == 500
 
     def test_decodes_with_terrain(self) -> None:
