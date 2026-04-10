@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
+import pytest
 from scripts import _test_hooks
+
+from tankpit_bot import _test_hooks as core_hooks
+
+
+@pytest.fixture(autouse=True)
+def _restore_real_hooks() -> Generator[None, None, None]:
+    """Force real script/core hooks for these integration-style hook tests."""
+    _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.read_text = _test_hooks._real_read_text
+    _test_hooks.load_and_decode_session = _test_hooks._real_load_and_decode_session
+    _test_hooks.setup_rich_logging = _test_hooks._real_setup_rich_logging
+    core_hooks.path_exists = core_hooks._real_path_exists
+    core_hooks.read_text = core_hooks._real_read_text
+    yield
+    _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.read_text = _test_hooks._real_read_text
+    _test_hooks.load_and_decode_session = _test_hooks._real_load_and_decode_session
+    _test_hooks.setup_rich_logging = _test_hooks._real_setup_rich_logging
+    core_hooks.path_exists = core_hooks._real_path_exists
+    core_hooks.read_text = core_hooks._real_read_text
 
 
 def test_real_path_exists_true(tmp_path: Path) -> None:
