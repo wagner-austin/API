@@ -7,7 +7,7 @@ This document describes the bot control model as it exists today.
 This is a current-state document, not the desired future architecture.
 For the planned refactor target, see:
 
-- `docs/hfsm-refactor-plan.md`
+- `docs/bot-hfsm-refactor-plan.md`
 
 ## High-Level Shape
 
@@ -138,16 +138,23 @@ This is the strategic memory used by the planner.
 Examples:
 
 - config
+- `mode`
+- `mode_state`
+- `mode_started_ms`
 - killed tank IDs
 - `last_scan_ms`
 - `last_map_open_ms`
 - `combat_target_id`
 - `combat_target_x`
 - `combat_target_y`
-- `combat_phase`
 - `patrol_waypoint_index`
 - `equipment_search_failures`
 - `blocked_combat_targets`
+
+Important point:
+
+- teleport affordability is now computed from exact source/target coordinates
+  using the in-game distance formula, not a flat estimated cost
 
 ### Current Behavior Labels
 
@@ -158,7 +165,28 @@ The planner currently emits one of these behavior labels per decision:
 - `COLLECT_EQUIPMENT`
 
 These labels are decision outputs for the current tick.
-They are not yet durable top-level control modes.
+They are not the same thing as the durable top-level control mode stored in AI
+state.
+
+### Durable Mode Migration
+
+The planner state now also carries a durable top-level mode lock:
+
+- `mode`
+- `mode_state`
+- `mode_started_ms`
+
+Current migration contract:
+
+- `mode == "UNSET"`: choose the top-level owner from current recovery
+  priorities
+- `mode == "HUNT"`: HUNT owns planning until a recovery mode takes priority
+- `mode == "RECOVER_FUEL"`: fuel recovery owns planning until the full-fuel
+  exit threshold is restored
+- `mode == "RECOVER_EQUIPMENT"`: equipment recovery owns planning until combat
+  reserves are restored to resume thresholds
+- unsupported or invalid durable modes are ignored for the tick, then owner
+  selection re-runs from the current world state
 
 ## Tick Flow
 
@@ -209,18 +237,15 @@ Implemented in:
 
 - `decide(...)` in `src/tankpit_bot/bot/ai_strategy.py`
 
-The current planner is a flat priority chain with some tactical substate.
+The current planner is now a durable-owner selector, not a flat priority chain.
 
 Current shape:
 
-1. critical fuel
-2. critical equipment
-3. critical equipment search
-4. combat if already locked
-5. normal fuel if combat not locked
-6. normal equipment if combat not locked
-7. combat acquisition/continuation
-8. fallback enemy search
+1. choose the active top-level owner (`RECOVER_FUEL`, `RECOVER_EQUIPMENT`, or
+   `HUNT`)
+2. run exactly one owner route for the tick
+3. derive the durable substate from the owner's returned decision
+4. persist the chosen owner in AI state
 
 ### Execute
 
@@ -240,31 +265,33 @@ Important point:
 
 ## Combat Model
 
-Combat currently uses a subphase model inside AI state rather than a full
-hierarchical controller.
+Combat now runs under a durable `HUNT` owner. The combat target fields and the
+durable `mode_state` are the authoritative combat memory.
 
-Current phases:
+Current durable HUNT substates:
 
-- `none` (no combat engagement)
-- `acquiring` (opening map to locate target)
-- `closing` (teleporting to target, then verifying firing position)
-- `engaging` (shooting at target)
+- `ACQUIRE`
+- `REFRESH`
+- `CLOSE`
+- `ENGAGE`
+- `CONFIRM_KILL`
 
 Main functions:
 
-- `_try_combat(...)`
-- `_combat_open_map(...)`
-- `_combat_teleport(...)`
-- `_combat_close(...)` (verifies cardinal adjacency before shooting; re-teleports if not)
-- `_combat_shoot(...)`
+- `decide_hunt_mode(...)`
+- `search_for_enemies(...)`
+- `open_map_for_target(...)`
+- `teleport_to_target(...)`
+- `close_target(...)`
+- `engage_target(...)`
 
 Current broad sequence:
 
-1. open map to refresh enemy positions
-2. teleport near target
-3. verify cardinally adjacent (re-teleport if not)
-4. shoot
-5. on miss, reopen map and reacquire
+1. `HUNT.ACQUIRE` picks a viable target or searches for enemies
+2. `HUNT.REFRESH` refreshes target information and re-evaluates geometry
+3. `HUNT.CLOSE` teleports near the target and verifies firing geometry
+4. `HUNT.ENGAGE` shoots or refreshes on miss
+5. `HUNT.CONFIRM_KILL` explicitly clears a vanished/killed target before reacquiring
 
 If teleport finds no passable adjacent landing tile (e.g. enemy is on water with
 all 4 cardinal neighbors impassable), the target is added to
@@ -279,16 +306,31 @@ Fuel:
 
 - below low threshold triggers fuel recovery
 - below critical threshold can interrupt more aggressively
+- the durable owner now clears stale combat target locks when fuel recovery
+  takes control
+- the default full-fuel exit threshold is `1100`, matching the live tank fuel
+  cap observed on April 6, 2026
 
 Equipment:
 
-- break thresholds trigger emergency recovery
-- resume thresholds determine when new fights may start again
+- break thresholds trigger durable equipment recovery ownership
+- resume thresholds determine when equipment recovery may release control
+- the owner now runs explicit recovery substates:
+  - `SENSE`
+  - `SEARCH`
+  - `APPROACH`
+  - `PICKUP`
 
 Important point:
 
-- these are not yet fully durable recovery modes
-- they are planner branches with some retained state
+- fuel recovery is now a durable owner with the same explicit recovery
+  substates:
+  - `SENSE`
+  - `SEARCH`
+  - `APPROACH`
+  - `PICKUP`
+- equipment recovery is also a durable owner with the same substate vocabulary
+  and direct ownership of route planning
 
 ## Map Open in the Current Model
 
@@ -335,14 +377,14 @@ The current control model is functional but structurally mixed.
 
 Main reasons:
 
-1. execution state, strategic memory, and behavior intent are separate but not
-   hierarchical
-2. planner re-arbitrates much of the world every tick
-3. combat uses retained subphase, while fuel/equipment mostly use threshold
-   branches
-4. world-state freshness/source is not yet expressed strongly enough in planner
+1. execution state, strategic memory, and behavior intent are still separate
+   layers
+2. some migration glue still relies on older combat-target memory conventions
+3. some route helpers still derive behavior labels from older tick-era naming
+4. world-state freshness/source can still be expressed more strongly in planner
    decisions
-5. executor does not yet act as a strong last-mile validator
+5. executor does not yet act as a strong last-mile validator for every command
+   family
 6. in-flight action handling and planner memory still interact in fragile ways,
    even after the stale-container retry bug above was fixed
 
@@ -369,8 +411,7 @@ modes such as:
 - `HUNT`
 - `RECOVER_FUEL`
 - `RECOVER_EQUIPMENT`
-- `SEARCH_ENEMY`
 
 That migration plan is documented in:
 
-- `docs/hfsm-refactor-plan.md`
+- `docs/bot-hfsm-refactor-plan.md`
