@@ -229,7 +229,7 @@ class TestDirectPathHelpers:
         assert find_path_segment_target(terrain, 10, 10, 15, 10) is None
 
     def test_find_path_segment_target_respects_action_bounds(self) -> None:
-        """Waypoint helper returns the farthest direct step inside supplied bounds."""
+        """Waypoint helper returns None when bounds exclude the goal tile."""
         terrain = FakeTerrainMap({(12, 10): "#"})
         result = find_path_segment_target(
             terrain,
@@ -242,7 +242,13 @@ class TestDirectPathHelpers:
             max_x=12,
             max_y=12,
         )
-        assert result == (12, 11)
+        assert result is None
+
+    def test_find_path_segment_target_breaks_at_first_non_direct_candidate(self) -> None:
+        """Waypoint helper keeps the last directly reachable step before a bend."""
+        terrain = FakeTerrainMap({(11, 10): "#", (11, 9): "#"})
+        result = find_path_segment_target(terrain, 10, 10, 14, 10)
+        assert result == (11, 11)
 
     def test_find_path_segment_target_returns_none_when_min_x_excludes_progress(self) -> None:
         """Waypoint helper rejects candidates left of the supplied min_x bound."""
