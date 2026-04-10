@@ -27,6 +27,8 @@ class BotRunArtifactsDict(TypedDict):
         archive_log_path: Timestamped archived bot log path.
         latest_events_path: Stable latest structured bot event stream path.
         archive_events_path: Timestamped archived bot event stream path.
+        latest_capture_path: Stable latest capture session path for replay.
+        archive_capture_path: Timestamped archived capture session path.
     """
 
     log_dir: str
@@ -34,6 +36,8 @@ class BotRunArtifactsDict(TypedDict):
     archive_log_path: str
     latest_events_path: str
     archive_events_path: str
+    latest_capture_path: str
+    archive_capture_path: str
 
 
 class SniffRunArtifactsDict(TypedDict):
@@ -94,6 +98,8 @@ def build_bot_run_artifacts(stamp: str) -> BotRunArtifactsDict:
         archive_log_path=str(_BOT_DIR / f"bot-{stamp}.log"),
         latest_events_path=str(_BOT_DIR / "latest.events.jsonl"),
         archive_events_path=str(_BOT_DIR / f"bot-{stamp}.events.jsonl"),
+        latest_capture_path=str(_BOT_DIR / "latest.capture_session.json"),
+        archive_capture_path=str(_BOT_DIR / f"bot-{stamp}.capture_session.json"),
     )
 
 
@@ -136,6 +142,8 @@ def encode_bot_run_artifacts(artifacts: BotRunArtifactsDict) -> JSONObject:
         "archive_log_path": artifacts["archive_log_path"],
         "latest_events_path": artifacts["latest_events_path"],
         "archive_events_path": artifacts["archive_events_path"],
+        "latest_capture_path": artifacts["latest_capture_path"],
+        "archive_capture_path": artifacts["archive_capture_path"],
     }
 
 
@@ -154,6 +162,8 @@ def decode_bot_run_artifacts(data: JSONObject) -> BotRunArtifactsDict:
         archive_log_path=require_str(data, "archive_log_path"),
         latest_events_path=require_str(data, "latest_events_path"),
         archive_events_path=require_str(data, "archive_events_path"),
+        latest_capture_path=require_str(data, "latest_capture_path"),
+        archive_capture_path=require_str(data, "archive_capture_path"),
     )
 
 
