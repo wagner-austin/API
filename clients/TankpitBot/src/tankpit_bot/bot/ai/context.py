@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
+from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -42,6 +43,9 @@ class DecideCtx:
         "fuel",
         "inventory",
         "killed",
+        "mode",
+        "mode_started_ms",
+        "mode_state",
         "self_state",
         "terrain",
         "timestamp_ms",
@@ -67,6 +71,9 @@ class DecideCtx:
         self.combat_feedback = combat_feedback
 
         self.config: AIConfigDict = ai_state["config"]
+        self.mode = ai_state["mode"]
+        self.mode_state = ai_state["mode_state"]
+        self.mode_started_ms = ai_state["mode_started_ms"]
         self.fuel: int = self_state["fuel"]
         self.equip: list[int] = compute_equipment(self.fuel, inventory)
 
@@ -241,8 +248,6 @@ def locked_resource_target(
 # Equipment helpers
 # =============================================================================
 
-_EQUIP_LOW_THRESHOLD = 20
-
 
 def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
     """Compute desired equipment as sorted list.
@@ -263,24 +268,6 @@ def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
     return sorted(desired)
 
 
-def equipment_low(inventory: InventoryState) -> bool:
-    """Check if any equipment slot is below the restock threshold.
-
-    Args:
-        inventory: Current inventory state.
-
-    Returns:
-        True if any equipment count is below 20.
-    """
-    return (
-        inventory["armor_shields"]["count"] < _EQUIP_LOW_THRESHOLD
-        or inventory["dual_shots"]["count"] < _EQUIP_LOW_THRESHOLD
-        or inventory["missile_shots"]["count"] < _EQUIP_LOW_THRESHOLD
-        or inventory["homing_shots"]["count"] < _EQUIP_LOW_THRESHOLD
-        or inventory["extra_radars"]["count"] < _EQUIP_LOW_THRESHOLD
-    )
-
-
 def needs_emergency_equipment(ctx: DecideCtx) -> bool:
     """Check if any combat reserve has dropped below the break threshold.
 
@@ -291,9 +278,9 @@ def needs_emergency_equipment(ctx: DecideCtx) -> bool:
         True if dual, homing, or radar count is below the break threshold.
     """
     return (
-        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
-        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
-        or ctx.inventory["extra_radars"]["count"] < ctx.config["dual_break_threshold"]
+        ctx.inventory["dual_shots"]["count"] <= ctx.config["dual_break_threshold"]
+        or ctx.inventory["homing_shots"]["count"] <= ctx.config["dual_break_threshold"]
+        or ctx.inventory["extra_radars"]["count"] <= ctx.config["dual_break_threshold"]
     )
 
 
@@ -421,18 +408,83 @@ def should_scan_resources_in_current_viewport(ctx: DecideCtx) -> bool:
     return not is_current_viewport_scan_failed(ctx)
 
 
-def can_afford_teleport_search(ctx: DecideCtx) -> bool:
-    """Check if the bot has enough fuel to teleport and still operate.
+def can_use_radar(ctx: DecideCtx) -> bool:
+    """Return True when the bot can afford a radar scan this tick.
+
+    Regular radar is always available; extra radar only widens the scan area.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True if current fuel can cover one teleport while still leaving a
-        practical operating reserve for recovery/combat follow-up.
+        True if the fixed radar fuel cost can be paid.
     """
-    required_fuel = ctx.config["teleport_fuel_cost"] + ctx.config["hunt_min_fuel"]
+    return ctx.fuel >= 10
+
+
+def teleport_fuel_cost_to(ctx: DecideCtx, target_x: int, target_y: int) -> int:
+    """Return the exact fuel cost to teleport from self to a destination.
+
+    Args:
+        ctx: Decision context.
+        target_x: Destination X coordinate.
+        target_y: Destination Y coordinate.
+
+    Returns:
+        Exact teleport fuel cost for the current self position.
+    """
+    return compute_teleport_fuel_cost(
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+        target_x,
+        target_y,
+    )
+
+
+def can_afford_teleport(
+    ctx: DecideCtx,
+    target_x: int,
+    target_y: int,
+    *,
+    reserve_fuel: int = 0,
+) -> bool:
+    """Check if the bot has enough fuel for a specific teleport.
+
+    Args:
+        ctx: Decision context.
+        target_x: Destination X coordinate.
+        target_y: Destination Y coordinate.
+        reserve_fuel: Minimum fuel that must remain after teleporting.
+
+    Returns:
+        True if current fuel covers the exact teleport cost plus reserve.
+    """
+    required_fuel = teleport_fuel_cost_to(ctx, target_x, target_y) + reserve_fuel
     return ctx.fuel >= required_fuel
+
+
+def can_afford_teleport_search(
+    ctx: DecideCtx,
+    target_x: int,
+    target_y: int,
+) -> bool:
+    """Check if the bot can afford a recovery/search teleport.
+
+    Args:
+        ctx: Decision context.
+        target_x: Destination X coordinate.
+        target_y: Destination Y coordinate.
+
+    Returns:
+        True if current fuel covers the exact teleport cost and leaves the
+        configured hunt operating reserve afterward.
+    """
+    return can_afford_teleport(
+        ctx,
+        target_x,
+        target_y,
+        reserve_fuel=ctx.config["hunt_min_fuel"],
+    )
 
 
 def require_command(
@@ -462,10 +514,11 @@ def require_command(
 
 __all__ = [
     "DecideCtx",
+    "can_afford_teleport",
     "can_afford_teleport_search",
+    "can_use_radar",
     "clear_resource_target",
     "compute_equipment",
-    "equipment_low",
     "equipment_reserve_restored",
     "expire_kills",
     "filter_killed_tanks",
@@ -479,4 +532,5 @@ __all__ = [
     "require_command",
     "set_resource_target",
     "should_scan_resources_in_current_viewport",
+    "teleport_fuel_cost_to",
 ]
