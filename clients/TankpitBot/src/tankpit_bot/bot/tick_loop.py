@@ -13,7 +13,10 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import PageProtocol
 from tankpit_bot.bot import ai_strategy, executor, world_sync
-from tankpit_bot.bot.ai.equipment import is_reachable
+from tankpit_bot.bot.ai.reachability import (
+    is_collection_reachable_in_viewport,
+    is_move_reachable_in_viewport,
+)
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -103,11 +106,14 @@ def _tick_once(bot: Bot) -> None:
         combat_feedback,
     )
 
-    # 7. Persist AI state
-    bot._ai_state = decision["updated_ai_state"]
+    # 7. EXECUTE — game queues commands
+    command_sent = executor.execute(bot, decision)
 
-    # 8. EXECUTE — game queues commands
-    executor.execute(bot, decision)
+    # 8. Persist AI state only after the command actually dispatches.
+    # This prevents speculative shot feedback state from leaking across
+    # executor-side validation failures.
+    if command_sent:
+        bot._ai_state = decision["updated_ai_state"]
 
 
 def _has_in_flight_action(bot: Bot) -> bool:
@@ -289,7 +295,8 @@ def _clear_blocked_walk(
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
-    if is_reachable(
+    if is_move_reachable_in_viewport(
+        world,
         terrain,
         self_state["x"],
         self_state["y"],
@@ -328,7 +335,8 @@ def _clear_blocked_collection(
     tx, ty = action["target_x"], action["target_y"]
     if abs(self_state["x"] - tx) <= 1 and abs(self_state["y"] - ty) <= 1:
         return False
-    if is_reachable(
+    if is_collection_reachable_in_viewport(
+        world,
         terrain,
         self_state["x"],
         self_state["y"],
@@ -391,7 +399,6 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
             "combat_target_id": -1 if clear_combat_target else ai_state["combat_target_id"],
             "combat_target_x": 0 if clear_combat_target else ai_state["combat_target_x"],
             "combat_target_y": 0 if clear_combat_target else ai_state["combat_target_y"],
-            "combat_phase": "none" if clear_combat_target else ai_state["combat_phase"],
         }
     )
 
