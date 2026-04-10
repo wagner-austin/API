@@ -70,6 +70,37 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
+    def test_run_saves_capture_session(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """Test run() saves a capture session file when runtime logging is configured.
+
+        Configures bot runtime logging so get_bot_runtime_artifacts() is non-None,
+        then verifies the capture session is written to the canonical paths.
+        """
+        from tankpit_bot import _test_hooks
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+        from tests.fakes import fake_sync_playwright_bot
+
+        original = _test_hooks.sync_playwright
+        _test_hooks.sync_playwright = fake_sync_playwright_bot
+
+        try:
+            configure_bot_runtime_logging(stamp="20260404-000000")
+            bot = Bot("https://test.tankpit.com/", headless=True)
+            bot.run()
+            written_files = fake_fs.get_written_files()
+            has_capture = False
+            for path in written_files:
+                if "capture_session.json" in path:
+                    has_capture = True
+            assert has_capture
+        finally:
+            _test_hooks.sync_playwright = original
+
 
 class TestBotBaseMain:
     """Tests for bot.base.main function."""
@@ -180,14 +211,14 @@ class TestBotGameLoopStates:
             bot._game_loop(interrupting_page)
 
         # AI state unchanged — no self_state to act on
-        assert bot._ai_state["active_mode"] == "HUNT"
-        assert bot._ai_state["combat_phase"] == "none"
+        assert bot._ai_state["mode"] == "UNSET"
+        assert bot._ai_state["mode_state"] == ""
 
     def test_game_loop_ai_tick_reaches_ready_state_and_starts_equipment_search(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """Game loop reaches IDLE and starts equipment-search teleport flow.
+        """Game loop reaches IDLE and starts equipment-search radar flow.
 
         Args:
             fake_env: Installed fake environment fixture.
@@ -214,6 +245,6 @@ class TestBotGameLoopStates:
             bot._game_loop(interrupting_page)
 
         runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
-        assert runtime_calls == ["Runtime.evaluate", "Runtime.evaluate"]
-        assert bot._ai_state["patrol_waypoint_index"] == 1
-        assert bot.get_state() == "TELEPORTING"
+        assert runtime_calls == ["Runtime.evaluate"]
+        assert bot._ai_state["last_scan_ms"] > 0
+        assert bot.get_state() == "SCANNING"
