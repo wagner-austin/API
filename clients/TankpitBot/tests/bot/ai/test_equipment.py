@@ -5,6 +5,8 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.equipment import (
     describe_container_search,
     find_best_fuel,
+    find_known_equipment_candidates,
+    find_known_fuel_candidates,
     find_nearest_deposit,
     find_nearest_equipment,
     find_nearest_fuel,
@@ -17,6 +19,7 @@ from tankpit_bot.state.types import (
     ViewportStateDict,
     WorldStateDict,
     make_container_state,
+    make_mine_state,
     make_self_state,
     viewport_scan_key,
 )
@@ -84,13 +87,15 @@ class TestIsReachable:
         """Returns False when known mines block the only route."""
         terrain = FakeTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
-            f"12,{y}": {
-                "x": 12,
-                "y": y,
-                "mine_type": 0,
-                "tank_id": -1,
-                "team": 1,
-            }
+            f"12,{y}": make_mine_state(
+                x=12,
+                y=y,
+                mine_type=0,
+                tank_id=-1,
+                team=1,
+                source="radar",
+                timestamp_ms=0,
+            )
             for y in range(256)
         }
         assert is_reachable(terrain, 10, 10, 15, 10, blocked_mines) is False
@@ -143,20 +148,24 @@ class TestFindTeleportLandingTile:
         """Known mines are excluded from teleport landing candidates."""
         terrain = FakeTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
-            "128,126": {
-                "x": 128,
-                "y": 126,
-                "mine_type": 0,
-                "tank_id": -1,
-                "team": 1,
-            },
-            "129,126": {
-                "x": 129,
-                "y": 126,
-                "mine_type": 0,
-                "tank_id": -1,
-                "team": 1,
-            },
+            "128,126": make_mine_state(
+                x=128,
+                y=126,
+                mine_type=0,
+                tank_id=-1,
+                team=1,
+                source="radar",
+                timestamp_ms=0,
+            ),
+            "129,126": make_mine_state(
+                x=129,
+                y=126,
+                mine_type=0,
+                tank_id=-1,
+                team=1,
+                source="radar",
+                timestamp_ms=0,
+            ),
         }
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126, blocked_mines)
@@ -310,6 +319,80 @@ class TestFindNearestFuel:
         )
         world["containers"]["103,100"] = farther
         assert find_nearest_fuel(world, state) == farther
+
+
+class TestKnownContainerCandidates:
+    """Tests for full-registry known-container helpers."""
+
+    def test_find_known_fuel_candidates_orders_by_volume_then_distance(self) -> None:
+        """Known fuel selection uses the global registry, not just the viewport."""
+        world, state = _world_and_self()
+        world["containers"]["120,100"] = make_container_state(
+            x=120,
+            y=100,
+            is_fuel=True,
+            volume=700,
+            timestamp_ms=100000,
+        )
+        world["containers"]["130,100"] = make_container_state(
+            x=130,
+            y=100,
+            is_fuel=True,
+            volume=900,
+            timestamp_ms=100000,
+        )
+        world["containers"]["101,100"] = make_container_state(
+            x=101,
+            y=100,
+            is_fuel=True,
+            volume=50,
+            timestamp_ms=100000,
+        )
+
+        candidates = find_known_fuel_candidates(world, state, now_ms=100000, minimum_volume=100)
+
+        assert [(container["x"], container["volume"]) for container in candidates] == [
+            (130, 900),
+            (120, 700),
+        ]
+
+    def test_find_known_equipment_candidates_skips_stale_entries(self) -> None:
+        """Stale known equipment is filtered before nearest-first ordering."""
+        world, state = _world_and_self()
+        world["containers"]["120,100"] = make_container_state(
+            x=120,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+        )
+        world["containers"]["101,100"] = make_container_state(
+            x=101,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=0,
+        )
+
+        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
+
+        assert [(container["x"], container["y"]) for container in candidates] == [(120, 100)]
+
+    def test_find_known_equipment_candidates_skips_failed_pickups(self) -> None:
+        """Failed pickup markers suppress known equipment pursuit."""
+        world, state = _world_and_self()
+        world["containers"]["120,100"] = make_container_state(
+            x=120,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=1,
+        )
+
+        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
+
+        assert candidates == []
 
     def test_uses_viewport_bounds_not_distance_from_self(self) -> None:
         """Visible containers at the far viewport edge are still eligible."""
@@ -694,8 +777,8 @@ class TestDescribeContainerSearch:
             "no_landing=0 low_volume=0 nearest=(101,100) failed_pickup"
         )
 
-    def test_reports_unconfirmed_viewport_when_radar_has_not_scanned_here(self) -> None:
-        """Summary explains that current viewport containers are not radar-confirmed."""
+    def test_reports_actionable_visible_target_without_viewport_scan_flag(self) -> None:
+        """Visible targets are diagnosed by reachability, not viewport-origin scan state."""
         world, state = _world_and_self()
         world["scanned_viewports"] = {}
         world["containers"]["101,100"] = make_container_state(
@@ -714,8 +797,8 @@ class TestDescribeContainerSearch:
         )
 
         assert result == (
-            "equipment: total=1 nearby=1 actionable=0 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=(101,100) unconfirmed_viewport"
+            "equipment: total=1 nearby=1 actionable=1 blocked=0 "
+            "no_landing=0 low_volume=0 nearest=(101,100) actionable"
         )
 
     def test_with_terrain_skips_unreachable(self) -> None:
