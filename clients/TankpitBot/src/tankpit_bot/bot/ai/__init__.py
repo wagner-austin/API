@@ -7,6 +7,11 @@ The live planner is ``tankpit_bot.bot.ai_strategy.decide``.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_landing import (
+    choose_combat_landing_tile,
+    combat_landing_candidates,
+    has_cardinal_enemy_adjacency,
+)
 from tankpit_bot.bot.ai.equipment import (
     find_best_fuel,
     find_nearest_deposit,
@@ -59,6 +64,8 @@ __all__ = [
     "EnemyThreatDict",
     "PathStepDict",
     "analyze_threats",
+    "choose_combat_landing_tile",
+    "combat_landing_candidates",
     "compute_desired_equipment",
     "decode_ai_config",
     "decode_ai_state",
@@ -76,6 +83,7 @@ __all__ = [
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_path",
+    "has_cardinal_enemy_adjacency",
     "is_reachable",
     "make_behavior_score",
     "make_default_ai_config",
