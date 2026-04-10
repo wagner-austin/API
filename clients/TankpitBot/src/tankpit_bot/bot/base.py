@@ -9,6 +9,8 @@ This module provides the Bot class that extends WebSocketSniffer with:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -67,6 +69,7 @@ from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_state,
     mark_move_target_failed,
+    record_radar_command,
 )
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_teleport_landed
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
@@ -646,6 +649,12 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
+        inventory = get_inventory_state()
+        record_radar_command(
+            use_extra_radar=(
+                inventory["extra_radars"]["enabled"] and inventory["extra_radars"]["count"] > 0
+            ),
+        )
         encoded = build_query_command(CMD_RADAR)
         if not self._send_bytes(encoded, "radar"):
             return False
@@ -889,9 +898,51 @@ class Bot(BrowserSession):
             except KeyboardInterrupt:
                 log.info("Bot interrupted by user")
             finally:
+                self._save_capture_session()
                 self._cdp = None
                 self._page = None
                 self._cleanup(cdp, page, context, browser)
+
+    def _save_capture_session(self) -> None:
+        """Save accumulated messages as a replayable capture session.
+
+        Writes the capture session to the canonical bot artifact paths
+        (latest + archive) so ``replay_bot.py`` can replay the run offline.
+        """
+        from platform_core.json_utils import dump_json_str
+
+        from tankpit_bot.runtime_logging import get_bot_runtime_artifacts
+        from tankpit_bot.types import CaptureSession, encode_capture_session
+
+        artifacts = get_bot_runtime_artifacts()
+        if artifacts is None:
+            return
+
+        session = CaptureSession(
+            session_id=self._session_id,
+            start_timestamp_ms=self._start_timestamp_ms,
+            end_timestamp_ms=get_current_time_ms(),
+            base_url=self._target_url,
+            messages=self._messages,
+            magic=self._magic,
+            game_log=[],
+            tank_names={},
+        )
+        encoded = encode_capture_session(session)
+        json_str = dump_json_str(encoded, compact=False, indent=2)
+        _test_hooks.write_text(
+            Path(artifacts["latest_capture_path"]),
+            json_str,
+        )
+        _test_hooks.write_text(
+            Path(artifacts["archive_capture_path"]),
+            json_str,
+        )
+        log.info(
+            "Saved capture session: %d messages -> %s",
+            len(self._messages),
+            artifacts["latest_capture_path"],
+        )
 
     def _game_loop(self, page: _test_hooks.PageProtocol) -> None:
         """Run the tick loop: sync, decide, execute on each server tick."""
@@ -911,6 +962,7 @@ def main() -> None:
     set_protocol_frame_logging(False)
     log.info("Bot latest log: %s", artifacts["latest_log_path"])
     log.info("Bot latest events: %s", artifacts["latest_events_path"])
+    log.info("Bot latest capture: %s", artifacts["latest_capture_path"])
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
