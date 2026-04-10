@@ -1,18 +1,24 @@
-"""Combat decision logic for AI strategy.
+"""Combat route primitives for the durable HUNT owner.
 
-Handles target acquisition, teleport landing, shoot/miss cycles, and
-blocked-target replanning. All functions operate on a ``DecideCtx``.
+This module owns typed helper functions for target acquisition, teleport
+landing, shoot/miss cycles, and blocked-target replanning. Top-level owner
+selection now lives in ``ai_strategy`` and ``hunt_mode``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
+from tankpit_bot.bot.ai.combat_landing import (
+    choose_combat_landing_tile,
+    has_cardinal_enemy_adjacency,
+)
+from tankpit_bot.bot.ai.combat_landing import (
+    combat_landing_candidates as shared_combat_landing_candidates,
+)
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    equipment_reserve_restored,
-    has_recent_map_snapshot,
+    can_afford_teleport,
     make_decision,
+    teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
@@ -30,47 +36,70 @@ from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
 
 
-def try_combat(ctx: DecideCtx) -> TickDecisionDict | None:
-    """Route to the correct combat phase.
+def clear_combat_target(ai_state: AIStateDict) -> AIStateDict:
+    """Return AI state with combat-target ownership cleared.
+
+    Args:
+        ai_state: Current AI state.
+
+    Returns:
+        AI state with combat target fields reset.
+    """
+    return AIStateDict(
+        **{
+            **ai_state,
+            "combat_target_id": -1,
+            "combat_target_x": 0,
+            "combat_target_y": 0,
+        }
+    )
+
+
+def _set_combat_target(
+    ai_state: AIStateDict,
+    target: EnemyThreatDict,
+) -> AIStateDict:
+    """Return AI state with a locked combat target.
+
+    Args:
+        ai_state: Current AI state.
+        target: Combat target to lock.
+
+    Returns:
+        AI state with combat target coordinates updated.
+    """
+    return AIStateDict(
+        **{
+            **ai_state,
+            "combat_target_id": target["tank_id"],
+            "combat_target_x": target["x"],
+            "combat_target_y": target["y"],
+        }
+    )
+
+
+def select_new_combat_target(
+    ctx: DecideCtx,
+    threats: list[EnemyThreatDict],
+) -> EnemyThreatDict | None:
+    """Return the next viable new combat target.
 
     Args:
         ctx: Decision context.
+        threats: Visible threats in priority order.
 
     Returns:
-        Tick decision for a combat action, or None if combat is not viable.
+        The next viable enemy target, or ``None`` when combat should not start.
     """
-    if ctx.fuel < ctx.config["fuel_low_threshold"] and not combat_in_progress(ctx):
+    viable = [
+        threat
+        for threat in threats
+        if str(threat["tank_id"]) not in ctx.blocked_targets
+        and str(threat["tank_id"]) not in ctx.killed
+    ]
+    if not viable:
         return None
-
-    threats = analyze_threats(ctx.filtered, ctx.self_state)
-    if not threats:
-        return None
-
-    target = get_locked_target(ctx, threats)
-    if target is None:
-        if not equipment_reserve_restored(ctx):
-            return None
-        viable = [
-            t
-            for t in threats
-            if str(t["tank_id"]) not in ctx.blocked_targets and str(t["tank_id"]) not in ctx.killed
-        ]
-        if not viable:
-            return None
-        target = viable[0]
-        emit_ai("new target %s (id=%d)", target["name"], target["tank_id"])
-        if has_recent_map_snapshot(ctx):
-            emit_ai("fresh map intel available - teleporting to %s", target["name"])
-            return _combat_teleport(ctx, target)
-        return _combat_open_map(ctx, target)
-
-    phase = ctx.ai_state["combat_phase"]
-
-    if phase == "engaging":
-        return _combat_shoot(ctx, target)
-    if phase == "closing":
-        return _combat_close(ctx, target)
-    return _combat_open_map(ctx, target)
+    return viable[0]
 
 
 def get_locked_target(
@@ -95,31 +124,6 @@ def get_locked_target(
     return None
 
 
-def combat_in_progress(ctx: DecideCtx) -> bool:
-    """Return True when the AI is in an active combat engagement.
-
-    Returns False when combat is no longer executable:
-    - dual depleted (can't shoot)
-    - locked target was killed (should recover before reacquiring)
-
-    This releases the combat lock so the planner can fall through to
-    equipment/fuel recovery instead of immediately reacquiring.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if combat is actively locked and executable.
-    """
-    target_id = ctx.ai_state["combat_target_id"]
-    return (
-        target_id != -1
-        and str(target_id) not in ctx.killed
-        and ctx.ai_state["combat_phase"] in ("closing", "engaging")
-        and ctx.inventory["dual_shots"]["count"] != 0
-    )
-
-
 def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, int]:
     """Choose the tile to teleport to for combat.
 
@@ -133,17 +137,12 @@ def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, i
     Returns:
         Tuple of landing coordinates, or (-1, -1) if no landing possible.
     """
-    candidates = _combat_landing_candidates(ctx, target)
-    if not candidates:
-        return (-1, -1)
-
-    if ctx.terrain is not None:
-        for candidate_x, candidate_y in candidates:
-            if ctx.terrain.is_passable(candidate_x, candidate_y):
-                return (candidate_x, candidate_y)
-        return (-1, -1)
-
-    return candidates[0]
+    return choose_combat_landing_tile(
+        ctx.filtered,
+        ctx.self_state,
+        target,
+        ctx.terrain,
+    )
 
 
 def block_combat_target_and_replan(
@@ -167,12 +166,8 @@ def block_combat_target_and_replan(
     blocked[str(target["tank_id"])] = ctx.timestamp_ms
     base_with_block = AIStateDict(
         **{
-            **ctx.base,
+            **clear_combat_target(ctx.base),
             "blocked_combat_targets": blocked,
-            "combat_target_id": -1,
-            "combat_target_x": 0,
-            "combat_target_y": 0,
-            "combat_phase": "none",
         }
     )
 
@@ -196,12 +191,8 @@ def block_combat_target_and_replan(
             f"find {next_target['name']}",
             AIStateDict(
                 **{
-                    **base_with_block,
-                    "combat_target_id": next_target["tank_id"],
-                    "combat_target_x": next_target["x"],
-                    "combat_target_y": next_target["y"],
+                    **_set_combat_target(base_with_block, next_target),
                     "last_map_open_ms": ctx.timestamp_ms,
-                    "combat_phase": "closing",
                 }
             ),
             ctx.equip,
@@ -237,19 +228,28 @@ def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         f"find {target['name']}",
         AIStateDict(
             **{
-                **ctx.base,
-                "combat_target_id": target["tank_id"],
-                "combat_target_x": target["x"],
-                "combat_target_y": target["y"],
+                **_set_combat_target(ctx.base, target),
                 "last_map_open_ms": ctx.timestamp_ms,
-                "combat_phase": "closing",
             }
         ),
         ctx.equip,
     )
 
 
-def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+    """Open the map to refresh or acquire the given target.
+
+    Args:
+        ctx: Decision context.
+        target: Combat target to refresh.
+
+    Returns:
+        Map-open decision that locks the target.
+    """
+    return _combat_open_map(ctx, target)
+
+
+def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
     """Phase 1: Teleport to enemy."""
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if landing_x == -1 and landing_y == -1:
@@ -263,6 +263,22 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             target["name"],
         )
         return block_combat_target_and_replan(ctx, target)
+    if not can_afford_teleport(
+        ctx,
+        landing_x,
+        landing_y,
+        reserve_fuel=ctx.config["hunt_min_fuel"],
+    ):
+        emit_ai(
+            "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)",
+            target["name"],
+            landing_x,
+            landing_y,
+            ctx.fuel,
+            teleport_fuel_cost_to(ctx, landing_x, landing_y),
+            ctx.config["hunt_min_fuel"],
+        )
+        return None
     emit_ai("teleport near %s to (%d,%d)", target["name"], landing_x, landing_y)
     return make_decision(
         make_teleport_command(landing_x, landing_y),
@@ -271,20 +287,26 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         landing_x,
         landing_y,
         f"teleport {target['name']}",
-        AIStateDict(
-            **{
-                **ctx.base,
-                "combat_target_id": target["tank_id"],
-                "combat_target_x": target["x"],
-                "combat_target_y": target["y"],
-                "combat_phase": "closing",
-            }
-        ),
+        _set_combat_target(ctx.base, target),
         ctx.equip,
     )
 
 
-def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+    """Teleport toward the given combat target when legal.
+
+    Args:
+        ctx: Decision context.
+        target: Combat target to close on.
+
+    Returns:
+        Teleport decision, a blocked-target replanning decision, or ``None``
+        when the teleport is unaffordable.
+    """
+    return _combat_teleport(ctx, target)
+
+
+def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
     """Phase closing: confirm geometry before shooting."""
     if has_cardinal_combat_shot(ctx.self_state, target):
         return _combat_shoot(ctx, target)
@@ -297,6 +319,19 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     return _combat_teleport(ctx, target)
 
 
+def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+    """Close distance on the given combat target.
+
+    Args:
+        ctx: Decision context.
+        target: Combat target to approach.
+
+    Returns:
+        Close-range combat decision, or ``None`` when no close action is legal.
+    """
+    return _combat_close(ctx, target)
+
+
 def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase engaging: Shoot. On miss: reacquire."""
     if ctx.combat_feedback == "miss":
@@ -304,6 +339,7 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         return _combat_open_map(ctx, target)
 
     emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
+    engaging_state = _set_combat_target(ctx.base, target)
     return make_decision(
         make_shoot_command(target["x"], target["y"], target["tank_id"]),
         "HUNT",
@@ -313,18 +349,27 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         f"shoot {target['name']}",
         AIStateDict(
             **{
-                **ctx.base,
-                "combat_target_id": target["tank_id"],
-                "combat_target_x": target["x"],
-                "combat_target_y": target["y"],
+                **engaging_state,
                 "last_shoot_ms": ctx.timestamp_ms,
                 "last_shot_target_id": target["tank_id"],
                 "last_shot_target_name": target["name"],
-                "combat_phase": "engaging",
             }
         ),
         ctx.equip,
     )
+
+
+def engage_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+    """Engage the given combat target.
+
+    Args:
+        ctx: Decision context.
+        target: Combat target to shoot at.
+
+    Returns:
+        Combat engage decision, including miss-driven refresh behavior.
+    """
+    return _combat_shoot(ctx, target)
 
 
 def _combat_landing_candidates(
@@ -332,40 +377,7 @@ def _combat_landing_candidates(
     target: EnemyThreatDict,
 ) -> list[tuple[int, int]]:
     """Return usable adjacent landing tiles ordered by distance to self."""
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    candidates = [
-        (target["x"] + 1, target["y"]),
-        (target["x"] - 1, target["y"]),
-        (target["x"], target["y"] + 1),
-        (target["x"], target["y"] - 1),
-    ]
-    usable: list[tuple[int, int]] = []
-    for candidate_x, candidate_y in candidates:
-        if not (0 <= candidate_x <= 255 and 0 <= candidate_y <= 255):
-            continue
-        if _is_dynamically_occupied(ctx, candidate_x, candidate_y):
-            continue
-        usable.append((candidate_x, candidate_y))
-    usable.sort(key=_combat_distance_key(sx, sy))
-    return usable
-
-
-def _combat_distance_key(sx: int, sy: int) -> Callable[[tuple[int, int]], int]:
-    """Return a stable Manhattan-distance key for combat landing sort."""
-
-    def key(pos: tuple[int, int]) -> int:
-        return abs(pos[0] - sx) + abs(pos[1] - sy)
-
-    return key
-
-
-def _is_dynamically_occupied(ctx: DecideCtx, x: int, y: int) -> bool:
-    """Return True when a tile is occupied by a tank, container, or mine."""
-    if any(tank["x"] == x and tank["y"] == y for tank in ctx.filtered["tanks"].values()):
-        return True
-    if f"{x},{y}" in ctx.world["containers"]:
-        return True
-    return f"{x},{y}" in ctx.world["mines"]
+    return shared_combat_landing_candidates(ctx.filtered, ctx.self_state, target)
 
 
 def has_cardinal_combat_shot(
@@ -381,14 +393,18 @@ def has_cardinal_combat_shot(
     Returns:
         True if Manhattan distance is exactly 1.
     """
-    return abs(self_state["x"] - target["x"]) + abs(self_state["y"] - target["y"]) == 1
+    return has_cardinal_enemy_adjacency(self_state, target)
 
 
 __all__ = [
     "block_combat_target_and_replan",
-    "combat_in_progress",
+    "clear_combat_target",
+    "close_target",
     "combat_landing_tile",
+    "engage_target",
     "get_locked_target",
     "has_cardinal_combat_shot",
-    "try_combat",
+    "open_map_for_target",
+    "select_new_combat_target",
+    "teleport_to_target",
 ]
