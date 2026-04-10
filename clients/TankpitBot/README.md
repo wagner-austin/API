@@ -4,7 +4,7 @@ Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome De
 
 ## Features
 
-- **Autonomous AI Bot**: Modular behavior system with evaluators, pathfinding, threat analysis, equipment management, and tactical decisions
+- **Autonomous AI Bot**: Durable HFSM owner routing with HUNT, RECOVER_FUEL, and RECOVER_EQUIPMENT modes, pathfinding, threat analysis, and executor-side command validation
 - **Protocol Discovery**: Captures WebSocket traffic via Playwright CDP integration
 - **WebSocket Injection**: Sends commands via captured WebSocket (synthetic JS events don't work)
 - **XOR Codec**: Full encode/decode with static + session magic keys
@@ -38,12 +38,13 @@ make bot
 ```
 
 The bot joins a game, captures the WebSocket, and runs the AI behavior loop autonomously.
-Each run is also saved to:
+Each run is saved to:
 
 - `runs/bot/latest.log`
 - `runs/bot/latest.events.jsonl`
+- `runs/bot/latest.capture_session.json`
 
-plus timestamped archive copies for both.
+plus timestamped archive copies for all three.
 
 ### Capture the Protocol
 
@@ -82,6 +83,31 @@ This will:
 
 **Note**: Synthetic JavaScript KeyboardEvents don't work because browsers set `isTrusted: false` on programmatically created events. The probe uses WebSocket injection instead.
 
+### Teleport Probes
+
+```bash
+make teleport-probe          # Run safe + aggressive strategies
+make teleport-probe-safe     # sync_before_teleport only
+make teleport-probe-aggressive  # immediate_after_map_open only
+make enemy-teleport-probe    # Enemy-directed combat approach
+make fuel-probe              # Fuel container pickup sequences
+```
+
+These live diagnostic probes isolate transport-level server acceptance from
+planner logic. Results are saved to `teleport_probe.json`,
+`enemy_teleport_probe.json`, and `fuel_probe.json` with companion capture
+session files.
+
+### Replay Bot
+
+```bash
+poetry run python -m scripts.replay_bot [session.json] [--json]
+```
+
+Loads a captured WebSocket session and replays it offline through the protocol
+decoders and AI planner tick-by-tick, outputting structured decision traces
+without a live browser.
+
 ### Decode Captured Session
 
 ```bash
@@ -94,56 +120,78 @@ Loads a capture session JSON, extracts the magic key, builds the XOR table, and 
 
 ## AI Behavior System
 
-The current bot uses a tick-based planning pipeline built on pure functions,
-immutable TypedDicts, and an execution state machine. The important layers are:
+The bot uses a tick-based planning pipeline built on pure functions, immutable
+TypedDicts, and a durable HFSM owner model. The important layers are:
 
 - **World sync**: CDP WebSocket frames are drained each tick and decoded into
-  world state
-- **Planning**: `bot/ai_strategy.py` chooses one action for the current tick
-- **Execution**: `bot/executor.py` translates that action into bot commands
+  world state. Every tracked entity (tank, container, mine) carries a `source`
+  field (`viewport`, `radar`, or `world_state`) for freshness validation.
+- **Planning**: `bot/ai_strategy.py` selects exactly one durable mode owner per
+  tick (`RECOVER_FUEL`, `RECOVER_EQUIPMENT`, or `HUNT`) and delegates to the
+  corresponding owner module.
+- **Execution**: `bot/executor.py` validates commands against live world state
+  before dispatching. AI state is only persisted after successful dispatch.
 - **Action lifecycle**: `bot/states.py` and `bot/tick_loop.py` track in-flight
-  actions and completion/timeouts
+  actions and completion/timeouts.
 
-This is still a flat planner with some tactical substate, not yet the final
-control architecture. The concrete refactor plan for the next step is in
+The control architecture is documented in
+[`docs/bot-control-model.md`](docs/bot-control-model.md) and the HFSM
+migration plan is in
 [`docs/bot-hfsm-refactor-plan.md`](docs/bot-hfsm-refactor-plan.md).
 
-### Behavior Modes
+### Durable Mode Owners
 
-| Mode | Priority | Description |
-|------|----------|-------------|
-| `HUNT` | High | Refresh enemy positions, close distance, and engage |
-| `COLLECT_FUEL` | High when low | Recover fuel via visible containers, radar, or reposition |
-| `COLLECT_EQUIPMENT` | High when depleted | Recover dual/radar reserves before new combat |
+| Mode | Entry | Exit | Description |
+|------|-------|------|-------------|
+| `RECOVER_FUEL` | fuel <= low threshold | fuel >= full threshold (1100) | Locked target pursuit, known-fuel registry, radar sense, sector hop, edge walk |
+| `RECOVER_EQUIPMENT` | any combat reserve <= break | all reserves >= resume | Locked target pursuit, known-equipment registry, radar sense, sector hop |
+| `HUNT` | no recovery needed | recovery takes priority | ACQUIRE, REFRESH, CLOSE, ENGAGE, CONFIRM_KILL substates |
+
+### Executor Validation
+
+Before dispatching any command, the executor validates against current world
+state:
+
+- **Shoots**: target must be tracked, at the expected coordinates, and
+  viewport-confirmed
+- **Pickups**: container must exist and match the expected kind (fuel/equipment)
+- **Moves/Teleports**: destination must not be a known mine
+- **Combat teleports**: locked combat target must still be tracked with a valid
+  source
+- **Resource teleports**: locked resource target must still exist with a locally
+  trustworthy source
 
 ### Current Planner Notes
 
-- Combat currently uses map-open as the known fallback for global enemy refresh.
+- Combat uses map-open as the known fallback for global enemy refresh.
 - Radar is used for local resource search, not global enemy positions.
-- World viewport state now tracks the real visible 16x16 viewport.
-- Radar coverage is modeled separately as an 18x18 envelope extending one tile
-  beyond each visible edge.
-- Direct move and pickup commands are allowed on visible edge tiles; only tiles
-  beyond the visible viewport are treated as non-actionable.
-- The bot only trusts current-viewport fuel/equipment targets after radar has
-  confirmed that viewport. Sparse `0x5A` cache entries remain unconfirmed until
-  radar refreshes the current screen.
+- Extra radar scans the full 18x18 viewport envelope; built-in radar scans a
+  7x7 area centered on the tank. Viewport-scanned state is only set by extra
+  radar, not built-in radar.
+- World viewport state tracks the real visible 16x16 viewport. Direct move and
+  pickup commands are allowed on visible edge tiles; only tiles beyond the
+  visible viewport are treated as non-actionable.
+- Movement uses viewport-bounded A* pathfinding. Paths that would leave the
+  current visible viewport fall back to teleport instead of waypoint walking.
+- The bot only trusts current-viewport fuel/equipment targets after extra radar
+  has confirmed that viewport. Sparse `0x5A` cache entries remain unconfirmed
+  until radar refreshes the current screen.
 - Repeated radar in the same already-confirmed viewport is intentionally
   skipped.
-- Teleport affordability now uses the exact in-game fuel formula
+- Teleport affordability uses the exact in-game fuel formula
   `floor(6 * sqrt(dx^2 + dy^2))` rather than a flat estimated cost.
 - `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
   authoritative for viewport origin and tile cache updates, but absence from a
   single `0x5A` patch does not imply tank absence.
-- Fresh enemy-mine reveal is currently proven through tunneled `0x2E -> 0x4F`
-  radar results, and local mine placement is proven through tunneled
-  `0x2E -> 0x4B` placement updates.
+- Fresh enemy-mine reveal is proven through tunneled `0x2E -> 0x4F` radar
+  results, and local mine placement through tunneled `0x2E -> 0x4B` placement
+  updates.
 - The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
   `scan`, `shoot`, `map_open`) and waits for completion or timeout before
   replanning.
 - Teleport completion validates the actual landed position against the requested
   landing target and blacklists mismatched teleport landings immediately.
-- Equipment recovery now uses break/resume thresholds rather than a single
+- Equipment recovery uses break/resume thresholds rather than a single
   hard-coded “critical” level.
 
 ### Documentation Status
@@ -236,15 +284,18 @@ cp .env.example .env
 ### Commands
 
 ```bash
-make install   # Install dependencies + Playwright
-make lint      # Run guards + ruff + mypy
-make test      # Run pytest with coverage
-make check     # Run lint + test
-make sniff     # Run WebSocket sniffer
-make probe     # Run input probe
-make decode    # Decode captured session
-make bot       # Run bot client
-make discover  # Run command discovery
+make install          # Install dependencies + Playwright
+make lint             # Run guards + ruff + mypy
+make test             # Run pytest with coverage
+make check            # Run lint + test
+make sniff            # Run WebSocket sniffer
+make probe            # Run input probe
+make teleport-probe   # Run teleport timing probes (safe + aggressive)
+make enemy-teleport-probe  # Run enemy-directed teleport probe
+make fuel-probe       # Run fuel pickup probe
+make bot              # Run bot client
+make decode           # Decode captured session
+make discover         # Run command discovery
 ```
 
 Bot terminal logging is documented in [docs/bot-logging.md](docs/bot-logging.md).
@@ -279,6 +330,7 @@ poetry run pytest --cov=src --cov=scripts --cov-branch --cov-report=html
 TankpitBot/
 ├── src/tankpit_bot/
 │   ├── __init__.py           # Package exports
+│   ├── _pillow.py            # Typed Pillow image adapter
 │   ├── _test_hooks.py        # Dependency injection hooks
 │   ├── combat.py             # Combat event tracking
 │   ├── decoder.py            # Session decoder for captured data
@@ -289,12 +341,24 @@ TankpitBot/
 │   ├── state_decoder.py      # Game state message decoder
 │   ├── terrain.py            # Terrain/map decoding
 │   │
+│   ├── action_lab/           # Live protocol-level action probes
+│   │   ├── teleport.py       # Teleport timing probe
+│   │   ├── enemy_teleport.py # Enemy-directed teleport probe
+│   │   ├── fuel_probe.py     # Fuel pickup probe
+│   │   ├── capture.py        # Session capture helpers
+│   │   ├── session.py        # Probe session management
+│   │   └── types.py          # Probe type definitions
+│   │
+│   ├── replay/               # Offline bot decision replay
+│   │   ├── engine.py         # Session replay engine
+│   │   └── types.py          # Replay trace types
+│   │
 │   ├── bot/                  # Bot client package
 │   │   ├── __init__.py       # Re-exports Bot and all AI types
-│   │   ├── ai_strategy.py    # Main tick planner
+│   │   ├── ai_strategy.py    # Durable owner selection orchestrator
 │   │   ├── base.py           # Bot class (state machine, CDP, commands)
 │   │   ├── commands.py       # Command encoding helpers
-│   │   ├── executor.py       # Planner command dispatch
+│   │   ├── executor.py       # Command validation and dispatch
 │   │   ├── states.py         # Execution state machine + in-flight actions
 │   │   ├── tick_loop.py      # Sync -> decide -> execute orchestrator
 │   │   ├── tick_loop_types.py# Tick decision types
@@ -304,10 +368,19 @@ TankpitBot/
 │   │   └── ai/                      # AI decision modules
 │   │       ├── __init__.py          # Re-exports
 │   │       ├── types.py             # AI config/state/behavior types
+│   │       ├── modes.py             # HFSM mode/substate literals + validation
+│   │       ├── mode_controller.py   # Entry/exit rules, substate derivation
 │   │       ├── context.py           # DecideCtx and shared helpers
+│   │       ├── hunt_mode.py         # Durable HUNT owner
+│   │       ├── recover_fuel_mode.py # Durable RECOVER_FUEL owner
+│   │       ├── recover_equipment_mode.py # Durable RECOVER_EQUIPMENT owner
+│   │       ├── combat_strategy.py   # Combat route primitives
+│   │       ├── combat_landing.py    # Shared combat landing helpers
 │   │       ├── movement.py          # Walk/teleport/exploration planning
-│   │       ├── combat_strategy.py   # Combat phases and targeting
 │   │       ├── equipment.py         # Fuel/equipment target selection
+│   │       ├── reachability.py      # Viewport-bounded reachability
+│   │       ├── resource_search.py   # Shared resource search hop logic
+│   │       ├── teleport_cost.py     # Exact teleport fuel cost formula
 │   │       ├── threats.py           # Enemy analysis from world state
 │   │       ├── pathfinding.py       # Terrain-aware path helpers
 │   │       └── tactics.py           # Equipment/radar helper logic
@@ -443,6 +516,10 @@ TankpitBot/
 ├── scripts/
 │   ├── guard.py              # Monorepo guard orchestrator
 │   ├── decode.py             # Session decode script
+│   ├── teleport_probe.py     # Live teleport probe entry point
+│   ├── enemy_teleport_probe.py # Enemy-directed teleport probe
+│   ├── fuel_probe.py         # Fuel pickup probe entry point
+│   ├── replay_bot.py         # Offline session replay
 │   └── _test_hooks.py        # Guard test hooks
 │
 ├── docs/
@@ -465,47 +542,45 @@ The codebase is organized into focused packages:
 
 | Package | Purpose |
 |---------|---------|
-| `bot/` | Bot client, state machine, command dispatch |
-| `bot/ai/` | AI decision system (context, movement, combat, pathfinding, tactics) |
+| `bot/` | Bot client, state machine, executor validation, command dispatch |
+| `bot/ai/` | Durable HFSM owners (HUNT, RECOVER_FUEL, RECOVER_EQUIPMENT), mode controller, combat, movement, pathfinding |
+| `action_lab/` | Live protocol-level action probes (teleport, enemy teleport, fuel) |
+| `replay/` | Offline session replay engine and decision trace types |
 | `browser/` | Playwright automation, CDP setup, login flows |
 | `protocol/` | XOR codec, framing, command encoding |
 | `capture/` | Message capture, trackers, statistics |
 | `container/` | 0x2E container subtype decoding |
-| `sniffer/` | Live WebSocket analysis and formatting |
-| `state/` | Game state management and rendering |
+| `sniffer/` | Live WebSocket analysis, entity source tracking, radar geometry |
+| `state/` | Game state management, entity source fields, rendering |
 | `types/` | Shared TypedDict models and validation |
 
 ### AI Decision Architecture
 
 ```
 ┌──────────────────────────────────────────────┐
-│  ai_tick() — Main orchestrator               │
-│  Runs evaluators, selects best behavior      │
+│  decide() — Durable owner selection          │
+│  Select one owner per tick, delegate routing │
 └──────────────┬───────────────────────────────┘
                │
-     ┌─────────┴─────────┐
-     ▼                   ▼
-┌──────────┐    ┌──────────────┐
-│ Evaluators│    │ Threat       │
-│ score_*() │    │ Analysis     │
-│ 6 behaviors│   │ analyze_     │
-│ 0-1000    │    │ threats()    │
-└──────┬───┘    └──────────────┘
-       │
-       ▼
+     ┌─────────┼──────────────────┐
+     ▼         ▼                  ▼
+┌──────────┐ ┌──────────────┐ ┌──────────────────┐
+│RECOVER_  │ │ RECOVER_     │ │ HUNT             │
+│FUEL      │ │ EQUIPMENT    │ │ decide_hunt_mode │
+│fuel<=500 │ │ reserve<=brk │ │ default owner    │
+└────┬─────┘ └──────┬───────┘ └────────┬─────────┘
+     │              │                  │
+     ▼              ▼                  ▼
 ┌──────────────────────────────────────────────┐
-│  _ai_tick_once() — Bot integration           │
-│  Proactive radar → Teleport search → Normal  │
+│  Owner route: locked target → visible target │
+│  → known registry → radar sense → hop/edge   │
 └──────────────┬───────────────────────────────┘
                │
-     ┌─────────┼─────────┐
-     ▼         ▼         ▼
-┌────────┐ ┌────────┐ ┌────────────┐
-│ Tactics│ │ Actions│ │ Equipment  │
-│ radar, │ │ execute│ │ find_fuel, │
-│ teleport│ │ behavior│ │ pathfinding│
-│ equip  │ │ commands│ │            │
-└────────┘ └────────┘ └────────────┘
+               ▼
+┌──────────────────────────────────────────────┐
+│  executor._is_dispatchable() — World-state   │
+│  validation before command dispatch          │
+└──────────────────────────────────────────────┘
 ```
 
 ### Shared BrowserSession Base Class
