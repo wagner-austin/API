@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from PIL import Image
 
+from tankpit_bot._pillow import load_pillow_image_module
 from tankpit_bot.terrain import TerrainMap, format_viewport
+
+_IMAGE = load_pillow_image_module()
 
 
 def create_test_gif(path: Path, pixels: list[tuple[int, int, int]]) -> None:
@@ -17,7 +19,7 @@ def create_test_gif(path: Path, pixels: list[tuple[int, int, int]]) -> None:
         path: Path to save the GIF.
         pixels: List of 65536 RGB tuples (row-major order).
     """
-    img = Image.new("RGB", (256, 256))
+    img = _IMAGE.new("RGB", (256, 256))
     img.putdata(pixels)
     img.save(path)
 
@@ -60,7 +62,7 @@ def test_terrain_map_accepts_string_path(tmp_path: Path) -> None:
 def test_terrain_map_raises_on_wrong_size(tmp_path: Path) -> None:
     """Test TerrainMap raises ValueError for non-256x256 images."""
     gif_path = tmp_path / "small.gif"
-    img = Image.new("RGB", (128, 128), (60, 129, 85))
+    img = _IMAGE.new("RGB", (128, 128), (60, 129, 85))
     img.save(gif_path)
 
     with pytest.raises(ValueError, match="Expected 256x256 image, got \\(128, 128\\)"):
