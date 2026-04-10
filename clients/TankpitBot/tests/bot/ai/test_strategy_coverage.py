@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -56,7 +58,14 @@ def _c(x: int, y: int, volume: int, is_fuel: bool) -> ContainerStateDict:
     """Create a container state."""
     from tankpit_bot.state.types import make_container_state
 
-    return make_container_state(x, y, is_fuel, volume, 100000, 0)
+    return make_container_state(
+        x=x,
+        y=y,
+        is_fuel=is_fuel,
+        volume=volume,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
 
 
 def _make_inventory(
@@ -99,6 +108,9 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,
                 "resource_target_y": 105,
@@ -130,6 +142,9 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
                 "resource_target_x": 105,
                 "resource_target_y": 105,
@@ -191,7 +206,14 @@ class TestRadarForEquipment:
     def test_radar_for_equipment_in_unscanned_viewport(self) -> None:
         """Equipment recovery radars in unscanned viewport when stock available."""
         world, self_state = _make_world(fuel=800, scanned=False)
-        ai_state = _scanned_ai_state()
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
         # default_count=15: below low (20) but above break (12) → _try_collect_equipment
         # radar_count=15: above break (12) so _try_search_critical doesn't fire
         inventory = _make_inventory(default_count=15, radar_count=15)
@@ -228,8 +250,15 @@ class TestExplorationSkipsTeleportLowFuel:
                 terrain_data[(x, y)] = "W"
         terrain = FakeTerrainMap(terrain_data=terrain_data)
 
-        world, self_state = _make_world(fuel=150)
-        ai_state = _scanned_ai_state()
+        world, self_state = _make_world(fuel=140)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
         inventory = _make_inventory()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
@@ -254,7 +283,14 @@ class TestEquipmentSearchHopFallback:
     def test_equipment_search_hop_when_viewport_scanned_no_radar(self) -> None:
         """Equipment search hops to fresh sector when viewport scanned and no radar."""
         world, self_state = _make_world(fuel=800, scanned=True)
-        ai_state = _scanned_ai_state()
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
         # default_count=15: below low but above break; radar=0 so no scan
         # radar_count=13: above break (12) so critical path doesn't fire; radar stock
         # doesn't matter for this test since viewport is already scanned
@@ -266,21 +302,27 @@ class TestEquipmentSearchHopFallback:
         assert decision["behavior"]["reason"] == "search_equipment_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
-    def test_equipment_search_returns_none_when_teleport_unaffordable(self) -> None:
-        """Equipment search returns None when fuel can't cover teleport."""
+    def test_equipment_search_raises_when_teleport_unaffordable(self) -> None:
+        """Durable equipment recovery fails explicitly when search cannot proceed."""
         # fuel=550: above critical (500) so fuel recovery doesn't fire first
         world, self_state = _make_world(fuel=550, scanned=True)
         base_config = make_default_ai_config()
-        # teleport_fuel_cost=500: 550 < 500+100=600 → can_afford_teleport_search=False
-        config = AIConfigDict(**{**base_config, "teleport_fuel_cost": 500})
-        ai_state = AIStateDict(**{**_scanned_ai_state(), "config": config})
+        # hop_distance=90: floor(6 * 90)=540, so 550 < 540+100 reserve.
+        config = AIConfigDict(**{**base_config, "equip_search_hop_distance": 90})
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "config": config,
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
         inventory = _make_inventory(default_count=15, radar_count=13)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
-
-        # Can't afford teleport search, falls through to combat/fallback
-        assert decision["behavior"]["mode"] != "COLLECT_EQUIPMENT"
+        with pytest.raises(ValueError, match="expected executable recovery search action"):
+            decide(world, self_state, ai_state, inventory, 100000, None)
 
 
 class TestCriticalEquipmentLockedTarget:
@@ -399,7 +441,7 @@ class TestFuelSearchFallbacks:
 
     def test_fuel_edge_walk_when_teleport_unaffordable(self) -> None:
         """Fuel recovery walks to viewport edge when teleport too expensive."""
-        world, self_state = _make_world(fuel=150, scanned=True)
+        world, self_state = _make_world(fuel=140, scanned=True)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
@@ -408,8 +450,8 @@ class TestFuelSearchFallbacks:
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
         assert decision["behavior"]["reason"] == "edge_for_fuel"
 
-    def test_fuel_falls_through_when_all_blocked(self) -> None:
-        """Fuel recovery returns None when all search paths fail."""
+    def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
+        """Durable fuel recovery fails explicitly when no legal action exists."""
         from tests.fakes import FakeTerrainMap
 
         terrain_data: dict[tuple[int, int], str] = {}
@@ -417,11 +459,11 @@ class TestFuelSearchFallbacks:
             for y in range(92, 108):
                 terrain_data[(x, y)] = "W"
         terrain = FakeTerrainMap(terrain_data=terrain_data)
-        world, self_state = _make_world(fuel=150, scanned=True)
+        world, self_state = _make_world(fuel=140, scanned=True)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+        with pytest.raises(ValueError, match="expected executable recovery action"):
+            decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         # All fuel paths exhausted — falls through to combat/fallback
-        assert decision["behavior"]["mode"] != "COLLECT_FUEL"
