@@ -27,6 +27,7 @@ from tankpit_bot.state import (
     viewport_scan_key,
 )
 from tankpit_bot.state.viewport_geometry import (
+    regular_radar_bounds,
     viewport_radar_bounds,
     viewport_visible_bounds,
 )
@@ -107,6 +108,7 @@ _RADAR_CACHE_REFRESH_WINDOW_MS = 2000
 # known state". Track the empty differential so RadarAck can preserve existing
 # authoritative resource state instead of clearing it.
 _pending_radar_empty_delta_ms: int = 0
+_pending_radar_uses_extra: bool = True
 
 # Failed move targets — coordinates where a move stalled and timed out.
 # Maps "x,y" key to timestamp_ms of the failure. Cleared on radar refresh
@@ -132,6 +134,22 @@ def mark_radar_scan_complete() -> None:
     """Record that the server completed a radar scan."""
     global _radar_scan_complete
     _radar_scan_complete = True
+
+
+def record_radar_command(*, use_extra_radar: bool) -> None:
+    """Record which radar geometry the next server scan should use.
+
+    Args:
+        use_extra_radar: True for extra-radar viewport scans, False for the
+            built-in 7x7 radar centered on the tank.
+    """
+    global _pending_radar_uses_extra
+    _pending_radar_uses_extra = use_extra_radar
+
+
+def current_radar_uses_extra() -> bool:
+    """Return True when the pending/current scan uses extra radar geometry."""
+    return _pending_radar_uses_extra
 
 
 def _mark_pending_radar_cache_refresh() -> None:
@@ -214,6 +232,7 @@ def reset_world_state() -> None:
     global _got_confirmed_hit, _got_our_shot_response
     global _killed_tank_ids, _teleport_landed
     global _radar_scan_complete, _pending_radar_cache_refresh_ms, _pending_radar_empty_delta_ms
+    global _pending_radar_uses_extra
     _world_state = make_empty_world_state()
     _terrain_map = None
     _room_images = {}
@@ -226,6 +245,7 @@ def reset_world_state() -> None:
     _radar_scan_complete = False
     _pending_radar_cache_refresh_ms = 0
     _pending_radar_empty_delta_ms = 0
+    _pending_radar_uses_extra = True
     _failed_move_targets.clear()
     _failed_scan_viewports.clear()
 
@@ -451,13 +471,19 @@ def _radar_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
     Returns:
         Inclusive ``(left, top, right, bottom)`` radar bounds.
     """
-    return viewport_radar_bounds(world["viewport"])
+    self_state = world["self_state"]
+    if self_state is None:
+        return viewport_radar_bounds(world["viewport"])
+    if _pending_radar_uses_extra:
+        return viewport_radar_bounds(world["viewport"])
+    return regular_radar_bounds(self_state["x"], self_state["y"])
 
 
 __all__ = [
     "check_and_clear_radar_scan_complete",
     "clear_failed_move_targets",
     "clear_failed_scan_viewport",
+    "current_radar_uses_extra",
     "get_terrain_map",
     "get_world_state",
     "is_move_target_failed",
@@ -465,6 +491,7 @@ __all__ = [
     "mark_move_target_failed",
     "mark_radar_scan_complete",
     "mark_scan_viewport_failed",
+    "record_radar_command",
     "register_room_image",
     "reset_world_state",
     "set_selected_room",
