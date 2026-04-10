@@ -38,6 +38,7 @@ def update_world_state_from_tank_entry(tank_id: int, x: int, y: int, name: str) 
         False,
         x,
         y,
+        "viewport",
         ts,
     )
 
@@ -57,6 +58,7 @@ def update_world_state_from_tank_info(tank_id: int, team: int, name: str) -> Non
         existing["is_bot"] if existing else False,
         existing["x"] if existing else 0,
         existing["y"] if existing else 0,
+        existing["source"] if existing else "viewport",
         ts,
     )
 
@@ -81,6 +83,7 @@ def update_world_state_from_tank_status(
         existing["is_bot"] if existing else False,
         existing["x"] if existing else 0,
         existing["y"] if existing else 0,
+        existing["source"] if existing else "viewport",
         ts,
     )
 
@@ -134,6 +137,7 @@ def update_world_state_from_tank_registry(
         is_bot,
         tank_x,
         tank_y,
+        "viewport",
         ts,
     )
 
@@ -201,6 +205,7 @@ def update_world_state_from_move_response_full(
         is_bot,
         x,
         y,
+        "viewport",
         ts,
     )
 
@@ -241,6 +246,7 @@ def _update_tank_position(tank_id: int, x: int, y: int) -> None:
         existing["is_bot"] if existing else False,
         x,
         y,
+        "viewport",
         ts,
     )
 
@@ -273,6 +279,7 @@ def _update_enemy_from_detection(tank_id: int, x: int, y: int, team: int, rank: 
         is_bot,
         x,
         y,
+        "world_state",
         ts,
     )
     log.info(
