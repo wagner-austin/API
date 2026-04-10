@@ -638,6 +638,7 @@ def _update_map_tank(tank_id: int, x: int, y: int, team: int, rank: int) -> None
         existing["is_bot"] if existing else False,
         x,
         y,
+        "world_state",
         ts,
     )
 
