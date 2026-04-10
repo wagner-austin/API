@@ -16,6 +16,8 @@ from typing import Protocol
 from platform_core.config import _optional_env_str
 from platform_core.json_utils import JSONObject, JSONValue
 
+from tankpit_bot.state import WorldStateDict
+
 # =============================================================================
 # Environment Variable Hook
 # =============================================================================
@@ -630,6 +632,12 @@ load_terrain_map: LoadTerrainMapProtocol = _real_load_terrain_map
 # =============================================================================
 
 
+class BufferedMessageSourceProtocol(Protocol):
+    """Interface for objects that buffer received protocol payloads."""
+
+    _cdp_message_buffer: list[str]
+
+
 class BotProtocol(Protocol):
     """Interface for bot command dispatch used by executor and world_sync.
 
@@ -759,6 +767,14 @@ class BotProtocol(Protocol):
         """
         ...
 
+    def get_world_state(self) -> WorldStateDict:
+        """Return the current tracked world state.
+
+        Returns:
+            Current world-state snapshot.
+        """
+        ...
+
 
 # =============================================================================
 # CLI Argument Hook
@@ -794,6 +810,37 @@ def _real_get_sync_playwright() -> SyncPlaywrightFactoryProtocol:
 get_sync_playwright: Callable[[], SyncPlaywrightFactoryProtocol] = _real_get_sync_playwright
 
 
+# =============================================================================
+# Replay Message Processing Hook
+# =============================================================================
+
+
+class ProcessReceivedMessageProtocol(Protocol):
+    """Protocol for processing a received WebSocket message payload."""
+
+    def __call__(self, payload: str) -> None:
+        """Process a received message payload.
+
+        Args:
+            payload: Base64-encoded WebSocket frame payload.
+        """
+        ...
+
+
+def _real_process_received_message(payload: str) -> None:
+    """Real implementation - delegates to sniffer decoders.
+
+    Args:
+        payload: Base64-encoded WebSocket frame payload.
+    """
+    from tankpit_bot.sniffer.decoders import process_received_message
+
+    process_received_message(payload)
+
+
+process_received_message_hook: ProcessReceivedMessageProtocol = _real_process_received_message
+
+
 __all__ = [
     "AppendTextProtocol",
     "BotProtocol",
@@ -808,6 +855,7 @@ __all__ = [
     "PageProtocol",
     "PathExistsProtocol",
     "PlaywrightProtocol",
+    "ProcessReceivedMessageProtocol",
     "ReadTextProtocol",
     "ResponseProtocol",
     "SyncPlaywrightContextManagerProtocol",
@@ -821,6 +869,7 @@ __all__ = [
     "get_sync_playwright",
     "load_terrain_map",
     "path_exists",
+    "process_received_message_hook",
     "read_text",
     "sync_playwright",
     "write_text",
