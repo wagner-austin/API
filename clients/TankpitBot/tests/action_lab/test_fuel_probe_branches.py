@@ -6,10 +6,13 @@ from collections.abc import Callable, Generator
 from typing import Literal, Protocol
 
 import pytest
-from tests.action_lab.test_fuel_probe import _Clock, _ProbeHarness
+from tests.action_lab.test_fuel_probe import _Clock, _ProbeHarness, _terrain
 
+from tankpit_bot._test_hooks import CDPSessionProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
+from tankpit_bot.action_lab import fuel_collection_phase
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
     FuelProbeError,
@@ -21,10 +24,19 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
 )
+from tankpit_bot.action_lab.fuel_target_phase import (
+    BuildNoFuelVisibleResultProtocol,
+    BuildRepositionMapSyncTimeoutResultProtocol,
+    BuildRepositionTeleportTimeoutResultProtocol,
+    FuelTargetPhaseProbeProtocol,
+    FuelTargetResolution,
+)
 from tankpit_bot.action_lab.fuel_targeting import FuelTargetingError
 from tankpit_bot.action_lab.teleport import TeleportProbeError
+from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportPageSnapshotDict,
     TeleportStartupTimingDict,
     TeleportTargetDict,
 )
@@ -40,12 +52,18 @@ class _WaitForTeleportOutcomeProtocol(Protocol):
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict: ...
 
 
@@ -64,6 +82,7 @@ class _FuelProbeModuleProtocol(Protocol):
         [FuelProbe, ContainerStateDict],
         tuple[int, int] | None,
     ]
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
 
 
 _fuel_module_import = __import__("tankpit_bot.action_lab.fuel_probe", fromlist=["fuel_probe"])
@@ -92,68 +111,30 @@ class _SequenceProbeHarness(_ProbeHarness):
         return self._teleport_results.pop(0)
 
 
-class _DisappearingFuelProbe(_ProbeHarness):
-    """Probe harness that simulates impossible fuel-target loss after radar."""
-
-    def _resolve_fuel_target_after_radar(
-        self,
-        *,
-        page: action_session.WaitPageProtocol,
-        target: TeleportTargetDict,
-        map_open_started_ms: int,
-        map_sync_timestamp_ms: int,
-        teleport_started_ms: int,
-        radar_started_ms: int,
-        radar_sync_timestamp_ms: int,
-        map_sync_timeout_ms: int,
-        teleport_timeout_ms: int,
-        fuel_before: int,
-        teleport_result: TeleportAttemptResultDict,
-        message_start_index: int,
-    ) -> tuple[
-        ContainerStateDict | None,
-        TeleportAttemptResultDict,
-        FuelProbeAttemptResultDict | None,
-        int | None,
-        int | None,
-        int | None,
-    ]:
-        _ = (
-            page,
-            target,
-            map_open_started_ms,
-            map_sync_timestamp_ms,
-            teleport_started_ms,
-            radar_started_ms,
-            radar_sync_timestamp_ms,
-            map_sync_timeout_ms,
-            teleport_timeout_ms,
-            fuel_before,
-            message_start_index,
-        )
-        return (None, teleport_result, None, None, None, None)
-
-
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore patched fuel probe hooks after each test."""
     original_get_time = action_hooks.get_current_time_ms
     original_wait_sync = action_session.wait_for_world_sync
+    original_wait_radar_sync = action_session.wait_for_radar_sync
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
     original_find_visible = fuel_probe_module._find_visible_fuel_target
     original_requires_reposition = fuel_probe_module._visible_fuel_requires_reposition
     original_find_landing = fuel_probe_module._find_visible_fuel_landing_tile
     original_targeting_requires_reposition = fuel_probe_module.visible_fuel_requires_reposition
     original_targeting_find_landing = fuel_probe_module.find_visible_fuel_landing_tile
+    original_get_terrain_map = fuel_probe_module.get_terrain_map
     yield
     action_hooks.get_current_time_ms = original_get_time
     action_session.wait_for_world_sync = original_wait_sync
+    action_session.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_probe_module._find_visible_fuel_target = original_find_visible
     fuel_probe_module._visible_fuel_requires_reposition = original_requires_reposition
     fuel_probe_module._find_visible_fuel_landing_tile = original_find_landing
     fuel_probe_module.visible_fuel_requires_reposition = original_targeting_requires_reposition
     fuel_probe_module.find_visible_fuel_landing_tile = original_targeting_find_landing
+    fuel_probe_module.get_terrain_map = original_get_terrain_map
 
 
 def _target() -> TeleportTargetDict:
@@ -194,6 +175,10 @@ def _attempt(
     """Build a minimal typed fuel attempt payload."""
     return {
         "target": _target(),
+        "teleport_cycle_ids": [1],
+        "radar_cycle_id": None,
+        "move_cycle_id": None,
+        "pickup_cycle_id": None,
         "status": status,
         "map_open_started_ms": 1000,
         "map_sync_timestamp_ms": 1200,
@@ -213,6 +198,8 @@ def _attempt(
         "fuel_target_x": None,
         "fuel_target_y": None,
         "fuel_target_volume": None,
+        "phase_overlaps": [],
+        "decision_basis": None,
         "message_start_index": 0,
         "message_end_index": 1,
     }
@@ -315,22 +302,39 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
     clock = _Clock(1000)
     action_hooks.get_current_time_ms = clock
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -347,6 +351,7 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     _set_common_probe_hooks(_teleport_outcome)
@@ -386,16 +391,32 @@ def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() ->
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -412,9 +433,11 @@ def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() ->
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
     _set_common_probe_hooks(_teleport_outcome)
 
     with pytest.raises(
@@ -455,16 +478,32 @@ def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() ->
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -481,9 +520,11 @@ def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() ->
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
     _set_common_probe_hooks(_teleport_outcome)
 
     with pytest.raises(
@@ -524,14 +565,29 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         status: Literal[
             "landed_exact",
             "landed_offset",
@@ -540,6 +596,7 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
         ] = "map_sync_timeout" if target["label"].startswith("fuel_reposition_") else "landed_exact"
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status=status,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -556,9 +613,11 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
     _set_common_probe_hooks(_teleport_outcome)
 
     with pytest.raises(
@@ -584,22 +643,40 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
     clock = _Clock(1000)
     action_hooks.get_current_time_ms = clock
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    original_resolve_fuel_target_phase = fuel_collection_phase.resolve_fuel_target_phase
+    fuel_probe_module.get_terrain_map = lambda: _terrain({(124, 100), (101, 100), (102, 100)})
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -616,16 +693,122 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
-    fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
+    _set_common_probe_hooks(_teleport_outcome)
 
-    with pytest.raises(FuelProbeError, match="visible fuel target disappeared unexpectedly"):
-        _DisappearingFuelProbe(clock)._probe_single_fuel_target(
-            target=_target(),
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            radar_timeout_ms=3000,
-            pickup_timeout_ms=3000,
-            settle_delay_ms=0,
+    def _resolve_fuel_target_phase(
+        page: action_session.WaitPageProtocol,
+        probe: FuelTargetPhaseProbeProtocol,
+        *,
+        cdp: CDPSessionProtocol | None,
+        target: TeleportTargetDict,
+        map_open_started_ms: int,
+        map_sync_timestamp_ms: int | None,
+        teleport_started_ms: int,
+        radar_started_ms: int,
+        radar_sync_timestamp_ms: int,
+        map_sync_timeout_ms: int,
+        teleport_timeout_ms: int,
+        fuel_before: int,
+        teleport_result: TeleportAttemptResultDict,
+        message_start_index: int,
+        teleport_cycle_ids: list[int],
+        radar_cycle_id: int,
+        teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+        terrain_provider: Callable[[], TerrainMapProtocol | None],
+        find_visible_target: Callable[
+            [FuelTargetPhaseProbeProtocol, bool],
+            ContainerStateDict | None,
+        ],
+        requires_reposition: Callable[
+            [FuelTargetPhaseProbeProtocol, ContainerStateDict],
+            bool,
+        ],
+        find_landing_tile: Callable[
+            [FuelTargetPhaseProbeProtocol, ContainerStateDict],
+            tuple[int, int] | None,
+        ],
+        get_phase_overlaps: Callable[[], list[ActionPhaseOverlapDict]],
+        build_no_fuel_visible_result: BuildNoFuelVisibleResultProtocol,
+        build_reposition_map_sync_timeout_result: BuildRepositionMapSyncTimeoutResultProtocol,
+        build_reposition_teleport_timeout_result: BuildRepositionTeleportTimeoutResultProtocol,
+        make_reposition_target: Callable[[int, int], TeleportTargetDict],
+        wait_for_teleport_outcome: TeleportOutcomeWaiterProtocol,
+        teleport_strategy_requires_map_sync: Callable[
+            [Literal["sync_before_teleport", "immediate_after_map_open"]],
+            bool,
+        ],
+        dispatch_failure_error: type[Exception],
+        unexpected_result_error: type[Exception],
+        no_landing_tile_error: type[Exception],
+        unavailable_error: type[Exception],
+        unavailable_message: str,
+        no_landing_tile_message: str,
+        impossible_result_message: str,
+        acquisition_dispatch_failure_message: str,
+        teleport_dispatch_failure_message: str,
+    ) -> FuelTargetResolution:
+        _ = (
+            page,
+            probe,
+            cdp,
+            target,
+            map_open_started_ms,
+            map_sync_timestamp_ms,
+            teleport_started_ms,
+            radar_started_ms,
+            radar_sync_timestamp_ms,
+            map_sync_timeout_ms,
+            teleport_timeout_ms,
+            fuel_before,
+            teleport_result,
+            message_start_index,
+            teleport_cycle_ids,
+            radar_cycle_id,
+            teleport_strategy,
+            terrain_provider,
+            find_visible_target,
+            requires_reposition,
+            find_landing_tile,
+            get_phase_overlaps,
+            build_no_fuel_visible_result,
+            build_reposition_map_sync_timeout_result,
+            build_reposition_teleport_timeout_result,
+            make_reposition_target,
+            wait_for_teleport_outcome,
+            teleport_strategy_requires_map_sync,
+            dispatch_failure_error,
+            unexpected_result_error,
+            no_landing_tile_error,
+            unavailable_error,
+            unavailable_message,
+            no_landing_tile_message,
+            impossible_result_message,
+            acquisition_dispatch_failure_message,
+            teleport_dispatch_failure_message,
         )
+        return FuelTargetResolution(
+            fuel_target=None,
+            teleport_result=teleport_result,
+            terminal_result=None,
+            decision_basis=None,
+            reposition_map_open_started_ms=None,
+            reposition_map_sync_timestamp_ms=None,
+            reposition_teleport_started_ms=None,
+        )
+
+    fuel_collection_phase.resolve_fuel_target_phase = _resolve_fuel_target_phase
+    try:
+        with pytest.raises(FuelProbeError, match="visible fuel target disappeared unexpectedly"):
+            _ProbeHarness(clock)._probe_single_fuel_target(
+                target=_target(),
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+            )
+    finally:
+        fuel_collection_phase.resolve_fuel_target_phase = original_resolve_fuel_target_phase
