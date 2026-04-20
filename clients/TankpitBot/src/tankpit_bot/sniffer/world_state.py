@@ -329,27 +329,20 @@ def _load_terrain_map_if_needed() -> _test_hooks.TerrainMapProtocol | None:
     if _terrain_map is not None:
         return _terrain_map
 
-    # Try to load from selected room's field image
-    if _selected_room is not None:
-        image = _room_images.get(_selected_room)
-        if image is not None:
-            gif_path = _find_field_gif(image)
-            if gif_path is not None:
-                _terrain_map = _test_hooks.load_terrain_map(gif_path)
-                log.info("Loaded terrain map from %s (room %s)", gif_path, _selected_room)
-                return _terrain_map
-            log.warning("No local GIF found for %s", image)
-
-    # Fallback: try known GIF paths
-    gif_paths = [
-        Path("field01_r.gif"),
-        Path("field42-r.gif"),
-    ]
-    for gif_path in gif_paths:
-        if _test_hooks.path_exists(gif_path):
-            _terrain_map = _test_hooks.load_terrain_map(gif_path)
-            log.info("Loaded terrain map from %s (fallback)", gif_path)
-            return _terrain_map
+    if _selected_room is None:
+        log.warning("No selected room is available for terrain-map loading")
+        return None
+    image = _room_images.get(_selected_room)
+    if image is None:
+        log.warning("No registered room image for selected room %s", _selected_room)
+        return None
+    gif_path = _find_field_gif(image)
+    if gif_path is None:
+        log.warning("No local GIF found for %s (room %s)", image, _selected_room)
+        return None
+    _terrain_map = _test_hooks.load_terrain_map(gif_path)
+    log.info("Loaded terrain map from %s (room %s)", gif_path, _selected_room)
+    return _terrain_map
 
     return None
 
