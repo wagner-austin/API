@@ -46,15 +46,23 @@ xor_table[i] = static_key[i] ^ magic[i % len(magic)]
 | Type | ID | Name | Data | Status |
 |------|----|------|------|--------|
 | 4 | 112 | MOVE | `[x, y]` single bytes | ✅ VERIFIED |
-| 4 | 106 | PICKUP | `[x, y]` single bytes | ✅ VERIFIED |
+| 4 | 100 | PICKUP_FUEL | `[x, y]` single bytes | ✅ VERIFIED |
+| 4 | 106 | PICKUP_EQUIPMENT | `[x, y]` single bytes | ✅ VERIFIED |
 | 4 | 116 | TELEPORT | `[x, y]` single bytes | ✅ VERIFIED |
 | 6 | 115 | SHOOT | `[x, y, target_id_lo, target_id_hi]` | ✅ VERIFIED |
 | 2 | 63 | ENTER_GAME | (no data) | ✅ VERIFIED |
+| 2 | 42 | ACTIVE_FORCES | (no data) | ✅ VERIFIED |
+| 2 | 47 | ACTIVE_PLAYERS | (no data) | ✅ VERIFIED |
+| 2 | 46 | PING | (no data) | ✅ VERIFIED |
 | 2 | 102 | RADAR | (no data) | ✅ VERIFIED |
 | 2 | 104 | NEAREST_ENEMY | (no data) | ✅ VERIFIED |
+| 2 | 105 | INVENTORY | (no data) | ✅ VERIFIED |
+| 2 | 107 | MINE | (no data) | ✅ VERIFIED |
 | 2 | 108 | MAP_OPEN | (no data) | ✅ VERIFIED |
+| 2 | 118 | STATISTICS | (no data) | ✅ VERIFIED |
 | 3 | 114 | TOGGLE_EQUIPMENT | `[slot]` | ✅ VERIFIED |
 | 3 | 90 | SCOPE | `[direction]` | ✅ VERIFIED |
+| 3 | 49 | TOP10 | `[filter]` (0xff=all, 0x00-0x03=team) | ✅ VERIFIED |
 
 **XOR Decoding (offset0):**
 ```python
@@ -88,30 +96,30 @@ byte 3+: data (varies by command)
 | Char | Hex | Format | Handler | Description | Status |
 |------|-----|--------|---------|-------------|--------|
 | `.` | 0x2E | BINARY | `Og` | Tank updates (subtypes by length) | ⚠️ PARTIAL |
-| `!` | 0x21 | MIXED | `Tf` | Tank info (mostly text, some binary) | 🔍 TODO |
+| `!` | 0x21 | MIXED | `Tf` | Tank info (mostly text, some binary) | ✅ VERIFIED |
 | `=` | 0x3D | TEXT | `Mg` | Join confirm (team, date, name, equipment) | ✅ VERIFIED |
 | `G` | 0x47 | BINARY | `Lg` | Movement command (tank id, path waypoints) | ✅ VERIFIED |
 | `S` | 0x53 | BINARY | `Gg` | Shooting/hit event (shooter id, target pos) | ✅ VERIFIED |
 | `A` | 0x41 | BINARY | `Pg` | Deactivation/kill (victim, killer, points) | ✅ VERIFIED |
-| `C` | 0x43 | BINARY | - | Container fuel update (id, fuel amount) | ✅ VERIFIED |
-| `D` | 0x44 | BINARY | `Rg` | Fuel gain (tank id, auto-flag) | 🔍 TODO |
+| `C` | 0x43 | BINARY | - | Cache update (tile cache patches) | ✅ VERIFIED |
+| `D` | 0x44 | BINARY | `Rg` | Fuel gain (tank id, auto-flag) | ✅ VERIFIED |
 | `d` | 0x64 | BINARY | `Sg` | Fuel deposit (amount deposited) | ✅ VERIFIED |
-| `H` | 0x48 | BINARY | `Tg` | Enemy detection (pos x/y, rank, team) | 🔍 TODO |
+| `H` | 0x48 | BINARY | `Tg` | Enemy detection (pos x/y, rank, team) | ✅ VERIFIED |
 | `I` | 0x49 | BINARY | `Xf` | Item pickup confirmation (equipment gained) | ✅ VERIFIED |
 | `g` | 0x67 | BINARY | `Wf` | Equipment gain (equipment flags) | ✅ VERIFIED |
 | `t` | 0x74 | BINARY | `Yf` | Equipment toggle (5 enabled flags) | ✅ VERIFIED |
 | `K` | 0x4B | BINARY / tunneled 0x2E | `Dg` | Mine placement (owner id, counted position list) | ✅ VERIFIED |
 | `E` | 0x45 | BINARY / tunneled 0x2E | `dh` | Mine detonation (repeated coordinate pairs) | ✅ VERIFIED |
 | `F` | 0x46 | BINARY | `Fg` | Radar acknowledgement | ✅ VERIFIED |
-| `M` | 0x4D | BINARY | `Qg` | Chat message (tank id, message type) | 🔍 TODO |
+| `M` | 0x4D | BINARY | `Qg` | Chat message (tank id, message type) | ✅ VERIFIED |
 | `X` | 0x58 | BINARY | `Ug` | Tank exit/disconnect (tank id) | ✅ VERIFIED |
 | `Z` | 0x5A | BINARY | `Vg` | Sparse viewport tile patch (origin + tile cache/overlay/terrain) | ✅ VERIFIED |
-| `(` | 0x28 | BINARY | `Uf` | Tank entry (rank, position, name) | 🔍 TODO |
+| `(` | 0x28 | BINARY | `Uf` | Tank entry (rank, position, name) | ✅ VERIFIED |
 | `)` | 0x29 | BINARY | `Vf` | Tank exit (id, eliminated flag) | 🔍 TODO |
-| `>` | 0x3E | BINARY | `Qf` | Tank status (rank, equipment, pos) | 🔍 TODO |
+| `>` | 0x3E | BINARY | `Qf` | Tank status (rank, equipment, pos) | ✅ VERIFIED |
 | `+` | 0x2B | TEXT | `Rf` | World info / promotion | ✅ VERIFIED |
 | `N` | 0x4E | BINARY | `Sf` | Decoration/award (tank id, index) | 🔍 TODO |
-| `V` | 0x56 | BINARY | `Wg` | Statistics (playtime, kills, points) | 🔍 TODO |
+| `V` | 0x56 | BINARY | `Wg` | Statistics (playtime, kills, points) | ✅ VERIFIED |
 | `*` | 0x2A | TEXT | `Xg` | Active forces count | ✅ DETECTED |
 | `/` | 0x2F | BINARY | `Yg` | Active players list (tank ids) | 🔍 TODO |
 | `1` | 0x31 | BINARY | `Zg` | Top 10 leaderboard | 🔍 TODO |
@@ -167,7 +175,7 @@ Two decoder packages handle different message types:
 **`src/tankpit_bot/container/`** - 0x2E container subtypes:
 - `identification.py` - Length-based message identification (session-independent)
 - `decoders/` - First-byte checks for ambiguous lengths (5-byte 0x41, 7-byte 0x43)
-- `types.py` - 13 container message types with TypedDict structures
+- `types.py` - 22 container message types with TypedDict structures
 
 **Usage:**
 ```python
@@ -178,7 +186,7 @@ result = decode_container_message(xor_decoded_body)  # For 0x2E messages
 
 ### Game Constants (from client JS)
 
-**Tank Ranks** (0-7): Recruit, Private, Corporal, Sergeant, Lieutenant, Captain, Major, General
+**Tank Ranks** (0-8): Recruit, Private, Corporal, Sergeant, Lieutenant, Captain, Major, Colonel, General
 
 **Equipment Types** (5 items):
 1. Armor shields
@@ -205,16 +213,17 @@ result = decode_container_message(xor_decoded_body)  # For 0x2E messages
 
 ## High Priority Message Byte Layouts (from client JS)
 
-### `=` (0x3D) - Tank Position Update (Mg handler)
+### `=` (0x3D) - Movement Response (Mg handler)
 
 ```
-Byte 0-1: tank_id (X function: low + 256*high)
-Byte 2:   x coordinate
-Byte 3:   y coordinate
-Byte 4:   direction
-Byte 5:   rank (0-7)
-Byte 6-10: fuel (256*(256*a[8]+a[9])+a[10])
-Byte 11:  weapon type
+Byte 0:   team (0-3)
+Byte 1-2: tank_id (X function: low + 256*high)
+Byte 3:   x coordinate
+Byte 4:   y coordinate
+Byte 5:   direction
+Byte 6:   (padding)
+Byte 7:   rank (0-8)
+Byte 8-10: leaderboard_position (u24 BE)
 ```
 
 ### `H` (0x48) - Enemy Detection/Radar (Tg handler)
@@ -246,12 +255,14 @@ Byte 11:  friendly fire flag
 ### `A` (0x41) - Deactivation/Kill (Pg handler)
 
 ```
-Byte 0-1: victim_id (X function)
-Byte 2-3: killer_id (X function)
-Byte 4:   rank
-Byte 5-6: X function
-Byte 7-8: points (65530 threshold for bonus)
+Byte 0:   (pad)
+Byte 1-2: victim_id (X function, LE)
+Byte 3:   (pad)
+Byte 4-5: killer_id (X function, LE)
 ```
+
+Minimum 6 bytes. `rank` and `points` are not extracted from wire data
+(hardcoded to 0 in the decoder).
 
 Displays "has been deactivated by" message.
 
@@ -263,8 +274,9 @@ Byte 2:   start x
 Byte 3:   start y
 Byte 4:   direction
 Byte 5:   flag
-Byte 6-8: fuel (256 shift)
-Byte 9+:  waypoint array
+Byte 6-8: leaderboard_position (u24)
+Byte 9-10: (unknown)
+Byte 11+: waypoint direction chars (n/s/e/w)
 ```
 
 ### Helper Function: X(a, b)
@@ -347,40 +359,32 @@ Decoded:
 
 ---
 
-## Item Pickup Message Format (0x2E len=8, subtype 0x49)
+## Inventory Message Format (0x49, top-level)
 
-Wrapped inside 0x2E message with subtype byte 0x49 ('I').
-Sent when equipment is picked up from the map.
+Full inventory state update. Contains count + enabled flag for each of 5
+equipment slots. Decoded as `InventoryDict` in `protocol/decoders/resources.py`.
 
 ```
-Raw: 0x2E 0x49 + 6 data bytes
-Decoded (from byte 1):
-  [0] 0x67 = 'g' (item pickup marker)
-  [1] 0x01 = constant
-  [2] armor_count
-  [3] unknown (always 0)
-  [4] missile_count
-  [5] homing_count
-  [6] unknown (always 0)
+Raw: 0x49 + XOR encoded data (minimum 6 bytes after decode)
+Decoded:
+  [0] show_flag
+  For each equipment slot (5 slots, packed as count:u7 + enabled:u1):
+    count = byte & 0x7F
+    enabled = (byte >> 7) & 1
 ```
 
-**Examples:**
-- 8 homing shots: decoded `67010000000800`
-- 2 homing shots: decoded `67010000000200`
-- 7 armor shields: decoded `67010700000000`
-- 5 armor shields: decoded `67010500000000`
-- 7 missile shots: decoded `67010000070000`
+**Equipment Slots:**
+| Index | Item Type |
+|-------|-----------|
+| 0 | Armor shields |
+| 1 | Dual shots |
+| 2 | Missile shots |
+| 3 | Homing shots |
+| 4 | Extra radars |
 
-**Equipment Slots (from client JS `gc` array):**
-| Byte | Index | Item Type |
-|------|-------|-----------|
-| 2 | 0 | Armor shields |
-| 3 | 1 | Dual shots |
-| 4 | 2 | Missile shots |
-| 5 | 3 | Homing shots |
-| 6 | 4 | Extra radars |
-
-All 5 equipment types have distinct byte positions.
+**Note:** Equipment gain events (0x67) are a separate message type. The
+byte layout previously documented here (`67 01 ...`) actually describes the
+Equipment Gain format, not the 0x49 inventory format.
 
 ---
 
@@ -455,17 +459,15 @@ Server sends this message whenever equipment toggle state changes (pressing R ke
 ### Mine Mechanics
 - Placing mines creates a **3x3 grid** of mines centered on player position
 - Shooting enemy mines triggers **chain reaction** detonations
-- Mine drop command: type=4, id=98 or id=100
+- Mine drop command: type=2, id=107 (query command)
 - Enemy mines are not inherently visible; radar is required to reveal them
 
 ### Mine Drop Command (Client → Server)
 ```
 Raw: 0x21 + XOR encoded data
 Decoded:
-  [1] type = 4 (movement-type command)
-  [2] id = 98 or 100 (mine placement)
-  [3] x coordinate (center of 3x3 grid)
-  [4] y coordinate (center of 3x3 grid)
+  [1] type = 2 (query command)
+  [2] id = 107 (CMD_MINE)
 ```
 
 ### Mine Placement Confirmation (Server → Client, decoded 0x4B)
@@ -504,29 +506,24 @@ remaining neighboring mines, not as a single 9-mine packet.
 
 ---
 
-## Container Fuel Update (0x2E, decoded 0x43)
+## Cache Update (0x43, top-level)
 
-Fuel containers on the map have unique IDs separate from tank IDs. Server broadcasts container fuel levels.
+Tile cache patch message. Contains repeated 4-byte entries that update the
+tile cache at specific coordinates.
 
 ```
-Raw: 0x2E [subtype] + 4 data bytes
-Decoded (from byte 1):
-  [0] 0x43 = 'C' (container marker)
-  [1-2] container_id (little-endian u16)
-  [3-4] fuel_amount (little-endian u16)
+Raw: 0x43 + XOR encoded data
+Decoded:
+  Repeated entries (variable count):
+    [0] x coordinate
+    [1] y coordinate
+    [2-3] cache_value (u16)
 ```
 
 **Notes:**
-- Container IDs are distinct from tank IDs (no overlap observed)
-- Fuel amount of 0 means container is depleted/empty
-- Server may send updates when containers are picked up or respawn
-
-**Examples:**
-```
-decoded: 43722d8901  # container 11634, fuel=393
-decoded: 43722d0000  # container 11634, fuel=0 (depleted)
-decoded: 4375336400  # container 13173, fuel=100
-```
+- This is a top-level message (MSG_CACHE_UPDATE), not a 0x2E container subtype
+- Updates tile cache values at absolute map coordinates
+- Named `CacheUpdateDict` in the code (`protocol/decoders/world.py`)
 
 ---
 
@@ -592,7 +589,7 @@ Indicates fuel was deposited to base.
 Raw: 0x2E [subtype] + 2 data bytes
 Decoded (from byte 1):
   [0] 0x64 = 'd' (deposit marker)
-  [1-2] amount (little-endian u16)
+  [1-2] fuel_total (little-endian u16)
 ```
 
 **Example:**
@@ -729,9 +726,10 @@ When movement is blocked, the server:
 
 ```
 docs/
-├── protocol_reference.md    # This file - message byte layouts
-├── decoding_status.md       # Length-based identification tables
-└── protocol.md              # Protocol overview and discovery notes
+├── protocol-reference.md        # This file - message byte layouts
+├── protocol-decoding-status.md  # Length-based identification tables
+├── protocol-discovery.md        # Protocol overview and discovery notes
+└── protocol-pipeline.md         # Runtime protocol pipeline
 
 src/tankpit_bot/
 ├── sniffer/                 # WebSocket capture, trackers
