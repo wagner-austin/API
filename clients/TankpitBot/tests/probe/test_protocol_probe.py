@@ -254,3 +254,19 @@ def test_protocol_probe_send_key_command_unknown_key(
 
     assert result == "UNKNOWN_KEY"
     assert "Unknown key: w" in caplog.text
+
+
+def test_protocol_probe_probe_single_key_unknown_key_records_no_messages() -> None:
+    """Unknown keys skip response waiting and record an empty result set."""
+    from tests.fakes import FakeCDPSessionProbe, FakePageProbe
+
+    probe = ProtocolProbe("https://tankpit.com/play", headless=True)
+    cdp = FakeCDPSessionProbe()
+    page = FakePageProbe(cdp)
+    probe._messages = []
+    probe._results = []
+
+    probe._probe_single_key(page, cdp, "w")
+
+    assert len(probe._results) == 1
+    assert probe._results[0]["messages_after"] == []
