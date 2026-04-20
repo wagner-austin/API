@@ -134,7 +134,7 @@ class TestDecodeScript:
         reset_xor_state()
 
         room_payload = _make_text_payload(
-            "+2|World|42|flags|x|n|field42.gif|2026",
+            "+2|World|24|flags|2|n|field24.gif|2026",
         )
         join_payload = _make_text_payload(
             "=2|Jan 1, 2020|TestTank|3|5|5|5|5",
@@ -206,7 +206,7 @@ class TestDecodeScript:
         reset_xor_state()
 
         room_payload = _make_text_payload(
-            "+1|Practice|1|flags|x|p|field01.gif|2026",
+            "+1|Practice|1|flags|2|p|field01.gif|2026",
         )
         messages = [
             {"direction": "received", "payload": room_payload},
