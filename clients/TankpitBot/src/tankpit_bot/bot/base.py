@@ -508,7 +508,7 @@ class Bot(BrowserSession):
         if len(data) > 2 and data[2] == COMMAND_PREFIX:
             data = self._xor_encode_command(data)
 
-        self._send_websocket_bytes(self._cdp, data)
+        self._send_websocket_bytes(self._cdp, data, cmd_name)
         emit_wire("%s", cmd_name)
         return True
 
