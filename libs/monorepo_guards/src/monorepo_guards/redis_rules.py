@@ -37,8 +37,7 @@ class RedisRule:
 
     def _scan_node(self, path: Path, node: ast.AST) -> list[Violation]:
         if (
-            self._should_check(path)
-            and isinstance(node, ast.ClassDef)
+            isinstance(node, ast.ClassDef)
             and self._class_name_mentions_redis(node)
             and self._class_is_protocol(node)
         ):
@@ -55,6 +54,8 @@ class RedisRule:
     def run(self, files: list[Path]) -> list[Violation]:
         out: list[Violation] = []
         for path in files:
+            if not self._should_check(path):
+                continue
             tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
             for node in ast.walk(tree):
                 out.extend(self._scan_node(path, node))
