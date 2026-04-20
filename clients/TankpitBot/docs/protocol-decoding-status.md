@@ -91,11 +91,11 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | 0x3D | movement_response | 12 | `team:u8 tank_id:u16 x:u8 y:u8 dir:u8 [1B] rank:u8 score:u24BE [1B]` |
 | 0x3E | tank_status | 22 | See detailed format below |
 | 0x3F | sync | 3 | Heartbeat (no data) |
-| 0x41 | deactivation | 8 | `victim_id:u16 killer_id:u16 rank:u8 [2B] points:u16` |
-| 0x43 | container_fuel | 6 | `container_id:u16 fuel:u16` |
+| 0x41 | deactivation | 6 | `[pad:1] victim_id:u16 [pad:1] killer_id:u16` |
+| 0x43 | cache_update | var | `repeated (x:u8 y:u8 cache_value:u16)` |
 | 0x45 | mine_detonate | var (tunneled in 0x2E) | `positions:[(x:u8,y:u8)]` |
 | 0x46 | radar_ack | 4 | `ack:u8 status:u8` |
-| 0x47 | movement | 17-37 | `tank_id:u16 x:u8 y:u8 dir:u8 flag:u8 fuel:u24 waypoints:str` |
+| 0x47 | movement | 17-37 | `tank_id:u16 x:u8 y:u8 dir:u8 flag:u8 lb_pos:u24 [2B] waypoints:str` |
 | 0x49 | item_pickup | 8 | `show:u8 armor:u7+flag dual:u7+flag missile:u7+flag homing:u7+flag radar:u7+flag` |
 | 0x4A | terrain_update | var | `[(x:u8, y:u8, type:u8)]` - updates terrain types (e.g., ferry) |
 | 0x4B | mine_place | 15 (tunneled in 0x2E) | `type:u8 tank_id:u16 count:u8 positions:[(x:u8,y:u8)]` |
@@ -106,7 +106,7 @@ For 0x2E container body decoding, some lengths require first-byte checks:
 | 0x56 | statistics | 16 | `hours:u16 mins:u8 secs:u8 destroyed:u32 deactivated:u32 score:u32` |
 | 0x58 | tank_exit | 4 | `tank_id:u16` |
 | 0x5A | viewport_update | 28-144 | `zone_id:u8 zone_x:u8 zone_y:u8 entities:[(marker:u8,b1:u8,value:u16)]` |
-| 0x64 | fuel_deposit | 4 | `amount:u16` |
+| 0x64 | fuel_deposit | 4 | `fuel_total:u16` |
 | 0x67 | equip_gain | 8 | `type:u8 armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` |
 | 0x74 | equip_toggle | 7 | `armor:u8 dual:u8 missile:u8 homing:u8 radar:u8` (0=OFF,1=ON) |
 
@@ -131,6 +131,12 @@ Container messages (0x2E) wrap various subtypes. After XOR decode, identified by
 | 15 | 0x4B | mine_place | `[0x4B:1] [mine_type:1] [tank_id:2 LE] [count:1] [positions:count*2]` |
 | 15 | other | tank_update_full | `[subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]` |
 | 16-20 | any | tank_registry | `[subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]` |
+| 1 | any | teleport_landed | `[subtype:1]` (teleport completion) |
+| 5 | 0x43 | container_pickup | `[0x43:1] [x:1] [y:1] [volume:2 LE]` |
+| var | 0x4F | radar_response | `[0x4F:1] [count:1] [flags:1] [containers:count*4] [mines:rest/3]` |
+| 29-79 | any | tip_notification | `[subtype:1] [notification_data:28-78]` |
+| 80-130 | any | chunk_data | `[subtype:1] [chunk_data:79-129]` |
+| 500+ | any | world_state | `[subtype:1] [world_data:499+]` |
 
 ---
 
@@ -239,7 +245,8 @@ captures. They are not a current completeness metric for the whole codebase.
 | 4 | Lieutenant |
 | 5 | Captain |
 | 6 | Major |
-| 7 | General |
+| 7 | Colonel |
+| 8 | General |
 
 ### 0x2E Tank Leave (6 bytes)
 
