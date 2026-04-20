@@ -1,0 +1,109 @@
+{
+  "session_id": "061aa936-d0b0-48f6-a3bc-0710a7588f2d",
+  "start_timestamp_ms": 1776128796816,
+  "end_timestamp_ms": 1776128835652,
+  "base_url": "https://tankpit.com/play",
+  "spawn_x": 131,
+  "spawn_y": 126,
+  "max_targets": 3,
+  "capture_session_path": "movement_probe.capture_session.json",
+  "initial_sync_timeout_ms": 10000,
+  "startup_timing": {
+    "game_ready_timestamp_ms": 1776128823187,
+    "intel_ready_timestamp_ms": 1776128823300,
+    "initial_sync_started_ms": 1776128823300,
+    "initial_world_timestamp_ms": 1776128826062,
+    "command_ready_timestamp_ms": 1776128826079,
+    "first_attempt_started_ms": 1776128826087,
+    "game_ready_to_intel_ready_ms": 113,
+    "intel_ready_to_initial_world_ms": 2762,
+    "initial_world_to_command_ready_ms": 17,
+    "command_ready_to_first_attempt_ms": 8
+  },
+  "move_timeout_ms": 5000,
+  "settle_delay_ms": 500,
+  "queue_map_open_during_move": false,
+  "map_open_delay_ms": 0,
+  "targets": [
+    {
+      "label": "fuel_ground_131_122",
+      "x": 131,
+      "y": 122
+    },
+    {
+      "label": "fuel_ground_135_126",
+      "x": 135,
+      "y": 126
+    },
+    {
+      "label": "fuel_ground_131_118",
+      "x": 131,
+      "y": 118
+    }
+  ],
+  "attempts": [
+    {
+      "target": {
+        "label": "fuel_ground_131_122",
+        "x": 131,
+        "y": 122
+      },
+      "status": "arrived_exact",
+      "move_started_ms": 1776128826087,
+      "map_open_requested_ms": null,
+      "map_open_message_timestamp_ms": null,
+      "completion_timestamp_ms": 1776128827161,
+      "move_elapsed_ms": 1074,
+      "fuel_before": 1100,
+      "fuel_after": 1096,
+      "world_timestamp_before": 1776128826062,
+      "world_timestamp_after": 1776128827150,
+      "settled_x": 131,
+      "settled_y": 122,
+      "message_start_index": 55,
+      "message_end_index": 59
+    },
+    {
+      "target": {
+        "label": "fuel_ground_135_126",
+        "x": 135,
+        "y": 126
+      },
+      "status": "arrived_exact",
+      "move_started_ms": 1776128827667,
+      "map_open_requested_ms": null,
+      "map_open_message_timestamp_ms": null,
+      "completion_timestamp_ms": 1776128831219,
+      "move_elapsed_ms": 3552,
+      "fuel_before": 1096,
+      "fuel_after": 1088,
+      "world_timestamp_before": 1776128827150,
+      "world_timestamp_after": 1776128831211,
+      "settled_x": 135,
+      "settled_y": 126,
+      "message_start_index": 59,
+      "message_end_index": 63
+    },
+    {
+      "target": {
+        "label": "fuel_ground_131_118",
+        "x": 131,
+        "y": 118
+      },
+      "status": "arrived_exact",
+      "move_started_ms": 1776128831729,
+      "map_open_requested_ms": null,
+      "map_open_message_timestamp_ms": null,
+      "completion_timestamp_ms": 1776128835129,
+      "move_elapsed_ms": 3400,
+      "fuel_before": 1088,
+      "fuel_after": 1076,
+      "world_timestamp_before": 1776128831211,
+      "world_timestamp_after": 1776128835129,
+      "settled_x": 131,
+      "settled_y": 118,
+      "message_start_index": 63,
+      "message_end_index": 70
+    }
+  ]
+}
