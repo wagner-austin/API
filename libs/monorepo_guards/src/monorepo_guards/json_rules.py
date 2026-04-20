@@ -37,8 +37,6 @@ class JsonRule:
         return node.module == "json"
 
     def _scan_node(self, path: Path, node: ast.AST) -> list[Violation]:
-        if self._is_allowed(path):
-            return []
         if isinstance(node, (ast.Import, ast.ImportFrom)) and self._import_is_stdlib_json(node):
             return [
                 Violation(
@@ -55,6 +53,8 @@ class JsonRule:
     def run(self, files: list[Path]) -> list[Violation]:
         out: list[Violation] = []
         for path in files:
+            if self._is_allowed(path):
+                continue
             tree = ast.parse(path.read_text(encoding="utf-8", errors="strict"), filename=str(path))
             for node in ast.walk(tree):
                 out.extend(self._scan_node(path, node))
