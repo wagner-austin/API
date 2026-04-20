@@ -87,14 +87,21 @@ Primary binary decode entry points:
 
 These decoders produce TypedDict-shaped protocol messages.
 
-Examples:
+Examples of protocol-level decoder outputs:
 
 - `movement_response`
 - `tank_status`
 - `radar_ack`
+- `shoot_event`
+- `deactivation`
+- `cache_update`
+
+Container-level decoder outputs (from 0x2E wrapping):
+
 - `radar_response`
 - `world_state`
-- `deactivation`
+- `combat_hit`
+- `position_update`
 
 ### Container Decode Layer
 
@@ -235,8 +242,8 @@ That script:
 3. decodes each recorded frame
 4. prints the decoded output
 
-This is useful for protocol inspection, but it is not yet a full bot replay
-system.
+This is useful for protocol inspection. A separate replay harness exists in
+`replay/engine.py` for offline bot decision replay.
 
 ## Current Limits
 
