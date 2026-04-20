@@ -19,6 +19,7 @@ from tankpit_bot._test_hooks import (
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
 )
+from tankpit_bot.action_lab import DEFAULT_TELEPORT_STRATEGY
 from tankpit_bot.action_lab.types import TeleportProbeSessionDict, TeleportTargetDict
 
 
@@ -152,6 +153,11 @@ def test_parse_optional_strategy_arg() -> None:
 
 
 def test_parse_teleport_strategy_rejects_unsupported_values() -> None:
+    assert teleport_probe._parse_teleport_strategy("sync_before_teleport") == "sync_before_teleport"
+    assert (
+        teleport_probe._parse_teleport_strategy("immediate_after_map_open")
+        == "immediate_after_map_open"
+    )
     with pytest.raises(ValueError, match="unsupported teleport strategy"):
         teleport_probe._parse_teleport_strategy("bad")
 
@@ -188,7 +194,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
         box_step_x: int = 8,
         box_step_y: int = 8,
         max_targets: int | None = None,
-        teleport_strategy: str = "sync_before_teleport",
+        teleport_strategy: str = DEFAULT_TELEPORT_STRATEGY,
         initial_sync_timeout_ms: int = 10000,
         map_sync_timeout_ms: int = 3000,
         teleport_timeout_ms: int = 10000,
@@ -227,7 +233,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
         8,
         8,
         None,
-        "sync_before_teleport",
+        "immediate_after_map_open",
         10000,
         3000,
         10000,
@@ -280,7 +286,7 @@ def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
         box_step_x: int = 8,
         box_step_y: int = 8,
         max_targets: int | None = None,
-        teleport_strategy: str = "sync_before_teleport",
+        teleport_strategy: str = DEFAULT_TELEPORT_STRATEGY,
         initial_sync_timeout_ms: int = 10000,
         map_sync_timeout_ms: int = 3000,
         teleport_timeout_ms: int = 10000,
