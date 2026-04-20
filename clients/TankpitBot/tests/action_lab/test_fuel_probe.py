@@ -10,6 +10,7 @@ from typing import Literal, Protocol
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str, narrow_json_to_dict
 from tests.conftest import FakeFileSystem
+from typing_extensions import Unpack
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
@@ -27,10 +28,14 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
     FuelProbeError,
+    _clear_stale_radar_completion,
+    _effective_pickup_timeout_ms,
     _find_visible_fuel_target,
+    _format_visible_fuel_entries,
     _get_completed_pickup_outcome,
     _wait_for_pickup_outcome,
     format_fuel_probe_summary,
@@ -41,8 +46,23 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeSessionDict,
     decode_fuel_probe_session,
 )
+from tankpit_bot.action_lab.pickup_phase import (
+    PickupImmediateOutcomeProtocol,
+    PickupOutcomeWaiterProtocol,
+    PickupPhaseError,
+    PickupTimeoutSizerProtocol,
+)
 from tankpit_bot.action_lab.teleport import TeleportProbeError
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
+from tankpit_bot.action_lab.teleport_phase import (
+    TeleportOutcomeWaiterKwargs,
+    TeleportOutcomeWaiterProtocol,
+)
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportPageSnapshotDict,
+    TeleportTargetDict,
+)
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import (
     ContainerStateDict,
@@ -67,6 +87,7 @@ class _FuelProbeModuleProtocol(Protocol):
         [FuelProbe, ContainerStateDict], tuple[int, int] | None
     ]
     _wait_for_pickup_outcome: _WaitForPickupOutcomeProtocol
+    run_tracked_pickup_phase: _RunTrackedPickupPhaseProtocol
     get_terrain_map: Callable[[], TerrainMapProtocol | None]
     FuelProbe: type[FuelProbe]
 
@@ -80,12 +101,18 @@ class _WaitForTeleportOutcomeProtocol(Protocol):
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict: ...
 
 
@@ -103,6 +130,35 @@ class _WaitForPickupOutcomeProtocol(Protocol):
         fuel_before: int,
         timeout_ms: int,
     ) -> tuple[Literal["picked_up_fuel", "pickup_timeout"], int, int]: ...
+
+
+class _RunTrackedPickupPhaseProtocol(Protocol):
+    """Callable protocol for the shared pickup-phase runner."""
+
+    def __call__(
+        self,
+        page: action_session.WaitPageProtocol,
+        probe: FuelProbe,
+        *,
+        attempt_label: str,
+        target_x: int,
+        target_y: int,
+        current_x: int,
+        current_y: int,
+        fuel_before_pickup: int,
+        pickup_timeout_ms: int,
+        dispatch_failure_error: type[Exception],
+        get_completed_outcome: PickupImmediateOutcomeProtocol,
+        wait_for_outcome: PickupOutcomeWaiterProtocol,
+        compute_timeout: PickupTimeoutSizerProtocol,
+    ) -> tuple[
+        ActionPhaseCycleDict,
+        ActionPhaseCycleDict,
+        int,
+        Literal["picked_up_fuel", "pickup_timeout"],
+        int,
+        int,
+    ]: ...
 
 
 _fuel_module_import = __import__("tankpit_bot.action_lab.fuel_probe", fromlist=["fuel_probe"])
@@ -301,14 +357,29 @@ def _make_teleport_outcome_callback(
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         if teleport_status == "teleport_timeout":
             resolved_status: Literal[
                 "landed_exact",
@@ -326,6 +397,7 @@ def _make_teleport_outcome_callback(
             resolved_status = "landed_exact"
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status=resolved_status,
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -342,6 +414,7 @@ def _make_teleport_outcome_callback(
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     return _teleport_outcome
@@ -427,6 +500,7 @@ class _ProbeHarness(FuelProbe):
         super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
         self._world_state = _make_world(1000, 100, 100, 700)
         self._fake_page = _FakePage(clock)
+        self._cdp = _FakeCDPSession()
         self._messages = []
         self.map_open_result = True
         self.teleport_result = True
@@ -462,8 +536,10 @@ class _ProbeHarness(FuelProbe):
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore patched hooks after each test."""
     original_get_time = action_hooks.get_current_time_ms
+    original_check_radar = action_hooks.check_and_clear_radar_scan_complete
     original_drain = action_hooks.drain_buffered_messages
     original_wait_sync = action_session.wait_for_world_sync
+    original_wait_radar_sync = action_session.wait_for_radar_sync
     original_get_terrain_map = fuel_probe_module.get_terrain_map
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
     original_find_visible = fuel_probe_module._find_visible_fuel_target
@@ -473,8 +549,10 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_probe_class = fuel_probe_module.FuelProbe
     yield
     action_hooks.get_current_time_ms = original_get_time
+    action_hooks.check_and_clear_radar_scan_complete = original_check_radar
     action_hooks.drain_buffered_messages = original_drain
     action_session.wait_for_world_sync = original_wait_sync
+    action_session.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module.get_terrain_map = original_get_terrain_map
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_probe_module._find_visible_fuel_target = original_find_visible
@@ -482,6 +560,44 @@ def _restore_hooks() -> Generator[None, None, None]:
     fuel_probe_module._find_visible_fuel_landing_tile = original_find_landing
     fuel_probe_module._wait_for_pickup_outcome = original_wait_pickup
     fuel_probe_module.FuelProbe = original_probe_class
+
+
+def test_clear_stale_radar_completion_drains_all_pending_flags() -> None:
+    """Radar completion drain clears all leaked flags before a new scan."""
+    completions = [True, True, False]
+
+    def _check_radar_complete() -> bool:
+        return completions.pop(0)
+
+    action_hooks.check_and_clear_radar_scan_complete = _check_radar_complete
+
+    _clear_stale_radar_completion()
+
+    assert completions == []
+
+
+def test_effective_pickup_timeout_scales_with_distance() -> None:
+    """Pickup timeout grows with travel distance and never shrinks below base."""
+    assert (
+        _effective_pickup_timeout_ms(
+            current_x=100,
+            current_y=100,
+            target_x=101,
+            target_y=100,
+            base_timeout_ms=3000,
+        )
+        == 3000
+    )
+    assert (
+        _effective_pickup_timeout_ms(
+            current_x=162,
+            current_y=94,
+            target_x=160,
+            target_y=86,
+            base_timeout_ms=3000,
+        )
+        == 6000
+    )
 
 
 def test_find_visible_fuel_target_returns_best_visible_container() -> None:
@@ -507,6 +623,88 @@ def test_find_visible_fuel_target_returns_best_visible_container() -> None:
     fuel_target = _find_visible_fuel_target(probe)
 
     assert fuel_target == world["containers"][coord_key(102, 100)]
+
+
+def test_format_visible_fuel_entries_returns_unavailable_without_terrain() -> None:
+    """Visible-fuel diagnostics report unavailable without a terrain map."""
+    probe = _ProbeHarness(_Clock(1000))
+    fuel_probe_module.get_terrain_map = lambda: None
+
+    summary = _format_visible_fuel_entries(probe, fuel_target=None)
+
+    assert summary == "unavailable"
+
+
+def test_format_visible_fuel_entries_returns_unavailable_without_self_state() -> None:
+    """Visible-fuel diagnostics report unavailable without self state."""
+    probe = _ProbeHarness(_Clock(1000))
+    probe._world_state["self_state"] = None
+    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100)})
+
+    summary = _format_visible_fuel_entries(probe, fuel_target=None)
+
+    assert summary == "unavailable"
+
+
+def test_format_visible_fuel_entries_returns_none_when_no_visible_fuel_is_tracked() -> None:
+    """Visible-fuel diagnostics exclude non-fuel and out-of-viewport containers."""
+    probe = _ProbeHarness(_Clock(1000))
+    world = probe.get_world_state()
+    world["containers"][coord_key(101, 100)] = make_container_state(
+        101,
+        100,
+        False,
+        300,
+        timestamp_ms=world["timestamp_ms"],
+    )
+    world["containers"][coord_key(200, 200)] = make_container_state(
+        200,
+        200,
+        True,
+        300,
+        timestamp_ms=world["timestamp_ms"],
+    )
+    fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100), (200, 200)})
+
+    summary = _format_visible_fuel_entries(probe, fuel_target=None)
+
+    assert summary == "none"
+
+
+def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None:
+    """Visible-fuel diagnostics mark stale entries and truncate long summaries."""
+    probe = _ProbeHarness(_Clock(1000))
+    probe._world_state = _make_world(40001, 100, 100, 700)
+    world = probe.get_world_state()
+    passable_tiles = {(100, 100)}
+    selected_target = make_container_state(101, 100, True, 300, timestamp_ms=0)
+    world["containers"][coord_key(101, 100)] = selected_target
+    passable_tiles.add((101, 100))
+    stale_positions = [
+        (102, 100),
+        (103, 100),
+        (104, 100),
+        (105, 100),
+        (106, 100),
+        (107, 100),
+        (101, 101),
+        (102, 101),
+    ]
+    for x, y in stale_positions:
+        world["containers"][coord_key(x, y)] = make_container_state(
+            x,
+            y,
+            True,
+            300,
+            timestamp_ms=0,
+        )
+        passable_tiles.add((x, y))
+    fuel_probe_module.get_terrain_map = lambda: _terrain(passable_tiles)
+
+    summary = _format_visible_fuel_entries(probe, fuel_target=selected_target)
+
+    assert "reason=stale actionable=False selected=True" in summary
+    assert "...+1 more" in summary
 
 
 def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
@@ -586,7 +784,7 @@ def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
         timeout_ms=1000,
     )
 
-    assert disappeared == ("picked_up_fuel", 1100, 700)
+    assert disappeared == ("pickup_timeout", 2000, 450)
 
 
 def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> None:
@@ -680,6 +878,35 @@ def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() ->
     assert completed == ("picked_up_fuel", 1000, 850)
 
     probe = _ProbeHarness(_Clock(1000))
+    probe._world_state["containers"][coord_key(101, 100)] = make_container_state(
+        101,
+        100,
+        True,
+        300,
+        timestamp_ms=1000,
+    )
+    probe._world_state["self_state"] = make_self_state(
+        tank_id=1,
+        x=100,
+        y=100,
+        team=2,
+        rank=1,
+        fuel=700,
+        leaderboard_position=1,
+    )
+    probe._world_state["containers"].pop(coord_key(101, 100), None)
+
+    assert (
+        _get_completed_pickup_outcome(
+            probe,
+            target_x=101,
+            target_y=100,
+            fuel_before=700,
+        )
+        is None
+    )
+
+    probe = _ProbeHarness(_Clock(1000))
     probe._world_state["self_state"] = None
 
     with pytest.raises(FuelProbeError, match="self state disappeared while waiting"):
@@ -689,6 +916,103 @@ def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() ->
             target_y=100,
             fuel_before=700,
         )
+
+
+def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
+    """Fuel pickup wrapper converts shared pickup-phase failures."""
+    clock = _Clock(1000)
+    probe = _ProbeHarness(clock)
+    page = _FakePage(clock)
+    target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
+    fuel_target = make_container_state(101, 100, True, 300)
+    pickup_attr = "run_tracked_pickup_phase"
+    original_run_pickup = fuel_probe_module.run_tracked_pickup_phase
+
+    def _raise_pickup_phase_error(
+        page_arg: action_session.WaitPageProtocol,
+        probe_arg: FuelProbe,
+        *,
+        attempt_label: str,
+        target_x: int,
+        target_y: int,
+        current_x: int,
+        current_y: int,
+        fuel_before_pickup: int,
+        pickup_timeout_ms: int,
+        dispatch_failure_error: type[Exception],
+        get_completed_outcome: PickupImmediateOutcomeProtocol,
+        wait_for_outcome: PickupOutcomeWaiterProtocol,
+        compute_timeout: PickupTimeoutSizerProtocol,
+    ) -> tuple[
+        ActionPhaseCycleDict,
+        ActionPhaseCycleDict,
+        int,
+        Literal["picked_up_fuel", "pickup_timeout"],
+        int,
+        int,
+    ]:
+        _ = (
+            page_arg,
+            probe_arg,
+            attempt_label,
+            target_x,
+            target_y,
+            current_x,
+            current_y,
+            fuel_before_pickup,
+            pickup_timeout_ms,
+            dispatch_failure_error,
+            get_completed_outcome,
+            wait_for_outcome,
+            compute_timeout,
+        )
+        raise PickupPhaseError("shared pickup failure")
+
+    setattr(fuel_probe_module, pickup_attr, _raise_pickup_phase_error)
+    try:
+        with pytest.raises(FuelProbeError, match="shared pickup failure"):
+            probe._run_pickup_attempt(
+                page=page,
+                target=target,
+                map_open_started_ms=1000,
+                map_sync_timestamp_ms=1200,
+                teleport_started_ms=1300,
+                radar_started_ms=1600,
+                radar_sync_timestamp_ms=1700,
+                reposition_map_open_started_ms=None,
+                reposition_map_sync_timestamp_ms=None,
+                reposition_teleport_started_ms=None,
+                pickup_timeout_ms=3000,
+                fuel_before=900,
+                teleport_result=TeleportAttemptResultDict(
+                    target=target,
+                    teleport_cycle_id=1,
+                    status="landed_exact",
+                    map_open_started_ms=1000,
+                    map_sync_timestamp_ms=1200,
+                    teleport_started_ms=1300,
+                    completion_timestamp_ms=1500,
+                    map_sync_elapsed_ms=200,
+                    teleport_elapsed_ms=200,
+                    fuel_before=900,
+                    fuel_after=840,
+                    world_timestamp_before=950,
+                    world_timestamp_after=1450,
+                    landed_signal_received=True,
+                    landed_x=124,
+                    landed_y=100,
+                    message_start_index=0,
+                    message_end_index=0,
+                    page_snapshots=[],
+                ),
+                fuel_target=fuel_target,
+                message_start_index=0,
+                teleport_cycle_ids=[1],
+                radar_cycle_id=2,
+                decision_basis=None,
+            )
+    finally:
+        setattr(fuel_probe_module, pickup_attr, original_run_pickup)
 
 
 def test_format_fuel_probe_summary_counts_statuses() -> None:
@@ -724,6 +1048,10 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
         attempts=[
             FuelProbeAttemptResultDict(
                 target={"label": "a", "x": 1, "y": 1},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="picked_up_fuel",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=1100,
@@ -743,11 +1071,17 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=2,
                 fuel_target_y=1,
                 fuel_target_volume=200,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=0,
                 message_end_index=1,
             ),
             FuelProbeAttemptResultDict(
                 target={"label": "b", "x": 2, "y": 2},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="no_fuel_visible",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=1100,
@@ -767,11 +1101,17 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=None,
                 fuel_target_y=None,
                 fuel_target_volume=None,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=1,
                 message_end_index=2,
             ),
             FuelProbeAttemptResultDict(
                 target={"label": "c", "x": 3, "y": 3},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="radar_timeout",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=1100,
@@ -791,11 +1131,17 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=None,
                 fuel_target_y=None,
                 fuel_target_volume=None,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=2,
                 message_end_index=3,
             ),
             FuelProbeAttemptResultDict(
                 target={"label": "d", "x": 4, "y": 4},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="map_sync_timeout",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=None,
@@ -815,11 +1161,17 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=None,
                 fuel_target_y=None,
                 fuel_target_volume=None,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=3,
                 message_end_index=4,
             ),
             FuelProbeAttemptResultDict(
                 target={"label": "e", "x": 5, "y": 5},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="teleport_timeout",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=1100,
@@ -839,11 +1191,17 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=None,
                 fuel_target_y=None,
                 fuel_target_volume=None,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=4,
                 message_end_index=5,
             ),
             FuelProbeAttemptResultDict(
                 target={"label": "f", "x": 6, "y": 6},
+                teleport_cycle_ids=[1],
+                radar_cycle_id=None,
+                move_cycle_id=None,
+                pickup_cycle_id=None,
                 status="pickup_timeout",
                 map_open_started_ms=1000,
                 map_sync_timestamp_ms=1100,
@@ -863,6 +1221,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_x=7,
                 fuel_target_y=6,
                 fuel_target_volume=200,
+                phase_overlaps=[],
+                decision_basis=None,
                 message_start_index=5,
                 message_end_index=6,
             ),
@@ -927,6 +1287,7 @@ def _run_probe_single_target_scenario(
         return wait_for_world_sync(page, provider, started_ms, timeout_ms)
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _make_teleport_outcome_callback(teleport_status)
     fuel_probe_module._find_visible_fuel_target = _make_find_target_callback(fuel_target)
     fuel_probe_module._visible_fuel_requires_reposition = _make_requires_reposition_callback(status)
@@ -940,6 +1301,7 @@ def _run_probe_single_target_scenario(
         radar_timeout_ms=3000,
         pickup_timeout_ms=3000,
         settle_delay_ms=250,
+        teleport_strategy="sync_before_teleport",
     )
 
     assert result["status"] == status
@@ -1038,31 +1400,44 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page,
             provider,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             map_sync_timestamp_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="map_sync_timeout",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
@@ -1079,6 +1454,7 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
@@ -1095,6 +1471,335 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
             pickup_timeout_ms=3000,
             settle_delay_ms=0,
         )
+
+
+def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
+    """Fuel probe rejects a tracked attempt that never produced a teleport result."""
+    from tankpit_bot.action_lab import fuel_probe as fuel_probe_runtime
+
+    clock = _Clock(1000)
+    probe = _ProbeHarness(clock)
+    target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
+    original_attempt_runner = fuel_probe_runtime.run_tracked_teleport_attempt
+
+    def _capture_page_snapshot(
+        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    ) -> TeleportPageSnapshotDict:
+        return TeleportPageSnapshotDict(
+            phase=phase,
+            timestamp_ms=1000,
+            client_present=True,
+            map_visible=False,
+            client_state=1,
+            client_busy=False,
+            pending_actions=0,
+            heartbeat_age_ms=1,
+            last_page_client_send_age_ms=2,
+            last_bot_send_age_ms=3,
+            ws_ready_state=1,
+            current_send_label=None,
+            sent_frame_meta_queue_length=0,
+        )
+
+    def _run_attempt(
+        page_arg: action_session.WaitPageProtocol,
+        probe_arg: FuelProbe,
+        target_arg: TeleportTargetDict,
+        *,
+        cdp: CDPSessionProtocol | None,
+        attempt_label: str,
+        fuel_before: int,
+        world_timestamp_before: int,
+        send_acquisition_command: Callable[[], bool],
+        acquisition_command_name: str,
+        capture_before_map_open: bool,
+        wait_for_acquisition_sync: bool,
+        acquisition_timeout_ms: int,
+        teleport_timeout_ms: int,
+        wait_for_outcome: _WaitForTeleportOutcomeProtocol,
+        dispatch_failure_error: type[Exception],
+        acquisition_dispatch_failure_message: str,
+        teleport_dispatch_failure_message: str,
+        unavailable_error: type[Exception],
+        unavailable_message: str,
+        unexpected_result_error: type[Exception],
+        unexpected_result_message: str,
+        reset_to_idle_before_start: bool = True,
+    ) -> TrackedTeleportAttempt:
+        _ = (
+            page_arg,
+            probe_arg,
+            target_arg,
+            cdp,
+            attempt_label,
+            fuel_before,
+            world_timestamp_before,
+            send_acquisition_command,
+            acquisition_command_name,
+            capture_before_map_open,
+            wait_for_acquisition_sync,
+            acquisition_timeout_ms,
+            teleport_timeout_ms,
+            wait_for_outcome,
+            dispatch_failure_error,
+            acquisition_dispatch_failure_message,
+            teleport_dispatch_failure_message,
+            unavailable_error,
+            unavailable_message,
+            unexpected_result_error,
+            unexpected_result_message,
+            reset_to_idle_before_start,
+        )
+        return TrackedTeleportAttempt(
+            message_start_index=0,
+            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=1, started_ms=1000),
+            acquisition_started_ms=1000,
+            acquisition_sync_timestamp_ms=1200,
+            page_snapshots=[],
+            capture_page_snapshot=_capture_page_snapshot,
+            teleport_result=None,
+            teleport_started_ms=None,
+        )
+
+    attempt_runner_name = "run_tracked_teleport_attempt"
+    setattr(fuel_probe_runtime, attempt_runner_name, _run_attempt)
+    try:
+        with pytest.raises(FuelProbeError, match="fuel attempt ended before teleport dispatch"):
+            probe._probe_single_fuel_target(
+                target=target,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+                teleport_strategy="sync_before_teleport",
+            )
+    finally:
+        setattr(fuel_probe_runtime, attempt_runner_name, original_attempt_runner)
+
+
+def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_result() -> None:
+    """Fuel target resolution rejects a tracked reposition without a teleport result."""
+    from tankpit_bot.action_lab import fuel_target_phase
+
+    clock = _Clock(1000)
+    probe = _ProbeHarness(clock)
+    page = _FakePage(clock)
+    target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
+    fuel_target = make_container_state(101, 100, True, 300)
+    original_attempt_runner = fuel_target_phase.run_reposition_attempt
+
+    def _requires_reposition(
+        probe: fuel_target_phase.FuelTargetPhaseProbeProtocol,
+        fuel_target: ContainerStateDict,
+    ) -> bool:
+        _ = (probe, fuel_target)
+        return True
+
+    def _landing_tile(
+        probe: fuel_target_phase.FuelTargetPhaseProbeProtocol,
+        fuel_target: ContainerStateDict,
+    ) -> tuple[int, int] | None:
+        _ = (probe, fuel_target)
+        return (102, 100)
+
+    def _make_reposition_target(target_x: int, target_y: int) -> TeleportTargetDict:
+        return TeleportTargetDict(
+            label=f"fuel_reposition_{target_x}_{target_y}",
+            x=target_x,
+            y=target_y,
+        )
+
+    def _teleport_strategy_requires_map_sync(
+        strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+    ) -> bool:
+        return strategy == "sync_before_teleport"
+
+    def _wait_for_teleport_outcome_adapter(
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
+        target: TeleportTargetDict,
+        **kwargs: Unpack[TeleportOutcomeWaiterKwargs],
+    ) -> TeleportAttemptResultDict:
+        _ = (page, provider)
+        return TeleportAttemptResultDict(
+            target=target,
+            teleport_cycle_id=kwargs["teleport_cycle_id"],
+            status="landed_exact",
+            map_open_started_ms=kwargs["map_open_started_ms"],
+            map_sync_timestamp_ms=kwargs["map_sync_timestamp_ms"],
+            teleport_started_ms=kwargs["teleport_started_ms"],
+            completion_timestamp_ms=2200,
+            map_sync_elapsed_ms=200,
+            teleport_elapsed_ms=200,
+            fuel_before=kwargs["fuel_before"],
+            fuel_after=840,
+            world_timestamp_before=kwargs["world_timestamp_before"],
+            world_timestamp_after=2150,
+            landed_signal_received=True,
+            landed_x=102,
+            landed_y=100,
+            message_start_index=kwargs["message_start_index"],
+            message_end_index=kwargs["message_start_index"],
+            page_snapshots=kwargs["page_snapshots"],
+        )
+
+    wait_for_teleport_outcome: TeleportOutcomeWaiterProtocol = _wait_for_teleport_outcome_adapter
+
+    def _capture_page_snapshot(
+        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    ) -> TeleportPageSnapshotDict:
+        return TeleportPageSnapshotDict(
+            phase=phase,
+            timestamp_ms=2000,
+            client_present=True,
+            map_visible=False,
+            client_state=1,
+            client_busy=False,
+            pending_actions=0,
+            heartbeat_age_ms=1,
+            last_page_client_send_age_ms=2,
+            last_bot_send_age_ms=3,
+            ws_ready_state=1,
+            current_send_label=None,
+            sent_frame_meta_queue_length=0,
+        )
+
+    def _run_attempt(
+        page_arg: action_session.WaitPageProtocol,
+        probe_arg: FuelProbe,
+        target_arg: TeleportTargetDict,
+        *,
+        cdp: CDPSessionProtocol | None,
+        attempt_label: str,
+        fuel_before: int,
+        world_timestamp_before: int,
+        send_acquisition_command: Callable[[], bool],
+        acquisition_command_name: str,
+        capture_before_map_open: bool,
+        wait_for_acquisition_sync: bool,
+        acquisition_timeout_ms: int,
+        teleport_timeout_ms: int,
+        wait_for_outcome: _WaitForTeleportOutcomeProtocol,
+        dispatch_failure_error: type[Exception],
+        acquisition_dispatch_failure_message: str,
+        teleport_dispatch_failure_message: str,
+        unavailable_error: type[Exception],
+        unavailable_message: str,
+        unexpected_result_error: type[Exception],
+        unexpected_result_message: str,
+        reset_to_idle_before_start: bool = True,
+    ) -> TrackedTeleportAttempt:
+        _ = (
+            page_arg,
+            probe_arg,
+            target_arg,
+            cdp,
+            attempt_label,
+            fuel_before,
+            world_timestamp_before,
+            send_acquisition_command,
+            acquisition_command_name,
+            capture_before_map_open,
+            wait_for_acquisition_sync,
+            acquisition_timeout_ms,
+            teleport_timeout_ms,
+            wait_for_outcome,
+            dispatch_failure_error,
+            acquisition_dispatch_failure_message,
+            teleport_dispatch_failure_message,
+            unavailable_error,
+            unavailable_message,
+            unexpected_result_error,
+            unexpected_result_message,
+            reset_to_idle_before_start,
+        )
+        return TrackedTeleportAttempt(
+            message_start_index=0,
+            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=3, started_ms=2000),
+            acquisition_started_ms=2000,
+            acquisition_sync_timestamp_ms=2200,
+            page_snapshots=[],
+            capture_page_snapshot=_capture_page_snapshot,
+            teleport_result=None,
+            teleport_started_ms=None,
+        )
+
+    attempt_runner_name = "run_reposition_attempt"
+    setattr(fuel_target_phase, attempt_runner_name, _run_attempt)
+    try:
+        with pytest.raises(FuelProbeError, match="fuel reposition ended before teleport dispatch"):
+            fuel_target_phase.resolve_fuel_target_after_radar(
+                page,
+                probe,
+                cdp=probe._cdp,
+                target=target,
+                map_open_started_ms=1000,
+                map_sync_timestamp_ms=1200,
+                teleport_started_ms=1300,
+                radar_started_ms=1600,
+                radar_sync_timestamp_ms=1700,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                fuel_before=900,
+                teleport_result=TeleportAttemptResultDict(
+                    target=target,
+                    teleport_cycle_id=1,
+                    status="landed_exact",
+                    map_open_started_ms=1000,
+                    map_sync_timestamp_ms=1200,
+                    teleport_started_ms=1300,
+                    completion_timestamp_ms=1500,
+                    map_sync_elapsed_ms=200,
+                    teleport_elapsed_ms=200,
+                    fuel_before=900,
+                    fuel_after=840,
+                    world_timestamp_before=950,
+                    world_timestamp_after=1450,
+                    landed_signal_received=True,
+                    landed_x=124,
+                    landed_y=100,
+                    message_start_index=0,
+                    message_end_index=0,
+                    page_snapshots=[],
+                ),
+                message_start_index=0,
+                teleport_cycle_ids=[1],
+                radar_cycle_id=2,
+                teleport_strategy="sync_before_teleport",
+                terrain_provider=lambda: None,
+                find_visible_target=lambda current_probe, allow_unreachable: fuel_target,
+                requires_reposition=_requires_reposition,
+                find_landing_tile=_landing_tile,
+                get_phase_overlaps=probe._get_attempt_phase_overlaps,
+                build_no_fuel_visible_result=probe._build_no_fuel_visible_result,
+                build_reposition_map_sync_timeout_result=(
+                    probe._build_reposition_map_sync_timeout_result
+                ),
+                build_reposition_teleport_timeout_result=(
+                    probe._build_reposition_teleport_timeout_result
+                ),
+                make_reposition_target=_make_reposition_target,
+                wait_for_teleport_outcome=wait_for_teleport_outcome,
+                teleport_strategy_requires_map_sync=_teleport_strategy_requires_map_sync,
+                no_landing_tile_error=FuelProbeError,
+                dispatch_failure_error=FuelProbeError,
+                unavailable_error=FuelProbeError,
+                unexpected_result_error=TeleportProbeError,
+                unavailable_message="cdp session is unavailable",
+                no_landing_tile_message="visible fuel target has no teleport landing tile",
+                impossible_result_message=(
+                    "teleport outcome reported impossible map_sync_timeout during fuel reposition"
+                ),
+                acquisition_dispatch_failure_message=(
+                    "map_open command dispatch failed during fuel reposition"
+                ),
+                teleport_dispatch_failure_message=(
+                    "teleport command dispatch failed during fuel reposition"
+                ),
+            )
+    finally:
+        setattr(fuel_target_phase, attempt_runner_name, original_attempt_runner)
 
 
 def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
@@ -1115,28 +1820,40 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
         return wait_results.pop(0)
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page,
             provider,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             map_sync_timestamp_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         if target["label"].startswith("fuel_reposition_"):
             landed_x = 102
@@ -1148,6 +1865,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
             fuel_after = 640
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
@@ -1164,6 +1882,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
             landed_y=landed_y,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     def _find_target(
@@ -1227,7 +1946,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
 
     assert result["status"] == "picked_up_fuel"
     assert result["reposition_map_open_started_ms"] == 1000
-    assert result["reposition_map_sync_timestamp_ms"] == 1800
+    assert result["reposition_map_sync_timestamp_ms"] is None
     assert result["reposition_teleport_started_ms"] == 1000
     assert result["landed_x"] == 102
     assert result["landed_y"] == 100
@@ -1257,25 +1976,37 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page,
             provider,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             map_sync_timestamp_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
@@ -1292,6 +2023,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     def _find_target(
@@ -1303,8 +2035,14 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
         return fuel_target
 
+    drain_calls = 0
+
     def _pickup_before_move(provider: BufferedMessageSourceProtocol) -> int:
+        nonlocal drain_calls
         _ = provider
+        drain_calls += 1
+        if drain_calls < 2:
+            return 0
         probe.get_world_state()["self_state"] = make_self_state(
             tank_id=1,
             x=100,
@@ -1318,6 +2056,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         return 1
 
     action_session.wait_for_world_sync = _wait_for_world_sync
+    action_session.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
     fuel_probe_module._find_visible_fuel_target = _find_target
     fuel_probe_module._visible_fuel_requires_reposition = lambda probe, fuel_target: False
@@ -1349,7 +2088,27 @@ def test_finalize_attempt_delay_skips_wait_for_zero_delay() -> None:
 
 class _FakeCDPSession:
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = (method, params)
+        _ = params
+        if method == "Runtime.evaluate":
+            return {
+                "result": {
+                    "value": {
+                        "phase": "before_map_open",
+                        "timestamp_ms": 1000,
+                        "client_present": True,
+                        "map_visible": True,
+                        "client_state": 13,
+                        "client_busy": False,
+                        "pending_actions": 0,
+                        "heartbeat_age_ms": 10,
+                        "last_page_client_send_age_ms": 20,
+                        "last_bot_send_age_ms": 5,
+                        "ws_ready_state": 1,
+                        "current_send_label": None,
+                        "sent_frame_meta_queue_length": 0,
+                    }
+                }
+            }
         return {}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
@@ -1496,6 +2255,9 @@ class _ExecuteHarness(FuelProbe):
         radar_timeout_ms: int,
         pickup_timeout_ms: int,
         settle_delay_ms: int,
+        teleport_strategy: Literal[
+            "sync_before_teleport", "immediate_after_map_open"
+        ] = "immediate_after_map_open",
     ) -> FuelProbeAttemptResultDict:
         _ = (
             target,
@@ -1504,6 +2266,7 @@ class _ExecuteHarness(FuelProbe):
             radar_timeout_ms,
             pickup_timeout_ms,
             settle_delay_ms,
+            teleport_strategy,
         )
         result = self.results[0]
         if len(self.results) > 1:
@@ -1569,93 +2332,146 @@ class _FakeFuelProbe(FuelProbe):
 
 def test_probe_single_target_raises_when_dispatch_fails() -> None:
     """Single-target probe raises on command dispatch failures."""
+    from tests.fakes import FakeTerrainMap
+
+    from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
+
+    original_path_exists = core_hooks.path_exists
+    original_load_terrain_map = core_hooks.load_terrain_map
     clock = _Clock(1000)
     action_hooks.get_current_time_ms = clock
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
+    try:
+        register_room_image("1", "field01.gif")
+        set_selected_room("1")
+        core_hooks.path_exists = lambda path: True
+        core_hooks.load_terrain_map = lambda path: FakeTerrainMap()
 
-    probe = _ProbeHarness(clock)
-    probe.map_open_result = False
-    with pytest.raises(FuelProbeError, match="map_open command dispatch failed"):
-        probe._probe_single_fuel_target(
-            target=target,
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            radar_timeout_ms=3000,
-            pickup_timeout_ms=3000,
-            settle_delay_ms=0,
-        )
+        probe = _ProbeHarness(clock)
+        probe.map_open_result = False
+        with pytest.raises(FuelProbeError, match="map_open command dispatch failed"):
+            probe._probe_single_fuel_target(
+                target=target,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+            )
 
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-    probe = _ProbeHarness(clock)
-    probe.teleport_result = False
-    with pytest.raises(FuelProbeError, match="teleport command dispatch failed"):
-        probe._probe_single_fuel_target(
-            target=target,
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            radar_timeout_ms=3000,
-            pickup_timeout_ms=3000,
-            settle_delay_ms=0,
-        )
+        action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+        action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+        probe = _ProbeHarness(clock)
+        probe.teleport_result = False
+        with pytest.raises(FuelProbeError, match="teleport command dispatch failed"):
+            probe._probe_single_fuel_target(
+                target=target,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+            )
 
-    probe = _ProbeHarness(clock)
-    fuel_probe_module._wait_for_teleport_outcome = (
-        lambda page, provider, target, **kwargs: TeleportAttemptResultDict(
-            target=target,
-            status="landed_exact",
-            map_open_started_ms=1000,
-            map_sync_timestamp_ms=1200,
-            teleport_started_ms=1300,
-            completion_timestamp_ms=1500,
-            map_sync_elapsed_ms=200,
-            teleport_elapsed_ms=200,
-            fuel_before=700,
-            fuel_after=650,
-            world_timestamp_before=1000,
-            world_timestamp_after=1450,
-            landed_signal_received=True,
-            landed_x=124,
-            landed_y=100,
-            message_start_index=0,
-            message_end_index=0,
-        )
-    )
-    probe.radar_result = False
-    with pytest.raises(FuelProbeError, match="radar command dispatch failed"):
-        probe._probe_single_fuel_target(
-            target=target,
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            radar_timeout_ms=3000,
-            pickup_timeout_ms=3000,
-            settle_delay_ms=0,
-        )
+        probe = _ProbeHarness(clock)
 
-    probe = _ProbeHarness(clock)
+        def _landed_teleport_outcome(
+            page: action_session.WaitPageProtocol,
+            provider: action_session.BufferedWorldStateProviderProtocol,
+            target: TeleportTargetDict,
+            *,
+            teleport_cycle_id: int,
+            message_start_index: int = 0,
+            map_open_started_ms: int,
+            map_sync_timestamp_ms: int | None,
+            teleport_started_ms: int,
+            fuel_before: int,
+            world_timestamp_before: int,
+            timeout_ms: int,
+            page_snapshots: list[TeleportPageSnapshotDict],
+            capture_page_snapshot: Callable[
+                [
+                    Literal[
+                        "before_map_open",
+                        "before_teleport",
+                        "after_map_data",
+                        "landed",
+                        "timeout",
+                    ]
+                ],
+                TeleportPageSnapshotDict,
+            ],
+        ) -> TeleportAttemptResultDict:
+            _ = (
+                page,
+                provider,
+                message_start_index,
+                timeout_ms,
+                page_snapshots,
+                capture_page_snapshot,
+            )
+            return TeleportAttemptResultDict(
+                target=target,
+                teleport_cycle_id=teleport_cycle_id,
+                status="landed_exact",
+                map_open_started_ms=map_open_started_ms,
+                map_sync_timestamp_ms=map_sync_timestamp_ms,
+                teleport_started_ms=teleport_started_ms,
+                completion_timestamp_ms=1500,
+                map_sync_elapsed_ms=200,
+                teleport_elapsed_ms=200,
+                fuel_before=fuel_before,
+                fuel_after=650,
+                world_timestamp_before=world_timestamp_before,
+                world_timestamp_after=1450,
+                landed_signal_received=True,
+                landed_x=124,
+                landed_y=100,
+                message_start_index=0,
+                message_end_index=0,
+                page_snapshots=[],
+            )
 
-    def _find_target(
-        current_probe: FuelProbe,
-        allow_unreachable: bool,
-    ) -> ContainerStateDict | None:
-        _ = (current_probe, allow_unreachable)
-        fuel_target = make_container_state(101, 100, True, 300)
-        current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
-        return fuel_target
+        fuel_probe_module._wait_for_teleport_outcome = _landed_teleport_outcome
+        probe.radar_result = False
+        with pytest.raises(FuelProbeError, match="radar command dispatch failed"):
+            probe._probe_single_fuel_target(
+                target=target,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+            )
 
-    fuel_probe_module._find_visible_fuel_target = _find_target
-    probe.move_result = False
-    with pytest.raises(
-        FuelProbeError,
-        match="move_to command dispatch failed during fuel collection",
-    ):
-        probe._probe_single_fuel_target(
-            target=target,
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            radar_timeout_ms=3000,
-            pickup_timeout_ms=3000,
-            settle_delay_ms=0,
-        )
+        probe = _ProbeHarness(clock)
+
+        def _find_target(
+            current_probe: FuelProbe,
+            allow_unreachable: bool,
+        ) -> ContainerStateDict | None:
+            _ = (current_probe, allow_unreachable)
+            fuel_target = make_container_state(101, 100, True, 300)
+            current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
+            return fuel_target
+
+        fuel_probe_module._find_visible_fuel_target = _find_target
+        probe.move_result = False
+        with pytest.raises(
+            FuelProbeError,
+            match="move_to command dispatch failed during fuel collection",
+        ):
+            probe._probe_single_fuel_target(
+                target=target,
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                radar_timeout_ms=3000,
+                pickup_timeout_ms=3000,
+                settle_delay_ms=0,
+            )
+    finally:
+        core_hooks.path_exists = original_path_exists
+        core_hooks.load_terrain_map = original_load_terrain_map
 
 
 def test_execute_probe_raises_for_invalid_limits_and_missing_playwright() -> None:
@@ -1740,6 +2556,10 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_124_100", "x": 124, "y": 100},
+            teleport_cycle_ids=[1],
+            radar_cycle_id=None,
+            move_cycle_id=None,
+            pickup_cycle_id=None,
             status="picked_up_fuel",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1100,
@@ -1759,6 +2579,8 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
             fuel_target_x=125,
             fuel_target_y=100,
             fuel_target_volume=300,
+            phase_overlaps=[],
+            decision_basis=None,
             message_start_index=0,
             message_end_index=1,
         )
@@ -1834,6 +2656,10 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_116_100", "x": 116, "y": 100},
+            teleport_cycle_ids=[1],
+            radar_cycle_id=None,
+            move_cycle_id=None,
+            pickup_cycle_id=None,
             status="picked_up_fuel",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1100,
@@ -1853,11 +2679,17 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
             fuel_target_x=117,
             fuel_target_y=100,
             fuel_target_volume=150,
+            phase_overlaps=[],
+            decision_basis=None,
             message_start_index=0,
             message_end_index=1,
         ),
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_117_100", "x": 117, "y": 100},
+            teleport_cycle_ids=[1],
+            radar_cycle_id=None,
+            move_cycle_id=None,
+            pickup_cycle_id=None,
             status="picked_up_fuel",
             map_open_started_ms=1700,
             map_sync_timestamp_ms=1800,
@@ -1877,6 +2709,8 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
             fuel_target_x=118,
             fuel_target_y=100,
             fuel_target_volume=150,
+            phase_overlaps=[],
+            decision_basis=None,
             message_start_index=2,
             message_end_index=3,
         ),
@@ -1930,6 +2764,10 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_116_100", "x": 116, "y": 100},
+            teleport_cycle_ids=[1],
+            radar_cycle_id=None,
+            move_cycle_id=None,
+            pickup_cycle_id=None,
             status="no_fuel_visible",
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1100,
@@ -1949,11 +2787,17 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
             fuel_target_x=None,
             fuel_target_y=None,
             fuel_target_volume=None,
+            phase_overlaps=[],
+            decision_basis=None,
             message_start_index=0,
             message_end_index=1,
         ),
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_117_100", "x": 117, "y": 100},
+            teleport_cycle_ids=[1],
+            radar_cycle_id=None,
+            move_cycle_id=None,
+            pickup_cycle_id=None,
             status="picked_up_fuel",
             map_open_started_ms=1700,
             map_sync_timestamp_ms=1800,
@@ -1973,6 +2817,8 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
             fuel_target_x=118,
             fuel_target_y=100,
             fuel_target_volume=250,
+            phase_overlaps=[],
+            decision_basis=None,
             message_start_index=2,
             message_end_index=3,
         ),
