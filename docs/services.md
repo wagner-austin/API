@@ -410,12 +410,14 @@ make up-discord
 
 ### TankpitBot
 
-Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol.
+Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol, with a durable HFSM AI system for autonomous tank control.
 
 **Features:**
+- Autonomous AI bot with durable HFSM (HUNT, RECOVER_FUEL, RECOVER_EQUIPMENT modes)
 - WebSocket traffic capture via Chrome DevTools Protocol
 - XOR codec for message encoding/decoding (static + session keys)
-- 94% protocol signature coverage, 31+ message types documented
-- 3 CLI entry points: `tankpit-sniff`, `tankpit-probe`, `tankpit-bot`
+- Length-based container decoder with 22 message subtypes
+- Executor-side command validation against live world state
+- 7 CLI entry points: `tankpit-sniff`, `tankpit-probe`, `tankpit-bot`, `tankpit-teleport-probe`, `tankpit-enemy-teleport-probe`, `tankpit-fuel-probe`, `tankpit-movement-probe`
 
 **Docs:** [README](../clients/TankpitBot/README.md)
