@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe bot decode discover analyze-viewport
+.PHONY: lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe movement-probe bot decode discover analyze-viewport
 
 install:
 	poetry lock
@@ -55,6 +55,9 @@ enemy-teleport-probe-nearest: install
 
 fuel-probe: install
 	poetry run tankpit-fuel-probe --target-pickups 3 --max-attempts 9
+
+movement-probe: install
+	poetry run tankpit-movement-probe --max-targets 3
 
 bot: install
 	poetry run tankpit-bot
