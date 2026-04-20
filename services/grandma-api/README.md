@@ -1,10 +1,12 @@
 # Grandma API
 
-Strictly typed, modular multi-language audio to English translation API using OpenAI Whisper. Supports 57 input languages with automatic language detection. Features Protocol-based dependency injection, structured error handling, and 100% test coverage.
+Strictly typed, modular multi-language audio to English translation API. Three-stage pipeline: Whisper STT for transcription, MMS-LID for language identification, and GPT-4o-mini for translation. Supports 57 input languages with automatic language detection. Features Protocol-based dependency injection, structured error handling, and 100% test coverage.
+
+**Live demo:** [grandma.austinwagner.org](https://grandma.austinwagner.org/)
 
 ## Features
 
-- **Multi-Language Translation**: Translates speech from 57 languages to English text using OpenAI Whisper
+- **Three-Stage Pipeline**: Language ID (MMS-LID) → Transcription (Whisper) → Translation (GPT-4o-mini)
 - **Automatic Language Detection**: Whisper auto-detects the input language
 - **Protocol-Based DI**: ServiceContainer with typed dependency injection
 - **Strict Typing**: mypy strict mode, zero `Any` types, no casts, no type ignores
@@ -183,8 +185,20 @@ class ServiceContainer:
          │
          ▼
 ┌─────────────────┐     ┌─────────────────┐
-│   Translate     │────▶│   STT Client    │
+│   Translate     │────▶│   Whisper STT   │
 │   Route         │     │   (OpenAI)      │
+└────────┬────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│   Language ID   │────▶│   MMS-LID       │
+│   Detection     │     │   (Meta)        │
+└────────┬────────┘     └─────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│   Translation   │────▶│   GPT-4o-mini   │
+│   (if non-EN)   │     │   (OpenAI)      │
 └────────┬────────┘     └─────────────────┘
          │
          ▼
@@ -329,6 +343,8 @@ See [DEPLOYING_RAILWAY.md](./DEPLOYING_RAILWAY.md) for Railway deployment instru
 | `python-multipart` | Form data parsing |
 | `platform-core` | Logging, errors, config |
 | `platform-stt` | OpenAI Whisper client |
+| `platform-langid` | Spoken language identification (Meta MMS-LID) |
+| `platform-translate` | Text translation (GPT-4o-mini) |
 
 ### Development
 
