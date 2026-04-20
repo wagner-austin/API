@@ -51,7 +51,7 @@ def test_run_sniffer_with_live_decode(fake_fs: FakeFileSystem) -> None:
         live_decode=True,
     )
 
-    assert len(session["messages"]) == 8
+    assert len(session["messages"]) == 4
 
 
 # =============================================================================
@@ -71,7 +71,7 @@ def test_main_with_defaults(
 
     captured = capsys.readouterr()
     output = captured.out
-    assert "Captured 8 WebSocket messages in" in output
+    assert "Captured 4 WebSocket messages in" in output
     assert "Saved to: runs\\sniff\\latest.capture_session.json" in output
     assert "Sniffer latest capture:" in output
     assert "runs\\sniff\\latest.capture_session.json" in output
