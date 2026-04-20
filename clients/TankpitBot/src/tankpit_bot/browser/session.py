@@ -14,8 +14,16 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import TypedDict
 
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import (
+    JSONObject,
+    JSONValue,
+    optional_str,
+    require_dict,
+    require_list,
+    require_str,
+)
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -36,7 +44,6 @@ from tankpit_bot.browser.key_discovery import (
     load_static_key,
     save_static_key,
 )
-from tankpit_bot.browser.login import handle_login_flow
 from tankpit_bot.browser.types import (
     STATIC_KEY_PATH,
     GameNotJoinedError,
@@ -51,11 +58,171 @@ from tankpit_bot.types import (
     decode_cdp_websocket_created_event,
     decode_cdp_websocket_frame_event,
 )
+from tankpit_bot.types.literals import SentFrameOrigin, require_sent_frame_origin
 
 log = get_logger(__name__)
 
 # Base64 validation pattern: A-Z, a-z, 0-9, +, /, and = for padding
 _BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]*={0,2}$")
+_BROWSER_HOOK_SOURCE = """
+            (function() {
+                window.__capturedWS = null;
+                window.__allWS = [];
+                window.__rawMsgs = [];
+                window.__wsRecvCount = 0;
+                window.__codexCurrentSendLabel = null;
+                window.__sentFrameMetaQueue = [];
+                window.__lastPageClientSendPerfMs = null;
+                window.__lastBotInjectedSendPerfMs = null;
+                window.__tankpitActiveGame = null;
+
+                function maybeCaptureGameClient(candidate) {
+                    if (!candidate || typeof candidate !== 'object') {
+                        return;
+                    }
+                    const mapObject =
+                        candidate.map && typeof candidate.map === 'object'
+                            ? candidate.map
+                            : null;
+                    const worldObject =
+                        candidate.h && typeof candidate.h === 'object'
+                            ? candidate.h
+                            : null;
+                    const selfTank =
+                        candidate.i && typeof candidate.i === 'object'
+                            ? candidate.i
+                            : null;
+                    const transport =
+                        candidate.va && typeof candidate.va === 'object'
+                            ? candidate.va
+                            : null;
+                    const actionQueue =
+                        worldObject &&
+                        worldObject.j &&
+                        typeof worldObject.j === 'object' &&
+                        Array.isArray(worldObject.j.actions)
+                            ? worldObject.j.actions
+                            : null;
+                    if (
+                        mapObject !== null &&
+                        worldObject !== null &&
+                        selfTank !== null &&
+                        transport !== null &&
+                        actionQueue !== null &&
+                        typeof candidate.s === 'number' &&
+                        typeof candidate.Ha === 'boolean'
+                    ) {
+                        window.__tankpitActiveGame = candidate;
+                    }
+                }
+
+                function installClientProbe(propertyName) {
+                    const storageName = '__codexProbeValue_' + propertyName;
+                    Object.defineProperty(Object.prototype, propertyName, {
+                        configurable: true,
+                        enumerable: false,
+                        get: function() {
+                            if (Object.prototype.hasOwnProperty.call(this, storageName)) {
+                                return this[storageName];
+                            }
+                            return undefined;
+                        },
+                        set: function(value) {
+                            Object.defineProperty(this, storageName, {
+                                value: value,
+                                writable: true,
+                                configurable: true,
+                                enumerable: false
+                            });
+                            Object.defineProperty(this, propertyName, {
+                                value: value,
+                                writable: true,
+                                configurable: true,
+                                enumerable: true
+                            });
+                            maybeCaptureGameClient(this);
+                        }
+                    });
+                }
+
+                installClientProbe('map');
+                installClientProbe('h');
+                installClientProbe('i');
+                installClientProbe('va');
+                installClientProbe('Ha');
+                installClientProbe('s');
+
+                // Hook EventTarget.prototype.addEventListener globally.
+                // This catches ALL addEventListener calls, including those
+                // made by the game on WebSocket instances.
+                const origAEL = EventTarget.prototype.addEventListener;
+                EventTarget.prototype.addEventListener = function(type, fn, opts) {
+                    if (this instanceof WebSocket && type === 'message') {
+                        if (window.__allWS.indexOf(this) === -1) {
+                            window.__allWS.push(this);
+                        }
+                        const ws = this;
+                        const origFn = fn;
+                        fn = function(event) {
+                            window.__wsRecvCount++;
+                            if (ws.readyState === 1) window.__capturedWS = ws;
+                            try {
+                                if (event.data instanceof Blob) {
+                                    const reader = new FileReader();
+                                    reader.onload = function() {
+                                        const bytes = new Uint8Array(reader.result);
+                                        let b = '';
+                                        for (let i = 0; i < bytes.length; i += 8192) {
+                                            b += String.fromCharCode.apply(null,
+                                                bytes.subarray(i, i + 8192));
+                                        }
+                                        window.__rawMsgs.push(btoa(b));
+                                        if (window.__rawMsgs.length > 500) {
+                                            window.__rawMsgs = window.__rawMsgs.slice(-200);
+                                        }
+                                    };
+                                    reader.readAsArrayBuffer(event.data);
+                                }
+                            } catch(e) {}
+                            return origFn.call(this, event);
+                        };
+                    }
+                    return origAEL.call(this, type, fn, opts);
+                };
+
+                // Hook send for command injection
+                const origSend = WebSocket.prototype.send;
+                WebSocket.prototype.send = function(data) {
+                    if (!window.__capturedWS || window.__capturedWS.readyState !== 1) {
+                        if (this.readyState === 1) window.__capturedWS = this;
+                    }
+                    if (window.__allWS.indexOf(this) === -1) {
+                        window.__allWS.push(this);
+                    }
+                    const currentLabel =
+                        typeof window.__codexCurrentSendLabel === 'string'
+                            ? window.__codexCurrentSendLabel
+                            : null;
+                    const perfNow = performance.now();
+                    const err = new Error();
+                    const stack = typeof err.stack === 'string' ? err.stack : '';
+                    if (currentLabel) {
+                        window.__lastBotInjectedSendPerfMs = perfNow;
+                    } else {
+                        window.__lastPageClientSendPerfMs = perfNow;
+                    }
+                    window.__sentFrameMetaQueue.push({
+                        origin: currentLabel ? 'bot_injected' : 'page_client',
+                        label: currentLabel || '',
+                        stack: stack
+                    });
+                    if (window.__sentFrameMetaQueue.length > 500) {
+                        window.__sentFrameMetaQueue = window.__sentFrameMetaQueue.slice(-200);
+                    }
+                    return origSend.call(this, data);
+                };
+            })();
+            """
 
 
 def _is_valid_base64(payload: str) -> bool:
@@ -72,6 +239,160 @@ def _is_valid_base64(payload: str) -> bool:
     if not _BASE64_PATTERN.match(payload):
         return False
     return len(payload) % 4 == 0
+
+
+def _extract_runtime_value(result: JSONObject) -> JSONValue:
+    """Return the `Runtime.evaluate` value field.
+
+    Args:
+        result: Raw CDP result object.
+
+    Returns:
+        The evaluated JavaScript value.
+
+    Raises:
+        ValueError: If the CDP result is missing the value field.
+    """
+    result_obj = require_dict(result, "result")
+    if "value" not in result_obj:
+        raise ValueError(f"Runtime.evaluate result missing value: {result_obj}")
+    return result_obj["value"]
+
+
+def get_captured_raw_messages(cdp: CDPSessionProtocol) -> list[str]:
+    """Return the captured raw WebSocket message buffer from the page hook.
+
+    Args:
+        cdp: Active CDP session.
+
+    Returns:
+        Captured raw message payloads as base64 strings.
+
+    Raises:
+        ValueError: If the page hook returned malformed data.
+    """
+    result = cdp.send(
+        "Runtime.evaluate",
+        {
+            "expression": """
+            (() => Array.isArray(window.__rawMsgs) ? window.__rawMsgs.slice(-500) : [])()
+            """,
+            "returnByValue": True,
+        },
+    )
+    raw_value = _extract_runtime_value(result)
+    payloads_raw = require_list({"items": raw_value}, "items")
+    payloads: list[str] = []
+    for payload in payloads_raw:
+        payloads.append(require_str({"payload": payload}, "payload"))
+    return payloads
+
+
+def send_websocket_bytes(cdp: CDPSessionProtocol, data: bytes, label: str = "direct_send") -> str:
+    """Send raw bytes via the captured WebSocket.
+
+    Uses the WebSocket instance captured by the prototype hook installed in
+    `_setup_cdp_handlers`, with fallbacks to the game globals used by older
+    client builds.
+
+    Args:
+        cdp: Active CDP session.
+        data: Raw framed bytes to send.
+        label: Bot-side label for outbound provenance logging.
+
+    Returns:
+        Status string returned by the browser-side send helper.
+    """
+    b64 = base64.b64encode(data).decode()
+    send_js = """
+    (() => {
+        let ws = window.__capturedWS;
+        if (!ws && typeof tankpit !== 'undefined' && tankpit.ws) {
+            ws = tankpit.ws;
+        }
+        if (!ws && typeof window.ws !== 'undefined') {
+            ws = window.ws;
+        }
+        if (!ws) {
+            const status = window.__capturedWS ? 'exists' : 'null';
+            return 'NO_WEBSOCKET_FOUND (__capturedWS=' + status + ')';
+        }
+        if (ws.readyState !== 1) {
+            return 'WEBSOCKET_NOT_OPEN: ' + ws.readyState;
+        }
+        const binary = atob('%B64%');
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        window.__codexCurrentSendLabel = %LABEL%;
+        try {
+            ws.send(bytes.buffer);
+        } finally {
+            window.__codexCurrentSendLabel = null;
+        }
+        return 'SENT_' + bytes.length + '_BYTES via ' + ws.url;
+    })()
+    """
+    send_js = send_js.replace("%B64%", b64)
+    send_js = send_js.replace("%LABEL%", repr(label))
+    result = cdp.send("Runtime.evaluate", {"expression": send_js, "returnByValue": True})
+    runtime_value = _extract_runtime_value(result)
+    return require_str({"value": runtime_value}, "value")
+
+
+class SentFrameMetadata(TypedDict):
+    """Metadata captured at outbound WebSocket send time.
+
+    Attributes:
+        origin: Whether the send came from bot injection or the page client.
+        label: Bot-side send label when known.
+        stack: JavaScript stack recorded at send time.
+    """
+
+    origin: SentFrameOrigin
+    label: str
+    stack: str
+
+
+def _pop_sent_frame_metadata(cdp: CDPSessionProtocol) -> SentFrameMetadata | None:
+    """Pop the next outbound frame metadata record from the browser hook queue.
+
+    Args:
+        cdp: Active CDP session.
+
+    Returns:
+        The next queued outbound metadata record, or None when unavailable.
+
+    Raises:
+        ValueError: If the hook returned malformed metadata.
+    """
+    result = cdp.send(
+        "Runtime.evaluate",
+        {
+            "expression": """
+            (() => {
+                if (!Array.isArray(window.__sentFrameMetaQueue)) {
+                    return null;
+                }
+                if (window.__sentFrameMetaQueue.length === 0) {
+                    return null;
+                }
+                return window.__sentFrameMetaQueue.shift();
+            })()
+            """,
+            "returnByValue": True,
+        },
+    )
+    raw_value = _extract_runtime_value(result)
+    if raw_value is None or raw_value == "":
+        return None
+    metadata_obj = require_dict({"metadata": raw_value}, "metadata")
+    return SentFrameMetadata(
+        origin=require_sent_frame_origin(metadata_obj, "origin"),
+        label=optional_str(metadata_obj, "label") or "",
+        stack=optional_str(metadata_obj, "stack") or "",
+    )
 
 
 def get_current_time_ms() -> int:
@@ -146,6 +467,8 @@ class BrowserSession:
         self._start_timestamp_ms = 0
         self._messages: list[CapturedMessage] = []
         self._ws_urls: dict[str, str] = {}  # requestId -> url mapping
+        self._cdp: CDPSessionProtocol | None = None
+        self._page: PageProtocol | None = None
         self._magic: str | None = None
         self._static_key: str | None = None
         self._game_log_scraper: GameLogScraper | None = None
@@ -327,6 +650,14 @@ class BrowserSession:
             payload=payload,
             ws_url=ws_url,
         )
+        if direction == "sent" and self._cdp is not None:
+            metadata = _pop_sent_frame_metadata(self._cdp)
+            if metadata is not None:
+                message["sent_origin"] = metadata["origin"]
+                if metadata["label"]:
+                    message["sent_label"] = metadata["label"]
+                if metadata["stack"]:
+                    message["sent_stack"] = metadata["stack"]
         self._messages.append(message)
         self._on_message_captured(message)
 
@@ -378,66 +709,7 @@ class BrowserSession:
         # Also hooks WebSocket.prototype.send for command injection.
         cdp.send(
             "Page.addScriptToEvaluateOnNewDocument",
-            {
-                "source": """
-            (function() {
-                window.__capturedWS = null;
-                window.__allWS = [];
-                window.__rawMsgs = [];
-                window.__wsRecvCount = 0;
-
-                // Hook EventTarget.prototype.addEventListener globally.
-                // This catches ALL addEventListener calls, including those
-                // made by the game on WebSocket instances.
-                const origAEL = EventTarget.prototype.addEventListener;
-                EventTarget.prototype.addEventListener = function(type, fn, opts) {
-                    if (this instanceof WebSocket && type === 'message') {
-                        if (window.__allWS.indexOf(this) === -1) {
-                            window.__allWS.push(this);
-                        }
-                        const ws = this;
-                        const origFn = fn;
-                        fn = function(event) {
-                            window.__wsRecvCount++;
-                            if (ws.readyState === 1) window.__capturedWS = ws;
-                            try {
-                                if (event.data instanceof Blob) {
-                                    const reader = new FileReader();
-                                    reader.onload = function() {
-                                        const bytes = new Uint8Array(reader.result);
-                                        let b = '';
-                                        for (let i = 0; i < bytes.length; i += 8192) {
-                                            b += String.fromCharCode.apply(null,
-                                                bytes.subarray(i, i + 8192));
-                                        }
-                                        window.__rawMsgs.push(btoa(b));
-                                        if (window.__rawMsgs.length > 500) {
-                                            window.__rawMsgs = window.__rawMsgs.slice(-200);
-                                        }
-                                    };
-                                    reader.readAsArrayBuffer(event.data);
-                                }
-                            } catch(e) {}
-                            return origFn.call(this, event);
-                        };
-                    }
-                    return origAEL.call(this, type, fn, opts);
-                };
-
-                // Hook send for command injection
-                const origSend = WebSocket.prototype.send;
-                WebSocket.prototype.send = function(data) {
-                    if (!window.__capturedWS || window.__capturedWS.readyState !== 1) {
-                        if (this.readyState === 1) window.__capturedWS = this;
-                    }
-                    if (window.__allWS.indexOf(this) === -1) {
-                        window.__allWS.push(this);
-                    }
-                    return origSend.call(this, data);
-                };
-            })();
-            """
-            },
+            {"source": _BROWSER_HOOK_SOURCE},
         )
 
         # Enable Network domain for WebSocket frame capture
@@ -634,7 +906,12 @@ class BrowserSession:
             save_static_key(new_key)
             log.info("Updated static key file: %s", STATIC_KEY_PATH)
 
-    def _send_websocket_bytes(self, cdp: CDPSessionProtocol, data: bytes) -> str:
+    def _send_websocket_bytes(
+        self,
+        cdp: CDPSessionProtocol,
+        data: bytes,
+        label: str = "direct_send",
+    ) -> str:
         """Send raw bytes via the captured WebSocket.
 
         Uses the WebSocket instance captured by the prototype hook installed
@@ -643,54 +920,12 @@ class BrowserSession:
         Args:
             cdp: CDP session.
             data: Raw bytes to send.
+            label: Bot-side label for outbound provenance logging.
 
         Returns:
             Status string: 'SENT_N_BYTES via URL' on success, error message otherwise.
         """
-        import base64
-
-        b64 = base64.b64encode(data).decode()
-
-        send_js = f"""
-        (() => {{
-            // Use captured WebSocket from prototype hook
-            let ws = window.__capturedWS;
-
-            // Fallback: try common locations
-            if (!ws && typeof tankpit !== 'undefined' && tankpit.ws) {{
-                ws = tankpit.ws;
-            }}
-            if (!ws && typeof window.ws !== 'undefined') {{
-                ws = window.ws;
-            }}
-
-            if (!ws) {{
-                let status = window.__capturedWS ? 'exists' : 'null';
-                return 'NO_WEBSOCKET_FOUND (__capturedWS=' + status + ')';
-            }}
-
-            if (ws.readyState !== 1) {{
-                return 'WEBSOCKET_NOT_OPEN: ' + ws.readyState;
-            }}
-
-            // Decode base64 to binary
-            const binary = atob('{b64}');
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {{
-                bytes[i] = binary.charCodeAt(i);
-            }}
-
-            // Send as binary
-            ws.send(bytes.buffer);
-            return 'SENT_' + bytes.length + '_BYTES via ' + ws.url;
-        }})()
-        """
-        result = cdp.send("Runtime.evaluate", {"expression": send_js, "returnByValue": True})
-        result_obj = result.get("result")
-        if isinstance(result_obj, dict):
-            val = result_obj.get("value", "?")
-            return str(val) if val is not None else "?"
-        return "?"
+        return send_websocket_bytes(cdp, data, label)
 
     def _wait_for_game_ready(self, page: PageProtocol) -> None:
         """Wait for game to fully load (message flow stabilizes).
@@ -768,16 +1003,20 @@ class BrowserSession:
             tank_name_prefix: Prefix for tank name.
             auto_join_room: Whether to automatically join a room.
         """
+        from tankpit_bot.browser.login import handle_login_flow
+
         page.goto(self._target_url, wait_until="domcontentloaded")
         log.info("Navigated to %s", page.url)
 
-        handle_login_flow(
+        success = handle_login_flow(
             page,
             cdp,
             tank_name_prefix=tank_name_prefix,
             prefer_account=self._prefer_account,
             auto_join_room=auto_join_room,
         )
+        if not success:
+            raise GameNotJoinedError("login or room join did not complete successfully")
 
     def _cleanup(
         self,
