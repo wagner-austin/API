@@ -9,6 +9,7 @@ from platform_core.logging import get_logger
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks
 from tankpit_bot.action_lab import (
+    DEFAULT_TELEPORT_STRATEGY,
     TeleportProbeSessionDict,
     TeleportTargetDict,
     format_teleport_probe_summary,
@@ -156,7 +157,7 @@ def main() -> int:
     teleport_strategy = _parse_teleport_strategy(
         teleport_strategy_arg
         or _test_hooks.get_env("TANKPIT_TELEPORT_STRATEGY")
-        or "sync_before_teleport"
+        or DEFAULT_TELEPORT_STRATEGY
     )
     env_initial_sync_timeout_ms = int(
         _test_hooks.get_env("TANKPIT_TELEPORT_INITIAL_SYNC_TIMEOUT_MS") or "10000"
