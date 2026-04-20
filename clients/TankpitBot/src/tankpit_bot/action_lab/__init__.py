@@ -34,13 +34,29 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     encode_fuel_probe_attempt_result,
     encode_fuel_probe_session,
 )
+from tankpit_bot.action_lab.movement_probe import (
+    MovementProbe,
+    MovementProbeError,
+    format_movement_probe_summary,
+    run_movement_probe,
+)
+from tankpit_bot.action_lab.movement_probe_types import (
+    MovementProbeAttemptResultDict,
+    MovementProbeSessionDict,
+    decode_movement_probe_attempt_result,
+    decode_movement_probe_session,
+    encode_movement_probe_attempt_result,
+    encode_movement_probe_session,
+)
 from tankpit_bot.action_lab.session import (
     ActionLabSessionError,
     advance_startup_state,
     wait_for_initial_self_state,
+    wait_for_radar_sync,
     wait_for_world_sync,
 )
 from tankpit_bot.action_lab.teleport import (
+    DEFAULT_TELEPORT_STRATEGY,
     TeleportProbe,
     TeleportProbeError,
     build_box_targets,
@@ -61,6 +77,7 @@ from tankpit_bot.action_lab.types import (
 )
 
 __all__ = [
+    "DEFAULT_TELEPORT_STRATEGY",
     "ActionLabSessionError",
     "EnemyTeleportAttemptResultDict",
     "EnemyTeleportProbe",
@@ -69,6 +86,10 @@ __all__ = [
     "FuelProbeAttemptResultDict",
     "FuelProbeError",
     "FuelProbeSessionDict",
+    "MovementProbe",
+    "MovementProbeAttemptResultDict",
+    "MovementProbeError",
+    "MovementProbeSessionDict",
     "TeleportAttemptResultDict",
     "TeleportProbe",
     "TeleportProbeError",
@@ -82,6 +103,8 @@ __all__ = [
     "decode_enemy_teleport_probe_session",
     "decode_fuel_probe_attempt_result",
     "decode_fuel_probe_session",
+    "decode_movement_probe_attempt_result",
+    "decode_movement_probe_session",
     "decode_teleport_attempt_result",
     "decode_teleport_probe_session",
     "decode_teleport_target",
@@ -89,17 +112,22 @@ __all__ = [
     "encode_enemy_teleport_probe_session",
     "encode_fuel_probe_attempt_result",
     "encode_fuel_probe_session",
+    "encode_movement_probe_attempt_result",
+    "encode_movement_probe_session",
     "encode_teleport_attempt_result",
     "encode_teleport_probe_session",
     "encode_teleport_target",
     "format_enemy_teleport_probe_summary",
     "format_fuel_probe_summary",
+    "format_movement_probe_summary",
     "format_teleport_probe_summary",
     "parse_targets_arg",
     "run_enemy_teleport_probe",
     "run_fuel_probe",
+    "run_movement_probe",
     "run_teleport_probe",
     "save_capture_session",
     "wait_for_initial_self_state",
+    "wait_for_radar_sync",
     "wait_for_world_sync",
 ]
