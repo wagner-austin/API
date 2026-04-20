@@ -7,18 +7,21 @@ timestamped archive copy.
 
 ## `make bot`
 
-`make bot` now writes four canonical artifacts:
+`make bot` now writes six canonical artifacts:
 
 - latest text log: `runs/bot/latest.log`
 - archived text log: `runs/bot/bot-YYYYMMDD-HHMMSS.log`
 - latest structured events: `runs/bot/latest.events.jsonl`
 - archived structured events: `runs/bot/bot-YYYYMMDD-HHMMSS.events.jsonl`
+- latest capture session: `runs/bot/latest.capture_session.json`
+- archived capture session: `runs/bot/bot-YYYYMMDD-HHMMSS.capture_session.json`
 
-For autonomous debugging, the two important files are:
+For autonomous debugging, the three important files are:
 
 ```text
 runs/bot/latest.log
 runs/bot/latest.events.jsonl
+runs/bot/latest.capture_session.json
 ```
 
 `latest.log` is the operator-readable timeline. `latest.events.jsonl` is the
@@ -59,8 +62,9 @@ runs/sniff/latest.session_summary.json
 The bot and sniffer no longer rely on terminal scrollback as the primary source
 of truth.
 
-- `make bot` always leaves one deterministic latest text log plus one
-  deterministic latest structured event stream.
+- `make bot` always leaves one deterministic latest text log, one
+  deterministic latest structured event stream, and one latest capture
+  session.
 - `make sniff` always leaves one deterministic latest capture bundle plus the
   corresponding text/event logs.
 - The CLI and the docs now point to the same locations, so future debugging can
