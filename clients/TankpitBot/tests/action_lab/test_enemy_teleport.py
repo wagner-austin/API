@@ -41,7 +41,11 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     decode_enemy_teleport_probe_session,
 )
 from tankpit_bot.action_lab.teleport import TeleportProbeError
-from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportPageSnapshotDict,
+    TeleportTargetDict,
+)
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.bot.states import make_in_flight_action
 from tankpit_bot.browser import PlaywrightNotInstalledError
@@ -76,12 +80,18 @@ class _WaitForTeleportOutcomeProtocol(Protocol):
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict: ...
 
 
@@ -240,6 +250,7 @@ class _ProbeHarness(EnemyTeleportProbe):
         )
         self._world_state = _make_world(1000, 100, 100, 900)
         self._fake_page = _FakePage(_Clock(1000), _SequencedProvider([self._world_state]))
+        self._cdp = _FakeCDPSession()
         self.map_open_result = True
         self.request_enemy_result = True
         self.teleport_result = True
@@ -271,7 +282,27 @@ class _ProbeHarness(EnemyTeleportProbe):
 
 class _FakeCDPSession:
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = (method, params)
+        _ = params
+        if method == "Runtime.evaluate":
+            return {
+                "result": {
+                    "value": {
+                        "phase": "before_teleport",
+                        "timestamp_ms": 1000,
+                        "client_present": True,
+                        "map_visible": True,
+                        "client_state": 13,
+                        "client_busy": False,
+                        "pending_actions": 0,
+                        "heartbeat_age_ms": 10,
+                        "last_page_client_send_age_ms": 20,
+                        "last_bot_send_age_ms": 5,
+                        "ws_ready_state": 1,
+                        "current_send_label": None,
+                        "sent_frame_meta_queue_length": 0,
+                    }
+                }
+            }
         return {}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
@@ -813,16 +844,32 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="teleport_timeout",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -839,6 +886,7 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
             landed_y=100,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     def _enemy_after(
@@ -901,16 +949,32 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -927,6 +991,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
             landed_y=130,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     def _enemy_after(
@@ -999,16 +1064,32 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
-        _ = (page, provider, timeout_ms)
+        _ = (
+            page,
+            provider,
+            teleport_cycle_id,
+            message_start_index,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
         return TeleportAttemptResultDict(
             target=target,
+            teleport_cycle_id=teleport_cycle_id,
             status="landed_exact",
             map_open_started_ms=map_open_started_ms,
             map_sync_timestamp_ms=map_sync_timestamp_ms,
@@ -1025,6 +1106,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
             landed_y=130,
             message_start_index=0,
             message_end_index=0,
+            page_snapshots=[],
         )
 
     def _enemy_after(
