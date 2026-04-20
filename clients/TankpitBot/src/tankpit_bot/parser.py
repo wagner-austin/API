@@ -3,7 +3,7 @@
 Protocol analysis based on captured session data:
 
 Lobby messages (text, pipe-delimited):
-- + received: Room list (room_id|name|player_count|modes|?|?|image|year)
+- + received: Room list (room_id|name|field_id|modes|default_troop|mode_code|image|year)
 - + sent: Join room request (encrypted payload)
 - * sent: Room query (room_id)
 - - sent/received: Leave notification
@@ -60,23 +60,50 @@ LOBBY_PREFIXES: tuple[LobbyPrefix, ...] = (
 class RoomInfo(TypedDict):
     """Information about a game room.
 
-    Format: room_id|name|player_count|game_modes|unknown1|unknown2|image|year
+    Format: room_id|name|field_id|game_modes|default_troop|mode_code|image|year
 
     Attributes:
         room_id: Unique room identifier.
         name: Room display name.
-        player_count: Number of players in the room.
+        field_id: Field/map identifier used to resolve the room image.
         game_modes: Comma-separated game mode flags.
+        default_troop: Default troop/team code sent by the client for room entry.
+        mode_code: One-letter room mode code from the lobby payload.
         image: Background image filename.
         year: Year value (purpose unknown).
     """
 
     room_id: str
     name: str
-    player_count: int
+    field_id: int
     game_modes: str
+    default_troop: int
+    mode_code: str
     image: str
     year: str
+
+
+def is_room_info_text(text: str) -> bool:
+    """Return whether text matches the ROOM_LIST wire format.
+
+    Args:
+        text: Pipe-delimited room info without the leading ``+`` prefix.
+
+    Returns:
+        True when the text has the expected ROOM_LIST field structure.
+    """
+    parts = text.split("|")
+    if len(parts) < 8:
+        return False
+    if not parts[0].isdigit():
+        return False
+    if not parts[2].isdigit():
+        return False
+    if not parts[4].isdigit():
+        return False
+    if not parts[6].endswith(".gif"):
+        return False
+    return parts[7].isdigit()
 
 
 def encode_room_info(room: RoomInfo) -> JSONObject:
@@ -91,8 +118,10 @@ def encode_room_info(room: RoomInfo) -> JSONObject:
     return {
         "room_id": room["room_id"],
         "name": room["name"],
-        "player_count": room["player_count"],
+        "field_id": room["field_id"],
         "game_modes": room["game_modes"],
+        "default_troop": room["default_troop"],
+        "mode_code": room["mode_code"],
         "image": room["image"],
         "year": room["year"],
     }
@@ -113,8 +142,10 @@ def decode_room_info(data: JSONObject) -> RoomInfo:
     return RoomInfo(
         room_id=require_str(data, "room_id"),
         name=require_str(data, "name"),
-        player_count=require_int(data, "player_count"),
+        field_id=require_int(data, "field_id"),
         game_modes=require_str(data, "game_modes"),
+        default_troop=require_int(data, "default_troop"),
+        mode_code=require_str(data, "mode_code"),
         image=require_str(data, "image"),
         year=require_str(data, "year"),
     )
@@ -520,7 +551,7 @@ class ParserError(Exception):
 def parse_room_info(text: str) -> RoomInfo:
     """Parse single room from pipe-delimited text.
 
-    Format: room_id|name|player_count|game_modes|unknown1|unknown2|image|year
+    Format: room_id|name|field_id|game_modes|default_troop|mode_code|image|year
 
     Args:
         text: Pipe-delimited room info.
@@ -531,19 +562,17 @@ def parse_room_info(text: str) -> RoomInfo:
     Raises:
         ParserError: If format is invalid.
     """
+    if not is_room_info_text(text):
+        raise ParserError(f"Invalid room info: {text}")
     parts = text.split("|")
-    if len(parts) < 8:
-        raise ParserError(f"Room info needs 8 fields, got {len(parts)}")
-
-    player_count_str = parts[2]
-    if not player_count_str.isdigit():
-        raise ParserError(f"Invalid player count: {player_count_str}")
 
     return RoomInfo(
         room_id=parts[0],
         name=parts[1],
-        player_count=int(player_count_str),
+        field_id=int(parts[2]),
         game_modes=parts[3],
+        default_troop=int(parts[4]),
+        mode_code=parts[5],
         image=parts[6],
         year=parts[7],
     )
@@ -668,6 +697,7 @@ __all__ = [
     "encode_parsed_status_message",
     "encode_room_info",
     "encode_system_status",
+    "is_room_info_text",
     "parse_game_record",
     "parse_lobby_message",
     "parse_room_info",
