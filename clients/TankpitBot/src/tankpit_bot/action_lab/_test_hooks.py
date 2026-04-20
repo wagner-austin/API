@@ -11,6 +11,9 @@ from typing import Protocol
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.bot.world_sync import drain_messages as _real_drain_buffered_messages
 from tankpit_bot.browser import get_current_time_ms as _real_get_current_time_ms
+from tankpit_bot.sniffer.world_state import (
+    check_and_clear_radar_scan_complete as _real_check_and_clear_radar_scan_complete,
+)
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed as _real_check_and_clear_teleport_landed,
 )
@@ -40,6 +43,19 @@ check_and_clear_teleport_landed: CheckAndClearTeleportLandedProtocol = (
 )
 
 
+class CheckAndClearRadarScanCompleteProtocol(Protocol):
+    """Protocol for draining the radar-scan-complete confirmation flag."""
+
+    def __call__(self) -> bool:
+        """Return True when a radar completion confirmation is pending."""
+        ...
+
+
+check_and_clear_radar_scan_complete: CheckAndClearRadarScanCompleteProtocol = (
+    _real_check_and_clear_radar_scan_complete
+)
+
+
 class DrainBufferedMessagesProtocol(Protocol):
     """Protocol for draining buffered protocol payloads into world state."""
 
@@ -59,9 +75,11 @@ drain_buffered_messages: DrainBufferedMessagesProtocol = _real_drain_buffered_me
 
 
 __all__ = [
+    "CheckAndClearRadarScanCompleteProtocol",
     "CheckAndClearTeleportLandedProtocol",
     "DrainBufferedMessagesProtocol",
     "GetCurrentTimeMsProtocol",
+    "check_and_clear_radar_scan_complete",
     "check_and_clear_teleport_landed",
     "drain_buffered_messages",
     "get_current_time_ms",
