@@ -1,24 +1,25 @@
 {
-  "session_id": "103def18-19ef-4bd2-b256-0029fb806090",
-  "start_timestamp_ms": 1775555922284,
-  "end_timestamp_ms": 1775555945555,
+  "session_id": "2946b19f-25a0-4378-9d61-9d5aa31b5ec6",
+  "start_timestamp_ms": 1776103482441,
+  "end_timestamp_ms": 1776103502353,
   "base_url": "https://tankpit.com/play",
-  "spawn_x": 61,
-  "spawn_y": 78,
+  "spawn_x": 134,
+  "spawn_y": 77,
   "teleport_strategy": "immediate_after_map_open",
   "max_targets": 3,
+  "capture_session_path": "teleport_probe.capture_session.json",
   "initial_sync_timeout_ms": 10000,
   "startup_timing": {
-    "game_ready_timestamp_ms": 1775555934701,
-    "intel_ready_timestamp_ms": 1775555934746,
-    "initial_sync_started_ms": 1775555934746,
-    "initial_world_timestamp_ms": 1775555934841,
-    "command_ready_timestamp_ms": 1775555934852,
-    "first_attempt_started_ms": 1775555934852,
-    "game_ready_to_intel_ready_ms": 45,
-    "intel_ready_to_initial_world_ms": 95,
-    "initial_world_to_command_ready_ms": 11,
-    "command_ready_to_first_attempt_ms": 0
+    "game_ready_timestamp_ms": 1776103489031,
+    "intel_ready_timestamp_ms": 1776103489061,
+    "initial_sync_started_ms": 1776103489061,
+    "initial_world_timestamp_ms": 1776103490707,
+    "command_ready_timestamp_ms": 1776103490714,
+    "first_attempt_started_ms": 1776103490715,
+    "game_ready_to_intel_ready_ms": 30,
+    "intel_ready_to_initial_world_ms": 1646,
+    "initial_world_to_command_ready_ms": 7,
+    "command_ready_to_first_attempt_ms": 1
   },
   "map_sync_timeout_ms": 3000,
   "teleport_timeout_ms": 10000,
@@ -26,83 +27,89 @@
   "targets": [
     {
       "label": "box_r0_c0",
-      "x": 45,
-      "y": 70
+      "x": 118,
+      "y": 69
     },
     {
       "label": "box_r0_c1",
-      "x": 53,
-      "y": 70
+      "x": 126,
+      "y": 69
     },
     {
       "label": "box_r0_c2",
-      "x": 61,
-      "y": 70
+      "x": 134,
+      "y": 69
     }
   ],
   "attempts": [
     {
       "target": {
         "label": "box_r0_c0",
-        "x": 45,
-        "y": 70
+        "x": 118,
+        "y": 69
       },
       "status": "landed_exact",
-      "map_open_started_ms": 1775555934852,
+      "map_open_started_ms": 1776103490715,
       "map_sync_timestamp_ms": null,
-      "teleport_started_ms": 1775555934863,
-      "completion_timestamp_ms": 1775555937063,
+      "teleport_started_ms": 1776103490720,
+      "completion_timestamp_ms": 1776103493799,
       "map_sync_elapsed_ms": null,
-      "teleport_elapsed_ms": 2200,
-      "fuel_before": 908,
-      "fuel_after": 801,
-      "world_timestamp_before": 1775555934841,
-      "world_timestamp_after": 1775555937061,
+      "teleport_elapsed_ms": 3079,
+      "fuel_before": 1100,
+      "fuel_after": 993,
+      "world_timestamp_before": 1776103490707,
+      "world_timestamp_after": 1776103493797,
       "landed_signal_received": true,
-      "landed_x": 45,
-      "landed_y": 70
+      "landed_x": 118,
+      "landed_y": 69,
+      "message_start_index": 55,
+      "message_end_index": 63
     },
     {
       "target": {
         "label": "box_r0_c1",
-        "x": 53,
-        "y": 70
+        "x": 126,
+        "y": 69
       },
-      "status": "landed_exact",
-      "map_open_started_ms": 1775555937577,
+      "status": "landed_offset",
+      "map_open_started_ms": 1776103494308,
       "map_sync_timestamp_ms": null,
-      "teleport_started_ms": 1775555937582,
-      "completion_timestamp_ms": 1775555941111,
+      "teleport_started_ms": 1776103494313,
+      "completion_timestamp_ms": 1776103497820,
       "map_sync_elapsed_ms": null,
-      "teleport_elapsed_ms": 3529,
-      "fuel_before": 801,
-      "fuel_after": 753,
-      "world_timestamp_before": 1775555937061,
-      "world_timestamp_after": 1775555941109,
+      "teleport_elapsed_ms": 3507,
+      "fuel_before": 993,
+      "fuel_after": 939,
+      "world_timestamp_before": 1776103493797,
+      "world_timestamp_after": 1776103497819,
       "landed_signal_received": true,
-      "landed_x": 53,
-      "landed_y": 70
+      "landed_x": 127,
+      "landed_y": 69,
+      "message_start_index": 63,
+      "message_end_index": 71
     },
     {
       "target": {
         "label": "box_r0_c2",
-        "x": 61,
-        "y": 70
+        "x": 134,
+        "y": 69
       },
       "status": "landed_exact",
-      "map_open_started_ms": 1775555941620,
+      "map_open_started_ms": 1776103498328,
       "map_sync_timestamp_ms": null,
-      "teleport_started_ms": 1775555941631,
-      "completion_timestamp_ms": 1775555945031,
+      "teleport_started_ms": 1776103498332,
+      "completion_timestamp_ms": 1776103501846,
       "map_sync_elapsed_ms": null,
-      "teleport_elapsed_ms": 3400,
-      "fuel_before": 753,
-      "fuel_after": 705,
-      "world_timestamp_before": 1775555941109,
-      "world_timestamp_after": 1775555945029,
+      "teleport_elapsed_ms": 3514,
+      "fuel_before": 939,
+      "fuel_after": 897,
+      "world_timestamp_before": 1776103497819,
+      "world_timestamp_after": 1776103501845,
       "landed_signal_received": true,
-      "landed_x": 61,
-      "landed_y": 70
+      "landed_x": 134,
+      "landed_y": 69,
+      "message_start_index": 71,
+      "message_end_index": 79
     }
   ]
 }
