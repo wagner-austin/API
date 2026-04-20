@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import types
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -25,18 +26,26 @@ from tankpit_bot._test_hooks import (
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
     TeleportProbeError,
+    _find_map_data_message_index,
+    _format_attempt_window_entries,
+    _format_page_snapshots,
     _limit_targets,
+    _start_teleport_page_snapshots,
     _wait_for_teleport_outcome,
     build_box_targets,
     format_teleport_probe_summary,
     parse_targets_arg,
     run_teleport_probe,
 )
+from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
+from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
     TeleportTargetDict,
     decode_teleport_probe_session,
@@ -69,6 +78,8 @@ class _SequencedProvider:
         self._worlds = worlds
         self._index = 0
         self._cdp_message_buffer: list[str] = []
+        self._messages: list[CapturedMessage] = []
+        self._magic: str | None = None
 
     def get_world_state(self) -> WorldStateDict:
         return self._worlds[self._index]
@@ -76,6 +87,14 @@ class _SequencedProvider:
     def advance(self) -> None:
         if self._index + 1 < len(self._worlds):
             self._index += 1
+
+    @property
+    def messages(self) -> list[CapturedMessage]:
+        return self._messages
+
+    @property
+    def magic(self) -> str | None:
+        return self._magic
 
 
 class _FakePage:
@@ -174,6 +193,7 @@ def _make_attempt(
 ) -> TeleportAttemptResultDict:
     return TeleportAttemptResultDict(
         target=TeleportTargetDict(label=status, x=150, y=171),
+        teleport_cycle_id=1,
         status=status,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200 if status != "map_sync_timeout" else None,
@@ -190,6 +210,28 @@ def _make_attempt(
         landed_y=171,
         message_start_index=10,
         message_end_index=14,
+        page_snapshots=[],
+    )
+
+
+def _make_page_snapshot(
+    phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+) -> TeleportPageSnapshotDict:
+    """Build a sample teleport page snapshot."""
+    return TeleportPageSnapshotDict(
+        phase=phase,
+        timestamp_ms=1000,
+        client_present=True,
+        map_visible=True,
+        client_state=13,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=12,
+        last_page_client_send_age_ms=250,
+        last_bot_send_age_ms=10,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
     )
 
 
@@ -232,6 +274,215 @@ def test_build_box_targets_rejects_non_positive_steps() -> None:
         build_box_targets(100, 100, 8, 0)
 
 
+def test_format_attempt_window_entries_filters_direction_and_reports_more() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload="$1|0",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1001,
+            direction="sent",
+            payload="%AUTH",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1002,
+            direction="sent",
+            payload="%MOVE",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1003,
+            direction="sent",
+            payload="%RADAR",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+    ]
+
+    summary = _format_attempt_window_entries(
+        provider,
+        message_start_index=0,
+        direction="sent",
+        limit=2,
+    )
+
+    assert "1:" in summary
+    assert "2:" in summary
+    assert "...+1 more" in summary
+
+
+def test_format_attempt_window_entries_returns_exact_window_without_more_suffix() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1001,
+            direction="sent",
+            payload="%AUTH",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1002,
+            direction="sent",
+            payload="%MOVE",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+    ]
+
+    summary = _format_attempt_window_entries(
+        provider,
+        message_start_index=0,
+        direction="sent",
+        limit=2,
+    )
+
+    assert "0:" in summary
+    assert "1:" in summary
+    assert "...+" not in summary
+
+
+def test_format_attempt_window_entries_for_received_messages_omits_sent_metadata() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload="bad",
+            ws_url="wss://tankpit.com/ws/",
+        )
+    ]
+
+    summary = _format_attempt_window_entries(
+        provider,
+        message_start_index=0,
+        direction="received",
+        limit=6,
+    )
+
+    assert "origin=" not in summary
+
+
+def test_format_attempt_window_entries_includes_sent_origin_metadata() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1001,
+            direction="sent",
+            payload="%AUTH",
+            ws_url="wss://tankpit.com/ws/",
+            sent_origin="bot_injected",
+            sent_label="teleport(129,106)",
+        ),
+        CapturedMessage(
+            timestamp_ms=1002,
+            direction="sent",
+            payload="%MOVE",
+            ws_url="wss://tankpit.com/ws/",
+            sent_origin="page_client",
+        ),
+    ]
+
+    summary = _format_attempt_window_entries(
+        provider,
+        message_start_index=0,
+        direction="sent",
+        limit=6,
+    )
+
+    assert "origin=bot_injected label=teleport(129,106)" in summary
+    assert "origin=page_client" in summary
+
+
+def test_format_page_snapshots_returns_none_for_empty_list() -> None:
+    assert _format_page_snapshots([]) == "none"
+
+
+def test_find_map_data_message_index_skips_earlier_and_sent_messages() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    map_data_payload = base64.b64encode(bytes([0, 0, 0x2E]) + bytes(600)).decode("ascii")
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload=map_data_payload,
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1001,
+            direction="sent",
+            payload=map_data_payload,
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1002,
+            direction="received",
+            payload=map_data_payload,
+            ws_url="wss://tankpit.com/ws/",
+        ),
+    ]
+
+    result = _find_map_data_message_index(
+        provider,
+        message_start_index=1,
+        scan_start_index=0,
+    )
+
+    assert result == 2
+
+
+def test_find_map_data_message_index_skips_non_map_data_received_messages() -> None:
+    provider = _SequencedProvider([_make_world(900, 100, 100, 900)])
+    map_data_payload = base64.b64encode(bytes([0, 0, 0x2E]) + bytes(600)).decode("ascii")
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1000,
+            direction="received",
+            payload="bad",
+            ws_url="wss://tankpit.com/ws/",
+        ),
+        CapturedMessage(
+            timestamp_ms=1001,
+            direction="received",
+            payload=map_data_payload,
+            ws_url="wss://tankpit.com/ws/",
+        ),
+    ]
+
+    result = _find_map_data_message_index(
+        provider,
+        message_start_index=0,
+        scan_start_index=0,
+    )
+
+    assert result == 1
+
+
+def test_start_teleport_page_snapshots_rejects_missing_cdp() -> None:
+    with pytest.raises(TeleportProbeError, match="cdp session is unavailable"):
+        _start_teleport_page_snapshots(
+            cdp=None,
+            capture_before_map_open=True,
+            unavailable_error=TeleportProbeError,
+            unavailable_message="cdp session is unavailable",
+        )
+
+
+def test_start_teleport_page_snapshots_can_skip_initial_capture() -> None:
+    snapshots, capture_page_snapshot = _start_teleport_page_snapshots(
+        cdp=_FakeCDPSession(),
+        capture_before_map_open=False,
+        unavailable_error=TeleportProbeError,
+        unavailable_message="cdp session is unavailable",
+    )
+
+    assert snapshots == []
+    snapshot = capture_page_snapshot("timeout")
+    assert snapshot["phase"] == "before_map_open"
+
+
 def test_limit_targets_rejects_non_positive_max_targets() -> None:
     with pytest.raises(ValueError, match="max_targets must be positive"):
         _limit_targets([TeleportTargetDict(label="target_0", x=1, y=2)], 0)
@@ -270,17 +521,68 @@ def test_wait_for_teleport_outcome_records_exact_landing() -> None:
         page,
         provider,
         TeleportTargetDict(label="target_0", x=156, y=170),
+        teleport_cycle_id=1,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
         teleport_started_ms=1300,
         fuel_before=900,
         world_timestamp_before=950,
         timeout_ms=1000,
+        page_snapshots=[],
+        capture_page_snapshot=_make_page_snapshot,
     )
     assert result["status"] == "landed_exact"
     assert result["landed_signal_received"] is True
     assert result["landed_x"] == 156
     assert result["fuel_after"] == 720
+
+
+def test_wait_for_teleport_outcome_captures_after_map_data_snapshot() -> None:
+    clock = _Clock(1200)
+    provider = _SequencedProvider(
+        [
+            _make_world(1200, 100, 100, 900),
+            _make_world(1400, 156, 170, 720),
+        ]
+    )
+    map_data_payload = base64.b64encode(bytes([0, 0, 0x2E]) + bytes(600)).decode("ascii")
+    provider._messages = [
+        CapturedMessage(
+            timestamp_ms=1200,
+            direction="received",
+            payload=map_data_payload,
+            ws_url="wss://tankpit.com/ws/",
+        )
+    ]
+    page = _FakePage(clock, provider)
+    action_hooks.get_current_time_ms = clock
+    action_hooks.check_and_clear_teleport_landed = _AckSequence([False, True])
+    page_snapshots = [_make_page_snapshot("before_map_open")]
+    captured_phases: list[str] = []
+
+    def _capture_page_snapshot(
+        phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
+    ) -> TeleportPageSnapshotDict:
+        captured_phases.append(phase)
+        return _make_page_snapshot(phase)
+
+    result = _wait_for_teleport_outcome(
+        page,
+        provider,
+        TeleportTargetDict(label="target_0", x=156, y=170),
+        teleport_cycle_id=1,
+        map_open_started_ms=1000,
+        map_sync_timestamp_ms=1200,
+        teleport_started_ms=1300,
+        fuel_before=900,
+        world_timestamp_before=950,
+        timeout_ms=1000,
+        page_snapshots=page_snapshots,
+        capture_page_snapshot=_capture_page_snapshot,
+    )
+
+    assert captured_phases == ["after_map_data", "landed"]
+    assert result["status"] == "landed_exact"
 
 
 def test_wait_for_teleport_outcome_records_offset_landing() -> None:
@@ -299,12 +601,15 @@ def test_wait_for_teleport_outcome_records_offset_landing() -> None:
         page,
         provider,
         TeleportTargetDict(label="target_0", x=156, y=170),
+        teleport_cycle_id=1,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
         teleport_started_ms=1300,
         fuel_before=900,
         world_timestamp_before=950,
         timeout_ms=1000,
+        page_snapshots=[],
+        capture_page_snapshot=_make_page_snapshot,
     )
     assert result["status"] == "landed_offset"
     assert result["landed_x"] == 159
@@ -332,12 +637,15 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_after_landing(
             page,
             provider,
             TeleportTargetDict(label="target_0", x=156, y=170),
+            teleport_cycle_id=1,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
             teleport_started_ms=1300,
             fuel_before=900,
             world_timestamp_before=950,
             timeout_ms=1000,
+            page_snapshots=[],
+            capture_page_snapshot=_make_page_snapshot,
         )
 
 
@@ -357,12 +665,15 @@ def test_wait_for_teleport_outcome_times_out() -> None:
         page,
         provider,
         TeleportTargetDict(label="target_0", x=156, y=170),
+        teleport_cycle_id=1,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
         teleport_started_ms=1300,
         fuel_before=900,
         world_timestamp_before=950,
         timeout_ms=250,
+        page_snapshots=[],
+        capture_page_snapshot=_make_page_snapshot,
     )
     assert result["status"] == "teleport_timeout"
     assert result["landed_signal_received"] is False
@@ -393,12 +704,15 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_on_timeout() -
             page,
             provider,
             TeleportTargetDict(label="target_0", x=156, y=170),
+            teleport_cycle_id=1,
             map_open_started_ms=1000,
             map_sync_timestamp_ms=1200,
             teleport_started_ms=1300,
             fuel_before=900,
             world_timestamp_before=950,
             timeout_ms=250,
+            page_snapshots=[],
+            capture_page_snapshot=_make_page_snapshot,
         )
 
 
@@ -458,6 +772,7 @@ class _ProbeMethodHarness(TeleportProbe):
         )
         self._world_state = _make_world(1000, 158, 132, 900)
         self._fake_page = _FakePage(_Clock(1000), _SequencedProvider([self._world_state]))
+        self._cdp = _FakeCDPSession()
         self.map_open_result = True
         self.teleport_result = True
         self.teleport_calls: list[tuple[int, int]] = []
@@ -661,23 +976,34 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
         provider: action_session.WorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page_arg,
             provider,
             target,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             map_sync_timestamp_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         return expected
 
@@ -698,9 +1024,93 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
         setattr(teleport_module, wait_outcome_name, original_wait_outcome)
     assert result == expected
     assert probe.teleport_calls == [(150, 171)]
-    assert result["message_start_index"] == 0
-    assert result["message_end_index"] == 0
+    assert result["message_start_index"] == 10
+    assert result["message_end_index"] == 14
     assert page.waits == []
+
+
+def test_probe_single_target_rejects_missing_teleport_result_after_acquisition() -> None:
+    from tankpit_bot.action_lab import teleport as teleport_module
+
+    probe = _ProbeMethodHarness()
+    original_attempt_runner = teleport_module.run_tracked_teleport_attempt
+
+    def _run_attempt(
+        page_arg: action_session.WaitPageProtocol,
+        probe_arg: TeleportProbe,
+        target_arg: TeleportTargetDict,
+        *,
+        cdp: CDPSessionProtocol | None,
+        attempt_label: str,
+        fuel_before: int,
+        world_timestamp_before: int,
+        send_acquisition_command: Callable[[], bool],
+        acquisition_command_name: str,
+        capture_before_map_open: bool,
+        wait_for_acquisition_sync: bool,
+        acquisition_timeout_ms: int,
+        teleport_timeout_ms: int,
+        wait_for_outcome: TeleportOutcomeWaiterProtocol,
+        dispatch_failure_error: type[Exception],
+        acquisition_dispatch_failure_message: str,
+        teleport_dispatch_failure_message: str,
+        unavailable_error: type[Exception],
+        unavailable_message: str,
+        unexpected_result_error: type[Exception],
+        unexpected_result_message: str,
+        reset_to_idle_before_start: bool = True,
+    ) -> TrackedTeleportAttempt:
+        _ = (
+            page_arg,
+            probe_arg,
+            target_arg,
+            cdp,
+            attempt_label,
+            fuel_before,
+            world_timestamp_before,
+            send_acquisition_command,
+            acquisition_command_name,
+            capture_before_map_open,
+            wait_for_acquisition_sync,
+            acquisition_timeout_ms,
+            teleport_timeout_ms,
+            wait_for_outcome,
+            dispatch_failure_error,
+            acquisition_dispatch_failure_message,
+            teleport_dispatch_failure_message,
+            unavailable_error,
+            unavailable_message,
+            unexpected_result_error,
+            unexpected_result_message,
+            reset_to_idle_before_start,
+        )
+        return TrackedTeleportAttempt(
+            message_start_index=0,
+            teleport_cycle=ActionPhaseCycleDict(phase="teleport", cycle_id=1, started_ms=1000),
+            acquisition_started_ms=1000,
+            acquisition_sync_timestamp_ms=1200,
+            page_snapshots=[],
+            capture_page_snapshot=lambda phase: _make_page_snapshot(phase),
+            teleport_result=None,
+            teleport_started_ms=None,
+        )
+
+    attempt_runner_name = "run_tracked_teleport_attempt"
+    setattr(teleport_module, attempt_runner_name, _run_attempt)
+    try:
+        with pytest.raises(
+            TeleportProbeError,
+            match="teleport attempt ended before teleport dispatch",
+        ):
+            probe._probe_single_target(
+                TeleportTargetDict(label="target_0", x=150, y=171),
+                teleport_strategy="sync_before_teleport",
+                map_sync_timeout_ms=3000,
+                teleport_timeout_ms=10000,
+                settle_delay_ms=0,
+            )
+    finally:
+        setattr(teleport_module, attempt_runner_name, original_attempt_runner)
 
 
 def test_probe_single_target_returns_wait_result_with_settle() -> None:
@@ -726,23 +1136,34 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
         provider: action_session.WorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page_arg,
             provider,
             target,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             map_sync_timestamp_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         return expected
 
@@ -762,8 +1183,8 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
         setattr(action_session, wait_sync_name, original_wait_sync)
         setattr(teleport_module, wait_outcome_name, original_wait_outcome)
     assert result == expected
-    assert result["message_start_index"] == 0
-    assert result["message_end_index"] == 0
+    assert result["message_start_index"] == 10
+    assert result["message_end_index"] == 14
     assert page.waits[-1] == 250.0
 
 
@@ -791,22 +1212,33 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
         provider: action_session.WorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
         map_open_started_ms: int,
         map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
         timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
     ) -> TeleportAttemptResultDict:
         _ = (
             page_arg,
             provider,
             target,
+            teleport_cycle_id,
+            message_start_index,
             map_open_started_ms,
             teleport_started_ms,
             fuel_before,
             world_timestamp_before,
             timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
         )
         assert map_sync_timestamp_ms is None
         return expected
@@ -833,7 +1265,27 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
 
 class _FakeCDPSession:
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = (method, params)
+        _ = params
+        if method == "Runtime.evaluate":
+            return {
+                "result": {
+                    "value": {
+                        "phase": "before_map_open",
+                        "timestamp_ms": 1000,
+                        "client_present": True,
+                        "map_visible": True,
+                        "client_state": 13,
+                        "client_busy": False,
+                        "pending_actions": 0,
+                        "heartbeat_age_ms": 10,
+                        "last_page_client_send_age_ms": 20,
+                        "last_bot_send_age_ms": 5,
+                        "ws_ready_state": 1,
+                        "current_send_label": None,
+                        "sent_frame_meta_queue_length": 0,
+                    }
+                }
+            }
         return {}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
