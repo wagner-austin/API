@@ -45,8 +45,14 @@ class TestWorldStateCore:
 
     def test_load_terrain_map_returns_none_if_no_file(self) -> None:
         """Test returns None when no terrain file exists."""
-        from tankpit_bot.sniffer.world_state import _load_terrain_map_if_needed
+        from tankpit_bot.sniffer.world_state import (
+            _load_terrain_map_if_needed,
+            register_room_image,
+            set_selected_room,
+        )
 
+        register_room_image("1", "field01.gif")
+        set_selected_room("1")
         _test_hooks.path_exists = lambda path: False
 
         result = _load_terrain_map_if_needed()
@@ -54,10 +60,16 @@ class TestWorldStateCore:
 
     def test_load_terrain_map_caches_result(self) -> None:
         """Test terrain map is cached after first load."""
-        from tankpit_bot.sniffer.world_state import _load_terrain_map_if_needed
+        from tankpit_bot.sniffer.world_state import (
+            _load_terrain_map_if_needed,
+            register_room_image,
+            set_selected_room,
+        )
 
         fake_terrain = FakeTerrainMap()
 
+        register_room_image("1", "field01.gif")
+        set_selected_room("1")
         _test_hooks.path_exists = lambda path: True
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
@@ -141,7 +153,10 @@ class TestWorldStateRendering:
     def test_render_world_state_ascii_returns_none_without_terrain(self) -> None:
         """Test returns None when no terrain file exists."""
         from tankpit_bot.sniffer import render_world_state_ascii
+        from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
 
+        register_room_image("1", "field01.gif")
+        set_selected_room("1")
         _test_hooks.path_exists = lambda path: False
 
         result = render_world_state_ascii()
@@ -150,8 +165,11 @@ class TestWorldStateRendering:
     def test_render_world_state_ascii_with_terrain(self) -> None:
         """Test renders ASCII with terrain map."""
         from tankpit_bot.sniffer import render_world_state_ascii
+        from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
 
         fake_terrain = FakeTerrainMap()
+        register_room_image("1", "field01.gif")
+        set_selected_room("1")
         _test_hooks.path_exists = lambda path: True
         _test_hooks.load_terrain_map = lambda path: fake_terrain
 
@@ -248,54 +266,41 @@ class TestRoomTracking:
         result = _find_field_gif("field99.gif")
         assert result is None
 
-    def test_load_terrain_falls_back_without_room(self) -> None:
-        """Test terrain loader falls back when no room selected."""
+    def test_load_terrain_returns_none_without_selected_room(self) -> None:
+        """Test terrain loader requires an explicit selected room."""
         from tankpit_bot.sniffer.world_state import _load_terrain_map_if_needed
 
-        fake_terrain = FakeTerrainMap()
-
-        _test_hooks.path_exists = lambda path: True
-        _test_hooks.load_terrain_map = lambda path: fake_terrain
-
         result = _load_terrain_map_if_needed()
-        assert result is fake_terrain
+        assert result is None
 
     def test_load_terrain_warns_when_gif_missing_for_room(self) -> None:
-        """Test terrain loader warns and falls back when selected room GIF missing."""
+        """Test terrain loader returns none when selected room GIF is missing."""
         from tankpit_bot.sniffer.world_state import (
             _load_terrain_map_if_needed,
             register_room_image,
             set_selected_room,
         )
 
-        fake_terrain = FakeTerrainMap()
         register_room_image("5", "field99.gif")
         set_selected_room("5")
 
-        # field99 doesn't exist, but fallback field42-r.gif does
-        _test_hooks.path_exists = lambda path: "field42" in str(path)
-        _test_hooks.load_terrain_map = lambda path: fake_terrain
+        _test_hooks.path_exists = lambda path: False
 
         result = _load_terrain_map_if_needed()
-        assert result is fake_terrain
+        assert result is None
 
-    def test_load_terrain_falls_back_when_room_has_no_image(self) -> None:
-        """Test terrain loader falls back when selected room has no registered image."""
+    def test_load_terrain_returns_none_when_room_has_no_image(self) -> None:
+        """Test terrain loader requires a registered image for the selected room."""
         from tankpit_bot.sniffer.world_state import (
             _load_terrain_map_if_needed,
             set_selected_room,
         )
 
-        fake_terrain = FakeTerrainMap()
-
         # Select room "9" but never register an image for it
         set_selected_room("9")
 
-        _test_hooks.path_exists = lambda path: True
-        _test_hooks.load_terrain_map = lambda path: fake_terrain
-
         result = _load_terrain_map_if_needed()
-        assert result is fake_terrain
+        assert result is None
 
     def test_reset_clears_room_tracking(self) -> None:
         """Test reset_world_state clears room tracking state."""
