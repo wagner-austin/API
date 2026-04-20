@@ -55,6 +55,7 @@ def update_world_state_from_radar(
             c["y"],
             c["volume"],
             ts,
+            refresh_kind="radar_response",
         )
     for m in mines:
         _ws._world_state = add_mine_from_radar(
@@ -115,6 +116,7 @@ def update_world_state_from_radar_cache() -> None:
             container["y"],
             container["volume"],
             ts,
+            refresh_kind="radar_cache_refresh",
         )
     emit_world(
         "Radar cache refresh: promoted %d containers from combined tile update",
@@ -160,6 +162,7 @@ def update_world_state_from_radar_known_resources() -> None:
             rc["y"],
             rc["volume"],
             ts,
+            refresh_kind="radar_known_resources",
         )
     emit_world(
         "Radar differential refresh: preserved %d known containers in viewport",
