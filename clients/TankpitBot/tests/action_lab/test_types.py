@@ -9,14 +9,17 @@ from platform_core.json_utils import JSONTypeError
 
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
+    TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
     TeleportStartupTimingDict,
     TeleportTargetDict,
     decode_teleport_attempt_result,
+    decode_teleport_page_snapshot,
     decode_teleport_probe_session,
     decode_teleport_startup_timing,
     decode_teleport_target,
     encode_teleport_attempt_result,
+    encode_teleport_page_snapshot,
     encode_teleport_probe_session,
     encode_teleport_startup_timing,
     encode_teleport_target,
@@ -36,6 +39,7 @@ def _sample_attempt(
     """Build a sample teleport attempt result."""
     return TeleportAttemptResultDict(
         target=_sample_target(),
+        teleport_cycle_id=1,
         status=status,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
@@ -52,6 +56,26 @@ def _sample_attempt(
         landed_y=171,
         message_start_index=10,
         message_end_index=14,
+        page_snapshots=[_sample_page_snapshot()],
+    )
+
+
+def _sample_page_snapshot() -> TeleportPageSnapshotDict:
+    """Build a sample teleport page snapshot."""
+    return TeleportPageSnapshotDict(
+        phase="after_map_data",
+        timestamp_ms=1350,
+        client_present=True,
+        map_visible=True,
+        client_state=13,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=101,
+        last_page_client_send_age_ms=250,
+        last_bot_send_age_ms=5,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
     )
 
 
@@ -111,6 +135,7 @@ def test_attempt_round_trip_with_null_fields() -> None:
     """Optional attempt fields preserve null values through codecs."""
     attempt = TeleportAttemptResultDict(
         target=_sample_target(),
+        teleport_cycle_id=2,
         status="map_sync_timeout",
         map_open_started_ms=1000,
         map_sync_timestamp_ms=None,
@@ -127,9 +152,17 @@ def test_attempt_round_trip_with_null_fields() -> None:
         landed_y=132,
         message_start_index=10,
         message_end_index=11,
+        page_snapshots=[_sample_page_snapshot()],
     )
     decoded = decode_teleport_attempt_result(encode_teleport_attempt_result(attempt))
     assert decoded == attempt
+
+
+def test_page_snapshot_round_trip() -> None:
+    """Teleport page snapshots encode and decode cleanly."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded == _sample_page_snapshot()
 
 
 def test_decode_attempt_rejects_invalid_status() -> None:
@@ -138,6 +171,46 @@ def test_decode_attempt_rejects_invalid_status() -> None:
     encoded["status"] = "bad"
     with pytest.raises(JSONTypeError, match="invalid teleport attempt status"):
         decode_teleport_attempt_result(encoded)
+
+
+def test_decode_page_snapshot_rejects_invalid_phase() -> None:
+    """Page snapshot decode rejects unsupported phases."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["phase"] = "bad"
+    with pytest.raises(JSONTypeError, match="invalid teleport page snapshot phase"):
+        decode_teleport_page_snapshot(encoded)
+
+
+def test_decode_page_snapshot_accepts_landed_phase() -> None:
+    """Page snapshot decode accepts landed phase values."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["phase"] = "landed"
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["phase"] == "landed"
+
+
+def test_decode_page_snapshot_accepts_timeout_phase() -> None:
+    """Page snapshot decode accepts timeout phase values."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["phase"] = "timeout"
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["phase"] == "timeout"
+
+
+def test_decode_page_snapshot_accepts_null_optional_bool() -> None:
+    """Page snapshot decode preserves null optional booleans."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["map_visible"] = None
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["map_visible"] is None
+
+
+def test_decode_page_snapshot_accepts_non_null_optional_str() -> None:
+    """Page snapshot decode preserves non-null optional strings."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["current_send_label"] = "teleport(129,106)"
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["current_send_label"] == "teleport(129,106)"
 
 
 def test_decode_attempt_accepts_landed_offset_status() -> None:
@@ -175,6 +248,38 @@ def test_decode_attempt_rejects_non_boolean_landed_signal() -> None:
     encoded = encode_teleport_attempt_result(_sample_attempt())
     encoded["landed_signal_received"] = "bad"
     with pytest.raises(JSONTypeError, match="landed_signal_received"):
+        decode_teleport_attempt_result(encoded)
+
+
+def test_decode_page_snapshot_rejects_invalid_optional_bool() -> None:
+    """Page snapshot decode rejects malformed optional booleans."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["map_visible"] = "bad"
+    with pytest.raises(JSONTypeError, match="map_visible"):
+        decode_teleport_page_snapshot(encoded)
+
+
+def test_decode_page_snapshot_rejects_invalid_optional_str() -> None:
+    """Page snapshot decode rejects malformed optional strings."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["current_send_label"] = 5
+    with pytest.raises(JSONTypeError, match="current_send_label"):
+        decode_teleport_page_snapshot(encoded)
+
+
+def test_decode_page_snapshot_rejects_non_boolean_client_present() -> None:
+    """Page snapshot decode rejects malformed required booleans."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["client_present"] = "bad"
+    with pytest.raises(JSONTypeError, match="client_present"):
+        decode_teleport_page_snapshot(encoded)
+
+
+def test_decode_attempt_rejects_non_object_page_snapshot_entry() -> None:
+    """Attempt decode rejects non-object page snapshot entries."""
+    encoded = encode_teleport_attempt_result(_sample_attempt())
+    encoded["page_snapshots"] = ["bad"]
+    with pytest.raises(JSONTypeError, match="page_snapshots"):
         decode_teleport_attempt_result(encoded)
 
 
