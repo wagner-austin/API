@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from platform_core.json_utils import JSONObject
 
@@ -11,6 +13,11 @@ from tankpit_bot.browser import (
     GameNotJoinedError,
     PlaywrightNotInstalledError,
 )
+from tankpit_bot.browser.session import (
+    _BROWSER_HOOK_SOURCE,
+    _pop_sent_frame_metadata,
+    get_captured_raw_messages,
+)
 from tankpit_bot.types import CapturedMessage
 from tests.fakes import (
     FakeBrowser,
@@ -19,6 +26,28 @@ from tests.fakes import (
     FakePage,
     FakePageGrowingMessages,
 )
+
+
+class _MetadataCDP:
+    """Minimal CDP fake for outbound metadata pop tests."""
+
+    def __init__(self, value: JSONObject | None) -> None:
+        """Store one runtime-evaluate result value."""
+        self._value = value
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Return the configured runtime-evaluate value."""
+        _ = params
+        if method != "Runtime.evaluate":
+            return {"result": {"value": ""}}
+        return {"result": {"value": self._value}}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Ignore event registration for this minimal fake."""
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """Ignore detach for this minimal fake."""
 
 
 def test_browser_session_init() -> None:
@@ -71,6 +100,13 @@ def test_browser_session_on_websocket_frame_received() -> None:
 def test_browser_session_on_websocket_frame_sent() -> None:
     """Test _on_websocket_frame_sent records message."""
     session = BrowserSession("https://example.com")
+    session._cdp = _MetadataCDP(
+        {
+            "origin": "bot_injected",
+            "label": "teleport(129,106)",
+            "stack": "Error\\n at send",
+        }
+    )
     session._ws_urls["req1"] = "wss://example.com/ws"
     params: JSONObject = {
         "requestId": "req1",
@@ -82,6 +118,62 @@ def test_browser_session_on_websocket_frame_sent() -> None:
     msg = session.messages[0]
     assert msg["direction"] == "sent"
     assert msg["payload"] == "sent_payload"
+    assert msg["sent_origin"] == "bot_injected"
+    assert msg["sent_label"] == "teleport(129,106)"
+    assert msg["sent_stack"] == "Error\\n at send"
+
+
+def test_browser_session_on_websocket_frame_sent_without_optional_metadata() -> None:
+    """Test sent frame metadata omits empty label and stack values."""
+    session = BrowserSession("https://example.com")
+    session._cdp = _MetadataCDP(
+        {
+            "origin": "page_client",
+            "label": "",
+            "stack": "",
+        }
+    )
+    session._ws_urls["req1"] = "wss://example.com/ws"
+    params: JSONObject = {
+        "requestId": "req1",
+        "timestamp": 12345.678,
+        "response": {"opcode": 1, "mask": True, "payloadData": "sent_payload"},
+    }
+
+    session._on_websocket_frame_sent(params)
+
+    msg = session.messages[0]
+    assert msg["sent_origin"] == "page_client"
+    assert "sent_label" not in msg
+    assert "sent_stack" not in msg
+
+
+def test_pop_sent_frame_metadata_returns_none_when_queue_empty() -> None:
+    """Test empty send metadata queue returns None."""
+    cdp = _MetadataCDP(None)
+
+    result = _pop_sent_frame_metadata(cdp)
+
+    assert result is None
+
+
+def test_pop_sent_frame_metadata_decodes_record() -> None:
+    """Test send metadata is decoded with strict validation."""
+    cdp = _MetadataCDP(
+        {
+            "origin": "bot_injected",
+            "label": "teleport(129,106)",
+            "stack": "Error\\n at send",
+        }
+    )
+
+    result = _pop_sent_frame_metadata(cdp)
+
+    assert result == {
+        "origin": "bot_injected",
+        "label": "teleport(129,106)",
+        "stack": "Error\\n at send",
+    }
 
 
 def test_browser_session_on_message_captured_non_auth_sent() -> None:
@@ -237,6 +329,15 @@ def test_browser_session_setup_cdp_handlers() -> None:
     assert "Network.webSocketFrameSent" in cdp._handlers
 
 
+def test_browser_hook_source_captures_closure_scoped_game_client() -> None:
+    """Injected browser hook stores the active game client outside tpclient closure scope."""
+    assert "window.__tankpitActiveGame = null;" in _BROWSER_HOOK_SOURCE
+    assert "function maybeCaptureGameClient(candidate)" in _BROWSER_HOOK_SOURCE
+    assert "installClientProbe('map');" in _BROWSER_HOOK_SOURCE
+    assert "installClientProbe('Ha');" in _BROWSER_HOOK_SOURCE
+    assert "window.__tankpitActiveGame = candidate;" in _BROWSER_HOOK_SOURCE
+
+
 def test_browser_session_wait_for_game_ready_success() -> None:
     """Test _wait_for_game_ready succeeds when messages captured."""
     session = BrowserSession("https://example.com")
@@ -258,6 +359,24 @@ def test_browser_session_wait_for_game_ready_no_messages() -> None:
     page = FakePage(cdp)
     with pytest.raises(GameNotJoinedError):
         session._wait_for_game_ready(page)
+
+
+def test_get_captured_raw_messages_requires_value_field() -> None:
+    """Captured raw-message helper rejects CDP results without a value field."""
+
+    class _FakeCDPMissingValue:
+        def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+            _ = (method, params)
+            return {"result": {}}
+
+        def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+            _ = (event, handler)
+
+        def detach(self) -> None:
+            return None
+
+    with pytest.raises(ValueError, match="missing value"):
+        get_captured_raw_messages(_FakeCDPMissingValue())
 
 
 def test_browser_session_wait_for_game_ready_stabilization_reset() -> None:
@@ -315,6 +434,18 @@ def test_browser_session_launch_browser_success() -> None:
         session._cleanup(cdp, page, context, browser)
     finally:
         _test_hooks.sync_playwright = original
+
+
+def test_browser_session_navigate_and_login_raises_when_login_flow_fails() -> None:
+    """Navigate/login raises when the login flow reports failure."""
+    from tests.login.conftest import FakeCDPLogin, FakePageLogin
+
+    session = BrowserSession("https://example.com")
+    page = FakePageLogin(start_url="https://tankpit.com/play")
+    cdp = FakeCDPLogin(include_practice_room=False)
+
+    with pytest.raises(GameNotJoinedError, match="did not complete successfully"):
+        session._navigate_and_login(page, cdp, auto_join_room=True)
 
 
 def test_browser_session_cleanup() -> None:
