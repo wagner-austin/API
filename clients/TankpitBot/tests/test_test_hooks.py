@@ -51,6 +51,27 @@ def test_real_read_text_raises_for_missing(tmp_path: Path) -> None:
         _test_hooks._real_read_text(test_file)
 
 
+def test_real_append_text_appends_to_existing_file(tmp_path: Path) -> None:
+    """Test _real_append_text appends content to an existing file."""
+    test_file = tmp_path / "append.txt"
+    test_file.write_text("first", encoding="utf-8")
+
+    _test_hooks._real_append_text(test_file, " second")
+
+    assert test_file.exists()
+    assert test_file.read_text(encoding="utf-8") == "first second"
+
+
+def test_real_append_text_creates_directories_for_new_file(tmp_path: Path) -> None:
+    """Test _real_append_text creates parent directories for a new file."""
+    test_file = tmp_path / "subdir" / "nested" / "append.txt"
+
+    _test_hooks._real_append_text(test_file, "created")
+
+    assert test_file.exists()
+    assert test_file.read_text(encoding="utf-8") == "created"
+
+
 def test_real_path_exists_true(tmp_path: Path) -> None:
     """Test _real_path_exists returns True for existing path."""
     test_file = tmp_path / "exists.txt"
