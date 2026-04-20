@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.probe import (
     _log_discovered_commands,
@@ -70,7 +70,7 @@ def test_log_discovered_commands_mouse_with_messages(
 def test_send_websocket_bytes_returns_false_on_non_dict_result(
     fake_fs: FakeFileSystem,
 ) -> None:
-    """Test _send_websocket_bytes returns False when result is not a dict."""
+    """Test _send_websocket_bytes raises on malformed CDP result objects."""
     from tankpit_bot.browser import BrowserSession
 
     class FakeCDPNonDictResult:
@@ -94,11 +94,8 @@ def test_send_websocket_bytes_returns_false_on_non_dict_result(
     session = BrowserSession("https://tankpit.com/play", headless=True)
     cdp = FakeCDPNonDictResult()
 
-    # Call _send_websocket_bytes with the fake CDP
-    result = session._send_websocket_bytes(cdp, b"test_data")
-
-    # Should return "?" since result["result"] is not a dict
-    assert result == "?"
+    with pytest.raises(JSONTypeError, match="Field 'result' must be an object"):
+        session._send_websocket_bytes(cdp, b"test_data")
 
 
 def test_protocol_probe_toggle_key_close(
