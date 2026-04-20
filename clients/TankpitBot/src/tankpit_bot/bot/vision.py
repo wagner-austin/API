@@ -591,6 +591,7 @@ def get_merged_fuel_containers(vision_state: VisionStateDict) -> list[ContainerS
                 is_fuel=is_fuel,
                 volume=entry["volume"],
                 source="world_state",
+                refresh_kind="world_state",
                 timestamp_ms=0,
                 failed_pickups=0,
             )
