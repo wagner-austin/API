@@ -54,6 +54,20 @@ def test_decode_message_select() -> None:
     assert result == "[SENT] SELECT: room=4"
 
 
+def test_decode_message_select_does_not_mutate_selected_room() -> None:
+    """Sent SELECT packets do not mark the room as joined."""
+    from tankpit_bot.sniffer import world_state
+    from tankpit_bot.sniffer.world_state import reset_world_state
+
+    reset_world_state()
+
+    payload = make_payload(b"*4")
+    result = decode_message(payload, "sent")
+
+    assert result == "[SENT] SELECT: room=4"
+    assert world_state._selected_room is None
+
+
 def test_decode_message_response() -> None:
     """Test decode_message decodes RESPONSE messages."""
     payload = make_payload(b"$4|0")
@@ -169,21 +183,36 @@ def test_process_received_message_respects_protocol_frame_logging(
 
 def test_decode_plus_message_room_list() -> None:
     """Test decode_plus_message decodes ROOM_LIST messages."""
-    result = decode_plus_message("+4|World (Meltdown)|42|flags", "RECV")
+    result = decode_plus_message(
+        "+4|World (Meltdown)|42|1,1,1,0,1,0,0|3|n|field42.gif|2026",
+        "RECV",
+    )
     assert result == "[RECV] ROOM_LIST: room=4 name=World (Meltdown)"
 
 
 def test_decode_plus_message_action() -> None:
     """Test decode_plus_message decodes ACTION messages (non-room-list format)."""
-    # Room list format has name as 2nd field, action has numeric 2nd field
-    result = decode_plus_message("+x|2|116|79|extra", "SENT")
-    assert result == "[SENT] ACTION: room=x coords=116,79"
+    result = decode_plus_message("+1|2|116|79|extra", "SENT")
+    assert result == "[SENT] ACTION: room=1 coords=116,79"
 
 
 def test_decode_plus_message_action_short() -> None:
     """Test decode_plus_message handles short ACTION messages."""
     result = decode_plus_message("+4|2", "SENT")
     assert result == "[SENT] ACTION: room=4 coords=?"
+
+
+def test_decode_plus_message_action_does_not_register_room_image() -> None:
+    """ACTION messages do not mutate room-image registration."""
+    from tankpit_bot.sniffer import world_state
+    from tankpit_bot.sniffer.world_state import reset_world_state
+
+    reset_world_state()
+
+    result = decode_plus_message("+1|2|118|101|manual-click", "SENT")
+
+    assert result == "[SENT] ACTION: room=1 coords=118,101"
+    assert "1" not in world_state._room_images
 
 
 # =============================================================================
@@ -201,6 +230,19 @@ def test_decode_join_confirm_short() -> None:
     """Test decode_join_confirm handles short messages."""
     result = decode_join_confirm("=4|date", "RECV")
     assert result == "[RECV] JOIN_CONFIRM: room=4 tank=? rank-1"
+
+
+def test_decode_join_confirm_empty_room_id_does_not_select_room() -> None:
+    """Empty room IDs do not mutate selected-room state."""
+    from tankpit_bot.sniffer import world_state
+    from tankpit_bot.sniffer.world_state import reset_world_state
+
+    reset_world_state()
+
+    result = decode_join_confirm("=|date", "RECV")
+
+    assert result == "[RECV] JOIN_CONFIRM: room= tank=? rank-1"
+    assert world_state._selected_room is None
 
 
 # =============================================================================
