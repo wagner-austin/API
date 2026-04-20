@@ -62,9 +62,6 @@ class EnvRule:
         return []
 
     def _scan_node(self, path: Path, node: ast.AST) -> list[Violation]:
-        if self._is_allowed(path):
-            return []
-
         if isinstance(node, ast.Attribute):
             return self._attr_violations(path, node)
         if isinstance(node, ast.ImportFrom):
@@ -78,6 +75,8 @@ class EnvRule:
     def run(self, files: list[Path]) -> list[Violation]:
         out: list[Violation] = []
         for path in files:
+            if self._is_allowed(path):
+                continue
             lines = path.read_text(encoding="utf-8", errors="strict").splitlines()
             tree = ast.parse("\n".join(lines), filename=str(path))
             for node in ast.walk(tree):
