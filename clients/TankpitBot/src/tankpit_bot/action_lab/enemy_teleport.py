@@ -2,36 +2,41 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Literal
 
-from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.capture import save_capture_session
 from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
     encode_enemy_teleport_probe_session,
 )
+from tankpit_bot.action_lab.probe_entrypoint import (
+    run_and_save_standard_probe_session,
+)
+from tankpit_bot.action_lab.probe_runtime import (
+    ProbeCommandReadyContextDict,
+    execute_live_probe_bootstrap,
+)
+from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
     TeleportProbeError,
     _wait_for_teleport_outcome,
 )
-from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
+from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
+from tankpit_bot.action_lab.teleport_phase import (
+    run_tracked_teleport_command,
+)
+from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
     has_cardinal_enemy_adjacency,
 )
 from tankpit_bot.bot.ai.threats import analyze_threats, find_closest_threat
 from tankpit_bot.bot.ai.types import EnemyThreatDict
-from tankpit_bot.browser import PlaywrightNotInstalledError, reset_cdp_time_offset
-from tankpit_bot.sniffer import reset_all_trackers, reset_world_state
-from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)
@@ -232,14 +237,24 @@ class EnemyTeleportProbe(TeleportProbe):
 
         self._reset_probe_state_to_idle()
         message_start_index = len(self.messages)
-        acquisition_started_ms = action_hooks.get_current_time_ms()
-        if not self._send_enemy_acquisition(acquisition_strategy):
-            raise TeleportProbeError("enemy acquisition command dispatch failed")
-        acquisition_sync_timestamp_ms = action_session.wait_for_world_sync(
+        (
+            acquisition_started_ms,
+            acquisition_sync_timestamp_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        ) = run_tracked_acquisition_phase(
             page,
             self,
-            acquisition_started_ms,
-            acquisition_timeout_ms,
+            cdp=self._cdp,
+            send_command=lambda: self._send_enemy_acquisition(acquisition_strategy),
+            command_name="enemy_acquisition",
+            capture_before_map_open=acquisition_strategy == "map_open",
+            wait_for_sync=True,
+            sync_timeout_ms=acquisition_timeout_ms,
+            dispatch_failure_error=TeleportProbeError,
+            dispatch_failure_message="enemy acquisition command dispatch failed",
+            unavailable_error=TeleportProbeError,
+            unavailable_message="cdp session is unavailable",
         )
         if acquisition_sync_timestamp_ms is None:
             return self._finish_non_teleport_attempt(
@@ -298,19 +313,25 @@ class EnemyTeleportProbe(TeleportProbe):
             x=landing_x,
             y=landing_y,
         )
-        teleport_started_ms = action_hooks.get_current_time_ms()
-        if not self.teleport_to(landing_x, landing_y):
-            raise TeleportProbeError("teleport command dispatch failed")
-        teleport_result = _wait_for_teleport_outcome(
+        teleport_cycle = self._start_action_phase(
+            "teleport",
+            attempt_label=landing_target["label"],
+        )
+        teleport_result, teleport_started_ms = run_tracked_teleport_command(
             page,
             self,
             landing_target,
+            teleport_cycle=teleport_cycle,
+            message_start_index=message_start_index,
             map_open_started_ms=acquisition_started_ms,
             map_sync_timestamp_ms=acquisition_sync_timestamp_ms,
-            teleport_started_ms=teleport_started_ms,
             fuel_before=fuel_before,
             world_timestamp_before=world_timestamp_before,
             timeout_ms=teleport_timeout_ms,
+            page_snapshots=page_snapshots,
+            capture_page_snapshot=capture_page_snapshot,
+            wait_for_outcome=_wait_for_teleport_outcome,
+            dispatch_failure_error=TeleportProbeError,
         )
         current_enemy = _enemy_by_id(self, enemy["tank_id"])
         self_state_after = self._require_self_state()
@@ -378,105 +399,53 @@ class EnemyTeleportProbe(TeleportProbe):
         """Run the live enemy-directed teleport probe session."""
         if max_attempts <= 0:
             raise ValueError("max_attempts must be positive")
-        if _test_hooks.sync_playwright is None:
-            raise PlaywrightNotInstalledError("Playwright is not installed.")
 
-        self._start_timestamp_ms = action_hooks.get_current_time_ms()
-        self._messages = []
-        self._ws_urls = {}
-        self._magic = None
-        self._cdp_message_buffer = []
-
-        with _test_hooks.sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=self._headless)
-            context = browser.new_context()
-            page = context.new_page()
-            cdp = context.new_cdp_session(page)
-
-            self._cdp = cdp
-            self._page = page
-
-            reset_world_state()
-            reset_all_trackers()
-            reset_cdp_time_offset()
-            reset_viewport_tracking()
-
-            self._setup_console_listener(cdp)
-            self._setup_cdp_handlers(cdp)
-            self._navigate_and_login(page, cdp, tank_name_prefix="TP", auto_join_room=True)
-            self._wait_for_game_ready(page)
-            game_ready_timestamp_ms = action_hooks.get_current_time_ms()
-            self._gather_intel(page, cdp)
-            intel_ready_timestamp_ms = action_hooks.get_current_time_ms()
-
-            try:
-                initial_sync_started_ms = action_hooks.get_current_time_ms()
-                initial_world_timestamp_ms, spawn = action_session.wait_for_initial_self_state(
-                    page,
-                    self,
-                    initial_sync_started_ms,
-                    initial_sync_timeout_ms,
-                )
-                action_session.advance_startup_state(self)
-                command_ready_timestamp_ms = action_hooks.get_current_time_ms()
-                attempts: list[EnemyTeleportAttemptResultDict] = []
-                targeted_enemy_ids: set[int] = set()
-                for _ in range(max_attempts):
-                    attempt = self._probe_single_enemy_attempt(
-                        acquisition_strategy=acquisition_strategy,
-                        acquisition_timeout_ms=acquisition_timeout_ms,
-                        teleport_timeout_ms=teleport_timeout_ms,
-                        settle_delay_ms=settle_delay_ms,
-                        excluded_tank_ids=frozenset(targeted_enemy_ids),
-                    )
-                    attempts.append(attempt)
-                    enemy = attempt["enemy"]
-                    if enemy is not None:
-                        targeted_enemy_ids.add(enemy["tank_id"])
-                first_attempt_started_ms = (
-                    attempts[0]["acquisition_started_ms"] if attempts else None
-                )
-                startup_timing = TeleportStartupTimingDict(
-                    game_ready_timestamp_ms=game_ready_timestamp_ms,
-                    intel_ready_timestamp_ms=intel_ready_timestamp_ms,
-                    initial_sync_started_ms=initial_sync_started_ms,
-                    initial_world_timestamp_ms=initial_world_timestamp_ms,
-                    command_ready_timestamp_ms=command_ready_timestamp_ms,
-                    first_attempt_started_ms=first_attempt_started_ms,
-                    game_ready_to_intel_ready_ms=intel_ready_timestamp_ms - game_ready_timestamp_ms,
-                    intel_ready_to_initial_world_ms=(
-                        initial_world_timestamp_ms - intel_ready_timestamp_ms
-                    ),
-                    initial_world_to_command_ready_ms=(
-                        command_ready_timestamp_ms - initial_world_timestamp_ms
-                    ),
-                    command_ready_to_first_attempt_ms=(
-                        None
-                        if first_attempt_started_ms is None
-                        else first_attempt_started_ms - command_ready_timestamp_ms
-                    ),
-                )
-                return EnemyTeleportProbeSessionDict(
-                    session_id=self.session_id,
-                    start_timestamp_ms=self._start_timestamp_ms,
-                    end_timestamp_ms=action_hooks.get_current_time_ms(),
-                    base_url=self._target_url,
-                    spawn_x=spawn["x"],
-                    spawn_y=spawn["y"],
+        def _run_ready_session(
+            context: ProbeCommandReadyContextDict,
+        ) -> EnemyTeleportProbeSessionDict:
+            attempts: list[EnemyTeleportAttemptResultDict] = []
+            targeted_enemy_ids: set[int] = set()
+            for _ in range(max_attempts):
+                attempt = self._probe_single_enemy_attempt(
                     acquisition_strategy=acquisition_strategy,
-                    max_attempts=max_attempts,
-                    capture_session_path="",
-                    initial_sync_timeout_ms=initial_sync_timeout_ms,
-                    startup_timing=startup_timing,
                     acquisition_timeout_ms=acquisition_timeout_ms,
                     teleport_timeout_ms=teleport_timeout_ms,
                     settle_delay_ms=settle_delay_ms,
-                    attempts=attempts,
+                    excluded_tank_ids=frozenset(targeted_enemy_ids),
                 )
-            finally:
-                self._cdp = None
-                self._page = None
-                self._cleanup(cdp, page, context, browser)
+                attempts.append(attempt)
+                enemy = attempt["enemy"]
+                if enemy is not None:
+                    targeted_enemy_ids.add(enemy["tank_id"])
+            first_attempt_started_ms = attempts[0]["acquisition_started_ms"] if attempts else None
+            session_envelope = build_probe_session_envelope(
+                self,
+                context=context,
+                first_attempt_started_ms=first_attempt_started_ms,
+            )
+            return EnemyTeleportProbeSessionDict(
+                session_id=session_envelope.session_id,
+                start_timestamp_ms=session_envelope.start_timestamp_ms,
+                end_timestamp_ms=session_envelope.end_timestamp_ms,
+                base_url=session_envelope.base_url,
+                spawn_x=session_envelope.spawn_x,
+                spawn_y=session_envelope.spawn_y,
+                acquisition_strategy=acquisition_strategy,
+                max_attempts=max_attempts,
+                capture_session_path="",
+                initial_sync_timeout_ms=initial_sync_timeout_ms,
+                startup_timing=session_envelope.startup_timing,
+                acquisition_timeout_ms=acquisition_timeout_ms,
+                teleport_timeout_ms=teleport_timeout_ms,
+                settle_delay_ms=settle_delay_ms,
+                attempts=attempts,
+            )
+
+        return execute_live_probe_bootstrap(
+            self,
+            initial_sync_timeout_ms=initial_sync_timeout_ms,
+            run_ready_session=_run_ready_session,
+        )
 
 
 def run_enemy_teleport_probe(
@@ -493,34 +462,27 @@ def run_enemy_teleport_probe(
     settle_delay_ms: int = 500,
 ) -> EnemyTeleportProbeSessionDict:
     """Run a live enemy teleport probe and save the session JSON."""
-    probe = EnemyTeleportProbe(
-        target_url,
+
+    def _run_session(probe: EnemyTeleportProbe) -> EnemyTeleportProbeSessionDict:
+        return probe.execute_probe(
+            acquisition_strategy=acquisition_strategy,
+            max_attempts=max_attempts,
+            initial_sync_timeout_ms=initial_sync_timeout_ms,
+            acquisition_timeout_ms=acquisition_timeout_ms,
+            teleport_timeout_ms=teleport_timeout_ms,
+            settle_delay_ms=settle_delay_ms,
+        )
+
+    return run_and_save_standard_probe_session(
+        probe_factory=EnemyTeleportProbe,
+        run_session=_run_session,
+        encoder=encode_enemy_teleport_probe_session,
+        summary_formatter=format_enemy_teleport_probe_summary,
+        target_url=target_url,
+        output_path=output_path,
         headless=headless,
         prefer_account=prefer_account,
     )
-    session = probe.execute_probe(
-        acquisition_strategy=acquisition_strategy,
-        max_attempts=max_attempts,
-        initial_sync_timeout_ms=initial_sync_timeout_ms,
-        acquisition_timeout_ms=acquisition_timeout_ms,
-        teleport_timeout_ms=teleport_timeout_ms,
-        settle_delay_ms=settle_delay_ms,
-    )
-    capture_session_path = save_capture_session(
-        session_id=session["session_id"],
-        start_timestamp_ms=session["start_timestamp_ms"],
-        end_timestamp_ms=session["end_timestamp_ms"],
-        base_url=session["base_url"],
-        messages=probe.messages,
-        magic=probe.magic,
-        output_path=output_path,
-    )
-    session["capture_session_path"] = capture_session_path
-    encoded = encode_enemy_teleport_probe_session(session)
-    json_str = dump_json_str(encoded, compact=False, indent=2)
-    _test_hooks.write_text(Path(output_path), json_str)
-    log.info(format_enemy_teleport_probe_summary(session))
-    return session
 
 
 __all__ = [
