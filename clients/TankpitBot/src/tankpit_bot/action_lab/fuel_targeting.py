@@ -2,19 +2,30 @@
 
 from __future__ import annotations
 
-from tankpit_bot.action_lab.teleport import TeleportProbe
+from typing import Protocol
+
 from tankpit_bot.bot.ai.equipment import find_best_fuel, find_teleport_landing_tile
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
 from tankpit_bot.sniffer.world_state import get_terrain_map
-from tankpit_bot.state.types import ContainerStateDict
+from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 
 
 class FuelTargetingError(Exception):
     """Raised when visible fuel targeting prerequisites are unavailable."""
 
 
+class VisibleFuelTargetingProbeProtocol(Protocol):
+    """Minimal probe interface required for visible-fuel targeting helpers."""
+
+    def get_world_state(self) -> WorldStateDict:
+        """Return the current world state."""
+
+    def get_self_state(self) -> SelfStateDict | None:
+        """Return the current self state when available."""
+
+
 def find_visible_fuel_target(
-    probe: TeleportProbe,
+    probe: VisibleFuelTargetingProbeProtocol,
     *,
     allow_unreachable: bool,
 ) -> ContainerStateDict | None:
@@ -49,7 +60,7 @@ def find_visible_fuel_target(
 
 
 def visible_fuel_requires_reposition(
-    probe: TeleportProbe,
+    probe: VisibleFuelTargetingProbeProtocol,
     fuel_target: ContainerStateDict,
 ) -> bool:
     """Return whether a visible fuel target needs a reposition teleport.
@@ -84,7 +95,7 @@ def visible_fuel_requires_reposition(
 
 
 def find_visible_fuel_landing_tile(
-    probe: TeleportProbe,
+    probe: VisibleFuelTargetingProbeProtocol,
     fuel_target: ContainerStateDict,
 ) -> tuple[int, int] | None:
     """Return the teleport landing tile for a blocked visible fuel target.
@@ -118,6 +129,7 @@ def find_visible_fuel_landing_tile(
 
 __all__ = [
     "FuelTargetingError",
+    "VisibleFuelTargetingProbeProtocol",
     "find_visible_fuel_landing_tile",
     "find_visible_fuel_target",
     "visible_fuel_requires_reposition",
