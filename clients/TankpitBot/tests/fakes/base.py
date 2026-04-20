@@ -8,6 +8,7 @@ tankpit_bot._test_hooks.
 from __future__ import annotations
 
 import base64
+import re
 import types
 from collections.abc import Callable
 
@@ -24,7 +25,13 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot.protocol.commands import CMD_ENTER_GAME, build_query_command
+from tankpit_bot.protocol.framing import decode_frame, encode_frame
 from tankpit_bot.types import CapturedMessage
+
+_FAKE_TPCLIENT_URL = "https://tankpit.com/game/tpclient-test.js"
+_FAKE_STATIC_KEY = "A" * 1000
+_FAKE_MAGIC = "test_magic_12345678"
 
 
 def _make_auth_payload(magic: str) -> str:
@@ -44,6 +51,132 @@ def _make_auth_payload(magic: str) -> str:
     body_bytes = body.encode("utf-8")
     length_prefix = len(body_bytes).to_bytes(2, "little")
     return base64.b64encode(length_prefix + body_bytes).decode("ascii")
+
+
+_WEBSOCKET_INJECTION_PATTERN = re.compile(r"atob\('([^']+)'\)")
+
+
+def _build_captured_raw_messages(
+    selected_room: str | None,
+    entered_room: str | None = None,
+) -> list[JSONValue]:
+    """Build the synthetic raw-message buffer used by protocol join tests.
+
+    Args:
+        selected_room: Joined room ID, if any.
+        entered_room: Entered room ID, if any.
+
+    Returns:
+        Base64-encoded framed room-discovery payloads.
+    """
+    payloads: list[JSONValue] = [
+        base64.b64encode(
+            encode_frame(b"+4|World (President Trump)|24|5,1,0,0,0,0,0|2|n|field24.gif|2026")
+        ).decode("utf-8"),
+        base64.b64encode(encode_frame(b"+1|Practice|1|0,0,0,0,0,0,0|2|p|field01.gif|2026")).decode(
+            "utf-8"
+        ),
+    ]
+    if selected_room is not None:
+        confirm = f"={selected_room}|Sep. 25, 2012|Artax|4|9|9|9|9".encode()
+        payloads.append(base64.b64encode(encode_frame(confirm)).decode("utf-8"))
+    if entered_room is not None:
+        response = f"${entered_room}|0".encode()
+        payloads.append(base64.b64encode(encode_frame(response)).decode("utf-8"))
+    return payloads
+
+
+def _extract_injected_websocket_payload_data(expression: str) -> str | None:
+    """Return the base64 websocket payload injected by the runtime helper.
+
+    Args:
+        expression: JavaScript passed to ``Runtime.evaluate``.
+
+    Returns:
+        Base64 payload string, or ``None`` when the helper is not used.
+    """
+    if "window.__capturedWS" not in expression or "atob('" not in expression:
+        return None
+    match = _WEBSOCKET_INJECTION_PATTERN.search(expression)
+    if match is None:
+        raise ValueError(f"missing websocket payload in expression: {expression}")
+    return match.group(1)
+
+
+def _extract_enter_room_id(body: bytes) -> str:
+    """Return the room ID from a ``+room|...`` enter packet body.
+
+    Args:
+        body: Decoded websocket body beginning with ``+``.
+
+    Returns:
+        Room ID portion of the enter packet.
+    """
+    parts = body[1:].split(b"|", 4)
+    if len(parts) != 5:
+        raise ValueError(f"unexpected room enter payload: {body!r}")
+    return parts[0].decode("utf-8")
+
+
+def _runtime_raw_messages_result(
+    expression: str,
+    *,
+    raw_messages_ready: bool,
+    selected_room: str | None,
+    entered_room: str | None,
+) -> JSONObject | None:
+    """Return the fake ``window.__rawMsgs`` snapshot response."""
+    if "window.__rawMsgs" not in expression:
+        return None
+    if not raw_messages_ready:
+        return {"result": {"value": []}}
+    return {
+        "result": {
+            "value": _build_captured_raw_messages(
+                selected_room,
+                entered_room,
+            )
+        }
+    }
+
+
+def _runtime_metadata_result(expression: str) -> JSONObject | None:
+    """Return fake metadata/script lookup responses for login helpers."""
+    if "tankpit.magic" in expression:
+        return {"result": {"value": _FAKE_MAGIC}}
+    if "script[src]" in expression and "tpclient" in expression:
+        return {"result": {"value": _FAKE_TPCLIENT_URL}}
+    if "fetch(" in expression and "tpclient-test.js" in expression:
+        return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
+    return None
+
+
+def _decode_injected_websocket_body(expression: str) -> bytes | None:
+    """Decode the browser helper's injected websocket payload.
+
+    Args:
+        expression: JavaScript passed to ``Runtime.evaluate``.
+
+    Returns:
+        The decoded framed-message body for framed payloads, the raw byte
+        payload for non-framed sends, or ``None`` when the expression does not
+        invoke the websocket helper.
+    """
+    if "window.__capturedWS" not in expression or "atob('" not in expression:
+        return None
+    match = _WEBSOCKET_INJECTION_PATTERN.search(expression)
+    if match is None:
+        raise ValueError(f"missing websocket payload in expression: {expression}")
+    framed = base64.b64decode(match.group(1))
+    if len(framed) < 2:
+        return framed
+    expected_total = 2 + int.from_bytes(framed[:2], "little")
+    if expected_total != len(framed):
+        return framed
+    body, remaining = decode_frame(framed)
+    if remaining:
+        raise ValueError(f"unexpected trailing framed data: {remaining.hex()}")
+    return body
 
 
 class FakeResponse:
@@ -173,11 +306,50 @@ class FakeTerrainMap:
 class FakeCDPSession:
     """Fake Playwright CDPSession."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, emit_runtime_frames: bool = True) -> None:
         """Initialize fake CDP session."""
         self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
         self._sent_methods: list[str] = []
         self._detached = False
+        self._selected_room: str | None = None
+        self._entered_room: str | None = None
+        self._ws_url = "wss://tankpit.com/ws/"
+        self._runtime_frame_count = 0
+        self._raw_messages_ready = False
+        self._emit_runtime_frames = emit_runtime_frames
+
+    def _emit_runtime_frame_sent(self, payload: str) -> None:
+        """Emit a synthetic websocket-sent CDP event for injected payloads."""
+        if not self._emit_runtime_frames:
+            return
+        self._runtime_frame_count += 1
+        if "Network.webSocketFrameSent" not in self._handlers:
+            return
+        event: JSONObject = {
+            "requestId": "1.1",
+            "timestamp": 200.0 + self._runtime_frame_count,
+            "response": {"opcode": 1, "mask": True, "payloadData": payload},
+        }
+        for handler in self._handlers["Network.webSocketFrameSent"]:
+            handler(event)
+
+    def _handle_runtime_injected_websocket(self, expression: str) -> JSONObject | None:
+        """Handle websocket helper sends from Runtime.evaluate."""
+        body = _decode_injected_websocket_body(expression)
+        if body is None:
+            return None
+        payload_data = _extract_injected_websocket_payload_data(expression)
+        if payload_data is not None:
+            self._emit_runtime_frame_sent(payload_data)
+        if body.startswith(b"*"):
+            self._selected_room = body[1:].decode("utf-8")
+            return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
+        if body.startswith(b"+"):
+            self._entered_room = _extract_enter_room_id(body)
+            return {"result": {"value": f"SENT_{len(body) + 2}_BYTES via {self._ws_url}"}}
+        if body == build_query_command(CMD_ENTER_GAME)[2:]:
+            return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
+        return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Send CDP command.
@@ -185,8 +357,24 @@ class FakeCDPSession:
         Returns a valid CDP response with ``{"result": {"value": ...}}``,
         matching the real Chrome DevTools Protocol contract.
         """
-        _ = params
         self._sent_methods.append(method)
+        if method != "Runtime.evaluate" or params is None:
+            return {"result": {"value": ""}}
+        expression = str(params.get("expression", ""))
+        raw_messages_result = _runtime_raw_messages_result(
+            expression,
+            raw_messages_ready=self._raw_messages_ready,
+            selected_room=self._selected_room,
+            entered_room=self._entered_room,
+        )
+        if raw_messages_result is not None:
+            return raw_messages_result
+        metadata_result = _runtime_metadata_result(expression)
+        if metadata_result is not None:
+            return metadata_result
+        injected_result = self._handle_runtime_injected_websocket(expression)
+        if injected_result is not None:
+            return injected_result
         return {"result": {"value": ""}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
@@ -209,31 +397,90 @@ class FakeCDPSession:
 class FakeCDPSessionRateLimited:
     """Fake CDP session that simulates rate-limiting error then successful login."""
 
-    def __init__(self, *, login_fails: bool = False) -> None:
+    def __init__(self, *, login_fails: bool = False, emit_runtime_frames: bool = True) -> None:
         """Initialize fake CDP session."""
         self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
         self._sent_methods: list[str] = []
         self._detached = False
         self._eval_count = 0
         self._login_fails = login_fails
+        self._selected_room: str | None = None
+        self._entered_room: str | None = None
+        self._ws_url = "wss://tankpit.com/ws/"
+        self._runtime_frame_count = 0
+        self._raw_messages_ready = False
+        self._emit_runtime_frames = emit_runtime_frames
+
+    def _emit_runtime_frame_sent(self, payload: str) -> None:
+        """Emit a synthetic websocket-sent CDP event for injected payloads."""
+        if not self._emit_runtime_frames:
+            return
+        self._runtime_frame_count += 1
+        if "Network.webSocketFrameSent" not in self._handlers:
+            return
+        event: JSONObject = {
+            "requestId": "1.1",
+            "timestamp": 200.0 + self._runtime_frame_count,
+            "response": {"opcode": 1, "mask": True, "payloadData": payload},
+        }
+        for handler in self._handlers["Network.webSocketFrameSent"]:
+            handler(event)
+
+    def _handle_runtime_fixture(self, expression: str) -> JSONObject | None:
+        """Handle raw-message, metadata, and websocket helper runtime calls."""
+        raw_messages_result = _runtime_raw_messages_result(
+            expression,
+            raw_messages_ready=self._raw_messages_ready,
+            selected_room=self._selected_room,
+            entered_room=self._entered_room,
+        )
+        if raw_messages_result is not None:
+            return raw_messages_result
+        metadata_result = _runtime_metadata_result(expression)
+        if metadata_result is not None:
+            return metadata_result
+        return self._handle_runtime_injected_websocket(expression)
+
+    def _handle_runtime_injected_websocket(self, expression: str) -> JSONObject | None:
+        """Handle injected websocket sends for the rate-limited fake session."""
+        body = _decode_injected_websocket_body(expression)
+        if body is None:
+            return None
+        payload_data = _extract_injected_websocket_payload_data(expression)
+        if payload_data is not None:
+            self._emit_runtime_frame_sent(payload_data)
+        if body.startswith(b"*"):
+            self._selected_room = body[1:].decode("utf-8")
+            return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
+        if body.startswith(b"+"):
+            self._entered_room = _extract_enter_room_id(body)
+            return {"result": {"value": f"SENT_{len(body) + 2}_BYTES via {self._ws_url}"}}
+        if body == build_query_command(CMD_ENTER_GAME)[2:]:
+            return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
+        return None
+
+    def _handle_runtime_default(self) -> JSONObject:
+        """Handle the guest/account login polling sequence."""
+        self._eval_count += 1
+        if self._eval_count == 3:
+            return {"result": {"value": "There are too many tanks"}}
+        if self._eval_count == 7:
+            if self._login_fails:
+                return {"result": {"value": "Invalid username or password"}}
+            return {"result": {"value": ""}}
+        return {"result": {"value": "success"}}
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Send CDP command, returning rate limit error on 3rd Runtime.evaluate."""
         self._sent_methods.append(method)
-        if method == "Runtime.evaluate":
-            self._eval_count += 1
-            # 3rd evaluate is the error check, return rate limit error
-            if self._eval_count == 3:
-                return {"result": {"value": "There are too many tanks"}}
-            # 7th evaluate is login error check
-            if self._eval_count == 7:
-                if self._login_fails:
-                    return {"result": {"value": "Invalid username or password"}}
-                return {"result": {"value": ""}}
-            # Other evaluates return success
-            return {"result": {"value": "success"}}
-        result: JSONObject = {}
-        return result
+        if method != "Runtime.evaluate":
+            result: JSONObject = {}
+            return result
+        expression = str(params.get("expression", "")) if params is not None else ""
+        fixture_result = self._handle_runtime_fixture(expression)
+        if fixture_result is not None:
+            return fixture_result
+        return self._handle_runtime_default()
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Register event handler."""
@@ -276,6 +523,7 @@ class FakePage:
         self._url = ""
         self._script_urls: list[JSONValue] = script_urls if script_urls is not None else []
         self._magic = magic
+        self._emitted_initial_messages = False
 
     @property
     def url(self) -> str:
@@ -308,6 +556,9 @@ class FakePage:
     def wait_for_timeout(self, timeout: float) -> None:
         """Wait and emit WebSocket events."""
         self._wait_timeout = timeout
+        if self._emitted_initial_messages:
+            return
+        self._emitted_initial_messages = True
         self._cdp_session.emit_event(
             "Network.webSocketCreated",
             {"requestId": "1.1", "url": "wss://example.com/ws"},
@@ -332,10 +583,14 @@ class FakePage:
                 "response": {"opcode": 1, "mask": False, "payloadData": "received message"},
             },
         )
+        self._cdp_session._raw_messages_ready = True
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - also emit WebSocket events like wait_for_timeout."""
         _ = (event, timeout)
+        if self._emitted_initial_messages:
+            return
+        self._emitted_initial_messages = True
         # Emit the same events as wait_for_timeout for test compatibility
         self._cdp_session.emit_event(
             "Network.webSocketCreated",
@@ -361,6 +616,7 @@ class FakePage:
                 "response": {"opcode": 1, "mask": False, "payloadData": "received message"},
             },
         )
+        self._cdp_session._raw_messages_ready = True
 
     def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
         """Wait for JavaScript function to return truthy.
@@ -562,9 +818,16 @@ class FakeBrowserContext:
             magic: Magic key to embed in AUTH messages.
         """
         cdp: FakeCDPSession | FakeCDPSessionRateLimited = (
-            FakeCDPSessionRateLimited(login_fails=login_fails) if rate_limited else FakeCDPSession()
+            FakeCDPSessionRateLimited(
+                login_fails=login_fails,
+                emit_runtime_frames=emit_messages,
+            )
+            if rate_limited
+            else FakeCDPSession(emit_runtime_frames=emit_messages)
         )
         self._cdp_session = cdp
+        if not emit_messages:
+            self._cdp_session._raw_messages_ready = True
         self._pages: list[FakePage | FakePageNoMessages] = []
         self._closed = False
         self._emit_messages = emit_messages
