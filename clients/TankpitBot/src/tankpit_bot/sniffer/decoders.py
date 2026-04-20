@@ -13,6 +13,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.capture import decode_base64_safe
+from tankpit_bot.parser import is_room_info_text
 from tankpit_bot.protocol.constants import RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
@@ -321,9 +322,7 @@ def decode_text_message(text: str, body_len: int, tag: str, body: bytes | None =
     if text.startswith("+") and "|" in text:
         return decode_plus_message(text, tag)
     if text.startswith("*"):
-        selected_room = text[1:]
-        set_selected_room(selected_room)
-        return f"[{tag}] SELECT: room={selected_room}"
+        return f"[{tag}] SELECT: room={text[1:]}"
     if text.startswith("="):
         return decode_join_confirm(text, tag)
     if text.startswith("$"):
@@ -370,8 +369,8 @@ def decode_message(payload: str, direction: str, magic: str | None = None) -> st
 def decode_plus_message(text: str, tag: str) -> str:
     """Decode a '+' prefixed message (ROOM_LIST or ACTION).
 
-    Room list format: +room_id|name|player_count|modes|unknown1|unknown2|image|year
-    Example: +2|World (Meltdown)|42|1,1,1,0,1,0,0|3|n|field42.gif|2026
+    Room list format: +room_id|name|field_id|modes|default_troop|mode_code|image|year
+    Example: +2|World (Meltdown)|24|1,1,1,0,1,0,0|2|n|field24.gif|2026
 
     Args:
         text: Text starting with '+'.
@@ -380,16 +379,15 @@ def decode_plus_message(text: str, tag: str) -> str:
     Returns:
         Decoded message string.
     """
-    parts = text.split("|")
-    if len(parts) >= 3 and len(parts[0]) > 1 and parts[0][1:].isdigit():
-        room_id = parts[0][1:]
-        name = parts[1] if len(parts) > 1 else "?"
-        # Register field image if present (index 6 in pipe-delimited format)
-        if len(parts) >= 7:
-            register_room_image(room_id, parts[6])
+    room_text = text[1:]
+    parts = room_text.split("|")
+    if is_room_info_text(room_text):
+        room_id = parts[0]
+        name = parts[1]
+        register_room_image(room_id, parts[6])
         return f"[{tag}] ROOM_LIST: room={room_id} name={name}"
     # Action message with coords
-    room_id = parts[0][1:] if len(parts) > 0 else "?"
+    room_id = parts[0] if len(parts) > 0 else "?"
     coords = f"{parts[2]},{parts[3]}" if len(parts) >= 4 else "?"
     return f"[{tag}] ACTION: room={room_id} coords={coords}"
 
@@ -412,6 +410,8 @@ def decode_join_confirm(text: str, tag: str) -> str:
     """
     parts = text.split("|")
     room_id = parts[0][1:] if len(parts) > 0 else "?"
+    if room_id:
+        set_selected_room(room_id)
     tank_name = parts[2] if len(parts) > 2 else "?"
     rank_num = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
     rank_str = RANK_NAMES[rank_num] if 0 <= rank_num < len(RANK_NAMES) else f"rank{rank_num}"
