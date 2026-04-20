@@ -10,6 +10,7 @@ from typing import Literal
 
 from tankpit_bot.state.types import (
     DAMAGE_FULL,
+    ContainerRefreshKind,
     SelfStateDict,
     TankStateDict,
     WorldStateDict,
@@ -252,6 +253,8 @@ def update_container_from_radar(
     y: int,
     volume: int,
     timestamp_ms: int,
+    *,
+    refresh_kind: ContainerRefreshKind = "radar_response",
 ) -> WorldStateDict:
     """Update container state from RadarResponse message.
 
@@ -261,6 +264,7 @@ def update_container_from_radar(
         y: Container Y coordinate.
         volume: Fuel volume (-1 for equipment, 0 for empty fuel, >0 for fuel with contents).
         timestamp_ms: Message timestamp.
+        refresh_kind: Specific radar-refresh path that confirmed the container.
 
     Returns:
         New WorldStateDict with updated container, or unchanged state if empty fuel.
@@ -297,6 +301,7 @@ def update_container_from_radar(
         is_fuel=is_fuel,
         volume=actual_volume,
         source="radar",
+        refresh_kind=refresh_kind,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
     )
