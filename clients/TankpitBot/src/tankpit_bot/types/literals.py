@@ -13,6 +13,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError, require_str
 MessageDirection = Literal["sent", "received"]
 InputType = Literal["key", "mouse"]
 MouseButton = Literal["left", "right", "middle"]
+SentFrameOrigin = Literal["bot_injected", "page_client", "unknown"]
 
 
 # =============================================================================
@@ -85,6 +86,31 @@ def require_mouse_button(obj: JSONObject, key: str) -> MouseButton:
     raise JSONTypeError(f"Field '{key}' must be 'left', 'right', or 'middle', got '{value}'")
 
 
+def require_sent_frame_origin(obj: JSONObject, key: str) -> SentFrameOrigin:
+    """Extract and validate SentFrameOrigin from JSON object.
+
+    Args:
+        obj: JSON object to extract from.
+        key: Key to extract.
+
+    Returns:
+        Validated SentFrameOrigin literal.
+
+    Raises:
+        JSONTypeError: If value is not a valid SentFrameOrigin.
+    """
+    value = require_str(obj, key)
+    if value == "bot_injected":
+        return "bot_injected"
+    if value == "page_client":
+        return "page_client"
+    if value == "unknown":
+        return "unknown"
+    raise JSONTypeError(
+        f"Field '{key}' must be 'bot_injected', 'page_client', or 'unknown', got '{value}'"
+    )
+
+
 # =============================================================================
 # Dict Conversion Helpers
 # =============================================================================
@@ -139,10 +165,12 @@ __all__ = [
     "InputType",
     "MessageDirection",
     "MouseButton",
+    "SentFrameOrigin",
     "int_dict_to_json",
     "mixed_dict_to_json",
     "require_input_type",
     "require_message_direction",
     "require_mouse_button",
+    "require_sent_frame_origin",
     "str_dict_to_json",
 ]
