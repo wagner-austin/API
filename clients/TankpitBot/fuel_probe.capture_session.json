@@ -1,659 +1,1008 @@
 {
-  "session_id": "c6061e98-c9a9-41d6-9b26-f7c6f3688ea4",
-  "start_timestamp_ms": 1775803223656,
-  "end_timestamp_ms": 1775803256890,
+  "session_id": "9ba3f345-7af8-4c8b-a69e-999250944da1",
+  "start_timestamp_ms": 1776121738688,
+  "end_timestamp_ms": 1776121831005,
   "base_url": "https://tankpit.com/play",
   "messages": [
     {
-      "timestamp_ms": 1775803227350,
+      "timestamp_ms": 1776121754328,
       "direction": "sent",
-      "payload": "UAAlQVVUSCAhYmUgNjI5MTN8MWU1NDRmNGJhYmEwYzQxNzc1YTE2NmEwZjM1NzNjMDl8NDEyOTUxNzEyNSBtZzgyajBudnBlMGxkZTcxNHk3ZA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "UAAlQVVUSCAhYmUgNjI5MTN8MWU1NDRmNGJhYmEwYzQxNzc1YTE2NmEwZjM1NzNjMDl8Mjk2Mjk2MzgyMCBzN3Zya3Rwc3lodnZwdmVqZGR2Mw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at ab.e [as l] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:214:879)\n    at ab.Pa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:11:620)"
     },
     {
-      "timestamp_ms": 1775803227453,
+      "timestamp_ms": 1776121755138,
       "direction": "received",
-      "payload": "QAArNHxXb3JsZCAoUHJlc2lkZW50IFRydW1wKXwyNHw1LDEsMCwwLDAsMCwwfDJ8bnxmaWVsZDI0LmdpZnwyMDI2",
+      "payload": "NgArNXxXb3JsZCAoRGVzZXJ0KXw1fDEsMSwxLDAsMSwwLDB8MnxufGZpZWxkMDUuZ2lmfDIwMjY=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803227454,
+      "timestamp_ms": 1776121755140,
       "direction": "received",
       "payload": "MAArMXxQcmFjdGljZXwxfDAsMCwwLDAsMCwwLDB8MnxwfGZpZWxkMDEuZ2lmfDIwMjY=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803227455,
+      "timestamp_ms": 1776121755141,
       "direction": "sent",
-      "payload": "AgAqNA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AgAqNQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at Ch.h [as s] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:215:499)\n    at ab.t [as m] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:218:260)\n    at ab.Va (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:12:306)"
     },
     {
-      "timestamp_ms": 1775803227528,
-      "direction": "received",
-      "payload": "IAA9NHxTZXAuIDI1LCAyMDEyfEFydGF4fDR8OXw5fDl8OQ==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803227695,
+      "timestamp_ms": 1776121755244,
       "direction": "sent",
       "payload": "AgAqMQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "direct_send",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121755947,
+      "direction": "received",
+      "payload": "IAA9NXxTZXAuIDI1LCAyMDEyfEFydGF4fDR8OXw5fDl8OQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803227756,
+      "timestamp_ms": 1776121755948,
       "direction": "received",
       "payload": "IAA9MXxKYW4uIDA4LCAyMDEzfEFydGF4fDF8OXw5fDl8OQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803228707,
+      "timestamp_ms": 1776121756062,
       "direction": "sent",
-      "payload": "YAArMXwyfDEyOHwxMjh8XCIIIUNzCBhxYAd6OGoQT3MsJhBlQyc5Nw08XHopOxV3YjF6ZyMAcy0uBh4dMVEhVg9yLVxndGhxe11DMTcucXQHcnBvR0M3CxtxRy9janIiR30=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "YAArMXwyfDEyOHwxMjh8QnJGYUI3Fh14bUFgLHlCFCMxZ0d7E2l5NkkiWXMkfQ9jcWMhNz5BJDN+SF4cdU8kXwI0N0h0JjMhZhwUL2dgMXVDbHVmSgUtHwgjHH9+KyU8FzM=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "direct_send",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803228785,
+      "timestamp_ms": 1776121756733,
       "direction": "received",
       "payload": "BAAkMXww",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803228867,
+      "timestamp_ms": 1776121756734,
       "direction": "received",
-      "payload": "EQAuFVRpVCpJJzcF9KhQOncFGQ==",
+      "payload": "EQAuCwQnFCsNOTIM+e5KLmRXQg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233915,
+      "timestamp_ms": 1776121761943,
       "direction": "sent",
-      "payload": "AwAhNmk=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKDk=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.ya (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:62:733)"
     },
     {
-      "timestamp_ms": 1775803233979,
+      "timestamp_ms": 1776121763303,
       "direction": "received",
-      "payload": "FAAuCkhpVCpJJzcFAD4RvcIlE2QiMw==",
+      "payload": "FAAuFBgnFCsNOTIMDXYLqdF3SDQ/cg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233980,
+      "timestamp_ms": 1776121763304,
       "direction": "received",
-      "payload": "VAAubi0KZs+2pzb6/ukQt/zkbu+8yxrq0MZVtJrIPwpaITtYFnAd86zpAvyy6XAyVhBNMyAmTz8LPU7g8PAnBnLMHLqdkBKp2/NewtLJeLrvlg/v1JY=",
+      "payload": "YAAucH1EJs7yuTPz868Ko++2NkPFimv0gIgZSXvWIfyoxy+z+oJJo7GoRx0dBzIzEg5AxdLAQtTnz1VPEhF3G1IiR0QmLlWg1rVIKk6bO+ry107xhNgR+/DNCNDJkyrqxZY=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233980,
+      "timestamp_ms": 1776121763304,
       "direction": "received",
-      "payload": "DgAuCVRpVLM3LzQEAWhGSA==",
+      "payload": "DgAuFwQnFLJzMTENDC5SXA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233981,
+      "timestamp_ms": 1776121763305,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2hdTA==",
+      "payload": "DgAuBAQnFDIMOTNVBi5HWA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233981,
+      "timestamp_ms": 1776121763305,
       "direction": "received",
-      "payload": "EQAuFVaIUDBJJzcFAWhjLWdJUA==",
+      "payload": "EQAuCwbGEDENOTIMDC55OXQbCw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233981,
+      "timestamp_ms": 1776121763306,
       "direction": "received",
-      "payload": "EQAuFVaJUDBJJzcFAWtjLWdJUw==",
+      "payload": "EQAuCwbHEDENOTIMDC15OXQbCA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233981,
+      "timestamp_ms": 1776121763306,
       "direction": "received",
-      "payload": "EQAuFVaKUDBJJzcFAWpjLWdJUg==",
+      "payload": "EQAuCwbEEDENOTIMDCx5OXQbCQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233982,
+      "timestamp_ms": 1776121763306,
       "direction": "received",
-      "payload": "EQAuFVaLUDBJJzcFAW1jLWdJVQ==",
+      "payload": "EQAuCwbFEDENOTIMDCt5OXQbDg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233982,
+      "timestamp_ms": 1776121763307,
       "direction": "received",
-      "payload": "EQAuFVaEUDBJJzcFAWxjLWdJVA==",
+      "payload": "EQAuCwbKEDENOTIMDCp5OXQbDw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233982,
+      "timestamp_ms": 1776121763307,
       "direction": "received",
-      "payload": "EQAuFVaFUDBJJzcFAW9jLWdJVw==",
+      "payload": "EQAuCwbLEDENOTIMDCl5OXQbDA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233983,
+      "timestamp_ms": 1776121763307,
       "direction": "received",
-      "payload": "EQAuFVaGUDBJJzcFAW5jLWdJVg==",
+      "payload": "EQAuCwbIEDENOTIMDCh5OXQbDQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233983,
+      "timestamp_ms": 1776121763307,
       "direction": "received",
-      "payload": "EQAuFVaHUDBJJzcFAWFjLWdJWQ==",
+      "payload": "EQAuCwbJEDENOTIMDCd5OXQbAg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233983,
+      "timestamp_ms": 1776121763308,
       "direction": "received",
-      "payload": "EQAuFVaAUDBJJzcFAWBjLWdJWA==",
+      "payload": "EQAuCwbOEDENOTIMDCZ5OXQbAw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233984,
+      "timestamp_ms": 1776121763308,
       "direction": "received",
-      "payload": "FAAuFVeBUDBJJzcFAWNhPXEUDXVueg==",
+      "payload": "FAAuCwfPEDENOTIMDCV7KWJGViVzOw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233984,
+      "timestamp_ms": 1776121763308,
       "direction": "received",
-      "payload": "FAAuFVeCUDBJJzcFAWJhPXEUDXVueQ==",
+      "payload": "FAAuCwfMEDENOTIMDCR7KWJGViVzOA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233984,
+      "timestamp_ms": 1776121763309,
       "direction": "received",
-      "payload": "FAAuFVeDUDBJJzcFAWVhPXEUDXVueA==",
+      "payload": "FAAuCwfNEDENOTIMDCN7KWJGViVzOQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233984,
+      "timestamp_ms": 1776121763309,
       "direction": "received",
-      "payload": "FAAuFVd8UzBJJzcFAWRhPXEUDXVufw==",
+      "payload": "FAAuCwcyEzENOTIMDCJ7KWJGViVzPg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233984,
+      "timestamp_ms": 1776121763309,
       "direction": "received",
-      "payload": "FAAuFVd9UzBJJzcFAWdhPXEUDXVufg==",
+      "payload": "FAAuCwczEzENOTIMDCF7KWJGViVzPw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233985,
+      "timestamp_ms": 1776121763309,
       "direction": "received",
-      "payload": "FAAuFVd+UzBJJzcFAWZhPXEUDXVufQ==",
+      "payload": "FAAuCwcwEzENOTIMDCB7KWJGViVzPA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233985,
+      "timestamp_ms": 1776121763309,
       "direction": "received",
-      "payload": "FAAuFVd/UzBJJzcFAXlhPXEUDXVufA==",
+      "payload": "FAAuCwcxEzENOTIMDD97KWJGViVzPQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233985,
+      "timestamp_ms": 1776121763310,
       "direction": "received",
-      "payload": "FAAuFVd4UzBJJzcFAXhhPXEUDXVucw==",
+      "payload": "FAAuCwc2EzENOTIMDD57KWJGViVzMg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233985,
+      "timestamp_ms": 1776121763310,
       "direction": "received",
-      "payload": "FAAuFVd5UzBJJzcFAXthPXEUDXVucg==",
+      "payload": "FAAuCwc3EzENOTIMDD17KWJGViVzMw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233985,
+      "timestamp_ms": 1776121763310,
       "direction": "received",
-      "payload": "EgAuFVR6UzBJJzcFAXpzJHYBTCE=",
+      "payload": "EgAuCwQ0EzENOTIMDDxpMGVTF3E=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233986,
+      "timestamp_ms": 1776121763310,
       "direction": "received",
-      "payload": "EgAuFVR7UzBJJzcFAX1zJHYBTCI=",
+      "payload": "EgAuCwQ1EzENOTIMDDtpMGVTF3I=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233986,
+      "timestamp_ms": 1776121763311,
       "direction": "received",
-      "payload": "EgAuFVR0UzBJJzcFAXxzJHYBTCM=",
+      "payload": "EgAuCwQ6EzENOTIMDDppMGVTF3M=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233986,
+      "timestamp_ms": 1776121763311,
       "direction": "received",
-      "payload": "EgAuFVR1UzBJJzcFAX9zJHYBTCQ=",
+      "payload": "EgAuCwQ7EzENOTIMDDlpMGVTF3Q=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233986,
+      "timestamp_ms": 1776121763311,
       "direction": "received",
-      "payload": "EgAuFVR2UzBJJzcFAX5zJHYBTCU=",
+      "payload": "EgAuCwQ4EzENOTIMDDhpMGVTF3U=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233987,
+      "timestamp_ms": 1776121763312,
       "direction": "received",
-      "payload": "EgAuFVR3UzBJJzcFAXFzJHYBTCY=",
+      "payload": "EgAuCwQ5EzENOTIMDDdpMGVTF3Y=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233987,
+      "timestamp_ms": 1776121763312,
       "direction": "received",
-      "payload": "EgAuFVRwUzBJJzcFAXBzJHYBTCc=",
+      "payload": "EgAuCwQ+EzENOTIMDDZpMGVTF3c=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233987,
+      "timestamp_ms": 1776121763313,
       "direction": "received",
-      "payload": "EgAuFVRxUzBJJzcFAXNzJHYBTCg=",
+      "payload": "EgAuCwQ/EzENOTIMDDVpMGVTF3g=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233987,
+      "timestamp_ms": 1776121763313,
       "direction": "received",
-      "payload": "EgAuFVRyUzBJJzcFAXJzJHYBTCk=",
+      "payload": "EgAuCwQ8EzENOTIMDDRpMGVTF3k=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233988,
+      "timestamp_ms": 1776121763313,
       "direction": "received",
-      "payload": "FAAuFVVzUzBJJzcFAXV+OmIKBnVueg==",
+      "payload": "FAAuCwU9EzENOTIMDDNkLnFYXSVzOw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233988,
+      "timestamp_ms": 1776121763313,
       "direction": "received",
-      "payload": "FAAuFVVsUzBJJzcFAXR+OmIKBnVueQ==",
+      "payload": "FAAuCwUiEzENOTIMDDJkLnFYXSVzOA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233988,
+      "timestamp_ms": 1776121763314,
       "direction": "received",
-      "payload": "FAAuFVVtUzBJJzcFAXd+OmIKBnVueA==",
+      "payload": "FAAuCwUjEzENOTIMDDFkLnFYXSVzOQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233988,
+      "timestamp_ms": 1776121763314,
       "direction": "received",
-      "payload": "FAAuFVVuUzBJJzcFAXZ+OmIKBnVufw==",
+      "payload": "FAAuCwUgEzENOTIMDDBkLnFYXSVzPg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233989,
+      "timestamp_ms": 1776121763314,
       "direction": "received",
-      "payload": "FAAuFVVvUzBJJzcFAUl+OmIKBnVufg==",
+      "payload": "FAAuCwUhEzENOTIMDA9kLnFYXSVzPw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233989,
+      "timestamp_ms": 1776121763315,
       "direction": "received",
-      "payload": "FAAuFVVoUzBJJzcFAUh+OmIKBnVufQ==",
+      "payload": "FAAuCwUmEzENOTIMDA5kLnFYXSVzPA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233989,
+      "timestamp_ms": 1776121763315,
       "direction": "received",
-      "payload": "FAAuFVVpUzBJJzcFAUt+OmIKBnVufA==",
+      "payload": "FAAuCwUnEzENOTIMDA1kLnFYXSVzPQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233990,
+      "timestamp_ms": 1776121763315,
       "direction": "received",
-      "payload": "FAAuFVVqUzBJJzcFAUp+OmIKBnVucw==",
+      "payload": "FAAuCwUkEzENOTIMDAxkLnFYXSVzMg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233990,
+      "timestamp_ms": 1776121763316,
       "direction": "received",
-      "payload": "FAAuFVVrUzBJJzcFAU1+OmIKBnVucg==",
+      "payload": "FAAuCwUlEzENOTIMDAtkLnFYXSVzMw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233990,
+      "timestamp_ms": 1776121763316,
       "direction": "received",
-      "payload": "CAAufVTlSKlQNg==",
+      "payload": "CAAuYwSrCKgUNQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233990,
+      "timestamp_ms": 1776121763316,
       "direction": "received",
-      "payload": "CAAufVflSKlQNg==",
+      "payload": "CAAuYwerCKgUNQ==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233990,
+      "timestamp_ms": 1776121763317,
       "direction": "received",
-      "payload": "BwAuQFZ9UTFI",
+      "payload": "BwAuXgYzETAM",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803233991,
+      "timestamp_ms": 1776121763317,
       "direction": "received",
-      "payload": "AwAuC1c=",
+      "payload": "AwAuFQc=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803235970,
+      "timestamp_ms": 1776121763460,
       "direction": "sent",
-      "payload": "AwAhNjo=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803236298,
-      "direction": "received",
-      "payload": "RAMueNF+IDpEIDbtAGAVYglvY9JUQjbeLEdJbKDbrekcLL96OmnyJkVHUAVXOf8tDwxTAJsoXmslWRIN/X8aHilJDUg6HYo3K33KOjBRRkFBEzgRXpwBAE5YBAOiByH+JAouR0iEOjB0WE8OXgBEJxTIauAo0ig63yMtnibqVT9VNBQ+ZAIlsw0MVCgPoqH7AnUQFwINExRDfXoXSxtPnhl1G9tNUCc6KKqQIwMxHb0RahZqS94yMSqkv3wpGSgJEk0lU73jLmG+EBhWQAI3XgYtOXw6WwpgpJpSAs+rOquBB99nCQcZTzJvTTLsOYfdNt1a5RJqL7xJPyVB6U3T/LdHnJBeavoVejNdclr4sGljXVRClFSUGLcTusbWvNvSex+00TTEXixXCVBh77wfZ6Q72y9pCF5V1BMVWhYfSssjF/L4ezZEAI8TNOBfkmKHpX5dJwcLcCoiQXftkFH3svViArZxBPYamRuvKhn4+fUWEDEnsxH3MvLKdCfMHl9OESQhf2NCv+hSoOwfRHGug82IUbloEooBUSeMTHLKMjNExb8uBTiiCPQaXa5pPYZRsIAd652wLvPcOLUFL4aD8mG0vb4c1FXFDY35FLLqH/xXWlZBi2NXuqoNMDipY0scvR9Zw04Q13Ovoy+tDU8PxV38v70btQF0p00yYrB2dzJZOz8fQ/xbTWxLMt1xViICMhMzvOxh8cJvohlECs184fjDAdUuZh4P1kffGy3dCehLGQ5U4zgc/ocSwS7Hfj4HNe8D+x6ITHnqJRVyfOt9PTPMLe5adS4WM2uu/uLYS32opAOSO1VTGYo4FmbHfiVUWE5xBE+4yt4O+MuAZjK3ooBgMh7JK1ZPRJYOPQR66TZYH5dITgBdEWpqF0Sfs1ZZEwIi3RRcULn5flaaFX9VLHkC4EtcAdPDWn5mNeNVIQ37qlJFOvkkQBEfwDwNZl77S1Ew3FB8WR5QSjQjSxkFMgdidgmjZ1JHZRETQiFUyCQU97pULRkglVsKXvwZUVBUAQwKSVSDODRKeojqsnxP57RFZQFFEwJFRwKj5Cx4zx+yVRQ2bAdONoQ9PTUkIbQCUGWTLEceIGizWxpevCqxCS/NdQBQTA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803236307,
+      "timestamp_ms": 1776121763466,
       "direction": "sent",
-      "payload": "BQAhMCL/Pw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "BQAhLnKxfw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(131,110)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803238300,
+      "timestamp_ms": 1776121766901,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2j9Sw==",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOrw/KAFX",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803238301,
+      "timestamp_ms": 1776121769582,
       "direction": "received",
-      "payload": "OAAubi0aRs+2pzYHC+kAt/zkY++8yxDq0MYLS2VIKgpaASdYFkARDFNpBgNNaVPNqbBezN+GTztynQ==",
+      "payload": "DgAuBAQnFDIMOTNVBi7nXw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803238301,
+      "timestamp_ms": 1776121769583,
       "direction": "received",
-      "payload": "DgAuCVRpVLMnLzQEAWhGSA==",
+      "payload": "LAAucH1UBs7yuQTz868Go++2cUBeCn/0gIgISiFGKANXRwGz+oJdo7GoQhlkpw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803238301,
+      "timestamp_ms": 1776121769584,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2j9Sw==",
+      "payload": "DgAuFwQnFLJjMTENDC5SXA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803238302,
+      "timestamp_ms": 1776121769584,
       "direction": "received",
-      "payload": "AgAuYA==",
+      "payload": "DgAuBAQnFDIMOTNVBi7nXw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803238421,
+      "timestamp_ms": 1776121769585,
+      "direction": "received",
+      "payload": "AgAufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121769705,
       "direction": "sent",
-      "payload": "AwAhNjA=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803240302,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2jzSw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803240302,
-      "direction": "received",
-      "payload": "CAAufVblSKlQNw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803240302,
-      "direction": "received",
-      "payload": "BAAue1Z8",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803240302,
-      "direction": "received",
-      "payload": "BAAuclZ9",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803240910,
+      "timestamp_ms": 1776121773264,
       "direction": "sent",
-      "payload": "AwAhNjo=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803242303,
-      "direction": "received",
-      "payload": "RAMueNF+IDpEIDbtAGAVYglvY9JUQjbeLEdJbKDbrekcLL96OmnyJkVHUAVXOf8tDwxTAJsoXmslWRIN/X8aHilJDUg6HYo3K33KOjBRRkFBEzgRXpwBAE5YBAOiByH+JAouR0iEOjB0WE8OXgBEJxTIauAo0ig63yMtnibqVT9VNBQ+ZAIlsw0MVCgPoqH7AnUQFwINExRDfXoXSxtPnhl1G9tNUCc6KKqQIwMxHb0RahZqS94yMSqkv3wpGSgJEk0lU73jLmG+EBhWQAI3XgYtOXw6WwpgpJpSAs+rOquBB99nCQcZTzJvTTLsOYfdNt1a5RJqL7xJPyVB6U3T/LdHnJBeavoVejNdclr4sGljXVRClFSUGLcTusbWvNvSex+00TTEXixXCVBh77wfZ6Q72y9pCF5V1BMVWhYfSssjF/L4ezZEAI8TNOBfkmKHpX5dJwcLcCoiQXftkFH3svViArZxBPYamRuvKhn4+fUWEDEnsxH3MvLKdCfMHl9OESQhf2NCv+hSoOwfRHGug82IUbloEooBUSeMTHLKMjNExb8uBTiiCPQaXa5pPYZRsIAd652wLvPcOLUFL4aD8mG0vb4c1FXFDY35FLLqH/xXWlZBi2NXuqoNMDipY0scvR9Zw04Q13Ovoy+tDU8PxV38v70btQF0p00yYrB2dzJZOz8fQ/xbTWxLMt1xViICMhMzvOxh8cJvohlECs184fjDAdUuZh4P1kffGy3dCehLGQ5U4zgc/ocSwS7Hfj4HNe8D+x6ITHnqJRVyfOt9PTPMLe5adS4WM2uu/uLYS32opAOSO1VTGYo4FmbHfiVUWE5xBE+4yt4O+MuAZjK3ooBgMh7JK1ZPRJYOPQR66TZYH5dITgBdEWpqF0Sfs1ZZEwIi3RRcULn5flaaFX9VLHkC4EtcAdPDWn5mNeNVIQ37qlJFOvkkQBEfwDwNZl77S1Ew3FB8WR5QSjQjSxkFMgdidgmjZ1JHZRETQiFUyCQU97pULRkglVsKXvwZUVBUAQwKSVSDODRKeojqsnxP57RFZQFFEwJFRwKj5Cx4zx+yVRQ2bAdONoQ9PTUkIbQCUGWTLEceIGizWxpevCqxCS/NZQBQTA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803242335,
+      "timestamp_ms": 1776121773278,
       "direction": "sent",
-      "payload": "BQAhMCLvPw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "BQAhLnKhfw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(147,110)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803244306,
+      "timestamp_ms": 1776121774870,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2iTSw==",
+      "payload": "DgAuBAQnFDIMOTNVBi7pXw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803244306,
+      "timestamp_ms": 1776121774872,
       "direction": "received",
-      "payload": "fAAubt0aUs+2pyUE4OkFSY3kaRBDWz0VL1ZGS2VYKQpaETtYFkARDFN5BANNeXIyViBEMyAmXD8LPQwfD1AjBuvMEbqdkBJWJGNVwtJZa7rvlh4QKzZaBUtzHSY7dTYBKWRyV19bFzrU+kr4/tZHHSlSNqTU9UZM9543DmiV",
+      "payload": "CAAuYwarCKgUMg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803244306,
+      "timestamp_ms": 1776121774874,
       "direction": "received",
-      "payload": "DgAuCVRpVKMnLzQEAWhGSA==",
+      "payload": "BAAuZQYy",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803244307,
+      "timestamp_ms": 1776121774875,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2iTSw==",
+      "payload": "BAAubAYz",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803244307,
+      "timestamp_ms": 1776121774875,
       "direction": "received",
-      "payload": "AgAuYA==",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOrwvKAFX",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803244418,
+      "timestamp_ms": 1776121776307,
+      "direction": "received",
+      "payload": "DgAuBAQnFDIMOTNVBi6JXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121776308,
+      "direction": "received",
+      "payload": "WAAucI1UFDHWuTYPw68HXO+2HkBeGmkLfxgBSiFGKANXVyxMBSJOXE4IUR0dBzEyAa5HOi1gRisYb1dPEhFnG1IiVEQmLj9eVbVMKDGbJRUNR3fxhNgIAKrN",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121776309,
+      "direction": "received",
+      "payload": "DgAuFwQnFKJjMTENDC5SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121776309,
+      "direction": "received",
+      "payload": "DgAuBAQnFDIMOTNVBi6JXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121776310,
+      "direction": "received",
+      "payload": "AgAufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121776432,
       "direction": "sent",
-      "payload": "AwAhNjA=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803246309,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2hpSw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803246309,
-      "direction": "received",
-      "payload": "CAAufVblSKlQKA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803246309,
-      "direction": "received",
-      "payload": "BAAue1Z8",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803246309,
-      "direction": "received",
-      "payload": "BAAuclZ9",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803246384,
+      "timestamp_ms": 1776121776968,
       "direction": "sent",
-      "payload": "BQAhMCbuOA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803248310,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2hjSw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248310,
-      "direction": "received",
-      "payload": "FAAuc0N5wl5BJDcEVmgRSHQKD34tJQ==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248311,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2hdTA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248311,
-      "direction": "received",
-      "payload": "BgAud8QVXjM=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248311,
-      "direction": "received",
-      "payload": "BgAud8QVXjM=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248311,
-      "direction": "received",
-      "payload": "AwAuC1c=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803248888,
+      "timestamp_ms": 1776121776987,
       "direction": "sent",
-      "payload": "AwAhNjo=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "BQAhLnKhbw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(147,126)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803250313,
+      "timestamp_ms": 1776121778247,
       "direction": "received",
-      "payload": "RAMueNF+IDpEIDbtAGAVYglvY9JUQjbeLEdJbKDbrekcLL96OmnyJkVHUAVXOf8tDwxTAJsoXmslWRIN/X8aHilJDUg6HYo3K33KOjBRRkFBEzgRXpwBAE5YBAOiByH+JAouR0iEOjB0WE8OXgBEJxTIauAo0ig63yMtnibqVT9VNBQ+ZAIlsw0MVCgPoqH7AnUQFwINExRDfXoXSxtPnhl1G9tNUCc6KKqQIwMxHb0RahZqS94yMSqkv3wpGSgJEk0lU73jLmG+EBhWQAI3XgYtOXw6WwpgpJpSAs+rOquBB99nCQcZTzJvTTLsOYfdNt1a5RJqL7xJPyVB6U3T/LdHnJBeavoVejNdclr4sGljXVRClFSUGLcTusbWvNvSex+00TTEXixXCVBh77wfZ6Q72y9pCF5V1BMVWhYfSssjF/L4ezZEAI8TNOBfkmKHpX5dJwcLcCoiQXftkFH3svViArZxBPYamRuvKhn4+fUWEDEnsxH3MvLKdCfMHl9OESQhf2NCv+hSoOwfRHGug82IUbloEooBUSeMTHLKMjNExb8uBTiiCPQaXa5pPYZRsIAd652wLvPcOLUFL4aD8mG0vb4c1FXFDY35FLLqH/xXWlZBi2NXuqoNMDipY0scvR9Zw04Q13Ovoy+tDU8PxV38v70btQF0p00yYrB2dzJZOz8fQ/xbTWxLMt1xViICMhMzvOxh8cJvohlECs184fjDAdUuZh4P1kffGy3dCehLGQ5U4zgc/ocSwS7Hfj4HNe8D+x6ITHnqJRVyfOt9PTPMLe5adS4WM2uu/uLYS32opAOSO1VTGYo4FmbHfiVUWE5xBE+4yt4O+MuAZjK3ooBgMh7JK1ZPRJYOPQR66TZYH5dITgBdEWpqF0Sfs1ZZEwIi3RRcULn5flaaFX9VLHkC4EtcAdPDWn5mNeNVIQ37qlJFOvkkQBEfwDwNZl77S1Ew3FB8WR5QSjQjSxkFMgdidgmjZ1JHZRETQiFUyCQU97pULRkglVsKXvwZUVBUAQwKSVSDODRKeojqsnxP57RFZQFFEwJFRwKj5Cx4zx+yVRQ2bAdONoQ9PTUkIbQCUGWTLEceIGizWxpevCqxCS/cYgBQTA==",
+      "payload": "DgAuBAQnFDIMOTNVBi5zXw==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803250419,
+      "timestamp_ms": 1776121778248,
+      "direction": "received",
+      "payload": "CAAuYwarCKgUMw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121778249,
+      "direction": "received",
+      "payload": "BAAuZQYy",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121778249,
+      "direction": "received",
+      "payload": "BAAubAYz",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121780403,
+      "direction": "received",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOqwvKAFX",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121787631,
       "direction": "sent",
-      "payload": "BQAhMCLuCA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803252313,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2j3Sw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803252313,
-      "direction": "received",
-      "payload": "TAAubtwsEM+2p04FAVkQSAPmYBBDyT4VL8RQS2XKKQpaETtYFkAaDFPrBANNeXIyViBcMyAWXD8LDQwfD/IgBQLOFEVikjFWJPFRwtLJ",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803252314,
-      "direction": "received",
-      "payload": "DgAuCVRpVKIRLzQEAWhGSA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803252314,
-      "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2j3Sw==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803252314,
-      "direction": "received",
-      "payload": "AgAuYA==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803252390,
+      "timestamp_ms": 1776121787653,
       "direction": "sent",
-      "payload": "AwAhNjA=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
+      "payload": "BQAhLnKRTw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(163,94)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     },
     {
-      "timestamp_ms": 1775803254315,
+      "timestamp_ms": 1776121790232,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2jNSw==",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOqwvKAFX",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803254315,
-      "direction": "received",
-      "payload": "CAAufVblSKlQKQ==",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803254315,
-      "direction": "received",
-      "payload": "EgAue1R8wmm6JaFRimuCEQLwOhA=",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803254315,
-      "direction": "received",
-      "payload": "BAAuclZ9",
-      "ws_url": "wss://dorothy.tankpit.com/ws/"
-    },
-    {
-      "timestamp_ms": 1775803254385,
+      "timestamp_ms": 1776121792071,
       "direction": "sent",
-      "payload": "BQAhMCbvCA==",
+      "payload": "AwAhKCc=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.Fb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:71:190)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:50:309)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:65:33)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1776121792150,
+      "direction": "received",
+      "payload": "DgAuBAQnFDMMOTNVBi7+Xg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256316,
+      "timestamp_ms": 1776121792153,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2jKSw==",
+      "payload": "VAAucJxkCDKWuS4MDB8ZXBAGMkBeOm8LIIgDSiFmPANXdyFMBTJTXo4YUR0dFzIzEh5YOi1wRisYf0dPEgF3G1IyUUW+jhqg1rVPK4ibJhWn10HxhNg=",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256317,
+      "timestamp_ms": 1776121792154,
       "direction": "received",
-      "payload": "DwAuc0N5w2hBJDcEVmgRSGY=",
+      "payload": "DgAuFwQnFJNTLTANDC5SXA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256317,
+      "timestamp_ms": 1776121792155,
       "direction": "received",
-      "payload": "DgAuGlRpVDNIJzZSC2hdTA==",
+      "payload": "DgAuBAQnFDMMOTNVBi7+Xg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256317,
+      "timestamp_ms": 1776121792155,
       "direction": "received",
-      "payload": "BgAud8Ul0zI=",
+      "payload": "AgAufg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256317,
+      "timestamp_ms": 1776121792281,
+      "direction": "sent",
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121792811,
+      "direction": "sent",
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121792835,
+      "direction": "sent",
+      "payload": "BQAhLnKQXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(162,78)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121794326,
       "direction": "received",
-      "payload": "BgAud8Ul0zI=",
+      "payload": "DgAuBAQnFDMMOTNVBi7gXg==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
     },
     {
-      "timestamp_ms": 1775803256317,
+      "timestamp_ms": 1776121794327,
       "direction": "received",
-      "payload": "BQAuZld8UA==",
+      "payload": "CAAuYwarCKgUMA==",
       "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121794328,
+      "direction": "received",
+      "payload": "BAAuZQYy",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121794329,
+      "direction": "received",
+      "payload": "BAAubAYz",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121796170,
+      "direction": "received",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOp0fKAFT",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121803369,
+      "direction": "sent",
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121803390,
+      "direction": "sent",
+      "payload": "BQAhLnKATw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(178,94)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121805078,
+      "direction": "received",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOp0fKAFT",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806152,
+      "direction": "received",
+      "payload": "DgAuBAQnFDMMOTNVBi6AXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806153,
+      "direction": "received",
+      "payload": "uAAucKxkBzK6uTQMDB8KXBAGPkANimwLfzgBTitmLANXdydMBTJOXE4YWB0dFzIzEh5IOi1wTysYf15PEgF3G1IyVEQmPh5fL7VJKT4rMxUNZ04Oe2g6+/DNHiu8kyEUGpYlB0IKbSMqtBUGRXhJ69uENk84FywYT299EE9rXz84sA8wMzEBTF8+PEVdYlBaeglFA1DDHbqprVMl0NFFMRYwDhwJFDNCRFs5KJSvWVYRLFAflbhbDfGx",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806154,
+      "direction": "received",
+      "payload": "DgAuFwQnFINTMTANDC5SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806155,
+      "direction": "received",
+      "payload": "DgAuFwQ0E5xaMTENDC1SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806155,
+      "direction": "received",
+      "payload": "DgAuBAQnFDMMOTNVBi6AXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806156,
+      "direction": "received",
+      "payload": "AgAufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121806278,
+      "direction": "sent",
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121806811,
+      "direction": "sent",
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121806831,
+      "direction": "sent",
+      "payload": "BQAhLnKAXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(178,78)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121808360,
+      "direction": "received",
+      "payload": "DgAuBAQnFDMMOTNVBi6KXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121808361,
+      "direction": "received",
+      "payload": "CAAuYwarCKgUMQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121808362,
+      "direction": "received",
+      "payload": "IAAuZQcyp1DyxodSD5pUX6VWOfYACd5UfL5gSZk3Lro2RA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121808363,
+      "direction": "received",
+      "payload": "BAAubAYz",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121810314,
+      "direction": "received",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOo0fKAFT",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121817424,
+      "direction": "sent",
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121817448,
+      "direction": "sent",
+      "payload": "BQAhLnKQTw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(162,94)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121820237,
+      "direction": "received",
+      "payload": "bQMuZrYwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID3jpoOEdM/jQFLX0D3qbCpFRK6RxC2cdaJ/apzFAHBvvc/BILHVoyZAWiTn8ICOpz+FQ4oH05urZeVlQH8xOQ+nGIT/xQ1lgfQnEHYmULDQPvGQM+Uj1lG6MCAxoMKnx+BU87O3t3rQMMQH3fWljoK1PMt68KnSfArhkqqnULIpJChzDcA1Y2ZDsGDvb3cTYYvpZKu1AflRr/C2fWQy6PNN+3y1HsYhw9A3QLMQvdX1lPtwgDNnA7FFdd605tozABph6hwuL30a8jB8cH1769D6zwTify2E+ojzDmFD38xM+VHcM30Eh030RjzUKMv/i241TpJRUGOFui/K/yH3KpINBWxu0gIU8zQW5eRDsHqgAbbyrKhgaSPQuCq+f16wVRwS8H0N5If8C5BfEjCHIEDhPFY3jrTnbFNCG6OV0Y8+SEnUPSCnuYOi7fpUPAByXOc4xxattRMD+IZ656Ola95wQgGc9FJhGJGdSfSkIaB/84PkFRXTOtANiizPn5q6nuwUTaR3PqRzxUy1VMkzF2RCIBveoceFgZ8htbUmaFTAEjF4ISKCHXZxl7VyTi5xRNPuYtVkQ84wQ/ObbzMQtDKp1GTh523NkEQ+SsPEZDxd+3BjdAvgZZABbevUcmafZYNR0f08cIPebP3g4INFi2VDsdGcM/D0Bk414SKPwIOFT+dzEmVX5Ouz8oQ41IeljYg1lAHfC7Az0FGqdLAgKERlcSUwvwNgIyY/QDCSv9MgcEFfF+A31cNtS8OkBsZKhMOo0fKAFT",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822076,
+      "direction": "sent",
+      "payload": "AwAhKCc=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.Fb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:71:190)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:50:309)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:65:33)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1776121822173,
+      "direction": "received",
+      "payload": "DgAuBAQnFDAMOTNVBi4qXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822175,
+      "direction": "received",
+      "payload": "VAAucJxkCDKWuS4MDB8ZXBAGMkBeOm8LIIgDSiFmPANXdyFMBTJTXo4YUR0dFzIzEh5YOi1wRisYf0dPEgF3G1IyUUW+jhqg1rVPK4ibJhWn10HxhNg=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822176,
+      "direction": "received",
+      "payload": "DgAuFwQnFJNTMTMNDC5SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822177,
+      "direction": "received",
+      "payload": "DgAuBAQnFDAMOTNVBi4qXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822178,
+      "direction": "received",
+      "payload": "AgAufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121822328,
+      "direction": "sent",
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121822348,
+      "direction": "sent",
+      "payload": "BQAhLnaSRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "move",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121824228,
+      "direction": "received",
+      "payload": "DgAuBAQnFDAMOTNVBi4cXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121824229,
+      "direction": "received",
+      "payload": "CAAuYwarCKgUPg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121824230,
+      "direction": "received",
+      "payload": "BAAuZQYy",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121824231,
+      "direction": "received",
+      "payload": "BAAubAYz",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121825973,
+      "direction": "sent",
+      "payload": "AwAhKGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "map_open",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121825987,
+      "direction": "sent",
+      "payload": "BQAhLnKgfw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "teleport(146,110)",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1776121826174,
+      "direction": "received",
+      "payload": "DgAuBAQnFDAMOTNVBi4GXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826176,
+      "direction": "received",
+      "payload": "GAAubRM3s28FODINVS4LXGdYVC4wZAZlEX8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826177,
+      "direction": "received",
+      "payload": "RAAucJ58AM7yuSrz868hXBC3YkPFil4LfzgHSn7WOANXxjxOxTJOXE4YUR0dFyIzEh5IOi1wQtTnz1pPEgF3G1IyUUW+jg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826178,
+      "direction": "received",
+      "payload": "DgAuFwQnFJFbNjMNDC5SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826179,
+      "direction": "received",
+      "payload": "DgAuBAQnFDAMOTNVBi4GXg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826179,
+      "direction": "received",
+      "payload": "DgAuBAQnFDIMOTNVBi5HWA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826180,
+      "direction": "received",
+      "payload": "BgAuaaZkTTA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826181,
+      "direction": "received",
+      "payload": "BgAuaaZkTTA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121826182,
+      "direction": "received",
+      "payload": "AwAuFQc=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121828235,
+      "direction": "received",
+      "payload": "bAMuZqkwYDsAPjPuCi4CWHKpOE9WGGwMyQ4ETihx0V86QzRhsxF8cekrVj7iBxklPDR0PHVSyy9sK3ymAShnAXw8YlQAxXpKLC1DTKd6PRuTUk0HV0gEAF5AAS5DdRleIx0jBUn/WthYbR0VHV1GH+IDMX8xG0wMRhBsRgpmSEL2MTdcbXOIalr5LC4aV0UEdANEQQ17AxF3XtfiDAxEJoZ6LwdbBjRocVcbCAEiVnkGJkt0S7CAWNI6pZWsNbooPHw1zERKji8nQVRi8SnfF5U2AxYpHSp4SEPBsNJ7Qzd7flUaCFGBAfFvUbb/NzojXvqWTV4lCrB1FVUG5G3JFYvcdltE01dq9DAJHs4l7l++4bReDfU0dT3rPdgyek4WLjSxKcIP3BID0R9FMVb5aS4wZ3So2abdSU6iFwiK3Qxt5KDGFkkp+/ulTgMxVScFUKAOORES5j2IWQvofXGTwSB7Vhr6CbHIJbchsRHfHWk0CwYYalcfE+s5ak0vO3EZvG01FgthDmc5SHdoIi6LJzJqKvcseIFgYdrMtwTSCsObCGLZDVlypWfuGvQ2AD9vShsgr7N9HRzByl31XmmlJpoZaJMKZLg0xp6DQK8TY2tqSh0LfdJUQ1nkAiI3dUF9Ll/3Vx3QXSSJB92a+eD10X4O0VmQ9L5F96wTVpu1ZvHsMcpVNK78rvwo+RHlIWjWVWTCFo20xtWAIqYVNx45FKash9RHApof1kO66TtbdiJCEHxcSnH7CwQlfeyrHa09AKrgq+f1N3PeBTbB7jsYyqIdyHd3DnckANspYqlde9xiZ4M0eEK3847DTcFmRaQbMv7fU9NuNNoH410rzhQWH6UzinJnes6gFQUK5XhDY+IAl50CWEEZhG1DVzQ5K6VSlbKizPn57uzuZ5VLD99uMDeHC0L8Jm0iSiL+rwwXZCKVEhFHfuA2SR0YkC4ePP8pWhB3A6PDGhkijDIqWSeVNhQig6JUJQYBsF1TQySmzC0Z4aFXPlnMwLZIGhXVABBUUZb/Q1ty5zJZOgeJqT0F29zmJgMfYu1PSSQB+z8jB2muFEMnsEkON7FaNDw7KkPpQDJE4llfd/buFVpftbVJAzIDtwxEDrdWJV8OEKseJx9//SkQFO1bXRUZpwsvB2Fu4NlKJxYFs11RhmlUOBo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830375,
+      "direction": "received",
+      "payload": "DgAuBAQnFDIMOTNVBi6tXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830377,
+      "direction": "received",
+      "payload": "WAAucIxUFzHWuTYPw68HXO+2HkBeGmkLfxgBSiFGKANXVyxMBSJOXE4IUR0dBzEyAa5HOi1gRisYb1dPEhFnG1IiVEQmLj9eVbVMKDGbJRUNR3fxhNgIAKrN",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830377,
+      "direction": "received",
+      "payload": "DgAuFwQnFKNjMTENDC5SXA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830378,
+      "direction": "received",
+      "payload": "DgAuBAQnFDIMOTNVBi6tXw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830379,
+      "direction": "received",
+      "payload": "AgAufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1776121830473,
+      "direction": "sent",
+      "payload": "AwAhKGA=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "radar",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
     }
   ],
-  "magic": "mg82j0nvpe0lde714y7d",
+  "magic": "s7vrktpsyhvvpvejddv3",
   "game_log": [],
   "tank_names": {}
 }
