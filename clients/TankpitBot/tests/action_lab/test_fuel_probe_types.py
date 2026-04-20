@@ -7,6 +7,7 @@ from typing import Literal
 import pytest
 from platform_core.json_utils import JSONTypeError
 
+from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeAttemptResultDict,
     FuelProbeSessionDict,
@@ -54,6 +55,10 @@ def _attempt(
     """Build a sample fuel probe attempt."""
     return FuelProbeAttemptResultDict(
         target=_target(),
+        teleport_cycle_ids=[1],
+        radar_cycle_id=2,
+        move_cycle_id=3,
+        pickup_cycle_id=4,
         status=status,
         map_open_started_ms=1000,
         map_sync_timestamp_ms=1200,
@@ -73,8 +78,25 @@ def _attempt(
         fuel_target_x=101,
         fuel_target_y=124,
         fuel_target_volume=400,
+        phase_overlaps=[],
+        decision_basis=_decision_basis(),
         message_start_index=4,
         message_end_index=9,
+    )
+
+
+def _decision_basis() -> FuelDecisionBasisDict:
+    """Build a sample fuel decision basis."""
+    return FuelDecisionBasisDict(
+        world_timestamp_ms=1600,
+        radar_cycle_id=2,
+        viewport_left=92,
+        viewport_top=116,
+        self_x=100,
+        self_y=124,
+        selected_target_x=101,
+        selected_target_y=124,
+        candidates=[],
     )
 
 
@@ -112,6 +134,10 @@ def test_fuel_probe_attempt_round_trip_with_null_fields() -> None:
     """Optional attempt fields preserve null values through codecs."""
     attempt = FuelProbeAttemptResultDict(
         target=_target(),
+        teleport_cycle_ids=[1],
+        radar_cycle_id=None,
+        move_cycle_id=None,
+        pickup_cycle_id=None,
         status="map_sync_timeout",
         map_open_started_ms=1000,
         map_sync_timestamp_ms=None,
@@ -131,11 +157,32 @@ def test_fuel_probe_attempt_round_trip_with_null_fields() -> None:
         fuel_target_x=None,
         fuel_target_y=None,
         fuel_target_volume=None,
+        phase_overlaps=[],
+        decision_basis=None,
         message_start_index=4,
         message_end_index=5,
     )
 
     decoded = decode_fuel_probe_attempt_result(encode_fuel_probe_attempt_result(attempt))
+    assert decoded == attempt
+
+
+def test_fuel_probe_attempt_round_trip_with_phase_overlap() -> None:
+    """Fuel attempt codecs preserve non-empty phase overlap diagnostics."""
+    attempt = _attempt()
+    attempt["phase_overlaps"] = [
+        ActionPhaseOverlapDict(
+            active_phase="radar",
+            active_cycle_id=2,
+            active_started_ms=1500,
+            next_phase="move",
+            next_cycle_id=3,
+            next_started_ms=1700,
+        )
+    ]
+
+    decoded = decode_fuel_probe_attempt_result(encode_fuel_probe_attempt_result(attempt))
+
     assert decoded == attempt
 
 
@@ -201,6 +248,33 @@ def test_fuel_probe_attempt_rejects_non_object_target() -> None:
     encoded["target"] = "bad"
 
     with pytest.raises(JSONTypeError, match="target"):
+        decode_fuel_probe_attempt_result(encoded)
+
+
+def test_fuel_probe_attempt_rejects_non_object_phase_overlap() -> None:
+    """Fuel attempt decode rejects malformed phase overlap payloads."""
+    encoded = encode_fuel_probe_attempt_result(_attempt())
+    encoded["phase_overlaps"] = ["bad"]
+
+    with pytest.raises(JSONTypeError, match="phase_overlaps"):
+        decode_fuel_probe_attempt_result(encoded)
+
+
+def test_fuel_probe_attempt_rejects_non_object_decision_basis() -> None:
+    """Fuel attempt decode rejects malformed decision basis payloads."""
+    encoded = encode_fuel_probe_attempt_result(_attempt())
+    encoded["decision_basis"] = "bad"
+
+    with pytest.raises(JSONTypeError, match="decision_basis"):
+        decode_fuel_probe_attempt_result(encoded)
+
+
+def test_fuel_probe_attempt_rejects_non_integer_teleport_cycle_id() -> None:
+    """Fuel attempt decode rejects malformed teleport cycle ids."""
+    encoded = encode_fuel_probe_attempt_result(_attempt())
+    encoded["teleport_cycle_ids"] = [True]
+
+    with pytest.raises(JSONTypeError, match="teleport_cycle_ids"):
         decode_fuel_probe_attempt_result(encoded)
 
 
