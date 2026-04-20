@@ -21,7 +21,16 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
-from tests.fakes.base import FakeKeyboard, FakeResponse
+from tests.fakes.base import (
+    _FAKE_MAGIC,
+    _FAKE_STATIC_KEY,
+    _FAKE_TPCLIENT_URL,
+    FakeKeyboard,
+    FakeResponse,
+    _build_captured_raw_messages,
+    _decode_injected_websocket_body,
+    _extract_enter_room_id,
+)
 
 
 class FakePageInterrupting:
@@ -97,6 +106,9 @@ class FakeCDPSessionBot:
         self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
         self._sent_methods: list[str] = []
         self._detached = False
+        self._selected_room: str | None = None
+        self._entered_room: str | None = None
+        self._ws_url = "wss://tankpit.com/ws/"
 
     def send(
         self,
@@ -108,8 +120,33 @@ class FakeCDPSessionBot:
         Returns a valid CDP response with ``{"result": {"value": ...}}``,
         matching the real Chrome DevTools Protocol contract.
         """
-        _ = params
         self._sent_methods.append(method)
+        if method == "Runtime.evaluate" and params is not None:
+            expression = str(params.get("expression", ""))
+            if "window.__rawMsgs" in expression:
+                return {
+                    "result": {
+                        "value": _build_captured_raw_messages(
+                            self._selected_room,
+                            self._entered_room,
+                        )
+                    }
+                }
+            if "tankpit.magic" in expression:
+                return {"result": {"value": _FAKE_MAGIC}}
+            if "script[src]" in expression and "tpclient" in expression:
+                return {"result": {"value": _FAKE_TPCLIENT_URL}}
+            if "fetch(" in expression and "tpclient-test.js" in expression:
+                return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
+            body = _decode_injected_websocket_body(expression)
+            if body is not None:
+                if body.startswith(b"*"):
+                    self._selected_room = body[1:].decode("utf-8")
+                    return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
+                if body.startswith(b"+"):
+                    self._entered_room = _extract_enter_room_id(body)
+                    return {"result": {"value": f"SENT_{len(body) + 2}_BYTES via {self._ws_url}"}}
+                return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
         return {"result": {"value": ""}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
