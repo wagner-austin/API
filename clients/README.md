@@ -7,6 +7,7 @@ Client applications that consume backend services from the monorepo. Each client
 | Client | Description | Backend Services |
 |--------|-------------|------------------|
 | [DiscordBot](./DiscordBot) | Discord bot with slash commands for QR codes, transcripts, digit recognition, and model training | qr-api, transcript-api, handwriting-ai, model-trainer |
+| [TankpitBot](./TankpitBot) | Tankpit.com WebSocket protocol reverse-engineering and autonomous game bot (HFSM AI, CDP capture, XOR codec) | (standalone) |
 
 ## Design Principles
 
