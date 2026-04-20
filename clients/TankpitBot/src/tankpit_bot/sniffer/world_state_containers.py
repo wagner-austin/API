@@ -128,6 +128,7 @@ def increment_container_failed_pickups(x: int, y: int) -> None:
         is_fuel=container["is_fuel"],
         volume=container["volume"],
         source=container["source"],
+        refresh_kind=container["refresh_kind"],
         timestamp_ms=container["timestamp_ms"],
         failed_pickups=container["failed_pickups"] + 1,
     )
