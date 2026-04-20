@@ -6,17 +6,37 @@ the sniffer and probe modules.
 
 from __future__ import annotations
 
+import base64
+import re
 import uuid
 from typing import TypedDict
 
-from platform_core.json_utils import require_dict, require_str
+from platform_core.json_utils import JSONObject, require_dict, require_str
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.browser.accounts import resolve_account
+from tankpit_bot.browser.session import get_captured_raw_messages, send_websocket_bytes
+from tankpit_bot.parser import RoomInfo, is_room_info_text, parse_room_info
+from tankpit_bot.protocol.codec import ProtocolCodec
+from tankpit_bot.protocol.framing import decode_frame
+from tankpit_bot.protocol.lobby import (
+    ROOM_ENTRY_DEFAULT_X,
+    ROOM_ENTRY_DEFAULT_Y,
+    RoomEnterRequestDict,
+    RoomSelectRequestDict,
+    build_room_enter_metadata,
+    serialize_room_enter_request,
+    serialize_room_select_request,
+)
 
 log = get_logger(__name__)
+_ROOM_DISCOVERY_TIMEOUT_MS = 10000
+_JOIN_CONFIRM_TIMEOUT_MS = 10000
+_ROOM_ENTER_TIMEOUT_MS = 10000
+_JOIN_POLL_INTERVAL_MS = 100.0
+_STATIC_KEY_PATTERN = re.compile(r'"([^"]{1000})"')
 
 
 class GuestLoginResult(TypedDict):
@@ -329,100 +349,408 @@ def ensure_on_play_page(page: PageProtocol) -> None:
         log.info("Game URL: %s", page.url)
 
 
-def _click_map(cdp: CDPSessionProtocol) -> str:
-    """Click the map to enter the game at center position.
+def _decode_captured_body(payload: str) -> bytes:
+    """Decode one captured raw WebSocket payload to its body bytes.
 
     Args:
-        cdp: CDP session for JavaScript evaluation.
+        payload: Base64-encoded framed message payload.
 
     Returns:
-        Result message from JavaScript evaluation.
+        Decoded frame body bytes.
     """
-    map_js = """
-    (() => {
-        const fieldImage = document.getElementById('field-image');
-        if (!fieldImage) return 'no field-image';
+    framed = base64.b64decode(payload)
+    body, remaining = decode_frame(framed)
+    if remaining:
+        raise ValueError(f"unexpected trailing bytes in framed message: {remaining.hex()}")
+    return body
 
-        const rect = fieldImage.getBoundingClientRect();
-        const event = new MouseEvent('click', {
-            clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2,
-            bubbles: true
-        });
-        fieldImage.dispatchEvent(event);
-        return 'clicked field-image at center';
-    })()
+
+def _evaluate_string(
+    cdp: CDPSessionProtocol,
+    expression: str,
+    *,
+    await_promise: bool = False,
+) -> str:
+    """Evaluate JavaScript and return the string result.
+
+    Args:
+        cdp: Active CDP session.
+        expression: JavaScript expression to evaluate.
+        await_promise: Whether Runtime.evaluate should await a returned Promise.
+
+    Returns:
+        String value returned by the expression.
     """
-    result = cdp.send("Runtime.evaluate", {"expression": map_js, "returnByValue": True})
-    result_obj = result.get("result")
-    if isinstance(result_obj, dict):
-        val = result_obj.get("value", "?")
-        return str(val) if val is not None else "?"
-    return "?"
+    params: JSONObject = {
+        "expression": expression,
+        "returnByValue": True,
+    }
+    if await_promise:
+        params["awaitPromise"] = True
+    result = cdp.send("Runtime.evaluate", params)
+    result_obj = require_dict(result, "result")
+    return require_str(result_obj, "value")
+
+
+def _get_magic_key(cdp: CDPSessionProtocol) -> str:
+    """Return the current session magic key from the page runtime.
+
+    Args:
+        cdp: Active CDP session.
+
+    Returns:
+        The current ``tankpit.magic`` value, or an empty string when absent.
+    """
+    return _evaluate_string(
+        cdp,
+        """
+        (() => {
+            if (typeof tankpit !== 'undefined' && typeof tankpit.magic === 'string') {
+                return tankpit.magic;
+            }
+            return '';
+        })()
+        """,
+    )
+
+
+def _get_tpclient_url(cdp: CDPSessionProtocol) -> str:
+    """Return the loaded tpclient script URL.
+
+    Args:
+        cdp: Active CDP session.
+
+    Returns:
+        Loaded tpclient script URL, or an empty string when not found.
+    """
+    return _evaluate_string(
+        cdp,
+        """
+        (() => {
+            const script = Array.from(document.querySelectorAll('script[src]')).find(
+                (item) => item.src.includes('tpclient')
+            );
+            return script ? script.src : '';
+        })()
+        """,
+    )
+
+
+def _load_tpclient_static_key(cdp: CDPSessionProtocol, tpclient_url: str) -> str:
+    """Fetch the loaded tpclient source and extract the current static key.
+
+    Args:
+        cdp: Active CDP session.
+        tpclient_url: Loaded tpclient script URL.
+
+    Returns:
+        Current 1000-character static key string.
+
+    Raises:
+        ValueError: If the loaded script does not contain the expected key.
+    """
+    js_content = _evaluate_string(
+        cdp,
+        f"fetch({tpclient_url!r}).then((response) => response.text())",
+        await_promise=True,
+    )
+    match = _STATIC_KEY_PATTERN.search(js_content)
+    if match is None:
+        raise ValueError("tpclient static key was not found in loaded script")
+    return match.group(1)
+
+
+def _collect_room_entries(cdp: CDPSessionProtocol) -> list[RoomInfo]:
+    """Return room metadata decoded from captured ROOM_LIST messages.
+
+    Args:
+        cdp: Active CDP session.
+
+    Returns:
+        Ordered room entries decoded from ROOM_LIST traffic.
+    """
+    entries: list[RoomInfo] = []
+    for payload in get_captured_raw_messages(cdp):
+        body = _decode_captured_body(payload)
+        if not body or body[0] != ord("+"):
+            continue
+        text = body.decode("utf-8")
+        if not is_room_info_text(text[1:]):
+            continue
+        entries.append(parse_room_info(text[1:]))
+    return entries
+
+
+def _register_room_entries(entries: list[RoomInfo]) -> None:
+    """Register discovered room images for later terrain-map loading.
+
+    Args:
+        entries: Room entries decoded from ROOM_LIST messages.
+    """
+    from tankpit_bot.sniffer.world_state import register_room_image
+
+    for entry in entries:
+        register_room_image(entry["room_id"], entry["image"])
+
+
+def _resolve_room_entry(
+    entries: list[RoomInfo],
+    room_name: str,
+) -> RoomInfo | None:
+    """Resolve the desired room entry from decoded room metadata.
+
+    Args:
+        entries: Room entries decoded from ROOM_LIST messages.
+        room_name: Desired room name from configuration.
+
+    Returns:
+        Matching room entry, or `None` if no room matches.
+    """
+    normalized_target = room_name.strip().lower()
+    prefix_match: RoomInfo | None = None
+    for entry in entries:
+        normalized_candidate = entry["name"].strip().lower()
+        if normalized_candidate == normalized_target:
+            return entry
+        if normalized_candidate.startswith(
+            normalized_target + " "
+        ) or normalized_candidate.startswith(normalized_target + "("):
+            prefix_match = entry
+    return prefix_match
+
+
+def _resolve_room_id(
+    entries: list[RoomInfo],
+    room_name: str,
+) -> str | None:
+    """Resolve the desired room ID from decoded room metadata.
+
+    Args:
+        entries: Room entries decoded from ROOM_LIST messages.
+        room_name: Desired room name from configuration.
+
+    Returns:
+        Matching room ID, or `None` if no room matches.
+    """
+    entry = _resolve_room_entry(entries, room_name)
+    if entry is None:
+        return None
+    return entry["room_id"]
+
+
+def _wait_for_room_entry(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    room_name: str,
+) -> RoomInfo | None:
+    """Wait for the desired room entry to appear in captured ROOM_LIST traffic.
+
+    Args:
+        page: Playwright page used for polling delays.
+        cdp: Active CDP session.
+        room_name: Desired room name from configuration.
+
+    Returns:
+        Matching room entry, or `None` if the room never appears.
+    """
+    waited_ms = 0
+    while waited_ms < _ROOM_DISCOVERY_TIMEOUT_MS:
+        entries = _collect_room_entries(cdp)
+        _register_room_entries(entries)
+        room_entry = _resolve_room_entry(entries, room_name)
+        if room_entry is not None:
+            return room_entry
+        page.wait_for_timeout(_JOIN_POLL_INTERVAL_MS)
+        waited_ms += int(_JOIN_POLL_INTERVAL_MS)
+    return None
+
+
+def _wait_for_room_id(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    room_name: str,
+) -> str | None:
+    """Wait for the desired room to appear in captured ROOM_LIST traffic.
+
+    Args:
+        page: Playwright page used for polling delays.
+        cdp: Active CDP session.
+        room_name: Desired room name from configuration.
+
+    Returns:
+        Matching room ID, or `None` if the room never appears.
+    """
+    room_entry = _wait_for_room_entry(page, cdp, room_name)
+    if room_entry is None:
+        return None
+    return room_entry["room_id"]
+
+
+def _has_join_confirm(cdp: CDPSessionProtocol, room_id: str, *, start_index: int = 0) -> bool:
+    """Return whether a JOIN_CONFIRM for the selected room was captured.
+
+    Args:
+        cdp: Active CDP session.
+        room_id: Expected joined room ID.
+        start_index: Raw-message index where matching should begin.
+
+    Returns:
+        True when a matching JOIN_CONFIRM has been captured.
+    """
+    expected_prefix = f"={room_id}|"
+    payloads = get_captured_raw_messages(cdp)
+    for payload in payloads[start_index:]:
+        body = _decode_captured_body(payload)
+        if not body or body[0] != ord("="):
+            continue
+        if body.decode("utf-8").startswith(expected_prefix):
+            return True
+    return False
+
+
+def _wait_for_join_confirm(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    room_id: str,
+    *,
+    start_index: int = 0,
+) -> bool:
+    """Wait for a JOIN_CONFIRM message for the selected room.
+
+    Args:
+        page: Playwright page used for polling delays.
+        cdp: Active CDP session.
+        room_id: Selected room ID.
+        start_index: Raw-message index where matching should begin.
+
+    Returns:
+        True when the matching JOIN_CONFIRM arrives, False on timeout.
+    """
+    waited_ms = 0
+    while waited_ms < _JOIN_CONFIRM_TIMEOUT_MS:
+        if _has_join_confirm(cdp, room_id, start_index=start_index):
+            return True
+        page.wait_for_timeout(_JOIN_POLL_INTERVAL_MS)
+        waited_ms += int(_JOIN_POLL_INTERVAL_MS)
+    return False
+
+
+def _has_enter_response(cdp: CDPSessionProtocol, room_id: str, *, start_index: int = 0) -> bool:
+    """Return whether an enter response for the selected room was captured.
+
+    Args:
+        cdp: Active CDP session.
+        room_id: Expected entered room ID.
+        start_index: Raw-message index where matching should begin.
+
+    Returns:
+        True when a matching ``$room_id|...`` response has been captured.
+    """
+    expected_prefix = f"${room_id}|"
+    payloads = get_captured_raw_messages(cdp)
+    for payload in payloads[start_index:]:
+        body = _decode_captured_body(payload)
+        if not body or body[0] != ord("$"):
+            continue
+        if body.decode("utf-8").startswith(expected_prefix):
+            return True
+    return False
+
+
+def _wait_for_enter_response(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+    room_id: str,
+    *,
+    start_index: int = 0,
+) -> bool:
+    """Wait for the room-enter response for the selected room.
+
+    Args:
+        page: Playwright page used for polling delays.
+        cdp: Active CDP session.
+        room_id: Selected room ID.
+        start_index: Raw-message index where matching should begin.
+
+    Returns:
+        True when the matching enter response arrives, False on timeout.
+    """
+    waited_ms = 0
+    while waited_ms < _ROOM_ENTER_TIMEOUT_MS:
+        if _has_enter_response(cdp, room_id, start_index=start_index):
+            return True
+        page.wait_for_timeout(_JOIN_POLL_INTERVAL_MS)
+        waited_ms += int(_JOIN_POLL_INTERVAL_MS)
+    return False
 
 
 def join_room(
     page: PageProtocol,
     cdp: CDPSessionProtocol,
 ) -> bool:
-    """Join the game by clicking the map.
-
-    Clicks the field-image (map) to enter the game at center position.
+    """Join the configured room through the lobby websocket protocol.
 
     Args:
         page: Playwright page.
-        cdp: CDP session for JavaScript evaluation.
+        cdp: Active CDP session.
 
     Returns:
-        True if game was joined, False otherwise.
+        True if the room was confirmed and the enter response arrived.
     """
     log.info("Joining game...")
-
-    # Wait for lobby to load
-    page.wait_for_timeout(2000.0)
-
-    # Select room from dropdown in #game-list
-    # Room indices: 0=Meltdown, 1=Practice
     room_name = _test_hooks.get_env("TANKPIT_ROOM") or "Practice"
-    room_index = 0 if room_name == "Meltdown" else 1
-    room_js = f"""
-    new Promise((resolve, reject) => {{
-        let attempts = 0;
-        const check = () => {{
-            const sel = document.querySelector('#game-list select');
-            if (!sel) {{ reject('no select in #game-list'); return; }}
-            if (sel.options.length >= 2) {{
-                sel.selectedIndex = {room_index};
-                sel.dispatchEvent(new Event('change', {{bubbles: true}}));
-                const opt = sel.options[sel.selectedIndex];
-                const label = opt ? opt.text || opt.value : '?';
-                resolve('selected index={room_index} (' + label + ')');
-            }} else if (++attempts > 50) {{
-                reject('options never loaded after 50 checks');
-            }} else {{
-                setTimeout(check, 100);
-            }}
-        }};
-        check();
-    }})
-    """
-    room_result = cdp.send(
-        "Runtime.evaluate",
-        {"expression": room_js, "returnByValue": True, "awaitPromise": True},
-    )
-    result_obj = require_dict(room_result, "result")
-    room_val = require_str(result_obj, "value")
-    log.info("Room select: %s", room_val)
-    page.wait_for_timeout(1000.0)
-
-    # Click map to place tank
-    map_result = _click_map(cdp)
-    log.info("Map click: %s", map_result)
-
-    if "no field-image" in map_result:
+    room_entry = _wait_for_room_entry(page, cdp, room_name)
+    if room_entry is None:
+        log.info("Room select failed: room list never exposed %s", room_name)
+        return False
+    room_id = room_entry["room_id"]
+    join_confirm_start = len(get_captured_raw_messages(cdp))
+    select_request: RoomSelectRequestDict = {"room_id": room_id}
+    select_result = send_websocket_bytes(cdp, serialize_room_select_request(select_request))
+    log.info("Room select: room=%s name=%s -> %s", room_id, room_name, select_result)
+    if not select_result.startswith("SENT_"):
         return False
 
-    page.wait_for_timeout(3000.0)
+    if not _wait_for_join_confirm(page, cdp, room_id, start_index=join_confirm_start):
+        log.info("Join confirm timeout: room=%s name=%s", room_id, room_name)
+        return False
+    from tankpit_bot.sniffer.world_state import set_selected_room
+
+    set_selected_room(room_id)
+    magic = _get_magic_key(cdp)
+    if len(magic) == 0:
+        log.info("Enter game failed: tankpit.magic was unavailable")
+        return False
+    tpclient_url = _get_tpclient_url(cdp)
+    if len(tpclient_url) == 0:
+        log.info("Enter game failed: tpclient script URL was unavailable")
+        return False
+    static_key = _load_tpclient_static_key(cdp, tpclient_url)
+    metadata = build_room_enter_metadata(page.url, tpclient_url)
+    codec = ProtocolCodec(static_key, magic)
+    enter_request: RoomEnterRequestDict = {
+        "room_id": room_id,
+        "troop": room_entry["default_troop"],
+        "preview_x": ROOM_ENTRY_DEFAULT_X,
+        "preview_y": ROOM_ENTRY_DEFAULT_Y,
+        "metadata": metadata,
+    }
+    enter_response_start = len(get_captured_raw_messages(cdp))
+    enter_result = send_websocket_bytes(
+        cdp,
+        serialize_room_enter_request(enter_request, codec),
+    )
+    log.info(
+        "Enter game: room=%s troop=%d -> %s",
+        room_id,
+        room_entry["default_troop"],
+        enter_result,
+    )
+    if not enter_result.startswith("SENT_"):
+        return False
+    if not _wait_for_enter_response(page, cdp, room_id, start_index=enter_response_start):
+        log.info("Enter response timeout: room=%s name=%s", room_id, room_name)
+        return False
     return True
 
 
@@ -547,7 +875,7 @@ def handle_login_flow(
     )
 
     if success and auto_join_room:
-        join_room(page, cdp)
+        return join_room(page, cdp)
 
     return success
 
