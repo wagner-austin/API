@@ -101,6 +101,20 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
+    def test_save_capture_session_returns_when_runtime_artifacts_missing(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """Saving a capture session is a no-op when runtime logging is disabled."""
+        from tankpit_bot.bot.base import Bot
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+
+        bot._save_capture_session()
+
+        assert all("capture_session.json" not in path for path in fake_fs.get_written_files())
+
 
 class TestBotBaseMain:
     """Tests for bot.base.main function."""
