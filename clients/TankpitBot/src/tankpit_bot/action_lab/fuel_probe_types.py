@@ -14,6 +14,14 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from tankpit_bot.action_lab.action_trace_types import (
+    ActionPhaseOverlapDict,
+    FuelDecisionBasisDict,
+    decode_action_phase_overlap,
+    decode_fuel_decision_basis,
+    encode_action_phase_overlap,
+    encode_fuel_decision_basis,
+)
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
@@ -28,6 +36,10 @@ class FuelProbeAttemptResultDict(TypedDict):
     """Outcome of one teleport-radar-fuel attempt."""
 
     target: TeleportTargetDict
+    teleport_cycle_ids: list[int]
+    radar_cycle_id: int | None
+    move_cycle_id: int | None
+    pickup_cycle_id: int | None
     status: Literal[
         "picked_up_fuel",
         "no_fuel_visible",
@@ -56,6 +68,8 @@ class FuelProbeAttemptResultDict(TypedDict):
     fuel_target_x: int | None
     fuel_target_y: int | None
     fuel_target_volume: int | None
+    phase_overlaps: list[ActionPhaseOverlapDict]
+    decision_basis: FuelDecisionBasisDict | None
     message_start_index: int
     message_end_index: int
 
@@ -87,10 +101,19 @@ def _encode_optional_int(value: int | None) -> JSONValue:
     return value
 
 
+def _encode_int_list(values: list[int]) -> list[JSONValue]:
+    """Encode a list of integers as JSON values."""
+    return list(values)
+
+
 def encode_fuel_probe_attempt_result(result: FuelProbeAttemptResultDict) -> JSONObject:
     """Encode a fuel probe attempt result."""
     return {
         "target": encode_teleport_target(result["target"]),
+        "teleport_cycle_ids": _encode_int_list(result["teleport_cycle_ids"]),
+        "radar_cycle_id": _encode_optional_int(result["radar_cycle_id"]),
+        "move_cycle_id": _encode_optional_int(result["move_cycle_id"]),
+        "pickup_cycle_id": _encode_optional_int(result["pickup_cycle_id"]),
         "status": result["status"],
         "map_open_started_ms": result["map_open_started_ms"],
         "map_sync_timestamp_ms": _encode_optional_int(result["map_sync_timestamp_ms"]),
@@ -116,6 +139,14 @@ def encode_fuel_probe_attempt_result(result: FuelProbeAttemptResultDict) -> JSON
         "fuel_target_x": _encode_optional_int(result["fuel_target_x"]),
         "fuel_target_y": _encode_optional_int(result["fuel_target_y"]),
         "fuel_target_volume": _encode_optional_int(result["fuel_target_volume"]),
+        "phase_overlaps": [
+            encode_action_phase_overlap(overlap) for overlap in result["phase_overlaps"]
+        ],
+        "decision_basis": (
+            None
+            if result["decision_basis"] is None
+            else encode_fuel_decision_basis(result["decision_basis"])
+        ),
         "message_start_index": result["message_start_index"],
         "message_end_index": result["message_end_index"],
     }
@@ -137,6 +168,36 @@ def _require_bool_field(data: JSONObject, field: str) -> bool:
     if not isinstance(raw, bool):
         raise JSONTypeError(f"Field '{field}' must be a boolean")
     return raw
+
+
+def _decode_phase_overlaps(raw: JSONValue) -> list[ActionPhaseOverlapDict]:
+    """Decode a list of action-phase overlap diagnostics."""
+    result: list[ActionPhaseOverlapDict] = []
+    for item in require_list({"items": raw}, "items"):
+        if not isinstance(item, dict):
+            raise JSONTypeError("Field 'phase_overlaps' must contain only objects")
+        result.append(decode_action_phase_overlap(item))
+    return result
+
+
+def _decode_optional_decision_basis(data: JSONObject, field: str) -> FuelDecisionBasisDict | None:
+    """Decode an optional decision basis object."""
+    raw = data.get(field)
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise JSONTypeError(f"Field '{field}' must be an object or null")
+    return decode_fuel_decision_basis(raw)
+
+
+def _decode_int_list(data: JSONObject, field: str) -> list[int]:
+    """Decode a required list of integers."""
+    result: list[int] = []
+    for item in require_list(data, field):
+        if isinstance(item, bool) or not isinstance(item, int):
+            raise JSONTypeError(f"Field '{field}' must contain only integers")
+        result.append(item)
+    return result
 
 
 def _require_status(
@@ -180,6 +241,10 @@ def decode_fuel_probe_attempt_result(data: JSONObject) -> FuelProbeAttemptResult
         raise JSONTypeError("Field 'target' must be an object")
     return FuelProbeAttemptResultDict(
         target=decode_teleport_target(target_raw),
+        teleport_cycle_ids=_decode_int_list(data, "teleport_cycle_ids"),
+        radar_cycle_id=_require_optional_int(data, "radar_cycle_id"),
+        move_cycle_id=_require_optional_int(data, "move_cycle_id"),
+        pickup_cycle_id=_require_optional_int(data, "pickup_cycle_id"),
         status=_require_status(data, "status"),
         map_open_started_ms=require_int(data, "map_open_started_ms"),
         map_sync_timestamp_ms=_require_optional_int(data, "map_sync_timestamp_ms"),
@@ -206,6 +271,8 @@ def decode_fuel_probe_attempt_result(data: JSONObject) -> FuelProbeAttemptResult
         fuel_target_x=_require_optional_int(data, "fuel_target_x"),
         fuel_target_y=_require_optional_int(data, "fuel_target_y"),
         fuel_target_volume=_require_optional_int(data, "fuel_target_volume"),
+        phase_overlaps=_decode_phase_overlaps(data.get("phase_overlaps")),
+        decision_basis=_decode_optional_decision_basis(data, "decision_basis"),
         message_start_index=require_int(data, "message_start_index"),
         message_end_index=require_int(data, "message_end_index"),
     )
