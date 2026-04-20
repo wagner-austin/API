@@ -15,12 +15,17 @@ The current bot is a tick-based planner with an execution state machine.
 
 Each tick:
 
-1. drain received WebSocket messages
-2. update world state
-3. update execution state from world state
+1. drain buffered CDP payloads (sync)
+2. read world state, update execution state from world state
+3. check readiness (not INITIALIZING/WAITING/DISCONNECTED)
 4. block if an in-flight action is still resolving
-5. run the planner
-6. execute one command
+5. re-read world state after in-flight resolution
+6. merge protocol kills into AI state
+7. block if pending shot feedback has not resolved
+8. gather combat feedback
+9. run the planner (decide)
+10. execute one command
+11. persist AI state only if command dispatched
 
 Primary files:
 
@@ -229,7 +234,9 @@ This stage blocks replanning while waiting on:
 - scan
 - map_open
 
-Shoot is currently treated as non-blocking for replanning.
+Shoot is non-blocking as an in-flight action, but a separate shot feedback
+blocking gate (`_has_pending_shot_feedback`) defers replanning while waiting
+for hit/miss feedback within `shot_feedback_timeout_ms`.
 
 ### Plan
 
@@ -260,8 +267,16 @@ Behavior:
 
 Important point:
 
-- executor is currently thin
-- most command validity assumptions are made upstream in the planner
+- executor runs `_is_dispatchable()` validation before every dispatch
+- **shoots**: target must be tracked, at the expected coordinates, and
+  viewport-confirmed
+- **pickups**: container must still exist and match expected kind
+  (fuel/equipment)
+- **moves/teleports**: destination must not be a known mine
+- **combat teleports**: locked combat target must still be tracked with a
+  valid source
+- **resource teleports**: locked resource target must still exist with a
+  locally trustworthy source
 
 ## Combat Model
 
@@ -320,6 +335,7 @@ Equipment:
   - `SEARCH`
   - `APPROACH`
   - `PICKUP`
+  - `DONE`
 
 Important point:
 
@@ -329,6 +345,7 @@ Important point:
   - `SEARCH`
   - `APPROACH`
   - `PICKUP`
+  - `DONE`
 - equipment recovery is also a durable owner with the same substate vocabulary
   and direct ownership of route planning
 
@@ -383,8 +400,8 @@ Main reasons:
 3. some route helpers still derive behavior labels from older tick-era naming
 4. world-state freshness/source can still be expressed more strongly in planner
    decisions
-5. executor does not yet act as a strong last-mile validator for every command
-   family
+5. executor now validates shoots, pickups, moves, teleports, but validation
+   rules could still be extended to cover more edge cases
 6. in-flight action handling and planner memory still interact in fragile ways,
    even after the stale-container retry bug above was fixed
 
