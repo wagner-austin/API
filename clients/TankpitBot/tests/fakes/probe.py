@@ -5,6 +5,7 @@ Provides fake implementations specialized for probe testing.
 
 from __future__ import annotations
 
+import base64
 import types
 from collections.abc import Callable
 
@@ -21,7 +22,17 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
-from tests.fakes.base import FakeKeyboard, FakeResponse, _make_auth_payload
+from tankpit_bot.protocol.framing import decode_frame
+from tests.fakes.base import (
+    _FAKE_MAGIC,
+    _FAKE_STATIC_KEY,
+    _FAKE_TPCLIENT_URL,
+    FakeKeyboard,
+    FakeResponse,
+    _build_captured_raw_messages,
+    _extract_enter_room_id,
+    _make_auth_payload,
+)
 
 
 class FakeCDPSessionProbe:
@@ -62,16 +73,26 @@ class FakeCDPSessionProbe:
         self._js_keypress_fails = js_keypress_fails
         self._input_count = 0
         self._ws_url = "wss://tankpit.com/ws/"
+        self._selected_room: str | None = None
+        self._entered_room: str | None = None
+        self._raw_messages_ready = False
 
     def _handle_runtime_evaluate(self, params: JSONObject) -> JSONObject:
         """Handle Runtime.evaluate CDP command."""
         expression = params.get("expression", "")
         expr_str = str(expression)
 
-        if "innerWidth" in expr_str:
-            if self._viewport_result is not None:
-                return self._viewport_result
-            return {"result": {"value": '{"w":800,"h":600}'}}
+        captured_raw_result = self._handle_captured_raw_messages(expr_str)
+        if captured_raw_result is not None:
+            return captured_raw_result
+
+        viewport_result = self._handle_viewport_evaluate(expr_str)
+        if viewport_result is not None:
+            return viewport_result
+
+        websocket_result = self._handle_websocket_evaluate(expr_str)
+        if websocket_result is not None:
+            return websocket_result
 
         if self._return_invalid_result:
             return {"error": "simulated error"}
@@ -79,22 +100,67 @@ class FakeCDPSessionProbe:
         if self._return_missing_value:
             return {"result": {}}
 
-        # Detect WebSocket send via _send_websocket_bytes and emit messages
-        if "ws.send" in expr_str and "__capturedWS" in expr_str and self._emit_on_key:
+        keypress_result = self._handle_js_keypress_evaluate(expr_str)
+        if keypress_result is not None:
+            return keypress_result
+
+        return {"result": {"value": "success"}}
+
+    def _handle_captured_raw_messages(self, expression: str) -> JSONObject | None:
+        """Handle synthetic raw-message snapshot queries."""
+        if "window.__rawMsgs" not in expression:
+            return None
+        if not self._raw_messages_ready:
+            return {"result": {"value": []}}
+        return {
+            "result": {
+                "value": _build_captured_raw_messages(self._selected_room, self._entered_room)
+            }
+        }
+
+    def _handle_viewport_evaluate(self, expression: str) -> JSONObject | None:
+        """Handle viewport-size evaluation queries."""
+        if "innerWidth" not in expression:
+            return None
+        if self._viewport_result is not None:
+            return self._viewport_result
+        return {"result": {"value": '{"w":800,"h":600}'}}
+
+    def _handle_websocket_evaluate(self, expression: str) -> JSONObject | None:
+        """Handle injected websocket send expressions."""
+        if "window.__capturedWS" not in expression or "atob('" not in expression:
+            if "tankpit.magic" in expression:
+                return {"result": {"value": _FAKE_MAGIC}}
+            if "script[src]" in expression and "tpclient" in expression:
+                return {"result": {"value": _FAKE_TPCLIENT_URL}}
+            if "fetch(" in expression and "tpclient-test.js" in expression:
+                return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
+            return None
+        framed = base64.b64decode(expression.split("atob('", 1)[1].split("')", 1)[0])
+        body, remaining = decode_frame(framed)
+        if remaining:
+            raise ValueError(f"unexpected trailing framed data: {remaining.hex()}")
+        if body.startswith(b"*"):
+            self._selected_room = body[1:].decode("utf-8")
+            return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
+        if body.startswith(b"+"):
+            self._entered_room = _extract_enter_room_id(body)
+            return {"result": {"value": f"SENT_{len(framed)}_BYTES via {self._ws_url}"}}
+        if self._emit_on_key:
             self._input_count += 1
             self._emit_ws_sent(f"key_input_{self._input_count}")
             self._emit_ws_received(f"key_response_{self._input_count}")
-            return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
+        return {"result": {"value": f"SENT_{len(framed)}_BYTES via {self._ws_url}"}}
 
-        # Detect JS keypress for toggle close
-        if "KeyboardEvent" in expr_str and "dispatchEvent" in expr_str:
-            if self._js_keypress_fails:
-                return {"result": {"value": "ERROR"}}
-            if "'f'" in expr_str or '"f"' in expr_str:
-                return {"result": {"value": "JS_KEYPRESS_F"}}
-            return {"result": {"value": "JS_KEYPRESS_?"}}
-
-        return {"result": {"value": "success"}}
+    def _handle_js_keypress_evaluate(self, expression: str) -> JSONObject | None:
+        """Handle DOM keypress fallback used to close toggle menus."""
+        if "KeyboardEvent" not in expression or "dispatchEvent" not in expression:
+            return None
+        if self._js_keypress_fails:
+            return {"result": {"value": "ERROR"}}
+        if "'f'" in expression or '"f"' in expression:
+            return {"result": {"value": "JS_KEYPRESS_F"}}
+        return {"result": {"value": "JS_KEYPRESS_?"}}
 
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Send CDP command and optionally emit WebSocket response."""
@@ -248,6 +314,7 @@ class FakePageProbe:
                     "response": {"opcode": 1, "mask": False, "payloadData": "room_list"},
                 },
             )
+            self._cdp_session._raw_messages_ready = True
         elif self._emit_during_stabilization and self._wait_count == 5:
             # Emit extra message during stabilization loop (iteration 2)
             # Calls: 1=join_room, 2=join_room, 3=pre-stabilization, 4=loop iter 1, 5=loop iter 2
@@ -386,6 +453,8 @@ class FakeBrowserContextProbe:
             emit_on_mouse=emit_on_mouse,
             viewport_result=viewport_result,
         )
+        if not emit_messages:
+            self._cdp_session._raw_messages_ready = True
         self._pages: list[FakePageProbe | FakePageProbeNoMessages] = []
         self._closed = False
         self._emit_messages = emit_messages
