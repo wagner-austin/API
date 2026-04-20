@@ -81,28 +81,32 @@ class FakeCDPSessionSimple:
 
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
-    """Restore all hooks after each test."""
-    # Save original hooks
-    original_get_env = _test_hooks.get_env
-    original_write_text = _test_hooks.write_text
-    original_read_text = _test_hooks.read_text
-    original_append_text = _test_hooks.append_text
-    original_path_exists = _test_hooks.path_exists
-    original_sync_playwright = _test_hooks.sync_playwright
-    original_get_sync_playwright = _test_hooks.get_sync_playwright
-    original_get_argv = _test_hooks.get_argv
+    """Reset all shared test hooks to canonical defaults for each test."""
+    _test_hooks.get_env = _test_hooks._default_get_env
+    _test_hooks.write_text = _test_hooks._real_write_text
+    _test_hooks.read_text = _test_hooks._real_read_text
+    _test_hooks.append_text = _test_hooks._real_append_text
+    _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.find_best_static_byte = None
+    _test_hooks.sync_playwright = None
+    _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
+    _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
+    _test_hooks.get_argv = _test_hooks._real_get_argv
+    _test_hooks.process_received_message_hook = _test_hooks._real_process_received_message
 
     yield
 
-    # Restore hooks
-    _test_hooks.get_env = original_get_env
-    _test_hooks.write_text = original_write_text
-    _test_hooks.read_text = original_read_text
-    _test_hooks.append_text = original_append_text
-    _test_hooks.path_exists = original_path_exists
-    _test_hooks.sync_playwright = original_sync_playwright
-    _test_hooks.get_sync_playwright = original_get_sync_playwright
-    _test_hooks.get_argv = original_get_argv
+    _test_hooks.get_env = _test_hooks._default_get_env
+    _test_hooks.write_text = _test_hooks._real_write_text
+    _test_hooks.read_text = _test_hooks._real_read_text
+    _test_hooks.append_text = _test_hooks._real_append_text
+    _test_hooks.path_exists = _test_hooks._real_path_exists
+    _test_hooks.find_best_static_byte = None
+    _test_hooks.sync_playwright = None
+    _test_hooks.get_sync_playwright = _test_hooks._real_get_sync_playwright
+    _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
+    _test_hooks.get_argv = _test_hooks._real_get_argv
+    _test_hooks.process_received_message_hook = _test_hooks._real_process_received_message
 
 
 @pytest.fixture(autouse=True)
@@ -111,6 +115,24 @@ def _restore_guard_hooks() -> Generator[None, None, None]:
     yield
     _hooks_guard.guard_find_monorepo_root = None
     _hooks_guard.guard_load_orchestrator = None
+
+
+@pytest.fixture(autouse=True)
+def _restore_runtime_logging_state() -> Generator[None, None, None]:
+    """Reset runtime logging globals and artifact handlers for each test."""
+    from platform_core.logging import stdlib_logging
+
+    from tankpit_bot import runtime_logging
+
+    runtime_logging._BOT_ARTIFACTS = None
+    runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
+
+    yield
+
+    runtime_logging._BOT_ARTIFACTS = None
+    runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
 
 class FakeEnv:
