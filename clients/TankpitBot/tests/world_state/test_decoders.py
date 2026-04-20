@@ -4,7 +4,9 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.state import (
+    CONTAINER_REFRESH_KINDS,
     add_mine,
+    decode_container_refresh_kind,
     decode_container_state,
     decode_mine_state,
     decode_self_state,
@@ -12,6 +14,7 @@ from tankpit_bot.state import (
     decode_terrain_tile,
     decode_viewport_state,
     decode_world_state,
+    encode_container_refresh_kind,
     encode_world_state,
     make_empty_world_state,
     update_container_from_radar,
@@ -86,6 +89,7 @@ class TestDecodeContainerState:
             "is_fuel": True,
             "volume": 300,
             "source": "radar",
+            "refresh_kind": "radar_response",
             "timestamp_ms": 5000,
             "failed_pickups": 0,
         }
@@ -96,8 +100,26 @@ class TestDecodeContainerState:
         assert container["is_fuel"] is True
         assert container["volume"] == 300
         assert container["source"] == "radar"
+        assert container["refresh_kind"] == "radar_response"
         assert container["timestamp_ms"] == 5000
         assert container["failed_pickups"] == 0
+
+    @pytest.mark.parametrize("refresh_kind", CONTAINER_REFRESH_KINDS)
+    def test_decodes_all_refresh_kinds(self, refresh_kind: str) -> None:
+        """Decodes every supported container refresh kind."""
+        data: JSONObject = {"refresh_kind": refresh_kind}
+
+        decoded = decode_container_refresh_kind(data, "refresh_kind")
+
+        assert decoded == refresh_kind
+        assert encode_container_refresh_kind(decoded) == refresh_kind
+
+    def test_invalid_refresh_kind_raises(self) -> None:
+        """Raises JSONTypeError for an unsupported refresh kind."""
+        data: JSONObject = {"refresh_kind": "invalid"}
+
+        with pytest.raises(JSONTypeError, match="refresh_kind must be one of"):
+            decode_container_refresh_kind(data, "refresh_kind")
 
 
 class TestDecodeMineState:
