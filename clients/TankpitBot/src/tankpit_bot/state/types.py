@@ -63,6 +63,20 @@ ENTITY_SOURCES: tuple[str, ...] = (
     "world_state",
 )
 
+CONTAINER_REFRESH_KINDS: tuple[str, ...] = (
+    "radar_response",
+    "radar_cache_refresh",
+    "radar_known_resources",
+    "world_state",
+)
+
+ContainerRefreshKind = Literal[
+    "radar_response",
+    "radar_cache_refresh",
+    "radar_known_resources",
+    "world_state",
+]
+
 
 def _require_entity_source(
     data: JSONObject,
@@ -88,6 +102,46 @@ def _require_entity_source(
     if raw == "world_state":
         return "world_state"
     raise JSONTypeError(f"{key} must be one of {ENTITY_SOURCES}, got {raw!r}")
+
+
+def decode_container_refresh_kind(
+    data: JSONObject,
+    key: str,
+) -> ContainerRefreshKind:
+    """Validate and extract a container refresh kind from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated container refresh kind.
+
+    Raises:
+        JSONTypeError: If the value is not a supported refresh kind.
+    """
+    raw = require_str(data, key)
+    if raw == "radar_response":
+        return "radar_response"
+    if raw == "radar_cache_refresh":
+        return "radar_cache_refresh"
+    if raw == "radar_known_resources":
+        return "radar_known_resources"
+    if raw == "world_state":
+        return "world_state"
+    raise JSONTypeError(f"{key} must be one of {CONTAINER_REFRESH_KINDS}, got {raw!r}")
+
+
+def encode_container_refresh_kind(kind: ContainerRefreshKind) -> str:
+    """Encode a container refresh kind.
+
+    Args:
+        kind: Refresh kind to encode.
+
+    Returns:
+        JSON string value for the refresh kind.
+    """
+    return kind
 
 
 # =============================================================================
@@ -136,6 +190,8 @@ class ContainerStateDict(TypedDict):
         is_fuel: True if fuel container, False if equipment.
         volume: Fuel amount (0 for equipment).
         source: Which observed source most recently confirmed this container.
+        refresh_kind: Specific confirmation path that most recently refreshed
+            this container.
         timestamp_ms: When this container was last confirmed by the
             server (radar, viewport, or world state). Used for
             freshness-based target selection.
@@ -149,6 +205,7 @@ class ContainerStateDict(TypedDict):
     is_fuel: bool
     volume: int
     source: Literal["viewport", "radar", "world_state"]
+    refresh_kind: ContainerRefreshKind
     timestamp_ms: int
     failed_pickups: int
 
@@ -335,6 +392,7 @@ def make_container_state(
     is_fuel: bool,
     volume: int,
     source: Literal["viewport", "radar", "world_state"] = "radar",
+    refresh_kind: ContainerRefreshKind | None = None,
     timestamp_ms: int = 0,
     failed_pickups: int = 0,
 ) -> ContainerStateDict:
@@ -346,21 +404,42 @@ def make_container_state(
         is_fuel: True if fuel, False if equipment.
         volume: Fuel amount (0 for equipment).
         source: Which observed source confirmed this container.
+        refresh_kind: Specific refresh path that confirmed this container.
         timestamp_ms: When this container was confirmed.
         failed_pickups: How many pickup attempts failed.
 
     Returns:
         ContainerStateDict with the provided values.
     """
+    resolved_refresh_kind = (
+        _default_container_refresh_kind(source) if refresh_kind is None else refresh_kind
+    )
     return ContainerStateDict(
         x=x,
         y=y,
         is_fuel=is_fuel,
         volume=volume,
         source=source,
+        refresh_kind=resolved_refresh_kind,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
     )
+
+
+def _default_container_refresh_kind(
+    source: Literal["viewport", "radar", "world_state"],
+) -> ContainerRefreshKind:
+    """Return the canonical refresh kind for a coarse container source.
+
+    Args:
+        source: Coarse observed source.
+
+    Returns:
+        Canonical refresh kind matching the source.
+    """
+    if source == "radar":
+        return "radar_response"
+    return "world_state"
 
 
 def make_mine_state(
@@ -552,6 +631,7 @@ def encode_container_state(state: ContainerStateDict) -> JSONObject:
         "is_fuel": state["is_fuel"],
         "volume": state["volume"],
         "source": state["source"],
+        "refresh_kind": encode_container_refresh_kind(state["refresh_kind"]),
         "timestamp_ms": state["timestamp_ms"],
         "failed_pickups": state["failed_pickups"],
     }
@@ -703,6 +783,7 @@ def decode_container_state(data: JSONObject) -> ContainerStateDict:
         is_fuel=require_bool(data, "is_fuel"),
         volume=require_int(data, "volume"),
         source=_require_entity_source(data, "source"),
+        refresh_kind=decode_container_refresh_kind(data, "refresh_kind"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         failed_pickups=require_int(data, "failed_pickups"),
     )
@@ -890,6 +971,7 @@ __all__ = [
     "ASCII_SELF",
     "ASCII_UNKNOWN",
     "ASCII_WATER",
+    "CONTAINER_REFRESH_KINDS",
     "DAMAGE_CRITICAL",
     "DAMAGE_FULL",
     "DAMAGE_LIGHT",
@@ -905,6 +987,7 @@ __all__ = [
     "TERRAIN_ROCK_A",
     "TERRAIN_ROCK_AB",
     "TERRAIN_ROCK_B",
+    "ContainerRefreshKind",
     "ContainerStateDict",
     "MineStateDict",
     "SelfStateDict",
@@ -913,6 +996,7 @@ __all__ = [
     "ViewportStateDict",
     "WorldStateDict",
     "coord_key",
+    "decode_container_refresh_kind",
     "decode_container_state",
     "decode_mine_state",
     "decode_self_state",
@@ -920,6 +1004,7 @@ __all__ = [
     "decode_terrain_tile",
     "decode_viewport_state",
     "decode_world_state",
+    "encode_container_refresh_kind",
     "encode_container_state",
     "encode_mine_state",
     "encode_self_state",
