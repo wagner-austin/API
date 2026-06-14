@@ -43,7 +43,11 @@ from tankpit_bot.bot.vision import (
     make_empty_vision_state,
 )
 from tankpit_bot.browser import BrowserSession, get_current_time_ms
-from tankpit_bot.browser.dom_scraper import scrape_page_text
+from tankpit_bot.browser.dom_scraper import (
+    GameLogEntry,
+    GameLogScraper,
+    scrape_page_text,
+)
 from tankpit_bot.diagnostics.account_stats import (
     emit_account_stats_sample,
     parse_account_stats,
@@ -154,6 +158,7 @@ class Bot(BrowserSession):
             prefer_account=prefer_account,
         )
         self._cdp: _test_hooks.CDPSessionProtocol | None = None
+        self._game_log_scraper: GameLogScraper | None = None
         # Monotonic counter for opt-in per-shot screenshot filenames.
         self._shot_screenshot_seq: int = 0
         self._page: _test_hooks.PageProtocol | None = None
@@ -981,6 +986,25 @@ class Bot(BrowserSession):
         self._dispatch_keypress("m")
         log.info("Map: closed via local 'm' keyboard event (no wire byte sent)")
         return True
+
+    def _init_game_log_scraper(self, cdp: _test_hooks.CDPSessionProtocol) -> None:
+        """Create the game log scraper for server feedback visibility.
+
+        Args:
+            cdp: Active CDP session for DOM access.
+        """
+        self._game_log_scraper = GameLogScraper(cdp)
+
+    def _poll_game_log(self) -> list[GameLogEntry]:
+        """Poll the game log for new entries since the last scrape.
+
+        Returns:
+            New log entries (kills, hits, empty containers, etc.).
+        """
+        scraper = self._game_log_scraper
+        if scraper is None:
+            return []
+        return scraper.get_new_entries()
 
     def _capture_account_stats(self, phase: str) -> None:
         """Sample the in-game ``C`` statistics panel and emit it.
