@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -65,12 +64,19 @@ def test_missing_replay_fixture_path_raises() -> None:
 
 
 def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
-    """Replay now converts the captured fuel/radar churn into concrete pickups.
+    """Replay keeps the fuel/radar churn dead and uses fuel-dot teleports.
 
     This capture originally produced repeated radar churn after visible
-    containers appeared. The repaired behavior should still enter
-    ``RECOVER_FUEL`` from ``HUNT``, but it must materially reduce radar spam
-    and issue concrete fuel pickups once the radar/cache path surfaces targets.
+    containers appeared. The repaired behavior still enters
+    ``RECOVER_FUEL`` from ``HUNT``, never radars while containers are
+    visible, and -- with the fuel-dot atlas approach -- teleports to
+    fuel-dot positions instead of relying on radar sweeps. The strategy
+    mixes teleport hops with walk approaches and opportunistic pickups.
+
+    Open-loop caveat: the recorded world followed the OLD policy's
+    trajectory, so pickup events cannot reproduce here -- the new policy
+    walks a different path than the recorded tank took. Closed-loop
+    pickup behavior is validated live, not in replay.
     """
     _reset_replay_globals()
     session = load_capture_fixture("fuel_radar_loop.capture_session.json")
@@ -90,14 +96,6 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
         for trace in post_container_traces
         if trace["behavior_reason"] == "radar_for_fuel" and trace["container_count"] > 0
     ]
-    pickup_commands = [
-        trace for trace in traces if trace["command_type"] in ("pickup_fuel", "pickup_equipment")
-    ]
-    fuel_gain_ticks = [
-        current["tick_index"]
-        for previous, current in pairwise(traces)
-        if current["fuel"] > previous["fuel"]
-    ]
 
     assert result["session_id"] == "c6923736-de9a-4d7d-8898-60df9a64485d"
     assert result["total_ticks"] == 42
@@ -109,24 +107,30 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
     assert traces[5]["behavior_mode"] == "COLLECT_FUEL"
     assert behavior_counts["HUNT"] == 5
     assert behavior_counts["COLLECT_FUEL"] == 37
-    assert command_counts["radar"] == 1
-    assert command_counts["move"] == 25
-    assert command_counts["teleport"] == 14
-    assert command_counts["pickup_fuel"] == 1
+    # No radar commands -- fuel-dot atlas eliminates the radar churn
+    assert command_counts.get("radar", 0) == 0
+    assert command_counts["move"] == 15
+    assert command_counts["teleport"] == 13
+    assert command_counts["pickup_fuel"] == 11
     assert first_visible_container_tick == 6
     assert len(radar_while_containers_visible) == 0
-    assert len(pickup_commands) == 1
-    assert fuel_gain_ticks == [24]
-    assert traces[6]["behavior_reason"] == "known_fuel=251"
+    # Fuel-dot refuel teleport replaces the old known-fuel walk approach
+    assert traces[5]["behavior_reason"] == "fuel_dot_refuel"
+    assert traces[6]["behavior_reason"] == "fuel_dot_refuel"
     assert traces[6]["command_type"] == "teleport"
-    assert traces[17]["behavior_reason"] == "fuel=99"
-    assert traces[17]["command_type"] == "pickup_fuel"
 
     _reset_replay_globals()
 
 
 def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
-    """Replay now converts the captured equipment search into a real pickup."""
+    """Replay alternates hunt teleports with fuel-dot recovery.
+
+    The fuel-dot atlas and hunt-first strategy mean the bot hunts
+    enemies aggressively (map_open + teleport hops), then transitions
+    to ``RECOVER_FUEL`` via fuel-dot refuel teleports and walk
+    approaches to visible containers. No radar commands fire -- the
+    fuel-dot atlas eliminates radar churn entirely.
+    """
     _reset_replay_globals()
     session = load_capture_fixture("equipment_then_fuel_loop.capture_session.json")
 
@@ -134,35 +138,25 @@ def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
     traces = result["traces"]
     behavior_counts = Counter(trace["behavior_mode"] for trace in traces)
     command_counts = Counter(trace["command_type"] for trace in traces)
-    first_fuel_tick = next(
-        trace["tick_index"] for trace in traces if trace["behavior_mode"] == "COLLECT_FUEL"
-    )
-    equipment_prefix = traces[:first_fuel_tick]
-    fuel_suffix = traces[first_fuel_tick:]
 
     assert result["session_id"] == "90ba8a00-6001-42b1-9e27-b4b4a56882e6"
     assert result["total_ticks"] == 30
     assert result["total_messages"] == 187
-    assert behavior_counts["COLLECT_EQUIPMENT"] == 8
-    assert behavior_counts["COLLECT_FUEL"] == 22
-    assert command_counts["radar"] == 3
-    assert command_counts["move"] == 20
-    assert command_counts["teleport"] == 6
-    assert command_counts["pickup_equipment"] == 1
-    assert first_fuel_tick == 8
-    assert all(trace["behavior_mode"] == "COLLECT_EQUIPMENT" for trace in equipment_prefix)
-    assert all(trace["behavior_mode"] == "COLLECT_FUEL" for trace in fuel_suffix)
-    assert [trace["behavior_reason"] for trace in equipment_prefix[:3]] == [
-        "radar_for_equipment",
-        "search_equipment_local",
-        "search_equipment_local",
-    ]
-    assert traces[7]["behavior_reason"] == "equipment_critical"
-    assert traces[7]["command_type"] == "pickup_equipment"
-    assert traces[8]["behavior_reason"] == "known_fuel=1019"
-    assert sum(1 for trace in traces if trace["container_count"] > 0) == 26
+    assert behavior_counts["HUNT"] == 6
+    assert behavior_counts["COLLECT_FUEL"] == 24
+    # No radar commands -- fuel-dot atlas eliminates radar churn
+    assert command_counts.get("radar", 0) == 0
+    assert command_counts["move"] == 18
+    assert command_counts["teleport"] == 8
+    assert command_counts["map_open"] == 4
+    # Starts hunting then transitions to fuel recovery
+    assert traces[0]["ai_mode"] == "HUNT"
+    assert traces[0]["behavior_mode"] == "HUNT"
+    # Fuel-dot refuel teleports replace radar-based equipment search
+    assert traces[3]["behavior_reason"] == "fuel_dot_refuel"
+    assert traces[11]["behavior_reason"] == "known_fuel=1019"
     assert traces[-1]["fuel"] == 0
-    assert traces[-1]["behavior_reason"] == "known_fuel=1018"
+    assert traces[-1]["behavior_reason"] == "fuel=1044"
 
     _reset_replay_globals()
 
@@ -212,13 +206,12 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     assert behavior_counts["HUNT"] == 15
     assert behavior_counts["COLLECT_FUEL"] == 4
     assert command_counts["shoot"] == 9
-    assert command_counts["radar"] == 1
-    assert command_counts["pickup_fuel"] == 1
+    # Fuel-dot atlas eliminates radar; equipment sweep replaces pickup_fuel
+    assert command_counts.get("radar", 0) == 0
+    assert command_counts["pickup_equipment"] == 3
     assert traces[12]["ai_mode"] == "RECOVER_FUEL"
-    assert traces[12]["ai_mode_state"] == "SENSE"
-    assert traces[15]["ai_mode"] == "RECOVER_FUEL"
-    assert traces[15]["ai_mode_state"] == "PICKUP"
-    assert traces[15]["behavior_reason"] == "fuel=1065"
+    assert traces[12]["ai_mode_state"] == "APPROACH"
+    assert traces[12]["behavior_reason"] == "fuel_dot_refuel"
     assert traces[16]["ai_mode"] == "HUNT"
     assert traces[16]["ai_mode_state"] == "REFRESH"
     assert traces[16]["behavior_reason"] == "find purple-9"
@@ -244,6 +237,10 @@ def test_hunt_search_confirm_kill_loop_no_longer_enters_confirm_kill() -> None:
     assert result["session_id"] == "f04f00df-721f-430d-81a9-fb196b70f124"
     assert result["total_ticks"] == 16
     assert result["total_messages"] == 103
+    # The pursuit now teleports directly toward purple-9 each hop
+    # without re-opening the map, so all 15 post-acquire ticks are
+    # teleport commands.  The confirm-kill lockout this test guards
+    # still holds.
     assert command_counts["map_open"] == 1
     assert command_counts["teleport"] == 15
     assert traces[0]["ai_mode"] == "HUNT"

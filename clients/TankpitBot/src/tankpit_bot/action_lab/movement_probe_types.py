@@ -14,6 +14,11 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from tankpit_bot.action_lab.page_client_snapshot import (
+    PageClientSnapshotDict,
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
+)
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
@@ -25,7 +30,14 @@ from tankpit_bot.action_lab.types import (
 
 
 class MovementProbeAttemptResultDict(TypedDict):
-    """Outcome of one live movement attempt."""
+    """Outcome of one live movement attempt.
+
+    Includes the page-client snapshots captured immediately before the
+    move command is dispatched and immediately after the attempt resolves
+    (either ``arrived_exact`` or ``move_timeout``). Comparing
+    ``snapshot_before`` and ``snapshot_after`` lets reviewers confirm the
+    tank actually moved without watching the live game.
+    """
 
     target: TeleportTargetDict
     status: Literal["arrived_exact", "move_timeout"]
@@ -42,6 +54,8 @@ class MovementProbeAttemptResultDict(TypedDict):
     settled_y: int | None
     message_start_index: int
     message_end_index: int
+    snapshot_before: PageClientSnapshotDict
+    snapshot_after: PageClientSnapshotDict
 
 
 class MovementProbeSessionDict(TypedDict):
@@ -121,7 +135,28 @@ def encode_movement_probe_attempt_result(result: MovementProbeAttemptResultDict)
         "settled_y": _encode_optional_int(result["settled_y"]),
         "message_start_index": result["message_start_index"],
         "message_end_index": result["message_end_index"],
+        "snapshot_before": encode_page_client_snapshot(result["snapshot_before"]),
+        "snapshot_after": encode_page_client_snapshot(result["snapshot_after"]),
     }
+
+
+def _require_snapshot(data: JSONObject, field: str) -> PageClientSnapshotDict:
+    """Decode a required page-client snapshot field.
+
+    Args:
+        data: JSON object being decoded.
+        field: Field name to read.
+
+    Returns:
+        Validated page-client snapshot.
+
+    Raises:
+        JSONTypeError: If the field is missing or not a JSON object.
+    """
+    raw = data.get(field)
+    if not isinstance(raw, dict):
+        raise JSONTypeError(f"Field '{field}' must be an object")
+    return decode_page_client_snapshot(raw)
 
 
 def decode_movement_probe_attempt_result(data: JSONObject) -> MovementProbeAttemptResultDict:
@@ -145,6 +180,8 @@ def decode_movement_probe_attempt_result(data: JSONObject) -> MovementProbeAttem
         settled_y=_require_optional_int(data, "settled_y"),
         message_start_index=require_int(data, "message_start_index"),
         message_end_index=require_int(data, "message_end_index"),
+        snapshot_before=_require_snapshot(data, "snapshot_before"),
+        snapshot_after=_require_snapshot(data, "snapshot_after"),
     )
 
 

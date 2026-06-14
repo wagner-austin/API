@@ -1,0 +1,55 @@
+{
+  "session_id": "ghost-map-refresh-wire-silent",
+  "start_timestamp_ms": 1000,
+  "end_timestamp_ms": 20000,
+  "base_url": "https://test.tankpit.com/play",
+  "messages": [
+    {
+      "timestamp_ms": 1000,
+      "direction": "received",
+      "payload": "DQAuDwRTDARPLXQfBW9E",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 2000,
+      "direction": "received",
+      "payload": "9QEuJgYwLlYaLzUbBW9ETRcqJkJCGigTfwodTTNCaxReB29dAh5TXlI4EAUdJS40ADoPLSQACDofU0pNDiE2A1IASEM0GlBIIHUBODkHLhcRRw8We1oGAx1ZXzg/U3IEPQo0BV4qKT9fNgYBV1wMAy1EeF4/OzEaU088CE9ZRDwbJk8nOkFKXVgSIUdBQhFCejteBEJVSFJfbR81PU1OMwowTwQJBi9FVl96PzBvEkcWIEMfXSgPF34zHTNfFW8GM3ocWlZSGi4fUwFMal9JKjUqaycKTEBYL0cUUTEFFj0RNEtPWCNvCQdfHFgHED9WS10pHHQjHUhHJhhQEkN5Blw/JD0qABIdZlICW00+DCtIAAQ3FhYsT0laUj95D1gZJCYIMExAVixfEytCIVsRTgsiICBCMh8qTRkSBxpLGBxUElABE1cGMyYHDAEXcnI5TgACXAQRWw9ZKzkQTUtRKUB3VQkCEAo1GUEuGE0OGEckVHwsSA5dERcIKF8yQxVZQ14uAhsaAyAnUlpIDU8WLhQmXFNjFyhbBTF1X1keXi04FgdRPEhKQm1KPAwxAgZeS3NhEV4BDTgiUV0SREghCyJBAV8EBEEoPjwVQ0wDIgVLIAENIlIPVVEOUgYxKy5KPUgaXl8tQTYGL2RJD11FP1cRGBBQGwE=",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 3000,
+      "direction": "received",
+      "payload": "FAAuEwc1DjYfLXQbBW80OGVaSidvIw==",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 4000,
+      "direction": "received",
+      "payload": "FAAuEwc1DjYfLXQbBW80OGVaSidvIw==",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 15000,
+      "direction": "received",
+      "payload": "9QEuJgYwLlYaLzUbBW9ETRcqJkJCGigTfwodTTNCaxReB29dAh5TXlI4EAUdJS40ADoPLSQACDofU0pNDiE2A1IASEM0GlBIIHUBODkHLhcRRw8We1oGAx1ZXzg/U3IEPQo0BV4qKT9fNgYBV1wMAy1EeF4/OzEaU088CE9ZRDwbJk8nOkFKXVgSIUdBQhFCejteBEJVSFJfbR81PU1OMwowTwQJBi9FVl96PzBvEkcWIEMfXSgPF34zHTNfFW8GM3ocWlZSGi4fUwFMal9JKjUqaycKTEBYL0cUUTEFFj0RNEtPWCNvCQdfHFgHED9WS10pHHQjHUhHJhhQEkN5Blw/JD0qABIdZlICW00+DCtIAAQ3FhYsT0laUj95D1gZJCYIMExAVixfEytCIVsRTgsiICBCMh8qTRkSBxpLGBxUElABE1cGMyYHDAEXcnI5TgACXAQRWw9ZKzkQTUtRKUB3VQkCEAo1GUEuGE0OGEckVHwsSA5dERcIKF8yQxVZQ14uAhsaAyAnUlpIDU8WLhQmXFNjFyhbBTF1X1keXi04FgdRPEhKQm1KPAwxAgZeS3NhEV4BDTgiUV0SREghCyJBAV8EBEEoPjwVQ0wDIgVLIAENIlIPVVEOUgYxKy5KPUgaXl8tQTYGL2RJD11FP1cRGBBQGwE=",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 18000,
+      "direction": "received",
+      "payload": "9QEuJgYwLlYaLzUbBW9ETRcqJkJCGigTfwodTTNCaxReB29dAh5TXlI4EAUdJS40ADoPLSQACDofU0pNDiE2A1IASEM0GlBIIHUBODkHLhcRRw8We1oGAx1ZXzg/U3IEPQo0BV4qKT9fNgYBV1wMAy1EeF4/OzEaU088CE9ZRDwbJk8nOkFKXVgSIUdBQhFCejteBEJVSFJfbR81PU1OMwowTwQJBi9FVl96PzBvEkcWIEMfXSgPF34zHTNfFW8GM3ocWlZSGi4fUwFMal9JKjUqaycKTEBYL0cUUTEFFj0RNEtPWCNvCQdfHFgHED9WS10pHHQjHUhHJhhQEkN5Blw/JD0qABIdZlICW00+DCtIAAQ3FhYsT0laUj95D1gZJCYIMExAVixfEytCIVsRTgsiICBCMh8qTRkSBxpLGBxUElABE1cGMyYHDAEXcnI5TgACXAQRWw9ZKzkQTUtRKUB3VQkCEAo1GUEuGE0OGEckVHwsSA5dERcIKF8yQxVZQ14uAhsaAyAnUlpIDU8WLhQmXFNjFyhbBTF1X1keXi04FgdRPEhKQm1KPAwxAgZeS3NhEV4BDTgiUV0SREghCyJBAV8EBEEoPjwVQ0wDIgVLIAENIlIPVVEOUgYxKy5KPUgaXl8tQTYGL2RJD11FP1cRGBBQGwE=",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 20000,
+      "direction": "received",
+      "payload": "9QEuJgYwLlYaLzUbBW9ETRcqJkJCGigTfwodTTNCaxReB29dAh5TXlI4EAUdJS40ADoPLSQACDofU0pNDiE2A1IASEM0GlBIIHUBODkHLhcRRw8We1oGAx1ZXzg/U3IEPQo0BV4qKT9fNgYBV1wMAy1EeF4/OzEaU088CE9ZRDwbJk8nOkFKXVgSIUdBQhFCejteBEJVSFJfbR81PU1OMwowTwQJBi9FVl96PzBvEkcWIEMfXSgPF34zHTNfFW8GM3ocWlZSGi4fUwFMal9JKjUqaycKTEBYL0cUUTEFFj0RNEtPWCNvCQdfHFgHED9WS10pHHQjHUhHJhhQEkN5Blw/JD0qABIdZlICW00+DCtIAAQ3FhYsT0laUj95D1gZJCYIMExAVixfEytCIVsRTgsiICBCMh8qTRkSBxpLGBxUElABE1cGMyYHDAEXcnI5TgACXAQRWw9ZKzkQTUtRKUB3VQkCEAo1GUEuGE0OGEckVHwsSA5dERcIKF8yQxVZQ14uAhsaAyAnUlpIDU8WLhQmXFNjFyhbBTF1X1keXi04FgdRPEhKQm1KPAwxAgZeS3NhEV4BDTgiUV0SREghCyJBAV8EBEEoPjwVQ0wDIgVLIAENIlIPVVEOUgYxKy5KPUgaXl8tQTYGL2RJD11FP1cRGBBQGwE=",
+      "ws_url": "wss://test.tankpit.com/ws/"
+    }
+  ],
+  "magic": "k7tolfd5na69aqyvfxfs",
+  "game_log": [],
+  "tank_names": {
+    "517": "purple-9"
+  }
+}

@@ -74,6 +74,7 @@ def update_self_from_movement_response(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -129,6 +130,7 @@ def update_self_position(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -144,6 +146,8 @@ def update_tank_from_registry(
     y: int,
     source: Literal["viewport", "radar", "world_state"],
     timestamp_ms: int,
+    *,
+    wire_present: bool = True,
 ) -> WorldStateDict:
     """Update tank state from TankRegistry message.
 
@@ -158,6 +162,10 @@ def update_tank_from_registry(
         y: Y coordinate.
         source: Source that confirmed this tank.
         timestamp_ms: Message timestamp.
+        wire_present: Whether this update came from a live wire message.
+            When True the tank's ``last_wire_seen_ms`` is stamped to
+            *timestamp_ms*; when False the existing value is preserved
+            (or 0 for a first-seen tank).
 
     Returns:
         New WorldStateDict with updated tank.
@@ -166,6 +174,10 @@ def update_tank_from_registry(
     key = str(tank_id)
     existing = state["tanks"].get(key)
     damage_state = existing["damage_state"] if existing else DAMAGE_FULL
+    if wire_present:
+        last_wire_seen_ms = timestamp_ms
+    else:
+        last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
 
     new_tank = make_tank_state(
         tank_id=tank_id,
@@ -179,6 +191,7 @@ def update_tank_from_registry(
         is_self=is_self,
         source=source,
         timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=last_wire_seen_ms,
     )
 
     new_tanks = dict(state["tanks"])
@@ -192,6 +205,7 @@ def update_tank_from_registry(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -230,6 +244,7 @@ def update_tank_damage(
         is_self=existing["is_self"],
         source=existing["source"],
         timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=existing["last_wire_seen_ms"],
     )
 
     new_tanks = dict(state["tanks"])
@@ -243,6 +258,7 @@ def update_tank_damage(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -289,6 +305,7 @@ def update_container_from_radar(
             terrain=state["terrain"],
             viewport=state["viewport"],
             scanned_viewports=state["scanned_viewports"],
+            map_fuel_dots=state["map_fuel_dots"],
             timestamp_ms=timestamp_ms,
         )
 
@@ -317,6 +334,7 @@ def update_container_from_radar(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -353,6 +371,7 @@ def remove_container(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -402,6 +421,7 @@ def add_mine(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -447,6 +467,7 @@ def add_mine_from_radar(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -483,6 +504,7 @@ def remove_mine(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -533,6 +555,7 @@ def update_terrain_from_viewport(
         terrain=new_terrain,
         viewport=new_viewport,
         scanned_viewports=new_scanned_viewports,
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -574,6 +597,7 @@ def update_self_fuel(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -614,6 +638,7 @@ def set_self_fuel(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -666,6 +691,7 @@ def pickup_container(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -700,6 +726,7 @@ def remove_tank(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -732,6 +759,40 @@ def mark_viewport_scanned(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=new_scanned_viewports,
+        map_fuel_dots=state["map_fuel_dots"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def replace_map_fuel_dots(
+    state: WorldStateDict,
+    dots: list[tuple[int, int]],
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Replace the map-wide fuel-container atlas from a MAP_DATA dot layer.
+
+    The dot layer is server-cached and arrives complete on every MAP_DATA
+    response, so the previous atlas is replaced wholesale rather than
+    merged -- a dot that disappeared from the layer is gone.
+
+    Args:
+        state: Current world state.
+        dots: Decoded ``(x, y)`` world coordinates of every fuel dot.
+        timestamp_ms: MAP_DATA processing timestamp.
+
+    Returns:
+        New WorldStateDict with the replaced fuel-dot atlas.
+    """
+    new_dots = {coord_key(x, y): timestamp_ms for x, y in dots}
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=new_dots,
         timestamp_ms=timestamp_ms,
     )
 
@@ -748,6 +809,7 @@ __all__ = [
     "remove_container",
     "remove_mine",
     "remove_tank",
+    "replace_map_fuel_dots",
     "set_self_fuel",
     "update_container_from_radar",
     "update_self_from_movement_response",

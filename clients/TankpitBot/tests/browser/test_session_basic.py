@@ -13,8 +13,8 @@ from tankpit_bot.browser import (
     GameNotJoinedError,
     PlaywrightNotInstalledError,
 )
+from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.browser.session import (
-    _BROWSER_HOOK_SOURCE,
     _pop_sent_frame_metadata,
     get_captured_raw_messages,
 )
@@ -331,11 +331,11 @@ def test_browser_session_setup_cdp_handlers() -> None:
 
 def test_browser_hook_source_captures_closure_scoped_game_client() -> None:
     """Injected browser hook stores the active game client outside tpclient closure scope."""
-    assert "window.__tankpitActiveGame = null;" in _BROWSER_HOOK_SOURCE
-    assert "function maybeCaptureGameClient(candidate)" in _BROWSER_HOOK_SOURCE
-    assert "installClientProbe('map');" in _BROWSER_HOOK_SOURCE
-    assert "installClientProbe('Ha');" in _BROWSER_HOOK_SOURCE
-    assert "window.__tankpitActiveGame = candidate;" in _BROWSER_HOOK_SOURCE
+    assert "window.__tankpitActiveGame = null;" in BROWSER_HOOK_SOURCE
+    assert "function maybeCaptureGameClient(candidate)" in BROWSER_HOOK_SOURCE
+    assert "installClientProbe('map');" in BROWSER_HOOK_SOURCE
+    assert "installClientProbe('Ha');" in BROWSER_HOOK_SOURCE
+    assert "window.__tankpitActiveGame = candidate;" in BROWSER_HOOK_SOURCE
 
 
 def test_browser_session_wait_for_game_ready_success() -> None:
@@ -449,7 +449,19 @@ def test_browser_session_navigate_and_login_raises_when_login_flow_fails() -> No
 
 
 def test_browser_session_cleanup() -> None:
-    """Test _cleanup closes all browser resources."""
+    """Teardown arms the watchdog and closes only the browser.
+
+    ``browser.close()`` subsumes page/context/CDP teardown; the old
+    four-step sequence gave sync Playwright four chances to deadlock
+    (runs 20260611-083908/092159 hung 10+ minutes after saving).
+    """
+    armed: list[float] = []
+
+    def record_watchdog(seconds: float, on_fire: Callable[[], None]) -> None:
+        del on_fire
+        armed.append(seconds)
+
+    _test_hooks.start_watchdog = record_watchdog
     session = BrowserSession("https://example.com")
     cdp = FakeCDPSession()
     page = FakePage(cdp)
@@ -458,10 +470,23 @@ def test_browser_session_cleanup() -> None:
 
     session._cleanup(cdp, page, context, browser)
 
-    assert cdp._detached is True
-    assert page._closed is True
-    assert context._closed is True
     assert browser._closed is True
+    assert cdp._detached is False
+    assert page._closed is False
+    assert context._closed is False
+    assert armed == [30.0]
+
+
+def test_teardown_hang_handler_forces_distinct_exit_code() -> None:
+    """A fired teardown watchdog forces a recorded, distinct exit."""
+    from tankpit_bot.browser.session import _handle_teardown_hang
+
+    exit_codes: list[int] = []
+    _test_hooks.force_exit = exit_codes.append
+
+    _handle_teardown_hang()
+
+    assert exit_codes == [75]
 
 
 def test_browser_session_static_key_property() -> None:
@@ -501,40 +526,6 @@ def test_debug_js_websocket_no_result_dict() -> None:
     assert len(cdp._sent_methods) == 1
 
 
-class _FakeCDPRaising(FakeCDPSession):
-    """CDP session fake that raises RuntimeError on detach."""
-
-    def detach(self) -> None:
-        """Raise RuntimeError to simulate already-closed session."""
-        msg = "already closed"
-        raise RuntimeError(msg)
-
-
-class _FakePageRaising(FakePage):
-    """Page fake that raises RuntimeError on close."""
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        """Raise RuntimeError to simulate already-closed page."""
-        _ = (reason, run_before_unload)
-        msg = "already closed"
-        raise RuntimeError(msg)
-
-
-class _FakeContextRaising(FakeBrowserContext):
-    """Browser context fake that raises RuntimeError on close."""
-
-    def close(self, *, reason: str | None = None) -> None:
-        """Raise RuntimeError to simulate already-closed context."""
-        _ = reason
-        msg = "already closed"
-        raise RuntimeError(msg)
-
-
 class _FakeBrowserRaising(FakeBrowser):
     """Browser fake that raises RuntimeError on close."""
 
@@ -548,12 +539,12 @@ class _FakeBrowserRaising(FakeBrowser):
 class TestCleanup:
     """Tests for BrowserSession._cleanup error handling."""
 
-    def test_cleanup_handles_all_errors(self) -> None:
-        """_cleanup catches RuntimeError from all resources without propagating."""
+    def test_cleanup_handles_browser_close_error(self) -> None:
+        """_cleanup catches RuntimeError from an already-closed browser."""
         session = BrowserSession("https://example.com", headless=True)
-        cdp = _FakeCDPRaising()
-        page = _FakePageRaising(cdp)
-        context = _FakeContextRaising()
+        cdp = FakeCDPSession()
+        page = FakePage(cdp)
+        context = FakeBrowserContext()
         browser = _FakeBrowserRaising()
-        # Should not raise — all errors caught
+        # Should not raise — the close error is caught and logged
         session._cleanup(cdp, page, context, browser)

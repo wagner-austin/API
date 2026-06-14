@@ -6,6 +6,7 @@ from typing import Literal
 
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.state.types import ContainerStateDict
@@ -40,6 +41,8 @@ def build_attempt_result(
     message_start_index: int,
     message_end_index: int,
     teleport_cycle_ids: list[int],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
     radar_cycle_id: int | None = None,
     move_cycle_id: int | None = None,
     pickup_cycle_id: int | None = None,
@@ -111,6 +114,8 @@ def build_attempt_result(
         decision_basis=decision_basis,
         message_start_index=message_start_index,
         message_end_index=message_end_index,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -139,6 +144,8 @@ def build_terminal_attempt(
     message_start_index: int,
     message_end_index: int,
     teleport_cycle_ids: list[int],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
     radar_cycle_id: int | None = None,
     move_cycle_id: int | None = None,
     pickup_cycle_id: int | None = None,
@@ -206,6 +213,8 @@ def build_terminal_attempt(
         pickup_cycle_id=pickup_cycle_id,
         phase_overlaps=phase_overlaps,
         decision_basis=decision_basis,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -219,6 +228,8 @@ def build_map_sync_timeout_result(
     message_start_index: int,
     message_end_index: int,
     teleport_cycle_ids: list[int],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one initial map-sync-timeout result."""
     return build_terminal_attempt(
@@ -238,6 +249,8 @@ def build_map_sync_timeout_result(
         message_start_index=message_start_index,
         message_end_index=message_end_index,
         teleport_cycle_ids=teleport_cycle_ids,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -252,6 +265,8 @@ def build_teleport_timeout_result(
     message_start_index: int,
     message_end_index: int,
     teleport_cycle_ids: list[int],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one initial teleport-timeout result."""
     return build_attempt_result(
@@ -273,6 +288,8 @@ def build_teleport_timeout_result(
         message_start_index=message_start_index,
         message_end_index=message_end_index,
         teleport_cycle_ids=teleport_cycle_ids,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -295,6 +312,8 @@ def build_reposition_map_sync_timeout_result(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     phase_overlaps: list[ActionPhaseOverlapDict],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one blocked-fuel reposition map-sync-timeout result."""
     return build_attempt_result(
@@ -321,6 +340,8 @@ def build_reposition_map_sync_timeout_result(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle_id,
         phase_overlaps=phase_overlaps,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -343,6 +364,8 @@ def build_reposition_teleport_timeout_result(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     phase_overlaps: list[ActionPhaseOverlapDict],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one blocked-fuel reposition teleport-timeout result."""
     return build_attempt_result(
@@ -369,6 +392,8 @@ def build_reposition_teleport_timeout_result(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle_id,
         phase_overlaps=phase_overlaps,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -388,6 +413,8 @@ def build_radar_timeout_result(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     phase_overlaps: list[ActionPhaseOverlapDict],
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one radar-timeout result."""
     return build_terminal_attempt(
@@ -409,6 +436,8 @@ def build_radar_timeout_result(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle_id,
         phase_overlaps=phase_overlaps,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -430,6 +459,8 @@ def build_no_fuel_visible_result(
     radar_cycle_id: int,
     phase_overlaps: list[ActionPhaseOverlapDict],
     decision_basis: FuelDecisionBasisDict | None,
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> FuelProbeAttemptResultDict:
     """Build one no-visible-fuel result."""
     return build_terminal_attempt(
@@ -452,6 +483,8 @@ def build_no_fuel_visible_result(
         radar_cycle_id=radar_cycle_id,
         phase_overlaps=phase_overlaps,
         decision_basis=decision_basis,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 

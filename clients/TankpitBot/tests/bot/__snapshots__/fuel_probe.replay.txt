@@ -1,0 +1,29 @@
+# Replay trace for fuel_probe.capture_session.json
+# received_frames=119 ticks=24
+# dispatched_commands=9
+
+tick drained state            ai_mode             in_flight  self     fuel  inv  tanks cont mines  dispatched
+   0       5 INITIALIZING      -                   none       (none)      -      0     0    0     0  -
+   1       5 WAITING_FOR_POSITION -                   none       (131,126)  1100    0     1    0     0  -
+   2       5 SCANNING          -                   scan       (131,126)  1100    0     6    0     0  radar
+   3       5 SCANNING          -                   scan       (131,126)  1100    0    11    0     0  -
+   4       5 SCANNING          -                   scan       (131,126)  1100    0    16    0     0  -
+   5       5 SCANNING          -                   scan       (131,126)  1100    0    21    0     0  -
+   6       5 SCANNING          -                   scan       (131,126)  1100    0    26    0     0  -
+   7       5 SCANNING          -                   scan       (131,126)  1100    0    31    0     0  -
+   8       5 SCANNING          -                   scan       (131,126)  1100    0    36    0     0  -
+   9       5 SCANNING          -                   scan       (131,126)  1100  112    37    0     0  -
+  10       5 SCANNING          -                   scan       (131,110)  1004  112    37    0     0  -
+  11       5 COLLECTING        -                   collect    (131,110)   994  111    37    1     0  pickup_equipment
+  12       5 IDLE              -                   map_open   (147,110)   898  111    37    1     0  map_open
+  13       5 IDLE              -                   map_open   (147,110)   888  110    37    2     0  -
+  14       5 MOVING            -                   move       (162,94)    757  110    37    2     0  move
+  15       5 MOVING            -                   move       (162,94)    747  109    37    2     0  -
+  16       5 IDLE              -                   map_open   (162,94)    651  109    37    7     0  map_open
+  17       5 IDLE              -                   map_open   (178,94)    641  109    37    7     0  -
+  18       5 MOVING            -                   move       (178,94)    641  108    37    8     8  move
+  19       5 MOVING            -                   move       (162,94)    545  108    37    8     8  move
+  20       5 MOVING            -                   move       (162,94)    525  107    37    8     8  -
+  21       5 IDLE              -                   map_open   (160,86)   1100  107    37    8     8  map_open
+  22       5 IDLE              -                   map_open   (160,86)    934  107    37    8     8  map_open
+  23       4 IDLE              -                   map_open   (146,110)   934  107    37    8     8  -

@@ -135,9 +135,7 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         emit_ai("new target %s (id=%d)", target["name"], target["tank_id"])
         if _has_recent_map_snapshot(ctx):
             emit_ai("fresh map intel available - teleporting to %s", target["name"])
-            teleport = teleport_to_target(ctx, target)
-            if teleport is not None:
-                return teleport
+            return teleport_to_target(ctx, target)
         return open_map_for_target(ctx, target)
     return search_for_enemies(
         ctx,
@@ -156,10 +154,7 @@ def _decide_hunt_refresh(ctx: DecideCtx) -> TickDecisionDict:
         return _decide_hunt_acquire(ctx)
     if has_cardinal_combat_shot(ctx.self_state, target):
         return engage_target(ctx, target)
-    close_decision = close_target(ctx, target)
-    if close_decision is not None:
-        return close_decision
-    return open_map_for_target(ctx, target)
+    return close_target(ctx, target)
 
 
 def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
@@ -168,10 +163,7 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
     target = get_locked_target(ctx, threats)
     if target is None:
         return _enter_confirm_kill(ctx)
-    close_decision = close_target(ctx, target)
-    if close_decision is not None:
-        return close_decision
-    return open_map_for_target(ctx, target)
+    return close_target(ctx, target)
 
 
 def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
@@ -224,7 +216,7 @@ def _visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
     Returns:
         Visible enemy threats ordered by the threat analyzer.
     """
-    return analyze_threats(ctx.filtered, ctx.self_state)
+    return analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
 
 
 def _has_recent_map_snapshot(ctx: DecideCtx) -> bool:

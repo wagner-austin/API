@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal
 
 from tankpit_bot.action_lab import fuel_probe_operations as _fuel_probe_operations
@@ -43,6 +44,7 @@ from tankpit_bot.action_lab.fuel_targeting import (
     find_visible_fuel_landing_tile,
     visible_fuel_requires_reposition,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import PickupPhaseError, run_tracked_pickup_phase
 from tankpit_bot.action_lab.pickup_phase import (
     effective_pickup_timeout_ms as _shared_effective_pickup_timeout_ms,
@@ -317,6 +319,8 @@ class FuelProbe(TeleportProbe):
         fuel_target: ContainerStateDict | None,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
         radar_cycle_id: int | None = None,
         move_cycle_id: int | None = None,
         pickup_cycle_id: int | None = None,
@@ -354,6 +358,8 @@ class FuelProbe(TeleportProbe):
             reposition_map_open_started_ms=reposition_map_open_started_ms,
             reposition_map_sync_timestamp_ms=reposition_map_sync_timestamp_ms,
             reposition_teleport_started_ms=reposition_teleport_started_ms,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _finalize_attempt_delay(
@@ -373,6 +379,8 @@ class FuelProbe(TeleportProbe):
         fuel_before: int,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a map-sync-timeout result."""
         return _fuel_probe_operations.build_map_sync_timeout_result_for_probe(
@@ -382,6 +390,8 @@ class FuelProbe(TeleportProbe):
             fuel_before=fuel_before,
             message_start_index=message_start_index,
             teleport_cycle_ids=teleport_cycle_ids,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _build_teleport_timeout_result(
@@ -395,6 +405,8 @@ class FuelProbe(TeleportProbe):
         teleport_result: TeleportAttemptResultDict,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a teleport-timeout result."""
         return _fuel_probe_operations.build_teleport_timeout_result_for_probe(
@@ -407,6 +419,8 @@ class FuelProbe(TeleportProbe):
             teleport_result=teleport_result,
             message_start_index=message_start_index,
             teleport_cycle_ids=teleport_cycle_ids,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _build_reposition_map_sync_timeout_result(
@@ -426,6 +440,8 @@ class FuelProbe(TeleportProbe):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a reposition map-sync-timeout result."""
         return _fuel_probe_operations.build_reposition_map_sync_timeout_result_for_probe(
@@ -444,6 +460,8 @@ class FuelProbe(TeleportProbe):
             teleport_cycle_ids=teleport_cycle_ids,
             radar_cycle_id=radar_cycle_id,
             phase_overlaps=phase_overlaps,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _build_reposition_teleport_timeout_result(
@@ -465,6 +483,8 @@ class FuelProbe(TeleportProbe):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a reposition teleport-timeout result."""
         return _fuel_probe_operations.build_reposition_teleport_timeout_result_for_probe(
@@ -485,6 +505,8 @@ class FuelProbe(TeleportProbe):
             teleport_cycle_ids=teleport_cycle_ids,
             radar_cycle_id=radar_cycle_id,
             phase_overlaps=phase_overlaps,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _build_radar_timeout_result(
@@ -501,6 +523,8 @@ class FuelProbe(TeleportProbe):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a radar-timeout result."""
         return _fuel_probe_operations.build_radar_timeout_result_for_probe(
@@ -516,6 +540,8 @@ class FuelProbe(TeleportProbe):
             teleport_cycle_ids=teleport_cycle_ids,
             radar_cycle_id=radar_cycle_id,
             phase_overlaps=phase_overlaps,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _build_no_fuel_visible_result(
@@ -534,6 +560,8 @@ class FuelProbe(TeleportProbe):
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
         decision_basis: FuelDecisionBasisDict | None,
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build a no-fuel-visible result."""
         return _fuel_probe_operations.build_no_fuel_visible_result_for_probe(
@@ -551,6 +579,8 @@ class FuelProbe(TeleportProbe):
             radar_cycle_id=radar_cycle_id,
             phase_overlaps=phase_overlaps,
             decision_basis=decision_basis,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def _run_pickup_attempt(
@@ -574,6 +604,8 @@ class FuelProbe(TeleportProbe):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         decision_basis: FuelDecisionBasisDict | None,
+        snapshot_before: PageClientSnapshotDict,
+        capture_snapshot: Callable[[], PageClientSnapshotDict],
     ) -> FuelProbeAttemptResultDict:
         """Run the pickup portion of a fuel attempt."""
         try:
@@ -597,6 +629,8 @@ class FuelProbe(TeleportProbe):
                 teleport_cycle_ids=teleport_cycle_ids,
                 radar_cycle_id=radar_cycle_id,
                 decision_basis=decision_basis,
+                snapshot_before=snapshot_before,
+                capture_snapshot=capture_snapshot,
                 dispatch_failure_error=FuelProbeError,
                 run_tracked_pickup_phase=run_tracked_pickup_phase,
                 get_completed_outcome=_get_completed_pickup_outcome,

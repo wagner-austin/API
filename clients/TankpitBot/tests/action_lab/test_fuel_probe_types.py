@@ -16,7 +16,30 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     encode_fuel_probe_attempt_result,
     encode_fuel_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot for fuel attempt fixtures."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
+    )
 
 
 def _target() -> TeleportTargetDict:
@@ -82,6 +105,8 @@ def _attempt(
         decision_basis=_decision_basis(),
         message_start_index=4,
         message_end_index=9,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1900),
     )
 
 
@@ -161,6 +186,8 @@ def test_fuel_probe_attempt_round_trip_with_null_fields() -> None:
         decision_basis=None,
         message_start_index=4,
         message_end_index=5,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1600),
     )
 
     decoded = decode_fuel_probe_attempt_result(encode_fuel_probe_attempt_result(attempt))
@@ -239,6 +266,15 @@ def test_fuel_probe_attempt_rejects_non_boolean_landed_signal() -> None:
     encoded["landed_signal_received"] = "bad"
 
     with pytest.raises(JSONTypeError, match="landed_signal_received"):
+        decode_fuel_probe_attempt_result(encoded)
+
+
+def test_fuel_probe_attempt_rejects_non_object_snapshot() -> None:
+    """Fuel attempt decode rejects non-object snapshot values."""
+    encoded = encode_fuel_probe_attempt_result(_attempt())
+    encoded["snapshot_before"] = "bad"
+
+    with pytest.raises(JSONTypeError, match="snapshot_before"):
         decode_fuel_probe_attempt_result(encoded)
 
 

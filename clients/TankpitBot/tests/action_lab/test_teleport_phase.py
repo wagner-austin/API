@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Literal
 
 import pytest
+from tests.action_lab._replay_core import ReplayClock
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
@@ -18,22 +19,6 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.state import WorldStateDict, make_empty_world_state
 from tankpit_bot.types import CapturedMessage
-
-
-class _Clock:
-    """Mutable millisecond clock for deterministic tests."""
-
-    def __init__(self, start_ms: int) -> None:
-        """Initialize the clock."""
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        """Return the current timestamp."""
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        """Advance the current timestamp."""
-        self._now_ms += delta_ms
 
 
 class _Probe:
@@ -99,6 +84,10 @@ def _snapshot(
         ws_ready_state=1,
         current_send_label=None,
         sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
     )
 
 
@@ -235,7 +224,7 @@ def _result(target: TeleportTargetDict, teleport_started_ms: int) -> TeleportAtt
 
 def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
     """Shared teleport command runner waits for outcome and resets idle state."""
-    clock = _Clock(1400)
+    clock = ReplayClock(1400)
     original_clock = action_hooks.get_current_time_ms
     action_hooks.get_current_time_ms = clock
     page = _Page()
@@ -287,7 +276,7 @@ def test_run_tracked_teleport_command_waits_and_resets_state() -> None:
 
 def test_run_tracked_teleport_command_raises_on_dispatch_failure() -> None:
     """Shared teleport command runner raises immediately on dispatch failure."""
-    clock = _Clock(2000)
+    clock = ReplayClock(2000)
     original_clock = action_hooks.get_current_time_ms
     action_hooks.get_current_time_ms = clock
     page = _Page()
@@ -324,3 +313,20 @@ def test_run_tracked_teleport_command_raises_on_dispatch_failure() -> None:
     assert probe.teleports == [(147, 110)]
     assert probe.end_cycles == [ActionPhaseCycleDict(phase="teleport", cycle_id=7, started_ms=1900)]
     assert probe.reset_idle_calls == 0
+
+
+def test_command_dispatch_failure_diagnostic_round_trip() -> None:
+    """``CommandDispatchFailureDiagnosticDict`` round-trips through JSON encoding."""
+    from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+
+    payload = teleport_phase.CommandDispatchFailureDiagnosticDict(
+        command="teleport",
+        detail="websocket not ready",
+    )
+
+    encoded = teleport_phase.encode_command_dispatch_failure_diagnostic(payload)
+    decoded = teleport_phase.decode_command_dispatch_failure_diagnostic(
+        narrow_json_to_dict(load_json_str(dump_json_str(encoded)))
+    )
+
+    assert decoded == payload

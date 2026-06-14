@@ -74,6 +74,7 @@ class TestUpdateSelfFromMovementResponse:
             terrain=state["terrain"],
             viewport=state["viewport"],
             scanned_viewports=state["scanned_viewports"],
+            map_fuel_dots=state["map_fuel_dots"],
             timestamp_ms=state["timestamp_ms"],
         )
 
@@ -229,6 +230,135 @@ class TestUpdateTankFromRegistry:
         )
 
         assert updated["tanks"]["42"]["is_self"] is True
+
+
+class TestWirePresenceFunnel:
+    """Tests for the ``wire_present`` rule in update_tank_from_registry."""
+
+    def test_wire_present_advances_last_wire_seen_ms(self) -> None:
+        """A wire-present update stamps last_wire_seen_ms to the timestamp."""
+        state = make_empty_world_state()
+        updated = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=50,
+            y=50,
+            source="viewport",
+            timestamp_ms=1000,
+            wire_present=True,
+        )
+
+        assert updated["tanks"]["42"]["last_wire_seen_ms"] == 1000
+
+    def test_new_non_wire_tank_has_zero_last_wire_seen_ms(self) -> None:
+        """A first sighting from a non-wire source never vouches presence."""
+        state = make_empty_world_state()
+        updated = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Ghost",
+            rank=1,
+            is_bot=False,
+            x=34,
+            y=96,
+            source="world_state",
+            timestamp_ms=1000,
+            wire_present=False,
+        )
+
+        assert updated["tanks"]["42"]["last_wire_seen_ms"] == 0
+        assert updated["tanks"]["42"]["timestamp_ms"] == 1000
+
+    def test_map_refresh_preserves_wire_stamp_while_advancing_timestamp(self) -> None:
+        """A map (non-wire) refresh advances timestamp but freezes the wire stamp.
+
+        This is the exact ghost mechanism: a tank confirmed on the wire
+        leaves, the map keeps re-listing it, and only ``timestamp_ms``
+        advances. ``last_wire_seen_ms`` must stay frozen at the last real
+        sighting so the kill gate can tell the afterimage apart.
+        """
+        state = make_empty_world_state()
+        state = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=50,
+            y=50,
+            source="viewport",
+            timestamp_ms=1000,
+            wire_present=True,
+        )
+
+        refreshed = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=50,
+            y=50,
+            source="world_state",
+            timestamp_ms=9000,
+            wire_present=False,
+        )
+
+        assert refreshed["tanks"]["42"]["timestamp_ms"] == 9000
+        assert refreshed["tanks"]["42"]["last_wire_seen_ms"] == 1000
+
+    def test_returning_wire_update_readvances_wire_stamp(self) -> None:
+        """A fresh wire sighting after a map-only gap re-stamps presence."""
+        state = make_empty_world_state()
+        state = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=50,
+            y=50,
+            source="viewport",
+            timestamp_ms=1000,
+            wire_present=True,
+        )
+        state = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=50,
+            y=50,
+            source="world_state",
+            timestamp_ms=9000,
+            wire_present=False,
+        )
+
+        returned = update_tank_from_registry(
+            state,
+            tank_id=42,
+            team=1,
+            name="Enemy",
+            rank=1,
+            is_bot=False,
+            x=51,
+            y=50,
+            source="viewport",
+            timestamp_ms=12000,
+            wire_present=True,
+        )
+
+        assert returned["tanks"]["42"]["last_wire_seen_ms"] == 12000
 
 
 class TestUpdateTankDamage:

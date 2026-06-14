@@ -220,14 +220,13 @@ class TestEquipmentGainTrackerProcessMessage:
 
         xor_table = build_test_xor_table(static_key, magic)
 
-        # Equipment gain decoded: 0x67 type zeros... equipment_flags
-        # 7 bytes total for the decoded data
-        decoded_data = bytes([0x67, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00])
+        # Decoded layout (client JS handler V.g):
+        # 0x67 [show_message] [armor] [dual] [missile] [homing] [radar]
+        decoded_data = bytes([0x67, 0x01, 0x00, 0x02, 0x00, 0x01, 0x03])
         payload = _make_xor_payload(decoded_data, xor_table)
 
         result = tracker.process_message(payload)
-        assert result, "Expected non-None result from process_message"
-        assert "EQUIP" in result or "GAIN" in result
+        assert result == "[EQUIP:GAIN] 2 dual, 1 homing, 3 radar (show)"
 
 
 class TestEquipmentToggleTrackerEdgeCases:
@@ -401,13 +400,9 @@ class TestEquipmentGainTrackerEdgeCases:
 
         xor_table = build_test_xor_table(static_key, "testmagic123")
 
-        # Equipment gain with no matching flags (bits outside 0-4)
-        # flags5=0x00, flags6=0x00 -> no equipment, but decoded[0]=0x67
-        decoded_data = bytes([0x67, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+        # Equipment gain with all five counts at zero and show_message off
+        decoded_data = bytes([0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         payload = _make_xor_payload(decoded_data, xor_table)
         result = tracker.process_message(payload)
 
-        if result is None:
-            raise AssertionError("Expected non-None result from process_message")
-        assert "EQUIP:GAIN" in result
-        assert "flags=0,0" in result
+        assert result == "[EQUIP:GAIN] none"

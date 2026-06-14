@@ -9,7 +9,7 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
 from tankpit_bot.state.types import ContainerStateDict, TankStateDict, make_tank_state
 from tests.bot.ai._support import make_container, make_inventory, make_scanned_ai_state, make_world
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 class TestDecideBlockedCombatTargets:
@@ -32,7 +32,7 @@ class TestDecideBlockedCombatTargets:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -62,7 +62,7 @@ class TestDecideBlockedCombatTargets:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
             "60": make_tank_state(
                 tank_id=60,
@@ -74,7 +74,7 @@ class TestDecideBlockedCombatTargets:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -87,7 +87,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (106, 100): "W",
                 (104, 100): "W",
@@ -148,6 +148,52 @@ class TestDecideBlockedCombatTargets:
         assert "Reachable" in decision["behavior"]["reason"]
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
+    def test_walk_close_with_no_landing_tile_blocks_target(self) -> None:
+        """A walk-range target with no walkable adjacent tile is blocked.
+
+        The walk close uses the same landing-tile unviability rule as
+        the teleport close: water-ringed targets cannot be reached at
+        any range.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=104,
+                y=100,
+                team=2,
+                rank=1,
+                name="RingedNear",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "combat_target_id": 50,
+                "combat_target_x": 104,
+                "combat_target_y": 100,
+            }
+        )
+        inventory = make_inventory()
+        terrain = InMemoryTerrainMap(
+            terrain_data={
+                (105, 100): "W",
+                (103, 100): "W",
+                (104, 101): "W",
+                (104, 99): "W",
+            }
+        )
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["reason"] == "find_enemies"
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+
     def test_no_landing_tile_blocks_target_with_no_alternatives(self) -> None:
         """Landing failure with no alternatives falls back to generic enemy search."""
         tanks: dict[str, TankStateDict] = {
@@ -161,7 +207,7 @@ class TestDecideBlockedCombatTargets:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -174,7 +220,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (106, 100): "W",
                 (104, 100): "W",
@@ -197,7 +243,7 @@ class TestDecideBlockedCombatTargets:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
         target = make_enemy_threat(
             tank_id=50,
@@ -235,7 +281,7 @@ class TestDecideBlockedCombatTargets:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
         target = make_enemy_threat(
             tank_id=50,
@@ -259,7 +305,7 @@ class TestDecideBlockedCombatTargets:
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (106, 100): "W",
                 (104, 100): "W",
@@ -327,7 +373,7 @@ class TestDecideBlockedCombatTargets:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)

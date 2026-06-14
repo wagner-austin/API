@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import select_exploration_command, viewport_exploration_candidates
 from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict, make_default_ai_config
@@ -21,7 +19,7 @@ from tests.bot.ai._support import (
     make_scanned_ai_state,
     make_world,
 )
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _enemy(
@@ -30,7 +28,7 @@ def _enemy(
     x: int = 103,
     y: int = 103,
     name: str = "Enemy",
-    timestamp_ms: int = 0,
+    timestamp_ms: int = 100000,
 ) -> TankStateDict:
     """Create a visible enemy tank for recovery arbitration tests.
 
@@ -207,7 +205,7 @@ class TestRecoverEquipmentPriority:
         }
         world, self_state = make_world(self_x=130, self_y=124, fuel=800, containers=containers)
         inventory = make_inventory(default_count=5)
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (128, 126): "W",
                 (127, 126): "W",
@@ -234,7 +232,7 @@ class TestRecoverEquipmentPriority:
             scanned=False,
         )
         inventory = make_inventory(default_count=5)
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (128, 126): "W",
                 (129, 126): "W",
@@ -256,7 +254,7 @@ class TestRecoverEquipmentPriority:
         }
         world, self_state = make_world(self_x=129, self_y=126, fuel=800, containers=containers)
         inventory = make_inventory(default_count=5)
-        terrain = FakeTerrainMap(terrain_data={(128, 126): "W"})
+        terrain = InMemoryTerrainMap(terrain_data={(128, 126): "W"})
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
 
@@ -369,8 +367,12 @@ class TestRecoverEquipmentSearch:
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
-    def test_equipment_search_skips_when_teleport_unaffordable(self) -> None:
-        """Impossible critical equipment search raises instead of soft-failing."""
+    def test_equipment_search_edge_walks_when_teleport_unaffordable(self) -> None:
+        """Unaffordable critical equipment search degrades to an edge walk.
+
+        Regression guard for live run 20260610-000x: this path used to
+        raise and kill the bot process mid-game.
+        """
         world, self_state = make_world(fuel=550)
         config = AIConfigDict(
             **{
@@ -388,8 +390,11 @@ class TestRecoverEquipmentSearch:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=0)
 
-        with pytest.raises(ValueError, match="expected executable recovery search action"):
-            decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["command"]["cmd_type"] == "radar"
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers to fuel recovery when fuel is already low."""
@@ -413,7 +418,7 @@ class TestRecoverEquipmentSearch:
             "104,100": make_container(104, 100, 700, True),
         }
         world, self_state = make_world(fuel=450, containers=containers)
-        terrain = FakeTerrainMap({(102, 100): "#"})
+        terrain = InMemoryTerrainMap({(102, 100): "#"})
 
         decision = decide(
             world,
@@ -513,7 +518,7 @@ class TestRecoverEquipmentSearch:
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
             terrain_data[(candidate_x, candidate_y - 1)] = "#"
             terrain_data[(candidate_x, candidate_y + 1)] = "#"
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
@@ -541,7 +546,7 @@ class TestRecoverEquipmentSearch:
     def test_exploration_skips_blocked_target_and_uses_next_candidate(self) -> None:
         """Exploration skips blocked edges and falls through to the next candidate."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=550)
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (107, 107): "W",
                 (106, 107): "W",

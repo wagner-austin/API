@@ -42,6 +42,7 @@ def _world_with_container(
         terrain={},
         viewport={"left": 0, "top": 0, "width": 16, "height": 16},
         scanned_viewports={},
+        map_fuel_dots={},
         timestamp_ms=0,
     )
 
@@ -53,42 +54,58 @@ class TestNormalizeResourceTarget:
         """Non-fuel/equipment kind is cleared."""
         state = make_initial_ai_state()
         state = set_resource_target(state, "bogus", 10, 20)
-        result = normalize_resource_target(state, _world_with_container(10, 20, True, 100))
+        result = normalize_resource_target(
+            state,
+            _world_with_container(10, 20, True, 100),
+            now_ms=0,
+        )
         assert result["resource_target_kind"] == ""
 
     def test_clears_missing_container(self) -> None:
         """Target cleared when container no longer in world."""
         state = set_resource_target(make_initial_ai_state(), "fuel", 99, 99)
         world = _world_with_container(10, 20, True, 100)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
         assert result["resource_target_kind"] == ""
 
     def test_clears_fuel_targeting_equipment(self) -> None:
         """Fuel target pointing at equipment container is cleared."""
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, False, 0)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
         assert result["resource_target_kind"] == ""
 
     def test_clears_equipment_targeting_fuel(self) -> None:
         """Equipment target pointing at fuel container is cleared."""
         state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
         world = _world_with_container(10, 20, True, 500)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
         assert result["resource_target_kind"] == ""
 
     def test_clears_failed_pickup(self) -> None:
         """Target with failed_pickups > 0 is cleared."""
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500, failed_pickups=1)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
+        assert result["resource_target_kind"] == ""
+
+    def test_clears_stale_target(self) -> None:
+        """A lock on a container past the freshness TTL is cleared.
+
+        The lock previously skipped the freshness check that candidate
+        selection applies, so live run 20260610 walked across the map
+        to a long-drained container.
+        """
+        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
+        world = _world_with_container(10, 20, True, 500)
+        result = normalize_resource_target(state, world, 31000)
         assert result["resource_target_kind"] == ""
 
     def test_preserves_valid_fuel_target(self) -> None:
         """Valid fuel target is preserved."""
         state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
         world = _world_with_container(10, 20, True, 500)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
         assert result["resource_target_kind"] == "fuel"
         assert result["resource_target_x"] == 10
 
@@ -96,7 +113,7 @@ class TestNormalizeResourceTarget:
         """Valid equipment target is preserved."""
         state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
         world = _world_with_container(10, 20, False, 0)
-        result = normalize_resource_target(state, world)
+        result = normalize_resource_target(state, world, now_ms=0)
         assert result["resource_target_kind"] == "equipment"
 
 

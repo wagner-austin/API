@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score, make_initial_ai_state
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.executor import (
@@ -47,6 +48,33 @@ from tankpit_bot.state import (
 )
 from tests.conftest import FakeEnv
 from tests.fakes import FakeCDPSession
+
+
+def _make_snapshot(*, map_visible: bool = False) -> PageClientSnapshotDict:
+    """Return a healthy live-client snapshot for executor tests.
+
+    Defaults to ``map_visible=False`` so the ``map_open`` and ``teleport``
+    dispatch branches exercise their normal "open the map first" path.
+    Tests covering the short-circuit pass ``map_visible=True``.
+    """
+    return PageClientSnapshotDict(
+        timestamp_ms=1000,
+        client_present=True,
+        map_visible=map_visible,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=50,
+        last_page_client_send_age_ms=100,
+        last_bot_send_age_ms=100,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
+    )
 
 
 def _make_bot(fake_env: FakeEnv) -> tuple[Bot, FakeCDPSession]:
@@ -155,6 +183,14 @@ class _WorldOnlyBot:
         """Unused BotProtocol stub."""
         return False
 
+    def close_map(self) -> bool:
+        """Unused BotProtocol stub."""
+        return False
+
+    def captured_message_count(self) -> int:
+        """Unused BotProtocol stub."""
+        return 0
+
     def enable_equipment(self, slot: int) -> bool:
         """Unused BotProtocol stub."""
         _ = slot
@@ -256,51 +292,107 @@ class TestDispatchCommand:
     def test_dispatch_move(self, fake_env: FakeEnv) -> None:
         """Dispatches move command via bot.move_to."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_move_command(150, 160))
+        result = dispatch_command(bot, make_move_command(150, 160), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_pickup_fuel(self, fake_env: FakeEnv) -> None:
         """Dispatches pickup_fuel command via bot.pickup_fuel_to."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_pickup_fuel_command(80, 90))
+        result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_pickup_equipment(self, fake_env: FakeEnv) -> None:
         """Dispatches pickup_equipment command via bot.pickup_equipment_to."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_pickup_equipment_command(80, 90))
+        result = dispatch_command(bot, make_pickup_equipment_command(80, 90), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_shoot(self, fake_env: FakeEnv) -> None:
         """Dispatches shoot command via bot.shoot_at."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_shoot_command(105, 103))
+        result = dispatch_command(bot, make_shoot_command(105, 103), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_radar(self, fake_env: FakeEnv) -> None:
         """Dispatches radar command via bot.use_radar."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_radar_command())
+        result = dispatch_command(bot, make_radar_command(), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_map_open(self, fake_env: FakeEnv) -> None:
         """Dispatches map_open command via bot.open_map."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_map_open_command())
+        result = dispatch_command(bot, make_map_open_command(), _make_snapshot())
         assert result is True
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_map_open_closes_overlay_then_reopens_when_already_visible(
+        self, fake_env: FakeEnv
+    ) -> None:
+        """A visible map is closed client-side and the wire open re-dispatched.
+
+        Regression guard for live run 20260610-005248: skipping the
+        dispatch starved HUNT of fresh MAP_DATA forever -- the wire open
+        is a server no-op while the map is open, so the overlay must be
+        closed first and the open re-sent for a fresh sync.
+        """
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(
+            bot,
+            make_map_open_command(),
+            _make_snapshot(map_visible=True),
+        )
+        assert result is True
+        # close_map() dispatches the synthetic keypress pair, then
+        # open_map() sends the wire command via Runtime.evaluate.
+        key_events = [m for m in fake_cdp._sent_methods if m == "Input.dispatchKeyEvent"]
+        assert len(key_events) == 2
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_teleport(self, fake_env: FakeEnv) -> None:
         """Dispatches teleport command via bot.teleport_to."""
         bot, fake_cdp = _make_bot(fake_env)
-        result = dispatch_command(bot, make_teleport_command(200, 200))
+        result = dispatch_command(bot, make_teleport_command(200, 200), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_teleport_records_no_attempt_when_send_fails(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A failed teleport send leaves no pending attempt to mislabel later."""
+        from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
+
+        world = _make_world()
+        result = dispatch_command(
+            _WorldOnlyBot(world),
+            make_teleport_command(200, 200),
+            _make_snapshot(map_visible=True),
+        )
+
+        assert result is False
+        assert emit_teleport_attempt_outcome(status="landed_exact", messages=[]) is False
+
+    def test_dispatch_teleport_skips_open_map_when_map_already_visible(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Teleport skips the precondition map_open when the map is already open."""
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(
+            bot,
+            make_teleport_command(200, 200),
+            _make_snapshot(map_visible=True),
+        )
+        assert result is True
+        sent_methods = fake_cdp._sent_methods
+        runtime_calls = [m for m in sent_methods if m == "Runtime.evaluate"]
+        assert len(runtime_calls) == 1
 
 
 class TestExecutorValidationHelpers:
@@ -356,8 +448,8 @@ class TestExecutorValidationHelpers:
 
         assert result is False
 
-    def test_valid_shoot_accepts_viewport_target(self) -> None:
-        """Shoot validation accepts viewport-fresh tracked targets."""
+    def test_valid_shoot_accepts_tracked_in_position_target(self) -> None:
+        """Shoot validation accepts a tracked target at the commanded tile."""
         world = _make_world()
         world["tanks"]["10"] = make_tank_state(
             tank_id=10,
@@ -377,13 +469,19 @@ class TestExecutorValidationHelpers:
 
         assert result is True
 
-    def test_valid_shoot_accepts_world_state_target_in_visible_viewport(self) -> None:
-        """Shoot validation accepts a world-state target already inside view."""
+    def test_valid_shoot_accepts_target_regardless_of_source(self) -> None:
+        """Source no longer gates the shot: presence is the AI gate's job.
+
+        A world-state (map-sourced) target that is not inside the visible
+        viewport was rejected by the old viewport-fresh proxy; it is now
+        accepted structurally, because the wire-presence kill gate -- not
+        the executor -- decides whether the tank is a live target.
+        """
         world = _make_world()
-        world["viewport"]["left"] = 100
-        world["viewport"]["top"] = 96
-        world["viewport"]["width"] = 16
-        world["viewport"]["height"] = 16
+        world["viewport"]["left"] = 0
+        world["viewport"]["top"] = 0
+        world["viewport"]["width"] = 4
+        world["viewport"]["height"] = 4
         world["tanks"]["10"] = make_tank_state(
             tank_id=10,
             x=105,
@@ -795,12 +893,18 @@ class TestExecute:
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[5],
         )
-        execute(bot, decision)
+        execute(bot, decision, _make_snapshot())
         # Equipment toggles (disable 1, 2, 4) + move command
         assert len(fake_cdp._sent_methods) == 4
 
-    def test_execute_rejects_stale_non_viewport_shoot(self, fake_env: FakeEnv) -> None:
-        """Execute drops shoot commands for non-viewport targets."""
+    def test_execute_dispatches_structurally_valid_shoot(self, fake_env: FakeEnv) -> None:
+        """Execute dispatches a shoot at a tracked, in-position target.
+
+        Combat presence (live tank vs map-only afterimage) is gated
+        upstream by the HUNT owner's wire-presence kill gate; the executor
+        only re-checks that the target still exists at the commanded tile,
+        so ``source`` no longer affects dispatch.
+        """
         bot, fake_cdp = _make_bot(fake_env)
         _store_tank(10, x=105, y=103, source="world_state")
         behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot enemy", target_id=10)
@@ -811,9 +915,9 @@ class TestExecute:
             desired_equipment=[],
         )
 
-        execute(bot, decision)
+        execute(bot, decision, _make_snapshot())
 
-        assert fake_cdp._sent_methods == []
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
 
     def test_execute_rejects_missing_pickup_target(self, fake_env: FakeEnv) -> None:
         """Execute drops pickup commands when the container no longer exists."""
@@ -826,14 +930,19 @@ class TestExecute:
             desired_equipment=[],
         )
 
-        execute(bot, decision)
+        execute(bot, decision, _make_snapshot())
 
         assert fake_cdp._sent_methods == []
 
-    def test_execute_rejects_invalid_combat_teleport_source(self, fake_env: FakeEnv) -> None:
-        """Execute drops combat teleports when the target source is invalid."""
+    def test_execute_rejects_stale_combat_teleport(self, fake_env: FakeEnv) -> None:
+        """Execute drops combat teleports whose locked target has drifted.
+
+        The tracked tank no longer sits on the locked combat-target tile,
+        so the target reads as stale and the teleport is rejected before
+        any CDP command is sent.
+        """
         bot, fake_cdp = _make_bot(fake_env)
-        _store_tank(10, x=106, y=100, source="radar")
+        _store_tank(10, x=108, y=100, source="viewport")
         ai_state = AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -850,7 +959,7 @@ class TestExecute:
             desired_equipment=[],
         )
 
-        execute(bot, decision)
+        execute(bot, decision, _make_snapshot())
 
         assert fake_cdp._sent_methods == []
 
@@ -874,6 +983,6 @@ class TestExecute:
             desired_equipment=[],
         )
 
-        execute(bot, decision)
+        execute(bot, decision, _make_snapshot())
 
         assert fake_cdp._sent_methods == []

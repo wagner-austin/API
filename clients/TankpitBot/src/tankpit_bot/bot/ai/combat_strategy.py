@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
-    has_cardinal_enemy_adjacency,
 )
 from tankpit_bot.bot.ai.combat_landing import (
     combat_landing_candidates as shared_combat_landing_candidates,
@@ -20,7 +19,12 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.threats import analyze_threats
+from tankpit_bot.bot.ai.threats import (
+    CLUSTER_RADIUS_TILES,
+    analyze_threats,
+    count_clustered_enemies,
+    is_wire_present,
+)
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     EnemyThreatDict,
@@ -82,7 +86,16 @@ def select_new_combat_target(
     ctx: DecideCtx,
     threats: list[EnemyThreatDict],
 ) -> EnemyThreatDict | None:
-    """Return the next viable new combat target.
+    """Return the next viable new combat target, preferring isolated enemies.
+
+    Viable threats are re-ranked by how many OTHER enemies sit within
+    :data:`CLUSTER_RADIUS_TILES` of them, before distance: the bot
+    cannot win 1-vN fights, so a farther isolated enemy beats a nearer
+    one with backup. When every viable threat is clustered, the least
+    clustered one is taken -- the ranking degrades, it never deadlocks.
+    Neighbor counts are computed against the full threat list (not just
+    viable ones): a blocked or cooldown-killed tank that is still alive
+    nearby can still join a fight.
 
     Args:
         ctx: Decision context.
@@ -99,7 +112,26 @@ def select_new_combat_target(
     ]
     if not viable:
         return None
-    return viable[0]
+
+    def _cluster_rank(threat: EnemyThreatDict) -> tuple[int, int]:
+        """Rank a viable threat by backup count, then distance."""
+        return (
+            count_clustered_enemies(threats, threat, CLUSTER_RADIUS_TILES),
+            threat["distance"],
+        )
+
+    ranked = sorted(viable, key=_cluster_rank)
+    chosen = ranked[0]
+    if chosen["tank_id"] != viable[0]["tank_id"]:
+        emit_ai(
+            "preferring isolated %s at (%d,%d) over clustered %s (neighbors=%d)",
+            chosen["name"],
+            chosen["x"],
+            chosen["y"],
+            viable[0]["name"],
+            count_clustered_enemies(threats, viable[0], CLUSTER_RADIUS_TILES),
+        )
+    return chosen
 
 
 def get_locked_target(
@@ -171,7 +203,7 @@ def block_combat_target_and_replan(
         }
     )
 
-    threats = analyze_threats(ctx.filtered, ctx.self_state)
+    threats = analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
     skip = {*blocked, *ctx.killed}
     viable = [t for t in threats if str(t["tank_id"]) not in skip]
     if viable:
@@ -216,6 +248,42 @@ def block_combat_target_and_replan(
 # =============================================================================
 
 
+def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
+    """Delegate the tick to the fuel planner when hunting is fuel-starved.
+
+    Threats sort nearest-first and teleport cost is monotone in
+    distance, so an unaffordable nearest target means EVERY target is
+    unaffordable. Blocking and replanning instead cascaded through the
+    whole roster and ended in a map-reopen spin: run 20260611-025636
+    spawned at fuel 620 -- above the fuel-low entry rule (500) but
+    below every engagement's cost-plus-reserve -- and spent its entire
+    240s on 115 map reopens without a single shot. Collecting fuel is
+    the only decision that changes the blocked condition; the combat
+    target is cleared so reacquisition re-derives from fresh intel
+    once an engagement is affordable.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Fuel recovery decision with combat target cleared.
+    """
+    # Lazy import: recover_fuel_mode imports clear_combat_target from
+    # this module at import time.
+    from tankpit_bot.bot.ai.recover_fuel_mode import decide_recover_fuel_mode
+
+    cleared_ctx = DecideCtx(
+        ctx.world,
+        ctx.self_state,
+        clear_combat_target(ctx.base),
+        ctx.inventory,
+        ctx.timestamp_ms,
+        ctx.terrain,
+        ctx.combat_feedback,
+    )
+    return decide_recover_fuel_mode(cleared_ctx)
+
+
 def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 0: Open map to get fresh enemy positions."""
     emit_ai("open map to find %s", target["name"])
@@ -249,7 +317,7 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
     return _combat_open_map(ctx, target)
 
 
-def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 1: Teleport to enemy."""
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if landing_x == -1 and landing_y == -1:
@@ -263,22 +331,28 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             target["name"],
         )
         return block_combat_target_and_replan(ctx, target)
+    # Engaging must leave fuel above fuel_low_threshold, the line where
+    # COLLECT_FUEL outranks HUNT. Run 20260611-004505: a teleport gated
+    # only on hunt_min_fuel landed at 224 fuel, the fuel mode hijacked
+    # the very next tick, and the ~190 fuel spent to reach purple-8
+    # bought a fight the bot was then forbidden to fight.
     if not can_afford_teleport(
         ctx,
         landing_x,
         landing_y,
-        reserve_fuel=ctx.config["hunt_min_fuel"],
+        reserve_fuel=ctx.config["fuel_low_threshold"],
     ):
         emit_ai(
-            "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)",
+            "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)"
+            " - refueling before hunt",
             target["name"],
             landing_x,
             landing_y,
             ctx.fuel,
             teleport_fuel_cost_to(ctx, landing_x, landing_y),
-            ctx.config["hunt_min_fuel"],
+            ctx.config["fuel_low_threshold"],
         )
-        return None
+        return _refuel_for_hunt(ctx)
     emit_ai("teleport near %s to (%d,%d)", target["name"], landing_x, landing_y)
     return make_decision(
         make_teleport_command(landing_x, landing_y),
@@ -292,7 +366,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     )
 
 
-def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Teleport toward the given combat target when legal.
 
     Args:
@@ -300,13 +374,13 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
         target: Combat target to close on.
 
     Returns:
-        Teleport decision, a blocked-target replanning decision, or ``None``
-        when the teleport is unaffordable.
+        Teleport decision, or a blocked-target replanning decision when the
+        landing tile is unusable or the teleport is unaffordable.
     """
     return _combat_teleport(ctx, target)
 
 
-def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase closing: confirm geometry before shooting."""
     if has_cardinal_combat_shot(ctx.self_state, target):
         return _combat_shoot(ctx, target)
@@ -319,7 +393,7 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict |
     return _combat_teleport(ctx, target)
 
 
-def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | None:
+def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Close distance on the given combat target.
 
     Args:
@@ -327,16 +401,59 @@ def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict | 
         target: Combat target to approach.
 
     Returns:
-        Close-range combat decision, or ``None`` when no close action is legal.
+        Close-range combat decision: a shot when already in cardinal position,
+        a teleport when affordable, or a blocked-target replanning decision.
     """
     return _combat_close(ctx, target)
 
 
 def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Phase engaging: Shoot. On miss: reacquire."""
+    """Phase engaging: shoot; a miss on a STATIONARY target blocks it.
+
+    This is the single chokepoint every shoot path reaches (direct
+    engage, close-in shot, refresh-then-engage), so the wire-presence
+    kill gate lives here. A target whose last in-view wire confirmation
+    is older than the presence TTL is a map-only afterimage the blob
+    keeps re-listing (raw-capture 2026-06-13: ghost 517 was map-listed 49
+    times over 425s with zero wire traffic and absorbed every miss of the
+    run); it is blocked and replanned WITHOUT firing, so no shot is wasted
+    discovering what ``last_wire_seen_ms`` already knows. Acquisition may
+    still teleport toward such a tank -- the gate only forbids the shot.
+
+    Past the gate the target is genuinely present. Live adjacent targets
+    hit 255/255 (2026-06-11 data), so a shot that comes back with no
+    damage against a target that has not moved proves the target is not
+    killable right now -- a corpse from an unwitnessed kill or a shielded
+    tank. Reopening the map (the old miss response) changes nothing about
+    a visible target: run 20260611-103244 shot the same frozen tile 12
+    times in a row, each miss buying a 2s map reopen. Blocking uses the
+    same cooldown as kills, so a shielded tank gets retried after its
+    shields are plausibly down. A miss against a target that MOVED since
+    the shot is the one ambiguous case -- a live enemy may simply have
+    stepped off the tile as the shot resolved -- so a mover is re-aimed at
+    its fresh registry position instead of being abandoned.
+    """
+    if not is_wire_present(target["last_wire_seen_ms"], ctx.timestamp_ms):
+        emit_ai(
+            "ghost %s wire-silent (last wire %dms ago) - blocking without firing",
+            target["name"],
+            ctx.timestamp_ms - target["last_wire_seen_ms"],
+        )
+        return block_combat_target_and_replan(ctx, target)
+
     if ctx.combat_feedback == "miss":
-        emit_ai("miss - reopening map for %s", target["name"])
-        return _combat_open_map(ctx, target)
+        last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
+        if (target["x"], target["y"]) == last_shot_at:
+            emit_ai("miss on stationary %s at shot range - blocking and replanning", target["name"])
+            return block_combat_target_and_replan(ctx, target)
+        emit_ai(
+            "miss but %s moved (%d,%d)->(%d,%d) - re-aiming",
+            target["name"],
+            last_shot_at[0],
+            last_shot_at[1],
+            target["x"],
+            target["y"],
+        )
 
     emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
     engaging_state = _set_combat_target(ctx.base, target)
@@ -380,11 +497,44 @@ def _combat_landing_candidates(
     return shared_combat_landing_candidates(ctx.filtered, ctx.self_state, target)
 
 
+# The server's effective shot range, measured across 350 shots on
+# 2026-06-11: Manhattan distance 1 hit 255/255, distance 2 hit 1/1,
+# distance 4+ hit ~0% (45 misses at 4, 35 at 12; the two distance-15
+# "hits" were homing shots, which track). Shots in range never miss --
+# and the range is adjacency, not the awareness-range combat_range.
+SHOT_RANGE_TILES = 2
+# Within this distance a stepping target is chased by WALKING: the
+# game queue re-paths every tick toward fresh positions with no
+# map-open deferral and no teleport fuel. Run 20260611-083908 chased
+# a moving enemy through 30 teleport hops (~4s each) without firing;
+# walking the last tiles is how the gap closes on a mover.
+CLOSE_WALK_RANGE_TILES = 6
+
+
+def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
+    """Return True when the target is within the server's shot range.
+
+    Args:
+        ctx: Decision context (unused fields reserved; kept so every
+            engagement predicate shares one signature).
+        target: Enemy threat with its current-tick distance.
+
+    Returns:
+        True if the target's Manhattan distance is within
+        ``SHOT_RANGE_TILES``.
+    """
+    del ctx
+    return target["distance"] <= SHOT_RANGE_TILES
+
+
 def has_cardinal_combat_shot(
     self_state: SelfStateDict,
     target: EnemyThreatDict,
 ) -> bool:
     """Return True when self is cardinally adjacent to the target.
+
+    Cardinal adjacency (Manhattan distance exactly 1) is the geometry
+    required for a guaranteed hit at point-blank range.
 
     Args:
         self_state: Player's own state.
@@ -393,10 +543,12 @@ def has_cardinal_combat_shot(
     Returns:
         True if Manhattan distance is exactly 1.
     """
-    return has_cardinal_enemy_adjacency(self_state, target)
+    return abs(self_state["x"] - target["x"]) + abs(self_state["y"] - target["y"]) == 1
 
 
 __all__ = [
+    "CLOSE_WALK_RANGE_TILES",
+    "SHOT_RANGE_TILES",
     "block_combat_target_and_replan",
     "clear_combat_target",
     "close_target",
@@ -404,6 +556,7 @@ __all__ = [
     "engage_target",
     "get_locked_target",
     "has_cardinal_combat_shot",
+    "has_combat_shot",
     "open_map_for_target",
     "select_new_combat_target",
     "teleport_to_target",

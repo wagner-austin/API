@@ -10,6 +10,7 @@ from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace import build_fuel_decision_basis
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseOverlapDict, FuelDecisionBasisDict
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeAttemptResultDict
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.teleport_attempt import (
     TeleportAttemptProbeProtocol,
     run_tracked_teleport_attempt,
@@ -78,6 +79,8 @@ class BuildNoFuelVisibleResultProtocol(Protocol):
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
         decision_basis: FuelDecisionBasisDict | None,
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one no-visible-fuel terminal result."""
 
@@ -102,6 +105,8 @@ class BuildRepositionMapSyncTimeoutResultProtocol(Protocol):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one blocked-fuel reposition map-sync-timeout result."""
 
@@ -128,6 +133,8 @@ class BuildRepositionTeleportTimeoutResultProtocol(Protocol):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one blocked-fuel reposition teleport-timeout result."""
 
@@ -152,6 +159,8 @@ def _run_blocked_fuel_reposition(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+    snapshot_before: PageClientSnapshotDict,
+    capture_snapshot: Callable[[], PageClientSnapshotDict],
     wait_for_teleport_outcome: TeleportOutcomeWaiterProtocol,
     teleport_strategy_requires_map_sync: Callable[
         [Literal["sync_before_teleport", "immediate_after_map_open"]],
@@ -230,6 +239,8 @@ def _run_blocked_fuel_reposition(
                 teleport_cycle_ids=teleport_cycle_ids,
                 radar_cycle_id=radar_cycle_id,
                 phase_overlaps=get_phase_overlaps(),
+                snapshot_before=snapshot_before,
+                snapshot_after=capture_snapshot(),
             ),
             reposition_map_open_started_ms=reposition_map_open_started_ms,
             reposition_map_sync_timestamp_ms=None,
@@ -259,6 +270,8 @@ def _run_blocked_fuel_reposition(
                 teleport_cycle_ids=teleport_cycle_ids,
                 radar_cycle_id=radar_cycle_id,
                 phase_overlaps=get_phase_overlaps(),
+                snapshot_before=snapshot_before,
+                snapshot_after=capture_snapshot(),
             ),
             reposition_map_open_started_ms=reposition_map_open_started_ms,
             reposition_map_sync_timestamp_ms=reposition_map_sync_timestamp_ms,
@@ -292,6 +305,8 @@ def resolve_fuel_target_after_radar(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+    snapshot_before: PageClientSnapshotDict,
+    capture_snapshot: Callable[[], PageClientSnapshotDict],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[[FuelTargetPhaseProbeProtocol, bool], ContainerStateDict | None],
     requires_reposition: Callable[[FuelTargetPhaseProbeProtocol, ContainerStateDict], bool],
@@ -348,6 +363,8 @@ def resolve_fuel_target_after_radar(
                 radar_cycle_id=radar_cycle_id,
                 phase_overlaps=get_phase_overlaps(),
                 decision_basis=decision_basis,
+                snapshot_before=snapshot_before,
+                snapshot_after=capture_snapshot(),
             ),
             decision_basis=decision_basis,
             reposition_map_open_started_ms=None,
@@ -383,6 +400,8 @@ def resolve_fuel_target_after_radar(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle_id,
         teleport_strategy=teleport_strategy,
+        snapshot_before=snapshot_before,
+        capture_snapshot=capture_snapshot,
         wait_for_teleport_outcome=wait_for_teleport_outcome,
         teleport_strategy_requires_map_sync=teleport_strategy_requires_map_sync,
         find_landing_tile=find_landing_tile,

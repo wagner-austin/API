@@ -18,7 +18,6 @@ from tankpit_bot.state.types import (
     SelfStateDict,
     WorldStateDict,
     coord_key,
-    viewport_scan_key,
 )
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -33,6 +32,64 @@ _ADJACENT_DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0
 # enough for stable containers but short enough to reject ghost targets
 # that were picked up by other players.
 _CONTAINER_FRESHNESS_TTL_MS = 30000
+
+# A locked resource target is released only when a same-kind candidate
+# is at most HALF the locked distance AND at least this many tiles
+# closer. The minimum gap keeps near-equal candidates from oscillating
+# the lock (the churn the lock exists to prevent); the halving rule
+# stops the bot from crossing the map past abundant nearby resources
+# (observed in live run 20260610-011x).
+_LOCK_RELEASE_MIN_GAP = 10
+
+# Known containers beyond this Manhattan distance are not worth walking
+# to: three viewport widths is ~96 seconds of travel at one tile per
+# tick, by which point the 30s freshness TTL guarantees the belief is
+# stale on arrival. Live run 20260610 walked across the map to a
+# container drained long before ("Empty container" x8); local search is
+# strictly better past this radius.
+_KNOWN_PURSUIT_MAX_DIST = 48
+
+# Radar coverage is keyed by exact viewport origin, but the viewport
+# shifts a tile or two with every walk. A scan whose origin is within
+# this offset still covers nearly the whole current viewport, so it
+# counts -- otherwise corner-hopping re-radars 95%-overlapping ground
+# (live run 20260610: same corner scanned repeatedly).
+_SCAN_COVERAGE_OVERLAP_TILES = 4
+
+# Coverage older than this no longer vetoes a rescan: containers spawn
+# and drain continuously, so a scan is only authoritative briefly.
+_SCAN_COVERAGE_TTL_MS = 45000
+
+#: Public alias for cross-module consumers (recover_fuel_mode).
+SCAN_COVERAGE_TTL_MS = _SCAN_COVERAGE_TTL_MS
+
+
+def is_lock_release_warranted(
+    self_state: SelfStateDict,
+    locked_x: int,
+    locked_y: int,
+    candidate_x: int,
+    candidate_y: int,
+) -> bool:
+    """Return True when a candidate is enough closer to drop a locked target.
+
+    Args:
+        self_state: Player state for the distance origin.
+        locked_x: Locked target X coordinate.
+        locked_y: Locked target Y coordinate.
+        candidate_x: Fresh candidate X coordinate.
+        candidate_y: Fresh candidate Y coordinate.
+
+    Returns:
+        True when the candidate is at most half the locked distance and
+        at least ``_LOCK_RELEASE_MIN_GAP`` tiles closer.
+    """
+    sx, sy = self_state["x"], self_state["y"]
+    locked_dist = manhattan_distance(sx, sy, locked_x, locked_y)
+    candidate_dist = manhattan_distance(sx, sy, candidate_x, candidate_y)
+    if candidate_dist * 2 > locked_dist:
+        return False
+    return locked_dist - candidate_dist >= _LOCK_RELEASE_MIN_GAP
 
 
 def describe_container_search(
@@ -419,11 +476,13 @@ def find_known_fuel_candidates(
     sx, sy = self_state["x"], self_state["y"]
     scored: list[tuple[int, int, ContainerStateDict]] = []
     for container in world["containers"].values():
-        if not _is_known_candidate(container, want_fuel=True, now_ms=now_ms):
+        if not is_container_pursuable(container, want_fuel=True, now_ms=now_ms):
             continue
         if container["volume"] < minimum_volume:
             continue
         dist = manhattan_distance(sx, sy, container["x"], container["y"])
+        if dist > _KNOWN_PURSUIT_MAX_DIST:
+            continue
         scored.append((container["volume"] - dist, dist, container))
     scored.sort(key=_known_fuel_candidate_key)
     return [container for _, _, container in scored]
@@ -448,12 +507,66 @@ def find_known_equipment_candidates(
     sx, sy = self_state["x"], self_state["y"]
     candidates: list[tuple[int, ContainerStateDict]] = []
     for container in world["containers"].values():
-        if not _is_known_candidate(container, want_fuel=False, now_ms=now_ms):
+        if not is_container_pursuable(container, want_fuel=False, now_ms=now_ms):
             continue
         dist = manhattan_distance(sx, sy, container["x"], container["y"])
+        if dist > _KNOWN_PURSUIT_MAX_DIST:
+            continue
         candidates.append((dist, container))
     candidates.sort(key=_equipment_candidate_distance)
     return [container for _, container in candidates]
+
+
+def find_adjacent_container(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None,
+    *,
+    want_fuel: bool,
+    now_ms: int,
+) -> ContainerStateDict | None:
+    """Return a fresh, reachable container of the requested kind within one tile.
+
+    Used for opportunistic cross-kind pickups: a recovery mode hunting
+    one resource kind should not walk straight past the other kind when
+    it is standing next to it (live run 20260610-011x ignored adjacent
+    equipment during fuel search). Adjacency alone is NOT pickability:
+    a diagonal neighbor across a water gap is one tile away and
+    unreachable (live run 20260611-000x dispatched a pickup at
+    (129,152) from (128,153) that the server rejected -- the bot's own
+    A* already knew it), so the SAME terrain-reachability predicate as
+    candidate selection applies here.
+
+    Args:
+        world: Current world state with container positions.
+        self_state: Player's own state for adjacency.
+        terrain: Terrain map for reachability; ``None`` skips the check.
+        want_fuel: True to look for fuel, False for equipment.
+        now_ms: Current timestamp for freshness filtering.
+
+    Returns:
+        An adjacent fresh reachable container of the requested kind, or
+        ``None``.
+    """
+    sx, sy = self_state["x"], self_state["y"]
+    for container in world["containers"].values():
+        if not is_container_pursuable(container, want_fuel=want_fuel, now_ms=now_ms):
+            continue
+        if abs(container["x"] - sx) > 1 or abs(container["y"] - sy) > 1:
+            continue
+        if not _is_actionable_with_terrain(
+            world,
+            terrain,
+            sx,
+            sy,
+            container["x"],
+            container["y"],
+            allow_unreachable=False,
+            blocked_mines=world["mines"],
+        ):
+            continue
+        return container
+    return None
 
 
 def find_nearest_deposit(
@@ -569,29 +682,105 @@ def _is_visible_candidate(
     now_ms: int,
 ) -> bool:
     """Return True when a container passes type, freshness, and viewport checks."""
-    if container["is_fuel"] != want_fuel:
-        return False
-    if container["failed_pickups"] > 0:
-        return False
-    if now_ms > 0 and _is_stale(container, now_ms):
+    if not is_container_pursuable(container, want_fuel=want_fuel, now_ms=now_ms):
         return False
     cx, cy = container["x"], container["y"]
     left, top, right, bottom = _viewport_bounds(world)
     return left <= cx <= right and top <= cy <= bottom
 
 
-def _is_known_candidate(
+def is_container_pursuable(
     container: ContainerStateDict,
     *,
     want_fuel: bool,
     now_ms: int,
 ) -> bool:
-    """Return True when a tracked container is worth pursuing at all."""
+    """Return True when a tracked container is worth pursuing at all.
+
+    This is the SINGLE definition of pursuability: candidate selection,
+    opportunistic pickups, and lock continuation must all apply it. The
+    lock path previously skipped the freshness check and kept the bot
+    walking to containers whose belief had long expired.
+
+    Args:
+        container: Tracked container to check.
+        want_fuel: True to require fuel, False to require equipment.
+        now_ms: Current timestamp for freshness filtering. ``0`` disables
+            the TTL.
+
+    Returns:
+        True when the container matches the kind, has no failed pickup,
+        and is within the freshness TTL.
+    """
     if container["is_fuel"] != want_fuel:
         return False
     if container["failed_pickups"] > 0:
         return False
     return not (now_ms > 0 and _is_stale(container, now_ms))
+
+
+def is_area_scanned(world: WorldStateDict, left: int, top: int, now_ms: int) -> bool:
+    """Return True when a viewport origin has fresh overlapping scan coverage.
+
+    Coverage is keyed by exact scan-time viewport origins, but the
+    viewport shifts with every walk; a scan within
+    :data:`_SCAN_COVERAGE_OVERLAP_TILES` of the queried origin still
+    covers nearly the whole area and counts. Entries older than
+    :data:`_SCAN_COVERAGE_TTL_MS` no longer veto a rescan.
+
+    Args:
+        world: Current world state with scan coverage records.
+        left: Queried viewport left X coordinate.
+        top: Queried viewport top Y coordinate.
+        now_ms: Current timestamp for coverage freshness.
+
+    Returns:
+        True when a fresh, mostly-overlapping scan covers the origin.
+    """
+    for key, scanned_ms in world["scanned_viewports"].items():
+        if now_ms - scanned_ms > _SCAN_COVERAGE_TTL_MS:
+            continue
+        key_left_text, _, key_top_text = key.partition(",")
+        if (
+            abs(int(key_left_text) - left) <= _SCAN_COVERAGE_OVERLAP_TILES
+            and abs(int(key_top_text) - top) <= _SCAN_COVERAGE_OVERLAP_TILES
+        ):
+            return True
+    return False
+
+
+def is_tile_scanned(world: WorldStateDict, x: int, y: int, now_ms: int) -> bool:
+    """Return True when a world tile sits inside fresh scan coverage.
+
+    Unlike :func:`is_area_scanned`, which asks whether a viewport
+    ORIGIN is close enough to a past scan to skip re-scanning, this
+    asks whether a specific TILE was inside any freshly scanned
+    viewport. A tile that was scanned and produced no container is
+    refuted ground truth: live run 20260611-155750 oscillated between
+    two stale fuel dots 7-9 tiles away for ~35s (607->414 fuel)
+    because the origin-proximity check let already-seen dots count as
+    fresh leads.
+
+    Args:
+        world: Current world state with scan coverage records.
+        x: World tile X coordinate.
+        y: World tile Y coordinate.
+        now_ms: Current timestamp for coverage freshness.
+
+    Returns:
+        True when a fresh scan's viewport contained the tile.
+    """
+    width = world["viewport"]["width"]
+    height = world["viewport"]["height"]
+    for key, scanned_ms in world["scanned_viewports"].items():
+        if now_ms - scanned_ms > _SCAN_COVERAGE_TTL_MS:
+            continue
+        key_left_text, _, key_top_text = key.partition(",")
+        left = int(key_left_text)
+        top = int(key_top_text)
+        if left <= x < left + width and top <= y < top + height:
+            return True
+    return False
 
 
 def is_current_viewport_scanned(world: WorldStateDict) -> bool:
@@ -601,12 +790,11 @@ def is_current_viewport_scanned(world: WorldStateDict) -> bool:
         world: Current world state.
 
     Returns:
-        True if the current viewport origin has been confirmed by fresh radar
-        data or a fresh visible viewport update.
+        True if the current viewport area is covered by a fresh radar
+        scan whose origin overlaps the current one.
     """
     viewport = world["viewport"]
-    key = viewport_scan_key(viewport["left"], viewport["top"])
-    return key in world["scanned_viewports"]
+    return is_area_scanned(world, viewport["left"], viewport["top"], world["timestamp_ms"])
 
 
 def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
@@ -654,7 +842,9 @@ def _is_actionable_with_terrain(
 
 
 __all__ = [
+    "SCAN_COVERAGE_TTL_MS",
     "describe_container_search",
+    "find_adjacent_container",
     "find_best_fuel",
     "find_equipment_candidates",
     "find_known_equipment_candidates",
@@ -663,6 +853,10 @@ __all__ = [
     "find_nearest_equipment",
     "find_nearest_fuel",
     "find_teleport_landing_tile",
+    "is_area_scanned",
+    "is_container_pursuable",
     "is_current_viewport_scanned",
+    "is_lock_release_warranted",
     "is_reachable",
+    "is_tile_scanned",
 ]

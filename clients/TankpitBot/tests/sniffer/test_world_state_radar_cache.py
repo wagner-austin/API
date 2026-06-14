@@ -130,8 +130,8 @@ class TestContainersFromCurrentRadarCache:
         for c in containers:
             assert c["x"] != 200
 
-    def test_regular_radar_uses_centered_7x7_bounds(self) -> None:
-        """Built-in radar only covers a 7x7 square centered on the tank."""
+    def test_regular_radar_uses_centered_5x5_bounds(self) -> None:
+        """Built-in radar only covers a 5x5 square centered on the tank."""
         world = get_world_state()
         entities: list[tuple[int, int, int, int, int]] = [
             (5, 5, 0, 400, 255),

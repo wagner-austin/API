@@ -67,6 +67,7 @@ def make_world(
         terrain={},
         viewport=viewport,
         scanned_viewports=scanned_viewports,
+        map_fuel_dots={},
         timestamp_ms=0,
     )
     return world, self_state

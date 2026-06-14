@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.mode_controller import (
     apply_mode_to_decision,
@@ -62,7 +63,7 @@ def decide(
         normalized_state,
         inventory,
         timestamp_ms,
-        terrain,
+        compose_decision_terrain(world, terrain),
         combat_feedback,
     )
     mode = _select_owner_mode(ctx)

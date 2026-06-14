@@ -188,6 +188,39 @@ def test_should_exit_recover_equipment_uses_resume_threshold() -> None:
     assert should_exit_recover_equipment(_make_ctx(dual_count=5, radar_count=5)) is False
 
 
+def test_radar_at_break_enters_recover_equipment_to_restock() -> None:
+    """Radars at the break threshold enter restock even with full weapons.
+
+    Radars find enemies and equipment, so the bot rebuilds the kit
+    before hunting blind. The grid-sweep forager makes this safe at
+    zero extras (it spends none), reversing the conservative exclusion
+    that left the bot looping 0->3->2->1 (live run 20260613-011044).
+    """
+    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=5)) is True
+
+
+def test_radars_between_break_and_resume_do_not_re_enter() -> None:
+    """Radars above the break but below resume do not start a fresh restock.
+
+    The break/resume gap is hysteresis: a fresh entry needs the low
+    break, so a bot fighting with a partial stock is not yanked back
+    into restock at every spent radar.
+    """
+    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=6)) is False
+
+
+def test_exit_recover_equipment_requires_radar_resume() -> None:
+    """Restored weapons do NOT release recovery while radars stay low.
+
+    The mode holds until radars are rebuilt to the resume buffer, so
+    the bot reaches a healthy stock before returning to the hunt
+    instead of leaving at the first radar it scrapes together.
+    """
+    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=5)) is False
+    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=14)) is False
+    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=15)) is True
+
+
 def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:
     """HUNT owns the tick only when no recovery mode has stronger entry rules."""
     assert should_enter_hunt(_make_ctx(fuel=800, dual_count=30, radar_count=30)) is True
@@ -234,6 +267,40 @@ def test_derive_hunt_mode_state_keeps_search_teleport_in_acquire() -> None:
     decision = make_tick_decision(
         command=make_teleport_command(110, 100),
         behavior=make_behavior_score("HUNT", 0, 110, 100, "edge_for_enemies"),
+        updated_ai_state=make_initial_ai_state(),
+        desired_equipment=[],
+    )
+
+    assert derive_hunt_mode_state(decision) == "ACQUIRE"
+
+
+def test_derive_hunt_mode_state_maps_locked_walk_to_close() -> None:
+    """A combat walk toward a locked target is a CLOSE transition."""
+    decision = make_tick_decision(
+        command=make_move_command(103, 100),
+        behavior=make_behavior_score("HUNT", 800, 103, 100, "walk to Enemy"),
+        updated_ai_state=AIStateDict(
+            **{
+                **make_initial_ai_state(),
+                "combat_target_id": 42,
+            }
+        ),
+        desired_equipment=[],
+    )
+
+    assert derive_hunt_mode_state(decision) == "CLOSE"
+
+
+def test_derive_hunt_mode_state_uses_acquire_for_delegated_fuel_pickup() -> None:
+    """A refuel-for-hunt delegation's pickup stays in HUNT acquire.
+
+    When every engagement is unaffordable the hunt owner delegates the
+    tick to the fuel planner; its pickup command has no HUNT-specific
+    shape and lands in the acquire substate.
+    """
+    decision = make_tick_decision(
+        command=make_pickup_fuel_command(110, 100),
+        behavior=make_behavior_score("COLLECT_FUEL", 900, 110, 100, "fuel=500"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )

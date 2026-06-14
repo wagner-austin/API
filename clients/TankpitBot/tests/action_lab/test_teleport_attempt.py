@@ -112,6 +112,10 @@ def _snapshot(
         ws_ready_state=1,
         current_send_label=None,
         sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
     )
 
 

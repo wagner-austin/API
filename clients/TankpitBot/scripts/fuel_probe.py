@@ -7,6 +7,7 @@ from platform_core.logging import get_logger
 from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks
 from tankpit_bot.action_lab import FuelProbeSessionDict, format_fuel_probe_summary, run_fuel_probe
+from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
 
@@ -37,6 +38,7 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
+    configure_probe_runtime_logging("fuel")
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()

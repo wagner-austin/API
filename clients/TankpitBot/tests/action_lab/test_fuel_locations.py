@@ -3,89 +3,22 @@
 from __future__ import annotations
 
 import pytest
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.action_lab.fuel_locations import build_distinct_ground_targets
 
 
-class _Terrain:
-    """Minimal terrain map fake for ground-target tests."""
-
-    ROCK = "#"
-    GROUND = "."
-    WATER = "W"
-
-    def __init__(self, passable: set[tuple[int, int]]) -> None:
-        """Store the passable tile set.
-
-        Args:
-            passable: Coordinates considered walkable ground.
-        """
-        self._passable = passable
-
-    def get_terrain(self, x: int, y: int) -> str:
-        """Return a terrain character for one tile.
-
-        Args:
-            x: Tile X coordinate.
-            y: Tile Y coordinate.
-
-        Returns:
-            ``"."`` for passable tiles, otherwise ``"W"``.
-        """
-        return self.GROUND if (x, y) in self._passable else self.WATER
-
-    def is_passable(self, x: int, y: int) -> bool:
-        """Return whether a tile is walkable.
-
-        Args:
-            x: Tile X coordinate.
-            y: Tile Y coordinate.
-
-        Returns:
-            True when the tile is in the passable set.
-        """
-        return (x, y) in self._passable
-
-    def render_viewport(
-        self,
-        center_x: int,
-        center_y: int,
-        width: int = 16,
-        height: int = 16,
-    ) -> list[list[str]]:
-        """Render a viewport-sized terrain grid.
-
-        Args:
-            center_x: Viewport center X coordinate.
-            center_y: Viewport center Y coordinate.
-            width: Viewport width in tiles.
-            height: Viewport height in tiles.
-
-        Returns:
-            Terrain grid centered on ``center_x`` and ``center_y``.
-        """
-        rows: list[list[str]] = []
-        left = center_x - (width // 2)
-        top = center_y - (height // 2)
-        for y in range(top, top + height):
-            row: list[str] = []
-            for x in range(left, left + width):
-                row.append(self.get_terrain(x, y))
-            rows.append(row)
-        return rows
-
-
 def _terrain(passable: set[tuple[int, int]]) -> TerrainMapProtocol:
-    """Build a typed terrain fake.
+    """Build a typed in-memory terrain map.
 
     Args:
         passable: Passable coordinates.
 
     Returns:
-        Typed terrain fake.
+        Map whose passable tiles are ground and everything else is water.
     """
-    return _Terrain(passable)
+    return InMemoryTerrainMap.from_passable_set(passable)
 
 
 def _fill_neighborhood(passable: set[tuple[int, int]], x: int, y: int) -> None:

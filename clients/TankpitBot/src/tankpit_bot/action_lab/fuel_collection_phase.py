@@ -21,6 +21,7 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     FuelTargetResolution,
     resolve_fuel_target_after_radar,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.radar_phase import run_tracked_radar_phase
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
@@ -102,6 +103,8 @@ class ResolveFuelTargetPhaseProtocol(Protocol):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+        snapshot_before: PageClientSnapshotDict,
+        capture_snapshot: Callable[[], PageClientSnapshotDict],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
             [FuelTargetPhaseProbeProtocol, bool],
@@ -155,6 +158,8 @@ class BuildRadarTimeoutResultProtocol(Protocol):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         phase_overlaps: list[ActionPhaseOverlapDict],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one radar-timeout terminal result."""
 
@@ -183,6 +188,8 @@ class RunPickupAttemptProtocol(Protocol):
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         decision_basis: FuelDecisionBasisDict | None,
+        snapshot_before: PageClientSnapshotDict,
+        capture_snapshot: Callable[[], PageClientSnapshotDict],
     ) -> FuelProbeAttemptResultDict:
         """Run one tracked pickup attempt and return the result."""
 
@@ -209,6 +216,8 @@ def run_tracked_fuel_collection_phase(
     message_start_index: int,
     teleport_cycle_ids: list[int],
     teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+    snapshot_before: PageClientSnapshotDict,
+    capture_snapshot: Callable[[], PageClientSnapshotDict],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[
         [FuelTargetPhaseProbeProtocol, bool],
@@ -326,6 +335,8 @@ def run_tracked_fuel_collection_phase(
             teleport_cycle_ids=teleport_cycle_ids,
             radar_cycle_id=radar_cycle["cycle_id"],
             phase_overlaps=get_phase_overlaps(),
+            snapshot_before=snapshot_before,
+            snapshot_after=capture_snapshot(),
         )
 
     fuel_target_probe: FuelTargetPhaseProbeProtocol = probe
@@ -349,6 +360,8 @@ def run_tracked_fuel_collection_phase(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle["cycle_id"],
         teleport_strategy=teleport_strategy,
+        snapshot_before=snapshot_before,
+        capture_snapshot=capture_snapshot,
         terrain_provider=terrain_provider,
         find_visible_target=find_visible_target,
         requires_reposition=requires_reposition,
@@ -393,6 +406,8 @@ def run_tracked_fuel_collection_phase(
         teleport_cycle_ids=teleport_cycle_ids,
         radar_cycle_id=radar_cycle["cycle_id"],
         decision_basis=resolution.decision_basis,
+        snapshot_before=snapshot_before,
+        capture_snapshot=capture_snapshot,
     )
 
 

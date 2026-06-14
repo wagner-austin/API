@@ -134,6 +134,14 @@ class FakeCDPSessionBot:
                 }
             if "tankpit.magic" in expression:
                 return {"result": {"value": _FAKE_MAGIC}}
+            if "hasInventoryAnchor" in expression:
+                return {
+                    "result": {
+                        "value": (
+                            '{"bodyLength": 0, "hasInventoryAnchor": false, "hasChatAnchor": false}'
+                        )
+                    }
+                }
             if "script[src]" in expression and "tpclient" in expression:
                 return {"result": {"value": _FAKE_TPCLIENT_URL}}
             if "fetch(" in expression and "tpclient-test.js" in expression:

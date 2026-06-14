@@ -16,8 +16,34 @@ from tankpit_bot.inventory import (
     InventoryState,
     diff_inventory,
 )
+from tankpit_bot.runtime_logging import emit_diagnostic
 
 log = get_logger(__name__)
+
+
+def _emit_inventory_sample(changes: list[InventoryChange]) -> None:
+    """Emit a structured inventory sample after any tracked change.
+
+    One ``inventory_sample`` diagnostic per change batch gives the
+    per-run audit an absolute count trajectory without parsing
+    free-text log lines.
+
+    Args:
+        changes: Change batch that triggered the update; an empty batch
+            emits nothing.
+    """
+    if not changes:
+        return
+    state = _ws._inventory_state
+    emit_diagnostic(
+        diagnostic_kind="inventory_sample",
+        armor=state["armor_shields"]["count"],
+        dual=state["dual_shots"]["count"],
+        missile=state["missile_shots"]["count"],
+        homing=state["homing_shots"]["count"],
+        radar=state["extra_radars"]["count"],
+        radar_enabled=state["extra_radars"]["enabled"],
+    )
 
 
 def get_inventory_state() -> InventoryState:
@@ -52,6 +78,7 @@ def update_inventory_from_protocol(
     )
     changes = diff_inventory(old, _ws._inventory_state)
     _log_inventory_changes(changes)
+    _emit_inventory_sample(changes)
     return changes
 
 
@@ -89,6 +116,15 @@ def update_inventory_from_gain(gained: list[int]) -> list[InventoryChange]:
     )
     changes = diff_inventory(old, _ws._inventory_state)
     _log_inventory_changes(changes)
+    emit_diagnostic(
+        diagnostic_kind="equipment_gain",
+        armor=gained[0],
+        dual=gained[1],
+        missile=gained[2],
+        homing=gained[3],
+        radar=gained[4],
+    )
+    _emit_inventory_sample(changes)
     return changes
 
 
@@ -111,6 +147,7 @@ def update_inventory_from_toggle(enabled: list[bool]) -> list[InventoryChange]:
     )
     changes = diff_inventory(old, _ws._inventory_state)
     _log_inventory_changes(changes)
+    _emit_inventory_sample(changes)
     return changes
 
 

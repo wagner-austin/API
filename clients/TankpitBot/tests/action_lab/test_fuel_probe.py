@@ -2,28 +2,30 @@
 
 from __future__ import annotations
 
-import types
 from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_core.json_utils import JSONObject, JSONValue, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from tests.action_lab._replay_browser import RecordedChromiumSession
+from tests.action_lab._replay_core import (
+    ClockAdvancingPage,
+    ReplayClock,
+    StubbedBootstrapMixin,
+    StubSnapshotCDPSession,
+    WorldStateOverrideMixin,
+)
+from tests.action_lab.conftest import ground_terrain, rock_wall
 from tests.conftest import FakeFileSystem
+from tests.fakes import InMemoryTerrainMap
 from typing_extensions import Unpack
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
-    BrowserContextProtocol,
-    BrowserProtocol,
-    BrowserTypeProtocol,
     BufferedMessageSourceProtocol,
     CDPSessionProtocol,
-    KeyboardProtocol,
     PageProtocol,
-    PlaywrightProtocol,
-    ResponseProtocol,
-    SyncPlaywrightContextManagerProtocol,
     TerrainMapProtocol,
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -46,6 +48,7 @@ from tankpit_bot.action_lab.fuel_probe_types import (
     FuelProbeSessionDict,
     decode_fuel_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -75,6 +78,30 @@ from tankpit_bot.state import (
     make_self_state,
 )
 from tankpit_bot.types import CapturedMessage, decode_capture_session
+
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot for fuel-probe fixtures."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
+    )
 
 
 class _FuelProbeModuleProtocol(Protocol):
@@ -165,6 +192,23 @@ _fuel_module_import = __import__("tankpit_bot.action_lab.fuel_probe", fromlist=[
 fuel_probe_module: _FuelProbeModuleProtocol = _fuel_module_import
 
 
+class _FuelTargetingModuleProtocol(Protocol):
+    """Typed access to patchable equipment_targeting globals — the SHARED
+    fuel targeting module that ``_visible_fuel_requires_reposition`` and
+    ``_find_visible_fuel_landing_tile`` ultimately call into. Both rely on
+    ``get_terrain_map()`` from this module's namespace, so test scenarios
+    that exercise the real targeting helpers must patch the terrain provider
+    at BOTH ``fuel_probe_module`` AND this module."""
+
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
+
+
+_fuel_targeting_module_import = __import__(
+    "tankpit_bot.action_lab.fuel_targeting", fromlist=["fuel_targeting"]
+)
+fuel_targeting_module: _FuelTargetingModuleProtocol = _fuel_targeting_module_import
+
+
 def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
     """Build a world with one self tank."""
     world = make_empty_world_state()
@@ -184,118 +228,13 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=x - 8, top=y - 8, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 
 
-class _Clock:
-    """Mutable millisecond clock."""
-
-    def __init__(self, start_ms: int) -> None:
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        self._now_ms += delta_ms
-
-
-class _FakeKeyboard:
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        _ = (text, delay)
-
-
-class _FakePage:
-    """Minimal page fake that records waits."""
-
-    url = "https://tankpit.com/play"
-
-    def __init__(self, clock: _Clock) -> None:
-        self._clock = clock
-        self.waits: list[float] = []
-        self._keyboard = _FakeKeyboard()
-        self.on_wait: Callable[[float], None] | None = None
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> ResponseProtocol | None:
-        _ = (url, referer, timeout, wait_until)
-        return None
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        self.waits.append(timeout)
-        self._clock.advance(int(timeout))
-        if self.on_wait is not None:
-            self.on_wait(timeout)
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> JSONValue:
-        _ = expression
-        return None
-
-
-class _Terrain:
-    """Minimal terrain fake."""
-
-    ROCK = "#"
-    GROUND = "."
-    WATER = "W"
-
-    def __init__(self, passable: set[tuple[int, int]]) -> None:
-        self._passable = passable
-
-    def get_terrain(self, x: int, y: int) -> str:
-        return self.GROUND if (x, y) in self._passable else self.WATER
-
-    def is_passable(self, x: int, y: int) -> bool:
-        return (x, y) in self._passable
-
-    def render_viewport(
-        self,
-        center_x: int,
-        center_y: int,
-        width: int = 16,
-        height: int = 16,
-    ) -> list[list[str]]:
-        rows: list[list[str]] = []
-        left = center_x - (width // 2)
-        top = center_y - (height // 2)
-        for y in range(top, top + height):
-            row: list[str] = []
-            for x in range(left, left + width):
-                row.append(self.get_terrain(x, y))
-            rows.append(row)
-        return rows
-
-
 def _terrain(passable: set[tuple[int, int]]) -> TerrainMapProtocol:
-    return _Terrain(passable)
+    return InMemoryTerrainMap.from_passable_set(passable)
 
 
 def _build_wait_results(
@@ -420,48 +359,6 @@ def _make_teleport_outcome_callback(
     return _teleport_outcome
 
 
-def _make_find_target_callback(
-    fuel_target: ContainerStateDict | None,
-) -> Callable[[FuelProbe, bool], ContainerStateDict | None]:
-    """Return a visible fuel selector callback."""
-
-    def _find_target(
-        current_probe: FuelProbe,
-        allow_unreachable: bool,
-    ) -> ContainerStateDict | None:
-        _ = (current_probe, allow_unreachable)
-        if fuel_target is not None:
-            target_key = coord_key(fuel_target["x"], fuel_target["y"])
-            current_probe.get_world_state()["containers"][target_key] = fuel_target
-        return fuel_target
-
-    return _find_target
-
-
-def _make_requires_reposition_callback(
-    status: Literal[
-        "picked_up_fuel",
-        "no_fuel_visible",
-        "radar_timeout",
-        "map_sync_timeout",
-        "reposition_map_sync_timeout",
-        "teleport_timeout",
-        "reposition_teleport_timeout",
-        "pickup_timeout",
-    ],
-) -> Callable[[FuelProbe, ContainerStateDict], bool]:
-    """Return whether a scenario should trigger blocked-fuel reposition."""
-
-    def _requires_reposition(
-        current_probe: FuelProbe,
-        current_target: ContainerStateDict,
-    ) -> bool:
-        _ = (current_probe, current_target)
-        return status in {"reposition_map_sync_timeout", "reposition_teleport_timeout"}
-
-    return _requires_reposition
-
-
 def _make_pickup_outcome_callback(
     pickup_status: Literal["picked_up_fuel", "pickup_timeout"] | None,
 ) -> _WaitForPickupOutcomeProtocol:
@@ -496,11 +393,11 @@ def _make_pickup_outcome_callback(
 class _ProbeHarness(FuelProbe):
     """Fuel probe subclass with controllable world state."""
 
-    def __init__(self, clock: _Clock) -> None:
+    def __init__(self, clock: ReplayClock) -> None:
         super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
         self._world_state = _make_world(1000, 100, 100, 700)
-        self._fake_page = _FakePage(clock)
-        self._cdp = _FakeCDPSession()
+        self._fake_page = ClockAdvancingPage(clock)
+        self._cdp = StubSnapshotCDPSession()
         self._messages = []
         self.map_open_result = True
         self.teleport_result = True
@@ -541,6 +438,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_wait_sync = action_session.wait_for_world_sync
     original_wait_radar_sync = action_session.wait_for_radar_sync
     original_get_terrain_map = fuel_probe_module.get_terrain_map
+    original_targeting_terrain = fuel_targeting_module.get_terrain_map
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
     original_find_visible = fuel_probe_module._find_visible_fuel_target
     original_requires_reposition = fuel_probe_module._visible_fuel_requires_reposition
@@ -554,6 +452,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     action_session.wait_for_world_sync = original_wait_sync
     action_session.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module.get_terrain_map = original_get_terrain_map
+    fuel_targeting_module.get_terrain_map = original_targeting_terrain
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_probe_module._find_visible_fuel_target = original_find_visible
     fuel_probe_module._visible_fuel_requires_reposition = original_requires_reposition
@@ -602,7 +501,7 @@ def test_effective_pickup_timeout_scales_with_distance() -> None:
 
 def test_find_visible_fuel_target_returns_best_visible_container() -> None:
     """Fuel target selection chooses the visible high-volume fuel container."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     world = probe.get_world_state()
     world["containers"][coord_key(101, 100)] = make_container_state(
         101,
@@ -627,7 +526,7 @@ def test_find_visible_fuel_target_returns_best_visible_container() -> None:
 
 def test_format_visible_fuel_entries_returns_unavailable_without_terrain() -> None:
     """Visible-fuel diagnostics report unavailable without a terrain map."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     fuel_probe_module.get_terrain_map = lambda: None
 
     summary = _format_visible_fuel_entries(probe, fuel_target=None)
@@ -637,7 +536,7 @@ def test_format_visible_fuel_entries_returns_unavailable_without_terrain() -> No
 
 def test_format_visible_fuel_entries_returns_unavailable_without_self_state() -> None:
     """Visible-fuel diagnostics report unavailable without self state."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state["self_state"] = None
     fuel_probe_module.get_terrain_map = lambda: _terrain({(100, 100)})
 
@@ -648,7 +547,7 @@ def test_format_visible_fuel_entries_returns_unavailable_without_self_state() ->
 
 def test_format_visible_fuel_entries_returns_none_when_no_visible_fuel_is_tracked() -> None:
     """Visible-fuel diagnostics exclude non-fuel and out-of-viewport containers."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     world = probe.get_world_state()
     world["containers"][coord_key(101, 100)] = make_container_state(
         101,
@@ -673,7 +572,7 @@ def test_format_visible_fuel_entries_returns_none_when_no_visible_fuel_is_tracke
 
 def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None:
     """Visible-fuel diagnostics mark stale entries and truncate long summaries."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state = _make_world(40001, 100, 100, 700)
     world = probe.get_world_state()
     passable_tiles = {(100, 100)}
@@ -709,7 +608,7 @@ def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None
 
 def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
     """Fuel target selection raises when required state is missing."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     fuel_probe_module.get_terrain_map = lambda: None
     with pytest.raises(FuelProbeError, match="terrain map is unavailable"):
         _find_visible_fuel_target(probe)
@@ -722,7 +621,7 @@ def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
 
 def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
     """Pickup wait succeeds on fuel gain or container disappearance."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
     page = probe._fake_page
     worlds = [_make_world(1000, 100, 100, 300), _make_world(1100, 100, 100, 450)]
@@ -736,8 +635,7 @@ def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
         )
     probe._world_state = worlds[0]
 
-    def _advance(timeout: float) -> None:
-        _ = timeout
+    def _advance() -> None:
         if len(worlds) > 1:
             worlds.pop(0)
         probe._world_state = worlds[0]
@@ -789,7 +687,7 @@ def test_wait_for_pickup_outcome_detects_fuel_gain_and_disappearance() -> None:
 
 def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> None:
     """Pickup wait handles timeout and missing-self-state failures."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
     page = probe._fake_page
     probe._world_state["containers"][coord_key(101, 100)] = make_container_state(
@@ -849,8 +747,8 @@ def test_wait_for_pickup_outcome_times_out_and_handles_missing_self_state() -> N
 
 def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() -> None:
     """Immediate pickup helper detects queued pickup events and validates self state."""
-    action_hooks.get_current_time_ms = _Clock(1000)
-    probe = _ProbeHarness(_Clock(1000))
+    action_hooks.get_current_time_ms = ReplayClock(1000)
+    probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state["containers"][coord_key(101, 100)] = make_container_state(
         101,
         100,
@@ -877,7 +775,7 @@ def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() ->
 
     assert completed == ("picked_up_fuel", 1000, 850)
 
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state["containers"][coord_key(101, 100)] = make_container_state(
         101,
         100,
@@ -906,7 +804,7 @@ def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() ->
         is None
     )
 
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state["self_state"] = None
 
     with pytest.raises(FuelProbeError, match="self state disappeared while waiting"):
@@ -920,9 +818,9 @@ def test_get_completed_pickup_outcome_detects_pickup_and_missing_self_state() ->
 
 def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
     """Fuel pickup wrapper converts shared pickup-phase failures."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
-    page = _FakePage(clock)
+    page = ClockAdvancingPage(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     fuel_target = make_container_state(101, 100, True, 300)
     pickup_attr = "run_tracked_pickup_phase"
@@ -1010,6 +908,8 @@ def test_run_pickup_attempt_converts_pickup_phase_error() -> None:
                 teleport_cycle_ids=[1],
                 radar_cycle_id=2,
                 decision_basis=None,
+                snapshot_before=_snapshot(1000),
+                capture_snapshot=lambda: _snapshot(1900),
             )
     finally:
         setattr(fuel_probe_module, pickup_attr, original_run_pickup)
@@ -1073,6 +973,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=200,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=0,
                 message_end_index=1,
             ),
@@ -1103,6 +1005,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=None,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=1,
                 message_end_index=2,
             ),
@@ -1133,6 +1037,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=None,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=2,
                 message_end_index=3,
             ),
@@ -1163,6 +1069,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=None,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=3,
                 message_end_index=4,
             ),
@@ -1193,6 +1101,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=None,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=4,
                 message_end_index=5,
             ),
@@ -1223,6 +1133,8 @@ def test_format_fuel_probe_summary_counts_statuses() -> None:
                 fuel_target_volume=200,
                 phase_overlaps=[],
                 decision_basis=None,
+                snapshot_before=_snapshot(0),
+                snapshot_after=_snapshot(0),
                 message_start_index=5,
                 message_end_index=6,
             ),
@@ -1262,19 +1174,29 @@ def _run_probe_single_target_scenario(
     fuel_target: ContainerStateDict | None,
     pickup_status: Literal["picked_up_fuel", "pickup_timeout"] | None,
 ) -> FuelProbeAttemptResultDict:
-    """Run one configured single-target probe scenario."""
-    clock = _Clock(1000)
+    """Run one configured single-target probe scenario.
+
+    Runs the REAL targeting helpers (``_find_visible_fuel_target``,
+    ``_visible_fuel_requires_reposition``, ``_find_visible_fuel_landing_tile``)
+    against a harness whose world state holds the configured fuel container
+    and terrain set up to produce the desired branch:
+
+    * reposition scenarios get a rock-wall at x=102 that spans the viewport
+      height — the real BFS finds no detour, ``requires_reposition`` returns
+      True, and ``find_landing_tile`` returns the container coord (since the
+      container's tile is GROUND).
+    * all other scenarios get fully-passable terrain.
+    * ``no_fuel_visible`` simply omits the container; real finder returns None.
+
+    Teleport-outcome and pickup-outcome are still callbacks because they drive
+    the state machine's terminal status — those are the leaves the test is
+    exercising. Everything between the test and those leaves is real code.
+    """
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     wait_results = _build_wait_results(status, map_sync_result, radar_sync_result)
-
-    def _find_landing(
-        current_probe: FuelProbe,
-        current_target: ContainerStateDict,
-    ) -> tuple[int, int] | None:
-        _ = (current_probe, current_target)
-        return (102, 100)
 
     wait_for_world_sync = _make_world_sync_waiter(wait_results)
 
@@ -1289,10 +1211,25 @@ def _run_probe_single_target_scenario(
     action_session.wait_for_world_sync = _wait_for_world_sync
     action_session.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _make_teleport_outcome_callback(teleport_status)
-    fuel_probe_module._find_visible_fuel_target = _make_find_target_callback(fuel_target)
-    fuel_probe_module._visible_fuel_requires_reposition = _make_requires_reposition_callback(status)
-    fuel_probe_module._find_visible_fuel_landing_tile = _find_landing
     fuel_probe_module._wait_for_pickup_outcome = _make_pickup_outcome_callback(pickup_status)
+
+    is_reposition_scenario = status in {
+        "reposition_map_sync_timeout",
+        "reposition_teleport_timeout",
+    }
+
+    def _reposition_blocking_terrain() -> TerrainMapProtocol:
+        return ground_terrain(rock_wall(102, range(92, 108)))
+
+    terrain_provider: Callable[[], TerrainMapProtocol | None] = (
+        _reposition_blocking_terrain if is_reposition_scenario else ground_terrain
+    )
+    fuel_probe_module.get_terrain_map = terrain_provider
+    fuel_targeting_module.get_terrain_map = terrain_provider
+
+    if fuel_target is not None:
+        target_key = coord_key(fuel_target["x"], fuel_target["y"])
+        probe._world_state["containers"][target_key] = fuel_target
 
     result = probe._probe_single_fuel_target(
         target=target,
@@ -1334,7 +1271,7 @@ def _run_probe_single_target_scenario(
             1200,
             "landed_exact",
             1600,
-            make_container_state(101, 100, True, 300),
+            make_container_state(105, 100, True, 300),
             None,
         ),
         (
@@ -1342,7 +1279,7 @@ def _run_probe_single_target_scenario(
             1200,
             "reposition_teleport_timeout",
             1600,
-            make_container_state(101, 100, True, 300),
+            make_container_state(105, 100, True, 300),
             None,
         ),
         ("no_fuel_visible", 1200, "landed_exact", 1600, None, None),
@@ -1395,7 +1332,7 @@ def test_probe_single_target_records_terminal_statuses(
 
 def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcome() -> None:
     """Fuel probe rejects a teleport outcome that reports map-sync timeout after sync success."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
@@ -1477,7 +1414,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
     """Fuel probe rejects a tracked attempt that never produced a teleport result."""
     from tankpit_bot.action_lab import fuel_probe as fuel_probe_runtime
 
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     original_attempt_runner = fuel_probe_runtime.run_tracked_teleport_attempt
@@ -1499,6 +1436,10 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
             ws_ready_state=1,
             current_send_label=None,
             sent_frame_meta_queue_length=0,
+            self_fields={},
+            world_fields={},
+            map_fields={},
+            world_collections={},
         )
 
     def _run_attempt(
@@ -1582,9 +1523,9 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
     """Fuel target resolution rejects a tracked reposition without a teleport result."""
     from tankpit_bot.action_lab import fuel_target_phase
 
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
-    page = _FakePage(clock)
+    page = ClockAdvancingPage(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     fuel_target = make_container_state(101, 100, True, 300)
     original_attempt_runner = fuel_target_phase.run_reposition_attempt
@@ -1663,6 +1604,10 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
             ws_ready_state=1,
             current_send_label=None,
             sent_frame_meta_queue_length=0,
+            self_fields={},
+            world_fields={},
+            map_fields={},
+            world_collections={},
         )
 
     def _run_attempt(
@@ -1767,6 +1712,8 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
                 teleport_cycle_ids=[1],
                 radar_cycle_id=2,
                 teleport_strategy="sync_before_teleport",
+                snapshot_before=_snapshot(1000),
+                capture_snapshot=lambda: _snapshot(1900),
                 terrain_provider=lambda: None,
                 find_visible_target=lambda current_probe, allow_unreachable: fuel_target,
                 requires_reposition=_requires_reposition,
@@ -1804,7 +1751,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
 
 def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
     """Single-target fuel probe can reposition to a blocked visible fuel container."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
@@ -1956,7 +1903,7 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
 
 def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
     """Single-target probe does not enqueue move after an immediate fuel pickup."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
@@ -2026,15 +1973,6 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
             page_snapshots=[],
         )
 
-    def _find_target(
-        current_probe: FuelProbe,
-        allow_unreachable: bool,
-    ) -> ContainerStateDict | None:
-        _ = (current_probe, allow_unreachable)
-        fuel_target = make_container_state(101, 100, True, 300)
-        current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
-        return fuel_target
-
     drain_calls = 0
 
     def _pickup_before_move(provider: BufferedMessageSourceProtocol) -> int:
@@ -2055,11 +1993,13 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
         probe.get_world_state()["containers"].pop(coord_key(101, 100), None)
         return 1
 
+    fuel_target = make_container_state(101, 100, True, 300)
+    probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
+    fuel_probe_module.get_terrain_map = ground_terrain
+    fuel_targeting_module.get_terrain_map = ground_terrain
     action_session.wait_for_world_sync = _wait_for_world_sync
     action_session.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
-    fuel_probe_module._find_visible_fuel_target = _find_target
-    fuel_probe_module._visible_fuel_requires_reposition = lambda probe, fuel_target: False
     action_hooks.drain_buffered_messages = _pickup_before_move
 
     result = probe._probe_single_fuel_target(
@@ -2078,7 +2018,7 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
 
 def test_finalize_attempt_delay_skips_wait_for_zero_delay() -> None:
     """Fuel probe does not wait when settle delay is disabled."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
 
     probe._finalize_attempt_delay(probe._fake_page, settle_delay_ms=0)
@@ -2086,165 +2026,15 @@ def test_finalize_attempt_delay_skips_wait_for_zero_delay() -> None:
     assert probe._fake_page.waits == []
 
 
-class _FakeCDPSession:
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = params
-        if method == "Runtime.evaluate":
-            return {
-                "result": {
-                    "value": {
-                        "phase": "before_map_open",
-                        "timestamp_ms": 1000,
-                        "client_present": True,
-                        "map_visible": True,
-                        "client_state": 13,
-                        "client_busy": False,
-                        "pending_actions": 0,
-                        "heartbeat_age_ms": 10,
-                        "last_page_client_send_age_ms": 20,
-                        "last_bot_send_age_ms": 5,
-                        "ws_ready_state": 1,
-                        "current_send_label": None,
-                        "sent_frame_meta_queue_length": 0,
-                    }
-                }
-            }
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        return None
-
-
-class _FakeContext:
-    def __init__(self, page: _FakePage, cdp: _FakeCDPSession) -> None:
-        self._page = page
-        self._cdp = cdp
-
-    def new_page(self) -> PageProtocol:
-        return self._page
-
-    def new_cdp_session(self, page: PageProtocol) -> CDPSessionProtocol:
-        assert page is self._page
-        return self._cdp
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeBrowser:
-    def __init__(self, context: _FakeContext) -> None:
-        self._context = context
-
-    def new_context(self) -> BrowserContextProtocol:
-        return self._context
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeChromium:
-    def __init__(self, browser: _FakeBrowser) -> None:
-        self._browser = browser
-        self.last_headless: bool | None = None
-
-    def launch(
-        self,
-        *,
-        headless: bool | None = None,
-        slow_mo: float | None = None,
-        timeout: float | None = None,
-    ) -> BrowserProtocol:
-        _ = (slow_mo, timeout)
-        self.last_headless = headless
-        return self._browser
-
-
-class _FakePlaywright:
-    def __init__(self, chromium: _FakeChromium) -> None:
-        self.chromium: BrowserTypeProtocol = chromium
-
-    def stop(self) -> None:
-        pass
-
-
-class _FakePlaywrightContextManager:
-    def __init__(self, playwright: _FakePlaywright) -> None:
-        self._playwright: PlaywrightProtocol = playwright
-
-    def __enter__(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def start(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        _ = (exc_type, exc_val, exc_tb)
-
-
-class _FakePlaywrightFactory:
-    def __init__(self, manager: SyncPlaywrightContextManagerProtocol) -> None:
-        self._manager = manager
-
-    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
-        return self._manager
-
-
-class _ExecuteHarness(FuelProbe):
+class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, FuelProbe):
     """Fuel probe subclass that stubs browser/bootstrap internals."""
 
     def __init__(self) -> None:
-        super().__init__("https://tankpit.com/play", headless=False, prefer_account=True)
+        FuelProbe.__init__(self, "https://tankpit.com/play", headless=False, prefer_account=True)
+        self._init_bootstrap_stubs()
         self._world_state = _make_world(900, 100, 100, 700)
         self._messages = []
-        self.cleanup_calls = 0
         self.results: list[FuelProbeAttemptResultDict] = []
-
-    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
-
-    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
-
-    def _navigate_and_login(
-        self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
-        *,
-        tank_name_prefix: str = "TP",
-        auto_join_room: bool = True,
-    ) -> None:
-        _ = (page, cdp, tank_name_prefix, auto_join_room)
-
-    def _wait_for_game_ready(self, page: PageProtocol) -> None:
-        _ = page
-
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        _ = (page, cdp)
-        self._magic = "fake-magic"
-
-    def _cleanup(
-        self,
-        cdp: CDPSessionProtocol,
-        page: PageProtocol,
-        context: BrowserContextProtocol,
-        browser: BrowserProtocol,
-    ) -> None:
-        _ = (cdp, page, context, browser)
-        self.cleanup_calls += 1
-
-    def get_world_state(self) -> WorldStateDict:
-        return self._world_state
-
-    def get_self_state(self) -> SelfStateDict | None:
-        return self._world_state["self_state"]
 
     def _probe_single_fuel_target(
         self,
@@ -2332,20 +2122,18 @@ class _FakeFuelProbe(FuelProbe):
 
 def test_probe_single_target_raises_when_dispatch_fails() -> None:
     """Single-target probe raises on command dispatch failures."""
-    from tests.fakes import FakeTerrainMap
-
     from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
 
     original_path_exists = core_hooks.path_exists
     original_load_terrain_map = core_hooks.load_terrain_map
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
     try:
         register_room_image("1", "field01.gif")
         set_selected_room("1")
         core_hooks.path_exists = lambda path: True
-        core_hooks.load_terrain_map = lambda path: FakeTerrainMap()
+        core_hooks.load_terrain_map = lambda path: InMemoryTerrainMap()
 
         probe = _ProbeHarness(clock)
         probe.map_open_result = False
@@ -2476,7 +2264,7 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
 
 def test_execute_probe_raises_for_invalid_limits_and_missing_playwright() -> None:
     """Fuel probe execute validates pickup limits and Playwright presence."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     with pytest.raises(ValueError, match="target_pickups must be positive"):
         probe.execute_probe(
             target_pickups=0,
@@ -2533,13 +2321,11 @@ def test_execute_probe_raises_for_invalid_limits_and_missing_playwright() -> Non
 
 def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     """Fuel probe execute collects attempts and rejects missing terrain."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    page = _FakePage(clock)
-    cdp = _FakeCDPSession()
-    chromium = _FakeChromium(_FakeBrowser(_FakeContext(page, cdp)))
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
+    probe = _ExecuteHarness()
+    session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = session_browser.sync_playwright_factory
     action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
@@ -2552,7 +2338,6 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
             leaderboard_position=1,
         ),
     )
-    probe = _ExecuteHarness()
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_124_100", "x": 124, "y": 100},
@@ -2581,6 +2366,8 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
             fuel_target_volume=300,
             phase_overlaps=[],
             decision_basis=None,
+            snapshot_before=_snapshot(0),
+            snapshot_after=_snapshot(0),
             message_start_index=0,
             message_end_index=1,
         )
@@ -2615,7 +2402,7 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     assert session["target_pickups"] == 1
     assert session["startup_timing"]["initial_world_timestamp_ms"] == 1200
     assert probe.cleanup_calls == 1
-    assert chromium.last_headless is False
+    assert session_browser.browser_type.launches == [False]
 
     fuel_probe_module.get_terrain_map = lambda: None
     with pytest.raises(FuelProbeError, match="terrain map is unavailable"):
@@ -2633,13 +2420,11 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
 
 def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> None:
     """Fuel probe execute keeps probing after a pickup until target pickups are met."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    page = _FakePage(clock)
-    cdp = _FakeCDPSession()
-    chromium = _FakeChromium(_FakeBrowser(_FakeContext(page, cdp)))
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
+    probe = _ExecuteHarness()
+    session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = session_browser.sync_playwright_factory
     action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
@@ -2652,7 +2437,6 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
             leaderboard_position=1,
         ),
     )
-    probe = _ExecuteHarness()
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_116_100", "x": 116, "y": 100},
@@ -2681,6 +2465,8 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
             fuel_target_volume=150,
             phase_overlaps=[],
             decision_basis=None,
+            snapshot_before=_snapshot(0),
+            snapshot_after=_snapshot(0),
             message_start_index=0,
             message_end_index=1,
         ),
@@ -2711,6 +2497,8 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
             fuel_target_volume=150,
             phase_overlaps=[],
             decision_basis=None,
+            snapshot_before=_snapshot(0),
+            snapshot_after=_snapshot(0),
             message_start_index=2,
             message_end_index=3,
         ),
@@ -2741,13 +2529,11 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
 
 def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
     """Fuel probe execute keeps probing after a miss until a later pickup succeeds."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    page = _FakePage(clock)
-    cdp = _FakeCDPSession()
-    chromium = _FakeChromium(_FakeBrowser(_FakeContext(page, cdp)))
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
+    probe = _ExecuteHarness()
+    session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = session_browser.sync_playwright_factory
     action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
@@ -2760,7 +2546,6 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
             leaderboard_position=1,
         ),
     )
-    probe = _ExecuteHarness()
     probe.results = [
         FuelProbeAttemptResultDict(
             target={"label": "fuel_ground_116_100", "x": 116, "y": 100},
@@ -2789,6 +2574,8 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
             fuel_target_volume=None,
             phase_overlaps=[],
             decision_basis=None,
+            snapshot_before=_snapshot(0),
+            snapshot_after=_snapshot(0),
             message_start_index=0,
             message_end_index=1,
         ),
@@ -2819,6 +2606,8 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
             fuel_target_volume=250,
             phase_overlaps=[],
             decision_basis=None,
+            snapshot_before=_snapshot(0),
+            snapshot_after=_snapshot(0),
             message_start_index=2,
             message_end_index=3,
         ),

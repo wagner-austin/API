@@ -7,7 +7,7 @@ from typing import Literal, Protocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.teleport_phase import _log_command_dispatch_failure
+from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
 
 _PICKUP_TIMEOUT_PER_TILE_MS = 500
 _PICKUP_TIMEOUT_SETTLE_GRACE_MS = 1000
@@ -259,7 +259,7 @@ def run_tracked_pickup_phase(
     )
     if immediate_pickup_outcome is None:
         if not probe.move_to(target_x, target_y):
-            _log_command_dispatch_failure("move", dispatch_failure_message)
+            emit_command_dispatch_failure_diagnostic("move", dispatch_failure_message)
             probe._end_action_phase(move_cycle)
             probe._end_action_phase(pickup_cycle)
             raise dispatch_failure_error(dispatch_failure_message)

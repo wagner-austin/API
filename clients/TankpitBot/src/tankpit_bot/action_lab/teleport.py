@@ -42,6 +42,7 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.bot import Bot
 from tankpit_bot.bot.states import make_no_action, transition_to
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.decoders import decode_message
 from tankpit_bot.state import SelfStateDict
 
@@ -136,6 +137,36 @@ def _format_page_snapshots(snapshots: list[TeleportPageSnapshotDict]) -> str:
     return " | ".join(entries)
 
 
+def _log_teleport_attempt_diagnostic(
+    provider: action_session.BufferedWorldStateProviderProtocol,
+    *,
+    target: TeleportTargetDict,
+    teleport_cycle_id: int,
+    status: str,
+    message_start_index: int,
+    page_snapshots: list[TeleportPageSnapshotDict],
+) -> None:
+    """Emit one structured diagnostic line for a teleport attempt."""
+    emit_diagnostic(
+        diagnostic_kind="teleport_attempt",
+        target_x=target["x"],
+        target_y=target["y"],
+        cycle=teleport_cycle_id,
+        status=status,
+        sent=_format_attempt_window_entries(
+            provider,
+            message_start_index=message_start_index,
+            direction="sent",
+        ),
+        received=_format_attempt_window_entries(
+            provider,
+            message_start_index=message_start_index,
+            direction="received",
+        ),
+        page=_format_page_snapshots(page_snapshots),
+    )
+
+
 def _find_map_data_message_index(
     provider: action_session.BufferedWorldStateProviderProtocol,
     *,
@@ -156,7 +187,7 @@ def _find_map_data_message_index(
     return None
 
 
-def _log_teleport_attempt_diagnostic(
+def _emit_teleport_attempt_diagnostic(
     provider: action_session.BufferedWorldStateProviderProtocol,
     *,
     target: TeleportTargetDict,
@@ -165,24 +196,31 @@ def _log_teleport_attempt_diagnostic(
     message_start_index: int,
     page_snapshots: list[TeleportPageSnapshotDict],
 ) -> None:
-    """Emit one structured diagnostic line for a teleport attempt."""
-    log.info(
-        "TELEPORT_DIAGNOSTIC target=(%d,%d) cycle=%d status=%s sent=%s received=%s page=%s",
-        target["x"],
-        target["y"],
-        teleport_cycle_id,
-        status,
-        _format_attempt_window_entries(
+    """Emit one ``teleport_attempt`` structured diagnostic event.
+
+    Records target coordinates, cycle id, terminal status, and three
+    text-rendered windows (sent message timeline, received message
+    timeline, per-phase page snapshots) so consumers can reconstruct the
+    full attempt timing without scraping the text log.
+    """
+    emit_diagnostic(
+        diagnostic_kind="teleport_attempt",
+        target_x=target["x"],
+        target_y=target["y"],
+        teleport_cycle_id=teleport_cycle_id,
+        status=status,
+        sent_window=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
             direction="sent",
         ),
-        _format_attempt_window_entries(
+        received_window=_format_attempt_window_entries(
             provider,
             message_start_index=message_start_index,
             direction="received",
         ),
-        _format_page_snapshots(page_snapshots),
+        page_snapshots=_format_page_snapshots(page_snapshots),
+        page_snapshot_count=len(page_snapshots),
     )
 
 

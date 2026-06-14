@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from typing import Literal
 
 import pytest
+from tests.action_lab._replay_core import ReplayClock
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -15,26 +16,10 @@ from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_st
 from tankpit_bot.types import CapturedMessage
 
 
-class _Clock:
-    """Mutable millisecond clock for deterministic pickup-phase tests."""
-
-    def __init__(self, start_ms: int) -> None:
-        """Initialize the clock."""
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        """Return the current timestamp."""
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        """Advance the clock."""
-        self._now_ms += delta_ms
-
-
 class _Page:
     """Minimal page fake for pickup wait loops."""
 
-    def __init__(self, clock: _Clock) -> None:
+    def __init__(self, clock: ReplayClock) -> None:
         """Initialize the page."""
         self._clock = clock
         self.waits: list[float] = []
@@ -129,6 +114,7 @@ def _make_world(x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=1000,
     )
 
@@ -139,16 +125,6 @@ def _require_self_state(world: WorldStateDict) -> SelfStateDict:
     if self_state is None:
         raise AssertionError("expected self state")
     return self_state
-
-
-@pytest.fixture(autouse=True)
-def _restore_hooks() -> Generator[None, None, None]:
-    """Restore patched action hooks after each test."""
-    original_clock = action_hooks.get_current_time_ms
-    original_drain = action_hooks.drain_buffered_messages
-    yield
-    action_hooks.get_current_time_ms = original_clock
-    action_hooks.drain_buffered_messages = original_drain
 
 
 def test_effective_pickup_timeout_scales_with_distance() -> None:
@@ -177,7 +153,7 @@ def test_effective_pickup_timeout_scales_with_distance() -> None:
 
 def test_get_completed_pickup_outcome_detects_fuel_gain() -> None:
     """Pickup completion helper returns success once fuel increases."""
-    clock = _Clock(1600)
+    clock = ReplayClock(1600)
     probe = _Probe(_make_world(100, 100, 900))
     action_hooks.get_current_time_ms = clock
 
@@ -204,7 +180,7 @@ def test_get_completed_pickup_outcome_detects_fuel_gain() -> None:
 
 def test_wait_for_pickup_outcome_returns_timeout_when_fuel_never_changes() -> None:
     """Pickup wait returns timeout and current fuel after expiry."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _Probe(_make_world(100, 100, 700))
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
@@ -223,7 +199,7 @@ def test_wait_for_pickup_outcome_returns_timeout_when_fuel_never_changes() -> No
 
 def test_run_tracked_pickup_phase_returns_immediate_pickup_without_move() -> None:
     """Pickup phase short-circuits when fuel was already credited."""
-    clock = _Clock(1500)
+    clock = ReplayClock(1500)
     probe = _Probe(_make_world(100, 100, 800))
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
@@ -264,7 +240,7 @@ def test_run_tracked_pickup_phase_returns_immediate_pickup_without_move() -> Non
 
 def test_run_tracked_pickup_phase_dispatches_move_and_waits_for_pickup() -> None:
     """Pickup phase dispatches movement and waits for a later fuel credit."""
-    clock = _Clock(2000)
+    clock = ReplayClock(2000)
     probe = _Probe(_make_world(100, 100, 800))
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock
@@ -304,7 +280,7 @@ def test_run_tracked_pickup_phase_dispatches_move_and_waits_for_pickup() -> None
 
 def test_run_tracked_pickup_phase_raises_on_move_dispatch_failure() -> None:
     """Pickup phase raises immediately when movement dispatch fails."""
-    clock = _Clock(2500)
+    clock = ReplayClock(2500)
     probe = _Probe(_make_world(100, 100, 800), move_result=False)
     page = _Page(clock)
     action_hooks.get_current_time_ms = clock

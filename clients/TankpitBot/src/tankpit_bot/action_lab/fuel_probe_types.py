@@ -22,6 +22,11 @@ from tankpit_bot.action_lab.action_trace_types import (
     encode_action_phase_overlap,
     encode_fuel_decision_basis,
 )
+from tankpit_bot.action_lab.page_client_snapshot import (
+    PageClientSnapshotDict,
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
+)
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
@@ -33,7 +38,15 @@ from tankpit_bot.action_lab.types import (
 
 
 class FuelProbeAttemptResultDict(TypedDict):
-    """Outcome of one teleport-radar-fuel attempt."""
+    """Outcome of one teleport-radar-fuel attempt.
+
+    Includes the page-client snapshots captured immediately before the
+    first command of the attempt is dispatched and immediately before the
+    attempt finalizes at its terminal branch. Comparing
+    ``snapshot_before`` and ``snapshot_after`` lets reviewers confirm
+    the live JS client's view of the tank's state at each boundary
+    without watching the live game.
+    """
 
     target: TeleportTargetDict
     teleport_cycle_ids: list[int]
@@ -72,6 +85,8 @@ class FuelProbeAttemptResultDict(TypedDict):
     decision_basis: FuelDecisionBasisDict | None
     message_start_index: int
     message_end_index: int
+    snapshot_before: PageClientSnapshotDict
+    snapshot_after: PageClientSnapshotDict
 
 
 class FuelProbeSessionDict(TypedDict):
@@ -149,6 +164,8 @@ def encode_fuel_probe_attempt_result(result: FuelProbeAttemptResultDict) -> JSON
         ),
         "message_start_index": result["message_start_index"],
         "message_end_index": result["message_end_index"],
+        "snapshot_before": encode_page_client_snapshot(result["snapshot_before"]),
+        "snapshot_after": encode_page_client_snapshot(result["snapshot_after"]),
     }
 
 
@@ -188,6 +205,25 @@ def _decode_optional_decision_basis(data: JSONObject, field: str) -> FuelDecisio
     if not isinstance(raw, dict):
         raise JSONTypeError(f"Field '{field}' must be an object or null")
     return decode_fuel_decision_basis(raw)
+
+
+def _require_snapshot(data: JSONObject, field: str) -> PageClientSnapshotDict:
+    """Decode a required page-client snapshot field.
+
+    Args:
+        data: JSON object being decoded.
+        field: Field name to read.
+
+    Returns:
+        Validated page-client snapshot.
+
+    Raises:
+        JSONTypeError: If the field is missing or not a JSON object.
+    """
+    raw = data.get(field)
+    if not isinstance(raw, dict):
+        raise JSONTypeError(f"Field '{field}' must be an object")
+    return decode_page_client_snapshot(raw)
 
 
 def _decode_int_list(data: JSONObject, field: str) -> list[int]:
@@ -275,6 +311,8 @@ def decode_fuel_probe_attempt_result(data: JSONObject) -> FuelProbeAttemptResult
         decision_basis=_decode_optional_decision_basis(data, "decision_basis"),
         message_start_index=require_int(data, "message_start_index"),
         message_end_index=require_int(data, "message_end_index"),
+        snapshot_before=_require_snapshot(data, "snapshot_before"),
+        snapshot_after=_require_snapshot(data, "snapshot_after"),
     )
 
 

@@ -74,6 +74,7 @@ def _world(tanks: dict[str, TankStateDict]) -> WorldStateDict:
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
         scanned_viewports={viewport_scan_key(0, 0): 0},
+        map_fuel_dots={},
         timestamp_ms=0,
     )
 
@@ -131,19 +132,19 @@ class TestAnalyzeThreats:
     def test_empty_world(self) -> None:
         """No tanks produces empty threat list."""
         world = _world({})
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert threats == []
 
     def test_filters_same_team(self) -> None:
         """Tanks on same team are not threats."""
         world = _world({"10": _tank("10", x=110, y=100, team=0)})
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert threats == []
 
     def test_filters_self(self) -> None:
         """Player's own tank is not a threat."""
         world = _world({"1": _tank("1", x=100, y=100, team=1, is_self=True)})
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert threats == []
 
     def test_identifies_enemies(self) -> None:
@@ -154,13 +155,13 @@ class TestAnalyzeThreats:
                 "20": _tank("20", x=120, y=100, team=2),
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 2
 
     def test_computes_distance(self) -> None:
         """Threats have correct Manhattan distance."""
         world = _world({"10": _tank("10", x=115, y=107, team=1)})
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 1
         assert threats[0]["distance"] == 22  # |115-100| + |107-100|
 
@@ -173,7 +174,7 @@ class TestAnalyzeThreats:
                 "30": _tank("30", x=130, y=100, team=3),
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 3
         assert threats[0]["tank_id"] == 20  # distance 5
         assert threats[1]["tank_id"] == 30  # distance 30
@@ -187,7 +188,7 @@ class TestAnalyzeThreats:
                 "20": _tank("20", x=100, y=110, team=2, damage_state=2),
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 2
         # Both at distance 10, but tank 20 has damage_state=2 (sorted first)
         assert threats[0]["tank_id"] == 20
@@ -208,7 +209,7 @@ class TestAnalyzeThreats:
                 ),
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 1
         t = threats[0]
         assert t["tank_id"] == 42
@@ -228,7 +229,7 @@ class TestAnalyzeThreats:
                 "20": _tank("20", x=110, y=100, team=2),  # alive enemy
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 1
         assert threats[0]["tank_id"] == 20
 
@@ -242,7 +243,7 @@ class TestAnalyzeThreats:
                 "40": _tank("40", x=140, y=100, team=2),  # enemy
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 2
         ids = {t["tank_id"] for t in threats}
         assert ids == {20, 40}
@@ -268,7 +269,7 @@ class TestFindClosestThreat:
                 "20": _tank("20", x=105, y=100, team=2),
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         closest = find_closest_threat(threats)
         assert closest == threats[0]
         assert closest["tank_id"] == 20
@@ -295,7 +296,7 @@ class TestThreatsInRange:
                 "30": _tank("30", x=150, y=100, team=3),  # distance 50
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         in_range = threats_in_range(threats, 20)
         assert len(in_range) == 2
         assert in_range[0]["tank_id"] == 10
@@ -308,7 +309,7 @@ class TestThreatsInRange:
                 "10": _tank("10", x=120, y=100, team=1),  # distance exactly 20
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         in_range = threats_in_range(threats, 20)
         assert len(in_range) == 1
 
@@ -319,6 +320,6 @@ class TestThreatsInRange:
                 "10": _tank("10", x=200, y=200, team=1),  # distance 200
             }
         )
-        threats = analyze_threats(world, _self_at())
+        threats = analyze_threats(world, _self_at(), now_ms=0)
         in_range = threats_in_range(threats, 20)
         assert in_range == []

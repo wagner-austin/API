@@ -7,11 +7,16 @@ equipment slot toggling and command sending.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import BotProtocol
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
-from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.diagnostics.game_log_feedback import (
+    record_move_dispatch,
+    record_pickup_dispatch,
+)
+from tankpit_bot.diagnostics.teleport_attempts import record_teleport_dispatch
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict, coord_key
-from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
@@ -63,31 +68,141 @@ def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
             bot.disable_equipment(slot)
 
 
-def dispatch_command(bot: BotProtocol, command: BotCommand) -> bool:
+def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> bool:
+    """Send a move/pickup command and record its target for log feedback.
+
+    The game log reports failed pickups ("Empty container", "Tank
+    full") and rejected moves ("You can't go there!") without naming a
+    tile, so the dispatch target is recorded here for the feedback
+    consumer to resolve against.
+
+    Args:
+        bot: Bot instance for sending commands.
+        command: A ``move``, ``pickup_fuel``, or ``pickup_equipment``
+            command.
+
+    Returns:
+        True if the command was dispatched.
+
+    Raises:
+        ValueError: If the command is not a tracked-target kind.
+    """
+    if command["cmd_type"] == "move":
+        dispatched = bot.move_to(command["target_x"], command["target_y"])
+        if dispatched:
+            record_move_dispatch(command["target_x"], command["target_y"])
+        return dispatched
+    if command["cmd_type"] == "pickup_fuel":
+        dispatched = bot.pickup_fuel_to(command["target_x"], command["target_y"])
+        if dispatched:
+            # A pickup IS a move plus a grab: the tank drives to the
+            # container, so a "You can't go there!" rejection belongs to
+            # THIS target. Without the move record the rejection was
+            # attributed to a stale, long-finished move dispatch (live
+            # run 20260611-000x marked (105,154) for a pickup at
+            # (129,152)).
+            record_pickup_dispatch(command["target_x"], command["target_y"])
+            record_move_dispatch(command["target_x"], command["target_y"])
+        return dispatched
+    if command["cmd_type"] == "pickup_equipment":
+        dispatched = bot.pickup_equipment_to(command["target_x"], command["target_y"])
+        if dispatched:
+            record_pickup_dispatch(command["target_x"], command["target_y"])
+            record_move_dispatch(command["target_x"], command["target_y"])
+        return dispatched
+    raise ValueError(f"Not a tracked-target command: {command['cmd_type']}")
+
+
+def dispatch_command(
+    bot: BotProtocol,
+    command: BotCommand,
+    snapshot: PageClientSnapshotDict,
+) -> bool:
     """Dispatch a BotCommand through the appropriate bot action method.
 
     Args:
         bot: Bot instance for sending commands.
         command: The bot command to execute.
+        snapshot: Live page-client state captured at the start of this tick.
+            ``map_open`` and ``teleport`` consult ``snapshot["map_visible"]``
+            so the wire ``CMD_MAP_OPEN`` is not dispatched against an already
+            open map (the server is silent on the second send, which would
+            stall any downstream sync wait).
 
     Returns:
-        True if the command was sent successfully.
+        True if the desired effect was achieved -- either because a command
+        was dispatched, or because the desired client state was already in
+        place (e.g. ``map_open`` requested while ``snapshot["map_visible"]``
+        is already ``True``).
     """
-    if command["cmd_type"] == "move":
-        return bot.move_to(command["target_x"], command["target_y"])
-    if command["cmd_type"] == "pickup_fuel":
-        return bot.pickup_fuel_to(command["target_x"], command["target_y"])
-    if command["cmd_type"] == "pickup_equipment":
-        return bot.pickup_equipment_to(command["target_x"], command["target_y"])
+    if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
+        return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":
         return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
     if command["cmd_type"] == "radar":
         return bot.use_radar()
     if command["cmd_type"] == "map_open":
+        if snapshot["map_visible"] is True:
+            # The AI asked for FRESH map intel. The wire open is a
+            # server-side no-op while the map is considered open, so
+            # skipping here starved HUNT of new MAP_DATA forever (live
+            # run 20260610-005248 looped on this for 31 ticks). Close
+            # the overlay client-side (verified: 'm' keypress, no wire
+            # traffic) and re-dispatch the wire open for a fresh sync.
+            emit_ai("map already visible: closing overlay before fresh map_open")
+            emit_diagnostic(
+                diagnostic_kind="map_reopened_for_fresh_intel",
+                origin="executor.dispatch_command.map_open",
+                command_name="map_open",
+            )
+            bot.close_map()
         return bot.open_map()
-    # Teleport: open map first (required), then teleport
-    bot.open_map()
-    return bot.teleport_to(command["target_x"], command["target_y"])
+    # Teleport: an OPEN map is a server-side precondition. A teleport
+    # dispatched in the same tick as the wire map_open races the
+    # server's open processing and is silently dropped: run
+    # 20260610-024x lost 4 of 15 same-tick attempts to 10s stall
+    # timeouts while all 21 attempts against an already-open map
+    # landed. So the open and the teleport never share a tick: this
+    # tick opens the map, and the next tick's decision re-dispatches
+    # the teleport against a confirmed-open map.
+    if snapshot["map_visible"] is not True:
+        emit_ai(
+            "deferring teleport to (%d,%d): opening map first",
+            command["target_x"],
+            command["target_y"],
+        )
+        emit_diagnostic(
+            diagnostic_kind="teleport_deferred_for_map_open",
+            origin="executor.dispatch_command.teleport_precondition",
+            command_name="map_open",
+            teleport_target_x=command["target_x"],
+            teleport_target_y=command["target_y"],
+        )
+        return bot.open_map()
+    emit_diagnostic(
+        diagnostic_kind="map_open_skipped_already_open",
+        origin="executor.dispatch_command.teleport_precondition",
+        command_name="map_open",
+        teleport_target_x=command["target_x"],
+        teleport_target_y=command["target_y"],
+    )
+    message_index = bot.captured_message_count()
+    dispatched = bot.teleport_to(command["target_x"], command["target_y"])
+    if dispatched:
+        record_teleport_dispatch(
+            target_x=command["target_x"],
+            target_y=command["target_y"],
+            message_index=message_index,
+            sent_window=(
+                f"map_visible={snapshot['map_visible']} "
+                f"pending_actions={snapshot['pending_actions']} "
+                f"ws_ready_state={snapshot['ws_ready_state']} "
+                f"heartbeat_age_ms={snapshot['heartbeat_age_ms']} "
+                f"page_send_age_ms={snapshot['last_page_client_send_age_ms']} "
+                f"bot_send_age_ms={snapshot['last_bot_send_age_ms']}"
+            ),
+        )
+    return dispatched
 
 
 def _tracked_tank(world: WorldStateDict, tank_id: int) -> TankStateDict | None:
@@ -124,15 +239,25 @@ def _tracked_container(
 
 
 def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a shoot command targets a current viewport tank.
+    """Return True when a shoot command still targets the tracked tank.
+
+    Combat presence -- whether the target is a live tank rather than a
+    map-only afterimage -- is decided once, upstream, by the HUNT owner's
+    wire-presence kill gate (:func:`is_wire_present`). The executor's
+    remaining job is the structural re-check that the target still exists
+    at the commanded tile after any same-tick world-state update: a target
+    that vanished or drifted is rejected. ``source`` no longer gates the
+    shot -- the old ``source``/viewport proxy was the insufficient ghost
+    defense the wire-presence gate replaced (it admitted afterimages that
+    sat inside the viewport).
 
     Args:
         world: Current world-state snapshot.
         command: Command selected by the planner.
 
     Returns:
-        True when the target tank still exists, still matches the coordinates,
-        and is currently viewport-confirmed.
+        True when the target tank still exists and still matches the
+        commanded coordinates.
     """
     if command["cmd_type"] != "shoot":
         return True
@@ -155,28 +280,7 @@ def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
             tank["y"],
         )
         return False
-    if tank["source"] == "viewport":
-        return True
-    if tank["source"] == "world_state" and _is_within_visible_viewport(
-        world,
-        command["target_x"],
-        command["target_y"],
-    ):
-        return True
-    emit_ai(
-        "rejecting shoot at (%d,%d): target id=%d source=%s is not viewport-fresh",
-        command["target_x"],
-        command["target_y"],
-        command["target_id"],
-        tank["source"],
-    )
-    return False
-
-
-def _is_within_visible_viewport(world: WorldStateDict, x: int, y: int) -> bool:
-    """Return True when a coordinate is inside the current visible viewport."""
-    left, top, right, bottom = viewport_visible_bounds(world["viewport"])
-    return left <= x <= right and top <= y <= bottom
+    return True
 
 
 def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
@@ -344,14 +448,6 @@ def _is_valid_teleport(world: WorldStateDict, decision: TickDecisionDict) -> boo
                 command["target_y"],
             )
             return False
-        if combat_target["source"] not in ("viewport", "world_state"):
-            emit_ai(
-                "rejecting teleport to (%d,%d): combat target source=%s is invalid",
-                command["target_x"],
-                command["target_y"],
-                combat_target["source"],
-            )
-            return False
         return True
     resource_target = _tracked_resource_target(world, decision)
     if decision["updated_ai_state"]["resource_target_kind"] == "":
@@ -394,15 +490,22 @@ def _is_dispatchable(bot: BotProtocol, decision: TickDecisionDict) -> bool:
     )
 
 
-def execute(bot: BotProtocol, decision: TickDecisionDict) -> bool:
+def execute(
+    bot: BotProtocol,
+    decision: TickDecisionDict,
+    snapshot: PageClientSnapshotDict,
+) -> bool:
     """Execute a tick decision: apply equipment then dispatch command.
 
     Args:
         bot: Bot instance for sending commands.
         decision: The strategy's tick decision.
+        snapshot: Live page-client state captured at the start of this tick;
+            forwarded to :func:`dispatch_command` so dispatch decisions read
+            from authoritative live state rather than guessing.
 
     Returns:
-        True if the selected command was actually dispatched.
+        True if the selected command achieved its desired effect.
     """
     apply_equipment(bot, decision["desired_equipment"])
 
@@ -421,7 +524,7 @@ def execute(bot: BotProtocol, decision: TickDecisionDict) -> bool:
 
     if not _is_dispatchable(bot, decision):
         return False
-    return dispatch_command(bot, command)
+    return dispatch_command(bot, command, snapshot)
 
 
 __all__ = [

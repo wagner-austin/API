@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.equipment import (
     _describe_candidate_reason,
     _viewport_bounds,
 )
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict, WorldStateDict
 
 log = get_logger(__name__)
@@ -109,25 +110,22 @@ def log_phase_overlaps(
     *,
     attempt_label: str,
 ) -> None:
-    """Emit invariant logs for overlapping action phases.
+    """Emit one ``action_phase_overlap`` diagnostic per detected overlap.
 
     Args:
-        overlaps: Overlap violations to log.
+        overlaps: Overlap violations to emit.
         attempt_label: Human-readable attempt label for log correlation.
     """
     for overlap in overlaps:
-        log.info(
-            (
-                "ACTION_PHASE_OVERLAP attempt=%s active=%s#%d active_started_ms=%d "
-                "next=%s#%d next_started_ms=%d"
-            ),
-            attempt_label,
-            overlap["active_phase"],
-            overlap["active_cycle_id"],
-            overlap["active_started_ms"],
-            overlap["next_phase"],
-            overlap["next_cycle_id"],
-            overlap["next_started_ms"],
+        emit_diagnostic(
+            diagnostic_kind="action_phase_overlap",
+            attempt=attempt_label,
+            active_phase=overlap["active_phase"],
+            active_cycle_id=overlap["active_cycle_id"],
+            active_started_ms=overlap["active_started_ms"],
+            next_phase=overlap["next_phase"],
+            next_cycle_id=overlap["next_cycle_id"],
+            next_started_ms=overlap["next_started_ms"],
         )
 
 

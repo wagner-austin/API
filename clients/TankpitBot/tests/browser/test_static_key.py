@@ -17,6 +17,7 @@ from tankpit_bot.browser import (
     save_static_key,
 )
 from tankpit_bot.types import CapturedMessage
+from tests.no_op_keyboard import NoOpKeyboard
 
 # =============================================================================
 # Static Key Helper Function Tests
@@ -191,18 +192,6 @@ def test_save_static_key_wrong_length_raises() -> None:
 # =============================================================================
 
 
-class _FakeKeyboardMinimal:
-    """Minimal fake keyboard for static key tests."""
-
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        """Press key (no-op)."""
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        """Type text (no-op)."""
-        _ = (text, delay)
-
-
 class FakePageWithStaticKey:
     """Fake page that can find and fetch tpclient script for testing."""
 
@@ -210,7 +199,7 @@ class FakePageWithStaticKey:
         """Initialize with eval count tracker."""
         self._eval_count = 0
         self._url = "https://tankpit.com/play"
-        self._keyboard = _FakeKeyboardMinimal()
+        self._keyboard = NoOpKeyboard()
 
     @property
     def url(self) -> str:
@@ -218,7 +207,7 @@ class FakePageWithStaticKey:
         return self._url
 
     @property
-    def keyboard(self) -> _FakeKeyboardMinimal:
+    def keyboard(self) -> NoOpKeyboard:
         """Return keyboard interface."""
         return self._keyboard
 
@@ -271,7 +260,7 @@ class FakePageNoKey:
     def __init__(self) -> None:
         """Initialize."""
         self._url = "https://tankpit.com/play"
-        self._keyboard = _FakeKeyboardMinimal()
+        self._keyboard = NoOpKeyboard()
 
     @property
     def url(self) -> str:
@@ -279,7 +268,7 @@ class FakePageNoKey:
         return self._url
 
     @property
-    def keyboard(self) -> _FakeKeyboardMinimal:
+    def keyboard(self) -> NoOpKeyboard:
         """Return keyboard interface."""
         return self._keyboard
 
@@ -325,7 +314,7 @@ class FakePageFetchFails:
     def __init__(self) -> None:
         """Initialize."""
         self._url = "https://tankpit.com/play"
-        self._keyboard = _FakeKeyboardMinimal()
+        self._keyboard = NoOpKeyboard()
 
     @property
     def url(self) -> str:
@@ -333,7 +322,7 @@ class FakePageFetchFails:
         return self._url
 
     @property
-    def keyboard(self) -> _FakeKeyboardMinimal:
+    def keyboard(self) -> NoOpKeyboard:
         """Return keyboard interface."""
         return self._keyboard
 
@@ -396,8 +385,9 @@ def test_browser_session_capture_static_key_success() -> None:
     try:
         session._capture_static_key(page)
         assert session._static_key == "A" * 1000
-        assert len(saved_content) == 1
-        assert saved_content[0] == "A" * 1000 + "\n"
+        assert len(saved_content) == 2
+        assert '"' + "A" * 1000 + '"' in saved_content[0]
+        assert saved_content[1] == "A" * 1000 + "\n"
     finally:
         _test_hooks.write_text = original_save
 
@@ -492,15 +482,31 @@ def test_browser_session_derive_static_key_no_binary_messages() -> None:
 
 
 def test_browser_session_capture_static_key_no_key_found() -> None:
-    """Test _capture_static_key logs warning when no 1000-char key found."""
+    """A keyless tpclient JS is saved via the hook and leaves no static key.
+
+    Regression guard: the JS save used to be a raw ``Path.write_text``,
+    so this test overwrote the real repo-root ``tpclient.js`` protocol
+    artifact with the 20-byte fake on every run.
+    """
     from tankpit_bot._test_hooks import PageProtocol
 
     session = BrowserSession("https://example.com")
     page: PageProtocol = FakePageNoKey()
 
-    session._capture_static_key(page)
-    # Should return early, static key remains None
+    original_write = _test_hooks.write_text
+    written: list[tuple[Path, str]] = []
+
+    def fake_write(path: Path, content: str) -> None:
+        written.append((path, content))
+
+    _test_hooks.write_text = fake_write
+    try:
+        session._capture_static_key(page)
+    finally:
+        _test_hooks.write_text = original_write
+
     assert session._static_key is None
+    assert written == [(Path("tpclient.js"), 'var x = "short_key";')]
 
 
 def test_browser_session_capture_static_key_fetch_fails() -> None:

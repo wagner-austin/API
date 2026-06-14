@@ -6,6 +6,7 @@ from collections.abc import Callable, Generator
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
+from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock, StubSnapshotCDPSession
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -24,17 +25,6 @@ from tankpit_bot.state import (
     make_self_state,
 )
 from tankpit_bot.types import CapturedMessage
-
-
-class _Clock:
-    def __init__(self, start_ms: int) -> None:
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        self._now_ms += delta_ms
 
 
 class _SequencedProvider:
@@ -59,34 +49,6 @@ class _SequencedProvider:
     @property
     def magic(self) -> str | None:
         return self._magic
-
-
-class _FakePage:
-    def __init__(self, clock: _Clock, provider: _SequencedProvider) -> None:
-        self._clock = clock
-        self._provider = provider
-        self.waits: list[float] = []
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        self.waits.append(timeout)
-        self._clock.advance(int(timeout))
-        self._provider.advance()
-
-
-class _FakeCDPSession:
-    def __init__(self, snapshot: JSONObject) -> None:
-        self._snapshot = snapshot
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = params
-        assert method == "Runtime.evaluate"
-        return {"result": {"value": self._snapshot}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        return None
 
 
 class _InspectingCDPSession:
@@ -136,6 +98,7 @@ def _make_world(
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 
@@ -152,7 +115,7 @@ def _restore_action_hooks() -> Generator[None, None, None]:
 
 
 def test_wait_for_world_sync_returns_newer_timestamp() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=True),
@@ -160,7 +123,7 @@ def test_wait_for_world_sync_returns_newer_timestamp() -> None:
             _make_world(1200, 100, 100, 900, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
 
@@ -168,7 +131,7 @@ def test_wait_for_world_sync_returns_newer_timestamp() -> None:
 
 
 def test_wait_for_world_sync_times_out() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=True),
@@ -176,7 +139,7 @@ def test_wait_for_world_sync_times_out() -> None:
             _make_world(900, 100, 100, 900, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
 
@@ -184,7 +147,7 @@ def test_wait_for_world_sync_times_out() -> None:
 
 
 def test_wait_for_radar_sync_returns_completion_timestamp() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=True),
@@ -192,7 +155,7 @@ def test_wait_for_radar_sync_returns_completion_timestamp() -> None:
             _make_world(1200, 100, 100, 900, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
     radar_results = [False, False, True]
@@ -206,7 +169,7 @@ def test_wait_for_radar_sync_returns_completion_timestamp() -> None:
 
 
 def test_wait_for_radar_sync_times_out() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=True),
@@ -214,7 +177,7 @@ def test_wait_for_radar_sync_times_out() -> None:
             _make_world(900, 100, 100, 900, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
@@ -223,14 +186,14 @@ def test_wait_for_radar_sync_times_out() -> None:
 
 
 def test_wait_for_radar_sync_ignores_stale_completion_without_new_activity() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=True),
             _make_world(900, 100, 100, 900, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     drain_results = [0, 1]
 
@@ -254,14 +217,14 @@ def test_wait_for_radar_sync_ignores_stale_completion_without_new_activity() -> 
 
 
 def test_wait_for_initial_self_state_returns_fresh_self_state() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=False),
             _make_world(1200, 101, 102, 875, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
 
@@ -274,7 +237,7 @@ def test_wait_for_initial_self_state_returns_fresh_self_state() -> None:
 
 
 def test_wait_for_initial_self_state_raises_on_timeout() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=False),
@@ -282,7 +245,7 @@ def test_wait_for_initial_self_state_raises_on_timeout() -> None:
             _make_world(1300, 100, 100, 900, self_state_available=False),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
 
@@ -322,14 +285,14 @@ def test_advance_startup_state_raises_when_state_does_not_progress() -> None:
 
 
 def test_wait_for_initial_self_state_drains_buffered_messages_before_reading() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     provider = _SequencedProvider(
         [
             _make_world(900, 100, 100, 900, self_state_available=False),
             _make_world(1200, 105, 106, 880, self_state_available=True),
         ]
     )
-    page = _FakePage(clock, provider)
+    page = ClockAdvancingPage(clock, on_wait=provider.advance)
     action_hooks.get_current_time_ms = clock
 
     def _drain(source: BufferedMessageSourceProtocol, /) -> int:
@@ -349,9 +312,8 @@ def test_wait_for_initial_self_state_drains_buffered_messages_before_reading() -
 
 def test_capture_teleport_page_snapshot_returns_validated_state() -> None:
     """Teleport page snapshots decode strict CDP evaluation results."""
-    cdp: CDPSessionProtocol = _FakeCDPSession(
+    cdp: CDPSessionProtocol = StubSnapshotCDPSession(
         {
-            "phase": "after_map_data",
             "timestamp_ms": 1234,
             "client_present": True,
             "map_visible": True,
@@ -364,6 +326,10 @@ def test_capture_teleport_page_snapshot_returns_validated_state() -> None:
             "ws_ready_state": 1,
             "current_send_label": None,
             "sent_frame_meta_queue_length": 0,
+            "self_fields": {},
+            "world_fields": {},
+            "map_fields": {},
+            "world_collections": {},
         }
     )
 
@@ -376,9 +342,9 @@ def test_capture_teleport_page_snapshot_returns_validated_state() -> None:
 
 def test_capture_teleport_page_snapshot_rejects_invalid_payload() -> None:
     """Teleport page snapshots reject malformed CDP values."""
-    cdp: CDPSessionProtocol = _FakeCDPSession({"phase": "bad"})
+    cdp: CDPSessionProtocol = StubSnapshotCDPSession({"timestamp_ms": "bad"})
 
-    with pytest.raises(JSONTypeError, match=r"phase|timestamp_ms|client_present"):
+    with pytest.raises(JSONTypeError, match=r"timestamp_ms|client_present"):
         capture_teleport_page_snapshot(cdp, "timeout")
 
 
@@ -406,7 +372,6 @@ def test_capture_teleport_page_snapshot_reads_injected_active_game_handle() -> N
     """Teleport snapshot JS reads the injected game handle instead of window.W."""
     cdp = _InspectingCDPSession(
         {
-            "phase": "timeout",
             "timestamp_ms": 1234,
             "client_present": False,
             "map_visible": None,
@@ -419,6 +384,10 @@ def test_capture_teleport_page_snapshot_reads_injected_active_game_handle() -> N
             "ws_ready_state": 1,
             "current_send_label": None,
             "sent_frame_meta_queue_length": 0,
+            "self_fields": {},
+            "world_fields": {},
+            "map_fields": {},
+            "world_collections": {},
         }
     )
 

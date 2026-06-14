@@ -11,6 +11,11 @@ from typing import Literal, TypedDict
 
 from platform_core.json_utils import (
     JSONObject,
+    load_json_str,
+    narrow_json_to_dict,
+    require_bool,
+    require_dict,
+    require_int,
     require_list,
     require_str,
 )
@@ -92,6 +97,35 @@ SCRAPE_GAME_LOG_JS = """
 # =============================================================================
 
 
+def scrape_page_text(cdp: CDPSessionProtocol) -> str:
+    """Scrape the full rendered page text from the DOM.
+
+    Used for panels that live outside the game-log section, e.g. the
+    ``C`` statistics panel (play time, destroyed enemies, promotion
+    points).
+
+    Args:
+        cdp: CDP session for executing JavaScript.
+
+    Returns:
+        Full ``document.body.innerText``, or empty string when the body
+        is unavailable.
+    """
+    result: JSONObject = cdp.send(
+        "Runtime.evaluate",
+        {
+            "expression": "document.body ? document.body.innerText : ''",
+            "returnByValue": True,
+        },
+    )
+    result_obj = result.get("result")
+    if isinstance(result_obj, dict):
+        value = result_obj.get("value")
+        if isinstance(value, str):
+            return value
+    return ""
+
+
 def scrape_game_log_text(cdp: CDPSessionProtocol) -> str:
     """Scrape the raw game log text from the DOM.
 
@@ -114,6 +148,66 @@ def scrape_game_log_text(cdp: CDPSessionProtocol) -> str:
         if isinstance(value, str):
             return value
     return ""
+
+
+SCRAPE_LOG_HEALTH_JS = """
+(() => {
+    const body = document.body;
+    if (!body) return JSON.stringify(
+        {bodyLength: 0, hasInventoryAnchor: false, hasChatAnchor: false});
+    const text = body.innerText || '';
+    return JSON.stringify({
+        bodyLength: text.length,
+        hasInventoryAnchor: text.lastIndexOf('extra radars') >= 0,
+        hasChatAnchor: text.indexOf('Attack the') >= 0,
+    });
+})()
+"""
+
+
+class GameLogHealthDict(TypedDict):
+    """Anchor-level health probe of the game-log scrape.
+
+    Attributes:
+        body_length: Length of ``document.body.innerText``.
+        has_inventory_anchor: Whether the ``extra radars`` inventory
+            anchor the scrape starts from exists in the body text.
+        has_chat_anchor: Whether the ``Attack the`` chat anchor the
+            scrape ends at exists in the body text.
+    """
+
+    body_length: int
+    has_inventory_anchor: bool
+    has_chat_anchor: bool
+
+
+def scrape_game_log_health(cdp: CDPSessionProtocol) -> GameLogHealthDict:
+    """Probe why the game-log scrape might be returning empty text.
+
+    The scrape silently anchors on page text markers; when an anchor
+    disappears the scrape returns ``""`` forever and every downstream
+    consumer (kill detection, hit/miss feedback, tank-full learning)
+    goes blind without any signal (live 2026-06-12: silent for 8+
+    hours across 5 runs). This probe reports the anchors directly.
+
+    Args:
+        cdp: CDP session for executing JavaScript.
+
+    Returns:
+        Anchor-level health of the scrape.
+    """
+    result: JSONObject = cdp.send(
+        "Runtime.evaluate",
+        {"expression": SCRAPE_LOG_HEALTH_JS, "returnByValue": True},
+    )
+    result_obj = require_dict(result, "result")
+    raw = require_str(result_obj, "value")
+    data = narrow_json_to_dict(load_json_str(raw))
+    return GameLogHealthDict(
+        body_length=require_int(data, "bodyLength"),
+        has_inventory_anchor=require_bool(data, "hasInventoryAnchor"),
+        has_chat_anchor=require_bool(data, "hasChatAnchor"),
+    )
 
 
 # Pattern lists for categorization (checked in order)
@@ -202,8 +296,11 @@ def parse_game_log(raw_text: str) -> GameLogState:
 class GameLogScraper:
     """Tracks game log changes over time.
 
-    Maintains state of the previous log to detect new entries
-    when scraping the DOM repeatedly.
+    Maintains per-text occurrence counts of the previous scrape so that
+    repeated identical lines (``Empty container``, ``Tank full``, a
+    second kill banner for the same enemy) are each detected as new.
+    A forever-set of seen texts would report each distinct line exactly
+    once per session and silently swallow every repeat.
     """
 
     def __init__(self, cdp: CDPSessionProtocol) -> None:
@@ -213,7 +310,7 @@ class GameLogScraper:
             cdp: CDP session for DOM access.
         """
         self._cdp = cdp
-        self._previous_entries: set[str] = set()
+        self._previous_counts: dict[str, int] = {}
 
     def scrape(self) -> GameLogState:
         """Scrape current game log state.
@@ -227,20 +324,26 @@ class GameLogScraper:
     def get_new_entries(self) -> list[GameLogEntry]:
         """Get new log entries since last call.
 
-        Compares current log with previous state and returns
-        only entries that weren't seen before.
+        Compares per-text occurrence counts between the previous and
+        current scrape: the Nth occurrence of a text in the current
+        window is new when the previous window held fewer than N of it.
+        In-place line mutations (equip-bar counters) therefore surface
+        once as a new line but never re-emit the rest of the window.
 
         Returns:
             List of new log entries.
         """
         state = self.scrape()
+        current_counts: dict[str, int] = {}
         new_entries: list[GameLogEntry] = []
 
         for entry in state["entries"]:
-            if entry["text"] not in self._previous_entries:
+            text = entry["text"]
+            current_counts[text] = current_counts.get(text, 0) + 1
+            if current_counts[text] > self._previous_counts.get(text, 0):
                 new_entries.append(entry)
-                self._previous_entries.add(entry["text"])
 
+        self._previous_counts = current_counts
         return new_entries
 
     def log_new_entries(self) -> None:
@@ -380,5 +483,6 @@ __all__ = [
     "encode_game_log_state",
     "parse_game_log",
     "scrape_game_log_text",
+    "scrape_page_text",
     "validate_log_category",
 ]

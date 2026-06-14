@@ -6,7 +6,7 @@ from tankpit_bot.state.types import ViewportStateDict
 
 VISIBLE_VIEWPORT_WIDTH = 16
 VISIBLE_VIEWPORT_HEIGHT = 16
-REGULAR_RADAR_RADIUS = 3
+REGULAR_RADAR_RADIUS = 2
 RADAR_ENVELOPE_MARGIN = 1
 VIEWPORT_PATCH_WIDTH = VISIBLE_VIEWPORT_WIDTH + (RADAR_ENVELOPE_MARGIN * 2)
 VIEWPORT_PATCH_HEIGHT = VISIBLE_VIEWPORT_HEIGHT + (RADAR_ENVELOPE_MARGIN * 2)
@@ -67,7 +67,10 @@ def viewport_radar_bounds(viewport: ViewportStateDict) -> tuple[int, int, int, i
 
 
 def regular_radar_bounds(center_x: int, center_y: int) -> tuple[int, int, int, int]:
-    """Return inclusive bounds for the built-in 7x7 radar scan.
+    """Return inclusive bounds for the built-in 5x5 radar scan.
+
+    The built-in radar reveals a 2-tile radius around the tank; only an
+    extra radar sweeps the whole viewport.
 
     Args:
         center_x: Controlled tank X coordinate.

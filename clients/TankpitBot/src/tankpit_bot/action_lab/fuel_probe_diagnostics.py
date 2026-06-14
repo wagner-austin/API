@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.action_trace import (
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeSessionDict
 from tankpit_bot.action_lab.fuel_target_phase import FuelTargetPhaseProbeProtocol
 from tankpit_bot.bot.ai.equipment import describe_container_search
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict
 
 log = get_logger(__name__)
@@ -27,28 +28,37 @@ def log_fuel_target_diagnostic(
     fuel_target: ContainerStateDict | None,
     terrain_provider: Callable[[], TerrainMapProtocol | None],
 ) -> None:
-    """Emit one structured diagnostic line after radar target resolution.
+    """Emit one ``fuel_target_selection`` diagnostic after target resolution.
+
+    Records the selected target (or ``none``), the candidate-search summary,
+    and the decision-basis breakdown in a structured event so JSONL
+    consumers can audit target selection across attempts without parsing
+    the rendered text. Selection metadata is flattened to top-level fields;
+    the human-readable ``summary`` and ``decision_basis`` blobs are kept as
+    string fields for completeness.
 
     Args:
         probe: Probe exposing current world and self state.
         radar_cycle_id: Radar cycle used for the decision.
         fuel_target: Selected fuel target, if any.
         terrain_provider: Terrain lookup for decision-basis construction.
-
-    Returns:
-        None.
     """
     terrain = terrain_provider()
     self_state = probe.get_self_state()
     if terrain is None or self_state is None:
-        log.info(
-            "FUEL_TARGET_DIAGNOSTIC selected=%s summary=unavailable decision_basis=%s",
-            "none" if fuel_target is None else f"({fuel_target['x']},{fuel_target['y']})",
-            "unavailable",
+        emit_diagnostic(
+            diagnostic_kind="fuel_target_selection",
+            radar_cycle_id=radar_cycle_id,
+            target_present=fuel_target is not None,
+            target_x=-1 if fuel_target is None else fuel_target["x"],
+            target_y=-1 if fuel_target is None else fuel_target["y"],
+            summary="unavailable",
+            decision_basis="unavailable",
+            terrain_available=terrain is not None,
+            self_state_available=self_state is not None,
         )
         return
     world = probe.get_world_state()
-    selected = "none" if fuel_target is None else f"({fuel_target['x']},{fuel_target['y']})"
     summary = describe_container_search(
         world,
         self_state,
@@ -65,11 +75,16 @@ def log_fuel_target_diagnostic(
         terrain=terrain,
         fuel_target=fuel_target,
     )
-    log.info(
-        "FUEL_TARGET_DIAGNOSTIC selected=%s summary=%s decision_basis=%s",
-        selected,
-        summary,
-        format_fuel_decision_basis(decision_basis),
+    emit_diagnostic(
+        diagnostic_kind="fuel_target_selection",
+        radar_cycle_id=radar_cycle_id,
+        target_present=fuel_target is not None,
+        target_x=-1 if fuel_target is None else fuel_target["x"],
+        target_y=-1 if fuel_target is None else fuel_target["y"],
+        summary=summary,
+        decision_basis=format_fuel_decision_basis(decision_basis),
+        terrain_available=True,
+        self_state_available=True,
     )
 
 

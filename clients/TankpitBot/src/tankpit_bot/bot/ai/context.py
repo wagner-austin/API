@@ -97,7 +97,7 @@ class DecideCtx:
                 "last_shot_target_name": "",
             },
         )
-        self.base = normalize_resource_target(self.base, self.filtered)
+        self.base = normalize_resource_target(self.base, self.filtered, timestamp_ms)
 
 
 # =============================================================================
@@ -193,16 +193,26 @@ def set_resource_target(
 def normalize_resource_target(
     ai_state: AIStateDict,
     world: WorldStateDict,
+    now_ms: int,
 ) -> AIStateDict:
-    """Drop stale locked resource targets that no longer exist in world state.
+    """Drop locked resource targets that are no longer pursuable.
+
+    Applies the SAME pursuability predicate as candidate selection
+    (kind match, failed pickups, freshness TTL). The lock previously
+    skipped the freshness check, so the bot kept walking to containers
+    whose belief had expired -- live run 20260610 crossed the map to a
+    long-drained container because of exactly this divergence.
 
     Args:
         ai_state: Current AI state with resource target fields.
         world: Current world state with container positions.
+        now_ms: Current timestamp for freshness filtering.
 
     Returns:
-        AI state with stale target cleared, or unchanged if valid.
+        AI state with a no-longer-pursuable target cleared, or unchanged.
     """
+    from tankpit_bot.bot.ai.equipment import is_container_pursuable
+
     kind = ai_state["resource_target_kind"]
     if kind not in ("fuel", "equipment"):
         return clear_resource_target(ai_state)
@@ -211,11 +221,7 @@ def normalize_resource_target(
     target = world["containers"].get(f"{tx},{ty}")
     if target is None:
         return clear_resource_target(ai_state)
-    if kind == "fuel" and not target["is_fuel"]:
-        return clear_resource_target(ai_state)
-    if kind == "equipment" and target["is_fuel"]:
-        return clear_resource_target(ai_state)
-    if target["failed_pickups"] > 0:
+    if not is_container_pursuable(target, want_fuel=kind == "fuel", now_ms=now_ms):
         return clear_resource_target(ai_state)
     return ai_state
 
@@ -238,10 +244,10 @@ def locked_resource_target(
         return (base_state, None)
     tx = base_state["resource_target_x"]
     ty = base_state["resource_target_y"]
-    target = ctx.filtered["containers"].get(f"{tx},{ty}")
-    if target is None:
-        return (clear_resource_target(base_state), None)
-    return (base_state, target)
+    # ctx.base was normalized against this same filtered world at
+    # construction, so a surviving lock kind guarantees the container
+    # exists; a KeyError here means the normalization invariant broke.
+    return (base_state, ctx.filtered["containers"][f"{tx},{ty}"])
 
 
 # =============================================================================
@@ -269,23 +275,54 @@ def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
 
 
 def needs_emergency_equipment(ctx: DecideCtx) -> bool:
-    """Check if any combat reserve has dropped below the break threshold.
+    """Check if a WEAPON reserve has dropped below the break threshold.
+
+    Only duals and homings can preempt the session: extra radars are a
+    search resource, and radar-driven equipment recovery SPENDS radars
+    while looking for them. Live run 20260611-232301 entered recovery
+    with radars at the threshold while holding 25 duals and 25 homings,
+    burned radars scanning for radars, and produced 0 kills in 240s.
+    Radars are topped up opportunistically (cross-kind pickups and
+    pre-departure sweeps), never as a session-owning emergency.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True if dual, homing, or radar count is below the break threshold.
+        True if the dual or homing count is below the break threshold.
     """
     return (
         ctx.inventory["dual_shots"]["count"] <= ctx.config["dual_break_threshold"]
         or ctx.inventory["homing_shots"]["count"] <= ctx.config["dual_break_threshold"]
-        or ctx.inventory["extra_radars"]["count"] <= ctx.config["dual_break_threshold"]
+    )
+
+
+def combat_reserve_restored(ctx: DecideCtx) -> bool:
+    """Check if the WEAPON reserves are back above the resume threshold.
+
+    The recovery-exit counterpart of :func:`needs_emergency_equipment`:
+    radars are deliberately excluded so a session that entered recovery
+    for weapons cannot be held hostage by the radars it spent while
+    searching.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True if the dual and homing counts are above the resume threshold.
+    """
+    return (
+        ctx.inventory["dual_shots"]["count"] >= ctx.config["dual_resume_threshold"]
+        and ctx.inventory["homing_shots"]["count"] >= ctx.config["dual_resume_threshold"]
     )
 
 
 def equipment_reserve_restored(ctx: DecideCtx) -> bool:
-    """Check if equipment has been restocked above the resume threshold.
+    """Check if every tracked reserve (radars included) is comfortable.
+
+    Used to gate opportunistic topping (pre-departure sweeps), NOT
+    recovery exit: sweeps are cheap and local, so they fire whenever
+    anything -- including radars -- is below the resume threshold.
 
     Args:
         ctx: Decision context.
@@ -294,8 +331,7 @@ def equipment_reserve_restored(ctx: DecideCtx) -> bool:
         True if all combat reserves are above the resume threshold.
     """
     return (
-        ctx.inventory["dual_shots"]["count"] >= ctx.config["dual_resume_threshold"]
-        and ctx.inventory["homing_shots"]["count"] >= ctx.config["dual_resume_threshold"]
+        combat_reserve_restored(ctx)
         and ctx.inventory["extra_radars"]["count"] >= ctx.config["dual_resume_threshold"]
     )
 
@@ -346,6 +382,7 @@ def filter_killed_tanks(world: WorldStateDict, killed: dict[str, int]) -> WorldS
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots=world["map_fuel_dots"],
         timestamp_ms=world["timestamp_ms"],
     )
 
@@ -512,6 +549,36 @@ def require_command(
     return command
 
 
+def mark_scan_dispatched(ctx: DecideCtx, ai_state: AIStateDict) -> AIStateDict:
+    """Return AI state with the current cell's built-in scan recorded.
+
+    Called when the forager dispatches a free built-in radar scan so the
+    coverage grid knows this cell has been swept.
+
+    Args:
+        ctx: Decision context (provides tank position and timestamp).
+        ai_state: AI state to update.
+
+    Returns:
+        New AIStateDict with the scan recorded in ``local_scan_cells``
+        and ``last_scan_ms`` updated.
+    """
+    from tankpit_bot.bot.ai.scan_coverage import record_local_scan
+
+    return AIStateDict(
+        **{
+            **ai_state,
+            "last_scan_ms": ctx.timestamp_ms,
+            "local_scan_cells": record_local_scan(
+                ai_state["local_scan_cells"],
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+                ctx.timestamp_ms,
+            ),
+        },
+    )
+
+
 __all__ = [
     "DecideCtx",
     "can_afford_teleport",
@@ -527,6 +594,7 @@ __all__ = [
     "local_actionable_bounds",
     "locked_resource_target",
     "make_decision",
+    "mark_scan_dispatched",
     "needs_emergency_equipment",
     "normalize_resource_target",
     "require_command",

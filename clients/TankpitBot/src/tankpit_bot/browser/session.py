@@ -38,6 +38,7 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.browser.fuel_probe import FuelProber, FuelProbeResult
+from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.browser.key_discovery import (
     extract_xor_first_bytes,
     find_best_static_byte,
@@ -61,6 +62,25 @@ from tankpit_bot.types import (
 from tankpit_bot.types.literals import SentFrameOrigin, require_sent_frame_origin
 
 log = get_logger(__name__)
+
+# Teardown bound: artifacts are saved before cleanup starts, so a
+# teardown that outlives this is converted into a recorded forced exit
+# instead of an eternal hang (runs 20260611-083908/092159 each sat 10+
+# minutes inside sync Playwright teardown after saving).
+_TEARDOWN_WATCHDOG_SECONDS = 30.0
+# EX_TEMPFAIL-style distinct code so orchestration can tell a forced
+# teardown exit apart from both clean exits and crashes.
+_TEARDOWN_HANG_EXIT_CODE = 75
+
+
+def _handle_teardown_hang() -> None:
+    """Force the process to exit after a hung browser teardown."""
+    log.error(
+        "Teardown exceeded %.0fs; forcing process exit (artifacts were saved before cleanup)",
+        _TEARDOWN_WATCHDOG_SECONDS,
+    )
+    _test_hooks.force_exit(_TEARDOWN_HANG_EXIT_CODE)
+
 
 # Base64 validation pattern: A-Z, a-z, 0-9, +, /, and = for padding
 _BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]*={0,2}$")
@@ -477,6 +497,14 @@ class BrowserSession:
         self._fuel_prober: FuelProber | None = None
         self._last_fuel_result: FuelProbeResult | None = None
 
+    def captured_message_count(self) -> int:
+        """Return how many WebSocket messages have been captured so far.
+
+        Returns:
+            Length of the session's captured-message list.
+        """
+        return len(self._messages)
+
     @property
     def session_id(self) -> str:
         """Get session ID."""
@@ -709,7 +737,7 @@ class BrowserSession:
         # Also hooks WebSocket.prototype.send for command injection.
         cdp.send(
             "Page.addScriptToEvaluateOnNewDocument",
-            {"source": _BROWSER_HOOK_SOURCE},
+            {"source": BROWSER_HOOK_SOURCE},
         )
 
         # Enable Network domain for WebSocket frame capture
@@ -848,7 +876,7 @@ class BrowserSession:
 
         # Save full JS file for protocol analysis
         js_path = Path("tpclient.js")
-        js_path.write_text(js_content, encoding="utf-8")
+        _test_hooks.write_text(js_path, js_content)
         log.info("Saved tpclient JS to %s (%d bytes)", js_path, len(js_content))
 
         # Extract 1000-char static key: any 1000-char quoted string
@@ -1025,30 +1053,34 @@ class BrowserSession:
         context: BrowserContextProtocol,
         browser: BrowserProtocol,
     ) -> None:
-        """Clean up browser resources.
+        """Close the browser, bounded by a teardown watchdog.
+
+        ``browser.close()`` tears down every context, page, and
+        attached CDP session in one protocol call. The previous
+        four-step sequence (detach, page close, context close, browser
+        close) gave sync Playwright four separate chances to deadlock,
+        and runs 20260611-083908 and 20260611-092159 each sat 10+
+        minutes hung after saving their captures. The watchdog converts
+        any remaining hang -- including ``playwright.stop()`` after
+        this method returns -- into a recorded forced exit: every
+        artifact is saved before cleanup starts, so a bounded exit
+        with a logged cause strictly beats an unrecorded eternal hang.
 
         Args:
-            cdp: CDP session.
-            page: Playwright page.
-            context: Browser context.
+            cdp: CDP session (closed implicitly by the browser close;
+                kept for the shared cleanup protocol signature).
+            page: Playwright page (closed implicitly; see ``cdp``).
+            context: Browser context (closed implicitly; see ``cdp``).
             browser: Browser instance.
         """
-        try:
-            cdp.detach()
-        except (OSError, RuntimeError) as exc:
-            log.debug("CDP detach failed (already closed): %s", exc)
-        try:
-            page.close()
-        except (OSError, RuntimeError) as exc:
-            log.debug("Page close failed (already closed): %s", exc)
-        try:
-            context.close()
-        except (OSError, RuntimeError) as exc:
-            log.debug("Context close failed (already closed): %s", exc)
+        del cdp, page, context
+        _test_hooks.start_watchdog(_TEARDOWN_WATCHDOG_SECONDS, _handle_teardown_hang)
+        log.info("Teardown: closing browser")
         try:
             browser.close()
         except (OSError, RuntimeError) as exc:
             log.debug("Browser close failed (already closed): %s", exc)
+        log.info("Teardown: browser closed")
 
 
 __all__ = [

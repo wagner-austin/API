@@ -45,6 +45,7 @@ def update_viewport_entities(
         terrain=_ws._world_state["terrain"],
         viewport=make_visible_viewport_state(viewport_left, viewport_top),
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=_ws._world_state["timestamp_ms"],
     )
 
@@ -99,6 +100,7 @@ def update_viewport_tiles(
         terrain=new_terrain,
         viewport=_ws._world_state["viewport"],
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=ts,
     )
 
@@ -132,6 +134,7 @@ def update_cache_tiles(updates: list[tuple[int, int, int]]) -> None:
         terrain=new_terrain,
         viewport=_ws._world_state["viewport"],
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -165,6 +168,7 @@ def update_overlay_tiles(updates: list[tuple[int, int, int]]) -> None:
         terrain=new_terrain,
         viewport=_ws._world_state["viewport"],
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -199,6 +203,7 @@ def update_terrain_tiles(updates: list[tuple[int, int, int]]) -> None:
         terrain=new_terrain,
         viewport=_ws._world_state["viewport"],
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 

@@ -186,6 +186,10 @@ class EnemyThreatDict(TypedDict):
         is_bot: Whether this enemy is a bot.
         timestamp_ms: When this tank was last confirmed by the server.
             Used for freshness-based target selection.
+        last_wire_seen_ms: When a wire-presence source last vouched this
+            tank is actually in view (zero means never). Read by the
+            kill-shot gate: a target the map keeps re-listing but that no
+            wire source confirms is a ghost and must not be fired at.
     """
 
     tank_id: int
@@ -198,6 +202,7 @@ class EnemyThreatDict(TypedDict):
     name: str
     is_bot: bool
     timestamp_ms: int
+    last_wire_seen_ms: int
 
 
 def make_enemy_threat(
@@ -211,6 +216,7 @@ def make_enemy_threat(
     name: str,
     is_bot: bool,
     timestamp_ms: int = 0,
+    last_wire_seen_ms: int = 0,
 ) -> EnemyThreatDict:
     """Create an EnemyThreatDict.
 
@@ -224,6 +230,9 @@ def make_enemy_threat(
         team: Team ID (0-3).
         name: Player name.
         is_bot: Whether this is a bot.
+        timestamp_ms: When this tank was last confirmed by any source.
+        last_wire_seen_ms: When a wire-presence source last vouched this
+            tank is in view. Zero means never wire-confirmed.
 
     Returns:
         EnemyThreatDict with the provided values.
@@ -239,6 +248,7 @@ def make_enemy_threat(
         name=name,
         is_bot=is_bot,
         timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=last_wire_seen_ms,
     )
 
 
@@ -262,6 +272,7 @@ def encode_enemy_threat(threat: EnemyThreatDict) -> JSONObject:
         "name": threat["name"],
         "is_bot": threat["is_bot"],
         "timestamp_ms": threat["timestamp_ms"],
+        "last_wire_seen_ms": threat["last_wire_seen_ms"],
     }
 
 
@@ -288,6 +299,7 @@ def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
         timestamp_ms=require_int(data, "timestamp_ms"),
+        last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
     )
 
 
@@ -359,8 +371,10 @@ class AIConfigDict(TypedDict):
     Attributes:
         fuel_critical_threshold: Below this, shields activate and fuel is emergency.
         fuel_low_threshold: Below this, fuel collection gets priority boost.
+            Also the reserve a combat teleport must leave behind -- engaging
+            below it would flip priority to COLLECT_FUEL the next tick.
         fuel_full_threshold: Above this level, fuel collection score drops to zero.
-        hunt_min_fuel: Minimum fuel required to engage in combat.
+        hunt_min_fuel: Operating reserve for search/recovery teleport hops.
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
         shoot_cooldown_ms: Minimum milliseconds between shots.
@@ -369,10 +383,20 @@ class AIConfigDict(TypedDict):
         kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
         map_open_cooldown_ms: Minimum milliseconds between map open commands.
         patrol_waypoints: Circuit of waypoints for PATROL behavior.
-        dual_break_threshold: Emergency restock threshold for combat reserves.
-            Applies to dual shots, homing shots, and extra radar.
-        dual_resume_threshold: Minimum healthy reserve to leave emergency
-            restock mode. Applies to dual shots, homing shots, and extra radar.
+        dual_break_threshold: Emergency restock threshold for combat
+            reserves. Applies to dual shots and homing shots only;
+            extra radar has its own thresholds (radars are a search
+            resource whose recovery SPENDS radars, so they were split
+            out after the live run 20260611-232301 death spiral).
+        dual_resume_threshold: Minimum healthy weapon reserve to leave
+            emergency restock. Applies to dual and homing shots only.
+        radar_break_threshold: Extra-radar count at or below which the
+            bot enters equipment restock to rebuild radars before
+            hunting. The grid-sweep forager handles the zero case.
+        radar_resume_threshold: Extra-radar count to rebuild to before
+            leaving restock and returning to the hunt. Radars find
+            enemies and equipment, so a healthy buffer is rebuilt
+            first; below it the bot restocks instead of fighting.
         equip_search_hop_distance: Teleport hop distance for local equipment search.
         equip_search_max_failures: Maximum consecutive equipment-search hops.
     """
@@ -391,6 +415,8 @@ class AIConfigDict(TypedDict):
     patrol_waypoints: list[tuple[int, int]]
     dual_break_threshold: int
     dual_resume_threshold: int
+    radar_break_threshold: int
+    radar_resume_threshold: int
     equip_search_hop_distance: int
     equip_search_max_failures: int
 
@@ -416,6 +442,8 @@ def make_default_ai_config() -> AIConfigDict:
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
         dual_break_threshold=12,
         dual_resume_threshold=20,
+        radar_break_threshold=5,
+        radar_resume_threshold=15,
         equip_search_hop_distance=30,
         equip_search_max_failures=3,
     )
@@ -446,6 +474,8 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "patrol_waypoints": waypoints,
         "dual_break_threshold": config["dual_break_threshold"],
         "dual_resume_threshold": config["dual_resume_threshold"],
+        "radar_break_threshold": config["radar_break_threshold"],
+        "radar_resume_threshold": config["radar_resume_threshold"],
         "equip_search_hop_distance": config["equip_search_hop_distance"],
         "equip_search_max_failures": config["equip_search_max_failures"],
     }
@@ -506,6 +536,8 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         patrol_waypoints=_decode_patrol_waypoints(data),
         dual_break_threshold=require_int(data, "dual_break_threshold"),
         dual_resume_threshold=require_int(data, "dual_resume_threshold"),
+        radar_break_threshold=require_int(data, "radar_break_threshold"),
+        radar_resume_threshold=require_int(data, "radar_resume_threshold"),
         equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
         equip_search_max_failures=require_int(data, "equip_search_max_failures"),
     )
@@ -542,6 +574,15 @@ class AIStateDict(TypedDict):
             teleports and viewport recentering.
         resource_target_x: X coordinate of the locked resource target.
         resource_target_y: Y coordinate of the locked resource target.
+        local_scan_cells: Built-in radar coverage grid keyed by ``"cx,cy"``
+            cell index, values are scan timestamps. Used by the equipment
+            foraging sweep.
+        attempted_equipment_targets: Equipment targets that have been
+            teleport-approached. {``"x,y"``: timestamp_ms}. Prevents
+            repeated orbits around the same container.
+        attempted_fuel_dots: Fuel dots that have been approached or
+            teleported to. {``"x,y"``: timestamp_ms}. Prevents revisiting
+            dots within the scan coverage TTL.
     """
 
     config: AIConfigDict
@@ -563,6 +604,9 @@ class AIStateDict(TypedDict):
     resource_target_kind: str
     resource_target_x: int
     resource_target_y: int
+    local_scan_cells: dict[str, int]
+    attempted_equipment_targets: dict[str, int]
+    attempted_fuel_dots: dict[str, int]
 
 
 def make_initial_ai_state(
@@ -596,6 +640,9 @@ def make_initial_ai_state(
         resource_target_kind="",
         resource_target_x=0,
         resource_target_y=0,
+        local_scan_cells={},
+        attempted_equipment_targets={},
+        attempted_fuel_dots={},
     )
 
 
@@ -629,6 +676,9 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "resource_target_kind": state["resource_target_kind"],
         "resource_target_x": state["resource_target_x"],
         "resource_target_y": state["resource_target_y"],
+        "local_scan_cells": dict(state["local_scan_cells"]),
+        "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
+        "attempted_fuel_dots": dict(state["attempted_fuel_dots"]),
     }
 
 
@@ -711,6 +761,15 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         resource_target_kind=require_str(data, "resource_target_kind"),
         resource_target_x=require_int(data, "resource_target_x"),
         resource_target_y=require_int(data, "resource_target_y"),
+        local_scan_cells=_require_str_int_mapping(data, "local_scan_cells")
+        if "local_scan_cells" in data
+        else {},
+        attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
+        if "attempted_equipment_targets" in data
+        else {},
+        attempted_fuel_dots=_require_str_int_mapping(data, "attempted_fuel_dots")
+        if "attempted_fuel_dots" in data
+        else {},
     )
 
 

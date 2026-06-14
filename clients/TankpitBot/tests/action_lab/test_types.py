@@ -76,6 +76,10 @@ def _sample_page_snapshot() -> TeleportPageSnapshotDict:
         ws_ready_state=1,
         current_send_label=None,
         sent_frame_meta_queue_length=0,
+        self_fields={"a": 105, "b": 110, "c": 1100},
+        world_fields={},
+        world_collections={},
+        map_fields={},
     )
 
 
@@ -179,6 +183,22 @@ def test_decode_page_snapshot_rejects_invalid_phase() -> None:
     encoded["phase"] = "bad"
     with pytest.raises(JSONTypeError, match="invalid teleport page snapshot phase"):
         decode_teleport_page_snapshot(encoded)
+
+
+def test_decode_page_snapshot_accepts_before_map_open_phase() -> None:
+    """Page snapshot decode accepts the ``before_map_open`` phase literal."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["phase"] = "before_map_open"
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["phase"] == "before_map_open"
+
+
+def test_decode_page_snapshot_accepts_before_teleport_phase() -> None:
+    """Page snapshot decode accepts the ``before_teleport`` phase literal."""
+    encoded = encode_teleport_page_snapshot(_sample_page_snapshot())
+    encoded["phase"] = "before_teleport"
+    decoded = decode_teleport_page_snapshot(encoded)
+    assert decoded["phase"] == "before_teleport"
 
 
 def test_decode_page_snapshot_accepts_landed_phase() -> None:

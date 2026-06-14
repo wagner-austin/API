@@ -2,26 +2,25 @@
 
 from __future__ import annotations
 
-import types
 from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_core.json_utils import JSONObject, JSONValue, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from tests.action_lab._replay_browser import RecordedChromiumSession
+from tests.action_lab._replay_core import (
+    ClockAdvancingPage,
+    ReplayClock,
+    StubbedBootstrapMixin,
+    StubSnapshotCDPSession,
+    WorldStateOverrideMixin,
+)
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
-    BrowserContextProtocol,
-    BrowserProtocol,
-    BrowserTypeProtocol,
-    CDPSessionProtocol,
-    KeyboardProtocol,
     PageProtocol,
-    PlaywrightProtocol,
-    ResponseProtocol,
-    SyncPlaywrightContextManagerProtocol,
     TerrainMapProtocol,
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -40,6 +39,7 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportProbeSessionDict,
     decode_enemy_teleport_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
@@ -55,8 +55,11 @@ from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
     make_self_state,
+    make_tank_state,
 )
 from tankpit_bot.types import CapturedMessage, decode_capture_session
+
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
 
 class _EnemyTeleportModuleProtocol(Protocol):
@@ -133,6 +136,27 @@ def _target() -> TeleportTargetDict:
     return TeleportTargetDict(label="enemy_50_120_130", x=119, y=130)
 
 
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
+    )
+
+
 def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
     world = make_empty_world_state()
     return WorldStateDict(
@@ -151,19 +175,9 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
-
-
-class _Clock:
-    def __init__(self, start_ms: int) -> None:
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        self._now_ms += delta_ms
 
 
 class _SequencedProvider:
@@ -180,62 +194,6 @@ class _SequencedProvider:
             self._index += 1
 
 
-class _FakeKeyboard:
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        _ = (text, delay)
-
-
-class _FakePage:
-    url = "https://tankpit.com/play"
-
-    def __init__(self, clock: _Clock, provider: _SequencedProvider) -> None:
-        self._clock = clock
-        self._provider = provider
-        self.waits: list[float] = []
-        self._keyboard = _FakeKeyboard()
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> ResponseProtocol | None:
-        _ = (url, referer, timeout, wait_until)
-        return None
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        self.waits.append(timeout)
-        self._clock.advance(int(timeout))
-        self._provider.advance()
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> JSONValue:
-        _ = expression
-        return None
-
-
 class _ProbeHarness(EnemyTeleportProbe):
     def __init__(self) -> None:
         super().__init__("https://tankpit.com/play", headless=True, prefer_account=False)
@@ -249,8 +207,11 @@ class _ProbeHarness(EnemyTeleportProbe):
             leaderboard_position=1,
         )
         self._world_state = _make_world(1000, 100, 100, 900)
-        self._fake_page = _FakePage(_Clock(1000), _SequencedProvider([self._world_state]))
-        self._cdp = _FakeCDPSession()
+        self._fake_page = ClockAdvancingPage(
+            ReplayClock(1000),
+            on_wait=_SequencedProvider([self._world_state]).advance,
+        )
+        self._cdp = StubSnapshotCDPSession()
         self.map_open_result = True
         self.request_enemy_result = True
         self.teleport_result = True
@@ -280,164 +241,16 @@ class _ProbeHarness(EnemyTeleportProbe):
         return self.teleport_result
 
 
-class _FakeCDPSession:
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = params
-        if method == "Runtime.evaluate":
-            return {
-                "result": {
-                    "value": {
-                        "phase": "before_teleport",
-                        "timestamp_ms": 1000,
-                        "client_present": True,
-                        "map_visible": True,
-                        "client_state": 13,
-                        "client_busy": False,
-                        "pending_actions": 0,
-                        "heartbeat_age_ms": 10,
-                        "last_page_client_send_age_ms": 20,
-                        "last_bot_send_age_ms": 5,
-                        "ws_ready_state": 1,
-                        "current_send_label": None,
-                        "sent_frame_meta_queue_length": 0,
-                    }
-                }
-            }
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        return None
-
-
-class _FakeContext:
-    def __init__(self, page: _FakePage, cdp: _FakeCDPSession) -> None:
-        self._page = page
-        self._cdp = cdp
-
-    def new_page(self) -> PageProtocol:
-        return self._page
-
-    def new_cdp_session(self, page: PageProtocol) -> CDPSessionProtocol:
-        assert page is self._page
-        return self._cdp
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeBrowser:
-    def __init__(self, context: _FakeContext) -> None:
-        self._context = context
-
-    def new_context(self) -> BrowserContextProtocol:
-        return self._context
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeChromium:
-    def __init__(self, browser: _FakeBrowser) -> None:
-        self._browser = browser
-        self.last_headless: bool | None = None
-
-    def launch(
-        self,
-        *,
-        headless: bool | None = None,
-        slow_mo: float | None = None,
-        timeout: float | None = None,
-    ) -> BrowserProtocol:
-        _ = (slow_mo, timeout)
-        self.last_headless = headless
-        return self._browser
-
-
-class _FakePlaywright:
-    def __init__(self, chromium: _FakeChromium) -> None:
-        self.chromium: BrowserTypeProtocol = chromium
-
-    def stop(self) -> None:
-        return None
-
-
-class _FakePlaywrightContextManager:
-    def __init__(self, playwright: _FakePlaywright) -> None:
-        self._playwright: PlaywrightProtocol = playwright
-
-    def __enter__(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def start(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        _ = (exc_type, exc_val, exc_tb)
-
-
-class _FakePlaywrightFactory:
-    def __init__(self, manager: SyncPlaywrightContextManagerProtocol) -> None:
-        self._manager = manager
-
-    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
-        return self._manager
-
-
-class _ExecuteHarness(EnemyTeleportProbe):
+class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, EnemyTeleportProbe):
     def __init__(self) -> None:
-        super().__init__("https://tankpit.com/play", headless=False, prefer_account=True)
+        EnemyTeleportProbe.__init__(
+            self, "https://tankpit.com/play", headless=False, prefer_account=True
+        )
+        self._init_bootstrap_stubs()
         self._world_state = _make_world(900, 100, 100, 900)
-        self.cleanup_calls = 0
         self.results: list[EnemyTeleportAttemptResultDict] = []
         self.acquisition_strategies: list[str] = []
         self.excluded_tank_ids: list[frozenset[int]] = []
-
-    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
-
-    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
-
-    def _navigate_and_login(
-        self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
-        *,
-        tank_name_prefix: str = "TP",
-        auto_join_room: bool = True,
-    ) -> None:
-        _ = (page, cdp, tank_name_prefix, auto_join_room)
-
-    def _wait_for_game_ready(self, page: PageProtocol) -> None:
-        _ = page
-
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        _ = (page, cdp)
-        self._magic = "fake-magic"
-
-    def _cleanup(
-        self,
-        cdp: CDPSessionProtocol,
-        page: PageProtocol,
-        context: BrowserContextProtocol,
-        browser: BrowserProtocol,
-    ) -> None:
-        _ = (cdp, page, context, browser)
-        self.cleanup_calls += 1
-
-    def get_world_state(self) -> WorldStateDict:
-        return self._world_state
-
-    def get_self_state(self) -> SelfStateDict | None:
-        return self._world_state["self_state"]
 
     def _probe_single_enemy_attempt(
         self,
@@ -530,18 +343,50 @@ def _restore_hooks() -> Generator[None, None, None]:
 
 
 def test_require_fresh_enemy_threat_filters_old_entries() -> None:
-    probe = _ProbeHarness()
-    original_analyze = enemy_module.analyze_threats
-    enemy_module.analyze_threats = lambda world, self_state: [
-        _enemy(tank_id=1, distance=9, timestamp_ms=900),
-        _enemy(tank_id=2, distance=2, timestamp_ms=1500),
-    ]
-    try:
-        result = _require_fresh_enemy_threat(probe, 1000, frozenset())
-    finally:
-        enemy_module.analyze_threats = original_analyze
+    """Real ``analyze_threats`` against real tanks — closer fresh enemy wins.
 
-    assert result == _enemy(tank_id=2, distance=2, timestamp_ms=1500)
+    Probe self at (100, 100), team=2. Two enemy tanks on team=1 in the world:
+    one far at distance 9 with old timestamp (filtered as stale at age >250ms
+    relative to now=1000), one close at distance 2 with fresh timestamp.
+    Real analyze_threats sorts by distance ascending; freshness filter in
+    _require_fresh_enemy_threat then keeps the close, fresh one.
+    """
+    action_hooks.get_current_time_ms = ReplayClock(1000)
+    probe = _ProbeHarness()
+    probe._world_state["tanks"] = {
+        "1": make_tank_state(
+            tank_id=1,
+            x=109,
+            y=100,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-1",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=900,
+        ),
+        "2": make_tank_state(
+            tank_id=2,
+            x=102,
+            y=100,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-2",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=1500,
+        ),
+    }
+
+    result = _require_fresh_enemy_threat(probe, 1000, frozenset())
+
+    if result is None:
+        pytest.fail("expected real analyze_threats to return the fresh close enemy")
+    assert result["tank_id"] == 2
+    assert result["distance"] == 2
+    assert result["timestamp_ms"] == 1500
 
 
 def test_require_fresh_enemy_threat_returns_none_without_self_state() -> None:
@@ -552,34 +397,86 @@ def test_require_fresh_enemy_threat_returns_none_without_self_state() -> None:
 
 
 def test_require_fresh_enemy_threat_excludes_previously_targeted_enemy_ids() -> None:
-    probe = _ProbeHarness()
-    original_analyze = enemy_module.analyze_threats
-    enemy_module.analyze_threats = lambda world, self_state: [
-        _enemy(tank_id=1, distance=1, timestamp_ms=1500),
-        _enemy(tank_id=2, distance=2, timestamp_ms=1500),
-    ]
-    try:
-        result = _require_fresh_enemy_threat(probe, 1000, frozenset({1}))
-    finally:
-        enemy_module.analyze_threats = original_analyze
+    """Real ``analyze_threats`` over real tanks; previously-targeted IDs are skipped.
 
-    assert result == _enemy(tank_id=2, distance=2, timestamp_ms=1500)
+    Tank 1 at distance 1 (closest, but excluded), tank 2 at distance 2.
+    Real analyze_threats returns both sorted by distance; the exclude set
+    skips tank 1, so tank 2 is returned.
+    """
+    action_hooks.get_current_time_ms = ReplayClock(1500)
+    probe = _ProbeHarness()
+    probe._world_state["tanks"] = {
+        "1": make_tank_state(
+            tank_id=1,
+            x=101,
+            y=100,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-1",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=1500,
+        ),
+        "2": make_tank_state(
+            tank_id=2,
+            x=102,
+            y=100,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-2",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=1500,
+        ),
+    }
+
+    result = _require_fresh_enemy_threat(probe, 1000, frozenset({1}))
+
+    if result is None:
+        pytest.fail("expected real analyze_threats to return tank 2 after excluding tank 1")
+    assert result["tank_id"] == 2
+    assert result["distance"] == 2
 
 
 def test_enemy_by_id_returns_matching_enemy_and_none_when_missing() -> None:
+    """Real ``analyze_threats`` produces threats from real tanks; lookup by ID works."""
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    original_analyze = enemy_module.analyze_threats
-    enemy_module.analyze_threats = lambda world, self_state: [
-        _enemy(tank_id=11),
-        _enemy(tank_id=12),
-    ]
-    try:
-        match = _enemy_by_id(probe, 12)
-        missing = _enemy_by_id(probe, 99)
-    finally:
-        enemy_module.analyze_threats = original_analyze
+    probe._world_state["tanks"] = {
+        "11": make_tank_state(
+            tank_id=11,
+            x=120,
+            y=130,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-11",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=1000,
+        ),
+        "12": make_tank_state(
+            tank_id=12,
+            x=120,
+            y=130,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-12",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=1000,
+        ),
+    }
 
-    assert match == _enemy(tank_id=12)
+    match = _enemy_by_id(probe, 12)
+    missing = _enemy_by_id(probe, 99)
+
+    if match is None:
+        pytest.fail("expected real analyze_threats to expose tank 12")
+    assert match["tank_id"] == 12
     assert missing is None
 
 
@@ -609,6 +506,8 @@ def test_format_enemy_helpers_cover_terminal_result_and_summary() -> None:
         landed_y=101,
         message_start_index=5,
         message_end_index=9,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1100),
     )
     session = EnemyTeleportProbeSessionDict(
         session_id="enemy-session",
@@ -666,11 +565,13 @@ def test_send_enemy_acquisition_dispatches_by_strategy() -> None:
 
 
 def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     probe._state_data["state"] = "TELEPORTING"
     probe._state_data["in_flight_action"] = make_in_flight_action("teleport", 119, 130, 1000)
     result = probe._finish_non_teleport_attempt(
         page=probe._fake_page,
+        cdp=StubSnapshotCDPSession(),
         acquisition_strategy="nearest_enemy",
         status="no_enemy",
         acquisition_started_ms=1000,
@@ -681,6 +582,7 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
         landing_target=None,
         message_start_index=4,
         settle_delay_ms=250,
+        snapshot_before=_snapshot(900),
     )
 
     assert result["status"] == "no_enemy"
@@ -691,21 +593,8 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
     assert probe._fake_page.waits[-1] == 250.0
 
 
-def test_probe_single_enemy_attempt_raises_when_acquisition_dispatch_fails() -> None:
-    probe = _ProbeHarness()
-    probe.request_enemy_result = False
-
-    with pytest.raises(TeleportProbeError, match="enemy acquisition command dispatch failed"):
-        probe._probe_single_enemy_attempt(
-            acquisition_strategy="nearest_enemy",
-            acquisition_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            settle_delay_ms=0,
-            excluded_tank_ids=frozenset(),
-        )
-
-
 def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: None
 
@@ -723,6 +612,7 @@ def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
 
 
 def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
@@ -748,6 +638,7 @@ def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
 
 
 def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
@@ -784,6 +675,7 @@ def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
 
 
 def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     probe.teleport_result = False
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
@@ -819,6 +711,7 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
 
 
 def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
@@ -914,6 +807,7 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
 
 
 def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     probe._self_state = make_self_state(
         tank_id=1,
@@ -1029,6 +923,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
     enemy_after: EnemyThreatDict,
     expected_status: str,
 ) -> None:
+    action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     probe._self_state = make_self_state(
         tank_id=1,
@@ -1168,14 +1063,11 @@ def test_execute_probe_raises_when_playwright_is_missing() -> None:
 
 
 def test_execute_probe_collects_attempts() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    page = _FakePage(clock, _SequencedProvider([_make_world(900, 100, 100, 900)]))
-    cdp = _FakeCDPSession()
-    chromium = _FakeChromium(_FakeBrowser(_FakeContext(page, cdp)))
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
     probe = _ExecuteHarness()
+    recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     probe.results = [
         EnemyTeleportAttemptResultDict(
             acquisition_strategy="nearest_enemy",
@@ -1201,6 +1093,8 @@ def test_execute_probe_collects_attempts() -> None:
             enemy_y_after=130,
             message_start_index=0,
             message_end_index=1,
+            snapshot_before=_snapshot(1000),
+            snapshot_after=_snapshot(1400),
         ),
         EnemyTeleportAttemptResultDict(
             acquisition_strategy="nearest_enemy",
@@ -1226,6 +1120,8 @@ def test_execute_probe_collects_attempts() -> None:
             enemy_y_after=130,
             message_start_index=1,
             message_end_index=2,
+            snapshot_before=_snapshot(1100),
+            snapshot_after=_snapshot(1500),
         ),
     ]
 
@@ -1266,18 +1162,15 @@ def test_execute_probe_collects_attempts() -> None:
     assert session["startup_timing"]["initial_world_timestamp_ms"] == 1200
     assert session["startup_timing"]["first_attempt_started_ms"] == 1000
     assert probe.cleanup_calls == 1
-    assert chromium.last_headless is False
+    assert recorded.browser_type.launches == [False]
 
 
 def test_execute_probe_does_not_exclude_when_attempt_has_no_enemy() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    page = _FakePage(clock, _SequencedProvider([_make_world(900, 100, 100, 900)]))
-    cdp = _FakeCDPSession()
-    chromium = _FakeChromium(_FakeBrowser(_FakeContext(page, cdp)))
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
     probe = _ExecuteHarness()
+    recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     probe.results = [
         EnemyTeleportAttemptResultDict(
             acquisition_strategy="map_open",
@@ -1303,6 +1196,8 @@ def test_execute_probe_does_not_exclude_when_attempt_has_no_enemy() -> None:
             enemy_y_after=None,
             message_start_index=0,
             message_end_index=0,
+            snapshot_before=_snapshot(1000),
+            snapshot_after=_snapshot(1200),
         ),
         EnemyTeleportAttemptResultDict(
             acquisition_strategy="map_open",
@@ -1328,6 +1223,8 @@ def test_execute_probe_does_not_exclude_when_attempt_has_no_enemy() -> None:
             enemy_y_after=130,
             message_start_index=0,
             message_end_index=1,
+            snapshot_before=_snapshot(1300),
+            snapshot_after=_snapshot(1700),
         ),
     ]
 

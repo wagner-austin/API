@@ -8,8 +8,9 @@ from typing import Literal
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
-from tankpit_bot.action_lab.teleport_phase import _log_command_dispatch_failure
+from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
 from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+from tankpit_bot.runtime_logging import emit_diagnostic
 
 
 def start_teleport_page_snapshots(
@@ -126,8 +127,27 @@ def run_tracked_acquisition_phase(
         unavailable_message=unavailable_message,
     )
     started_ms = action_hooks.get_current_time_ms()
+    # The wire ``map_open`` command only opens the map; it does not toggle
+    # closed (that requires a separate action). But re-sending it when the
+    # map is already open does not produce a fresh map-sync response, so
+    # the subsequent ``wait_for_world_sync`` either times out or returns a
+    # stale sync and breaks the rest of the attempt. The before-map-open
+    # snapshot reflects the live ``activeGame.map.h`` flag, so short-circuit
+    # the dispatch and the sync wait when the goal state is already met.
+    if (
+        command_name == "map_open"
+        and capture_before_map_open
+        and page_snapshots
+        and page_snapshots[-1]["map_visible"] is True
+    ):
+        emit_diagnostic(
+            diagnostic_kind="map_open_skipped_already_open",
+            origin="acquisition_phase",
+            command_name=command_name,
+        )
+        return (started_ms, started_ms, page_snapshots, capture_page_snapshot)
     if not send_command():
-        _log_command_dispatch_failure(command_name, dispatch_failure_message)
+        emit_command_dispatch_failure_diagnostic(command_name, dispatch_failure_message)
         raise dispatch_failure_error(dispatch_failure_message)
     if not wait_for_sync:
         return (started_ms, None, page_snapshots, capture_page_snapshot)

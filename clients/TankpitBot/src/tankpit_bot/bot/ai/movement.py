@@ -14,7 +14,8 @@ from tankpit_bot.bot.ai.context import (
     local_actionable_bounds,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.equipment import find_teleport_landing_tile
+from tankpit_bot.bot.ai.equipment import find_teleport_landing_tile, is_area_scanned
+from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
 from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
@@ -215,6 +216,67 @@ def _approach_target(ctx: DecideCtx, tx: int, ty: int) -> tuple[int, int]:
     return (approach_x, approach_y)
 
 
+def _select_walkable_approach_tile(
+    ctx: DecideCtx,
+    tx: int,
+    ty: int,
+) -> tuple[int, int] | None:
+    """Return a passable, walk-reachable viewport tile facing an off-viewport target.
+
+    The geometric clamp alone is terrain-blind: live run 20260610-000x
+    rejected every known equipment container because the single projected
+    edge tile happened to be rock or water (for example targets west of
+    the viewport all clamped onto the x=185 rock ridge). This selector
+    starts from the clamp and scans outward along the facing viewport
+    edge for the nearest tile that is passable AND walk-reachable,
+    keeping known off-viewport containers approachable on broken ground.
+
+    Args:
+        ctx: Decision context with viewport and terrain.
+        tx: Real target X coordinate (may be off-viewport).
+        ty: Real target Y coordinate (may be off-viewport).
+
+    Returns:
+        Best approach tile, or ``None`` when no facing-edge tile is
+        currently walkable.
+    """
+    terrain = ctx.terrain
+    clamp_x, clamp_y = _approach_target(ctx, tx, ty)
+    if terrain is None:
+        return (clamp_x, clamp_y)
+    left, top, right, bottom = local_actionable_bounds(ctx)
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    # Callers only reach this for off-viewport targets, so at least one
+    # axis is clamped: scan along the facing edge of whichever axis it is.
+    if tx < left or tx > right:
+        candidates = [(clamp_x, y) for y in range(top, bottom + 1)]
+    else:
+        candidates = [(x, clamp_y) for x in range(left, right + 1)]
+
+    def _distance_from_clamp(tile: tuple[int, int]) -> int:
+        """Order candidates by closeness to the geometric projection."""
+        return abs(tile[0] - clamp_x) + abs(tile[1] - clamp_y)
+
+    candidates.sort(key=_distance_from_clamp)
+    for cx, cy in candidates:
+        if (cx, cy) == (sx, sy):
+            continue
+        if not terrain.is_passable(cx, cy):
+            continue
+        if not is_move_reachable_in_viewport(
+            ctx.world,
+            terrain,
+            sx,
+            sy,
+            cx,
+            cy,
+            ctx.world["mines"],
+        ):
+            continue
+        return (cx, cy)
+    return None
+
+
 def _predicted_viewport_origin_for_target(
     ctx: DecideCtx,
     target_x: int,
@@ -242,7 +304,7 @@ def _exploration_priority(
     next_key = viewport_scan_key(next_left, next_top)
     is_current = next_key == current_key
     is_failed = is_scan_viewport_failed(next_left, next_top, ctx.timestamp_ms)
-    is_scanned = next_key in ctx.world["scanned_viewports"]
+    is_scanned = is_area_scanned(ctx.world, next_left, next_top, ctx.timestamp_ms)
     reveal_distance = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
     return (is_current, is_failed, is_scanned, -reveal_distance)
 
@@ -323,7 +385,7 @@ def _walk_or_teleport_with_terrain(
         ty,
         ctx.world["mines"],
     ):
-        return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
+        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty, pickup_kind=pickup_kind)
     if pickup_kind is None and is_move_reachable_in_viewport(
         ctx.world,
         terrain,
@@ -333,8 +395,60 @@ def _walk_or_teleport_with_terrain(
         ty,
         ctx.world["mines"],
     ):
-        return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
+        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty, pickup_kind=pickup_kind)
     return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
+
+
+def _surface_clamped_move(
+    ctx: DecideCtx,
+    terrain: TerrainMapProtocol,
+    sx: int,
+    sy: int,
+    tx: int,
+    ty: int,
+    *,
+    pickup_kind: str | None,
+) -> BotCommand | None:
+    """Issue a direct move bounded at the first surface transition.
+
+    Boarding a ferry and stepping from ferry/water onto land each
+    consume one action-queue slot: the server stops the tank on the
+    transition tile, so a command planned past it would stall against
+    its own target. When the path crosses a surface boundary the
+    command becomes a plain move to that boundary tile and the next
+    tick replans the remainder.
+
+    Args:
+        ctx: Decision context.
+        terrain: Ferry-aware terrain view used for planning.
+        sx: Starting X coordinate.
+        sy: Starting Y coordinate.
+        tx: Requested target X coordinate.
+        ty: Requested target Y coordinate.
+        pickup_kind: Resource kind for pickup commands, or None.
+
+    Returns:
+        Planned command, or None when the clamped tile is occupied.
+    """
+    clamp_x, clamp_y = clamp_move_target_at_surface_transition(
+        ctx.world,
+        terrain,
+        sx,
+        sy,
+        tx,
+        ty,
+        ctx.world["mines"],
+    )
+    if (clamp_x, clamp_y) != (tx, ty):
+        emit_ai(
+            "surface transition at (%d,%d) bounds move toward (%d,%d)",
+            clamp_x,
+            clamp_y,
+            tx,
+            ty,
+        )
+        return _direct_move_command(ctx, clamp_x, clamp_y, pickup_kind=None)
+    return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
 
 
 def _walk_or_teleport_without_terrain(
@@ -365,18 +479,46 @@ def _approach_command(
     *,
     pickup_kind: str | None,
 ) -> BotCommand | None:
-    """Return a non-pickup approach command for an off-viewport target."""
-    approach_x, approach_y = _approach_target(ctx, tx, ty)
+    """Return an approach command for an off-viewport target.
+
+    Prefers a cheap walk to a terrain-validated viewport-edge tile facing
+    the target. When no facing-edge tile is walkable, teleports to the
+    landing tile near the REAL target instead -- the bot knows the exact
+    coordinates, and abandoning a known target because one edge tile is
+    rock wastes radar and fuel on blind re-searches.
+    """
     target_kind = "pickup" if pickup_kind is not None else "move"
+    approach = _select_walkable_approach_tile(ctx, tx, ty)
+    if approach is not None:
+        approach_x, approach_y = approach
+        emit_ai(
+            "%s target (%d,%d) is outside viewport, approaching via (%d,%d)",
+            target_kind,
+            tx,
+            ty,
+            approach_x,
+            approach_y,
+        )
+        walked = walk_or_teleport(ctx, approach_x, approach_y, pickup_kind=None)
+        if walked is not None:
+            return walked
+    if ctx.terrain is None:
+        return None
     emit_ai(
-        "%s target (%d,%d) is outside viewport, approaching via (%d,%d)",
+        "no walkable approach edge for %s target (%d,%d), teleporting to it directly",
         target_kind,
         tx,
         ty,
-        approach_x,
-        approach_y,
     )
-    return walk_or_teleport(ctx, approach_x, approach_y, pickup_kind=None)
+    return _teleport_fallback_command(
+        ctx,
+        ctx.terrain,
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+        tx,
+        ty,
+        ctx.world["mines"],
+    )
 
 
 def _direct_move_command(

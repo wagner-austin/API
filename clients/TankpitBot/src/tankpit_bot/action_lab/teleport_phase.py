@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal, Protocol
 
+from platform_core.json_utils import JSONObject, require_str
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict, Unpack
 
@@ -16,8 +17,52 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.runtime_logging import emit_diagnostic
 
 log = get_logger(__name__)
+
+
+class CommandDispatchFailureDiagnosticDict(TypedDict):
+    """Structured payload for a single ``command_dispatch_failure`` diagnostic.
+
+    Attributes:
+        command: Command name that failed to dispatch.
+        detail: Human-readable failure detail.
+    """
+
+    command: str
+    detail: str
+
+
+def encode_command_dispatch_failure_diagnostic(
+    payload: CommandDispatchFailureDiagnosticDict,
+) -> JSONObject:
+    """Encode a command_dispatch_failure diagnostic payload to JSON.
+
+    Args:
+        payload: Structured diagnostic payload.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {"command": payload["command"], "detail": payload["detail"]}
+
+
+def decode_command_dispatch_failure_diagnostic(
+    data: JSONObject,
+) -> CommandDispatchFailureDiagnosticDict:
+    """Decode a command_dispatch_failure diagnostic payload from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated payload.
+    """
+    return CommandDispatchFailureDiagnosticDict(
+        command=require_str(data, "command"),
+        detail=require_str(data, "detail"),
+    )
 
 
 class TeleportPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol, Protocol):
@@ -64,14 +109,29 @@ class TeleportOutcomeWaiterProtocol(Protocol):
         """Wait for a terminal teleport outcome and return the typed result."""
 
 
-def _log_command_dispatch_failure(command: str, detail: str) -> None:
-    """Emit a structured command-dispatch failure record.
+def emit_command_dispatch_failure_diagnostic(command: str, detail: str) -> None:
+    """Emit a structured ``command_dispatch_failure`` diagnostic event.
 
     Args:
         command: Command name that failed to dispatch.
         detail: Human-readable failure detail.
     """
-    log.info("COMMAND_DISPATCH_FAILURE command=%s detail=%s", command, detail)
+    emit_diagnostic(
+        diagnostic_kind="command_dispatch_failure",
+        command=command,
+        detail=detail,
+    )
+
+
+def _log_command_dispatch_failure(command: str, detail: str) -> None:
+    """Log and emit a command dispatch failure.
+
+    Args:
+        command: Command name that failed to dispatch.
+        detail: Human-readable failure detail.
+    """
+    log.warning("command dispatch failed: %s — %s", command, detail)
+    emit_command_dispatch_failure_diagnostic(command, detail)
 
 
 def run_tracked_teleport_command(
@@ -124,7 +184,7 @@ def run_tracked_teleport_command(
     teleport_started_ms = action_hooks.get_current_time_ms()
     page_snapshots.append(capture_page_snapshot("before_teleport"))
     if not probe.teleport_to(target["x"], target["y"]):
-        _log_command_dispatch_failure("teleport", dispatch_failure_message)
+        emit_command_dispatch_failure_diagnostic("teleport", dispatch_failure_message)
         probe._end_action_phase(teleport_cycle)
         raise dispatch_failure_error(dispatch_failure_message)
     result = wait_for_outcome(
@@ -148,9 +208,13 @@ def run_tracked_teleport_command(
 
 
 __all__ = [
+    "CommandDispatchFailureDiagnosticDict",
     "TeleportOutcomeWaiterKwargs",
     "TeleportOutcomeWaiterProtocol",
     "TeleportPhaseProbeProtocol",
     "_log_command_dispatch_failure",
+    "decode_command_dispatch_failure_diagnostic",
+    "emit_command_dispatch_failure_diagnostic",
+    "encode_command_dispatch_failure_diagnostic",
     "run_tracked_teleport_command",
 ]

@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 
-import types
-from collections.abc import Callable, Generator
+from collections.abc import Generator
+from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject
+from tests.action_lab._replay_browser import RecordedChromiumSession
+from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock, StubSnapshotCDPSession
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
     BrowserContextProtocol,
     BrowserProtocol,
-    BrowserTypeProtocol,
     CDPSessionProtocol,
-    KeyboardProtocol,
     PageProtocol,
-    PlaywrightProtocol,
-    ResponseProtocol,
-    SyncPlaywrightContextManagerProtocol,
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import probe_runtime
@@ -27,162 +23,17 @@ from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage
 
-
-class _Clock:
-    def __init__(self, start_ms: int) -> None:
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        return self._now_ms
-
-    def advance(self, delta_ms: int) -> None:
-        self._now_ms += delta_ms
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
 
-class _FakeKeyboard:
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        _ = (text, delay)
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
 
-class _FakePage:
-    url = "https://tankpit.com/play"
-
-    def __init__(self) -> None:
-        self._keyboard = _FakeKeyboard()
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> ResponseProtocol | None:
-        _ = (url, referer, timeout, wait_until)
-        return None
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        _ = timeout
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> None:
-        _ = expression
-        return
-
-
-class _FakeCDP:
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = (method, params)
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        return None
-
-
-class _FakeContext:
-    def __init__(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        self._page = page
-        self._cdp = cdp
-
-    def new_page(self) -> PageProtocol:
-        return self._page
-
-    def new_cdp_session(self, page: PageProtocol) -> CDPSessionProtocol:
-        assert page is self._page
-        return self._cdp
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeBrowser:
-    def __init__(self, context: BrowserContextProtocol) -> None:
-        self._context = context
-
-    def new_context(self) -> BrowserContextProtocol:
-        return self._context
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeChromium:
-    def __init__(self, browser: BrowserProtocol) -> None:
-        self._browser = browser
-        self.last_headless: bool | None = None
-
-    def launch(
-        self,
-        *,
-        headless: bool | None = None,
-        slow_mo: float | None = None,
-        timeout: float | None = None,
-    ) -> BrowserProtocol:
-        _ = (slow_mo, timeout)
-        self.last_headless = headless
-        return self._browser
-
-
-class _FakePlaywright:
-    def __init__(self, chromium: BrowserTypeProtocol) -> None:
-        self.chromium = chromium
-
-    def stop(self) -> None:
-        return None
-
-
-class _FakePlaywrightContextManager:
-    def __init__(self, playwright: PlaywrightProtocol) -> None:
-        self._playwright = playwright
-
-    def __enter__(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def start(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        _ = (exc_type, exc_val, exc_tb)
-
-
-class _FakePlaywrightFactory:
-    def __init__(self, manager: SyncPlaywrightContextManagerProtocol) -> None:
-        self._manager = manager
-
-    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
-        return self._manager
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
 
 class _ProbeHarness:
-    def __init__(self, clock: _Clock | None = None) -> None:
+    def __init__(self, clock: ReplayClock | None = None) -> None:
         self._start_timestamp_ms = 0
         self._messages: list[CapturedMessage] = [
             CapturedMessage(
@@ -302,7 +153,7 @@ def _restore_hooks() -> Generator[None, None, None]:
 
 
 def test_initialize_live_probe_session_resets_runtime_state() -> None:
-    clock = _Clock(500)
+    clock = ReplayClock(500)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
 
@@ -318,33 +169,29 @@ def test_initialize_live_probe_session_resets_runtime_state() -> None:
 
 
 def test_launch_probe_browser_returns_live_handles() -> None:
-    page = _FakePage()
-    cdp = _FakeCDP()
-    context = _FakeContext(page, cdp)
-    browser = _FakeBrowser(context)
-    chromium = _FakeChromium(browser)
-    playwright: PlaywrightProtocol = _FakePlaywright(chromium)
+    probe = _ProbeHarness(ReplayClock())
+    recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
 
     (
         launched_browser,
         launched_context,
         launched_page,
         launched_cdp,
-    ) = probe_runtime.launch_probe_browser(playwright, headless=True)
+    ) = probe_runtime.launch_probe_browser(recorded.playwright, headless=True)
 
-    assert launched_browser is browser
-    assert launched_context is context
-    assert launched_page is page
-    assert launched_cdp is cdp
-    assert chromium.last_headless is True
+    assert launched_browser is recorded.browser
+    assert launched_context is recorded.context
+    assert launched_page is recorded.page
+    assert launched_cdp is recorded.cdp
+    assert recorded.browser_type.launches == [True]
 
 
 def test_prepare_live_probe_runtime_sets_handles_and_records_timing() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
-    page = _FakePage()
-    cdp = _FakeCDP()
+    page = ClockAdvancingPage(ReplayClock())
+    cdp = StubSnapshotCDPSession()
     probe.ready_advance_ms = 25
     probe.intel_advance_ms = 35
 
@@ -366,10 +213,10 @@ def test_prepare_live_probe_runtime_sets_handles_and_records_timing() -> None:
 
 
 def test_wait_for_probe_command_ready_advances_startup_state() -> None:
-    clock = _Clock(2000)
+    clock = ReplayClock(2000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness()
-    page = _FakePage()
+    page = ClockAdvancingPage(ReplayClock())
     spawn = _spawn()
     advance_calls = 0
 
@@ -433,8 +280,8 @@ def test_build_probe_startup_timing_computes_deltas() -> None:
 
 def test_clear_live_probe_runtime_clears_page_and_cdp() -> None:
     probe = _ProbeHarness()
-    probe._page = _FakePage()
-    probe._cdp = _FakeCDP()
+    probe._page = ClockAdvancingPage(ReplayClock())
+    probe._cdp = StubSnapshotCDPSession()
 
     probe_runtime.clear_live_probe_runtime(probe)
 
@@ -443,18 +290,13 @@ def test_clear_live_probe_runtime_clears_page_and_cdp() -> None:
 
 
 def test_execute_live_probe_bootstrap_runs_ready_callback_and_cleans_up() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     probe.ready_advance_ms = 25
     probe.intel_advance_ms = 35
-    page = _FakePage()
-    cdp = _FakeCDP()
-    context = _FakeContext(page, cdp)
-    browser = _FakeBrowser(context)
-    chromium = _FakeChromium(browser)
-    manager = _FakePlaywrightContextManager(_FakePlaywright(chromium))
-    core_hooks.sync_playwright = _FakePlaywrightFactory(manager)
+    recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     spawn = _spawn()
 
     def _wait_initial(
@@ -463,7 +305,7 @@ def test_execute_live_probe_bootstrap_runs_ready_callback_and_cleans_up() -> Non
         started_ms: int,
         timeout_ms: int,
     ) -> tuple[int, SelfStateDict]:
-        assert page_arg is page
+        assert page_arg is recorded.page
         assert provider is probe
         assert started_ms == 1060
         assert timeout_ms == 9000
@@ -492,8 +334,8 @@ def test_execute_live_probe_bootstrap_runs_ready_callback_and_cleans_up() -> Non
             spawn=spawn,
             command_ready_timestamp_ms=1115,
         )
-        assert probe._page is page
-        assert probe._cdp is cdp
+        assert probe._page is recorded.page
+        assert probe._cdp is recorded.cdp
         return "session-result"
 
     result = probe_runtime.execute_live_probe_bootstrap(
@@ -513,7 +355,7 @@ def test_execute_live_probe_bootstrap_runs_ready_callback_and_cleans_up() -> Non
     assert probe.ready_calls == 1
     assert probe.intel_calls == 1
     assert advance_calls == 1
-    assert chromium.last_headless is False
+    assert recorded.browser_type.launches == [False]
 
 
 def test_execute_live_probe_bootstrap_raises_without_playwright() -> None:

@@ -15,7 +15,7 @@ from tankpit_bot.state import (
     make_self_state,
 )
 from tankpit_bot.state.types import make_container_state, make_mine_state, make_tank_state
-from tests.fakes.base import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _world() -> tuple[WorldStateDict, SelfStateDict, EnemyThreatDict]:
@@ -103,12 +103,12 @@ def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
 
 def test_choose_combat_landing_tile_prefers_first_passable_candidate() -> None:
     world, self_state, target = _world()
-    terrain = FakeTerrainMap(
+    terrain = InMemoryTerrainMap(
         {
-            (103, 100): FakeTerrainMap.ROCK,
-            (105, 100): FakeTerrainMap.GROUND,
-            (104, 101): FakeTerrainMap.GROUND,
-            (104, 99): FakeTerrainMap.GROUND,
+            (103, 100): InMemoryTerrainMap.ROCK,
+            (105, 100): InMemoryTerrainMap.GROUND,
+            (104, 101): InMemoryTerrainMap.GROUND,
+            (104, 99): InMemoryTerrainMap.GROUND,
         }
     )
 
@@ -123,12 +123,12 @@ def test_choose_combat_landing_tile_returns_first_candidate_without_terrain() ->
 
 def test_choose_combat_landing_tile_returns_missing_when_all_candidates_impassable() -> None:
     world, self_state, target = _world()
-    terrain = FakeTerrainMap(
+    terrain = InMemoryTerrainMap(
         {
-            (103, 100): FakeTerrainMap.ROCK,
-            (105, 100): FakeTerrainMap.WATER,
-            (104, 101): FakeTerrainMap.ROCK,
-            (104, 99): FakeTerrainMap.WATER,
+            (103, 100): InMemoryTerrainMap.ROCK,
+            (105, 100): InMemoryTerrainMap.WATER,
+            (104, 101): InMemoryTerrainMap.ROCK,
+            (104, 99): InMemoryTerrainMap.WATER,
         }
     )
 

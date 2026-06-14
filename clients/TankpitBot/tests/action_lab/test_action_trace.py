@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import logging
-
 import pytest
+from tests.conftest import FakeFileSystem
 
 from tankpit_bot.action_lab.action_trace import (
     ActionCycleTracker,
@@ -67,6 +66,7 @@ def _world_with_viewport() -> WorldStateDict:
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=139, top=102, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=40_000,
     )
 
@@ -84,17 +84,47 @@ def test_action_cycle_tracker_begin_and_end_phase() -> None:
     tracker.end_phase(cycle)
 
 
-def test_action_cycle_tracker_reports_overlap_and_logs_it(caplog: pytest.LogCaptureFixture) -> None:
-    """Cycle tracker records and logs active-phase overlap violations."""
+def test_action_cycle_tracker_reports_overlap_and_emits_diagnostic(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Cycle tracker records overlaps and emits an ``action_phase_overlap`` diagnostic.
+
+    Validates the JSONL artifact through the production
+    ``configure_bot_runtime_logging`` pipeline so the test exercises the
+    real encoder, handler, and file writer end to end.
+    """
+    from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
+    from tankpit_bot.runtime_logging import (
+        configure_bot_runtime_logging,
+        decode_runtime_event_record,
+    )
+
+    artifacts = configure_bot_runtime_logging("20260331-230405")
+
     tracker = ActionCycleTracker()
     tracker.begin_phase("radar", started_ms=1200)
     _, overlaps = tracker.begin_phase("move", started_ms=1300)
 
-    with caplog.at_level(logging.INFO):
-        log_phase_overlaps(overlaps, attempt_label="attempt-2")
+    log_phase_overlaps(overlaps, attempt_label="attempt-2")
 
     assert len(overlaps) == 1
-    assert "ACTION_PHASE_OVERLAP attempt=attempt-2 active=radar#1" in caplog.text
+    event_lines = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip().splitlines()
+    decoded = [
+        decode_runtime_event_record(narrow_json_to_dict(load_json_str(line)))
+        for line in event_lines
+    ]
+    diagnostics = [d for d in decoded if d["channel"] == "DIAGNOSTIC"]
+    assert len(diagnostics) == 1
+    fields = diagnostics[0]["fields"]
+    assert fields["diagnostic_kind"] == "action_phase_overlap"
+    assert fields["attempt"] == "attempt-2"
+    assert fields["active_phase"] == "radar"
+    assert fields["active_cycle_id"] == 1
+    assert fields["active_started_ms"] == 1200
+    assert fields["next_phase"] == "move"
+    assert fields["next_cycle_id"] == 1
+    assert fields["next_started_ms"] == 1300
 
 
 def test_action_cycle_tracker_rejects_ending_inactive_phase() -> None:

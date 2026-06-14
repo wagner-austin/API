@@ -17,10 +17,24 @@ from tankpit_bot.state import (
     WorldStateDict,
     make_container_state,
     pickup_container,
+    replace_map_fuel_dots,
     set_self_fuel,
 )
 
 log = get_logger(__name__)
+
+
+def update_world_state_from_fuel_dots(dots: list[tuple[int, int]]) -> None:
+    """Replace the map-wide fuel-dot atlas from a parsed MAP_DATA dot layer.
+
+    Args:
+        dots: Decoded ``(x, y)`` world coordinates of every fuel dot.
+    """
+    _ws._world_state = replace_map_fuel_dots(
+        _ws._world_state,
+        dots,
+        get_current_time_ms(),
+    )
 
 
 def update_world_state_from_tank_registry_container(
@@ -102,6 +116,7 @@ def remove_container_at(x: int, y: int) -> None:
             terrain=_ws._world_state["terrain"],
             viewport=_ws._world_state["viewport"],
             scanned_viewports=_ws._world_state["scanned_viewports"],
+            map_fuel_dots=_ws._world_state["map_fuel_dots"],
             timestamp_ms=_ws._world_state["timestamp_ms"],
         )
         clear_container_tile_cache(x, y)
@@ -142,6 +157,7 @@ def increment_container_failed_pickups(x: int, y: int) -> None:
         terrain=_ws._world_state["terrain"],
         viewport=_ws._world_state["viewport"],
         scanned_viewports=_ws._world_state["scanned_viewports"],
+        map_fuel_dots=_ws._world_state["map_fuel_dots"],
         timestamp_ms=_ws._world_state["timestamp_ms"],
     )
     log.info(
@@ -157,6 +173,7 @@ __all__ = [
     "increment_container_failed_pickups",
     "remove_container_at",
     "update_world_state_from_container_pickup",
+    "update_world_state_from_fuel_dots",
     "update_world_state_from_fuel_total",
     "update_world_state_from_tank_registry_container",
 ]

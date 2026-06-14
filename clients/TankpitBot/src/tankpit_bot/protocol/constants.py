@@ -53,8 +53,11 @@ RANK_NAMES: tuple[str, ...] = (
     "general",
 )
 
-# Damage state names indexed by damage value
-DAMAGE_NAMES: tuple[str, ...] = ("full", "light", "medium", "critical")
+# Damage state names indexed by damage value. The tier COUNTS DOWN
+# toward deactivation: live run 20260610-231x recorded every fight as
+# 0 -> 3 -> 2 -> 1 under sustained fire, and all five kills with tier
+# data died from tier 1.
+DAMAGE_NAMES: tuple[str, ...] = ("full", "critical", "medium", "light")
 
 
 class Team(IntEnum):

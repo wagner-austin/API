@@ -6,6 +6,7 @@ from collections.abc import Generator
 from typing import Literal
 
 import pytest
+from tests.action_lab._replay_core import ReplayClock
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -14,18 +15,6 @@ from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.state import WorldStateDict
 from tankpit_bot.types import CapturedMessage
-
-
-class _Clock:
-    """Mutable millisecond clock for deterministic radar-phase tests."""
-
-    def __init__(self, start_ms: int) -> None:
-        """Initialize the clock."""
-        self._now_ms = start_ms
-
-    def __call__(self) -> int:
-        """Return the current timestamp."""
-        return self._now_ms
 
 
 class _Page:
@@ -124,7 +113,7 @@ def test_clear_stale_radar_completion_drains_all_pending_flags() -> None:
 
 def test_run_tracked_radar_phase_waits_for_sync() -> None:
     """Radar helper dispatches once, waits for sync, and closes the phase."""
-    clock = _Clock(1200)
+    clock = ReplayClock(1200)
     probe = _Probe()
     page = _Page()
     drain_calls: list[str] = []
@@ -170,7 +159,7 @@ def test_run_tracked_radar_phase_waits_for_sync() -> None:
 
 def test_run_tracked_radar_phase_raises_on_dispatch_failure() -> None:
     """Radar helper raises immediately when dispatch fails."""
-    clock = _Clock(1400)
+    clock = ReplayClock(1400)
     probe = _Probe(radar_result=False)
     page = _Page()
     wait_attr = "wait_for_radar_sync"

@@ -9,7 +9,7 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 class TestDecideMapOpen:
@@ -126,7 +126,7 @@ class TestDecideMapOpen:
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
             terrain_data[(candidate_x, candidate_y - 1)] = "#"
             terrain_data[(candidate_x, candidate_y + 1)] = "#"
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
@@ -145,7 +145,7 @@ class TestDecideBlockedEdgeSearch:
         self,
         world: WorldStateDict,
         self_state: SelfStateDict,
-    ) -> FakeTerrainMap:
+    ) -> InMemoryTerrainMap:
         """Build terrain that blocks every exploration candidate and landing tile.
 
         Args:
@@ -153,7 +153,7 @@ class TestDecideBlockedEdgeSearch:
             self_state: Player state under test.
 
         Returns:
-            FakeTerrainMap with all exploration targets and their adjacent
+            InMemoryTerrainMap with all exploration targets and their adjacent
             teleport landing tiles blocked.
         """
         ctx = DecideCtx(
@@ -172,7 +172,7 @@ class TestDecideBlockedEdgeSearch:
             terrain_data[(candidate_x + 1, candidate_y)] = "#"
             terrain_data[(candidate_x, candidate_y - 1)] = "#"
             terrain_data[(candidate_x, candidate_y + 1)] = "#"
-        return FakeTerrainMap(terrain_data=terrain_data)
+        return InMemoryTerrainMap(terrain_data=terrain_data)
 
     def test_fallback_uses_alternate_edge_when_preferred_candidate_blocked(self) -> None:
         """Fallback rotates to another edge candidate before reopening the map."""
@@ -186,7 +186,7 @@ class TestDecideBlockedEdgeSearch:
             }
         )
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (107, 107): "#",
                 (106, 107): "#",

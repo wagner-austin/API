@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    equipment_reserve_restored,
+    combat_reserve_restored,
     needs_emergency_equipment,
 )
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
@@ -132,28 +132,65 @@ def should_exit_recover_fuel(ctx: DecideCtx) -> bool:
     return ctx.fuel >= ctx.config["fuel_full_threshold"]
 
 
-def should_enter_recover_equipment(ctx: DecideCtx) -> bool:
-    """Return True when equipment recovery should own planning.
+def needs_radar_restock(ctx: DecideCtx) -> bool:
+    """Return True while extra radars sit below the healthy buffer.
+
+    Radars find both enemies and equipment, so the bot rebuilds a
+    healthy stock before returning to the hunt rather than fighting
+    blind at one or two. This is the exit-side (resume) predicate; it
+    deliberately ignores visible threats, because rebuilding the kit
+    outranks chasing wanderers the bot cannot find or beat without
+    radar (live run 20260613-011044: looped 0->3->2->1, never built a
+    buffer, because it ran off to fight at the first radar).
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when combat reserves are below the break threshold.
+        True when the extra-radar count is below the resume threshold.
     """
-    return needs_emergency_equipment(ctx)
+    return ctx.inventory["extra_radars"]["count"] < ctx.config["radar_resume_threshold"]
+
+
+def should_enter_recover_equipment(ctx: DecideCtx) -> bool:
+    """Return True when equipment recovery should own planning.
+
+    Two entries share the mode: a weapon emergency (duals or homings
+    below the break threshold) and a radar restock when extras fall to
+    or below the radar break threshold. The radar entry rebuilds the
+    search kit -- the grid-sweep forager handles the zero case, the
+    viewport sweep handles the rest -- before the bot returns to
+    fighting.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when a weapon emergency or a radar restock is needed.
+    """
+    return (
+        needs_emergency_equipment(ctx)
+        or ctx.inventory["extra_radars"]["count"] <= ctx.config["radar_break_threshold"]
+    )
 
 
 def should_exit_recover_equipment(ctx: DecideCtx) -> bool:
     """Return True when equipment recovery can release control.
 
+    The mode holds until BOTH reserves are healthy: weapons back above
+    the resume threshold AND radars rebuilt to their resume buffer.
+    The break/resume gap gives hysteresis -- entry at the low break,
+    exit only at the higher resume -- so the bot rebuilds to a full
+    stock instead of leaving the moment it scrapes together one radar.
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when all recovery-governed reserves are above the resume threshold.
+        True when weapon reserves are restored and radars are no longer
+        below the resume buffer.
     """
-    return equipment_reserve_restored(ctx)
+    return combat_reserve_restored(ctx) and not needs_radar_restock(ctx)
 
 
 def should_enter_hunt(ctx: DecideCtx) -> bool:
@@ -196,7 +233,7 @@ def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:
         return "CONFIRM_KILL"
     if command_type == "shoot":
         return "ENGAGE"
-    if command_type == "teleport":
+    if command_type in ("teleport", "move"):
         if has_locked_target:
             return "CLOSE"
         return "ACQUIRE"

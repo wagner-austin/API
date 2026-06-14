@@ -13,6 +13,11 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from tankpit_bot.action_lab.page_client_snapshot import (
+    PageClientSnapshotDict,
+    decode_page_client_snapshot,
+    encode_page_client_snapshot,
+)
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
@@ -29,7 +34,15 @@ from tankpit_bot.bot.ai.types import (
 
 
 class EnemyTeleportAttemptResultDict(TypedDict):
-    """Outcome of one enemy-directed teleport attempt."""
+    """Outcome of one enemy-directed teleport attempt.
+
+    Includes the page-client snapshots captured immediately before the
+    acquisition command is dispatched and immediately before the attempt
+    finalizes (whether it lands, times out, or terminates early).
+    Comparing ``snapshot_before`` and ``snapshot_after`` lets reviewers
+    confirm the live JS client's view of the tank's state at each
+    boundary without watching the live game.
+    """
 
     acquisition_strategy: Literal["map_open", "nearest_enemy"]
     status: Literal[
@@ -61,6 +74,8 @@ class EnemyTeleportAttemptResultDict(TypedDict):
     enemy_y_after: int | None
     message_start_index: int
     message_end_index: int
+    snapshot_before: PageClientSnapshotDict
+    snapshot_after: PageClientSnapshotDict
 
 
 class EnemyTeleportProbeSessionDict(TypedDict):
@@ -158,6 +173,8 @@ def encode_enemy_teleport_attempt_result(result: EnemyTeleportAttemptResultDict)
         "enemy_y_after": _encode_optional_int(result["enemy_y_after"]),
         "message_start_index": result["message_start_index"],
         "message_end_index": result["message_end_index"],
+        "snapshot_before": encode_page_client_snapshot(result["snapshot_before"]),
+        "snapshot_after": encode_page_client_snapshot(result["snapshot_after"]),
     }
 
 
@@ -285,6 +302,25 @@ def _decode_optional_enemy(data: JSONObject, field: str) -> EnemyThreatDict | No
     return decode_enemy_threat(raw)
 
 
+def _require_snapshot(data: JSONObject, field: str) -> PageClientSnapshotDict:
+    """Decode a required page-client snapshot field.
+
+    Args:
+        data: JSON object being decoded.
+        field: Field name to read.
+
+    Returns:
+        Validated page-client snapshot.
+
+    Raises:
+        JSONTypeError: If the field is missing or not a JSON object.
+    """
+    raw = data.get(field)
+    if not isinstance(raw, dict):
+        raise JSONTypeError(f"Field '{field}' must be an object")
+    return decode_page_client_snapshot(raw)
+
+
 def _decode_optional_target(data: JSONObject, field: str) -> TeleportTargetDict | None:
     """Decode an optional teleport target field.
 
@@ -339,6 +375,8 @@ def decode_enemy_teleport_attempt_result(data: JSONObject) -> EnemyTeleportAttem
         enemy_y_after=_require_optional_int(data, "enemy_y_after"),
         message_start_index=require_int(data, "message_start_index"),
         message_end_index=require_int(data, "message_end_index"),
+        snapshot_before=_require_snapshot(data, "snapshot_before"),
+        snapshot_after=_require_snapshot(data, "snapshot_after"),
     )
 
 

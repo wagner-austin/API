@@ -7,7 +7,7 @@ from typing import Literal, Protocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
-from tankpit_bot.action_lab.teleport_phase import _log_command_dispatch_failure
+from tankpit_bot.action_lab.teleport_phase import emit_command_dispatch_failure_diagnostic
 
 
 class RadarPhaseProbeProtocol(action_session.BufferedWorldStateProviderProtocol, Protocol):
@@ -68,7 +68,7 @@ def run_tracked_radar_phase(
     radar_cycle = probe._start_action_phase("radar", attempt_label=attempt_label)
     radar_started_ms = action_hooks.get_current_time_ms()
     if not probe.use_radar():
-        _log_command_dispatch_failure("radar", dispatch_failure_message)
+        emit_command_dispatch_failure_diagnostic("radar", dispatch_failure_message)
         probe._end_action_phase(radar_cycle)
         raise dispatch_failure_error(dispatch_failure_message)
     radar_sync_timestamp_ms = action_session.wait_for_radar_sync(

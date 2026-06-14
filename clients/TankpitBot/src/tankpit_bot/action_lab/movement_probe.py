@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.movement_probe_types import (
     MovementProbeSessionDict,
     encode_movement_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import capture_page_client_snapshot
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
 )
@@ -25,6 +26,7 @@ from tankpit_bot.action_lab.probe_runtime import (
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.teleport import TeleportProbe
 from tankpit_bot.action_lab.types import TeleportTargetDict
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -201,12 +203,22 @@ class MovementProbe(TeleportProbe):
         map_open_delay_ms: int,
         settle_delay_ms: int,
     ) -> MovementProbeAttemptResultDict:
-        """Run one movement attempt against the live server."""
+        """Run one movement attempt against the live server.
+
+        Captures a page-client snapshot immediately before the move
+        command dispatches and again after settlement; these snapshots
+        provide a side-by-side view of what the live JS client believed
+        about the tank's state at each boundary.
+        """
         page = self._require_page()
+        cdp = self._cdp
+        if cdp is None:
+            raise MovementProbeError("cdp session is unavailable")
         world_before = self.get_world_state()
         self_state_before = self._require_self_state()
         fuel_before = self_state_before["fuel"]
         world_timestamp_before = world_before["timestamp_ms"]
+        snapshot_before = capture_page_client_snapshot(cdp)
 
         self._reset_probe_state_to_idle()
         message_start_index = len(self.messages)
@@ -219,9 +231,26 @@ class MovementProbe(TeleportProbe):
             if map_open_delay_ms > 0:
                 page.wait_for_timeout(float(map_open_delay_ms))
                 action_hooks.drain_buffered_messages(self)
-            map_open_requested_ms = action_hooks.get_current_time_ms()
-            if not self.open_map():
-                raise MovementProbeError("map_open command dispatch failed during movement probe")
+            # The wire ``CMD_MAP_OPEN`` only opens the map; re-sending against an
+            # already-open map is a server-side no-op (no fresh map sync). If the
+            # live JS client already shows the overlay -- e.g. a prior attempt
+            # opened it and the player/probe never closed it -- skip the dispatch
+            # and record the skip via ``map_open_requested_ms=None``. Mirrors the
+            # short-circuit in ``run_tracked_acquisition_phase``.
+            mid_move_snapshot = capture_page_client_snapshot(cdp)
+            if mid_move_snapshot["map_visible"] is True:
+                emit_diagnostic(
+                    diagnostic_kind="movement_probe_map_already_showing",
+                    target_x=target["x"],
+                    target_y=target["y"],
+                    map_open_delay_ms=map_open_delay_ms,
+                )
+            else:
+                map_open_requested_ms = action_hooks.get_current_time_ms()
+                if not self.open_map():
+                    raise MovementProbeError(
+                        "map_open command dispatch failed during movement probe"
+                    )
 
         (
             status,
@@ -244,6 +273,7 @@ class MovementProbe(TeleportProbe):
         self_state_after = self.get_self_state()
         if self_state_after is None:
             raise MovementProbeError("self state is unavailable after movement probe attempt")
+        snapshot_after = capture_page_client_snapshot(cdp)
         return MovementProbeAttemptResultDict(
             target=target,
             status=status,
@@ -264,6 +294,8 @@ class MovementProbe(TeleportProbe):
             settled_y=settled_y,
             message_start_index=message_start_index,
             message_end_index=len(self.messages),
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
 
     def execute_probe(

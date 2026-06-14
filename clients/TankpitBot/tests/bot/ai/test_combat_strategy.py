@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.combat_strategy import (
+    SHOT_RANGE_TILES,
     _combat_landing_candidates,
+    engage_target,
+    has_combat_shot,
     select_new_combat_target,
     teleport_to_target,
 )
@@ -20,6 +23,7 @@ def _enemy_threat(
     x: int = 120,
     y: int = 100,
     name: str = "Enemy",
+    last_wire_seen_ms: int = 100000,
 ) -> EnemyThreatDict:
     """Create a typed enemy threat for combat helper tests.
 
@@ -28,6 +32,9 @@ def _enemy_threat(
         x: Enemy x coordinate.
         y: Enemy y coordinate.
         name: Enemy display name.
+        last_wire_seen_ms: Last wire-presence confirmation (defaults to
+            the helper's ``timestamp_ms`` so the threat is wire-present at
+            the tests' 100000 clock unless overridden to model a ghost).
 
     Returns:
         Enemy threat payload.
@@ -43,6 +50,7 @@ def _enemy_threat(
         name=name,
         is_bot=False,
         timestamp_ms=100000,
+        last_wire_seen_ms=last_wire_seen_ms,
     )
 
 
@@ -134,6 +142,98 @@ class TestCombatTargetSelection:
 
         assert result is None
 
+    def test_select_new_combat_target_prefers_isolated_over_clustered(self) -> None:
+        """A farther isolated enemy beats a nearer one with backup.
+
+        Targets 50 and 60 sit 4 tiles apart (each is the other's backup
+        inside the 8-tile cluster radius); target 70 is alone 30 tiles
+        out. The bot cannot win 1-vN fights, so 70 wins despite the
+        distance.
+        """
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = select_new_combat_target(
+            ctx,
+            [
+                _enemy_threat(tank_id=50, x=110, name="ClusteredNear"),
+                _enemy_threat(tank_id=60, x=114, name="ClusteredBuddy"),
+                _enemy_threat(tank_id=70, x=130, name="Isolated"),
+            ],
+        )
+
+        if result is None:
+            raise AssertionError("expected isolated combat target")
+        assert result["tank_id"] == 70
+        assert result["name"] == "Isolated"
+
+    def test_select_new_combat_target_takes_least_clustered_when_all_have_backup(self) -> None:
+        """With no isolated option, the least-clustered nearest target wins.
+
+        Target 50 has two backups inside the radius; targets 60 and 61
+        back each other up (one each). The nearer of the one-backup pair
+        is taken -- the ranking degrades instead of deadlocking.
+        """
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = select_new_combat_target(
+            ctx,
+            [
+                _enemy_threat(tank_id=50, x=110, name="TripleCluster"),
+                _enemy_threat(tank_id=51, x=112, name="TripleBuddyA"),
+                _enemy_threat(tank_id=52, x=114, name="TripleBuddyB"),
+                _enemy_threat(tank_id=60, x=140, name="PairNear"),
+                _enemy_threat(tank_id=61, x=146, name="PairFar"),
+            ],
+        )
+
+        if result is None:
+            raise AssertionError("expected least-clustered combat target")
+        assert result["tank_id"] == 60
+        assert result["name"] == "PairNear"
+
+    def test_select_new_combat_target_keeps_nearest_among_isolated(self) -> None:
+        """Equal cluster counts fall back to the distance ordering."""
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = select_new_combat_target(
+            ctx,
+            [
+                _enemy_threat(tank_id=50, x=112, name="IsolatedNear"),
+                _enemy_threat(tank_id=60, x=130, name="IsolatedFar"),
+            ],
+        )
+
+        if result is None:
+            raise AssertionError("expected nearest isolated combat target")
+        assert result["tank_id"] == 50
+
 
 def test_combat_landing_candidates_delegate_to_shared_helper() -> None:
     """Combat landing candidates expose shared adjacent-tile ordering."""
@@ -167,8 +267,17 @@ class TestCombatTeleportGuards:
         """Reset shared world-state globals after each test."""
         reset_world_state()
 
-    def test_teleport_to_target_returns_none_when_unaffordable(self) -> None:
-        """Combat teleport refuses targets that violate the exact fuel guard."""
+    def test_teleport_to_target_refuels_when_unaffordable(self) -> None:
+        """An unaffordable combat target delegates the tick to fuel recovery.
+
+        Threats sort nearest-first and teleport cost is monotone in
+        distance, so an unaffordable nearest target means every target
+        is unaffordable. Blocking and replanning instead cascaded
+        through the roster and ended in a map-reopen spin: run
+        20260611-025636 spawned at fuel 620 -- above the fuel-low
+        entry rule but below every engagement's cost-plus-reserve --
+        and spent its entire 240s on 115 map reopens without a shot.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -196,7 +305,11 @@ class TestCombatTeleportGuards:
 
         result = teleport_to_target(ctx, _enemy_threat(x=190, y=100, name="FarEnemy"))
 
-        assert result is None
+        if result is None:
+            raise AssertionError("expected fuel recovery decision")
+        assert result["behavior"]["mode"] == "COLLECT_FUEL"
+        assert result["updated_ai_state"]["combat_target_id"] == -1
+        assert result["updated_ai_state"]["blocked_combat_targets"] == {}
 
     def test_teleport_to_target_returns_teleport_for_affordable_close(self) -> None:
         """Combat teleport emits a teleport decision when the landing is affordable."""
@@ -231,3 +344,176 @@ class TestCombatTeleportGuards:
             raise AssertionError("expected teleport decision")
         assert result["command"]["cmd_type"] == "teleport"
         assert result["behavior"]["reason"] == "teleport CloseEnemy"
+
+
+class TestKillShotWireGate:
+    """Tests for the wire-presence kill gate at the shoot chokepoint."""
+
+    def setup_method(self) -> None:
+        """Reset shared world-state globals before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
+
+    def _adjacent_world_and_ctx(self, last_wire_seen_ms: int) -> tuple[DecideCtx, EnemyThreatDict]:
+        """Build a ctx with one adjacent enemy at the given wire stamp.
+
+        Args:
+            last_wire_seen_ms: The enemy's last wire-presence confirmation.
+
+        Returns:
+            A decision context (tick clock 100000) and the matching
+            adjacent enemy threat.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="Adjacent",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=last_wire_seen_ms,
+            ),
+        }
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        target = _enemy_threat(x=101, y=100, name="Adjacent", last_wire_seen_ms=last_wire_seen_ms)
+        return ctx, target
+
+    def test_wire_fresh_adjacent_target_is_shot(self) -> None:
+        """A wire-present adjacent enemy is fired at directly."""
+        ctx, target = self._adjacent_world_and_ctx(last_wire_seen_ms=100000)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["reason"] == "shoot Adjacent"
+
+    def test_wire_stale_adjacent_target_is_blocked_not_shot(self) -> None:
+        """A wire-silent adjacent ghost is blocked without firing.
+
+        The map keeps the tank at a fresh ``timestamp_ms`` (it is an
+        acquirable threat), but its last wire confirmation is far older
+        than the presence TTL, so the gate must refuse the shot and
+        replan instead of wasting a round on an afterimage.
+        """
+        ctx, target = self._adjacent_world_and_ctx(last_wire_seen_ms=100000 - 60000)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["updated_ai_state"]["combat_target_id"] != 50
+
+
+class TestMissOnMovedTarget:
+    """Tests for the miss-on-moved-target re-aim path in _combat_shoot."""
+
+    def setup_method(self) -> None:
+        """Reset shared world-state globals before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
+
+    def test_miss_on_moved_target_re_aims_instead_of_blocking(self) -> None:
+        """A miss against a target that moved since the shot re-aims at the new position.
+
+        When ``combat_feedback == "miss"`` and the target's current
+        coordinates differ from the stored last-shot position, the enemy
+        is NOT blocked.  Instead the bot fires at the target's fresh
+        registry position -- the miss was ambiguous (the enemy may have
+        stepped off the tile as the shot resolved), so abandoning a live
+        mover is premature.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=102,
+                y=100,
+                team=2,
+                rank=1,
+                name="Mover",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+            ),
+        }
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ai_state["combat_target_x"] = 101
+        ai_state["combat_target_y"] = 100
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            None,
+            "miss",
+        )
+        target = _enemy_threat(x=102, y=100, name="Mover", last_wire_seen_ms=100000)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_x"] == 102
+        assert decision["command"]["target_y"] == 100
+        assert decision["behavior"]["reason"] == "shoot Mover"
+        assert "50" not in decision["updated_ai_state"]["blocked_combat_targets"]
+
+
+class TestHasCombatShot:
+    """Tests for the ``has_combat_shot`` range predicate."""
+
+    def test_has_combat_shot_returns_true_within_range(self) -> None:
+        """A target at SHOT_RANGE_TILES distance is within shot range."""
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        target = _enemy_threat(x=102, y=100)  # distance=2
+
+        assert SHOT_RANGE_TILES == 2
+        assert has_combat_shot(ctx, target) is True
+
+    def test_has_combat_shot_returns_false_beyond_range(self) -> None:
+        """A target beyond SHOT_RANGE_TILES distance is out of shot range."""
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        target = _enemy_threat(x=103, y=100)  # distance=3
+
+        assert has_combat_shot(ctx, target) is False

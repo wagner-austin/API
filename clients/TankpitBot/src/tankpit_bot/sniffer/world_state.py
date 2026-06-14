@@ -20,6 +20,7 @@ from tankpit_bot.inventory import (
     InventoryState,
     ItemType,
 )
+from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
@@ -86,6 +87,14 @@ _WEAPON_BYTE_TO_ITEM: dict[int, ItemType] = {
 # Corpses stay at their death position, so the AI must filter by ID not position.
 _killed_tank_ids: set[int] = set()
 
+# Corpse anchors: tank_id -> world tile where the tank deactivated.
+# The client registry keeps rendering a deactivated tank at its death
+# tile for minutes (purple-3 in run 20260611-004505), so registry
+# ingestion must not resurrect a tank observed at its own death tile.
+# A corpse never moves and a respawn appears elsewhere, so the anchor
+# clears on the first observation at a different tile.
+_tank_death_anchors: dict[int, tuple[int, int]] = {}
+
 # Teleport tracking — set to True when TeleportLanded is received from server.
 # Drained by the tick loop so it knows the teleport completed.
 _teleport_landed: bool = False
@@ -94,6 +103,12 @@ _teleport_landed: bool = False
 # Drained by the bot state machine so SCANNING can complete even when the scan
 # finds zero containers.
 _radar_scan_complete: bool = False
+
+# MAP_DATA processing tracking — set when the world_state blob from a MAP_DATA
+# response has been parsed into tank positions. Drained by the tick loop's
+# map_open completion gate so replanning waits for the AUTHORITATIVE MAP_DATA
+# refresh rather than any unrelated server sync that happens to arrive next.
+_map_data_processed: bool = False
 
 # Some radar scans arrive as a differential cache refresh (0x4F CombinedTileUpdate)
 # followed by a RadarAck instead of an explicit RadarResponse. Track the most
@@ -136,12 +151,26 @@ def mark_radar_scan_complete() -> None:
     _radar_scan_complete = True
 
 
+def mark_map_data_processed() -> None:
+    """Record that a MAP_DATA world-state blob was parsed into positions.
+
+    Called by the world-state dispatcher after :func:`_parse_world_state_blob`
+    successfully ingests a MAP_DATA payload. The HFSM consumes this through
+    :func:`check_and_clear_map_data_processed` so a pending ``map_open``
+    action only completes once the *specific* MAP_DATA response has been
+    applied -- not on any incidental server sync that happens to follow
+    the dispatch.
+    """
+    global _map_data_processed
+    _map_data_processed = True
+
+
 def record_radar_command(*, use_extra_radar: bool) -> None:
     """Record which radar geometry the next server scan should use.
 
     Args:
         use_extra_radar: True for extra-radar viewport scans, False for the
-            built-in 7x7 radar centered on the tank.
+            built-in 5x5 radar (2-tile radius) centered on the tank.
     """
     global _pending_radar_uses_extra
     _pending_radar_uses_extra = use_extra_radar
@@ -198,6 +227,19 @@ def check_and_clear_radar_scan_complete() -> bool:
     return result
 
 
+def check_and_clear_map_data_processed() -> bool:
+    """Check if a MAP_DATA world-state blob was parsed since last check.
+
+    Returns:
+        True if a MAP_DATA payload was successfully ingested since the last
+        call to this function.
+    """
+    global _map_data_processed
+    result = _map_data_processed
+    _map_data_processed = False
+    return result
+
+
 # Inventory tracking from binary protocol (0x49, 0x67, 0x74)
 # Default: all disabled, zero counts. The game starts with most items disabled
 # (armor, missile, homing disabled; dual and radar enabled). The protocol
@@ -230,9 +272,9 @@ def reset_world_state() -> None:
     """Reset world state for new session (used by tests)."""
     global _world_state, _terrain_map, _room_images, _selected_room, _inventory_state
     global _got_confirmed_hit, _got_our_shot_response
-    global _killed_tank_ids, _teleport_landed
+    global _killed_tank_ids, _teleport_landed, _tank_death_anchors
     global _radar_scan_complete, _pending_radar_cache_refresh_ms, _pending_radar_empty_delta_ms
-    global _pending_radar_uses_extra
+    global _pending_radar_uses_extra, _map_data_processed
     _world_state = make_empty_world_state()
     _terrain_map = None
     _room_images = {}
@@ -241,8 +283,10 @@ def reset_world_state() -> None:
     _got_confirmed_hit = False
     _got_our_shot_response = False
     _killed_tank_ids = set()
+    _tank_death_anchors = {}
     _teleport_landed = False
     _radar_scan_complete = False
+    _map_data_processed = False
     _pending_radar_cache_refresh_ms = 0
     _pending_radar_empty_delta_ms = 0
     _pending_radar_uses_extra = True
@@ -283,6 +327,9 @@ def set_selected_room(room_id: str) -> None:
     """Track which room was selected from a SELECT message.
 
     Resets the terrain map so the correct one loads on next render.
+    Emits a ``session_room_joined`` diagnostic so consumers of the
+    runtime event stream can correlate the analysis terrain with the
+    actual room the session joined.
 
     Args:
         room_id: Room ID that was selected.
@@ -292,6 +339,11 @@ def set_selected_room(room_id: str) -> None:
     _terrain_map = None
     image = _room_images.get(room_id)
     log.info("Selected room %s (field image: %s)", room_id, image or "unknown")
+    emit_diagnostic(
+        diagnostic_kind="session_room_joined",
+        room_id=room_id,
+        field_image=image if image is not None else "unknown",
+    )
 
 
 def _find_field_gif(image: str) -> Path | None:
@@ -473,6 +525,7 @@ def _radar_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
 
 
 __all__ = [
+    "check_and_clear_map_data_processed",
     "check_and_clear_radar_scan_complete",
     "clear_failed_move_targets",
     "clear_failed_scan_viewport",
@@ -481,6 +534,7 @@ __all__ = [
     "get_world_state",
     "is_move_target_failed",
     "is_scan_viewport_failed",
+    "mark_map_data_processed",
     "mark_move_target_failed",
     "mark_radar_scan_complete",
     "mark_scan_viewport_failed",

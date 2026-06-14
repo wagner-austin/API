@@ -103,6 +103,8 @@ class TestEnemyThreat:
             team=0,
             name="red-1",
             is_bot=True,
+            timestamp_ms=8000,
+            last_wire_seen_ms=4200,
         )
         assert threat["tank_id"] == 536
         assert threat["x"] == 100
@@ -111,6 +113,23 @@ class TestEnemyThreat:
         assert threat["rank"] == 3
         assert threat["name"] == "red-1"
         assert threat["is_bot"] is True
+        assert threat["timestamp_ms"] == 8000
+        assert threat["last_wire_seen_ms"] == 4200
+
+    def test_make_enemy_threat_defaults_wire_stamp_zero(self) -> None:
+        """last_wire_seen_ms defaults to zero (never wire-confirmed)."""
+        threat = make_enemy_threat(
+            tank_id=1,
+            x=0,
+            y=0,
+            distance=0,
+            damage_state=0,
+            rank=0,
+            team=1,
+            name="n",
+            is_bot=True,
+        )
+        assert threat["last_wire_seen_ms"] == 0
 
     def test_encode_decode_roundtrip(self) -> None:
         """Encode then decode produces identical EnemyThreatDict."""
@@ -124,8 +143,11 @@ class TestEnemyThreat:
             team=1,
             name="test",
             is_bot=False,
+            timestamp_ms=7000,
+            last_wire_seen_ms=6500,
         )
         encoded = encode_enemy_threat(original)
+        assert encoded["last_wire_seen_ms"] == 6500
         decoded = decode_enemy_threat(encoded)
         assert decoded == original
 
@@ -314,6 +336,8 @@ class TestAIState:
             map_open_cooldown_ms=config["map_open_cooldown_ms"],
             dual_break_threshold=config["dual_break_threshold"],
             dual_resume_threshold=config["dual_resume_threshold"],
+            radar_break_threshold=config["radar_break_threshold"],
+            radar_resume_threshold=config["radar_resume_threshold"],
             equip_search_hop_distance=config["equip_search_hop_distance"],
             equip_search_max_failures=config["equip_search_max_failures"],
             patrol_waypoints=config["patrol_waypoints"],

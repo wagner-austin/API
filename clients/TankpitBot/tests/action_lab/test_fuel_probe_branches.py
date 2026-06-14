@@ -6,7 +6,13 @@ from collections.abc import Callable, Generator
 from typing import Literal, Protocol
 
 import pytest
-from tests.action_lab.test_fuel_probe import _Clock, _ProbeHarness, _terrain
+from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab.conftest import ground_terrain, rock_wall
+from tests.action_lab.test_fuel_probe import (
+    _ProbeHarness,
+    _terrain,
+    fuel_targeting_module,
+)
 
 from tankpit_bot._test_hooks import CDPSessionProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -32,6 +38,7 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     FuelTargetResolution,
 )
 from tankpit_bot.action_lab.fuel_targeting import FuelTargetingError
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.teleport import TeleportProbeError
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import (
@@ -41,6 +48,28 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.state import ContainerStateDict, make_container_state
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot for fuel-probe branch tests."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
+    )
 
 
 class _WaitForTeleportOutcomeProtocol(Protocol):
@@ -94,7 +123,7 @@ class _SequenceProbeHarness(_ProbeHarness):
 
     def __init__(
         self,
-        clock: _Clock,
+        clock: ReplayClock,
         *,
         open_map_results: list[bool] | None = None,
         teleport_results: list[bool] | None = None,
@@ -202,6 +231,8 @@ def _attempt(
         "decision_basis": None,
         "message_start_index": 0,
         "message_end_index": 1,
+        "snapshot_before": _snapshot(0),
+        "snapshot_after": _snapshot(0),
     }
 
 
@@ -251,6 +282,40 @@ def _set_common_probe_hooks(teleport_outcome: _WaitForTeleportOutcomeProtocol) -
     fuel_probe_module._find_visible_fuel_landing_tile = lambda probe, fuel_target: (102, 100)
 
 
+def _set_real_targeting_with_reposition(
+    teleport_outcome: _WaitForTeleportOutcomeProtocol,
+    probe: _ProbeHarness,
+) -> None:
+    """Configure REAL targeting helpers with terrain that forces reposition.
+
+    Places a fuel container at (105, 100) inside the probe's default viewport
+    (left=92, top=92, 16x16) and installs a rock wall at x=92..107 column 102.
+    The real ``find_visible_fuel_target`` returns the container, the real
+    ``is_collection_reachable_in_viewport`` returns False (BFS can't detour
+    inside viewport bounds — see feedback_viewport_mechanics memory), so
+    ``requires_reposition=True`` falls out of real logic. The real landing
+    tile is (105, 100) — the container's own coord.
+
+    Teleport outcome is still callback-driven because the state machine's
+    terminal status depends on the test's specific scenario.
+    """
+    fuel_probe_module._wait_for_teleport_outcome = teleport_outcome
+    terrain_provider = _make_rock_wall_terrain_provider()
+    fuel_probe_module.get_terrain_map = terrain_provider
+    fuel_targeting_module.get_terrain_map = terrain_provider
+    fuel_container = make_container_state(105, 100, True, 300)
+    probe._world_state["containers"][f"{fuel_container['x']},{fuel_container['y']}"] = (
+        fuel_container
+    )
+
+
+def _make_rock_wall_terrain_provider() -> Callable[[], TerrainMapProtocol | None]:
+    def _provider() -> TerrainMapProtocol | None:
+        return ground_terrain(rock_wall(102, range(92, 108)))
+
+    return _provider
+
+
 def test_format_fuel_probe_summary_counts_reposition_statuses() -> None:
     """Fuel summary includes reposition timeout counters explicitly."""
     summary = format_fuel_probe_summary(
@@ -270,7 +335,7 @@ def test_format_fuel_probe_summary_counts_reposition_statuses() -> None:
 
 def test_targeting_wrappers_convert_targeting_errors() -> None:
     """Fuel-probe targeting wrappers convert shared targeting errors."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     target = make_container_state(101, 100, True, 300)
 
     def _raise_requires_reposition(
@@ -299,7 +364,7 @@ def test_targeting_wrappers_convert_targeting_errors() -> None:
 
 def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> None:
     """Fuel probe rejects blocked visible fuel without a teleport landing tile."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
     action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
@@ -373,7 +438,7 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
 
 def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() -> None:
     """Fuel probe rejects blocked-fuel reposition when map-open dispatch fails."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     wait_results = [1200, 1600]
 
@@ -438,17 +503,18 @@ def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() ->
 
     action_session.wait_for_world_sync = _wait_for_world_sync
     action_session.wait_for_radar_sync = _wait_for_world_sync
-    _set_common_probe_hooks(_teleport_outcome)
+    harness = _SequenceProbeHarness(
+        clock,
+        open_map_results=[True, False],
+        teleport_results=[True],
+    )
+    _set_real_targeting_with_reposition(_teleport_outcome, harness)
 
     with pytest.raises(
         FuelProbeError,
         match="map_open command dispatch failed during fuel reposition",
     ):
-        _SequenceProbeHarness(
-            clock,
-            open_map_results=[True, False],
-            teleport_results=[True],
-        )._probe_single_fuel_target(
+        harness._probe_single_fuel_target(
             target=_target(),
             map_sync_timeout_ms=3000,
             teleport_timeout_ms=10000,
@@ -460,7 +526,7 @@ def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() ->
 
 def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() -> None:
     """Fuel probe rejects blocked-fuel reposition when teleport dispatch fails."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     wait_results = [1200, 1600, 1800]
 
@@ -525,17 +591,18 @@ def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() ->
 
     action_session.wait_for_world_sync = _wait_for_world_sync
     action_session.wait_for_radar_sync = _wait_for_world_sync
-    _set_common_probe_hooks(_teleport_outcome)
+    harness = _SequenceProbeHarness(
+        clock,
+        open_map_results=[True, True],
+        teleport_results=[True, False],
+    )
+    _set_real_targeting_with_reposition(_teleport_outcome, harness)
 
     with pytest.raises(
         FuelProbeError,
         match="teleport command dispatch failed during fuel reposition",
     ):
-        _SequenceProbeHarness(
-            clock,
-            open_map_results=[True, True],
-            teleport_results=[True, False],
-        )._probe_single_fuel_target(
+        harness._probe_single_fuel_target(
             target=_target(),
             map_sync_timeout_ms=3000,
             teleport_timeout_ms=10000,
@@ -547,7 +614,7 @@ def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() ->
 
 def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_timeout() -> None:
     """Fuel probe rejects impossible map-sync timeout after reposition teleport dispatch."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     wait_results = [1200, 1600, 1800]
 
@@ -618,17 +685,18 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
 
     action_session.wait_for_world_sync = _wait_for_world_sync
     action_session.wait_for_radar_sync = _wait_for_world_sync
-    _set_common_probe_hooks(_teleport_outcome)
+    harness = _SequenceProbeHarness(
+        clock,
+        open_map_results=[True, True],
+        teleport_results=[True, True],
+    )
+    _set_real_targeting_with_reposition(_teleport_outcome, harness)
 
     with pytest.raises(
         TeleportProbeError,
         match="teleport outcome reported impossible map_sync_timeout during fuel reposition",
     ):
-        _SequenceProbeHarness(
-            clock,
-            open_map_results=[True, True],
-            teleport_results=[True, True],
-        )._probe_single_fuel_target(
+        harness._probe_single_fuel_target(
             target=_target(),
             map_sync_timeout_ms=3000,
             teleport_timeout_ms=10000,
@@ -640,7 +708,7 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
 
 def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -> None:
     """Fuel probe rejects impossible loss of visible fuel after target resolution."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
     action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
     action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
@@ -717,6 +785,8 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
         teleport_cycle_ids: list[int],
         radar_cycle_id: int,
         teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+        snapshot_before: PageClientSnapshotDict,
+        capture_snapshot: Callable[[], PageClientSnapshotDict],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
             [FuelTargetPhaseProbeProtocol, bool],
@@ -768,6 +838,8 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
             teleport_cycle_ids,
             radar_cycle_id,
             teleport_strategy,
+            snapshot_before,
+            capture_snapshot,
             terrain_provider,
             find_visible_target,
             requires_reposition,

@@ -9,6 +9,7 @@ This module provides the Bot class that extends WebSocketSniffer with:
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -42,6 +43,13 @@ from tankpit_bot.bot.vision import (
     make_empty_vision_state,
 )
 from tankpit_bot.browser import BrowserSession, get_current_time_ms
+from tankpit_bot.browser.dom_scraper import scrape_page_text
+from tankpit_bot.diagnostics.account_stats import (
+    emit_account_stats_sample,
+    parse_account_stats,
+)
+from tankpit_bot.diagnostics.combat_screenshot import save_screenshot
+from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
 from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     build_xor_table,
@@ -60,9 +68,11 @@ from tankpit_bot.protocol.commands import (
 )
 from tankpit_bot.runtime_logging import (
     configure_bot_runtime_logging,
+    emit_diagnostic,
     emit_state,
     emit_sync,
     emit_wire,
+    emit_wire_complete,
 )
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.sniffer.world_state import (
@@ -77,6 +87,20 @@ from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
+
+# The C statistics panel paints incrementally: the "Statistics:" header
+# can be in the DOM before the stat lines (a single 1500ms timed read
+# landed in that gap and crashed sessions 20260611-004251/004405/012807).
+# Poll the parse predicate instead of trusting one timed read.
+_ACCOUNT_STATS_POLL_INTERVAL_MS = 300
+_ACCOUNT_STATS_POLL_ATTEMPTS = 10
+# Total wait budget for a single timed panel read (used by the simple
+# capture path; equals one full poll budget).
+_ACCOUNT_STATS_PANEL_RENDER_MS = _ACCOUNT_STATS_POLL_INTERVAL_MS * _ACCOUNT_STATS_POLL_ATTEMPTS
+# The first-tick keypress itself can be swallowed by the client (run
+# 20260611-013801: panel never opened across a full poll budget), so
+# the startup capture retries on later ticks.
+_ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS = 3
 
 
 class BotError(Exception):
@@ -130,19 +154,38 @@ class Bot(BrowserSession):
             prefer_account=prefer_account,
         )
         self._cdp: _test_hooks.CDPSessionProtocol | None = None
+        # Monotonic counter for opt-in per-shot screenshot filenames.
+        self._shot_screenshot_seq: int = 0
         self._page: _test_hooks.PageProtocol | None = None
         self._state_data: BotStateDataDict = make_initial_state_data()
         self._ai_state: AIStateDict = make_initial_ai_state()
         # XOR encoding table for outgoing commands
         self._xor_table: bytes | None = None
-        # Map state
-        # Legacy test/debug field only. The game does not expose a reliable
-        # authoritative map-open flag, so bot behavior must not depend on it.
-        self._map_is_open: bool = False
         # Vision state for fallback tracking
         self._vision_state: VisionStateDict = make_empty_vision_state()
         # CDP message buffer — received payloads for tick loop sync
         self._cdp_message_buffer: list[str] = []
+        # Gate for the C-panel account stats capture; fired from the
+        # first HEALTHY tick rather than at bootstrap because the game
+        # client ignores hotkeys until fully loaded (run 20260611-000x
+        # captured panel_visible=False at startup). Failed attempts
+        # retry on later ticks (bounded) since even a healthy-tick
+        # keypress can be swallowed (run 20260611-013801).
+        self._account_stats_captured = False
+        self._account_stats_attempts = 0
+
+    def _require_cdp(self) -> _test_hooks.CDPSessionProtocol:
+        """Return the attached CDP session or raise.
+
+        Used by tick-loop code that must read the live page-client state.
+        The tick loop's readiness gates ensure ``_cdp`` is attached well
+        before any code reaches the capture point, so a missing session
+        is an invariant violation rather than a normal pre-bootstrap
+        state.
+        """
+        if self._cdp is None:
+            raise RuntimeError("Bot has no CDP session attached")
+        return self._cdp
 
     # =========================================================================
     # State Machine
@@ -287,6 +330,7 @@ class Bot(BrowserSession):
             return False
         if not check_and_clear_radar_scan_complete():
             return False
+        self._emit_completion(action_kind="scan", signal="radar_scan_complete", action=action)
         self._transition("IDLE", in_flight_action=make_no_action())
         return True
 
@@ -304,6 +348,13 @@ class Bot(BrowserSession):
         action = self._state_data["in_flight_action"]
         tx, ty = action["target_x"], action["target_y"]
         if self_state["x"] == tx and self_state["y"] == ty:
+            self._emit_completion(
+                action_kind="move",
+                signal="position_reached",
+                action=action,
+                landed_x=self_state["x"],
+                landed_y=self_state["y"],
+            )
             self._transition("IDLE", in_flight_action=make_no_action())
             return True
         return False
@@ -334,6 +385,18 @@ class Bot(BrowserSession):
                     self_state["x"],
                     self_state["y"],
                 )
+            self._emit_completion(
+                action_kind="teleport",
+                signal="teleport_landed",
+                action=action,
+                landed_x=self_state["x"],
+                landed_y=self_state["y"],
+            )
+            landed_exactly = self_state["x"] == tx and self_state["y"] == ty
+            emit_teleport_attempt_outcome(
+                status="landed_exact" if landed_exactly else "landed_inexact",
+                messages=self._messages,
+            )
             self._transition("IDLE", in_flight_action=make_no_action())
             return True
         return False
@@ -357,12 +420,48 @@ class Bot(BrowserSession):
         action = self._state_data["in_flight_action"]
         tx, ty = action["target_x"], action["target_y"]
         target_key = f"{tx},{ty}"
-        if (self_state["x"] == tx and self_state["y"] == ty) or target_key not in world[
-            "containers"
-        ]:
+        position_reached = self_state["x"] == tx and self_state["y"] == ty
+        if position_reached or target_key not in world["containers"]:
+            signal = "position_reached" if position_reached else "container_consumed"
+            self._emit_completion(
+                action_kind="collect",
+                signal=signal,
+                action=action,
+                landed_x=self_state["x"],
+                landed_y=self_state["y"],
+            )
             self._transition("IDLE", in_flight_action=make_no_action())
             return True
         return False
+
+    def _emit_completion(
+        self,
+        *,
+        action_kind: str,
+        signal: str,
+        action: InFlightActionDict,
+        **extra: str | int | float | bool,
+    ) -> None:
+        """Emit a structured WIRE_COMPLETE event for an authoritative completion.
+
+        Args:
+            action_kind: Kind of action that completed.
+            signal: Name of the authoritative completion signal.
+            action: The in-flight action being cleared.
+            **extra: Additional structured fields (e.g. landed coordinates).
+        """
+        started_ms = action["started_ms"]
+        duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
+        target_x = action["target_x"]
+        target_y = action["target_y"]
+        emit_wire_complete(
+            action_kind=action_kind,
+            duration_ms=duration_ms,
+            signal=signal,
+            target_x=target_x,
+            target_y=target_y,
+            **extra,
+        )
 
     def _update_state_from_world(self) -> None:
         """Update state machine based on current world state.
@@ -631,6 +730,7 @@ class Bot(BrowserSession):
         encoded = build_shoot_command(x, y, target_id)
         if not self._send_bytes(encoded, f"shoot({x},{y},id={target_id})"):
             return False
+        self._capture_shot_screenshot(x, y, target_id)
         now = get_current_time_ms()
         action = make_in_flight_action("shoot", x, y, now)
         if self.get_state() != "COMBAT":
@@ -643,6 +743,27 @@ class Bot(BrowserSession):
             )
         return True
 
+    def _capture_shot_screenshot(self, x: int, y: int, target_id: int) -> None:
+        """Save a canvas PNG at a shot when screenshots are enabled.
+
+        Opt-in via the ``TANKPIT_SHOT_SCREENSHOTS`` environment variable,
+        whose value is the output directory. Each shot writes one PNG
+        named by sequence and target tile so the fire-moment geometry can
+        be reviewed as an image rather than inferred from telemetry. A
+        no-op when the variable is unset or no CDP session is attached.
+
+        Args:
+            x: Shot target X tile.
+            y: Shot target Y tile.
+            target_id: Targeted tank id.
+        """
+        directory = _test_hooks.get_env("TANKPIT_SHOT_SCREENSHOTS")
+        if directory is None or self._cdp is None:
+            return
+        self._shot_screenshot_seq += 1
+        label = f"shot_{self._shot_screenshot_seq:04d}_x{x}_y{y}_id{target_id}"
+        save_screenshot(self._cdp, Path(directory), label)
+
     def use_radar(self) -> bool:
         """Send radar scan command and transition to SCANNING state.
 
@@ -650,10 +771,12 @@ class Bot(BrowserSession):
             True if command was sent.
         """
         inventory = get_inventory_state()
-        record_radar_command(
-            use_extra_radar=(
-                inventory["extra_radars"]["enabled"] and inventory["extra_radars"]["count"] > 0
-            ),
+        uses_extra = inventory["extra_radars"]["enabled"] and inventory["extra_radars"]["count"] > 0
+        record_radar_command(use_extra_radar=uses_extra)
+        emit_diagnostic(
+            diagnostic_kind="radar_dispatch",
+            uses_extra=uses_extra,
+            extra_radar_count=inventory["extra_radars"]["count"],
         )
         encoded = build_query_command(CMD_RADAR)
         if not self._send_bytes(encoded, "radar"):
@@ -792,12 +915,14 @@ class Bot(BrowserSession):
     # =========================================================================
 
     def open_map(self) -> bool:
-        """Send the map-open toggle and record the action.
+        """Dispatch the wire ``CMD_MAP_OPEN`` command.
 
-        The game does not expose a reliable "map is open" flag. This method
-        therefore always sends the toggle when called and records a "map_open"
-        action for tick-loop timing/sync purposes. Callers must not treat local
-        state as authoritative UI truth.
+        The wire command is one-way: it only opens the map. Sending it again
+        against an already-open map is a server-side no-op (no fresh map sync
+        is returned). The authoritative live "is the map showing" signal is
+        :func:`~tankpit_bot.action_lab.page_client_snapshot.capture_page_client_snapshot`'s
+        ``map_visible`` field, which reads ``activeGame.map.h`` from the JS
+        client.
 
         Returns:
             True if the command was sent.
@@ -814,32 +939,122 @@ class Bot(BrowserSession):
             return True
         return False
 
-    def close_map(self) -> bool:
-        """Send the map toggle once.
+    def _dispatch_keypress(self, key: str) -> None:
+        """Send a synthetic keyDown+keyUp pair through CDP.
 
-        This helper remains available for explicit/manual use, but normal AI
-        flow should not depend on tracked map-open state. The game uses the
-        same protocol command as a toggle, and teleports close the map
-        automatically.
+        Args:
+            key: Single character key to dispatch (e.g. ``"m"``, ``"c"``).
+        """
+        if self._cdp is None:
+            raise RuntimeError("_dispatch_keypress requires an attached CDP session")
+        code = f"Key{key.upper()}"
+        vk = ord(key.upper())
+        for event_type in ("keyDown", "keyUp"):
+            self._cdp.send(
+                "Input.dispatchKeyEvent",
+                {
+                    "type": event_type,
+                    "key": key,
+                    "code": code,
+                    "windowsVirtualKeyCode": vk,
+                    "nativeVirtualKeyCode": vk,
+                },
+            )
+
+    def close_map(self) -> bool:
+        """Close the map overlay by dispatching a synthetic ``m`` keypress.
+
+        No wire byte closes the map on the server: it tracks "user requested
+        the map" (``CMD_MAP_OPEN``) and "user teleported" (``CMD_MAP_TELEPORT``
+        auto-closes). Pressing ``m`` (or ``f``) in the browser closes the
+        overlay purely client-side by toggling ``activeGame.map.h`` -- no
+        WebSocket traffic. This method reproduces that behavior by sending a
+        synthetic keyboard event through CDP. Verified live in
+        ``discover_map_close.py``.
 
         Returns:
-            True if the toggle command was sent, False if CDP unavailable.
+            True if the key event was dispatched, False if no CDP session is
+            attached.
         """
-        encoded = build_query_command(CMD_MAP_OPEN)
-        if self._send_bytes(encoded, "map_close"):
-            log.info("Map: closed via protocol toggle")
-            return True
-        return False
+        if self._cdp is None:
+            return False
+        self._dispatch_keypress("m")
+        log.info("Map: closed via local 'm' keyboard event (no wire byte sent)")
+        return True
+
+    def _capture_account_stats(self, phase: str) -> None:
+        """Sample the in-game ``C`` statistics panel and emit it.
+
+        The panel carries account-wide ground truth the wire never
+        sends (lifetime play time, kills, deactivations, promotion
+        points); the startup sample baselines every run so consecutive
+        runs' deltas verify the game-log kill detection. The panel is
+        toggled open, scraped, and toggled closed so it never obstructs
+        play.
+
+        Args:
+            phase: Capture point label (e.g. ``startup``).
+        """
+        if self._cdp is None or self._page is None:
+            return
+        for event_type in ("keyDown", "keyUp"):
+            self._cdp.send(
+                "Input.dispatchKeyEvent",
+                {
+                    "type": event_type,
+                    "key": "c",
+                    "code": "KeyC",
+                    "windowsVirtualKeyCode": ord("C"),
+                    "nativeVirtualKeyCode": ord("C"),
+                },
+            )
+        self._page.wait_for_timeout(_ACCOUNT_STATS_PANEL_RENDER_MS)
+        page_text = scrape_page_text(self._cdp)
+        for event_type in ("keyDown", "keyUp"):
+            self._cdp.send(
+                "Input.dispatchKeyEvent",
+                {
+                    "type": event_type,
+                    "key": "c",
+                    "code": "KeyC",
+                    "windowsVirtualKeyCode": ord("C"),
+                    "nativeVirtualKeyCode": ord("C"),
+                },
+            )
+        emit_account_stats_sample(parse_account_stats(page_text), phase=phase)
+
+    def maybe_capture_account_stats_once(self) -> None:
+        """Capture account stats on the first healthy tick, with bounded retries.
+
+        The C-panel hotkey can be swallowed by the game client (run
+        20260611-013801), so failed attempts retry on later ticks up to
+        a bounded maximum.
+        """
+        if self._account_stats_captured:
+            return
+        if self._account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS:
+            return
+        self._account_stats_attempts += 1
+        self._capture_account_stats("startup")
+        self._account_stats_captured = True
 
     # =========================================================================
     # Run Loop
     # =========================================================================
 
-    def run(self) -> None:
+    def run(self, *, session_seconds: int, stop_file_path: Path) -> None:
         """Run the bot.
 
         Launches browser, logs in, joins game, and runs the game loop.
-        The bot will scan for fuel and collect it automatically.
+        The bot will scan for fuel and collect it automatically. The
+        run ends gracefully -- capture saved, browser closed -- when
+        the tick budget elapses or the stop file appears.
+
+        Args:
+            session_seconds: Bounded session length in seconds; zero
+                or negative runs until externally stopped.
+            stop_file_path: Sentinel file whose existence requests a
+                graceful shutdown.
 
         Raises:
             RuntimeError: If Playwright is not installed.
@@ -894,7 +1109,11 @@ class Bot(BrowserSession):
 
             # Game loop
             try:
-                self._game_loop(page)
+                self._game_loop(
+                    page,
+                    session_seconds=session_seconds,
+                    stop_file_path=stop_file_path,
+                )
             except KeyboardInterrupt:
                 log.info("Bot interrupted by user")
             finally:
@@ -944,11 +1163,77 @@ class Bot(BrowserSession):
             artifacts["latest_capture_path"],
         )
 
-    def _game_loop(self, page: _test_hooks.PageProtocol) -> None:
-        """Run the tick loop: sync, decide, execute on each server tick."""
+    def _game_loop(
+        self,
+        page: _test_hooks.PageProtocol,
+        *,
+        session_seconds: int,
+        stop_file_path: Path,
+    ) -> None:
+        """Run the tick loop: sync, decide, execute on each server tick.
+
+        Args:
+            page: Playwright page for waiting between ticks.
+            session_seconds: Bounded session length in seconds; zero
+                or negative runs until externally stopped.
+            stop_file_path: Sentinel file whose existence requests a
+                graceful shutdown.
+        """
         from tankpit_bot.bot.tick_loop import run_tick_loop
 
-        run_tick_loop(self, page)
+        run_tick_loop(
+            self,
+            page,
+            session_seconds=session_seconds,
+            stop_file_path=stop_file_path,
+        )
+
+
+_USAGE = (
+    "usage: tankpit-bot [--seconds N]\n"
+    "\n"
+    "Live HFSM bot. Runs for --seconds then shuts down gracefully\n"
+    "(capture saved, browser closed). Creating the stop file\n"
+    "(make bot-stop) ends a running session the same way.\n"
+    "\n"
+    "options:\n"
+    "  --seconds N  Bounded session length in seconds (0 = run until\n"
+    "               stopped). Defaults to TANKPIT_BOT_SESSION_SECONDS,\n"
+    "               then 0.\n"
+)
+
+
+def resolve_session_seconds(argv: list[str], env_value: str | None) -> int:
+    """Resolve the bounded session length from CLI args and environment.
+
+    The CLI flag wins over the environment variable; with neither the
+    session runs until externally stopped. Unknown arguments are a
+    hard error -- a typo must never silently launch an unbounded live
+    session (``tankpit-bot --help`` once started a 42-minute run
+    because no argument parsing existed).
+
+    Args:
+        argv: Process arguments without the program name.
+        env_value: Raw ``TANKPIT_BOT_SESSION_SECONDS`` value, or None.
+
+    Returns:
+        Session length in seconds; zero means run until stopped.
+
+    Raises:
+        SystemExit: On ``--help``/``-h`` (usage written to stdout,
+            exit code 0) or any unrecognized argument shape (usage in
+            the exit message, exit code 1).
+        ValueError: If the seconds value (CLI or environment) is not
+            an integer.
+    """
+    if argv and argv[0] in ("--help", "-h"):
+        sys.stdout.write(_USAGE)
+        raise SystemExit(0)
+    if not argv:
+        return int(env_value) if env_value is not None else 0
+    if len(argv) == 2 and argv[0] == "--seconds":
+        return int(argv[1])
+    raise SystemExit(f"tankpit-bot: unrecognized arguments: {' '.join(argv)}\n\n{_USAGE}")
 
 
 def main() -> None:
@@ -958,11 +1243,22 @@ def main() -> None:
     from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
     load_dotenv()
+    session_seconds = resolve_session_seconds(
+        _test_hooks.get_argv()[1:],
+        _test_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"),
+    )
     artifacts = configure_bot_runtime_logging()
     set_protocol_frame_logging(False)
     log.info("Bot latest log: %s", artifacts["latest_log_path"])
     log.info("Bot latest events: %s", artifacts["latest_events_path"])
     log.info("Bot latest capture: %s", artifacts["latest_capture_path"])
+    stop_file_path = Path(artifacts["latest_log_path"]).parent / "STOP"
+    _test_hooks.remove_file(stop_file_path)
+    log.info(
+        "Session bound: %s; stop file: %s",
+        f"{session_seconds}s" if session_seconds > 0 else "until stopped",
+        stop_file_path,
+    )
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
@@ -976,7 +1272,7 @@ def main() -> None:
     )
 
     bot = Bot(target_url, headless=False, prefer_account=prefer_account)
-    bot.run()
+    bot.run(session_seconds=session_seconds, stop_file_path=stop_file_path)
 
 
 __all__ = [
@@ -984,4 +1280,5 @@ __all__ = [
     "BotError",
     "ProtocolNotDiscoveredError",
     "main",
+    "resolve_session_seconds",
 ]

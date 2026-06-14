@@ -7,12 +7,13 @@ the public entry point is ``dispatch_world_state_update``.
 
 from __future__ import annotations
 
+from platform_core.json_utils import JSONObject, require_int
 from platform_core.logging import get_logger
+from typing_extensions import TypedDict
 
 import tankpit_bot.sniffer.world_state as _ws
-from tankpit_bot import protocol
-from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.runtime_logging import emit_world
+from tankpit_bot import browser, protocol
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
 from tankpit_bot.sniffer.world_state_combat import (
     mark_combat_hit,
     mark_tank_killed,
@@ -20,6 +21,7 @@ from tankpit_bot.sniffer.world_state_combat import (
 )
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_container_pickup,
+    update_world_state_from_fuel_dots,
     update_world_state_from_fuel_total,
     update_world_state_from_tank_registry_container,
 )
@@ -55,6 +57,80 @@ from tankpit_bot.sniffer.world_state_tiles import (
 from tankpit_bot.state import add_mine, remove_mine
 
 log = get_logger(__name__)
+
+
+# =============================================================================
+# Diagnostic — MAP_DATA blob parsed
+# =============================================================================
+
+
+class MapPositionsParsedDiagnosticDict(TypedDict):
+    """Structured payload for the ``map_positions_parsed`` diagnostic event.
+
+    Attributes:
+        tank_count: Number of tank position entries decoded from the blob.
+        blob_bytes: Total byte length of the MAP_DATA world_state blob.
+        fuel_dot_count: Number of fuel dots decoded from the blob's
+            skip-RLE dot layer (the map's yellow fuel pixels).
+    """
+
+    tank_count: int
+    blob_bytes: int
+    fuel_dot_count: int
+
+
+def encode_map_positions_parsed_diagnostic(
+    payload: MapPositionsParsedDiagnosticDict,
+) -> JSONObject:
+    """Encode a ``map_positions_parsed`` diagnostic payload to JSON.
+
+    Args:
+        payload: Structured diagnostic payload.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "tank_count": payload["tank_count"],
+        "blob_bytes": payload["blob_bytes"],
+        "fuel_dot_count": payload["fuel_dot_count"],
+    }
+
+
+def decode_map_positions_parsed_diagnostic(
+    data: JSONObject,
+) -> MapPositionsParsedDiagnosticDict:
+    """Decode a ``map_positions_parsed`` diagnostic payload from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated payload.
+    """
+    return MapPositionsParsedDiagnosticDict(
+        tank_count=require_int(data, "tank_count"),
+        blob_bytes=require_int(data, "blob_bytes"),
+        fuel_dot_count=require_int(data, "fuel_dot_count"),
+    )
+
+
+def emit_map_positions_parsed_diagnostic(payload: MapPositionsParsedDiagnosticDict) -> None:
+    """Emit one ``map_positions_parsed`` structured diagnostic event.
+
+    Fires after :func:`_parse_world_state_blob` decodes a MAP_DATA payload.
+    Carries the tank/blob/fuel-dot counts so consumers can audit how
+    much data each MAP_DATA refresh delivered without scraping the text log.
+
+    Args:
+        payload: Validated structured payload.
+    """
+    emit_diagnostic(
+        diagnostic_kind="map_positions_parsed",
+        tank_count=payload["tank_count"],
+        blob_bytes=payload["blob_bytes"],
+        fuel_dot_count=payload["fuel_dot_count"],
+    )
 
 
 # =============================================================================
@@ -145,9 +221,16 @@ def _dispatch_tank_update(decoded: protocol.BinaryMessage) -> bool:
         case {
             "msg_type": 0x41,
             "victim_id": int(vid),
+            "killer_id": int(kid),
         }:
-            _update_tank_position(vid, 0, 0)
             mark_tank_killed(vid)
+            _update_tank_position(vid, 0, 0)
+            emit_diagnostic(
+                diagnostic_kind="tank_deactivated",
+                origin="protocol_0x41",
+                victim_id=vid,
+                killer_id=kid,
+            )
             log.info("DEACTIVATED: tank=%d killed, position invalidated", vid)
             return True
     return False
@@ -424,10 +507,22 @@ def _dispatch_tank_event(decoded: protocol.BinaryMessage) -> bool:
                 vid,
                 known_tanks[:10],
             )
-            _update_tank_position(vid, 0, 0)
             mark_tank_killed(vid)
+            _update_tank_position(vid, 0, 0)
+            emit_diagnostic(
+                diagnostic_kind="tank_deactivated",
+                origin="container_kill",
+                victim_id=vid,
+                killer_id=-1,
+            )
             return True
         case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
+            emit_diagnostic(
+                diagnostic_kind="tank_deactivated",
+                origin="container_death",
+                victim_id=-1,
+                killer_id=kid,
+            )
             log.info("DEACTIVATION_DEATH: killed by tank=%d", kid)
             return True
     return False
@@ -463,7 +558,7 @@ def _dispatch_mine_placement(
             team = tank_state["team"]
     if team is None:
         return True
-    timestamp_ms = get_current_time_ms()
+    timestamp_ms = browser.get_current_time_ms()
     for x, y in positions:
         _ws._world_state = add_mine(
             _ws._world_state,
@@ -488,7 +583,7 @@ def _dispatch_mine_detonation(
     Returns:
         True after applying the removals.
     """
-    timestamp_ms = get_current_time_ms()
+    timestamp_ms = browser.get_current_time_ms()
     for x, y in positions:
         _ws._world_state = remove_mine(_ws._world_state, x, y, timestamp_ms)
     return True
@@ -563,15 +658,54 @@ def _dispatch_container_message(decoded: protocol.BinaryMessage) -> bool:
 # =============================================================================
 
 
-def _parse_world_state_blob(wd: bytes) -> None:
-    """Parse world_state blob from map response to extract all tank positions.
+def _decode_fuel_dot_layer(section: bytes) -> list[tuple[int, int]]:
+    """Decode the MAP_DATA fuel-dot layer into world coordinates.
 
-    Format (verified from world_state_dump.bin):
-    - [terrain_count:2 LE] - number of terrain delta bytes
-    - [terrain_count terrain delta bytes]
+    The algorithm mirrors the live client's ``Ig.h`` parser exactly
+    (tpclient-b45bd1ebc9c0c668.js): a cursor starts at world (1, 1);
+    every byte advances x, wrapping past 255 to the next row; byte 255
+    is a pure skip, any other byte also drops a dot at the resulting
+    coordinate. The client draws these dots as the map's yellow fuel
+    pixels. Verified 2026-06-11 across 15 captured sessions: fuel
+    pickups land on dots 33-71% by gain bucket vs ~1% chance; radar
+    equipment at exact coordinates 0/184.
+
+    Args:
+        section: Raw dot-layer bytes (the length-prefixed first section
+            of the MAP_DATA blob, prefix excluded).
+
+    Returns:
+        Decoded ``(x, y)`` world coordinates of every fuel dot.
+    """
+    x, y = 1, 1
+    dots: list[tuple[int, int]] = []
+    for step in section:
+        x += step
+        if x > 255:
+            y += 1
+            x %= 256
+        if step != 255:
+            dots.append((x, y))
+    return dots
+
+
+def _parse_world_state_blob(wd: bytes) -> None:
+    """Parse world_state blob from map response: fuel dots + tank positions.
+
+    Format (verified from world_state_dump.bin + client Ig.h parser):
+    - [dot_section_bytes:2 LE] - length of the fuel-dot layer
+    - [dot_section_bytes fuel-dot skip-RLE bytes] (see
+      :func:`_decode_fuel_dot_layer`)
     - Repeated 5-byte tank entries until end:
       [x:1][y:1][id_lo:1][id_hi:1][packed:1]
       where tank_id = id_lo + id_hi*256 (LE), team = packed & 3, rank = (packed>>4) & 15
+      (bits 2-3 of packed are an undecoded client field; the client
+      stores them as the map tank's ``u``)
+
+    On successful ingest -- including the zero-tank case -- this marks the
+    MAP_DATA processed signal via :func:`mark_map_data_processed` so the tick
+    loop's ``map_open`` completion gate fires on the AUTHORITATIVE response
+    rather than any incidental sync.
 
     Args:
         wd: Raw world state blob bytes.
@@ -579,16 +713,26 @@ def _parse_world_state_blob(wd: bytes) -> None:
     if len(wd) < 2:
         return
 
-    terrain_count = wd[0] | (wd[1] << 8)
-    tank_data_start = 2 + terrain_count
+    dot_section_bytes = wd[0] | (wd[1] << 8)
+    tank_data_start = 2 + dot_section_bytes
 
     if tank_data_start > len(wd):
-        log.warning("WorldState blob too short: %d bytes, terrain_count=%d", len(wd), terrain_count)
+        log.warning(
+            "WorldState blob too short: %d bytes, dot_section_bytes=%d",
+            len(wd),
+            dot_section_bytes,
+        )
         return
+
+    fuel_dots = _decode_fuel_dot_layer(wd[2:tank_data_start])
+    update_world_state_from_fuel_dots(fuel_dots)
 
     remaining = wd[tank_data_start:]
     num_tanks = len(remaining) // 5
     if num_tanks == 0:
+        # Empty MAP_DATA is still an authoritative server response to
+        # ``map_open``; the HFSM gate must fire so replanning can resume.
+        _ws.mark_map_data_processed()
         return
 
     updated = 0
@@ -604,18 +748,29 @@ def _parse_world_state_blob(wd: bytes) -> None:
         _update_map_tank(tank_id, x, y, team, rank)
         updated += 1
 
-    log.info(
-        "MAP_POSITIONS: parsed %d tanks from world_state blob (%d bytes, %d terrain)",
-        updated,
-        len(wd),
-        terrain_count,
+    emit_map_positions_parsed_diagnostic(
+        MapPositionsParsedDiagnosticDict(
+            tank_count=updated,
+            blob_bytes=len(wd),
+            fuel_dot_count=len(fuel_dots),
+        )
     )
+    _ws.mark_map_data_processed()
 
 
 def _update_map_tank(tank_id: int, x: int, y: int, team: int, rank: int) -> None:
     """Update a tank's position/team/rank from map data.
 
     Preserves existing name and is_bot fields if the tank is already known.
+
+    The map blob is server-authoritative and lists EVERY tank, including
+    departed afterimages at stale cached positions (raw-capture
+    2026-06-13: ghost 517 was re-listed 49 times over 425s while never
+    once appearing on a per-tank wire path). It refreshes ``timestamp_ms``
+    so acquisition can still navigate toward map-listed enemies, but
+    passes ``wire_present=False`` so it never advances
+    ``last_wire_seen_ms`` -- the map is not evidence the tank is in view,
+    and the kill-shot gate must not fire at a map-only afterimage.
 
     Args:
         tank_id: Tank identifier.
@@ -626,7 +781,7 @@ def _update_map_tank(tank_id: int, x: int, y: int, team: int, rank: int) -> None
     """
     from tankpit_bot.state import update_tank_from_registry
 
-    ts = get_current_time_ms()
+    ts = browser.get_current_time_ms()
     key = str(tank_id)
     existing = _ws._world_state["tanks"].get(key)
     _ws._world_state = update_tank_from_registry(
@@ -640,6 +795,7 @@ def _update_map_tank(tank_id: int, x: int, y: int, team: int, rank: int) -> None
         y,
         "world_state",
         ts,
+        wire_present=False,
     )
 
 

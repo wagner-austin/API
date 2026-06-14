@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 _RUNS_DIR = Path("runs")
 _BOT_DIR = _RUNS_DIR / "bot"
 _SNIFF_DIR = _RUNS_DIR / "sniff"
+_PROBE_DIR = _RUNS_DIR / "probe"
 
 
 class BotRunArtifactsDict(TypedDict):
@@ -70,6 +71,29 @@ class SniffRunArtifactsDict(TypedDict):
     archive_summary_path: str
 
 
+class ProbeRunArtifactsDict(TypedDict):
+    """Canonical artifact paths for one action_lab probe run.
+
+    Attributes:
+        log_dir: Directory containing probe run artifacts.
+        probe_name: Probe identifier (``fuel``, ``equipment``, ``movement``,
+            ``teleport``, ``enemy_teleport``, ``fuel_drill``) used in the
+            archive filenames so multiple probe kinds can coexist under
+            ``runs/probe/``.
+        latest_log_path: Stable latest human-readable probe log path.
+        archive_log_path: Timestamped archived probe log path.
+        latest_events_path: Stable latest structured probe event stream path.
+        archive_events_path: Timestamped archived probe event stream path.
+    """
+
+    log_dir: str
+    probe_name: str
+    latest_log_path: str
+    archive_log_path: str
+    latest_events_path: str
+    archive_events_path: str
+
+
 def make_run_stamp(now: datetime | None = None) -> str:
     """Return the canonical timestamp stamp for run archives.
 
@@ -100,6 +124,33 @@ def build_bot_run_artifacts(stamp: str) -> BotRunArtifactsDict:
         archive_events_path=str(_BOT_DIR / f"bot-{stamp}.events.jsonl"),
         latest_capture_path=str(_BOT_DIR / "latest.capture_session.json"),
         archive_capture_path=str(_BOT_DIR / f"bot-{stamp}.capture_session.json"),
+    )
+
+
+def build_probe_run_artifacts(probe_name: str, stamp: str) -> ProbeRunArtifactsDict:
+    """Build canonical artifact paths for one action_lab probe run.
+
+    Args:
+        probe_name: Probe identifier embedded in the archive filenames
+            (e.g. ``fuel``, ``equipment``, ``movement``, ``teleport``,
+            ``enemy_teleport``, ``fuel_drill``). Must be non-empty.
+        stamp: Timestamp stamp from :func:`make_run_stamp`.
+
+    Returns:
+        Probe artifact path bundle.
+
+    Raises:
+        ValueError: When ``probe_name`` is empty.
+    """
+    if not probe_name:
+        raise ValueError("probe_name must be non-empty")
+    return ProbeRunArtifactsDict(
+        log_dir=str(_PROBE_DIR),
+        probe_name=probe_name,
+        latest_log_path=str(_PROBE_DIR / f"latest.{probe_name}.log"),
+        archive_log_path=str(_PROBE_DIR / f"{probe_name}-{stamp}.log"),
+        latest_events_path=str(_PROBE_DIR / f"latest.{probe_name}.events.jsonl"),
+        archive_events_path=str(_PROBE_DIR / f"{probe_name}-{stamp}.events.jsonl"),
     )
 
 
@@ -191,6 +242,44 @@ def encode_sniff_run_artifacts(artifacts: SniffRunArtifactsDict) -> JSONObject:
     }
 
 
+def encode_probe_run_artifacts(artifacts: ProbeRunArtifactsDict) -> JSONObject:
+    """Encode probe run artifacts to JSON-compatible data.
+
+    Args:
+        artifacts: Probe run artifacts.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "log_dir": artifacts["log_dir"],
+        "probe_name": artifacts["probe_name"],
+        "latest_log_path": artifacts["latest_log_path"],
+        "archive_log_path": artifacts["archive_log_path"],
+        "latest_events_path": artifacts["latest_events_path"],
+        "archive_events_path": artifacts["archive_events_path"],
+    }
+
+
+def decode_probe_run_artifacts(data: JSONObject) -> ProbeRunArtifactsDict:
+    """Decode probe run artifacts from JSON-compatible data.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated probe run artifacts.
+    """
+    return ProbeRunArtifactsDict(
+        log_dir=require_str(data, "log_dir"),
+        probe_name=require_str(data, "probe_name"),
+        latest_log_path=require_str(data, "latest_log_path"),
+        archive_log_path=require_str(data, "archive_log_path"),
+        latest_events_path=require_str(data, "latest_events_path"),
+        archive_events_path=require_str(data, "archive_events_path"),
+    )
+
+
 def decode_sniff_run_artifacts(data: JSONObject) -> SniffRunArtifactsDict:
     """Decode sniffer run artifacts from JSON-compatible data.
 
@@ -217,12 +306,16 @@ def decode_sniff_run_artifacts(data: JSONObject) -> SniffRunArtifactsDict:
 
 __all__ = [
     "BotRunArtifactsDict",
+    "ProbeRunArtifactsDict",
     "SniffRunArtifactsDict",
     "build_bot_run_artifacts",
+    "build_probe_run_artifacts",
     "build_sniff_run_artifacts",
     "decode_bot_run_artifacts",
+    "decode_probe_run_artifacts",
     "decode_sniff_run_artifacts",
     "encode_bot_run_artifacts",
+    "encode_probe_run_artifacts",
     "encode_sniff_run_artifacts",
     "make_run_stamp",
 ]

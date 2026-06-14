@@ -13,6 +13,7 @@ from tankpit_bot.action_lab import (
     parse_targets_arg,
     run_movement_probe,
 )
+from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
 
@@ -58,6 +59,7 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
+    configure_probe_runtime_logging("movement")
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()

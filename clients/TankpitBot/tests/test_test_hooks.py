@@ -87,6 +87,25 @@ def test_real_path_exists_false(tmp_path: Path) -> None:
     assert _test_hooks._real_path_exists(test_file) is False
 
 
+def test_real_glob_paths_lists_sorted_matches(tmp_path: Path) -> None:
+    """Test _real_glob_paths returns matching files in sorted order."""
+    (tmp_path / "bot-20260610-2.events.jsonl").write_text("b", encoding="utf-8")
+    (tmp_path / "bot-20260610-1.events.jsonl").write_text("a", encoding="utf-8")
+    (tmp_path / "other.txt").write_text("c", encoding="utf-8")
+
+    result = _test_hooks._real_glob_paths(tmp_path, "bot-*.events.jsonl")
+
+    assert [path.name for path in result] == [
+        "bot-20260610-1.events.jsonl",
+        "bot-20260610-2.events.jsonl",
+    ]
+
+
+def test_real_glob_paths_missing_directory_is_empty(tmp_path: Path) -> None:
+    """Test _real_glob_paths returns empty for a nonexistent directory."""
+    assert _test_hooks._real_glob_paths(tmp_path / "nope", "*.jsonl") == []
+
+
 def test_sync_playwright_initially_none() -> None:
     """Test sync_playwright hook starts as None."""
     # Note: conftest.py restores hooks, so we check the module attribute

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -48,6 +46,7 @@ def _make_world(
             terrain={},
             viewport={"left": self_x - 8, "top": self_y - 8, "width": 16, "height": 16},
             scanned_viewports=scanned_viewports,
+            map_fuel_dots={},
             timestamp_ms=100000,
         ),
         self_state,
@@ -126,7 +125,7 @@ class TestLockedEquipmentTarget:
 
     def test_locked_equipment_target_clears_when_unexecutable(self) -> None:
         """Locked equipment target is cleared when walk_or_teleport fails."""
-        from tests.fakes import FakeTerrainMap
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         # Target on water with all adjacent tiles also water — no landing
         containers = {"105,105": _c(105, 105, 0, False)}
@@ -138,7 +137,7 @@ class TestLockedEquipmentTarget:
             (105, 104): "W",
             (105, 106): "W",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -241,14 +240,14 @@ class TestExplorationSkipsTeleportLowFuel:
         """Exploration skips teleport candidates when fuel reserve too low."""
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.bot.ai.movement import select_exploration_command
-        from tests.fakes import FakeTerrainMap
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         # All edge tiles are water — only teleport is possible, but fuel is too low
         terrain_data: dict[tuple[int, int], str] = {}
         for x in range(92, 108):
             for y in range(92, 108):
                 terrain_data[(x, y)] = "W"
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         world, self_state = _make_world(fuel=140)
         ai_state = AIStateDict(
@@ -302,8 +301,12 @@ class TestEquipmentSearchHopFallback:
         assert decision["behavior"]["reason"] == "search_equipment_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
-    def test_equipment_search_raises_when_teleport_unaffordable(self) -> None:
-        """Durable equipment recovery fails explicitly when search cannot proceed."""
+    def test_equipment_search_walks_edge_when_teleport_unaffordable(self) -> None:
+        """Durable equipment recovery edge-walks when the search hop is unaffordable.
+
+        Regression guard for live run 20260610-000x: the owner used to
+        raise here, killing the bot process mid-game.
+        """
         # fuel=550: above critical (500) so fuel recovery doesn't fire first
         world, self_state = _make_world(fuel=550, scanned=True)
         base_config = make_default_ai_config()
@@ -321,8 +324,11 @@ class TestEquipmentSearchHopFallback:
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
         inventory = _make_inventory(default_count=15, radar_count=13)
 
-        with pytest.raises(ValueError, match="expected executable recovery search action"):
-            decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["reason"] == "edge_for_equipment"
+        assert decision["command"]["cmd_type"] == "move"
 
 
 class TestCriticalEquipmentLockedTarget:
@@ -359,7 +365,7 @@ class TestCriticalEquipmentLockedTarget:
 
     def test_clears_locked_critical_equipment_when_unexecutable(self) -> None:
         """Critical locked equipment target is cleared when not executable."""
-        from tests.fakes import FakeTerrainMap
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers)
@@ -370,7 +376,7 @@ class TestCriticalEquipmentLockedTarget:
             (105, 104): "W",
             (105, 106): "W",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -401,7 +407,7 @@ class TestFuelSearchFallbacks:
 
     def test_locked_fuel_clears_when_unexecutable(self) -> None:
         """Locked fuel target is cleared when walk_or_teleport fails."""
-        from tests.fakes import FakeTerrainMap
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=400, containers=containers)
@@ -412,7 +418,7 @@ class TestFuelSearchFallbacks:
             (105, 104): "W",
             (105, 106): "W",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -450,20 +456,26 @@ class TestFuelSearchFallbacks:
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
         assert decision["behavior"]["reason"] == "edge_for_fuel"
 
-    def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
-        """Durable fuel recovery fails explicitly when no legal action exists."""
-        from tests.fakes import FakeTerrainMap
+    def test_fuel_recovery_opens_map_when_all_paths_are_blocked(self) -> None:
+        """Durable fuel recovery opens the map for intel instead of crashing.
+
+        With every viewport tile water, radar exhausted, and no
+        affordable hop, the owner's terminal fallback is the free
+        map-intel action -- raising here used to kill the bot process.
+        """
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         terrain_data: dict[tuple[int, int], str] = {}
         for x in range(92, 108):
             for y in range(92, 108):
                 terrain_data[(x, y)] = "W"
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world, self_state = _make_world(fuel=140, scanned=True)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        with pytest.raises(ValueError, match="expected executable recovery action"):
-            decide(world, self_state, ai_state, inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        # All fuel paths exhausted — falls through to combat/fallback
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "map_intel_for_fuel"
+        assert decision["command"]["cmd_type"] == "map_open"

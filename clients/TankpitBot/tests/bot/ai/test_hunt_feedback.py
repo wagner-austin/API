@@ -29,7 +29,8 @@ class TestDecideCombatFeedback:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -80,7 +81,8 @@ class TestDecideCombatFeedback:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -133,7 +135,8 @@ class TestDecideShotTracking:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -175,7 +178,8 @@ class TestDecideKillCooldown:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -208,7 +212,8 @@ class TestDecideKillCooldown:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -228,8 +233,7 @@ class TestDecideKillCooldown:
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["updated_ai_state"]["combat_target_id"] == 50
-        assert decision["updated_ai_state"]["combat_target_id"] == 50
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
 
     def test_miss_always_reacquires_even_when_close(self) -> None:
         """Miss feedback triggers reacquisition even when the target was adjacent."""
@@ -244,7 +248,8 @@ class TestDecideKillCooldown:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -267,7 +272,7 @@ class TestDecideKillCooldown:
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["updated_ai_state"]["combat_target_id"] == 50
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
 
     def test_closing_recloses_when_not_cardinally_adjacent(self) -> None:
         """Diagonal landing positions continue HUNT close behavior instead of shooting."""
@@ -282,7 +287,8 @@ class TestDecideKillCooldown:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)
@@ -320,7 +326,8 @@ class TestDecideKillCooldown:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)

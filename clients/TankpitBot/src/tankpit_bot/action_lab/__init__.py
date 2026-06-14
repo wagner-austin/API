@@ -19,6 +19,13 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     encode_enemy_teleport_attempt_result,
     encode_enemy_teleport_probe_session,
 )
+from tankpit_bot.action_lab.fuel_dot_probe import (
+    format_fuel_dot_probe_summary,
+    run_fuel_dot_probe,
+)
+from tankpit_bot.action_lab.fuel_dot_probe_types import (
+    FuelDotProbeSessionDict,
+)
 from tankpit_bot.action_lab.fuel_locations import build_distinct_ground_targets
 from tankpit_bot.action_lab.fuel_probe import (
     FuelProbe,
@@ -82,6 +89,7 @@ __all__ = [
     "EnemyTeleportAttemptResultDict",
     "EnemyTeleportProbe",
     "EnemyTeleportProbeSessionDict",
+    "FuelDotProbeSessionDict",
     "FuelProbe",
     "FuelProbeAttemptResultDict",
     "FuelProbeError",
@@ -118,11 +126,13 @@ __all__ = [
     "encode_teleport_probe_session",
     "encode_teleport_target",
     "format_enemy_teleport_probe_summary",
+    "format_fuel_dot_probe_summary",
     "format_fuel_probe_summary",
     "format_movement_probe_summary",
     "format_teleport_probe_summary",
     "parse_targets_arg",
     "run_enemy_teleport_probe",
+    "run_fuel_dot_probe",
     "run_fuel_probe",
     "run_movement_probe",
     "run_teleport_probe",

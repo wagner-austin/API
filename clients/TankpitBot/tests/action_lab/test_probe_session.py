@@ -4,18 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
+from tests.action_lab._replay_core import ReplayClock
+
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.probe_runtime import ProbeCommandReadyContextDict
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.state import SelfStateDict, make_self_state
-
-
-class _Clock:
-    def __init__(self, now_ms: int) -> None:
-        self._now_ms = now_ms
-
-    def __call__(self) -> int:
-        return self._now_ms
 
 
 class _ProbeHarness:
@@ -60,7 +54,7 @@ def _restore_clock() -> Generator[None, None, None]:
 def test_build_probe_session_envelope_returns_shared_session_fields() -> None:
     restore = _restore_clock()
     next(restore)
-    action_hooks.get_current_time_ms = _Clock(1900)
+    action_hooks.get_current_time_ms = ReplayClock(1900)
     probe = _ProbeHarness()
     spawn = _spawn()
 
@@ -85,7 +79,7 @@ def test_build_probe_session_envelope_returns_shared_session_fields() -> None:
 def test_build_probe_session_envelope_preserves_missing_first_attempt() -> None:
     restore = _restore_clock()
     next(restore)
-    action_hooks.get_current_time_ms = _Clock(1900)
+    action_hooks.get_current_time_ms = ReplayClock(1900)
     probe = _ProbeHarness()
     spawn = _spawn()
 

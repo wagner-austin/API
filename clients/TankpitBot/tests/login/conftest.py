@@ -10,7 +10,7 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot.protocol.framing import decode_frame, encode_frame
-from tests.fakes import FakeKeyboard
+from tests.no_op_keyboard import NoOpKeyboard
 
 
 class FakeCDPLogin:
@@ -255,7 +255,7 @@ class FakePageLogin:
     @property
     def keyboard(self) -> KeyboardProtocol:
         """Get keyboard for typing."""
-        return FakeKeyboard()
+        return NoOpKeyboard()
 
 
 class FakeCDPNonDictResult:

@@ -13,6 +13,7 @@ from tankpit_bot.action_lab.enemy_teleport_types import (
     encode_enemy_teleport_attempt_result,
     encode_enemy_teleport_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 
@@ -34,6 +35,27 @@ def _enemy() -> EnemyThreatDict:
 
 def _target() -> TeleportTargetDict:
     return TeleportTargetDict(label="enemy_55_120_130", x=119, y=130)
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
+    )
 
 
 def _attempt() -> EnemyTeleportAttemptResultDict:
@@ -61,6 +83,8 @@ def _attempt() -> EnemyTeleportAttemptResultDict:
         enemy_y_after=130,
         message_start_index=10,
         message_end_index=16,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1500),
     )
 
 
@@ -127,6 +151,8 @@ def test_enemy_teleport_attempt_round_trip_with_optional_nulls() -> None:
         enemy_y_after=None,
         message_start_index=1,
         message_end_index=2,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(4000),
     )
 
     assert (
@@ -197,6 +223,14 @@ def test_enemy_teleport_attempt_decode_rejects_non_object_target() -> None:
     encoded["landing_target"] = "bad"
 
     with pytest.raises(JSONTypeError, match="landing_target"):
+        decode_enemy_teleport_attempt_result(encoded)
+
+
+def test_enemy_teleport_attempt_decode_rejects_non_object_snapshot() -> None:
+    encoded = encode_enemy_teleport_attempt_result(_attempt())
+    encoded["snapshot_before"] = "bad"
+
+    with pytest.raises(JSONTypeError, match="snapshot_before"):
         decode_enemy_teleport_attempt_result(encoded)
 
 

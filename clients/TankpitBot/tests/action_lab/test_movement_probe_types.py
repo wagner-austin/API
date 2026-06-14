@@ -13,7 +13,30 @@ from tankpit_bot.action_lab.movement_probe_types import (
     encode_movement_probe_attempt_result,
     encode_movement_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot used by the movement attempts."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={"a": 120, "b": 121, "c": 900},
+        world_fields={},
+        world_collections={},
+        map_fields={},
+    )
 
 
 def _attempt() -> MovementProbeAttemptResultDict:
@@ -34,6 +57,8 @@ def _attempt() -> MovementProbeAttemptResultDict:
         settled_y=121,
         message_start_index=10,
         message_end_index=18,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1800),
     )
 
 
@@ -116,6 +141,33 @@ def test_decode_attempt_rejects_boolean_optional_int() -> None:
     encoded = encode_movement_probe_attempt_result(_attempt())
     encoded["fuel_after"] = True
     with pytest.raises(JSONTypeError, match="integer or null"):
+        decode_movement_probe_attempt_result(encoded)
+
+
+def test_decode_attempt_rejects_non_object_snapshot_before() -> None:
+    """Movement attempt decoding requires an object snapshot_before payload."""
+    encoded = encode_movement_probe_attempt_result(_attempt())
+    encoded["snapshot_before"] = "bad"
+    with pytest.raises(JSONTypeError, match="snapshot_before"):
+        decode_movement_probe_attempt_result(encoded)
+
+
+def test_decode_attempt_rejects_non_object_snapshot_after() -> None:
+    """Movement attempt decoding requires an object snapshot_after payload."""
+    encoded = encode_movement_probe_attempt_result(_attempt())
+    encoded["snapshot_after"] = "bad"
+    with pytest.raises(JSONTypeError, match="snapshot_after"):
+        decode_movement_probe_attempt_result(encoded)
+
+
+def test_decode_attempt_propagates_snapshot_decoder_errors() -> None:
+    """Movement attempt decoding delegates inner snapshot validation."""
+    encoded = encode_movement_probe_attempt_result(_attempt())
+    snapshot_before = encoded["snapshot_before"]
+    if not isinstance(snapshot_before, dict):
+        pytest.fail("encoded snapshot_before must be a JSON object for this test")
+    snapshot_before["client_present"] = "bad"
+    with pytest.raises(JSONTypeError, match="client_present"):
         decode_movement_probe_attempt_result(encoded)
 
 

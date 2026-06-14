@@ -18,6 +18,11 @@ def _enemy_tank(
 ) -> TankStateDict:
     """Create a visible enemy tank for HUNT tests.
 
+    The tank is wire-present at the HUNT tests' tick clock (100000):
+    ``last_wire_seen_ms`` is set equal to ``timestamp_ms`` so it passes
+    the kill-shot wire-presence gate, modelling an enemy genuinely in
+    view rather than a map-only afterimage.
+
     Args:
         tank_id: Enemy tank id.
         x: Enemy x coordinate.
@@ -38,6 +43,7 @@ def _enemy_tank(
         is_bot=False,
         damage_state=0,
         timestamp_ms=100000,
+        last_wire_seen_ms=100000,
     )
 
 
@@ -223,8 +229,13 @@ def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() ->
     assert decision["behavior"]["reason"] == "teleport Enemy"
 
 
-def test_hunt_acquire_opens_map_when_recent_snapshot_teleport_is_unaffordable() -> None:
-    """Acquire falls back to map refresh when close teleport cannot be afforded."""
+def test_hunt_acquire_refuels_when_recent_snapshot_teleport_is_unaffordable() -> None:
+    """Acquire delegates to fuel recovery when combat teleport is unaffordable.
+
+    Run 20260611-025636: the old map-open fallback spun 115 map reopens
+    without a single shot. Fuel collection is the only action that changes
+    the affordability condition, so the bot refuels before re-acquiring.
+    """
     tanks: dict[str, TankStateDict] = {
         "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
     }
@@ -243,9 +254,9 @@ def test_hunt_acquire_opens_map_when_recent_snapshot_teleport_is_unaffordable() 
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find FarEnemy"
-    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
 def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
@@ -271,8 +282,8 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
     assert decision["behavior"]["reason"] == "find_enemies"
 
 
-def test_hunt_refresh_opens_map_when_close_action_is_not_legal() -> None:
-    """Refresh reopens the map when the target cannot be legally closed on."""
+def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
+    """Refresh delegates to fuel recovery when combat teleport is unaffordable."""
     tanks: dict[str, TankStateDict] = {
         "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
     }
@@ -293,8 +304,8 @@ def test_hunt_refresh_opens_map_when_close_action_is_not_legal() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find FarEnemy"
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
 
 def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
@@ -346,8 +357,8 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
     assert decision["behavior"]["reason"] == "teleport Enemy"
 
 
-def test_hunt_close_opens_map_when_close_action_is_not_legal() -> None:
-    """Close state reopens the map when no close action can legally run."""
+def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
+    """Close state delegates to fuel recovery when combat teleport is unaffordable."""
     tanks: dict[str, TankStateDict] = {
         "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
     }
@@ -368,8 +379,8 @@ def test_hunt_close_opens_map_when_close_action_is_not_legal() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find FarEnemy"
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
 
 def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None:

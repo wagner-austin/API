@@ -249,7 +249,7 @@ def _build_trace(
     """
     behavior = decision["behavior"]
     command = decision["command"]
-    threats = analyze_threats(world, self_state)
+    threats = analyze_threats(world, self_state, timestamp_ms)
     target_x, target_y = _extract_command_target(command)
 
     return ReplayTickTraceDict(

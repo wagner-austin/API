@@ -63,11 +63,16 @@ class TestDamageName:
     """Tests for damage_name function."""
 
     def test_known_damage_states(self) -> None:
-        """Test known damage values return correct names."""
+        """The tier counts DOWN toward deactivation.
+
+        Live run 20260610-231x: every fight ran 0 -> 3 -> 2 -> 1 under
+        sustained fire and all five kills with tier data died from
+        tier 1, so 1 is critical and 3 is light.
+        """
         assert damage_name(0) == "full"
-        assert damage_name(1) == "light"
+        assert damage_name(1) == "critical"
         assert damage_name(2) == "medium"
-        assert damage_name(3) == "critical"
+        assert damage_name(3) == "light"
 
     def test_unknown_damage(self) -> None:
         """Test unknown damage values return formatted string."""

@@ -12,15 +12,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from platform_core.json_utils import JSONObject, dump_json_str, require_str
+from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str, require_str
 from platform_core.logging import get_logger, setup_rich_logging, stdlib_logging
 from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.runtime_artifacts import (
     BotRunArtifactsDict,
+    ProbeRunArtifactsDict,
     SniffRunArtifactsDict,
     build_bot_run_artifacts,
+    build_probe_run_artifacts,
     build_sniff_run_artifacts,
     make_run_stamp,
 )
@@ -30,6 +32,12 @@ _ARTIFACT_HANDLER_NAME_PREFIX = "tankpit_bot.runtime.artifacts."
 
 _BOT_ARTIFACTS: BotRunArtifactsDict | None = None
 _SNIFF_ARTIFACTS: SniffRunArtifactsDict | None = None
+_PROBE_ARTIFACTS: ProbeRunArtifactsDict | None = None
+
+
+_RESERVED_EVENT_KEYS: frozenset[str] = frozenset(
+    {"timestamp", "level", "logger", "mode", "channel", "message"}
+)
 
 
 class RuntimeEventRecordDict(TypedDict):
@@ -42,6 +50,11 @@ class RuntimeEventRecordDict(TypedDict):
         mode: Runtime mode, either ``bot`` or ``sniff``.
         channel: High-level event channel such as ``AI`` or ``WORLD``.
         message: Human-readable event text without the channel prefix.
+        fields: Structured key/value payload spread into the JSONL record at
+            the top level (no nesting). Reserved keys (timestamp, level,
+            logger, mode, channel, message) may not appear here -- collision
+            is rejected at encode time so queries against the JSONL never
+            see ambiguous data.
     """
 
     timestamp: str
@@ -50,6 +63,7 @@ class RuntimeEventRecordDict(TypedDict):
     mode: str
     channel: str
     message: str
+    fields: dict[str, str | int | float | bool]
 
 
 class RuntimeLogExtraDict(TypedDict):
@@ -58,6 +72,7 @@ class RuntimeLogExtraDict(TypedDict):
     runtime_channel: str
     runtime_message: str
     runtime_mode: str
+    runtime_fields: dict[str, str | int | float | bool]
 
 
 class _RuntimeRecordMapping(Protocol):
@@ -67,21 +82,41 @@ class _RuntimeRecordMapping(Protocol):
         """Return True when a runtime extra exists."""
         ...
 
-    def __getitem__(self, key: str) -> str | int | float | bool | None:
+    def __getitem__(
+        self, key: str
+    ) -> str | int | float | bool | dict[str, str | int | float | bool] | None:
         """Return a runtime extra value."""
+        ...
+
+    def get(
+        self,
+        key: str,
+        default: None = None,
+    ) -> str | int | float | bool | dict[str, str | int | float | bool] | None:
+        """Return a runtime extra value or the default when absent."""
         ...
 
 
 def encode_runtime_event_record(record: RuntimeEventRecordDict) -> JSONObject:
     """Encode a runtime event record to JSON-compatible data.
 
+    Structured ``fields`` are spread into the top-level JSON object so
+    consumers can query them directly (``jq '.duration_ms'``). A field
+    whose name collides with one of the reserved record keys raises --
+    silent overwriting of ``timestamp``/``channel``/``message`` would
+    produce ambiguous traces.
+
     Args:
         record: Runtime event record.
 
     Returns:
         JSON-compatible representation.
+
+    Raises:
+        ValueError: When a structured field name collides with a
+            reserved top-level event key.
     """
-    return {
+    encoded: JSONObject = {
         "timestamp": record["timestamp"],
         "level": record["level"],
         "logger": record["logger"],
@@ -89,10 +124,18 @@ def encode_runtime_event_record(record: RuntimeEventRecordDict) -> JSONObject:
         "channel": record["channel"],
         "message": record["message"],
     }
+    for key, value in record["fields"].items():
+        if key in _RESERVED_EVENT_KEYS:
+            raise ValueError(f"runtime event field name {key!r} collides with reserved record key")
+        encoded[key] = value
+    return encoded
 
 
 def decode_runtime_event_record(data: JSONObject) -> RuntimeEventRecordDict:
     """Decode a runtime event record from JSON-compatible data.
+
+    Reverse-spreads structured fields: any top-level key that is not in
+    :data:`_RESERVED_EVENT_KEYS` is collected into ``fields``.
 
     Args:
         data: JSON object to decode.
@@ -100,6 +143,15 @@ def decode_runtime_event_record(data: JSONObject) -> RuntimeEventRecordDict:
     Returns:
         Validated runtime event record.
     """
+    fields: dict[str, str | int | float | bool] = {}
+    for key, value in data.items():
+        if key in _RESERVED_EVENT_KEYS:
+            continue
+        if not isinstance(value, (str, int, float, bool)):
+            raise JSONTypeError(
+                f"runtime event field {key!r} has non-primitive type {type(value).__name__}"
+            )
+        fields[key] = value
     return RuntimeEventRecordDict(
         timestamp=require_str(data, "timestamp"),
         level=require_str(data, "level"),
@@ -107,6 +159,7 @@ def decode_runtime_event_record(data: JSONObject) -> RuntimeEventRecordDict:
         mode=require_str(data, "mode"),
         channel=require_str(data, "channel"),
         message=require_str(data, "message"),
+        fields=fields,
     )
 
 
@@ -162,6 +215,18 @@ class _HookEventArtifactHandler(stdlib_logging.Handler):
         message_raw = record_dict["runtime_message"]
         if not isinstance(channel_raw, str) or not isinstance(message_raw, str):
             return
+        fields_raw = record_dict.get("runtime_fields")
+        if not isinstance(fields_raw, dict):
+            return
+        fields: dict[str, str | int | float | bool] = {}
+        bad = False
+        for raw_key, raw_value in fields_raw.items():
+            if not isinstance(raw_key, str) or not isinstance(raw_value, (str, int, float, bool)):
+                bad = True
+                break
+            fields[raw_key] = raw_value
+        if bad:
+            return
         event = RuntimeEventRecordDict(
             timestamp=datetime.fromtimestamp(record.created).strftime("%Y-%m-%dT%H:%M:%S"),
             level=record.levelname,
@@ -169,6 +234,7 @@ class _HookEventArtifactHandler(stdlib_logging.Handler):
             mode=self._mode,
             channel=channel_raw,
             message=message_raw,
+            fields=fields,
         )
         line = dump_json_str(encode_runtime_event_record(event), compact=True) + "\n"
         _test_hooks.append_text(self._latest_path, line)
@@ -184,7 +250,7 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
     Returns:
         Configured bot runtime artifacts.
     """
-    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS
+    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_bot_run_artifacts(resolved_stamp)
     setup_rich_logging(level="INFO")
@@ -203,6 +269,7 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
     )
     _BOT_ARTIFACTS = artifacts
     _SNIFF_ARTIFACTS = None
+    _PROBE_ARTIFACTS = None
     return artifacts
 
 
@@ -215,7 +282,7 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
     Returns:
         Configured sniffer runtime artifacts.
     """
-    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS
+    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = build_sniff_run_artifacts(resolved_stamp)
     setup_rich_logging(level="INFO")
@@ -234,6 +301,50 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
     )
     _BOT_ARTIFACTS = None
     _SNIFF_ARTIFACTS = artifacts
+    _PROBE_ARTIFACTS = None
+    return artifacts
+
+
+def configure_probe_runtime_logging(
+    probe_name: str,
+    stamp: str | None = None,
+) -> ProbeRunArtifactsDict:
+    """Configure console logging plus canonical probe artifact outputs.
+
+    Args:
+        probe_name: Probe identifier (``fuel``, ``equipment``, ``movement``,
+            ``teleport``, ``enemy_teleport``, ``fuel_drill``). Embedded in
+            archive filenames so multiple probe kinds share
+            ``runs/probe/``.
+        stamp: Optional archive timestamp stamp for deterministic tests.
+
+    Returns:
+        Configured probe runtime artifacts.
+
+    Raises:
+        ValueError: When ``probe_name`` is empty (validated by
+            :func:`tankpit_bot.runtime_artifacts.build_probe_run_artifacts`).
+    """
+    global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
+    resolved_stamp = stamp if stamp is not None else make_run_stamp()
+    artifacts = build_probe_run_artifacts(probe_name, resolved_stamp)
+    setup_rich_logging(level="INFO")
+    _reset_artifact_files(
+        Path(artifacts["latest_log_path"]),
+        Path(artifacts["archive_log_path"]),
+        Path(artifacts["latest_events_path"]),
+        Path(artifacts["archive_events_path"]),
+    )
+    _install_artifact_handlers(
+        f"probe:{probe_name}",
+        Path(artifacts["latest_log_path"]),
+        Path(artifacts["archive_log_path"]),
+        Path(artifacts["latest_events_path"]),
+        Path(artifacts["archive_events_path"]),
+    )
+    _BOT_ARTIFACTS = None
+    _SNIFF_ARTIFACTS = None
+    _PROBE_ARTIFACTS = artifacts
     return artifacts
 
 
@@ -245,6 +356,11 @@ def get_bot_runtime_artifacts() -> BotRunArtifactsDict | None:
 def get_sniff_runtime_artifacts() -> SniffRunArtifactsDict | None:
     """Return the active sniffer runtime artifacts for this process, if configured."""
     return _SNIFF_ARTIFACTS
+
+
+def get_probe_runtime_artifacts() -> ProbeRunArtifactsDict | None:
+    """Return the active probe runtime artifacts for this process, if configured."""
+    return _PROBE_ARTIFACTS
 
 
 def emit_ai(message: str, *args: str | int | float | bool) -> None:
@@ -270,6 +386,168 @@ def emit_wire(message: str, *args: str | int | float | bool) -> None:
 def emit_world(message: str, *args: str | int | float | bool) -> None:
     """Emit a structured world-state event."""
     _emit_runtime_event("WORLD", message, *args)
+
+
+def require_int_field(
+    fields: dict[str, str | int | float | bool],
+    key: str,
+) -> int:
+    """Extract a required int-valued structured field.
+
+    Mirrors ``platform_core.json_utils.require_int`` for the
+    :data:`RuntimeEventRecordDict.fields` payload, whose value type is
+    the narrow primitive union ``str | int | float | bool``. Booleans
+    are rejected so callers reading ``duration_ms`` / ``timeout_ms`` /
+    coordinate fields are guaranteed a numeric int.
+
+    Args:
+        fields: Decoded structured payload from a runtime event record.
+        key: Field name to extract.
+
+    Returns:
+        Validated int value.
+
+    Raises:
+        KeyError: When ``key`` is absent from ``fields``.
+        TypeError: When the field is not a numeric int (bools are
+            rejected even though Python treats ``bool`` as ``int``).
+    """
+    if key not in fields:
+        raise KeyError(f"runtime field {key!r} is required")
+    value = fields[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"runtime field {key!r} must be int, got {type(value).__name__}")
+    return value
+
+
+def require_str_field(
+    fields: dict[str, str | int | float | bool],
+    key: str,
+) -> str:
+    """Extract a required str-valued structured field.
+
+    Args:
+        fields: Decoded structured payload from a runtime event record.
+        key: Field name to extract.
+
+    Returns:
+        Validated str value.
+
+    Raises:
+        KeyError: When ``key`` is absent from ``fields``.
+        TypeError: When the field is not a str.
+    """
+    if key not in fields:
+        raise KeyError(f"runtime field {key!r} is required")
+    value = fields[key]
+    if not isinstance(value, str):
+        raise TypeError(f"runtime field {key!r} must be str, got {type(value).__name__}")
+    return value
+
+
+def require_bool_field(
+    fields: dict[str, str | int | float | bool],
+    key: str,
+) -> bool:
+    """Extract a required bool-valued structured field.
+
+    Args:
+        fields: Decoded structured payload from a runtime event record.
+        key: Field name to extract.
+
+    Returns:
+        Validated bool value.
+
+    Raises:
+        KeyError: When ``key`` is absent from ``fields``.
+        TypeError: When the field is not a bool.
+    """
+    if key not in fields:
+        raise KeyError(f"runtime field {key!r} is required")
+    value = fields[key]
+    if not isinstance(value, bool):
+        raise TypeError(f"runtime field {key!r} must be bool, got {type(value).__name__}")
+    return value
+
+
+def emit_diagnostic(
+    *,
+    diagnostic_kind: str,
+    **fields: str | int | float | bool,
+) -> None:
+    """Emit a structured diagnostic event.
+
+    The ``DIAGNOSTIC`` channel carries observability-only emissions:
+    target-selection breakdowns, attempt-window message timelines,
+    invariant-violation reports, and the like. Every emit lands on
+    ``runs/<mode>/latest.events.jsonl`` with ``diagnostic_kind`` plus
+    any caller-supplied primitive fields spread at the top level, so
+    queries against the JSONL can filter by kind and compare timing
+    distributions across runs.
+
+    Args:
+        diagnostic_kind: Stable identifier for the diagnostic shape
+            (``teleport_attempt``, ``fuel_target_selection``,
+            ``action_phase_overlap``, ``map_positions_parsed``,
+            ``movement_probe_map_already_showing``,
+            ``command_dispatch_failure``, etc.). The kind names the
+            payload schema; callers passing structured fields must
+            match the kind's documented schema.
+        **fields: Caller-supplied structured fields. Each field name
+            must not collide with the reserved top-level event keys
+            (timestamp, level, logger, mode, channel, message) --
+            collision raises at encode time.
+    """
+    message = f"diagnostic_kind={diagnostic_kind}"
+    _emit_runtime_event(
+        "DIAGNOSTIC",
+        message,
+        diagnostic_kind=diagnostic_kind,
+        **fields,
+    )
+
+
+def emit_wire_complete(
+    *,
+    action_kind: str,
+    duration_ms: int,
+    signal: str,
+    **extra: str | int | float | bool,
+) -> None:
+    """Emit a structured completion event for a dispatched bot action.
+
+    Symmetric to :func:`emit_wire`: where ``WIRE`` records the moment the
+    bot dispatched a command, ``WIRE_COMPLETE`` records the moment the
+    HFSM observed the authoritative completion signal for that command.
+    The resulting JSONL line carries ``action_kind`` / ``duration_ms`` /
+    ``signal`` at the top level so consumers can run queries like
+    ``jq 'select(.channel=="WIRE_COMPLETE" and .action_kind=="map_open")
+    | .duration_ms'`` directly against ``runs/bot/latest.events.jsonl``.
+
+    Args:
+        action_kind: Kind of action that completed (e.g. ``map_open``,
+            ``move``, ``teleport``, ``collect``, ``scan``).
+        duration_ms: Wall-clock milliseconds between dispatch and the
+            observed completion. Negative values mean the gate fired
+            with no recorded ``started_ms`` and are passed through
+            verbatim so reviewers can spot the case.
+        signal: Name of the authoritative completion signal -- e.g.
+            ``map_data_processed``, ``teleport_landed``,
+            ``radar_scan_complete``, ``position_reached``,
+            ``container_consumed_or_reached``, ``stall_timeout``.
+        **extra: Additional structured fields to attach (e.g. target
+            coordinates). Field names must not collide with the reserved
+            top-level event keys -- collision raises at encode time.
+    """
+    message = f"{action_kind} completed in {duration_ms}ms via {signal}"
+    _emit_runtime_event(
+        "WIRE_COMPLETE",
+        message,
+        action_kind=action_kind,
+        duration_ms=duration_ms,
+        signal=signal,
+        **extra,
+    )
 
 
 def _reset_artifact_files(*paths: Path) -> None:
@@ -332,6 +610,7 @@ def _emit_runtime_event(
     channel: str,
     message: str,
     *args: str | int | float | bool,
+    **fields: str | int | float | bool,
 ) -> None:
     """Emit a runtime event to both console logs and JSONL artifacts.
 
@@ -339,12 +618,16 @@ def _emit_runtime_event(
         channel: Event channel such as ``AI`` or ``WORLD``.
         message: ``printf``-style message string without the channel prefix.
         *args: Format arguments for the message string.
+        **fields: Structured key/value payload spread into the JSONL event
+            at the top level. Must not collide with the reserved event keys
+            (timestamp, level, logger, mode, channel, message).
     """
     formatted = message % args if args else message
     extra = RuntimeLogExtraDict(
         runtime_channel=channel,
         runtime_message=formatted,
         runtime_mode=_runtime_mode_name(),
+        runtime_fields=dict(fields),
     )
     _EMITTER_LOGGER.info("%s: %s", channel, formatted, extra=extra)
 
@@ -353,26 +636,36 @@ def _runtime_mode_name() -> str:
     """Return the active runtime mode name.
 
     Returns:
-        ``bot`` or ``sniff`` when configured, otherwise ``unconfigured``.
+        ``bot``, ``sniff``, or ``probe:<name>`` when configured,
+        otherwise ``unconfigured``.
     """
     if _BOT_ARTIFACTS is not None:
         return "bot"
     if _SNIFF_ARTIFACTS is not None:
         return "sniff"
+    if _PROBE_ARTIFACTS is not None:
+        return f"probe:{_PROBE_ARTIFACTS['probe_name']}"
     return "unconfigured"
 
 
 __all__ = [
     "RuntimeEventRecordDict",
     "configure_bot_runtime_logging",
+    "configure_probe_runtime_logging",
     "configure_sniff_runtime_logging",
     "decode_runtime_event_record",
     "emit_ai",
+    "emit_diagnostic",
     "emit_state",
     "emit_sync",
     "emit_wire",
+    "emit_wire_complete",
     "emit_world",
     "encode_runtime_event_record",
     "get_bot_runtime_artifacts",
+    "get_probe_runtime_artifacts",
     "get_sniff_runtime_artifacts",
+    "require_bool_field",
+    "require_int_field",
+    "require_str_field",
 ]

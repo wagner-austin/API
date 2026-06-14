@@ -38,6 +38,7 @@ class TestDecodeTankState:
             "is_self": False,
             "source": "viewport",
             "timestamp_ms": 5000,
+            "last_wire_seen_ms": 4200,
         }
         tank = decode_tank_state(data)
 
@@ -48,6 +49,7 @@ class TestDecodeTankState:
         assert tank["rank"] == 3
         assert tank["damage_state"] == 1
         assert tank["timestamp_ms"] == 5000
+        assert tank["last_wire_seen_ms"] == 4200
         assert tank["source"] == "viewport"
         assert tank["name"] == "Test"
         assert tank["is_bot"] is True
@@ -220,6 +222,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -229,6 +232,7 @@ class TestDecodeWorldState:
         assert state["containers"] == {}
         assert state["mines"] == {}
         assert state["terrain"] == {}
+        assert state["map_fuel_dots"] == {}
         assert state["timestamp_ms"] == 0
 
     def test_round_trip_encoding(self) -> None:
@@ -262,6 +266,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -302,6 +307,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -317,6 +323,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -332,6 +339,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -347,6 +355,7 @@ class TestDecodeWorldState:
             "terrain": {"10,20": 12345, "15,25": False},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -362,6 +371,7 @@ class TestDecodeWorldState:
             "terrain": None,
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
         state = decode_world_state(data)
@@ -387,6 +397,7 @@ class TestDecodeWorldState:
                     "is_self": False,
                     "source": "viewport",
                     "timestamp_ms": 500,
+                    "last_wire_seen_ms": 500,
                 },
             },
             "containers": {},
@@ -394,6 +405,7 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {},
+            "map_fuel_dots": {},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -423,6 +435,7 @@ class TestDecodeWorldState:
             },
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {"0,0": 1234},
+            "map_fuel_dots": {"6,1": 1234},
             "timestamp_ms": 1000,
         }
         state = decode_world_state(data)
@@ -434,6 +447,7 @@ class TestDecodeWorldState:
         assert tile["cache_value"] == 0
         assert tile["overlay_value"] == 255
         assert state["scanned_viewports"] == {"0,0": 1234}
+        assert state["map_fuel_dots"] == {"6,1": 1234}
 
     def test_raises_on_non_integer_scanned_viewport_timestamp(self) -> None:
         """Raises JSONTypeError for non-integer scanned viewport timestamps."""
@@ -445,8 +459,26 @@ class TestDecodeWorldState:
             "terrain": {},
             "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
             "scanned_viewports": {"0,0": True},
+            "map_fuel_dots": {},
             "timestamp_ms": 0,
         }
 
         with pytest.raises(JSONTypeError, match=r"scanned_viewports\.0,0 must be an integer"):
+            decode_world_state(data)
+
+    def test_raises_on_non_integer_fuel_dot_timestamp(self) -> None:
+        """Raises JSONTypeError for non-integer fuel-dot timestamps."""
+        data: JSONObject = {
+            "self_state": None,
+            "tanks": {},
+            "containers": {},
+            "mines": {},
+            "terrain": {},
+            "viewport": {"left": 0, "top": 0, "width": 18, "height": 18},
+            "scanned_viewports": {},
+            "map_fuel_dots": {"6,1": "soon"},
+            "timestamp_ms": 0,
+        }
+
+        with pytest.raises(JSONTypeError, match=r"map_fuel_dots\.6,1 must be an integer"):
             decode_world_state(data)

@@ -4,14 +4,10 @@ from __future__ import annotations
 
 from typing import Literal, Protocol
 
-from platform_core.json_utils import JSONValue, require_dict
-
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.types import (
-    TeleportPageSnapshotDict,
-    decode_teleport_page_snapshot,
-)
+from tankpit_bot.action_lab.page_client_snapshot import capture_page_client_snapshot
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
 
@@ -86,126 +82,45 @@ class StartupStateDriverProtocol(Protocol):
         ...
 
 
-def _extract_runtime_value(result: dict[str, JSONValue]) -> JSONValue:
-    """Return the ``Runtime.evaluate`` value field.
-
-    Args:
-        result: Raw CDP result object.
-
-    Returns:
-        Evaluated JavaScript value.
-
-    Raises:
-        ValueError: If the CDP result is missing the value field.
-    """
-    result_obj = require_dict(result, "result")
-    if "value" not in result_obj:
-        raise ValueError(f"Runtime.evaluate result missing value: {result_obj}")
-    return result_obj["value"]
-
-
 def capture_teleport_page_snapshot(
     cdp: CDPSessionProtocol,
     phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
 ) -> TeleportPageSnapshotDict:
-    """Capture the current page-client state relevant to teleport investigation.
+    """Capture the current page-client state, annotated with a teleport phase.
+
+    Thin wrapper around :func:`capture_page_client_snapshot` that adds the
+    teleport-specific ``phase`` label so consumers of the teleport probe
+    JSON can distinguish snapshots taken at different points in one
+    attempt. All page-client field semantics are identical to the
+    universal snapshot.
 
     Args:
-        cdp: Active CDP session.
+        cdp: Active CDP session attached to the live tankpit page.
         phase: Attempt phase associated with this snapshot.
 
     Returns:
-        Validated page-client snapshot.
+        Validated teleport page snapshot annotated with the phase.
     """
-    expression = """
-    (() => {
-        const activeGame =
-            window.__tankpitActiveGame && typeof window.__tankpitActiveGame === 'object'
-                ? window.__tankpitActiveGame
-                : null;
-        const mapObject =
-            activeGame && activeGame.map && typeof activeGame.map === 'object'
-                ? activeGame.map
-                : null;
-        const actionSource =
-            activeGame &&
-            activeGame.h &&
-            typeof activeGame.h === 'object' &&
-            activeGame.h.j &&
-            typeof activeGame.h.j === 'object'
-                ? activeGame.h.j
-                : null;
-        const actions =
-            actionSource && Array.isArray(actionSource.actions)
-                ? actionSource.actions
-                : null;
-        const heartbeatSource =
-            activeGame && activeGame.va && typeof activeGame.va === 'object'
-                ? activeGame.va
-                : null;
-        const lastHeartbeat =
-            heartbeatSource && typeof heartbeatSource.j === 'number'
-                ? heartbeatSource.j
-                : null;
-        const lastPageClientSend =
-            typeof window.__lastPageClientSendPerfMs === 'number'
-                ? window.__lastPageClientSendPerfMs
-                : null;
-        const lastBotSend =
-            typeof window.__lastBotInjectedSendPerfMs === 'number'
-                ? window.__lastBotInjectedSendPerfMs
-                : null;
-        const ws =
-            window.__capturedWS instanceof WebSocket
-                ? window.__capturedWS
-                : null;
-        const queue =
-            Array.isArray(window.__sentFrameMetaQueue)
-                ? window.__sentFrameMetaQueue
-                : [];
-        const now = performance.now();
-        return {
-            phase: %PHASE%,
-            timestamp_ms: Date.now(),
-            client_present: activeGame !== null,
-            map_visible: mapObject === null ? null : !!mapObject.h,
-            client_state:
-                activeGame !== null && typeof activeGame.s === 'number'
-                    ? activeGame.s
-                    : null,
-            client_busy:
-                activeGame !== null && typeof activeGame.Ha === 'boolean'
-                    ? activeGame.Ha
-                    : null,
-            pending_actions: actions === null ? null : actions.length,
-            heartbeat_age_ms:
-                lastHeartbeat === null ? null : Math.max(0, Math.floor(now - lastHeartbeat)),
-            last_page_client_send_age_ms:
-                lastPageClientSend === null
-                    ? null
-                    : Math.max(0, Math.floor(now - lastPageClientSend)),
-            last_bot_send_age_ms:
-                lastBotSend === null
-                    ? null
-                    : Math.max(0, Math.floor(now - lastBotSend)),
-            ws_ready_state: ws === null ? null : ws.readyState,
-            current_send_label:
-                typeof window.__codexCurrentSendLabel === 'string'
-                    ? window.__codexCurrentSendLabel
-                    : null,
-            sent_frame_meta_queue_length: queue.length
-        };
-    })()
-    """
-    result = cdp.send(
-        "Runtime.evaluate",
-        {
-            "expression": expression.replace("%PHASE%", repr(phase)),
-            "returnByValue": True,
-        },
+    base = capture_page_client_snapshot(cdp)
+    return TeleportPageSnapshotDict(
+        phase=phase,
+        timestamp_ms=base["timestamp_ms"],
+        client_present=base["client_present"],
+        map_visible=base["map_visible"],
+        client_state=base["client_state"],
+        client_busy=base["client_busy"],
+        pending_actions=base["pending_actions"],
+        heartbeat_age_ms=base["heartbeat_age_ms"],
+        last_page_client_send_age_ms=base["last_page_client_send_age_ms"],
+        last_bot_send_age_ms=base["last_bot_send_age_ms"],
+        ws_ready_state=base["ws_ready_state"],
+        current_send_label=base["current_send_label"],
+        sent_frame_meta_queue_length=base["sent_frame_meta_queue_length"],
+        self_fields=base["self_fields"],
+        world_fields=base["world_fields"],
+        map_fields=base["map_fields"],
+        world_collections=base["world_collections"],
     )
-    raw_value = _extract_runtime_value(result)
-    return decode_teleport_page_snapshot(require_dict({"snapshot": raw_value}, "snapshot"))
 
 
 def wait_for_world_sync(

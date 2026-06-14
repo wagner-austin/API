@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from tests.conftest import FakeEnv, FakeFileSystem
+
+_STOP = Path("__nonexistent_stop_file__")
 
 
 class TestBotGameLoop:
@@ -24,7 +28,39 @@ class TestBotGameLoop:
 
         # _game_loop will exit when KeyboardInterrupt is raised
         with pytest.raises(KeyboardInterrupt):
-            bot._game_loop(interrupting_page)
+            bot._game_loop(interrupting_page, session_seconds=0, stop_file_path=_STOP)
+
+    def test_game_loop_returns_at_session_tick_budget(self, fake_env: FakeEnv) -> None:
+        """A positive TANKPIT_BOT_SESSION_SECONDS ends the loop cleanly.
+
+        With TICK_RATE_MS=2000, 4 seconds is exactly 2 ticks: the loop
+        must return (not raise) after the second tick, before any
+        inter-tick wait would run for the final tick.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.protocol.commands import TICK_RATE_MS
+        from tests.fakes import FakeCDPSession, FakePageInterrupting
+
+        fake_env.set("TANKPIT_BOT_SESSION_SECONDS", "4")
+        assert 4 * 1000 // TICK_RATE_MS == 2
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+
+        # Interrupt as a backstop: a correct budget exit never waits twice.
+        page = FakePageInterrupting(interrupt_after=2)
+
+        bot._game_loop(page, session_seconds=4, stop_file_path=_STOP)
+
+        assert page._wait_count == 1
+
+    def test_game_loop_invalid_session_seconds_raises(self, fake_env: FakeEnv) -> None:
+        """A non-integer TANKPIT_BOT_SESSION_SECONDS propagates ValueError."""
+        from tankpit_bot.bot.base import resolve_session_seconds
+
+        with pytest.raises(ValueError):
+            resolve_session_seconds([], "soon")
 
 
 class TestBotRunMethod:
@@ -42,7 +78,7 @@ class TestBotRunMethod:
         try:
             bot = Bot("https://test.tankpit.com/", headless=True)
             with pytest.raises(PlaywrightNotInstalledError):
-                bot.run()
+                bot.run(session_seconds=0, stop_file_path=_STOP)
         finally:
             _test_hooks.sync_playwright = original
 
@@ -63,7 +99,7 @@ class TestBotRunMethod:
         try:
             bot = Bot("https://test.tankpit.com/", headless=True)
             # run() catches KeyboardInterrupt internally and returns normally
-            bot.run()
+            bot.run(session_seconds=0, stop_file_path=_STOP)
             # After cleanup, _cdp and _page should be None
             assert bot._cdp is None
             assert bot._page is None
@@ -91,7 +127,7 @@ class TestBotRunMethod:
         try:
             configure_bot_runtime_logging(stamp="20260404-000000")
             bot = Bot("https://test.tankpit.com/", headless=True)
-            bot.run()
+            bot.run(session_seconds=0, stop_file_path=_STOP)
             written_files = fake_fs.get_written_files()
             has_capture = False
             for path in written_files:
@@ -136,7 +172,9 @@ class TestBotBaseMain:
 
         # Set up fakes
         original_pw = _test_hooks.sync_playwright
+        original_argv = _test_hooks.get_argv
         _test_hooks.sync_playwright = fake_sync_playwright_factory
+        _test_hooks.get_argv = lambda: ["tankpit-bot"]
 
         try:
             from tankpit_bot.bot import base
@@ -145,6 +183,7 @@ class TestBotBaseMain:
                 base.main()
         finally:
             _test_hooks.sync_playwright = original_pw
+            _test_hooks.get_argv = original_argv
 
         if not factory_called:
             raise AssertionError("Expected sync_playwright factory to be called")
@@ -170,9 +209,11 @@ class TestBotBaseMain:
         # Save originals
         original_pw = _test_hooks.sync_playwright
         original_get_pw = _test_hooks.get_sync_playwright
+        original_argv = _test_hooks.get_argv
 
         # Set sync_playwright to None so main() will call get_sync_playwright()
         _test_hooks.sync_playwright = None
+        _test_hooks.get_argv = lambda: ["tankpit-bot"]
 
         # Track if get_sync_playwright was called
         get_called = False
@@ -197,6 +238,7 @@ class TestBotBaseMain:
         finally:
             _test_hooks.sync_playwright = original_pw
             _test_hooks.get_sync_playwright = original_get_pw
+            _test_hooks.get_argv = original_argv
 
         if not get_called:
             raise AssertionError("Expected get_sync_playwright to be called")
@@ -222,7 +264,7 @@ class TestBotGameLoopStates:
         interrupting_page = FakePageInterrupting(interrupt_after=3)
 
         with pytest.raises(KeyboardInterrupt):
-            bot._game_loop(interrupting_page)
+            bot._game_loop(interrupting_page, session_seconds=0, stop_file_path=_STOP)
 
         # AI state unchanged — no self_state to act on
         assert bot._ai_state["mode"] == "UNSET"
@@ -256,9 +298,10 @@ class TestBotGameLoopStates:
         interrupting_page = FakePageInterrupting(interrupt_after=3)
 
         with pytest.raises(KeyboardInterrupt):
-            bot._game_loop(interrupting_page)
+            bot._game_loop(interrupting_page, session_seconds=0, stop_file_path=_STOP)
 
         runtime_calls = [m for m in fake_cdp._sent_methods if m == "Runtime.evaluate"]
-        assert runtime_calls == ["Runtime.evaluate"]
+        # CDP calls: snapshot read + structure survey + radar dispatch + overlay update.
+        assert runtime_calls == ["Runtime.evaluate"] * 4
         assert bot._ai_state["last_scan_ms"] > 0
         assert bot.get_state() == "SCANNING"

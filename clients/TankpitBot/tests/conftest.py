@@ -9,6 +9,7 @@ import pytest
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot import _hooks_guard, _test_hooks
+from tankpit_bot._test_hooks import CDPSessionProtocol
 
 
 class FakeCDPSessionSimple:
@@ -79,6 +80,29 @@ class FakeCDPSessionSimple:
         return len(self._calls)
 
 
+def _noop_start_watchdog(seconds: float, on_fire: Callable[[], None]) -> None:
+    """Inert watchdog for tests: never arms a real timer.
+
+    Args:
+        seconds: Ignored delay.
+        on_fire: Ignored callback.
+    """
+    del seconds, on_fire
+
+
+def _unexpected_force_exit(exit_code: int) -> None:
+    """Fail loudly if production code force-exits during a test.
+
+    Args:
+        exit_code: Exit code the production code requested.
+
+    Raises:
+        AssertionError: Always; a test that expects a forced exit must
+            install its own recording fake.
+    """
+    raise AssertionError(f"force_exit({exit_code}) called without a test-installed fake")
+
+
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     """Reset all shared test hooks to canonical defaults for each test."""
@@ -93,9 +117,17 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
     _test_hooks.get_argv = _test_hooks._real_get_argv
     _test_hooks.process_received_message_hook = _test_hooks._real_process_received_message
+    # Watchdog hooks default to inert fakes in tests: a real daemon
+    # timer armed by one test would os._exit the xdist worker seconds
+    # later, killing unrelated tests. Tests that assert watchdog
+    # behavior install recording fakes explicitly.
+    _test_hooks.start_watchdog = _noop_start_watchdog
+    _test_hooks.force_exit = _unexpected_force_exit
 
     yield
 
+    _test_hooks.start_watchdog = _noop_start_watchdog
+    _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.get_env = _test_hooks._default_get_env
     _test_hooks.write_text = _test_hooks._real_write_text
     _test_hooks.read_text = _test_hooks._real_read_text
@@ -133,6 +165,35 @@ def _restore_runtime_logging_state() -> Generator[None, None, None]:
     runtime_logging._BOT_ARTIFACTS = None
     runtime_logging._SNIFF_ARTIFACTS = None
     runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
+
+
+@pytest.fixture(autouse=True)
+def _isolate_protocol_singletons() -> Generator[None, None, None]:
+    """Reset world-state and XOR singletons around every test.
+
+    Several test paths (replay harnesses, sniffer/world_state tests,
+    bot tick-loop tests) mutate module-level singletons -- the global
+    world-state dict, the global XOR table built from the session
+    magic key, etc. Without a consistent reset, tests that run later
+    on the same xdist worker can decode bytes with a stale XOR key or
+    read containers seeded by a prior run, producing failures that
+    look like flakes.
+
+    Centralising the reset here (top-level autouse) means every test
+    inherits the same clean baseline regardless of which directory it
+    lives in -- no duplicated per-file fixtures, no missed resets.
+    """
+    from tankpit_bot.diagnostics.teleport_attempts import reset_teleport_attempt_tracking
+    from tankpit_bot.sniffer.world_state import reset_world_state
+    from tankpit_bot.sniffer.xor import reset_xor_state
+
+    reset_world_state()
+    reset_xor_state()
+    reset_teleport_attempt_tracking()
+    yield
+    reset_world_state()
+    reset_xor_state()
+    reset_teleport_attempt_tracking()
 
 
 class FakeEnv:
@@ -255,6 +316,25 @@ class FakeFileSystem:
         if key in self._files:
             del self._files[key]
 
+    def glob_paths(self, directory: Path, pattern: str) -> list[Path]:
+        """List fake files in a directory matching a glob pattern.
+
+        Args:
+            directory: Directory to list.
+            pattern: Glob pattern matched against file names.
+
+        Returns:
+            Matching paths in sorted order.
+        """
+        from fnmatch import fnmatch
+
+        matches = [
+            Path(key)
+            for key in self._files
+            if Path(key).parent == directory and fnmatch(Path(key).name, pattern)
+        ]
+        return sorted(matches)
+
     def get_written_files(self) -> dict[str, str]:
         """Get all written files.
 
@@ -265,15 +345,26 @@ class FakeFileSystem:
 
 
 @pytest.fixture()
-def fake_fs() -> FakeFileSystem:
-    """Create a FakeFileSystem and install it as hooks.
+def fake_fs() -> Generator[FakeFileSystem, None, None]:
+    """Create a FakeFileSystem, install it as hooks, and restore on teardown.
 
-    Pre-populates the static XOR key file used by the codec and probe modules.
+    Pre-populates the static XOR key file used by the codec and probe
+    modules. The original hooks are restored after the test: without
+    teardown, every later test on the same xdist worker silently kept
+    the fake file system, so any test reading a real fixture file (for
+    example ``RecordedChromiumSession.from_capture_path``) passed or
+    failed depending on scheduling order.
 
-    Returns:
+    Yields:
         FakeFileSystem instance.
     """
     from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+    original_write_text = _test_hooks.write_text
+    original_read_text = _test_hooks.read_text
+    original_append_text = _test_hooks.append_text
+    original_path_exists = _test_hooks.path_exists
+    original_glob_paths = _test_hooks.glob_paths
 
     # Create a 1000-character fake static key for testing
     # This matches the expected format of the real key
@@ -284,11 +375,18 @@ def fake_fs() -> FakeFileSystem:
     _test_hooks.read_text = fs.read_text
     _test_hooks.append_text = fs.append_text
     _test_hooks.path_exists = fs.path_exists
+    _test_hooks.glob_paths = fs.glob_paths
 
     # Pre-populate the static key file
     fs.write_text(DEFAULT_STATIC_KEY_PATH, fake_static_key)
 
-    return fs
+    yield fs
+
+    _test_hooks.write_text = original_write_text
+    _test_hooks.read_text = original_read_text
+    _test_hooks.append_text = original_append_text
+    _test_hooks.path_exists = original_path_exists
+    _test_hooks.glob_paths = original_glob_paths
 
 
 def make_fake_get_env(env_vars: dict[str, str]) -> Callable[[str], str | None]:
@@ -315,3 +413,27 @@ def fake_cdp() -> FakeCDPSessionSimple:
         FakeCDPSessionSimple instance.
     """
     return FakeCDPSessionSimple()
+
+
+@pytest.fixture(scope="module")
+def live_cdp() -> Generator[CDPSessionProtocol, None, None]:
+    """Yield a real CDP session attached to a rendered headless page.
+
+    Launches one genuine headless Chromium per test module (loadscope
+    keeps a module's tests on one worker) and tears it down afterwards,
+    so the launch cost is paid once. Used to exercise CDP screenshot
+    capture against a real browser rather than a substitute.
+
+    Yields:
+        A live CDP session whose page has visible rendered content.
+    """
+    factory = _test_hooks.get_sync_playwright()
+    with factory() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        try:
+            context = browser.new_context()
+            page = context.new_page()
+            page.goto("data:text/html,<body style='margin:0;background:#33aa66'>tankpit</body>")
+            yield context.new_cdp_session(page)
+        finally:
+            browser.close()

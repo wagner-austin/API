@@ -100,10 +100,17 @@ def _decrement_ammo_for_weapon(weapon_byte: int) -> None:
 def mark_tank_killed(tank_id: int) -> None:
     """Record a tank as killed via Deactivation protocol message.
 
+    Also anchors the tank's current world-state position as its death
+    tile so the registry-truth module can suppress corpse re-ingestion
+    (the client registry keeps rendering deactivated sprites for minutes).
+
     Args:
         tank_id: The killed tank's ID.
     """
     _ws._killed_tank_ids.add(tank_id)
+    existing = _ws._world_state["tanks"].get(str(tank_id))
+    if existing is not None:
+        _ws._tank_death_anchors[tank_id] = (existing["x"], existing["y"])
 
 
 def drain_killed_tank_ids() -> set[int]:
@@ -115,6 +122,32 @@ def drain_killed_tank_ids() -> set[int]:
     result = _ws._killed_tank_ids
     _ws._killed_tank_ids = set()
     return result
+
+
+def get_death_anchor(tank_id: int) -> tuple[int, int] | None:
+    """Return the death-tile anchor for a killed tank.
+
+    Args:
+        tank_id: Tank ID to look up.
+
+    Returns:
+        ``(x, y)`` tuple of the tile where the tank was last killed,
+        or ``None`` if the tank has no death anchor.
+    """
+    return _ws._tank_death_anchors.get(tank_id)
+
+
+def clear_death_anchor(tank_id: int) -> None:
+    """Clear a tank's death-tile anchor after respawn evidence.
+
+    Called when a registry observation places the tank away from its
+    death tile -- proof that the tank respawned and its old corpse
+    sprite is gone.
+
+    Args:
+        tank_id: Tank whose death anchor to clear.
+    """
+    _ws._tank_death_anchors.pop(tank_id, None)
 
 
 def mark_teleport_landed() -> None:
@@ -137,7 +170,9 @@ __all__ = [
     "check_and_clear_combat_hit",
     "check_and_clear_our_shot_response",
     "check_and_clear_teleport_landed",
+    "clear_death_anchor",
     "drain_killed_tank_ids",
+    "get_death_anchor",
     "mark_combat_hit",
     "mark_tank_killed",
     "mark_teleport_landed",

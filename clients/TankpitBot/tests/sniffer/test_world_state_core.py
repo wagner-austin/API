@@ -19,7 +19,7 @@ from tankpit_bot.sniffer import (
     world_state,
 )
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 class TestWorldStateCore:
@@ -66,7 +66,7 @@ class TestWorldStateCore:
             set_selected_room,
         )
 
-        fake_terrain = FakeTerrainMap()
+        fake_terrain = InMemoryTerrainMap()
 
         register_room_image("1", "field01.gif")
         set_selected_room("1")
@@ -167,7 +167,7 @@ class TestWorldStateRendering:
         from tankpit_bot.sniffer import render_world_state_ascii
         from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
 
-        fake_terrain = FakeTerrainMap()
+        fake_terrain = InMemoryTerrainMap()
         register_room_image("1", "field01.gif")
         set_selected_room("1")
         _test_hooks.path_exists = lambda path: True
@@ -207,7 +207,7 @@ class TestRoomTracking:
         from tankpit_bot.sniffer.world_state import set_selected_room
 
         # Pre-load a terrain map so we can verify it gets reset
-        fake_terrain = FakeTerrainMap()
+        fake_terrain = InMemoryTerrainMap()
         world_state._terrain_map = fake_terrain
 
         set_selected_room("2")
@@ -222,7 +222,7 @@ class TestRoomTracking:
             set_selected_room,
         )
 
-        fake_terrain = FakeTerrainMap()
+        fake_terrain = InMemoryTerrainMap()
 
         register_room_image("2", "field42.gif")
         set_selected_room("2")

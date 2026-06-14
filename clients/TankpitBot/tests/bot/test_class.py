@@ -202,14 +202,6 @@ class TestBotCommandsWithoutCDP:
         result = bot.open_map()
         assert result is False
 
-    def test_close_map_returns_true_when_already_closed(self, fake_env: FakeEnv) -> None:
-        """Test Bot.close_map returns False without CDP."""
-        from tankpit_bot.bot import Bot
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        result = bot.close_map()
-        assert result is False
-
 
 class TestBotEquipmentState:
     """Tests for Bot equipment state management using server inventory."""
@@ -266,20 +258,15 @@ class TestBotEquipmentState:
 class TestBotMapState:
     """Tests for Bot map toggle helpers."""
 
-    def test_open_map_ignores_legacy_map_flag_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.open_map does not trust the legacy local map flag."""
-        from tankpit_bot.bot import Bot
-
-        bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._map_is_open = True
-        result = bot.open_map()
-        assert result is False
-
     def test_close_map_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.close_map returns False without CDP even if flag says open."""
+        """Bot.close_map returns False when no CDP session is attached.
+
+        Without CDP there is no transport to dispatch the synthetic ``m``
+        keypress that actually closes the overlay client-side, so the
+        method reports failure.
+        """
         from tankpit_bot.bot import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        bot._map_is_open = True
         result = bot.close_map()
         assert result is False

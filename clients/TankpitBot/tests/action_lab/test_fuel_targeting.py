@@ -6,7 +6,8 @@ from collections.abc import Callable, Generator
 from typing import Protocol
 
 import pytest
-from tests.action_lab.test_fuel_probe import _Clock, _ProbeHarness, _terrain
+from tests.action_lab._replay_core import ReplayClock
+from tests.action_lab.test_fuel_probe import _ProbeHarness, _terrain
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.action_lab.fuel_targeting import (
@@ -100,7 +101,7 @@ def _restore_hooks() -> Generator[None, None, None]:
 
 def test_find_visible_fuel_target_uses_current_probe_state() -> None:
     """Visible fuel selection passes the live world state through unchanged."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     probe.get_world_state()["timestamp_ms"] = 1500
     expected = make_container_state(101, 100, True, 350, timestamp_ms=1500)
     fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100)})
@@ -137,7 +138,7 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
 
 def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
     """Visible fuel selection rejects missing terrain and self state."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     fuel_targeting_module.get_terrain_map = lambda: None
 
     with pytest.raises(FuelTargetingError, match="terrain map is unavailable"):
@@ -152,7 +153,7 @@ def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
 
 def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state() -> None:
     """Reachability helper detects blocked visible fuel and validates prerequisites."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     target = make_container_state(101, 100, True, 300, timestamp_ms=1000)
     fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (101, 100)})
     captured: dict[str, int] = {}
@@ -195,7 +196,7 @@ def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state(
 
 def test_find_visible_fuel_landing_tile_uses_current_state_and_validates_state() -> None:
     """Landing-tile selection uses current probe state and validates prerequisites."""
-    probe = _ProbeHarness(_Clock(1000))
+    probe = _ProbeHarness(ReplayClock(1000))
     target = make_container_state(101, 100, True, 300, timestamp_ms=1000)
     fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (102, 100)})
     captured: dict[str, int] = {}

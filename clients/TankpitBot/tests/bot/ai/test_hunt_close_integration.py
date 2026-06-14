@@ -9,7 +9,7 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 class TestDecideTeleportToFarTarget:
@@ -19,12 +19,57 @@ class TestDecideTeleportToFarTarget:
         """Reset world state before each test."""
         reset_world_state()
 
-    def test_far_target_starts_with_map_open(self) -> None:
-        """A new far target starts by opening the map and locking combat state."""
+    def test_in_range_target_is_shot_on_acquire(self) -> None:
+        """A visible in-range target is engaged directly, never approached.
+
+        Shots resolve server-side and never miss in range; requiring
+        adjacency (or detouring through map intel) made run
+        20260611-083908 chase a moving orange-3 through 30 teleport
+        hops without firing.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
-                x=120,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="NearEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+                "mode": "HUNT",
+                "mode_state": "CLOSE",
+                "mode_started_ms": 90000,
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["target_x"] == 101
+        assert decision["behavior"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_far_target_starts_with_map_open(self) -> None:
+        """A new out-of-range target starts by opening the map."""
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=130,
                 y=100,
                 team=2,
                 rank=1,
@@ -32,7 +77,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -49,7 +94,7 @@ class TestDecideTeleportToFarTarget:
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
-                x=120,
+                x=130,
                 y=100,
                 team=2,
                 rank=1,
@@ -67,12 +112,17 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["behavior"]["target_x"] == 119
+        assert decision["behavior"]["target_x"] == 129
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_locked_phase_one_target_teleports_to_existing_enemy(self) -> None:
-        """Locked targets keep their target identity during close teleports."""
+        """Locked targets keep their target identity during close teleports.
+
+        The locked enemy sits beyond combat_range (distance 30 > 20),
+        so closing teleports instead of shooting; an in-range enemy is
+        shot directly (see the in-range test below).
+        """
         tanks: dict[str, TankStateDict] = {
             "60": make_tank_state(
                 tank_id=60,
@@ -84,11 +134,11 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
             "50": make_tank_state(
                 tank_id=50,
-                x=120,
+                x=130,
                 y=100,
                 team=2,
                 rank=1,
@@ -96,7 +146,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -105,7 +155,7 @@ class TestDecideTeleportToFarTarget:
                 **make_scanned_ai_state(),
                 "last_map_open_ms": 99500,
                 "combat_target_id": 50,
-                "combat_target_x": 120,
+                "combat_target_x": 130,
                 "combat_target_y": 100,
             }
         )
@@ -114,7 +164,51 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["behavior"]["target_x"] == 119
+        assert decision["behavior"]["target_x"] == 129
+        assert decision["behavior"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_locked_target_within_combat_range_is_shot(self) -> None:
+        """An in-range locked target is shot at its current position.
+
+        Shots resolve server-side and never miss in range; requiring
+        Manhattan adjacency instead made run 20260611-083908 chase a
+        moving orange-3 through 30 teleport hops without firing.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="LockedEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+                "mode": "HUNT",
+                "mode_state": "CLOSE",
+                "mode_started_ms": 90000,
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["target_x"] == 101
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
@@ -131,7 +225,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=180, self_y=80, fuel=800, tanks=tanks)
@@ -145,7 +239,7 @@ class TestDecideTeleportToFarTarget:
             }
         )
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (197, 86): "W",
                 (198, 86): "W",
@@ -172,7 +266,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=180, self_y=80, fuel=800, tanks=tanks)
@@ -186,7 +280,7 @@ class TestDecideTeleportToFarTarget:
             }
         )
         inventory = make_inventory()
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (198, 86): "W",
                 (196, 86): "W",
@@ -217,6 +311,7 @@ class TestDecideTeleportToFarTarget:
             name="EdgeEnemy",
             is_bot=False,
             timestamp_ms=0,
+            last_wire_seen_ms=0,
         )
 
         landing_x, landing_y = _combat_landing_tile(ctx, target)
@@ -236,7 +331,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -317,7 +412,7 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=50, tanks=tanks)

@@ -508,10 +508,19 @@ TankpitBot/
 │
 ├── tests/
 │   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
-│   ├── fakes/                # Fake Playwright classes
-│   │   ├── base.py           # Core fakes (FakeCDPSession, FakePage)
+│   ├── fakes/                # Shared Playwright fakes used by bot/probe/browser/sniffer tests
+│   │   ├── base.py           # FakeCDPSession, FakePage, InMemoryTerrainMap, FakeKeyboard
 │   │   ├── bot.py            # Bot-specific fakes
 │   │   └── probe.py          # Probe-specific fakes
+│   ├── action_lab/           # Action-lab probe tests (replay-driven, no Playwright fakes)
+│   │   ├── _replay_core.py   # ReplayClock, ClockAdvancingPage, StubSnapshotCDPSession,
+│   │   │                     # StubbedBootstrapMixin, WorldStateOverrideMixin,
+│   │   │                     # DispatchCaptureMixin, FrameBatchSource, ReplayResult[T]
+│   │   ├── _replay_browser.py # RecordedChromiumSession (drives execute_probe via real
+│   │   │                     # PlaywrightProtocol stack against a captured session)
+│   │   ├── _replay_harness.py / _replay_fuel.py / _replay_equipment.py /
+│   │   │   _replay_teleport.py / _replay_enemy_teleport.py # Per-probe replay attempts
+│   │   └── test_*.py         # Movement/fuel/equipment/teleport/enemy-teleport probe tests
 │   ├── bot/                  # Bot tests
 │   │   ├── ai/               # AI behavior tests (25 files)
 │   │   ├── test_cdp.py       # CDP session + equipment + AI integration

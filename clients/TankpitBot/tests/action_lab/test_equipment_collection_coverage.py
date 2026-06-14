@@ -1,0 +1,505 @@
+"""Coverage for equipment target resolution and collection phase.
+
+Exercises resolve_equipment_target_after_radar directly (lines 427, 449)
+and run_tracked_equipment_collection_phase via module-level hook swap
+for the terminal_result propagation path (line 375).
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+import pytest
+from typing_extensions import Unpack
+
+from tankpit_bot.action_lab import (
+    equipment_collection_phase as ecp_module,
+)
+from tankpit_bot.action_lab.action_trace_types import (
+    ActionPhaseCycleDict,
+    ActionPhaseOverlapDict,
+)
+from tankpit_bot.action_lab.equipment_collection_phase import (
+    run_tracked_equipment_collection_phase,
+)
+from tankpit_bot.action_lab.equipment_probe_types import (
+    EquipmentProbeAttemptResultDict,
+)
+from tankpit_bot.action_lab.equipment_target_phase import (
+    EquipmentTargetPhaseProbeProtocol,
+    resolve_equipment_target_after_radar,
+)
+from tankpit_bot.action_lab.session import (
+    BufferedWorldStateProviderProtocol,
+    WaitPageProtocol,
+)
+from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterKwargs
+from tankpit_bot.action_lab.types import (
+    TeleportAttemptResultDict,
+    TeleportTargetDict,
+)
+from tankpit_bot.state import (
+    SelfStateDict,
+    ViewportStateDict,
+    WorldStateDict,
+    make_container_state,
+    make_empty_world_state,
+    make_self_state,
+)
+from tankpit_bot.state.types import ContainerStateDict
+from tankpit_bot.types import CapturedMessage
+
+_TARGET = TeleportTargetDict(label="t", x=10, y=20)
+_SELF = make_self_state(
+    tank_id=1,
+    x=100,
+    y=100,
+    team=2,
+    rank=1,
+    fuel=700,
+    leaderboard_position=1,
+)
+
+
+def _world() -> WorldStateDict:
+    """Build world."""
+    b = make_empty_world_state()
+    return WorldStateDict(
+        self_state=_SELF,
+        tanks=b["tanks"],
+        containers=b["containers"],
+        mines=b["mines"],
+        terrain=b["terrain"],
+        viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
+        scanned_viewports=b["scanned_viewports"],
+        map_fuel_dots={},
+        timestamp_ms=2000,
+    )
+
+
+_ATTEMPT = EquipmentProbeAttemptResultDict(
+    target=_TARGET,
+    teleport_cycle_ids=[1],
+    radar_cycle_id=None,
+    move_cycle_id=None,
+    pickup_cycle_id=None,
+    status="no_equipment_visible",
+    map_open_started_ms=1000,
+    map_sync_timestamp_ms=None,
+    teleport_started_ms=None,
+    radar_started_ms=None,
+    radar_sync_timestamp_ms=None,
+    reposition_map_open_started_ms=None,
+    reposition_map_sync_timestamp_ms=None,
+    reposition_teleport_started_ms=None,
+    pickup_started_ms=None,
+    completion_timestamp_ms=2000,
+    inventory_count_before=0,
+    inventory_count_after=None,
+    landed_signal_received=False,
+    landed_x=None,
+    landed_y=None,
+    equipment_target_x=None,
+    equipment_target_y=None,
+    phase_overlaps=[],
+    message_start_index=0,
+    message_end_index=0,
+)
+
+_TP_RESULT = TeleportAttemptResultDict(
+    target=_TARGET,
+    teleport_cycle_id=1,
+    status="landed_exact",
+    map_open_started_ms=1000,
+    map_sync_timestamp_ms=1100,
+    teleport_started_ms=1200,
+    completion_timestamp_ms=1500,
+    map_sync_elapsed_ms=100,
+    teleport_elapsed_ms=300,
+    fuel_before=700,
+    fuel_after=690,
+    world_timestamp_before=1100,
+    world_timestamp_after=1450,
+    landed_signal_received=True,
+    landed_x=10,
+    landed_y=20,
+    message_start_index=0,
+    message_end_index=0,
+    page_snapshots=[],
+)
+
+
+class _Page:
+    """Minimal page."""
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """No-op."""
+
+
+class _Probe:
+    """Minimal probe."""
+
+    def __init__(self) -> None:
+        self._messages: list[CapturedMessage] = []
+        self._w = _world()
+        self._cid = 0
+        self._cdp_message_buffer: list[str] = []
+
+    @property
+    def messages(self) -> list[CapturedMessage]:
+        """Messages."""
+        return self._messages
+
+    @property
+    def magic(self) -> str | None:
+        """Magic."""
+        return None
+
+    def open_map(self) -> bool:
+        """Open map."""
+        return True
+
+    def use_radar(self) -> bool:
+        """Radar."""
+        return True
+
+    def teleport_to(self, x: int, y: int) -> bool:
+        """Teleport."""
+        return True
+
+    def get_world_state(self) -> WorldStateDict:
+        """World."""
+        return self._w
+
+    def get_self_state(self) -> SelfStateDict | None:
+        """Self."""
+        return self._w["self_state"]
+
+    def _require_self_state(self) -> SelfStateDict:
+        """Require self."""
+        return _SELF
+
+    def _start_action_phase(
+        self,
+        phase: Literal["teleport", "radar", "move", "pickup"],
+        *,
+        attempt_label: str,
+    ) -> ActionPhaseCycleDict:
+        """Start phase."""
+        self._cid += 1
+        return ActionPhaseCycleDict(
+            phase=phase,
+            cycle_id=self._cid,
+            started_ms=1000,
+        )
+
+    def _end_action_phase(
+        self,
+        cycle: ActionPhaseCycleDict,
+    ) -> None:
+        """End phase."""
+
+    def _reset_probe_state_to_idle(self) -> None:
+        """Reset."""
+
+
+def _no_find(
+    p: EquipmentTargetPhaseProbeProtocol,
+    a: bool,
+) -> ContainerStateDict | None:
+    """Return no equipment."""
+    return None
+
+
+def _found(
+    p: EquipmentTargetPhaseProbeProtocol,
+    a: bool,
+) -> ContainerStateDict | None:
+    """Return equipment at (10, 20)."""
+    return make_container_state(
+        x=10,
+        y=20,
+        is_fuel=False,
+        volume=0,
+        timestamp_ms=1000,
+    )
+
+
+def _no_repo(
+    p: EquipmentTargetPhaseProbeProtocol,
+    c: ContainerStateDict,
+) -> bool:
+    """No reposition."""
+    return False
+
+
+def _no_land(
+    p: EquipmentTargetPhaseProbeProtocol,
+    c: ContainerStateDict,
+) -> tuple[int, int] | None:
+    """No landing."""
+    return None
+
+
+def _build_no_vis(
+    *,
+    target: TeleportTargetDict,
+    map_open_started_ms: int,
+    map_sync_timestamp_ms: int | None,
+    teleport_started_ms: int,
+    radar_started_ms: int,
+    radar_sync_timestamp_ms: int,
+    inventory_count_before: int,
+    teleport_result: TeleportAttemptResultDict,
+    message_start_index: int,
+    teleport_cycle_ids: list[int],
+    radar_cycle_id: int,
+    phase_overlaps: list[ActionPhaseOverlapDict],
+) -> EquipmentProbeAttemptResultDict:
+    """No-equipment-visible builder."""
+    return _ATTEMPT
+
+
+def _build_repo_map(
+    *,
+    target: TeleportTargetDict,
+    map_open_started_ms: int,
+    map_sync_timestamp_ms: int | None,
+    teleport_started_ms: int,
+    radar_started_ms: int,
+    radar_sync_timestamp_ms: int,
+    reposition_map_open_started_ms: int,
+    inventory_count_before: int,
+    teleport_result: TeleportAttemptResultDict,
+    equipment_target: ContainerStateDict,
+    message_start_index: int,
+    teleport_cycle_ids: list[int],
+    radar_cycle_id: int,
+    phase_overlaps: list[ActionPhaseOverlapDict],
+) -> EquipmentProbeAttemptResultDict:
+    """Reposition map sync timeout builder."""
+    return _ATTEMPT
+
+
+def _build_repo_tp(
+    *,
+    target: TeleportTargetDict,
+    map_open_started_ms: int,
+    map_sync_timestamp_ms: int | None,
+    teleport_started_ms: int,
+    radar_started_ms: int,
+    radar_sync_timestamp_ms: int,
+    reposition_map_open_started_ms: int,
+    reposition_map_sync_timestamp_ms: int | None,
+    reposition_teleport_started_ms: int,
+    inventory_count_before: int,
+    teleport_result: TeleportAttemptResultDict,
+    equipment_target: ContainerStateDict,
+    message_start_index: int,
+    teleport_cycle_ids: list[int],
+    radar_cycle_id: int,
+    phase_overlaps: list[ActionPhaseOverlapDict],
+) -> EquipmentProbeAttemptResultDict:
+    """Reposition teleport timeout builder."""
+    return _ATTEMPT
+
+
+def _build_radar_timeout(
+    *,
+    target: TeleportTargetDict,
+    map_open_started_ms: int,
+    map_sync_timestamp_ms: int | None,
+    teleport_started_ms: int,
+    radar_started_ms: int,
+    inventory_count_before: int,
+    teleport_result: TeleportAttemptResultDict,
+    message_start_index: int,
+    teleport_cycle_ids: list[int],
+    radar_cycle_id: int,
+    phase_overlaps: list[ActionPhaseOverlapDict],
+) -> EquipmentProbeAttemptResultDict:
+    """Radar timeout builder."""
+    return _ATTEMPT
+
+
+def _build_pickup(
+    *,
+    page: WaitPageProtocol,
+    target: TeleportTargetDict,
+    map_open_started_ms: int,
+    map_sync_timestamp_ms: int | None,
+    teleport_started_ms: int,
+    radar_started_ms: int,
+    radar_sync_timestamp_ms: int,
+    reposition_map_open_started_ms: int | None,
+    reposition_map_sync_timestamp_ms: int | None,
+    reposition_teleport_started_ms: int | None,
+    pickup_timeout_ms: int,
+    inventory_count_before: int,
+    teleport_result: TeleportAttemptResultDict,
+    equipment_target: ContainerStateDict,
+    message_start_index: int,
+    teleport_cycle_ids: list[int],
+    radar_cycle_id: int,
+) -> EquipmentProbeAttemptResultDict:
+    """Pickup builder (never called in terminal_result path)."""
+    return _ATTEMPT
+
+
+def _waiter(
+    page: WaitPageProtocol,
+    provider: BufferedWorldStateProviderProtocol,
+    target: TeleportTargetDict,
+    **kwargs: Unpack[TeleportOutcomeWaiterKwargs],
+) -> TeleportAttemptResultDict:
+    """Unreachable waiter."""
+    raise AssertionError("should not be called")
+
+
+def _sync_policy(
+    s: Literal["sync_before_teleport", "immediate_after_map_open"],
+) -> bool:
+    """Sync policy."""
+    return s == "sync_before_teleport"
+
+
+def _resolve(
+    find_vis: bool = False,
+) -> EquipmentProbeAttemptResultDict | None:
+    """Call resolve and return terminal_result if any."""
+
+    def _fv(
+        p: EquipmentTargetPhaseProbeProtocol,
+        a: bool,
+    ) -> ContainerStateDict | None:
+        return _found(p, a) if find_vis else None
+
+    r = resolve_equipment_target_after_radar(
+        page=_Page(),
+        probe=_Probe(),
+        cdp=None,
+        target=_TARGET,
+        map_open_started_ms=1000,
+        map_sync_timestamp_ms=1100,
+        teleport_started_ms=1200,
+        radar_started_ms=1300,
+        radar_sync_timestamp_ms=1400,
+        map_sync_timeout_ms=30000,
+        teleport_timeout_ms=30000,
+        inventory_count_before=0,
+        teleport_result=_TP_RESULT,
+        message_start_index=0,
+        teleport_cycle_ids=[1],
+        radar_cycle_id=2,
+        teleport_strategy="immediate_after_map_open",
+        terrain_provider=lambda: None,
+        find_visible_target=_fv,
+        requires_reposition=_no_repo,
+        find_landing_tile=_no_land,
+        get_phase_overlaps=lambda: [],
+        build_no_equipment_visible_result=_build_no_vis,
+        build_reposition_map_sync_timeout_result=_build_repo_map,
+        build_reposition_teleport_timeout_result=_build_repo_tp,
+        make_reposition_target=lambda x, y: _TARGET,
+        wait_for_teleport_outcome=_waiter,
+        teleport_strategy_requires_map_sync=_sync_policy,
+        no_landing_tile_error=RuntimeError,
+        dispatch_failure_error=RuntimeError,
+        unavailable_error=RuntimeError,
+        unexpected_result_error=RuntimeError,
+        unavailable_message="u",
+        no_landing_tile_message="no landing",
+        impossible_result_message="i",
+        acquisition_dispatch_failure_message="m",
+        teleport_dispatch_failure_message="t",
+    )
+    return r.terminal_result
+
+
+def test_resolve_no_equipment_visible() -> None:
+    """Line 427: find_visible_target returns None."""
+    result = _resolve(find_vis=False)
+    if result is None:
+        pytest.fail("expected terminal result")
+    assert result["status"] == "no_equipment_visible"
+
+
+def test_resolve_equipment_no_reposition() -> None:
+    """Line 449: equipment found, no reposition needed."""
+    assert _resolve(find_vis=True) is None
+
+
+def test_collection_propagates_terminal_result() -> None:
+    """Line 375: no equipment visible via real resolve -> terminal returned."""
+    original_radar = ecp_module.run_radar_phase
+    original_resolve = ecp_module.resolve_equipment_target_phase
+
+    def fake_radar(
+        page: WaitPageProtocol,
+        probe: ecp_module.EquipmentCollectionPhaseProbeProtocol,
+        *,
+        attempt_label: str,
+        timeout_ms: int,
+        dispatch_failure_error: type[Exception],
+        dispatch_failure_message: str = "",
+    ) -> tuple[ActionPhaseCycleDict, int, int | None]:
+        """Fake radar that always succeeds."""
+        return (
+            ActionPhaseCycleDict(
+                phase="radar",
+                cycle_id=99,
+                started_ms=1300,
+            ),
+            1300,
+            1400,
+        )
+
+    ecp_module.run_radar_phase = fake_radar
+    ecp_module.resolve_equipment_target_phase = resolve_equipment_target_after_radar
+    try:
+        result = run_tracked_equipment_collection_phase(
+            page=_Page(),
+            probe=_Probe(),
+            cdp=None,
+            target=_TARGET,
+            map_open_started_ms=1000,
+            map_sync_timestamp_ms=1100,
+            teleport_started_ms=1200,
+            map_sync_timeout_ms=30000,
+            teleport_timeout_ms=30000,
+            radar_timeout_ms=30000,
+            pickup_timeout_ms=10000,
+            inventory_count_before=0,
+            teleport_result=_TP_RESULT,
+            message_start_index=0,
+            teleport_cycle_ids=[1],
+            teleport_strategy="immediate_after_map_open",
+            terrain_provider=lambda: None,
+            find_visible_target=_no_find,
+            requires_reposition=_no_repo,
+            find_landing_tile=_no_land,
+            get_phase_overlaps=lambda: [],
+            build_radar_timeout_result=_build_radar_timeout,
+            build_no_equipment_visible_result=_build_no_vis,
+            build_reposition_map_sync_timeout_result=_build_repo_map,
+            build_reposition_teleport_timeout_result=_build_repo_tp,
+            run_pickup_attempt=_build_pickup,
+            make_reposition_target=lambda x, y: _TARGET,
+            wait_for_teleport_outcome=_waiter,
+            teleport_strategy_requires_map_sync=_sync_policy,
+            dispatch_failure_error=RuntimeError,
+            unexpected_result_error=RuntimeError,
+            unexpected_missing_target_error=RuntimeError,
+            no_landing_tile_error=RuntimeError,
+            unavailable_error=RuntimeError,
+            unavailable_message="u",
+            no_landing_tile_message="nl",
+            impossible_result_message="i",
+            acquisition_dispatch_failure_message="m",
+            teleport_dispatch_failure_message="t",
+            unexpected_missing_target_message="missing",
+        )
+        assert result["status"] == "no_equipment_visible"
+    finally:
+        ecp_module.run_radar_phase = original_radar
+        ecp_module.resolve_equipment_target_phase = original_resolve

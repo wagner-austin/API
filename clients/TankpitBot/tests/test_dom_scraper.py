@@ -357,6 +357,52 @@ def test_game_log_scraper_get_new_entries_detects_new() -> None:
     assert new_entries[0]["text"] == "New entry"
 
 
+def test_game_log_scraper_detects_repeated_identical_lines() -> None:
+    """Each repeat of an identical line is reported as a new entry.
+
+    Live run 20260610 proof: the player watched 8 "Empty container"
+    lines while the old set-based dedup captured exactly one, so the
+    bot retried the same drained container forever.
+    """
+    cdp = FakeCDPForScraper("Empty container")
+    scraper = GameLogScraper(cdp)
+
+    first = scraper.get_new_entries()
+    assert [e["text"] for e in first] == ["Empty container"]
+
+    cdp._return_value = "Empty container\nEmpty container"
+    second = scraper.get_new_entries()
+    assert [e["text"] for e in second] == ["Empty container"]
+
+    cdp._return_value = "Empty container\nEmpty container\nTank full\nEmpty container"
+    third = scraper.get_new_entries()
+    assert [e["text"] for e in third] == ["Tank full", "Empty container"]
+
+
+def test_game_log_scraper_in_place_mutation_emits_only_changed_line() -> None:
+    """A line mutating in place (equip-bar counter) re-emits only itself."""
+    cdp = FakeCDPForScraper("extra radar ( 9 )\nYou hit red-1")
+    scraper = GameLogScraper(cdp)
+    scraper.get_new_entries()
+
+    cdp._return_value = "extra radar ( 8 )\nYou hit red-1"
+    new_entries = scraper.get_new_entries()
+    assert [e["text"] for e in new_entries] == ["extra radar ( 8 )"]
+
+
+def test_game_log_scraper_scrolled_off_lines_can_reappear_as_new() -> None:
+    """A text that scrolled out of the window counts fresh when it returns."""
+    cdp = FakeCDPForScraper("Tank full")
+    scraper = GameLogScraper(cdp)
+    scraper.get_new_entries()
+
+    cdp._return_value = "You hit red-1"
+    assert [e["text"] for e in scraper.get_new_entries()] == ["You hit red-1"]
+
+    cdp._return_value = "You hit red-1\nTank full"
+    assert [e["text"] for e in scraper.get_new_entries()] == ["Tank full"]
+
+
 def test_game_log_scraper_log_new_entries() -> None:
     """Test GameLogScraper.log_new_entries logs entries."""
     cdp = FakeCDPForScraper("LOCATION: 5,5")

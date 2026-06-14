@@ -140,14 +140,40 @@ def _runtime_raw_messages_result(
     }
 
 
+_PAGE_CLIENT_SNAPSHOT_VALUE: JSONObject = {
+    "timestamp_ms": 1000,
+    "client_present": True,
+    "map_visible": False,
+    "client_state": 1,
+    "client_busy": False,
+    "pending_actions": 0,
+    "heartbeat_age_ms": 50,
+    "last_page_client_send_age_ms": 100,
+    "last_bot_send_age_ms": 100,
+    "ws_ready_state": 1,
+    "current_send_label": None,
+    "sent_frame_meta_queue_length": 0,
+    "self_fields": {},
+    "world_fields": {},
+    "map_fields": {},
+    "world_collections": {},
+}
+
+
 def _runtime_metadata_result(expression: str) -> JSONObject | None:
     """Return fake metadata/script lookup responses for login helpers."""
+    if "MAX_DEPTH" in expression:
+        # Structure survey walk: the real page returns null until the
+        # game object exists; the fake models the pre-capture state.
+        return {"result": {"value": None}}
     if "tankpit.magic" in expression:
         return {"result": {"value": _FAKE_MAGIC}}
     if "script[src]" in expression and "tpclient" in expression:
         return {"result": {"value": _FAKE_TPCLIENT_URL}}
     if "fetch(" in expression and "tpclient-test.js" in expression:
         return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
+    if "window.__tankpitActiveGame" in expression and "map_visible" in expression:
+        return {"result": {"value": _PAGE_CLIENT_SNAPSHOT_VALUE}}
     return None
 
 
@@ -229,23 +255,59 @@ class FakeKeyboard:
         _ = (text, delay)
 
 
-class FakeTerrainMap:
-    """Fake TerrainMap for testing sniffer world state integration.
+class InMemoryTerrainMap:
+    """In-memory ``TerrainMapProtocol`` for tests.
 
-    Returns ground for all coordinates by default.
+    Real implementation backed by a ``dict[(x, y), str]`` plus a
+    configurable default tile. Callers seed the coordinates they care
+    about; every other tile resolves to ``default``. Not a fake of
+    behavior; this is what a small terrain map would look like in
+    production if the data fit in memory.
+
+    The ``default`` parameter lifts two common test shapes into one
+    class: "all ground" (the default) and "passable set as ground,
+    rest as water" (via :meth:`from_passable_set`).
     """
 
     ROCK: str = "#"
     GROUND: str = "."
     WATER: str = "W"
 
-    def __init__(self, terrain_data: dict[tuple[int, int], str] | None = None) -> None:
-        """Initialize fake terrain map.
+    def __init__(
+        self,
+        terrain_data: dict[tuple[int, int], str] | None = None,
+        *,
+        default: str = GROUND,
+    ) -> None:
+        """Initialize an in-memory terrain map.
 
         Args:
-            terrain_data: Optional dict mapping (x, y) to terrain character.
+            terrain_data: Dict mapping ``(x, y)`` to terrain character.
+                Unmapped tiles resolve to ``default``.
+            default: Tile returned for any coordinate not present in
+                ``terrain_data``. Defaults to ``GROUND``.
         """
         self._terrain_data = terrain_data or {}
+        self._default = default
+
+    @classmethod
+    def from_passable_set(
+        cls,
+        passable: set[tuple[int, int]],
+    ) -> InMemoryTerrainMap:
+        """Build a map where ``passable`` tiles are ground, rest is water.
+
+        Args:
+            passable: Coordinates considered walkable ground.
+
+        Returns:
+            Terrain map whose ``passable`` tiles resolve to ``GROUND``
+            and every other coordinate resolves to ``WATER``.
+        """
+        return cls(
+            dict.fromkeys(passable, cls.GROUND),
+            default=cls.WATER,
+        )
 
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain at coordinates.
@@ -257,7 +319,7 @@ class FakeTerrainMap:
         Returns:
             Terrain character.
         """
-        return self._terrain_data.get((x, y), self.GROUND)
+        return self._terrain_data.get((x, y), self._default)
 
     def is_passable(self, x: int, y: int) -> bool:
         """Check if terrain is passable.
@@ -317,6 +379,30 @@ class FakeCDPSession:
         self._runtime_frame_count = 0
         self._raw_messages_ready = False
         self._emit_runtime_frames = emit_runtime_frames
+        self._page_text = ""
+        self._page_text_queue: list[str] = []
+
+    def set_page_text(self, page_text: str) -> None:
+        """Set the rendered page text returned for body-text scrapes.
+
+        Args:
+            page_text: Value returned for ``document.body`` evaluate
+                expressions (the ``C`` statistics panel scrape).
+        """
+        self._page_text = page_text
+        self._page_text_queue = []
+
+    def set_page_text_sequence(self, page_texts: list[str]) -> None:
+        """Queue successive page texts for consecutive body-text scrapes.
+
+        Each ``document.body`` evaluate consumes the next entry; the
+        final entry then repeats. Models a panel that paints
+        incrementally across scrapes (the ``C`` statistics panel).
+
+        Args:
+            page_texts: Non-empty ordered scrape results.
+        """
+        self._page_text_queue = list(page_texts)
 
     def _emit_runtime_frame_sent(self, payload: str) -> None:
         """Emit a synthetic websocket-sent CDP event for injected payloads."""
@@ -361,6 +447,10 @@ class FakeCDPSession:
         if method != "Runtime.evaluate" or params is None:
             return {"result": {"value": ""}}
         expression = str(params.get("expression", ""))
+        if "document.body" in expression:
+            if self._page_text_queue:
+                self._page_text = self._page_text_queue.pop(0)
+            return {"result": {"value": self._page_text}}
         raw_messages_result = _runtime_raw_messages_result(
             expression,
             raw_messages_ready=self._raw_messages_ready,
@@ -1127,7 +1217,7 @@ __all__ = [
     "FakePlaywright",
     "FakeResponse",
     "FakeSyncPlaywrightContextManager",
-    "FakeTerrainMap",
+    "InMemoryTerrainMap",
     "_make_auth_payload",
     "fake_sync_playwright",
     "fake_sync_playwright_login_fails",

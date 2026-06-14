@@ -24,6 +24,10 @@ from tankpit_bot.action_lab.fuel_target_phase import (
     BuildRepositionTeleportTimeoutResultProtocol,
     FuelTargetPhaseProbeProtocol,
 )
+from tankpit_bot.action_lab.page_client_snapshot import (
+    PageClientSnapshotDict,
+    capture_page_client_snapshot,
+)
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -78,6 +82,8 @@ class BuildAttemptResultProtocol(Protocol):
         fuel_target: ContainerStateDict | None,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
         radar_cycle_id: int | None = None,
         move_cycle_id: int | None = None,
         pickup_cycle_id: int | None = None,
@@ -162,6 +168,8 @@ class BuildMapSyncTimeoutResultProtocol(Protocol):
         fuel_before: int,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one map-sync-timeout result."""
 
@@ -180,6 +188,8 @@ class BuildTeleportTimeoutResultProtocol(Protocol):
         teleport_result: TeleportAttemptResultDict,
         message_start_index: int,
         teleport_cycle_ids: list[int],
+        snapshot_before: PageClientSnapshotDict,
+        snapshot_after: PageClientSnapshotDict,
     ) -> FuelProbeAttemptResultDict:
         """Build one teleport-timeout result."""
 
@@ -250,6 +260,8 @@ class RunTrackedFuelCollectionPhaseProtocol(Protocol):
         message_start_index: int,
         teleport_cycle_ids: list[int],
         teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+        snapshot_before: PageClientSnapshotDict,
+        capture_snapshot: Callable[[], PageClientSnapshotDict],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
             [FuelTargetPhaseProbeProtocol, bool],
@@ -312,6 +324,8 @@ def run_fuel_pickup_attempt(
     teleport_cycle_ids: list[int],
     radar_cycle_id: int,
     decision_basis: FuelDecisionBasisDict | None,
+    snapshot_before: PageClientSnapshotDict,
+    capture_snapshot: Callable[[], PageClientSnapshotDict],
     dispatch_failure_error: type[Exception],
     build_attempt_result: BuildAttemptResultProtocol,
     get_phase_overlaps: Callable[[], list[ActionPhaseOverlapDict]],
@@ -380,6 +394,7 @@ def run_fuel_pickup_attempt(
         wait_for_outcome=wait_for_outcome,
         compute_timeout=compute_timeout,
     )
+    snapshot_after = capture_snapshot()
     return build_attempt_result(
         target=target,
         status=pickup_status,
@@ -406,6 +421,8 @@ def run_fuel_pickup_attempt(
         pickup_cycle_id=pickup_cycle["cycle_id"],
         phase_overlaps=get_phase_overlaps(),
         decision_basis=decision_basis,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -534,8 +551,17 @@ def run_single_fuel_target_attempt(
             or produce impossible states.
     """
     page = probe._require_page()
+    if cdp is None:
+        raise unavailable_error(unavailable_message)
+    cdp_for_snapshot: CDPSessionProtocol = cdp
+
+    def capture_snapshot() -> PageClientSnapshotDict:
+        """Capture the live page-client snapshot via the narrowed CDP."""
+        return capture_page_client_snapshot(cdp_for_snapshot)
+
     self_state_before = probe._require_self_state()
     fuel_before = self_state_before["fuel"]
+    snapshot_before = capture_snapshot()
     probe._reset_attempt_phase_overlaps()
     attempt = run_tracked_teleport_attempt(
         page,
@@ -566,12 +592,15 @@ def run_single_fuel_target_attempt(
     map_open_started_ms = attempt.acquisition_started_ms
     map_sync_timestamp_ms = attempt.acquisition_sync_timestamp_ms
     if teleport_strategy_requires_map_sync(teleport_strategy) and map_sync_timestamp_ms is None:
+        snapshot_after = capture_snapshot()
         result = build_map_sync_timeout_result(
             target=target,
             map_open_started_ms=map_open_started_ms,
             fuel_before=fuel_before,
             message_start_index=message_start_index,
             teleport_cycle_ids=teleport_cycle_ids,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
         probe._end_action_phase(teleport_cycle)
         probe._reset_probe_state_to_idle()
@@ -583,6 +612,7 @@ def run_single_fuel_target_attempt(
     if teleport_result is None or teleport_started_ms is None:
         raise missing_dispatch_error(missing_dispatch_message)
     if teleport_result["status"] == "teleport_timeout":
+        snapshot_after = capture_snapshot()
         result = build_teleport_timeout_result(
             target=target,
             map_open_started_ms=map_open_started_ms,
@@ -592,6 +622,8 @@ def run_single_fuel_target_attempt(
             teleport_result=teleport_result,
             message_start_index=message_start_index,
             teleport_cycle_ids=teleport_cycle_ids,
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
         finalize_attempt_delay(page, settle_delay_ms=settle_delay_ms)
         return result
@@ -613,6 +645,8 @@ def run_single_fuel_target_attempt(
         message_start_index=message_start_index,
         teleport_cycle_ids=teleport_cycle_ids,
         teleport_strategy=teleport_strategy,
+        snapshot_before=snapshot_before,
+        capture_snapshot=capture_snapshot,
         terrain_provider=terrain_provider,
         find_visible_target=find_visible_target,
         requires_reposition=requires_reposition,

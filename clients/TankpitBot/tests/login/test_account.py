@@ -8,8 +8,8 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot.browser.login import handle_account_login
-from tests.fakes import FakeKeyboard
 from tests.login.conftest import FakeCDPLogin, FakePageLogin
+from tests.no_op_keyboard import NoOpKeyboard
 
 # =============================================================================
 # Basic Account Login Tests
@@ -126,7 +126,7 @@ class FakePageLoginTimeout:
     @property
     def keyboard(self) -> KeyboardProtocol:
         """Get keyboard for typing."""
-        return FakeKeyboard()
+        return NoOpKeyboard()
 
 
 class FakeCDPLoginNoErrors:
@@ -218,7 +218,7 @@ class FakePageLoginIntermediateUrl:
     @property
     def keyboard(self) -> KeyboardProtocol:
         """Get keyboard for typing."""
-        return FakeKeyboard()
+        return NoOpKeyboard()
 
 
 # =============================================================================

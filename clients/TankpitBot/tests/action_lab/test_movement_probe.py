@@ -2,25 +2,25 @@
 
 from __future__ import annotations
 
-import types
 from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Literal
 
 import pytest
 from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
+from tests.action_lab._replay_browser import RecordedChromiumSession
+from tests.action_lab._replay_core import (
+    ClockAdvancingPage,
+    ReplayClock,
+    StubbedBootstrapMixin,
+)
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
-    BrowserContextProtocol,
-    BrowserProtocol,
-    BrowserTypeProtocol,
+    BufferedMessageSourceProtocol,
     CDPSessionProtocol,
-    KeyboardProtocol,
     PageProtocol,
-    PlaywrightProtocol,
-    SyncPlaywrightContextManagerProtocol,
     TerrainMapProtocol,
 )
 from tankpit_bot.action_lab import _test_hooks as action_hooks
@@ -44,21 +44,19 @@ from tankpit_bot.action_lab.movement_probe_types import (
     MovementProbeSessionDict,
     decode_movement_probe_session,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import SelfStateDict, WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
-class _Clock:
-    def __init__(self, start_ms: int) -> None:
-        self._now_ms = start_ms
 
-    def __call__(self) -> int:
-        return self._now_ms
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
-    def advance(self, delta_ms: int) -> None:
-        self._now_ms += delta_ms
+
+_FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
 
 
 class _SequencedWorld:
@@ -72,62 +70,6 @@ class _SequencedWorld:
     def advance(self) -> None:
         if self._index + 1 < len(self._worlds):
             self._index += 1
-
-
-class _FakeKeyboard:
-    def press(self, key: str, *, delay: float | None = None) -> None:
-        _ = (key, delay)
-
-    def type(self, text: str, *, delay: float | None = None) -> None:
-        _ = (text, delay)
-
-
-class _FakePage:
-    def __init__(self, clock: _Clock, worlds: _SequencedWorld) -> None:
-        self._clock = clock
-        self._worlds = worlds
-        self.waits: list[float] = []
-        self._keyboard = _FakeKeyboard()
-
-    @property
-    def url(self) -> str:
-        return "https://tankpit.com/play"
-
-    @property
-    def keyboard(self) -> KeyboardProtocol:
-        return self._keyboard
-
-    def goto(
-        self,
-        url: str,
-        *,
-        referer: str | None = None,
-        timeout: float | None = None,
-        wait_until: str | None = None,
-    ) -> None:
-        _ = (url, referer, timeout, wait_until)
-
-    def wait_for_timeout(self, timeout: float) -> None:
-        self.waits.append(timeout)
-        self._clock.advance(int(timeout))
-        self._worlds.advance()
-
-    def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
-        _ = (event, timeout)
-
-    def wait_for_function(self, expression: str, *, timeout: float | None = None) -> None:
-        _ = (expression, timeout)
-
-    def close(
-        self,
-        *,
-        reason: str | None = None,
-        run_before_unload: bool | None = None,
-    ) -> None:
-        _ = (reason, run_before_unload)
-
-    def evaluate(self, expression: str) -> None:
-        _ = expression
 
 
 class _MoveWaitProbe:
@@ -163,7 +105,30 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
+        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
+    )
+
+
+def _make_snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot used by movement attempt fakes."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
     )
 
 
@@ -186,6 +151,8 @@ def _make_attempt(
         settled_y=121,
         message_start_index=10,
         message_end_index=18,
+        snapshot_before=_make_snapshot(1000),
+        snapshot_after=_make_snapshot(1800),
     )
 
 
@@ -273,7 +240,7 @@ def test_build_probe_targets_uses_real_target_builder() -> None:
 
 
 def test_wait_for_move_outcome_returns_arrived_exact() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     worlds = _SequencedWorld(
         [
             _make_world(1000, 100, 100, 900),
@@ -281,7 +248,7 @@ def test_wait_for_move_outcome_returns_arrived_exact() -> None:
             _make_world(1200, 120, 121, 890),
         ]
     )
-    page = _FakePage(clock, worlds)
+    page = ClockAdvancingPage(clock, on_wait=worlds.advance)
     probe = _MoveWaitProbe(worlds)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
@@ -300,7 +267,7 @@ def test_wait_for_move_outcome_returns_arrived_exact() -> None:
 
 
 def test_wait_for_move_outcome_returns_timeout() -> None:
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     worlds = _SequencedWorld(
         [
             _make_world(1000, 100, 100, 900),
@@ -308,7 +275,7 @@ def test_wait_for_move_outcome_returns_timeout() -> None:
             _make_world(1200, 101, 101, 898),
         ]
     )
-    page = _FakePage(clock, worlds)
+    page = ClockAdvancingPage(clock, on_wait=worlds.advance)
     probe = _MoveWaitProbe(worlds)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
@@ -345,8 +312,11 @@ class _MissingSelfWaitProbe:
 
 
 def test_wait_for_move_outcome_raises_when_self_state_disappears_mid_wait() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _MissingSelfWaitProbe([make_self_state(1, 100, 100, 2, 1, 900, 5), None])
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
@@ -362,8 +332,11 @@ def test_wait_for_move_outcome_raises_when_self_state_disappears_mid_wait() -> N
 
 
 def test_wait_for_move_outcome_raises_when_self_state_missing_after_timeout() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _MissingSelfWaitProbe([None])
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
@@ -502,51 +475,74 @@ def test_run_movement_probe_writes_session_json(fake_fs: FakeFileSystem) -> None
     assert capture_decoded["session_id"] == "fake-session"
 
 
-class _ExecuteHarness(MovementProbe):
-    def __init__(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        super().__init__("https://tankpit.com/play", headless=False, prefer_account=True)
-        self._page_for_cleanup = page
-        self._cdp_for_cleanup = cdp
-        self.cleanup_calls = 0
+class _ExecuteHarness(StubbedBootstrapMixin, MovementProbe):
+    def __init__(self) -> None:
+        MovementProbe.__init__(
+            self, "https://tankpit.com/play", headless=False, prefer_account=True
+        )
+        self._init_bootstrap_stubs()
 
-    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
 
-    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
-        _ = cdp
+class _SnapshotFakeCDPSession:
+    """CDP fake returning a fixed valid page-client snapshot payload.
 
-    def _navigate_and_login(
-        self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
-        *,
-        tank_name_prefix: str = "TP",
-        auto_join_room: bool = True,
-    ) -> None:
-        _ = (page, cdp, tank_name_prefix, auto_join_room)
+    Used by single-target movement probe tests so the new in-loop
+    ``capture_page_client_snapshot`` call has a deterministic CDP
+    surface to drive without spinning up a real browser.
+    """
 
-    def _wait_for_game_ready(self, page: PageProtocol) -> None:
-        _ = page
+    def __init__(self) -> None:
+        """Initialise the fake with no recorded calls."""
+        self.send_calls = 0
 
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        _ = (page, cdp)
-        self._magic = "fake-magic"
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        """Return a stable snapshot payload from ``Runtime.evaluate``."""
+        _ = params
+        if method == "Runtime.evaluate":
+            self.send_calls += 1
+            return {
+                "result": {
+                    "value": {
+                        "timestamp_ms": 1000 + self.send_calls,
+                        "client_present": True,
+                        "map_visible": False,
+                        "client_state": 1,
+                        "client_busy": False,
+                        "pending_actions": 0,
+                        "heartbeat_age_ms": 5,
+                        "last_page_client_send_age_ms": 10,
+                        "last_bot_send_age_ms": 15,
+                        "ws_ready_state": 1,
+                        "current_send_label": None,
+                        "sent_frame_meta_queue_length": 0,
+                        "self_fields": {},
+                        "world_fields": {},
+                        "map_fields": {},
+                        "world_collections": {},
+                    }
+                }
+            }
+        return {}
 
-    def _cleanup(
-        self,
-        cdp: CDPSessionProtocol,
-        page: PageProtocol,
-        context: BrowserContextProtocol,
-        browser: BrowserProtocol,
-    ) -> None:
-        _ = (cdp, page, context, browser)
-        self.cleanup_calls += 1
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        """Ignore event subscription."""
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        """No-op detach."""
+        return
 
 
 class _SingleTargetHarness(MovementProbe):
-    def __init__(self, page: PageProtocol) -> None:
+    def __init__(
+        self,
+        page: PageProtocol,
+        *,
+        cdp: CDPSessionProtocol | None = None,
+    ) -> None:
         super().__init__("https://tankpit.com/play", headless=False, prefer_account=True)
         self._page = page
+        self._cdp = _SnapshotFakeCDPSession() if cdp is None else cdp
         self._messages = []
         self._world = _make_world(900, 100, 100, 900)
         self._self_state = self._world["self_state"]
@@ -599,13 +595,11 @@ class _SingleTargetHarness(MovementProbe):
 class _ExecuteSuccessHarness(_ExecuteHarness):
     def __init__(
         self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
         *,
         attempts: list[MovementProbeAttemptResultDict],
         default_targets: list[TeleportTargetDict],
     ) -> None:
-        super().__init__(page, cdp)
+        super().__init__()
         self._attempts = attempts
         self._default_targets = default_targets
         self.probed_targets: list[TeleportTargetDict] = []
@@ -663,95 +657,6 @@ class _TerrainMapStub:
     ) -> list[list[str]]:
         _ = (center_x, center_y, width, height)
         return [[self.GROUND]]
-
-
-class _FakeCDP:
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        _ = (method, params)
-        return {"result": {"value": None}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        _ = (event, handler)
-
-    def detach(self) -> None:
-        pass
-
-
-class _FakeContext:
-    def __init__(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        self._page = page
-        self._cdp = cdp
-
-    def new_page(self) -> PageProtocol:
-        return self._page
-
-    def new_cdp_session(self, page: PageProtocol) -> CDPSessionProtocol:
-        _ = page
-        return self._cdp
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeBrowser:
-    def __init__(self, context: _FakeContext) -> None:
-        self._context = context
-
-    def new_context(self) -> BrowserContextProtocol:
-        return self._context
-
-    def close(self, *, reason: str | None = None) -> None:
-        _ = reason
-
-
-class _FakeChromium:
-    def __init__(self, browser: _FakeBrowser) -> None:
-        self._browser = browser
-
-    def launch(
-        self,
-        *,
-        headless: bool | None = None,
-        slow_mo: float | None = None,
-        timeout: float | None = None,
-    ) -> BrowserProtocol:
-        _ = (headless, slow_mo, timeout)
-        return self._browser
-
-
-class _FakePlaywright:
-    def __init__(self, chromium: _FakeChromium) -> None:
-        self.chromium: BrowserTypeProtocol = chromium
-
-    def stop(self) -> None:
-        pass
-
-
-class _FakePlaywrightManager:
-    def __init__(self, playwright: PlaywrightProtocol) -> None:
-        self._playwright = playwright
-
-    def start(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def __enter__(self) -> PlaywrightProtocol:
-        return self._playwright
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        _ = (exc_type, exc_val, exc_tb)
-
-
-class _FakePlaywrightFactory:
-    def __init__(self, manager: SyncPlaywrightContextManagerProtocol) -> None:
-        self._manager = manager
-
-    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
-        return self._manager
 
 
 def test_execute_probe_rejects_non_positive_max_targets() -> None:
@@ -823,8 +728,11 @@ def test_build_default_targets_uses_spawn_position_and_limits() -> None:
 
 
 def test_probe_single_movement_target_records_queue_map_open() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _SingleTargetHarness(page)
     after_world = _make_world(1700, 120, 121, 880)
     action_hooks.get_current_time_ms = clock
@@ -868,9 +776,79 @@ def test_probe_single_movement_target_records_queue_map_open() -> None:
     assert page.waits == [150.0, 200.0]
 
 
+def test_probe_single_movement_target_raises_when_cdp_session_unavailable() -> None:
+    """The attempt fails fast when no CDP session is attached.
+
+    The movement probe captures a page-client snapshot before and after
+    each attempt; if CDP is unavailable there is no live source to read
+    from and the probe must not silently proceed.
+    """
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
+    probe = _SingleTargetHarness(page)
+    probe._cdp = None
+    action_hooks.get_current_time_ms = clock
+    with pytest.raises(MovementProbeError, match="cdp session is unavailable"):
+        probe._probe_single_movement_target(
+            TeleportTargetDict(label="move_1", x=120, y=121),
+            move_timeout_ms=5000,
+            queue_map_open_during_move=False,
+            map_open_delay_ms=0,
+            settle_delay_ms=0,
+        )
+
+
+def test_probe_single_movement_target_records_snapshots_before_and_after() -> None:
+    """The attempt result carries both bracketing page-client snapshots."""
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
+    probe = _SingleTargetHarness(page)
+    after_world = _make_world(1700, 120, 121, 880)
+    action_hooks.get_current_time_ms = clock
+    action_hooks.drain_buffered_messages = lambda source: 0
+
+    def _fake_wait_for_move_outcome(
+        page: action_session.WaitPageProtocol,
+        probe: MovementOutcomeProbeProtocol,
+        *,
+        target_x: int,
+        target_y: int,
+        move_started_ms: int,
+        timeout_ms: int,
+    ) -> tuple[Literal["arrived_exact", "move_timeout"], int, int, int, int]:
+        _ = (page, target_x, target_y, move_started_ms, timeout_ms)
+        if not isinstance(probe, _SingleTargetHarness):
+            raise AssertionError("expected single-target harness")
+        probe._world = after_world
+        probe._self_state = after_world["self_state"]
+        return ("arrived_exact", 1600, 600, 120, 121)
+
+    movement_probe_module._wait_for_move_outcome = _fake_wait_for_move_outcome
+    result = probe._probe_single_movement_target(
+        TeleportTargetDict(label="move_1", x=120, y=121),
+        move_timeout_ms=5000,
+        queue_map_open_during_move=False,
+        map_open_delay_ms=0,
+        settle_delay_ms=0,
+    )
+
+    assert result["snapshot_before"]["client_present"] is True
+    assert result["snapshot_after"]["client_present"] is True
+    assert result["snapshot_after"]["timestamp_ms"] > result["snapshot_before"]["timestamp_ms"]
+
+
 def test_probe_single_movement_target_raises_on_move_dispatch_failure() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _SingleTargetHarness(page)
     probe.move_result = False
     action_hooks.get_current_time_ms = clock
@@ -885,8 +863,11 @@ def test_probe_single_movement_target_raises_on_move_dispatch_failure() -> None:
 
 
 def test_probe_single_movement_target_raises_on_map_open_dispatch_failure() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _SingleTargetHarness(page)
     probe.open_map_result = False
     action_hooks.get_current_time_ms = clock
@@ -901,9 +882,115 @@ def test_probe_single_movement_target_raises_on_map_open_dispatch_failure() -> N
         )
 
 
+class _MapAlreadyOpenCDPSession:
+    """CDP fake whose ``Runtime.evaluate`` always reports ``map_visible=True``.
+
+    Drives the short-circuit branch of
+    ``MovementProbe._probe_single_movement_target`` where a stale open
+    map -- inherited from a prior attempt -- causes the probe to skip
+    the redundant ``CMD_MAP_OPEN`` dispatch.
+    """
+
+    def __init__(self) -> None:
+        self.send_calls = 0
+
+    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+        _ = params
+        if method == "Runtime.evaluate":
+            self.send_calls += 1
+            return {
+                "result": {
+                    "value": {
+                        "timestamp_ms": 1000 + self.send_calls,
+                        "client_present": True,
+                        "map_visible": True,
+                        "client_state": 1,
+                        "client_busy": False,
+                        "pending_actions": 0,
+                        "heartbeat_age_ms": 5,
+                        "last_page_client_send_age_ms": 10,
+                        "last_bot_send_age_ms": 15,
+                        "ws_ready_state": 1,
+                        "current_send_label": None,
+                        "sent_frame_meta_queue_length": 0,
+                        "self_fields": {},
+                        "world_fields": {},
+                        "map_fields": {},
+                        "world_collections": {},
+                    }
+                }
+            }
+        return {}
+
+    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+        _ = (event, handler)
+
+    def detach(self) -> None:
+        return
+
+
+def test_probe_single_movement_target_skips_queued_map_open_when_map_already_open() -> None:
+    """Mid-move queued ``map_open`` short-circuits when the JS client shows the map.
+
+    Mirrors the ``run_tracked_acquisition_phase`` short-circuit: the
+    wire ``CMD_MAP_OPEN`` is one-way, and re-sending it against an
+    already-open overlay is a server-side no-op. The probe records the
+    skip via ``map_open_requested_ms=None`` and refrains from calling
+    ``self.open_map()``.
+    """
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
+    probe = _SingleTargetHarness(page, cdp=_MapAlreadyOpenCDPSession())
+    action_hooks.get_current_time_ms = clock
+    drain_calls = {"count": 0}
+
+    def _count_drain(source: BufferedMessageSourceProtocol) -> int:
+        _ = source
+        drain_calls["count"] += 1
+        return 0
+
+    action_hooks.drain_buffered_messages = _count_drain
+
+    def _fake_wait_for_move_outcome(
+        page: action_session.WaitPageProtocol,
+        probe: MovementOutcomeProbeProtocol,
+        *,
+        target_x: int,
+        target_y: int,
+        move_started_ms: int,
+        timeout_ms: int,
+    ) -> tuple[Literal["arrived_exact", "move_timeout"], int, int, int, int]:
+        _ = (page, probe, target_x, target_y, move_started_ms, timeout_ms)
+        return ("arrived_exact", 1800, 800, target_x, target_y)
+
+    movement_probe_module._wait_for_move_outcome = _fake_wait_for_move_outcome
+
+    result = probe._probe_single_movement_target(
+        TeleportTargetDict(label="move_1", x=120, y=121),
+        move_timeout_ms=5000,
+        queue_map_open_during_move=True,
+        map_open_delay_ms=150,
+        settle_delay_ms=0,
+    )
+
+    assert probe.open_map_calls == 0
+    assert result["map_open_requested_ms"] is None
+    assert result["map_open_message_timestamp_ms"] is None
+    assert result["snapshot_before"]["map_visible"] is True
+    assert result["snapshot_after"]["map_visible"] is True
+    assert drain_calls["count"] == 1
+    assert result["status"] == "arrived_exact"
+
+
 def test_probe_single_movement_target_raises_when_self_state_missing_after_outcome() -> None:
-    clock = _Clock(1000)
-    page = _FakePage(clock, _SequencedWorld([_make_world(1000, 100, 100, 900)]))
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(
+        clock,
+        on_wait=_SequencedWorld([_make_world(1000, 100, 100, 900)]).advance,
+    )
     probe = _SingleTargetHarness(page)
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
@@ -972,15 +1059,6 @@ def _advance_startup_state_stub(bot: action_session.StartupStateDriverProtocol) 
     _ = bot
 
 
-def _make_playwright_factory(page: PageProtocol, cdp: CDPSessionProtocol) -> _FakePlaywrightFactory:
-    context = _FakeContext(page, cdp)
-    browser = _FakeBrowser(context)
-    chromium = _FakeChromium(browser)
-    playwright = _FakePlaywright(chromium)
-    manager = _FakePlaywrightManager(playwright)
-    return _FakePlaywrightFactory(manager)
-
-
 def test_execute_probe_rejects_negative_map_open_delay() -> None:
     probe = MovementProbe("https://tankpit.com/play", headless=False, prefer_account=True)
     with pytest.raises(ValueError, match="map_open_delay_ms must be non-negative"):
@@ -1010,18 +1088,15 @@ def test_execute_probe_rejects_negative_settle_delay() -> None:
 
 
 def test_execute_probe_runs_successfully_with_explicit_targets() -> None:
-    page = _FakePage(_Clock(1000), _SequencedWorld([_make_world(1000, 100, 100, 900)]))
-    cdp = _FakeCDP()
     attempts = [_make_attempt("arrived_exact")]
     harness = _ExecuteSuccessHarness(
-        page,
-        cdp,
         attempts=attempts,
         default_targets=[],
     )
     clock = _SteppingClock(1000, 100)
     action_hooks.get_current_time_ms = clock
-    core_hooks.sync_playwright = _make_playwright_factory(page, cdp)
+    recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     action_session.wait_for_initial_self_state = _wait_for_initial_self_state_101_102
     action_session.advance_startup_state = _advance_startup_state_stub
 
@@ -1046,19 +1121,16 @@ def test_execute_probe_runs_successfully_with_explicit_targets() -> None:
 
 
 def test_execute_probe_uses_default_targets_when_explicit_targets_are_absent() -> None:
-    page = _FakePage(_Clock(1000), _SequencedWorld([_make_world(1000, 100, 100, 900)]))
-    cdp = _FakeCDP()
     default_targets = [TeleportTargetDict(label="move_1", x=120, y=121)]
     attempts = [_make_attempt("move_timeout")]
     harness = _ExecuteSuccessHarness(
-        page,
-        cdp,
         attempts=attempts,
         default_targets=default_targets,
     )
     clock = _SteppingClock(1000, 100)
     action_hooks.get_current_time_ms = clock
-    core_hooks.sync_playwright = _make_playwright_factory(page, cdp)
+    recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     action_session.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
     action_session.advance_startup_state = _advance_startup_state_stub
 
@@ -1077,17 +1149,14 @@ def test_execute_probe_uses_default_targets_when_explicit_targets_are_absent() -
 
 
 def test_execute_probe_raises_when_target_builder_returns_empty_list() -> None:
-    page = _FakePage(_Clock(1000), _SequencedWorld([_make_world(1000, 100, 100, 900)]))
-    cdp = _FakeCDP()
     harness = _ExecuteSuccessHarness(
-        page,
-        cdp,
         attempts=[],
         default_targets=[],
     )
     clock = _SteppingClock(1000, 100)
     action_hooks.get_current_time_ms = clock
-    core_hooks.sync_playwright = _make_playwright_factory(page, cdp)
+    recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
+    core_hooks.sync_playwright = recorded.sync_playwright_factory
     action_session.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
     action_session.advance_startup_state = _advance_startup_state_stub
 

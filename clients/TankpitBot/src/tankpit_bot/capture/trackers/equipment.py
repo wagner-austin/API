@@ -130,11 +130,13 @@ class EquipmentToggleTracker:
 class EquipmentGainTracker:
     """Tracks equipment gain from 0x67 'g' messages.
 
-    Equipment Gain Format (verified):
-    - 8-byte 0x2E message, XOR decoded from byte 1
-    - Decoded: 0x67 [type] [zeros...] [equipment_flags]
+    Equipment Gain Format (verified against client JS handler ``V.g``,
+    2026-06-12):
+    - 8-byte 0x2E envelope, XOR decoded from byte 1
+    - Decoded: 0x67 [show_message] [armor] [dual] [missile] [homing] [radar]
+    - Bytes 2-6 are plain per-type gain counts; the client prints each
+      as "N <name>s gained"
     - Different from 0x49 'I' item pickup (which is confirmation)
-    - Represents equipment spawned/gained
     """
 
     EQUIPMENT_NAMES: ClassVar[list[str]] = ["armor", "dual", "missile", "homing", "radar"]
@@ -187,17 +189,18 @@ class EquipmentGainTracker:
         if decoded[0] != 0x67:
             return None
 
-        flags5 = decoded[5]
-        flags6 = decoded[6]
+        show_message = decoded[1] == 1
+        counts = list(decoded[2:7])
 
-        gained = []
-        for i, name in enumerate(self.EQUIPMENT_NAMES):
-            if flags5 & (1 << i) or flags6 & (1 << i):
-                gained.append(name)
-
+        gained = [
+            f"{count} {name}"
+            for name, count in zip(self.EQUIPMENT_NAMES, counts, strict=True)
+            if count > 0
+        ]
+        suffix = " (show)" if show_message else ""
         if gained:
-            return f"[EQUIP:GAIN] {', '.join(gained)}"
-        return f"[EQUIP:GAIN] flags={flags5},{flags6}"
+            return f"[EQUIP:GAIN] {', '.join(gained)}{suffix}"
+        return f"[EQUIP:GAIN] none{suffix}"
 
 
 __all__ = ["EquipmentGainTracker", "EquipmentToggleTracker"]

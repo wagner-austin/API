@@ -102,7 +102,8 @@ class TestFormatFunctions:
         result = format_tank_details(msg)
         assert "tank=100" in result
         assert "sergeant" in result  # rank 3
-        assert "light" in result  # damage_state 1
+        # Tier counts DOWN toward deactivation: 1 is critical.
+        assert "critical" in result  # damage_state 1
         assert "lb=5" in result
 
     def test_format_tank_details_status(self) -> None:

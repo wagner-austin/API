@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.states import (
     ActionKind,
     BotStateDataDict,
@@ -26,6 +27,28 @@ from tankpit_bot.sniffer.world_state_radar import (
     update_world_state_from_radar as _update_radar,
 )
 from tests.conftest import FakeEnv
+
+
+def _make_snapshot(*, map_visible: bool = False) -> PageClientSnapshotDict:
+    """Return a healthy live-client snapshot for dispatch_command tests."""
+    return PageClientSnapshotDict(
+        timestamp_ms=1000,
+        client_present=True,
+        map_visible=map_visible,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=50,
+        last_page_client_send_age_ms=100,
+        last_bot_send_age_ms=100,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
+    )
 
 
 def _sba(
@@ -293,7 +316,13 @@ class TestBotWithCDP:
         assert bot._state_data["in_flight_action"]["kind"] == "map_open"
 
     def test_close_map_success_with_cdp(self, fake_env: FakeEnv) -> None:
-        """Test Bot.close_map succeeds with CDP session."""
+        """Bot.close_map dispatches a synthetic 'm' keyDown+keyUp pair via CDP.
+
+        There is no wire byte that closes the map server-side (verified live
+        in ``discover_map_close.py``). Closing is purely a client-side overlay
+        toggle, so the bot dispatches an ``Input.dispatchKeyEvent`` keyDown
+        and matching keyUp for the ``m`` key.
+        """
         from tankpit_bot.bot import Bot
         from tests.fakes import FakeCDPSession
 
@@ -302,7 +331,10 @@ class TestBotWithCDP:
         bot._cdp = fake_cdp
         result = bot.close_map()
         assert result is True
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
+        assert fake_cdp._sent_methods == [
+            "Input.dispatchKeyEvent",
+            "Input.dispatchKeyEvent",
+        ]
 
     def test_toggle_equipment_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.toggle_equipment succeeds with CDP session."""
@@ -397,9 +429,14 @@ class TestBotAIIntegration:
                 self._state_data["state"] = "IDLE"
 
             def get_world_state(self) -> WorldStateDict:
-                """Return a populated state once, then a state without self."""
+                """Return populated state twice (kills poll + first read), then lose self.
+
+                Read 1 feeds the game-log kill registration, read 2 the
+                first self check; the disappearance must hit the post-sync
+                re-read to cover the mid-tick abort branch.
+                """
                 self._world_reads += 1
-                if self._world_reads == 1:
+                if self._world_reads <= 2:
                     return WorldStateDict(
                         self_state=SelfStateDict(
                             tank_id=1,
@@ -416,6 +453,7 @@ class TestBotAIIntegration:
                         terrain={},
                         viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
                         scanned_viewports={},
+                        map_fuel_dots={},
                         timestamp_ms=0,
                     )
                 return WorldStateDict(
@@ -426,6 +464,7 @@ class TestBotAIIntegration:
                     terrain={},
                     viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
                     scanned_viewports={},
+                    map_fuel_dots={},
                     timestamp_ms=0,
                 )
 
@@ -436,7 +475,7 @@ class TestBotAIIntegration:
 
         _tick_once(bot)
 
-        assert bot._world_reads == 2
+        assert bot._world_reads == 3
 
     def test_tick_once_waits_for_position_before_planning(self, fake_env: FakeEnv) -> None:
         """_tick_once does not execute AI commands while state is WAITING_FOR_POSITION."""
@@ -521,7 +560,8 @@ class TestBotAIIntegration:
             x=110,
             y=100,
             source="viewport",
-            timestamp_ms=0,
+            timestamp_ms=get_current_time_ms(),
+            wire_present=True,
         )
         # Set damage to critical so homing gets enabled
         tank = make_tank_state(
@@ -534,6 +574,7 @@ class TestBotAIIntegration:
             name="enemy",
             is_bot=True,
             is_self=False,
+            timestamp_ms=get_current_time_ms(),
         )
         new_tanks = dict(ws._world_state["tanks"])
         new_tanks["10"] = tank
@@ -591,7 +632,7 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_move_command(100, 100))
+        dispatch_command(bot, make_move_command(100, 100), _make_snapshot())
         assert bot.get_state() == "MOVING"
 
     def test_dispatch_command_pickup_fuel(self, fake_env: FakeEnv) -> None:
@@ -612,7 +653,7 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_pickup_fuel_command(100, 100))
+        dispatch_command(bot, make_pickup_fuel_command(100, 100), _make_snapshot())
         assert bot.get_state() == "COLLECTING"
 
     def test_dispatch_command_shoot(self, fake_env: FakeEnv) -> None:
@@ -633,7 +674,7 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_shoot_command(55, 53))  # Within viewport
+        dispatch_command(bot, make_shoot_command(55, 53), _make_snapshot())  # Within viewport
         assert bot.get_state() == "COMBAT"
 
     def test_dispatch_command_radar(self, fake_env: FakeEnv) -> None:
@@ -654,11 +695,11 @@ class TestBotAIIntegration:
         bot._cdp = fake_cdp
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_radar_command())
+        dispatch_command(bot, make_radar_command(), _make_snapshot())
         assert bot.get_state() == "SCANNING"
 
     def test_dispatch_command_teleport(self, fake_env: FakeEnv) -> None:
-        """executor.dispatch_command dispatches teleport to teleport_to."""
+        """With the map open, dispatch_command sends the teleport directly."""
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_teleport_command
@@ -676,8 +717,42 @@ class TestBotAIIntegration:
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_teleport_command(200, 200))
+        dispatch_command(bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True))
         assert bot.get_state() == "TELEPORTING"
+
+    def test_dispatch_command_teleport_defers_until_map_open(self, fake_env: FakeEnv) -> None:
+        """With the map closed, the tick opens the map instead of teleporting.
+
+        A teleport dispatched in the same tick as the wire map_open is
+        silently dropped by the server (run 20260610-024x: 4/15 lost vs
+        0/21 with the map already open), so the executor never sends
+        both in one tick.
+        """
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.executor import dispatch_command
+        from tankpit_bot.bot.types import make_teleport_command
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_position,
+        )
+        from tests.fakes import FakeCDPSession, FakePage
+
+        reset_world_state()
+        update_world_state_from_position(50, 50)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp: FakeCDPSession = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._page = FakePage(fake_cdp)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "IDLE"
+
+        achieved = dispatch_command(
+            bot, make_teleport_command(200, 200), _make_snapshot(map_visible=False)
+        )
+
+        assert achieved is True
+        assert bot.get_state() == "IDLE"
+        assert bot._state_data["in_flight_action"]["kind"] == "map_open"
 
 
 class TestBotEquipmentManagement:
@@ -946,13 +1021,13 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeCDPSession, FakeTerrainMap
+        from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(800)
         update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
-        ws._terrain_map = FakeTerrainMap()
+        ws._terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -999,7 +1074,7 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeCDPSession, FakeTerrainMap
+        from tests.fakes import FakeCDPSession, InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(205, 79)
@@ -1008,7 +1083,7 @@ class TestBotEquipmentManagement:
         containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=80, volume=-1)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
-        ws._terrain_map = FakeTerrainMap()
+        ws._terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1079,6 +1154,9 @@ class TestBotEquipmentManagement:
         update_world_state_from_position(100, 100)
         _update_fuel_total(800)
         update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        # The tracked tank sits at a different tile than the shoot command
+        # targets, so the executor's structural re-check rejects the shoot
+        # (the target drifted between decision and dispatch).
         ws._world_state = update_tank_from_registry(
             ws._world_state,
             tank_id=10,
@@ -1086,10 +1164,11 @@ class TestBotEquipmentManagement:
             name="enemy",
             rank=1,
             is_bot=False,
-            x=101,
+            x=105,
             y=100,
-            source="radar",
+            source="viewport",
             timestamp_ms=1000,
+            wire_present=True,
         )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1139,7 +1218,8 @@ class TestBotEquipmentManagement:
         assert bot._ai_state == original_state
         assert bot._ai_state["last_shot_target_id"] == -1
         assert bot._ai_state["combat_target_id"] == -1
-        assert len(fake_cdp._sent_methods) == 1
+        # CDP calls: snapshot read + structure survey + shoot dispatch + overlay update.
+        assert len(fake_cdp._sent_methods) == 4
 
     def test_tick_once_dispatches_regular_radar_before_search_hop(
         self,
@@ -1167,7 +1247,8 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
+        # CDP calls: snapshot read + structure survey + radar dispatch + overlay update.
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 4
         assert bot.get_state() == "SCANNING"
 
     def test_tick_once_critical_equipment_preempts_combat(
@@ -1202,7 +1283,8 @@ class TestBotEquipmentManagement:
             x=106,
             y=100,
             source="viewport",
-            timestamp_ms=0,
+            timestamp_ms=get_current_time_ms(),
+            wire_present=True,
         )
         enemy = make_tank_state(
             tank_id=10,
@@ -1214,6 +1296,7 @@ class TestBotEquipmentManagement:
             name="enemy",
             is_bot=True,
             is_self=False,
+            timestamp_ms=get_current_time_ms(),
         )
         new_tanks = dict(ws._world_state["tanks"])
         new_tanks["10"] = enemy
@@ -1274,7 +1357,8 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"]
+        # CDP calls: snapshot read + structure survey + radar dispatch + overlay update.
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 4
         assert bot.get_state() == "SCANNING"
 
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:
@@ -1286,12 +1370,12 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(800)
-        ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
+        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1314,12 +1398,12 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
         _update_fuel_total(800)
-        ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
+        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1357,7 +1441,7 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
@@ -1365,7 +1449,7 @@ class TestBotEquipmentManagement:
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
-        ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
+        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1392,7 +1476,7 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
@@ -1400,7 +1484,7 @@ class TestBotEquipmentManagement:
         containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
-        ws._terrain_map = FakeTerrainMap()
+        ws._terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1424,7 +1508,7 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(10, 10)
@@ -1432,7 +1516,7 @@ class TestBotEquipmentManagement:
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
-        ws._terrain_map = FakeTerrainMap({(11, y): "#" for y in range(256)})
+        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1569,16 +1653,24 @@ class TestBotEquipmentManagement:
         assert _has_in_flight_action(bot) is True
         assert bot._state_data["in_flight_action"]["kind"] == "map_open"
 
-    def test_has_in_flight_action_clears_map_open_after_fresh_sync(
+    def test_has_in_flight_action_holds_map_open_until_map_data_processed(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """map_open clears once newer world data has arrived."""
+        """map_open does not clear on incidental syncs; only on MAP_DATA arrival.
+
+        Asserts the authoritative-signal contract: bumping ``timestamp_ms``
+        through an unrelated ``TankStatus`` / ``ViewportUpdate`` must NOT
+        clear the pending map_open. Only :func:`mark_map_data_processed`
+        -- called by the dispatcher when a MAP_DATA blob is decoded -- is
+        the legitimate completion signal.
+        """
         import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
+            mark_map_data_processed,
             reset_world_state,
             update_world_state_from_position,
         )
@@ -1591,10 +1683,21 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         started_ms = get_current_time_ms()
         bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
+        # Bump world_state timestamp the way an unrelated sync would --
+        # this MUST NOT clear the action; the old proxy gate would have
+        # fired here.
         ws._world_state = WorldStateDict(**{**ws._world_state, "timestamp_ms": started_ms + 1})
 
+        assert _has_in_flight_action(bot) is True
+        kind_before_signal = bot._state_data["in_flight_action"]["kind"]
+        assert kind_before_signal == "map_open"
+
+        # Now mark the authoritative MAP_DATA signal; the wait should clear.
+        mark_map_data_processed()
+
         assert _has_in_flight_action(bot) is False
-        assert bot._state_data["in_flight_action"]["kind"] == "none"
+        kind_after_signal = bot._state_data["in_flight_action"]["kind"]
+        assert kind_after_signal == "none"
 
     def test_stalled_map_open_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A map_open that stalls past timeout clears so the bot can replan."""
@@ -1724,7 +1827,7 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tests.fakes import FakeTerrainMap
+        from tests.fakes import InMemoryTerrainMap
 
         reset_world_state()
         update_world_state_from_position(14, 10)
@@ -1732,7 +1835,7 @@ class TestBotEquipmentManagement:
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
         _update_radar(containers, mines)
-        ws._terrain_map = FakeTerrainMap({(15, 10): "#"})
+        ws._terrain_map = InMemoryTerrainMap({(15, 10): "#"})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -2095,6 +2198,178 @@ class TestBotEquipmentManagement:
         mark_combat_hit(weapon_byte=0)
         result = _get_combat_feedback(bot)
         assert result == ""
+
+
+class TestRequireCdp:
+    """Tests for Bot._require_cdp invariant check."""
+
+    def test_require_cdp_raises_when_session_not_attached(self, fake_env: FakeEnv) -> None:
+        """Bot._require_cdp raises when no CDP session is attached.
+
+        The tick loop guarantees an attached CDP by the time it reaches
+        the snapshot capture point; a missing session at that point is an
+        invariant violation rather than a normal pre-bootstrap state.
+        """
+        import pytest
+
+        from tankpit_bot.bot import Bot
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        with pytest.raises(RuntimeError, match="no CDP session attached"):
+            bot._require_cdp()
+
+
+def _snapshot_for_health(
+    *,
+    client_present: bool = True,
+    ws_ready_state: int | None = 1,
+) -> PageClientSnapshotDict:
+    """Build a snapshot with only the health-relevant fields parameterized."""
+    return PageClientSnapshotDict(
+        timestamp_ms=1000,
+        client_present=client_present,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=50,
+        last_page_client_send_age_ms=100,
+        last_bot_send_age_ms=100,
+        ws_ready_state=ws_ready_state,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        map_fields={},
+        world_collections={},
+    )
+
+
+class TestPageClientHealthGate:
+    """Tests for ``_is_page_client_healthy`` skip-tick decisions.
+
+    Every branch corresponds to one authoritative live signal that, when
+    unhealthy, makes dispatching pointless or wasted: client not yet
+    bootstrapped or WebSocket not OPEN. The transport heartbeat
+    (``activeGame.va.j``) is intentionally absent -- it refreshes only
+    every ~30s on a live connection, so it is not a liveness signal.
+    """
+
+    def test_healthy_snapshot_returns_true(self) -> None:
+        from tankpit_bot.bot.tick_loop import _is_page_client_healthy
+
+        assert _is_page_client_healthy(_snapshot_for_health()) is True
+
+    def test_client_not_present_returns_false(self) -> None:
+        from tankpit_bot.bot.tick_loop import _is_page_client_healthy
+
+        assert _is_page_client_healthy(_snapshot_for_health(client_present=False)) is False
+
+    def test_websocket_closed_returns_false(self) -> None:
+        from tankpit_bot.bot.tick_loop import _is_page_client_healthy
+
+        assert _is_page_client_healthy(_snapshot_for_health(ws_ready_state=3)) is False
+
+    def test_websocket_state_none_returns_false(self) -> None:
+        from tankpit_bot.bot.tick_loop import _is_page_client_healthy
+
+        assert _is_page_client_healthy(_snapshot_for_health(ws_ready_state=None)) is False
+
+    def test_stale_heartbeat_does_not_block_dispatch(self) -> None:
+        """A 30s-old transport heartbeat must NOT veto the tick.
+
+        Regression guard for the live-run freeze (run 20260609-233736):
+        ``activeGame.va.j`` only refreshes ~every 30s, so treating its
+        age as staleness froze the bot ~25 of every 30 seconds while
+        the WebSocket was OPEN and world updates were flowing.
+        """
+        from tankpit_bot.bot.tick_loop import _is_page_client_healthy
+
+        snapshot = _snapshot_for_health()
+        stale = PageClientSnapshotDict(**{**snapshot, "heartbeat_age_ms": 30_000})
+
+        assert _is_page_client_healthy(stale) is True
+
+    def test_tick_once_returns_early_when_snapshot_unhealthy(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Tick exits before dispatch when the live snapshot reports WS closed.
+
+        Drives the in-loop short-circuit at the snapshot-health check:
+        the bot decided to dispatch radar, but the page-client snapshot
+        shows the WebSocket isn't OPEN, so the tick returns before
+        ``executor.execute`` runs.
+        """
+        from collections.abc import Callable
+
+        from platform_core.json_utils import JSONObject
+
+        from tankpit_bot._test_hooks import CDPSessionProtocol
+        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.tick_loop import _tick_once
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_position,
+        )
+
+        class _UnhealthySnapshotCDP(CDPSessionProtocol):
+            """CDP returning a healthy-shaped snapshot with ws_ready_state=3 (CLOSED)."""
+
+            def __init__(self) -> None:
+                self.sent_methods: list[str] = []
+
+            def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+                _ = params
+                self.sent_methods.append(method)
+                if method == "Runtime.evaluate":
+                    return {
+                        "result": {
+                            "value": {
+                                "timestamp_ms": 1000,
+                                "client_present": True,
+                                "map_visible": False,
+                                "client_state": 1,
+                                "client_busy": False,
+                                "pending_actions": 0,
+                                "heartbeat_age_ms": 50,
+                                "last_page_client_send_age_ms": 100,
+                                "last_bot_send_age_ms": 100,
+                                "ws_ready_state": 3,
+                                "current_send_label": None,
+                                "sent_frame_meta_queue_length": 0,
+                                "self_fields": {},
+                                "world_fields": {},
+                                "map_fields": {},
+                                "world_collections": {},
+                            }
+                        }
+                    }
+                return {}
+
+            def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+                _ = (event, handler)
+
+            def detach(self) -> None:
+                return
+
+        reset_world_state()
+        update_world_state_from_position(50, 50)
+        _update_fuel_total(800)
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._magic = "test_magic"
+        bot._update_state_from_world()
+        bot._update_state_from_world()
+        unhealthy_cdp = _UnhealthySnapshotCDP()
+        bot._cdp = unhealthy_cdp
+        original_state = bot.get_state()
+
+        _tick_once(bot)
+
+        runtime_calls = [m for m in unhealthy_cdp.sent_methods if m == "Runtime.evaluate"]
+        assert runtime_calls == ["Runtime.evaluate"]
+        assert bot.get_state() == original_state
 
 
 class TestBotMessageDecoding:

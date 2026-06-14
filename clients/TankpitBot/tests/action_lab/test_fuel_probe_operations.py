@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from tests.action_lab.test_fuel_probe import _Clock, _FakePage, _ProbeHarness
+from tests.action_lab._replay_core import ClockAdvancingPage, ReplayClock
+from tests.action_lab.test_fuel_probe import _ProbeHarness
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
@@ -23,6 +24,7 @@ from tankpit_bot.action_lab.fuel_probe_operations import (
     finalize_attempt_delay,
     run_pickup_attempt_for_probe,
 )
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.action_lab.pickup_phase import (
     PickupImmediateOutcomeProtocol,
     PickupOutcomeWaiterProtocol,
@@ -31,6 +33,28 @@ from tankpit_bot.action_lab.pickup_phase import (
 )
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.state import make_container_state
+
+
+def _snapshot(timestamp_ms: int) -> PageClientSnapshotDict:
+    """Build a sample page-client snapshot for fuel-probe operations tests."""
+    return PageClientSnapshotDict(
+        timestamp_ms=timestamp_ms,
+        client_present=True,
+        map_visible=False,
+        client_state=1,
+        client_busy=False,
+        pending_actions=0,
+        heartbeat_age_ms=10,
+        last_page_client_send_age_ms=20,
+        last_bot_send_age_ms=30,
+        ws_ready_state=1,
+        current_send_label=None,
+        sent_frame_meta_queue_length=0,
+        self_fields={},
+        world_fields={},
+        world_collections={},
+        map_fields={},
+    )
 
 
 def _target() -> TeleportTargetDict:
@@ -69,8 +93,8 @@ def _teleport_result(
 
 def test_finalize_attempt_delay_waits_only_when_positive() -> None:
     """Finalize delay waits only when a positive settle delay is requested."""
-    clock = _Clock(1000)
-    page = _FakePage(clock)
+    clock = ReplayClock(1000)
+    page = ClockAdvancingPage(clock)
 
     finalize_attempt_delay(page, settle_delay_ms=0)
     finalize_attempt_delay(page, settle_delay_ms=250)
@@ -80,13 +104,15 @@ def test_finalize_attempt_delay_waits_only_when_positive() -> None:
 
 def test_result_builder_helpers_emit_expected_statuses() -> None:
     """Result-builder helpers produce terminal payloads with expected metadata."""
-    clock = _Clock(2000)
+    clock = ReplayClock(2000)
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = _target()
     fuel_target = make_container_state(101, 100, True, 300)
     teleport_result = _teleport_result(target)
 
+    snapshot_before = _snapshot(1000)
+    snapshot_after = _snapshot(1900)
     built = build_attempt_result_for_probe(
         probe,
         target=target,
@@ -114,6 +140,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         reposition_map_open_started_ms=1800,
         reposition_map_sync_timestamp_ms=1850,
         reposition_teleport_started_ms=1900,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     map_timeout = build_map_sync_timeout_result_for_probe(
         probe,
@@ -122,6 +150,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         fuel_before=700,
         message_start_index=0,
         teleport_cycle_ids=[1],
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     teleport_timeout = build_teleport_timeout_result_for_probe(
         probe,
@@ -133,6 +163,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         teleport_result=_teleport_result(target, status="teleport_timeout"),
         message_start_index=0,
         teleport_cycle_ids=[1],
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     reposition_map_timeout = build_reposition_map_sync_timeout_result_for_probe(
         probe,
@@ -150,6 +182,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         teleport_cycle_ids=[1],
         radar_cycle_id=2,
         phase_overlaps=[],
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     reposition_teleport_timeout = build_reposition_teleport_timeout_result_for_probe(
         probe,
@@ -169,6 +203,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         teleport_cycle_ids=[1],
         radar_cycle_id=2,
         phase_overlaps=[],
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     radar_timeout = build_radar_timeout_result_for_probe(
         probe,
@@ -183,6 +219,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         teleport_cycle_ids=[1],
         radar_cycle_id=2,
         phase_overlaps=[],
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
     no_fuel_visible = build_no_fuel_visible_result_for_probe(
         probe,
@@ -199,6 +237,8 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
         radar_cycle_id=2,
         phase_overlaps=[],
         decision_basis=None,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
     assert built["status"] == "picked_up_fuel"
@@ -216,7 +256,7 @@ def test_result_builder_helpers_emit_expected_statuses() -> None:
 
 def test_probe_build_attempt_result_wrapper_delegates_to_shared_builder() -> None:
     """FuelProbe wrapper returns the shared typed attempt result payload."""
-    clock = _Clock(2000)
+    clock = ReplayClock(2000)
     probe = _ProbeHarness(clock)
     target = _target()
     fuel_target = make_container_state(101, 100, True, 300)
@@ -247,6 +287,8 @@ def test_probe_build_attempt_result_wrapper_delegates_to_shared_builder() -> Non
         reposition_map_open_started_ms=1800,
         reposition_map_sync_timestamp_ms=1850,
         reposition_teleport_started_ms=1900,
+        snapshot_before=_snapshot(1000),
+        snapshot_after=_snapshot(1900),
     )
 
     assert built["status"] == "picked_up_fuel"
@@ -256,9 +298,9 @@ def test_probe_build_attempt_result_wrapper_delegates_to_shared_builder() -> Non
 
 def test_run_pickup_attempt_for_probe_uses_injected_phase_runner() -> None:
     """Pickup helper uses the injected tracked phase runner and builds the result."""
-    clock = _Clock(1000)
+    clock = ReplayClock(1000)
     probe = _ProbeHarness(clock)
-    page = _FakePage(clock)
+    page = ClockAdvancingPage(clock)
     target = _target()
     fuel_target = make_container_state(101, 100, True, 300)
     teleport_result = _teleport_result(target)
@@ -379,6 +421,8 @@ def test_run_pickup_attempt_for_probe_uses_injected_phase_runner() -> None:
         teleport_cycle_ids=[1],
         radar_cycle_id=2,
         decision_basis=None,
+        snapshot_before=_snapshot(1000),
+        capture_snapshot=lambda: _snapshot(1900),
         dispatch_failure_error=RuntimeError,
         run_tracked_pickup_phase=_TrackedPickupPhase(),
         get_completed_outcome=_CompletedOutcome(),

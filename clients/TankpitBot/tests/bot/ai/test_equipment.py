@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.equipment import (
     find_nearest_fuel,
     find_teleport_landing_tile,
     is_reachable,
+    is_tile_scanned,
 )
 from tankpit_bot.state.types import (
     MineStateDict,
@@ -23,7 +24,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     viewport_scan_key,
 )
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfStateDict]:
@@ -44,6 +45,7 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
         terrain={},
         viewport=ViewportStateDict(left=x - 9, top=y - 9, width=18, height=18),
         scanned_viewports={viewport_scan_key(x - 9, y - 9): 100000},
+        map_fuel_dots={},
         timestamp_ms=0,
     )
     state = make_self_state(
@@ -68,24 +70,24 @@ class TestIsReachable:
 
     def test_reachable_open_terrain(self) -> None:
         """Returns True when path exists on open ground."""
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         assert is_reachable(terrain, 10, 10, 15, 10) is True
 
     def test_same_position(self) -> None:
         """Returns True when start equals goal."""
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         assert is_reachable(terrain, 10, 10, 10, 10) is True
 
     def test_blocked_by_wall(self) -> None:
         """Returns False when terrain blocks all paths."""
         # Create a wall of rocks from y=0 to y=255 at x=12
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         assert is_reachable(terrain, 10, 10, 15, 10) is False
 
     def test_blocked_by_mines(self) -> None:
         """Returns False when known mines block the only route."""
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
             f"12,{y}": make_mine_state(
                 x=12,
@@ -111,7 +113,7 @@ class TestFindTeleportLandingTile:
             (127, 126): "W",
             (128, 127): "W",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
 
@@ -126,7 +128,7 @@ class TestFindTeleportLandingTile:
             (128, 127): "#",
             (128, 125): "#",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
 
@@ -138,7 +140,7 @@ class TestFindTeleportLandingTile:
             (0, 0): "W",
             (0, 1): "W",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         result = find_teleport_landing_tile(terrain, 10, 10, 0, 0)
 
@@ -146,7 +148,7 @@ class TestFindTeleportLandingTile:
 
     def test_skips_mined_adjacent_tiles(self) -> None:
         """Known mines are excluded from teleport landing candidates."""
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
             "128,126": make_mine_state(
                 x=128,
@@ -254,14 +256,14 @@ class TestFindNearestFuel:
         world, state = _world_and_self(x=10, y=10)
         # Container blocked behind wall
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         assert find_nearest_fuel(world, state, terrain) is None
 
     def test_with_terrain_accepts_reachable(self) -> None:
         """Accepts fuel container that is reachable through terrain."""
         world, state = _world_and_self(x=10, y=10)
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         expected = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         world["containers"]["15,10"] = expected
         assert find_nearest_fuel(world, state, terrain) == expected
@@ -270,7 +272,7 @@ class TestFindNearestFuel:
         """allow_unreachable=True returns a blocked fuel container for teleport fallback."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         expected = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         world["containers"]["15,10"] = expected
         assert find_nearest_fuel(world, state, terrain, allow_unreachable=True) == expected
@@ -285,7 +287,7 @@ class TestFindNearestFuel:
             (15, 11): "#",
             (15, 9): "#",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         assert find_nearest_fuel(world, state, terrain, allow_unreachable=True) is None
 
@@ -293,7 +295,7 @@ class TestFindNearestFuel:
         """Skips closer blocked container, picks farther reachable one."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         # Closer but blocked
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         # Farther but reachable (same side of wall)
@@ -377,6 +379,55 @@ class TestKnownContainerCandidates:
         candidates = find_known_equipment_candidates(world, state, now_ms=100000)
 
         assert [(container["x"], container["y"]) for container in candidates] == [(120, 100)]
+
+    def test_find_known_equipment_candidates_skips_beyond_pursuit_bound(self) -> None:
+        """Known equipment past the pursuit distance bound is excluded.
+
+        A fresh belief 60 tiles away is a two-minute walk; the 30s
+        freshness TTL guarantees it is stale on arrival, so local search
+        wins past the bound (live run 20260610 cross-map walk).
+        """
+        world, state = _world_and_self()
+        world["containers"]["160,100"] = make_container_state(
+            x=160,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+        )
+        world["containers"]["120,100"] = make_container_state(
+            x=120,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+        )
+
+        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
+
+        assert [(container["x"], container["y"]) for container in candidates] == [(120, 100)]
+
+    def test_find_known_fuel_candidates_skips_beyond_pursuit_bound(self) -> None:
+        """Known fuel past the pursuit distance bound is excluded even at high volume."""
+        world, state = _world_and_self()
+        world["containers"]["160,100"] = make_container_state(
+            x=160,
+            y=100,
+            is_fuel=True,
+            volume=1000,
+            timestamp_ms=100000,
+        )
+        world["containers"]["120,100"] = make_container_state(
+            x=120,
+            y=100,
+            is_fuel=True,
+            volume=300,
+            timestamp_ms=100000,
+        )
+
+        candidates = find_known_fuel_candidates(world, state, now_ms=100000, minimum_volume=100)
+
+        assert [(container["x"], container["volume"]) for container in candidates] == [(120, 300)]
 
     def test_find_known_equipment_candidates_skips_failed_pickups(self) -> None:
         """Failed pickup markers suppress known equipment pursuit."""
@@ -604,7 +655,7 @@ class TestDescribeContainerSearch:
             (15, 11): "#",
             (15, 9): "#",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         result = describe_container_search(
             world,
@@ -676,7 +727,7 @@ class TestDescribeContainerSearch:
         """Summary marks blocked targets as non-actionable without teleport fallback."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         world["containers"]["15,10"] = make_container_state(
             x=15,
             y=10,
@@ -703,7 +754,7 @@ class TestDescribeContainerSearch:
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain_data: dict[tuple[int, int], str] = dict(wall)
         terrain_data[(15, 10)] = "W"
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world["containers"]["15,10"] = make_container_state(
             x=15,
             y=10,
@@ -805,14 +856,14 @@ class TestDescribeContainerSearch:
         """Skips equipment container that is unreachable due to terrain."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=False, volume=0)
         assert find_nearest_equipment(world, state, terrain) is None
 
     def test_with_terrain_accepts_reachable(self) -> None:
         """Accepts equipment container that is reachable through terrain."""
         world, state = _world_and_self(x=10, y=10)
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         expected = make_container_state(x=15, y=10, is_fuel=False, volume=0)
         world["containers"]["15,10"] = expected
         assert find_nearest_equipment(world, state, terrain) == expected
@@ -821,7 +872,7 @@ class TestDescribeContainerSearch:
         """allow_unreachable=True returns a blocked equipment container for teleport fallback."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         expected = make_container_state(x=15, y=10, is_fuel=False, volume=0)
         world["containers"]["15,10"] = expected
         assert find_nearest_equipment(world, state, terrain, allow_unreachable=True) == expected
@@ -850,7 +901,7 @@ class TestFindNearestDeposit:
     def test_with_terrain(self) -> None:
         """Deposit search respects terrain reachability."""
         world, state = _world_and_self(x=10, y=10)
-        terrain = FakeTerrainMap()
+        terrain = InMemoryTerrainMap()
         expected = make_container_state(x=15, y=10, is_fuel=True, volume=50)
         world["containers"]["15,10"] = expected
         assert find_nearest_deposit(world, state, terrain) == expected
@@ -901,7 +952,7 @@ class TestFindBestFuel:
         """Skips high-volume container that is unreachable."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         # High volume but blocked
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
         # Lower volume but reachable (still >= 500 minimum)
@@ -939,7 +990,7 @@ class TestFindBestFuel:
         """allow_unreachable=True keeps a blocked high-value fuel target for teleport fallback."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain = FakeTerrainMap(terrain_data=wall)
+        terrain = InMemoryTerrainMap(terrain_data=wall)
         expected = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
         world["containers"]["15,10"] = expected
         world["containers"]["8,10"] = make_container_state(x=8, y=10, is_fuel=True, volume=600)
@@ -955,7 +1006,7 @@ class TestFindBestFuel:
             (15, 11): "#",
             (15, 9): "#",
         }
-        terrain = FakeTerrainMap(terrain_data=terrain_data)
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
         assert find_best_fuel(world, state, terrain, allow_unreachable=True) is None
 
@@ -997,3 +1048,38 @@ class TestFindBestFuel:
         )
         world["containers"]["105,100"] = fresh
         assert find_best_fuel(world, state, now_ms=100000) == fresh
+
+
+# =============================================================================
+# is_tile_scanned
+# =============================================================================
+
+
+class TestIsTileScanned:
+    """Tests for is_tile_scanned viewport coverage check."""
+
+    def test_is_tile_scanned_returns_true_for_fresh_scan_containing_tile(self) -> None:
+        """Returns True when the tile is inside a viewport scanned within TTL."""
+        world, _ = _world_and_self(x=100, y=100)
+        # Viewport at (91, 91) width=18 height=18, scanned at 100000.
+        # Tile (100, 100) is inside [91..109) x [91..109).
+        # now_ms=120000 => elapsed 20000 < 45000 TTL => fresh.
+        assert is_tile_scanned(world, 100, 100, now_ms=120000) is True
+
+    def test_is_tile_scanned_returns_false_for_stale_scan(self) -> None:
+        """Returns False when the scan is older than the 45 000 ms TTL."""
+        world, _ = _world_and_self(x=100, y=100)
+        # Scanned at 100000, now_ms=200000 => elapsed 100000 > 45000 TTL.
+        assert is_tile_scanned(world, 100, 100, now_ms=200000) is False
+
+    def test_is_tile_scanned_returns_false_for_tile_outside_viewport(self) -> None:
+        """Returns False when the tile lies outside every scanned viewport."""
+        world, _ = _world_and_self(x=100, y=100)
+        # Viewport covers [91..109) x [91..109). Tile (200, 200) is outside.
+        assert is_tile_scanned(world, 200, 200, now_ms=120000) is False
+
+    def test_is_tile_scanned_returns_false_for_empty_scanned_viewports(self) -> None:
+        """Returns False when no viewports have been scanned at all."""
+        world, _ = _world_and_self(x=100, y=100)
+        world["scanned_viewports"] = {}
+        assert is_tile_scanned(world, 100, 100, now_ms=120000) is False

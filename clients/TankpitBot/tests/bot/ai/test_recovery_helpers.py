@@ -18,7 +18,12 @@ from tankpit_bot.bot.ai.recover_equipment_mode import (
 from tankpit_bot.bot.ai.recover_equipment_mode import (
     try_search_critical_equipment,
 )
-from tankpit_bot.bot.ai.resource_search import local_resource_search_hop
+from tankpit_bot.bot.ai.resource_search import (
+    local_resource_search_hop,
+    make_resource_search_hop,
+    select_fuel_dot_hop,
+)
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.types import make_move_command
 from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
@@ -29,10 +34,10 @@ from tests.bot.ai._support import (
     make_scanned_ai_state,
     make_world,
 )
-from tests.fakes import FakeTerrainMap
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
-def _enemy(*, x: int, y: int, timestamp_ms: int = 0) -> TankStateDict:
+def _enemy(*, x: int, y: int, timestamp_ms: int = 100000) -> TankStateDict:
     """Create a visible enemy tank for helper tests.
 
     Args:
@@ -56,6 +61,7 @@ def _enemy(*, x: int, y: int, timestamp_ms: int = 0) -> TankStateDict:
         is_bot=False,
         damage_state=0,
         timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=timestamp_ms,
     )
 
 
@@ -107,8 +113,16 @@ class TestRecoveryHelpers:
         assert hop_y == 100
         assert next_index == 1
 
-    def test_local_equipment_search_hop_clamps_to_map_bounds(self) -> None:
-        """Local equipment search clamps to map bounds at the edges."""
+    def test_local_equipment_search_hop_skips_clamped_edge_hops(self) -> None:
+        """Edge-clamped hops onto covered ground are skipped, not taken.
+
+        At (250,250) the east hop clamps 280->254 (4 tiles onto the
+        already-scanned viewport) and south clamps the same way; both
+        are degenerate re-visits. The search advances to west ring 1,
+        the first hop into unscanned ground, consuming three cycle
+        positions. The old behavior returned the clamped corner hop and
+        produced the live 20260610 corner-trap loop.
+        """
         world, self_state = make_world(self_x=250, self_y=250, fuel=800)
         ctx = DecideCtx(
             world,
@@ -122,9 +136,298 @@ class TestRecoveryHelpers:
 
         hop_x, hop_y, next_index = local_resource_search_hop(ctx)
 
-        assert hop_x == 254
+        assert hop_x == 220
         assert hop_y == 250
+        assert next_index == 3
+
+    def test_local_search_hop_falls_back_when_everything_is_covered(self) -> None:
+        """With every cycle position covered, the raw indexed hop is returned.
+
+        Coverage expires within the scan TTL, so the fallback hop
+        self-heals instead of leaving the owner with no target.
+        """
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        hop_targets = [
+            (130, 100),
+            (100, 130),
+            (70, 100),
+            (100, 70),
+            (160, 100),
+            (100, 160),
+            (40, 100),
+            (100, 40),
+            (190, 100),
+            (100, 190),
+            (10, 100),
+            (100, 10),
+        ]
+        for target_x, target_y in hop_targets:
+            world["scanned_viewports"][f"{target_x - 8},{target_y - 8}"] = 100000
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(dual_count=5, default_count=30),
+            100000,
+            None,
+            "",
+        )
+
+        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
+
+        assert (hop_x, hop_y) == (130, 100)
         assert next_index == 1
+
+    def test_local_search_hop_escapes_map_corner(self) -> None:
+        """A corner position never re-targets the same clamped corner tile.
+
+        Live run 20260610: at (1,254) the west/south hops clamped back
+        onto the corner, and the bot teleported to (1,254)/(3,254)/
+        (5,254) repeatedly, re-radaring the same ground. With the
+        patrol index pointing west, the search must skip the
+        zero-displacement clamp and hop north into fresh ground.
+        """
+        world, self_state = make_world(self_x=1, self_y=254, fuel=800)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "patrol_waypoint_index": 2,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(dual_count=5, default_count=30),
+            100000,
+            None,
+            "",
+        )
+
+        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
+
+        assert (hop_x, hop_y) != (1, 254)
+        assert hop_y == 224
+        assert next_index == 4
+
+    def test_local_equipment_search_hop_ring_wraps_at_cap(self) -> None:
+        """The hop ring wraps instead of growing with the session-long index.
+
+        Regression guard for live run 20260610-000x: an ever-growing
+        patrol index produced 90+ tile hops costing more fuel than the
+        bot held, leaving the recovery owner with no affordable action.
+        Index 100 wraps to cycle 4 (east, ring 2) -> 60 tiles, not 780.
+        """
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "patrol_waypoint_index": 100,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(dual_count=5, default_count=30),
+            100000,
+            None,
+            "",
+        )
+
+        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
+
+        assert hop_x == 160
+        assert hop_y == 100
+        assert next_index == 101
+
+    def test_select_fuel_dot_hop_returns_none_with_empty_atlas(self) -> None:
+        """No fuel dots means no dot-guided target."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) is None
+
+    def test_select_fuel_dot_hop_picks_nearest_dot(self) -> None:
+        """The nearest worthwhile dot wins over farther ones."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"140,100": 100000, "120,100": 100000}
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) == (120, 100)
+
+    def test_select_fuel_dot_hop_skips_dot_in_scanned_ground(self) -> None:
+        """A dot whose tile sits inside fresh scan coverage is refuted, not a lead."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"120,100": 100000, "140,100": 100000}
+        world["scanned_viewports"]["112,92"] = 100000
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) == (140, 100)
+
+    def test_select_fuel_dot_hop_skips_degenerate_close_dot(self) -> None:
+        """A dot within the degenerate-hop displacement is never a teleport target."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"102,100": 100000, "130,100": 100000}
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) == (130, 100)
+
+    def test_select_fuel_dot_hop_returns_none_when_unaffordable(self) -> None:
+        """An unaffordable nearest dot ends the scan -- farther dots cost more."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
+        world["map_fuel_dots"] = {"160,100": 100000, "200,100": 100000}
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) is None
+
+    def test_select_fuel_dot_hop_returns_none_when_all_dots_covered(self) -> None:
+        """Every dot inside scanned ground leaves no dot-guided target."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"120,100": 100000}
+        world["scanned_viewports"]["112,92"] = 100000
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) is None
+
+    def test_select_fuel_dot_hop_revives_dot_after_scan_coverage_expires(self) -> None:
+        """An old scan no longer refutes a dot -- containers respawn."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"120,100": 100000}
+        world["scanned_viewports"]["112,92"] = 100000 - 46000
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) == (120, 100)
+
+    def test_select_fuel_dot_hop_dot_outside_scan_row_is_a_lead(self) -> None:
+        """A scan covering the dot's column but not its row does not refute it."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"120,140": 100000}
+        world["scanned_viewports"]["112,92"] = 100000
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert select_fuel_dot_hop(ctx) == (120, 140)
+
+    def test_dot_guided_hop_teleports_to_dot_without_consuming_patrol(self) -> None:
+        """A dot-guided hop targets the dot and leaves the ring patrol untouched."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        world["map_fuel_dots"] = {"120,110": 100000}
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        decision = make_resource_search_hop(
+            ctx,
+            mode="COLLECT_FUEL",
+            score=900,
+            reason="search_fuel_local",
+            fuel_dot_guided=True,
+        )
+
+        if decision is None:
+            raise AssertionError("expected dot-guided teleport decision")
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 120
+        assert decision["command"]["target_y"] == 110
+        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 0
+
+    def test_dot_guided_hop_falls_back_to_ring_when_atlas_empty(self) -> None:
+        """Without dots the dot-guided hop degrades to the ring patrol."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        decision = make_resource_search_hop(
+            ctx,
+            mode="COLLECT_FUEL",
+            score=900,
+            reason="search_fuel_local",
+            fuel_dot_guided=True,
+        )
+
+        if decision is None:
+            raise AssertionError("expected ring-patrol teleport decision")
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 130
+        assert decision["command"]["target_y"] == 100
+        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 1
 
     def test_expire_kills_removes_expired(self) -> None:
         """Expired kill cooldown entries are removed."""
@@ -149,7 +452,7 @@ class TestRecoveryHelpers:
         }
         world, _ = make_world(tanks=tanks)
 
-        filtered = filter_killed_tanks(world, {"50": 10000})
+        filtered = filter_killed_tanks(world, {"50": 100000})
 
         assert "50" not in filtered["tanks"]
         assert "60" in filtered["tanks"]
@@ -203,7 +506,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=30),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -223,7 +526,7 @@ class TestRecoveryHelpers:
             "107,107": make_container(107, 107, 0, False),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=300, containers=containers)
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (107, 107): "W",
                 (108, 107): "W",
@@ -253,7 +556,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=5),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -274,7 +577,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=5),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -296,7 +599,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=5),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -338,7 +641,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=5),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -359,7 +662,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(default_count=5),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 
@@ -429,7 +732,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             inventory,
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
         )
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
@@ -467,7 +770,7 @@ class TestRecoveryHelpers:
         )
         inventory = make_inventory(default_count=30)
         inventory["missile_shots"]["count"] = 5
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (107, 107): "W",
                 (108, 107): "W",
@@ -503,7 +806,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             inventory,
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
@@ -523,7 +826,7 @@ class TestRecoveryHelpers:
         )
         inventory = make_inventory(default_count=30)
         inventory["missile_shots"]["count"] = 5
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={
                 (130, 184): "W",
                 (131, 184): "W",
@@ -540,7 +843,7 @@ class TestRecoveryHelpers:
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
         """A* waypoints never produce moves outside the visible viewport."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=300)
-        terrain = FakeTerrainMap(
+        terrain = InMemoryTerrainMap(
             terrain_data={(row, col): "#" for row in range(92, 100) for col in range(92, 100)}
         )
         ctx = DecideCtx(
@@ -573,7 +876,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
         mark_move_target_failed(107, 100, 90000)
@@ -594,7 +897,7 @@ class TestRecoveryHelpers:
             make_scanned_ai_state(),
             make_inventory(),
             100000,
-            FakeTerrainMap(),
+            InMemoryTerrainMap(),
             "",
         )
 

@@ -6,12 +6,17 @@ from typing import Literal
 
 from platform_core.logging import get_logger
 
+from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.enemy_teleport_types import (
     EnemyTeleportAttemptResultDict,
     EnemyTeleportProbeSessionDict,
     encode_enemy_teleport_probe_session,
+)
+from tankpit_bot.action_lab.page_client_snapshot import (
+    PageClientSnapshotDict,
+    capture_page_client_snapshot,
 )
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
@@ -51,7 +56,9 @@ def _require_fresh_enemy_threat(
     self_state = probe.get_self_state()
     if self_state is None:
         return None
-    threats = analyze_threats(probe.get_world_state(), self_state)
+    threats = analyze_threats(
+        probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
+    )
     fresh = [
         threat
         for threat in threats
@@ -65,7 +72,9 @@ def _enemy_by_id(probe: TeleportProbe, tank_id: int) -> EnemyThreatDict | None:
     self_state = probe.get_self_state()
     if self_state is None:
         return None
-    for threat in analyze_threats(probe.get_world_state(), self_state):
+    for threat in analyze_threats(
+        probe.get_world_state(), self_state, action_hooks.get_current_time_ms()
+    ):
         if threat["tank_id"] == tank_id:
             return threat
     return None
@@ -93,6 +102,8 @@ def _make_terminal_result(
     landed_y: int,
     message_start_index: int,
     message_end_index: int,
+    snapshot_before: PageClientSnapshotDict,
+    snapshot_after: PageClientSnapshotDict,
 ) -> EnemyTeleportAttemptResultDict:
     """Build a non-teleport terminal enemy-teleport result."""
     return EnemyTeleportAttemptResultDict(
@@ -123,6 +134,8 @@ def _make_terminal_result(
         enemy_y_after=None,
         message_start_index=message_start_index,
         message_end_index=message_end_index,
+        snapshot_before=snapshot_before,
+        snapshot_after=snapshot_after,
     )
 
 
@@ -183,6 +196,7 @@ class EnemyTeleportProbe(TeleportProbe):
         self,
         *,
         page: action_session.WaitPageProtocol,
+        cdp: CDPSessionProtocol,
         acquisition_strategy: Literal["map_open", "nearest_enemy"],
         status: Literal["no_enemy", "no_landing_tile", "acquisition_timeout"],
         acquisition_started_ms: int,
@@ -193,11 +207,20 @@ class EnemyTeleportProbe(TeleportProbe):
         landing_target: TeleportTargetDict | None,
         message_start_index: int,
         settle_delay_ms: int,
+        snapshot_before: PageClientSnapshotDict,
     ) -> EnemyTeleportAttemptResultDict:
-        """Build and finalize a non-teleport terminal attempt."""
+        """Build and finalize a non-teleport terminal attempt.
+
+        Captures the page-client ``snapshot_after`` from the live JS
+        client immediately after the probe transitions back to IDLE and
+        before the optional settle delay. The result therefore carries
+        a side-by-side view of the live client state at attempt entry
+        (``snapshot_before``) and at the terminal boundary.
+        """
         completion_timestamp_ms = action_hooks.get_current_time_ms()
         self._reset_probe_state_to_idle()
         self_state_after = self._require_self_state()
+        snapshot_after = capture_page_client_snapshot(cdp)
         result = _make_terminal_result(
             acquisition_strategy=acquisition_strategy,
             status=status,
@@ -214,6 +237,8 @@ class EnemyTeleportProbe(TeleportProbe):
             landed_y=self_state_after["y"],
             message_start_index=message_start_index,
             message_end_index=len(self.messages),
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
         if settle_delay_ms > 0:
             page.wait_for_timeout(float(settle_delay_ms))
@@ -228,12 +253,22 @@ class EnemyTeleportProbe(TeleportProbe):
         settle_delay_ms: int,
         excluded_tank_ids: frozenset[int],
     ) -> EnemyTeleportAttemptResultDict:
-        """Run one enemy-directed teleport attempt against the live server."""
+        """Run one enemy-directed teleport attempt against the live server.
+
+        Captures a page-client snapshot immediately before the acquisition
+        command dispatches and again immediately before each terminal
+        return point; these snapshots provide a side-by-side view of the
+        live JS client's belief about tank state at each boundary.
+        """
         page = self._require_page()
+        cdp = self._cdp
+        if cdp is None:
+            raise TeleportProbeError("cdp session is unavailable")
         world_before = self.get_world_state()
         self_state_before = self._require_self_state()
         fuel_before = self_state_before["fuel"]
         world_timestamp_before = world_before["timestamp_ms"]
+        snapshot_before = capture_page_client_snapshot(cdp)
 
         self._reset_probe_state_to_idle()
         message_start_index = len(self.messages)
@@ -245,7 +280,7 @@ class EnemyTeleportProbe(TeleportProbe):
         ) = run_tracked_acquisition_phase(
             page,
             self,
-            cdp=self._cdp,
+            cdp=cdp,
             send_command=lambda: self._send_enemy_acquisition(acquisition_strategy),
             command_name="enemy_acquisition",
             capture_before_map_open=acquisition_strategy == "map_open",
@@ -259,6 +294,7 @@ class EnemyTeleportProbe(TeleportProbe):
         if acquisition_sync_timestamp_ms is None:
             return self._finish_non_teleport_attempt(
                 page=page,
+                cdp=cdp,
                 acquisition_strategy=acquisition_strategy,
                 status="acquisition_timeout",
                 acquisition_started_ms=acquisition_started_ms,
@@ -269,12 +305,14 @@ class EnemyTeleportProbe(TeleportProbe):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                snapshot_before=snapshot_before,
             )
 
         enemy = _require_fresh_enemy_threat(self, acquisition_started_ms, excluded_tank_ids)
         if enemy is None:
             return self._finish_non_teleport_attempt(
                 page=page,
+                cdp=cdp,
                 acquisition_strategy=acquisition_strategy,
                 status="no_enemy",
                 acquisition_started_ms=acquisition_started_ms,
@@ -285,6 +323,7 @@ class EnemyTeleportProbe(TeleportProbe):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                snapshot_before=snapshot_before,
             )
 
         landing_x, landing_y = choose_combat_landing_tile(
@@ -296,6 +335,7 @@ class EnemyTeleportProbe(TeleportProbe):
         if landing_x == -1 and landing_y == -1:
             return self._finish_non_teleport_attempt(
                 page=page,
+                cdp=cdp,
                 acquisition_strategy=acquisition_strategy,
                 status="no_landing_tile",
                 acquisition_started_ms=acquisition_started_ms,
@@ -306,6 +346,7 @@ class EnemyTeleportProbe(TeleportProbe):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                snapshot_before=snapshot_before,
             )
 
         landing_target = TeleportTargetDict(
@@ -351,6 +392,7 @@ class EnemyTeleportProbe(TeleportProbe):
             status = "landed_adjacent"
         else:
             status = "landed_not_adjacent"
+        snapshot_after = capture_page_client_snapshot(cdp)
         result = EnemyTeleportAttemptResultDict(
             acquisition_strategy=acquisition_strategy,
             status=status,
@@ -380,6 +422,8 @@ class EnemyTeleportProbe(TeleportProbe):
             enemy_y_after=None if current_enemy is None else current_enemy["y"],
             message_start_index=message_start_index,
             message_end_index=len(self.messages),
+            snapshot_before=snapshot_before,
+            snapshot_after=snapshot_after,
         )
         self._reset_probe_state_to_idle()
         if settle_delay_ms > 0:
