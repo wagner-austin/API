@@ -114,6 +114,8 @@ def make_decision(
     reason: str,
     ai_state: AIStateDict,
     equip: list[int],
+    *,
+    secondary_command: BotCommand | None = None,
 ) -> TickDecisionDict:
     """Build a TickDecisionDict with less boilerplate.
 
@@ -126,6 +128,7 @@ def make_decision(
         reason: Decision reason string.
         ai_state: Updated AI state for next tick.
         equip: Desired equipment slot list.
+        secondary_command: Optional secondary command for multi-command ticks.
 
     Returns:
         Complete tick decision.
@@ -136,6 +139,7 @@ def make_decision(
         behavior=behavior,
         updated_ai_state=ai_state,
         desired_equipment=equip,
+        secondary_command=secondary_command,
     )
 
 

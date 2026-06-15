@@ -524,7 +524,12 @@ def execute(
 
     if not _is_dispatchable(bot, decision):
         return False
-    return dispatch_command(bot, command, snapshot)
+    primary_sent = dispatch_command(bot, command, snapshot)
+    if primary_sent and decision["secondary_command"] is not None:
+        secondary = decision["secondary_command"]
+        emit_ai("secondary cmd=%s", secondary["cmd_type"])
+        dispatch_command(bot, secondary, snapshot)
+    return primary_sent
 
 
 __all__ = [

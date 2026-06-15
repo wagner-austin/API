@@ -517,3 +517,151 @@ class TestHasCombatShot:
         target = _enemy_threat(x=103, y=100)  # distance=3
 
         assert has_combat_shot(ctx, target) is False
+
+
+class TestFindCombatPickup:
+    """Tests for _find_combat_pickup mid-combat pickup selection."""
+
+    def setup_method(self) -> None:
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        reset_world_state()
+
+    def test_finds_adjacent_fuel_when_low(self) -> None:
+        """Returns fuel pickup when fuel is below threshold and fuel is adjacent."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+        from tankpit_bot.state import make_container_state
+
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=200,
+            containers={
+                "101,100": make_container_state(
+                    x=101,
+                    y=100,
+                    is_fuel=True,
+                    volume=300,
+                    timestamp_ms=100000,
+                ),
+            },
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = _find_combat_pickup(ctx)
+        if result is None:
+            raise AssertionError("expected a pickup command")
+        assert result["cmd_type"] == "pickup_fuel"
+
+    def test_finds_adjacent_equipment(self) -> None:
+        """Returns equipment pickup when equipment is adjacent."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+        from tankpit_bot.state import make_container_state
+
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers={
+                "101,100": make_container_state(
+                    x=101,
+                    y=100,
+                    is_fuel=False,
+                    volume=0,
+                    timestamp_ms=100000,
+                ),
+            },
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = _find_combat_pickup(ctx)
+        if result is None:
+            raise AssertionError("expected a pickup command")
+        assert result["cmd_type"] == "pickup_equipment"
+
+    def test_returns_none_when_no_adjacent(self) -> None:
+        """Returns None when nothing is adjacent."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        assert _find_combat_pickup(ctx) is None
+
+    def test_combat_shoot_includes_secondary_pickup(self) -> None:
+        """_combat_shoot produces secondary pickup when container is adjacent."""
+        from tankpit_bot.bot.ai.combat_strategy import _combat_shoot
+        from tankpit_bot.state import make_container_state
+
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=200,
+            tanks={
+                "50": make_tank_state(
+                    tank_id=50,
+                    x=101,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    damage_state=0,
+                    name="Enemy",
+                    is_bot=False,
+                    is_self=False,
+                    source="viewport",
+                    timestamp_ms=100000,
+                    last_wire_seen_ms=100000,
+                ),
+            },
+            containers={
+                "99,100": make_container_state(
+                    x=99,
+                    y=100,
+                    is_fuel=True,
+                    volume=300,
+                    timestamp_ms=100000,
+                ),
+            },
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        target = _enemy_threat(tank_id=50, x=101, y=100, last_wire_seen_ms=100000)
+
+        decision = _combat_shoot(ctx, target)
+        assert decision["command"]["cmd_type"] == "shoot"
+        secondary = decision["secondary_command"]
+        if secondary is None:
+            raise AssertionError("expected secondary pickup command")
+        assert secondary["cmd_type"] == "pickup_fuel"

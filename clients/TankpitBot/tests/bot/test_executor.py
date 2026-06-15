@@ -985,3 +985,125 @@ class TestExecute:
         execute(bot, decision, _make_snapshot())
 
         assert fake_cdp._sent_methods == []
+
+
+class TestSecondaryCommandDispatch:
+    """Tests for multi-command tick dispatch via secondary_command."""
+
+    def setup_method(self) -> None:
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        reset_world_state()
+
+    def test_secondary_dispatched_after_primary(self, fake_env: FakeEnv) -> None:
+        """When primary succeeds, secondary is also dispatched."""
+        bot, _cdp = _make_bot(fake_env)
+        ws = get_world_service()
+        ws.world_state = WorldStateDict(
+            self_state=ws.world_state["self_state"],
+            tanks={
+                "50": make_tank_state(
+                    tank_id=50,
+                    x=101,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    damage_state=0,
+                    name="Enemy",
+                    is_bot=False,
+                    is_self=False,
+                    source="viewport",
+                    timestamp_ms=1000,
+                    last_wire_seen_ms=1000,
+                ),
+            },
+            containers={
+                "99,100": make_container_state(
+                    x=99,
+                    y=100,
+                    is_fuel=True,
+                    volume=300,
+                    timestamp_ms=1000,
+                ),
+            },
+            mines=ws.world_state["mines"],
+            terrain=ws.world_state["terrain"],
+            viewport=ws.world_state["viewport"],
+            scanned_viewports=ws.world_state["scanned_viewports"],
+            map_fuel_dots=ws.world_state["map_fuel_dots"],
+            timestamp_ms=1000,
+        )
+
+        behavior = make_behavior_score("HUNT", 900, 101, 100, "engage_shoot")
+        decision = make_tick_decision(
+            command=make_shoot_command(101, 100, 50),
+            behavior=behavior,
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[2],
+            secondary_command=make_pickup_fuel_command(99, 100),
+        )
+
+        result = execute(bot, decision, _make_snapshot())
+        assert result is True
+
+    def test_no_secondary_when_primary_fails_validation(self) -> None:
+        """When primary fails validation, secondary is not dispatched."""
+        update_world_state_from_position(100, 100)
+        update_world_state_from_fuel_total(get_world_service(), 800)
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        behavior = make_behavior_score("HUNT", 900, 101, 100, "engage_shoot")
+        decision = make_tick_decision(
+            command=make_shoot_command(101, 100, 999),
+            behavior=behavior,
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[2],
+            secondary_command=make_pickup_fuel_command(99, 100),
+        )
+
+        result = execute(bot, decision, _make_snapshot())
+        assert result is False
+
+
+class TestTickDecisionCodecs:
+    """Tests for encode/decode with secondary_command."""
+
+    def test_encode_decode_with_secondary(self) -> None:
+        """Round-trip encode/decode preserves secondary_command."""
+        from tankpit_bot.bot.tick_loop_types import (
+            decode_tick_decision,
+            encode_tick_decision,
+        )
+
+        decision = make_tick_decision(
+            command=make_shoot_command(50, 60, 99),
+            behavior=make_behavior_score("HUNT", 900, 50, 60, "engage"),
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[1, 2],
+            secondary_command=make_pickup_fuel_command(49, 60),
+        )
+
+        encoded = encode_tick_decision(decision)
+        decoded = decode_tick_decision(encoded)
+        if decoded["secondary_command"] is None:
+            raise AssertionError("secondary_command should not be None")
+        assert decoded["secondary_command"]["cmd_type"] == "pickup_fuel"
+
+    def test_encode_decode_without_secondary(self) -> None:
+        """Round-trip encode/decode with no secondary_command."""
+        from tankpit_bot.bot.tick_loop_types import (
+            decode_tick_decision,
+            encode_tick_decision,
+        )
+
+        decision = make_tick_decision(
+            command=make_radar_command(),
+            behavior=make_behavior_score("HUNT", 500, 0, 0, "scan"),
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[],
+        )
+
+        encoded = encode_tick_decision(decision)
+        decoded = decode_tick_decision(encoded)
+        assert decoded["secondary_command"] is None

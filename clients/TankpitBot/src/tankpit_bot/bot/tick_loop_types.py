@@ -137,13 +137,17 @@ class TickDecisionDict(TypedDict):
     """Output of a strategy decision consumed by the executor.
 
     Attributes:
-        command: The bot command to send this tick.
+        command: The primary bot command to send this tick.
+        secondary_command: Optional secondary command dispatched after the
+            primary succeeds. The server queues commands, so both arrive
+            in the same tick window (~2040ms shot cooldown).
         behavior: The chosen behavior score (for logging/debugging).
         updated_ai_state: New AI state to persist after this tick.
         desired_equipment: Sorted list of equipment slot numbers (1-5) to enable.
     """
 
     command: BotCommand
+    secondary_command: BotCommand | None
     behavior: BehaviorScoreDict
     updated_ai_state: AIStateDict
     desired_equipment: list[int]
@@ -154,20 +158,24 @@ def make_tick_decision(
     behavior: BehaviorScoreDict,
     updated_ai_state: AIStateDict,
     desired_equipment: list[int],
+    *,
+    secondary_command: BotCommand | None = None,
 ) -> TickDecisionDict:
     """Create a TickDecisionDict.
 
     Args:
-        command: The bot command to send.
+        command: The primary bot command to send.
         behavior: The chosen behavior score.
         updated_ai_state: New AI state to persist.
         desired_equipment: Sorted list of equipment slot numbers (1-5) to enable.
+        secondary_command: Optional secondary command for multi-command ticks.
 
     Returns:
         TickDecisionDict with the provided values.
     """
     return TickDecisionDict(
         command=command,
+        secondary_command=secondary_command,
         behavior=behavior,
         updated_ai_state=updated_ai_state,
         desired_equipment=sorted(desired_equipment),
@@ -184,12 +192,16 @@ def encode_tick_decision(decision: TickDecisionDict) -> JSONObject:
         JSON-serializable dict representation.
     """
     equipment: list[JSONValue] = list(decision["desired_equipment"])
-    return {
+    secondary = decision["secondary_command"]
+    result: JSONObject = {
         "command": _encode_bot_command(decision["command"]),
         "behavior": encode_behavior_score(decision["behavior"]),
         "updated_ai_state": encode_ai_state(decision["updated_ai_state"]),
         "desired_equipment": equipment,
     }
+    if secondary is not None:
+        result["secondary_command"] = _encode_bot_command(secondary)
+    return result
 
 
 def decode_tick_decision(data: JSONObject) -> TickDecisionDict:
@@ -216,8 +228,14 @@ def decode_tick_decision(data: JSONObject) -> TickDecisionDict:
     if not isinstance(ai_state_raw, dict):
         raise ValueError("updated_ai_state must be an object")
 
+    secondary_raw = data.get("secondary_command")
+    secondary: BotCommand | None = None
+    if isinstance(secondary_raw, dict):
+        secondary = _decode_bot_command(secondary_raw)
+
     return TickDecisionDict(
         command=_decode_bot_command(command_raw),
+        secondary_command=secondary,
         behavior=decode_behavior_score(behavior_raw),
         updated_ai_state=decode_ai_state(ai_state_raw),
         desired_equipment=_require_int_list(data, "desired_equipment"),

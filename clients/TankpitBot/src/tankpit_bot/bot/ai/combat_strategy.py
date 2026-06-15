@@ -31,7 +31,10 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
+    BotCommand,
     make_map_open_command,
+    make_pickup_equipment_command,
+    make_pickup_fuel_command,
     make_shoot_command,
     make_teleport_command,
 )
@@ -407,6 +410,41 @@ def close_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     return _combat_close(ctx, target)
 
 
+def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
+    """Find an adjacent container to grab between shots.
+
+    Checks for both fuel and equipment within one tile. Fuel is preferred
+    when below the low threshold; equipment otherwise.
+
+    Args:
+        ctx: Decision context with world state and self position.
+
+    Returns:
+        A pickup command for the adjacent container, or None.
+    """
+    from tankpit_bot.bot.ai.equipment import find_adjacent_container
+
+    self_state = ctx.world["self_state"]
+    if self_state is None:
+        return None
+
+    fuel_low = self_state["fuel"] < ctx.config["fuel_low_threshold"]
+    for want_fuel in [True, False] if fuel_low else [False, True]:
+        container = find_adjacent_container(
+            ctx.world,
+            self_state,
+            ctx.terrain,
+            want_fuel=want_fuel,
+            now_ms=ctx.timestamp_ms,
+        )
+        if container is not None:
+            x, y = container["x"], container["y"]
+            if want_fuel:
+                return make_pickup_fuel_command(x, y)
+            return make_pickup_equipment_command(x, y)
+    return None
+
+
 def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase engaging: shoot; a miss on a STATIONARY target blocks it.
 
@@ -457,6 +495,9 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
 
     emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
     engaging_state = _set_combat_target(ctx.base, target)
+    secondary = _find_combat_pickup(ctx)
+    if secondary is not None:
+        emit_ai("mid-combat pickup %s", secondary["cmd_type"])
     return make_decision(
         make_shoot_command(target["x"], target["y"], target["tank_id"]),
         "HUNT",
@@ -473,6 +514,7 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             }
         ),
         ctx.equip,
+        secondary_command=secondary,
     )
 
 
