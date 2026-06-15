@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from tankpit_bot._test_hooks.cdp import CDPSessionProtocol
-from tankpit_bot.state import WorldStateDict
+from tankpit_bot.state.types import WorldStateDict
 
 
 class BufferedMessageSourceProtocol(Protocol):
