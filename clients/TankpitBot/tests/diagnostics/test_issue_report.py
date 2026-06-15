@@ -551,7 +551,7 @@ def test_require_object_list_rejects_non_object_element() -> None:
     """``_require_object_list`` raises ``JSONTypeError`` for a non-object element."""
     from platform_core.json_utils import JSONObject, JSONTypeError
 
-    from tankpit_bot.diagnostics.issue_report_types import _require_object_list
+    from tankpit_bot.diagnostics.issue_report_codecs import _require_object_list
 
     payload: JSONObject = {"items": [{"k": "v"}, "not an object"]}
 

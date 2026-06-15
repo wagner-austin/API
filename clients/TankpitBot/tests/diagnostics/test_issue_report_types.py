@@ -11,15 +11,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 
-from tankpit_bot.diagnostics.issue_report_types import (
-    FuelTargetSelectionRecordDict,
-    IssueReportDict,
-    MapOpenSkippedRecordDict,
-    SessionRoomRecordDict,
-    StateBudgetRecordDict,
-    TargetedTeleportRecordDict,
-    TeleportAttemptRecordDict,
-    WireCompleteRecordDict,
+from tankpit_bot.diagnostics.issue_report_codecs import (
     decode_fuel_target_selection_record,
     decode_issue_report,
     decode_map_open_skipped_record,
@@ -36,6 +28,16 @@ from tankpit_bot.diagnostics.issue_report_types import (
     encode_targeted_teleport_record,
     encode_teleport_attempt_record,
     encode_wire_complete_record,
+)
+from tankpit_bot.diagnostics.issue_report_types import (
+    FuelTargetSelectionRecordDict,
+    IssueReportDict,
+    MapOpenSkippedRecordDict,
+    SessionRoomRecordDict,
+    StateBudgetRecordDict,
+    TargetedTeleportRecordDict,
+    TeleportAttemptRecordDict,
+    WireCompleteRecordDict,
 )
 
 
@@ -301,9 +303,9 @@ def test_decode_issue_report_rejects_non_object_session_room() -> None:
 
 def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
     """A record without ``session_room`` decodes with the field set to None."""
+    from tankpit_bot.diagnostics.issue_report_codecs import encode_session_scorecard
     from tankpit_bot.diagnostics.issue_report_types import (
         SessionScorecardDict,
-        encode_session_scorecard,
         make_unsampled_inventory_counts,
         make_zero_inventory_counts,
     )
@@ -379,7 +381,7 @@ def test_targeted_teleport_record_round_trip() -> None:
 
 def test_require_object_rejects_non_dict() -> None:
     """``_require_object`` raises ``JSONTypeError`` when the value is not a dict."""
-    from tankpit_bot.diagnostics.issue_report_types import _require_object
+    from tankpit_bot.diagnostics.issue_report_codecs import _require_object
 
     payload: JSONObject = {"inventory_first": "not a dict"}
 
