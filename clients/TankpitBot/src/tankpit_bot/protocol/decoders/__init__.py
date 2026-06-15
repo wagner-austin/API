@@ -6,7 +6,6 @@ all decoder functions from submodules.
 
 from __future__ import annotations
 
-from tankpit_bot.container.types import ContainerMessage
 from tankpit_bot.protocol.constants import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
@@ -104,80 +103,10 @@ from tankpit_bot.protocol.decoders.world import (
 )
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.protocol.types import (
-    ActionDoneDict,
-    ActiveForcesDict,
-    CacheUpdateDict,
-    ChatMessageDict,
-    CombinedTileUpdateDict,
-    DeactivationDict,
-    EnemyDetectionDict,
-    EquipmentGainDict,
-    EquipmentToggleDict,
-    FuelDepositDict,
-    FuelGainDict,
-    InventoryDict,
-    JoinConfirmDict,
-    MineDetonationDict,
-    MinePlacementDict,
-    MovementDict,
-    MovementResponseDict,
-    OverlayUpdateDict,
-    RadarResultDict,
-    RadarScanResultDict,
-    ShootEventDict,
-    StatisticsDict,
-    SupervisorDict,
-    SyncDict,
-    TankEntryDict,
-    TankExitDict,
-    TankInfoDict,
-    TankStatusDict,
-    TankStatusSyncDict,
-    TerrainUpdateDict,
-    ViewportUpdateDict,
-    WorldInfoDict,
+    BinaryMessage,
+    DecodedMessage,
+    TextMessage,
 )
-
-# Text message types (no XOR decoding, ASCII format)
-TextMessage = JoinConfirmDict | WorldInfoDict
-
-# Binary message types (XOR decoded)
-BinaryMessage = (
-    ShootEventDict
-    | DeactivationDict
-    | FuelGainDict
-    | FuelDepositDict
-    | RadarResultDict
-    | EnemyDetectionDict
-    | InventoryDict
-    | EquipmentGainDict
-    | EquipmentToggleDict
-    | MinePlacementDict
-    | MineDetonationDict
-    | RadarScanResultDict
-    | MovementDict
-    | TankInfoDict
-    | MovementResponseDict
-    | SyncDict
-    | CacheUpdateDict
-    | OverlayUpdateDict
-    | CombinedTileUpdateDict
-    | TankEntryDict
-    | TankExitDict
-    | ActionDoneDict
-    | ChatMessageDict
-    | StatisticsDict
-    | ActiveForcesDict
-    | TankStatusSyncDict
-    | TankStatusDict
-    | SupervisorDict
-    | TerrainUpdateDict
-    | ViewportUpdateDict
-    | ContainerMessage
-)
-
-# Union type for all decoded messages
-DecodedMessage = TextMessage | BinaryMessage
 
 
 def _decode_combat_message(msg_type: int, data: bytes) -> BinaryMessage | None:

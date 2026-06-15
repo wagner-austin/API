@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+from tankpit_bot.container.types import ContainerMessage
+
 # =============================================================================
 # Text Messages (no XOR encoding)
 # =============================================================================
@@ -421,10 +423,12 @@ class ActiveForcesDict(TypedDict):
 __all__ = [
     "ActionDoneDict",
     "ActiveForcesDict",
+    "BinaryMessage",
     "CacheUpdateDict",
     "ChatMessageDict",
     "CombinedTileUpdateDict",
     "DeactivationDict",
+    "DecodedMessage",
     "EnemyDetectionDict",
     "EquipmentGainDict",
     "EquipmentToggleDict",
@@ -452,7 +456,51 @@ __all__ = [
     "TankStatusDict",
     "TankStatusSyncDict",
     "TerrainUpdateDict",
+    "TextMessage",
     "ViewportEntityDict",
     "ViewportUpdateDict",
     "WorldInfoDict",
 ]
+
+
+# =============================================================================
+# Message union types
+# =============================================================================
+
+TextMessage = JoinConfirmDict | WorldInfoDict
+
+BinaryMessage = (
+    ShootEventDict
+    | DeactivationDict
+    | FuelGainDict
+    | FuelDepositDict
+    | RadarResultDict
+    | EnemyDetectionDict
+    | InventoryDict
+    | EquipmentGainDict
+    | EquipmentToggleDict
+    | MinePlacementDict
+    | MineDetonationDict
+    | RadarScanResultDict
+    | MovementDict
+    | TankInfoDict
+    | MovementResponseDict
+    | SyncDict
+    | CacheUpdateDict
+    | OverlayUpdateDict
+    | CombinedTileUpdateDict
+    | TankEntryDict
+    | TankExitDict
+    | ActionDoneDict
+    | ChatMessageDict
+    | StatisticsDict
+    | ActiveForcesDict
+    | TankStatusSyncDict
+    | TankStatusDict
+    | SupervisorDict
+    | TerrainUpdateDict
+    | ViewportUpdateDict
+    | ContainerMessage
+)
+
+DecodedMessage = TextMessage | BinaryMessage
