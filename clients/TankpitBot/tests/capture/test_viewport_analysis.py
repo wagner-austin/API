@@ -16,6 +16,9 @@ from tankpit_bot.capture import (
 )
 from tankpit_bot.capture import viewport_analysis as va
 from tankpit_bot.capture.viewport_analysis import ViewportAnalysisDict, ViewportShiftDict
+from tankpit_bot.capture.viewport_analysis_types import (
+    ViewportAnalysisStateDict,
+)
 from tankpit_bot.capture.xor import xor_decode_body
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
@@ -697,7 +700,7 @@ class TestViewportAnalysisHelpers:
 
     def test_handle_movement_response_ignores_other_tanks(self) -> None:
         """Leaves viewport state unchanged when movement belongs to another tank."""
-        state = va._ViewportAnalysisStateDict(
+        state = ViewportAnalysisStateDict(
             self_tank_id=638,
             current_viewport_left=136,
             current_viewport_top=134,
@@ -708,7 +711,7 @@ class TestViewportAnalysisHelpers:
 
     def test_handle_movement_response_keeps_same_viewport_without_shift(self) -> None:
         """Learns self tank id without mutating known viewport origin."""
-        state = va._ViewportAnalysisStateDict(
+        state = ViewportAnalysisStateDict(
             self_tank_id=None,
             current_viewport_left=136,
             current_viewport_top=134,
@@ -721,7 +724,7 @@ class TestViewportAnalysisHelpers:
 
     def test_handle_viewport_update_requires_known_self_and_entity(self) -> None:
         """Records direct viewport origins and shift transitions."""
-        state = va._ViewportAnalysisStateDict(
+        state = ViewportAnalysisStateDict(
             self_tank_id=638,
             current_viewport_left=136,
             current_viewport_top=134,
@@ -755,7 +758,7 @@ class TestViewportAnalysisHelpers:
     def test_handle_position_update_early_returns_and_mismatch_counts(self) -> None:
         """Handles all early-return conditions and mixed x/y match counting."""
         evidence: list[va.PositionViewportEvidenceDict] = []
-        empty_state = va._ViewportAnalysisStateDict(
+        empty_state = ViewportAnalysisStateDict(
             self_tank_id=None,
             current_viewport_left=None,
             current_viewport_top=None,
@@ -803,7 +806,7 @@ class TestViewportAnalysisHelpers:
         assert evidence == []
 
         wrong_tank = va._handle_position_update(
-            va._ViewportAnalysisStateDict(
+            ViewportAnalysisStateDict(
                 self_tank_id=638,
                 current_viewport_left=136,
                 current_viewport_top=134,
@@ -821,7 +824,7 @@ class TestViewportAnalysisHelpers:
         assert evidence == []
 
         no_viewport = va._handle_position_update(
-            va._ViewportAnalysisStateDict(
+            ViewportAnalysisStateDict(
                 self_tank_id=638,
                 current_viewport_left=None,
                 current_viewport_top=None,
@@ -839,7 +842,7 @@ class TestViewportAnalysisHelpers:
         assert evidence == []
 
         matched = va._handle_position_update(
-            va._ViewportAnalysisStateDict(
+            ViewportAnalysisStateDict(
                 self_tank_id=638,
                 current_viewport_left=136,
                 current_viewport_top=134,
