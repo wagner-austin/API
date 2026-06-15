@@ -16,6 +16,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.command_sender import send_command_bytes
 from tankpit_bot.bot.commands import (
     encode_move_command,
     encode_pickup_equipment_command,
@@ -58,14 +59,12 @@ from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     build_xor_table,
     load_static_key,
-    xor_bytes,
 )
 from tankpit_bot.protocol.commands import (
     CMD_ENTER_GAME,
     CMD_MAP_OPEN,
     CMD_NEAREST_ENEMY,
     CMD_RADAR,
-    COMMAND_PREFIX,
     build_query_command,
     build_shoot_command,
     build_toggle_equipment_command,
@@ -75,7 +74,6 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_state,
     emit_sync,
-    emit_wire,
     emit_wire_complete,
 )
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
@@ -571,29 +569,6 @@ class Bot(BrowserSession):
     # Command Sending
     # =========================================================================
 
-    def _xor_encode_command(self, data: bytes) -> bytes:
-        """XOR encode a framed command for wire transmission.
-
-        Commands are framed as: [len_lo, len_hi, '!', type, cmd_id, ...data]
-        XOR encoding applies to everything after '!' (bytes at index 3+).
-
-        Args:
-            data: Framed command bytes (with 2-byte length header).
-
-        Returns:
-            XOR-encoded framed command bytes.
-        """
-        if self._xor_table is None or len(data) < 4:
-            return data
-
-        # data[0:2] = length header, data[2] = '!' prefix, data[3:] = type+cmd+payload
-        header = data[:2]
-        prefix = data[2:3]  # '!' byte stays as-is
-        payload = data[3:]  # type + cmd_id + optional data
-
-        encoded_payload = xor_bytes(self._xor_table, payload, offset=0)
-        return header + prefix + encoded_payload
-
     def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
         """XOR encode and send command bytes via WebSocket.
 
@@ -604,17 +579,13 @@ class Bot(BrowserSession):
         Returns:
             True if sent, False if CDP session not available.
         """
-        if self._cdp is None:
-            log.warning("Cannot send %s: CDP session not available", cmd_name)
-            return False
-
-        # XOR encode if it's a '!' command
-        if len(data) > 2 and data[2] == COMMAND_PREFIX:
-            data = self._xor_encode_command(data)
-
-        self._send_websocket_bytes(self._cdp, data, cmd_name)
-        emit_wire("%s", cmd_name)
-        return True
+        return send_command_bytes(
+            self._cdp,
+            self._xor_table,
+            data,
+            cmd_name,
+            self._send_websocket_bytes,
+        )
 
     def enter_game(self) -> bool:
         """Send CMD_ENTER_GAME to activate the tank in the game world.
