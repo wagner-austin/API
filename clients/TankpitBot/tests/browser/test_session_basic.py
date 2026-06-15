@@ -548,3 +548,56 @@ class TestCleanup:
         browser = _FakeBrowserRaising()
         # Should not raise — the close error is caught and logged
         session._cleanup(cdp, page, context, browser)
+
+
+class TestConsoleListener:
+    """Tests for BrowserSession._setup_console_listener."""
+
+    def test_console_listener_registers_handler(self) -> None:
+        """_setup_console_listener enables Runtime and registers handler."""
+        session = BrowserSession("https://example.com", headless=True)
+        calls: list[str] = []
+
+        class _TrackingCDP(FakeCDPSession):
+            def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+                calls.append(method)
+                return {}
+
+        cdp = _TrackingCDP()
+        session._setup_console_listener(cdp)
+        assert "Runtime.enable" in calls
+
+    def test_console_handler_logs_ws_messages(self) -> None:
+        """Console handler processes WebSocket-related messages."""
+        session = BrowserSession("https://example.com", headless=True)
+        registered_handlers: dict[str, Callable[[JSONObject], None]] = {}
+
+        class _CapturingCDP(FakeCDPSession):
+            def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+                registered_handlers[event] = handler
+
+        cdp = _CapturingCDP()
+        session._setup_console_listener(cdp)
+        handler = registered_handlers.get("Runtime.consoleAPICalled")
+        if handler is None:
+            raise AssertionError("expected Runtime.consoleAPICalled handler")
+        handler({"type": "log", "args": [{"value": "WS connected"}]})
+        handler({"type": "log", "args": [{"value": "normal message"}]})
+        handler({"type": "log", "args": []})
+        handler({"type": "log", "args": "not_a_list"})
+        handler({"type": "log", "args": [{"description": "Hook fired"}]})
+        handler({"type": "log", "args": [{"value": None}]})
+        handler({"type": "log", "args": ["raw_string_arg"]})
+
+
+class TestGetArgv:
+    """Tests for _test_hooks._real_get_argv."""
+
+    def test_real_get_argv_returns_sys_argv(self) -> None:
+        """_real_get_argv returns the actual sys.argv list."""
+        import sys
+
+        from tankpit_bot._test_hooks.runtime import _real_get_argv
+
+        result = _real_get_argv()
+        assert result is sys.argv

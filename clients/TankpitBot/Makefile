@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: help lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
 
 help:
 	@Write-Host ""
@@ -82,11 +82,6 @@ sniff: install
 	@Write-Host ""
 	@Write-Host "==> sniff (output: $(OUTPUT))" -ForegroundColor Cyan
 	$$env:TANKPIT_OUTPUT = '$(OUTPUT)'; poetry run tankpit-sniff
-
-probe: install
-	@Write-Host ""
-	@Write-Host "==> probe" -ForegroundColor Cyan
-	poetry run tankpit-probe
 
 teleport-probe: teleport-probe-safe teleport-probe-aggressive
 	@Write-Host ""

@@ -27,7 +27,6 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer:main"
-tankpit-probe = "tankpit_bot.probe:main"
 tankpit-bot = "tankpit_bot.bot:main"
 tankpit-teleport-probe = "scripts.teleport_probe:main"
 tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
