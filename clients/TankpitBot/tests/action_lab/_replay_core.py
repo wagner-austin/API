@@ -447,11 +447,13 @@ class WorldStateDerivedCDP:
             params: Optional method params.
 
         Returns:
-            Snapshot payload for snapshot queries; otherwise an empty
-            evaluate response.
+            Snapshot payload for snapshot queries; string for WebSocket
+            send evaluations; otherwise an empty evaluate response.
         """
-        _ = params
-        if method == "Runtime.evaluate":
+        if method == "Runtime.evaluate" and params is not None:
+            expression = params.get("expression", "")
+            if isinstance(expression, str) and "ws.send" in expression:
+                return {"result": {"value": "SENT_REPLAY_BYTES"}}
             return {"result": {"value": build_world_derived_snapshot()}}
         return {"result": {"value": None}}
 

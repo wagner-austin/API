@@ -47,7 +47,6 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
-from tankpit_bot.bot.states import make_in_flight_action
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import (
     SelfStateDict,
@@ -567,8 +566,6 @@ def test_send_enemy_acquisition_dispatches_by_strategy() -> None:
 def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    probe._state_data["state"] = "TELEPORTING"
-    probe._state_data["in_flight_action"] = make_in_flight_action("teleport", 119, 130, 1000)
     result = probe._finish_non_teleport_attempt(
         page=probe._fake_page,
         cdp=StubSnapshotCDPSession(),
@@ -589,7 +586,6 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
     assert result["message_start_index"] == 4
     assert result["message_end_index"] == 0
     assert probe.get_state() == "IDLE"
-    assert probe.get_state_data()["in_flight_action"]["kind"] == "none"
     assert probe._fake_page.waits[-1] == 250.0
 
 

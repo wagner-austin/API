@@ -50,7 +50,6 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
     decode_teleport_probe_session,
 )
-from tankpit_bot.bot.states import make_in_flight_action
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import (
     SelfStateDict,
@@ -749,15 +748,9 @@ def test_probe_helpers_cover_guards_and_clear_action() -> None:
     assert probe._require_self_state()["x"] == 158
     assert probe._require_page() is probe._fake_page
 
-    probe._state_data["in_flight_action"] = make_in_flight_action("teleport", 150, 171, 1000)
     probe._clear_in_flight_action()
-    assert probe.get_state_data()["in_flight_action"]["kind"] == "none"
-
-    probe._state_data["state"] = "TELEPORTING"
-    probe._state_data["in_flight_action"] = make_in_flight_action("teleport", 150, 171, 1000)
     probe._reset_probe_state_to_idle()
     assert probe.get_state() == "IDLE"
-    assert probe.get_state_data()["in_flight_action"]["kind"] == "none"
 
     probe._self_state = None
     with pytest.raises(TeleportProbeError, match="self state is unavailable"):
@@ -1398,3 +1391,78 @@ def test_run_teleport_probe_writes_session_json(fake_fs: FakeFileSystem) -> None
     assert session["capture_session_path"] == "teleport_probe.capture_session.json"
     assert session["targets"] == [TeleportTargetDict(label="target_0", x=150, y=171)]
     assert capture_decoded["session_id"] == "fake-session"
+
+
+# =========================================================================
+# TeleportProbe composition tests (Phase D coverage)
+# =========================================================================
+
+
+def test_send_bytes_delegates_to_command_service() -> None:
+    """_send_bytes syncs CDP and delegates to CommandService."""
+
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    sent: list[str] = []
+
+    def _fake_send(cdp: CDPSessionProtocol, data: bytes, label: str) -> str:
+        sent.append(label)
+        return ""
+
+    probe._commands._send_ws_bytes = _fake_send
+    probe._cdp = StubSnapshotCDPSession()
+    probe._commands.xor_table = b"\x00" * 256
+    assert probe._send_bytes(b"\x04\x00!test", "test_cmd") is True
+    assert sent == ["test_cmd"]
+
+
+def test_send_bytes_returns_false_when_cdp_none() -> None:
+    """_send_bytes returns False when no CDP session is attached."""
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    assert probe._send_bytes(b"\x04\x00!test", "test_cmd") is False
+
+
+def test_teleport_to_returns_false_when_cdp_none() -> None:
+    """teleport_to returns False early when no CDP session."""
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    assert probe.teleport_to(100, 200) is False
+
+
+def test_on_message_captured_buffers_received() -> None:
+    """_on_message_captured appends received payloads to buffer."""
+    from tankpit_bot.types import CapturedMessage
+
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    msg = CapturedMessage(
+        direction="received",
+        payload="dGVzdA==",
+        timestamp_ms=1000,
+        ws_url="wss://tankpit.com/ws/",
+    )
+    probe._on_message_captured(msg)
+    assert probe._cdp_message_buffer == ["dGVzdA=="]
+
+
+def test_on_message_captured_ignores_sent() -> None:
+    """_on_message_captured does not buffer sent messages."""
+    from tankpit_bot.types import CapturedMessage
+
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    msg = CapturedMessage(
+        direction="sent",
+        payload="dGVzdA==",
+        timestamp_ms=1000,
+        ws_url="wss://tankpit.com/ws/",
+    )
+    probe._on_message_captured(msg)
+    assert probe._cdp_message_buffer == []
+
+
+def test_on_magic_captured_builds_xor_table(fake_fs: FakeFileSystem) -> None:
+    """_on_magic_captured builds XOR table on CommandService."""
+    probe = TeleportProbe("https://tankpit.com/play", headless=True)
+    assert probe._commands.xor_table is None
+    probe._on_magic_captured("TESTMAGIC" * 5)
+    xor_table = probe._commands.xor_table
+    if xor_table is None:
+        raise AssertionError("xor_table should be set after magic capture")
+    assert len(xor_table) == 1000

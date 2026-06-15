@@ -40,11 +40,13 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
     encode_teleport_probe_session,
 )
-from tankpit_bot.bot import Bot
-from tankpit_bot.bot.states import make_no_action, transition_to
+from tankpit_bot.bot.command_service import CommandService
+from tankpit_bot.browser import BrowserSession
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.decoders import decode_message
-from tankpit_bot.state import SelfStateDict
+from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.state import SelfStateDict, WorldStateDict
+from tankpit_bot.types import CapturedMessage
 
 log = get_logger(__name__)
 _TELEPORT_POLL_INTERVAL_MS = 100.0
@@ -518,8 +520,12 @@ def _limit_targets(
     return targets[:max_targets]
 
 
-class TeleportProbe(Bot):
-    """Live teleport probe that isolates map-open and teleport behavior."""
+class TeleportProbe(BrowserSession):
+    """Live teleport probe that isolates map-open and teleport behavior.
+
+    Inherits browser lifecycle from BrowserSession. Uses CommandService
+    for command dispatch instead of inheriting from Bot.
+    """
 
     def __init__(
         self,
@@ -540,8 +546,160 @@ class TeleportProbe(Bot):
             headless=headless,
             prefer_account=prefer_account,
         )
+        self._commands = CommandService(send_ws_bytes=self._send_websocket_bytes)
+        self._cdp_message_buffer: list[str] = []
         self._action_cycle_tracker = ActionCycleTracker()
         self._attempt_phase_overlaps: list[ActionPhaseOverlapDict] = []
+
+    # -----------------------------------------------------------------
+    # Command dispatch
+    # -----------------------------------------------------------------
+
+    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+        """XOR encode and send command bytes via WebSocket.
+
+        Subclasses (replay harnesses) override this to capture dispatched
+        commands without hitting the wire.
+
+        Args:
+            data: Framed command bytes.
+            cmd_name: Command name for logging.
+
+        Returns:
+            True if sent, False if CDP unavailable.
+        """
+        self._commands.cdp = self._cdp
+        return self._commands.send_bytes(data, cmd_name)
+
+    def open_map(self) -> bool:
+        """Send map open command.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open")
+
+    def teleport_to(self, x: int, y: int) -> bool:
+        """Send teleport command. Map must already be open.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.bot.commands import encode_teleport_command
+        from tankpit_bot.bot.types import make_teleport_command
+
+        if self._cdp is None:
+            return False
+        cmd = make_teleport_command(x, y)
+        return self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})")
+
+    def move_to(self, x: int, y: int) -> bool:
+        """Send move command.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.bot.commands import encode_move_command
+        from tankpit_bot.bot.types import make_move_command
+
+        cmd = make_move_command(x, y)
+        return self._send_bytes(encode_move_command(cmd), "move")
+
+    def use_radar(self) -> bool:
+        """Send radar scan command.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_RADAR), "radar")
+
+    def request_nearest_enemy(self) -> bool:
+        """Send nearest enemy query command.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
+
+    # -----------------------------------------------------------------
+    # Lifecycle hooks
+    # -----------------------------------------------------------------
+
+    def _on_message_captured(self, message: CapturedMessage) -> None:
+        """Buffer received messages for probe sync.
+
+        Args:
+            message: The captured message.
+        """
+        super()._on_message_captured(message)
+        if message["direction"] == "received":
+            self._cdp_message_buffer.append(message["payload"])
+
+    def _on_magic_captured(self, magic: str) -> None:
+        """Build XOR table and init trackers when magic key is captured.
+
+        Args:
+            magic: The session magic string.
+        """
+        from tankpit_bot.protocol.codec import (
+            DEFAULT_STATIC_KEY_PATH,
+            build_xor_table,
+            load_static_key,
+        )
+        from tankpit_bot.sniffer.trackers import init_trackers_with_magic
+
+        init_trackers_with_magic(magic)
+        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
+        self._commands.xor_table = build_xor_table(static_key, magic)
+
+    # -----------------------------------------------------------------
+    # World state access
+    # -----------------------------------------------------------------
+
+    def get_world_state(self) -> WorldStateDict:
+        """Get current world state.
+
+        Returns:
+            Current WorldStateDict.
+        """
+        return get_world_state()
+
+    def get_state(self) -> str:
+        """Get current probe state.
+
+        Returns:
+            Always "IDLE" — probes do not use the Bot HFSM.
+        """
+        return "IDLE"
+
+    def _update_state_from_world(self) -> None:
+        """Update state from world data. No-op for probes."""
+
+    def get_self_state(self) -> SelfStateDict | None:
+        """Get self tank state.
+
+        Returns:
+            SelfStateDict if available, None if not yet tracked.
+        """
+        return get_world_state()["self_state"]
+
+    # -----------------------------------------------------------------
+    # Action phase tracking
+    # -----------------------------------------------------------------
 
     def _reset_action_cycle_tracker(self) -> None:
         """Reset action phase tracking for a new live session."""
@@ -615,20 +773,10 @@ class TeleportProbe(Bot):
         return self._page
 
     def _clear_in_flight_action(self) -> None:
-        """Clear any pending action record without inferring success or failure."""
-        self._state_data = transition_to(
-            self._state_data,
-            self._state_data["state"],
-            in_flight_action=make_no_action(),
-        )
+        """Clear any pending action record between phases."""
 
     def _reset_probe_state_to_idle(self) -> None:
-        """Reset the probe to an executable idle state between attempts."""
-        self._state_data = transition_to(
-            self._state_data,
-            "IDLE",
-            in_flight_action=make_no_action(),
-        )
+        """Reset the probe to idle state between attempts."""
 
     def _probe_single_target(
         self,
