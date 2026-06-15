@@ -28,10 +28,12 @@ from tankpit_bot.action_lab.probe_runtime import (
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
+)
+from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
+from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
     _wait_for_teleport_outcome,
 )
-from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_phase import (
     run_tracked_teleport_command,
 )

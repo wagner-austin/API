@@ -35,10 +35,12 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.radar_phase import run_tracked_radar_phase
 from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
+)
+from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
+from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
     _wait_for_teleport_outcome,
 )
-from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_phase import run_tracked_teleport_command
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.state.types import WorldStateDict, coord_key, parse_coord_key

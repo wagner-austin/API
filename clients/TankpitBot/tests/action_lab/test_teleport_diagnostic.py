@@ -10,7 +10,7 @@ from pathlib import Path
 
 from tests.conftest import FakeFileSystem
 
-from tankpit_bot.action_lab.teleport import _emit_teleport_attempt_diagnostic
+from tankpit_bot.action_lab.teleport_helpers import _emit_teleport_attempt_diagnostic
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import (
