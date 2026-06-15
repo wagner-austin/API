@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from tankpit_bot.browser import GameLogEntry, GameLogScraper
-from tankpit_bot.combat import CombatEvent, CombatTracker
+from tankpit_bot.combat import CombatEvent
+from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.game_state import GameStateManager
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol

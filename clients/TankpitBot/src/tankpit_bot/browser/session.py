@@ -50,7 +50,8 @@ from tankpit_bot.browser.types import (
     GameNotJoinedError,
     PlaywrightNotInstalledError,
 )
-from tankpit_bot.combat import CombatEvent, CombatTracker
+from tankpit_bot.combat import CombatEvent
+from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.inventory import InventoryChange, InventoryScraper
 from tankpit_bot.protocol.codec import extract_magic_from_auth_payload
 from tankpit_bot.types import (

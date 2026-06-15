@@ -27,13 +27,13 @@ from platform_core.logging import get_logger
 from tankpit_bot.browser import GameLogEntry, GameLogScraper
 from tankpit_bot.combat import (
     CombatStats,
-    CombatTracker,
     EntityPairStats,
     decode_combat_stats,
     decode_entity_pair_stats,
     encode_combat_stats,
     encode_entity_pair_stats,
 )
+from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.inventory import (
     InventoryState,
     decode_inventory_state,

@@ -9,7 +9,6 @@ from tankpit_bot.combat import (
     VALID_COMBAT_EVENT_TYPES,
     CombatEvent,
     CombatStats,
-    CombatTracker,
     EntityPairStats,
     decode_combat_event,
     decode_combat_stats,
@@ -21,6 +20,7 @@ from tankpit_bot.combat import (
     parse_combat_line,
     validate_combat_event_type,
 )
+from tankpit_bot.combat_tracker import CombatTracker
 
 # =============================================================================
 # parse_combat_line Tests - Player-centric
