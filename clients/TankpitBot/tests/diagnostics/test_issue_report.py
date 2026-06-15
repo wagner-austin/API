@@ -21,11 +21,8 @@ import pytest
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.diagnostics.issue_report import (
-    build_issue_report,
-    main,
-    render_issue_report,
-)
+from tankpit_bot.diagnostics.issue_report import build_issue_report
+from tankpit_bot.diagnostics.issue_report_renderer import main, render_issue_report
 from tankpit_bot.diagnostics.issue_report_types import SessionRoomRecordDict
 from tankpit_bot.runtime_logging import (
     configure_probe_runtime_logging,
