@@ -9,12 +9,11 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.browser.cdp_helpers import decode_captured_body, load_tpclient_static_key
 from tankpit_bot.browser.login import (
     _collect_room_entries,
-    _decode_captured_body,
     _has_enter_response,
     _has_join_confirm,
-    _load_tpclient_static_key,
     _register_room_entries,
     _resolve_room_id,
     _wait_for_enter_response,
@@ -157,7 +156,7 @@ def test_decode_captured_body_rejects_trailing_bytes() -> None:
     payload = base64.b64encode(encode_frame(b"+1|Practice") + b"\x00").decode("utf-8")
 
     with pytest.raises(ValueError, match="unexpected trailing bytes"):
-        _decode_captured_body(payload)
+        decode_captured_body(payload)
 
 
 def test_collect_room_entries_skips_non_room_messages_and_short_entries() -> None:
@@ -388,7 +387,7 @@ def test_load_tpclient_static_key_extracts_current_key() -> None:
     """Static-key extraction returns the 1000-char client key."""
     cdp = FakeCDPLogin()
 
-    static_key = _load_tpclient_static_key(cdp, "https://tankpit.com/game/tpclient-test.js")
+    static_key = load_tpclient_static_key(cdp, "https://tankpit.com/game/tpclient-test.js")
 
     assert static_key == "A" * 1000
 
@@ -398,7 +397,7 @@ def test_load_tpclient_static_key_raises_when_missing() -> None:
     cdp = _MissingStaticKeyCDP()
 
     with pytest.raises(ValueError, match="static key was not found"):
-        _load_tpclient_static_key(cdp, "https://tankpit.com/game/tpclient-test.js")
+        load_tpclient_static_key(cdp, "https://tankpit.com/game/tpclient-test.js")
 
 
 def test_join_room_returns_false_when_select_send_fails() -> None:

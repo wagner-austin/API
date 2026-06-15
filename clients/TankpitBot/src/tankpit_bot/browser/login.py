@@ -6,22 +6,25 @@ the sniffer and probe modules.
 
 from __future__ import annotations
 
-import base64
 import re
 import uuid
 from typing import TypedDict
 
-from platform_core.json_utils import JSONObject, require_dict, require_str
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.browser.accounts import resolve_account
+from tankpit_bot.browser.cdp_helpers import (
+    decode_captured_body,
+    get_magic_key,
+    get_tpclient_url,
+    load_tpclient_static_key,
+)
 from tankpit_bot.browser.session import get_captured_raw_messages, send_websocket_bytes
 from tankpit_bot.parser import RoomInfo, is_room_info_text
 from tankpit_bot.parser_messages import parse_room_info
 from tankpit_bot.protocol.codec import ProtocolCodec
-from tankpit_bot.protocol.framing import decode_frame
 from tankpit_bot.protocol.lobby import (
     ROOM_ENTRY_DEFAULT_X,
     ROOM_ENTRY_DEFAULT_Y,
@@ -350,117 +353,6 @@ def ensure_on_play_page(page: PageProtocol) -> None:
         log.info("Game URL: %s", page.url)
 
 
-def _decode_captured_body(payload: str) -> bytes:
-    """Decode one captured raw WebSocket payload to its body bytes.
-
-    Args:
-        payload: Base64-encoded framed message payload.
-
-    Returns:
-        Decoded frame body bytes.
-    """
-    framed = base64.b64decode(payload)
-    body, remaining = decode_frame(framed)
-    if remaining:
-        raise ValueError(f"unexpected trailing bytes in framed message: {remaining.hex()}")
-    return body
-
-
-def _evaluate_string(
-    cdp: CDPSessionProtocol,
-    expression: str,
-    *,
-    await_promise: bool = False,
-) -> str:
-    """Evaluate JavaScript and return the string result.
-
-    Args:
-        cdp: Active CDP session.
-        expression: JavaScript expression to evaluate.
-        await_promise: Whether Runtime.evaluate should await a returned Promise.
-
-    Returns:
-        String value returned by the expression.
-    """
-    params: JSONObject = {
-        "expression": expression,
-        "returnByValue": True,
-    }
-    if await_promise:
-        params["awaitPromise"] = True
-    result = cdp.send("Runtime.evaluate", params)
-    result_obj = require_dict(result, "result")
-    return require_str(result_obj, "value")
-
-
-def _get_magic_key(cdp: CDPSessionProtocol) -> str:
-    """Return the current session magic key from the page runtime.
-
-    Args:
-        cdp: Active CDP session.
-
-    Returns:
-        The current ``tankpit.magic`` value, or an empty string when absent.
-    """
-    return _evaluate_string(
-        cdp,
-        """
-        (() => {
-            if (typeof tankpit !== 'undefined' && typeof tankpit.magic === 'string') {
-                return tankpit.magic;
-            }
-            return '';
-        })()
-        """,
-    )
-
-
-def _get_tpclient_url(cdp: CDPSessionProtocol) -> str:
-    """Return the loaded tpclient script URL.
-
-    Args:
-        cdp: Active CDP session.
-
-    Returns:
-        Loaded tpclient script URL, or an empty string when not found.
-    """
-    return _evaluate_string(
-        cdp,
-        """
-        (() => {
-            const script = Array.from(document.querySelectorAll('script[src]')).find(
-                (item) => item.src.includes('tpclient')
-            );
-            return script ? script.src : '';
-        })()
-        """,
-    )
-
-
-def _load_tpclient_static_key(cdp: CDPSessionProtocol, tpclient_url: str) -> str:
-    """Fetch the loaded tpclient source and extract the current static key.
-
-    Args:
-        cdp: Active CDP session.
-        tpclient_url: Loaded tpclient script URL.
-
-    Returns:
-        Current 1000-character static key string.
-
-    Raises:
-        ValueError: If the loaded script does not contain the expected key.
-    """
-    js_content = _evaluate_string(
-        cdp,
-        f"fetch({tpclient_url!r}).then((response) => response.text())",
-        await_promise=True,
-    )
-    match = _STATIC_KEY_PATTERN.search(js_content)
-    if match is None:
-        raise ValueError("tpclient static key was not found in loaded script")
-    return match.group(1)
-
-
 def _collect_room_entries(cdp: CDPSessionProtocol) -> list[RoomInfo]:
     """Return room metadata decoded from captured ROOM_LIST messages.
 
@@ -472,7 +364,7 @@ def _collect_room_entries(cdp: CDPSessionProtocol) -> list[RoomInfo]:
     """
     entries: list[RoomInfo] = []
     for payload in get_captured_raw_messages(cdp):
-        body = _decode_captured_body(payload)
+        body = decode_captured_body(payload)
         if not body or body[0] != ord("+"):
             continue
         text = body.decode("utf-8")
@@ -601,7 +493,7 @@ def _has_join_confirm(cdp: CDPSessionProtocol, room_id: str, *, start_index: int
     expected_prefix = f"={room_id}|"
     payloads = get_captured_raw_messages(cdp)
     for payload in payloads[start_index:]:
-        body = _decode_captured_body(payload)
+        body = decode_captured_body(payload)
         if not body or body[0] != ord("="):
             continue
         if body.decode("utf-8").startswith(expected_prefix):
@@ -650,7 +542,7 @@ def _has_enter_response(cdp: CDPSessionProtocol, room_id: str, *, start_index: i
     expected_prefix = f"${room_id}|"
     payloads = get_captured_raw_messages(cdp)
     for payload in payloads[start_index:]:
-        body = _decode_captured_body(payload)
+        body = decode_captured_body(payload)
         if not body or body[0] != ord("$"):
             continue
         if body.decode("utf-8").startswith(expected_prefix):
@@ -718,15 +610,15 @@ def join_room(
     from tankpit_bot.sniffer.world_state import set_selected_room
 
     set_selected_room(room_id)
-    magic = _get_magic_key(cdp)
+    magic = get_magic_key(cdp)
     if len(magic) == 0:
         log.info("Enter game failed: tankpit.magic was unavailable")
         return False
-    tpclient_url = _get_tpclient_url(cdp)
+    tpclient_url = get_tpclient_url(cdp)
     if len(tpclient_url) == 0:
         log.info("Enter game failed: tpclient script URL was unavailable")
         return False
-    static_key = _load_tpclient_static_key(cdp, tpclient_url)
+    static_key = load_tpclient_static_key(cdp, tpclient_url)
     metadata = build_room_enter_metadata(page.url, tpclient_url)
     codec = ProtocolCodec(static_key, magic)
     enter_request: RoomEnterRequestDict = {
