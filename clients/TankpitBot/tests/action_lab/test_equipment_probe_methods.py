@@ -1,21 +1,11 @@
-"""Tests for EquipmentProbe wrapper methods and entrypoints.
-
-Covers the thin delegation wrappers on EquipmentProbe that forward to
-``equipment_probe_operations`` functions, plus the ``execute_probe`` and
-``run_and_save_equipment_probe_session`` entrypoints that delegate to the
-unimplemented session runner.
-"""
+"""Tests for EquipmentProbe result-builder delegation methods."""
 
 from __future__ import annotations
 
-import pytest
 from tests.action_lab.conftest import set_inventory_total
 
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.action_lab.equipment_probe import EquipmentProbe, run_equipment_probe
-from tankpit_bot.action_lab.equipment_probe_entrypoint import (
-    run_and_save_equipment_probe_session,
-)
+from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
@@ -269,32 +259,3 @@ def test_build_no_equipment_visible_result_delegates(
 
     assert result["status"] == "no_equipment_visible"
     assert result["completion_timestamp_ms"] == 2500
-
-
-def test_execute_probe_raises_not_implemented() -> None:
-    """EquipmentProbe.execute_probe delegates to the unimplemented runner."""
-    probe = EquipmentProbe.__new__(EquipmentProbe)
-    with pytest.raises(NotImplementedError):
-        probe.execute_probe()
-
-
-def test_run_and_save_equipment_probe_session_raises_not_implemented() -> None:
-    """run_and_save_equipment_probe_session delegates to the unimplemented runner."""
-    probe = EquipmentProbe.__new__(EquipmentProbe)
-    with pytest.raises(NotImplementedError):
-        run_and_save_equipment_probe_session(
-            probe,
-            max_targets=3,
-            initial_sync_timeout_ms=30000,
-            map_sync_timeout_ms=30000,
-            teleport_timeout_ms=30000,
-            radar_timeout_ms=15000,
-            pickup_timeout_ms=10000,
-            settle_delay_ms=500,
-        )
-
-
-def test_run_equipment_probe_raises_not_implemented() -> None:
-    """run_equipment_probe creates a probe and delegates to the unimplemented runner."""
-    with pytest.raises(NotImplementedError):
-        run_equipment_probe("https://test.tankpit.com/play")

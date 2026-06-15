@@ -16,15 +16,8 @@ from tankpit_bot.action_lab.equipment_probe_attempt import (
 from tankpit_bot.action_lab.equipment_probe_diagnostics import (
     format_equipment_probe_summary as _shared_format_equipment_probe_summary,
 )
-from tankpit_bot.action_lab.equipment_probe_entrypoint import (
-    run_and_save_equipment_probe_session as _shared_run_and_save_equipment_probe_session,
-)
-from tankpit_bot.action_lab.equipment_probe_runner import (
-    execute_equipment_probe_session as _shared_execute_equipment_probe_session,
-)
 from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
-    EquipmentProbeSessionDict,
 )
 from tankpit_bot.action_lab.equipment_target_phase import (
     EquipmentTargetPhaseProbeProtocol,
@@ -484,89 +477,6 @@ class EquipmentProbe(TeleportProbe):
             missing_dispatch_message="equipment attempt ended before teleport dispatch",
         )
 
-    def execute_probe(
-        self,
-        *,
-        max_targets: int = 3,
-        initial_sync_timeout_ms: int = 30_000,
-        map_sync_timeout_ms: int = 30_000,
-        teleport_timeout_ms: int = 30_000,
-        radar_timeout_ms: int = 15_000,
-        pickup_timeout_ms: int = 10_000,
-        settle_delay_ms: int = 500,
-    ) -> EquipmentProbeSessionDict:
-        """Run the equipment probe session.
-
-        Args:
-            max_targets: Maximum equipment targets to attempt.
-            initial_sync_timeout_ms: Timeout for initial world sync.
-            map_sync_timeout_ms: Timeout for map sync per attempt.
-            teleport_timeout_ms: Timeout for teleport per attempt.
-            radar_timeout_ms: Timeout for radar per attempt.
-            pickup_timeout_ms: Timeout for pickup per attempt.
-            settle_delay_ms: Post-action settle delay.
-
-        Returns:
-            Complete session result.
-        """
-        return _shared_execute_equipment_probe_session(
-            self,
-            max_targets=max_targets,
-            initial_sync_timeout_ms=initial_sync_timeout_ms,
-            map_sync_timeout_ms=map_sync_timeout_ms,
-            teleport_timeout_ms=teleport_timeout_ms,
-            radar_timeout_ms=radar_timeout_ms,
-            pickup_timeout_ms=pickup_timeout_ms,
-            settle_delay_ms=settle_delay_ms,
-        )
-
-
-def run_equipment_probe(
-    target_url: str,
-    *,
-    headless: bool = True,
-    prefer_account: bool = False,
-    max_targets: int = 3,
-    initial_sync_timeout_ms: int = 30_000,
-    map_sync_timeout_ms: int = 30_000,
-    teleport_timeout_ms: int = 30_000,
-    radar_timeout_ms: int = 15_000,
-    pickup_timeout_ms: int = 10_000,
-    settle_delay_ms: int = 500,
-) -> EquipmentProbeSessionDict:
-    """Run an equipment probe session end-to-end.
-
-    Args:
-        target_url: Tankpit game URL.
-        headless: Run browser headlessly.
-        prefer_account: Prefer account login.
-        max_targets: Maximum equipment targets.
-        initial_sync_timeout_ms: Initial sync timeout.
-        map_sync_timeout_ms: Map sync timeout per attempt.
-        teleport_timeout_ms: Teleport timeout per attempt.
-        radar_timeout_ms: Radar timeout per attempt.
-        pickup_timeout_ms: Pickup timeout per attempt.
-        settle_delay_ms: Post-action settle delay.
-
-    Returns:
-        Complete session result.
-    """
-    probe = EquipmentProbe(
-        target_url,
-        headless=headless,
-        prefer_account=prefer_account,
-    )
-    return _shared_run_and_save_equipment_probe_session(
-        probe,
-        max_targets=max_targets,
-        initial_sync_timeout_ms=initial_sync_timeout_ms,
-        map_sync_timeout_ms=map_sync_timeout_ms,
-        teleport_timeout_ms=teleport_timeout_ms,
-        radar_timeout_ms=radar_timeout_ms,
-        pickup_timeout_ms=pickup_timeout_ms,
-        settle_delay_ms=settle_delay_ms,
-    )
-
 
 format_equipment_probe_summary = _shared_format_equipment_probe_summary
 
@@ -576,5 +486,4 @@ __all__ = [
     "EquipmentProbeError",
     "EquipmentTargetingError",
     "format_equipment_probe_summary",
-    "run_equipment_probe",
 ]

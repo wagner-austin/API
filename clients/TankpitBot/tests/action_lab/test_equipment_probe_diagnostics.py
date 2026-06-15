@@ -4,14 +4,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-import pytest
-
-from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
 from tankpit_bot.action_lab.equipment_probe_diagnostics import (
     format_equipment_probe_summary,
-)
-from tankpit_bot.action_lab.equipment_probe_runner import (
-    execute_equipment_probe_session,
 )
 from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
@@ -183,19 +177,3 @@ def test_format_summary_skips_unknown_status() -> None:
     assert "no equipment" not in result
     assert "radar timeout" not in result
     assert "teleport timeout" not in result
-
-
-def test_execute_equipment_probe_session_raises() -> None:
-    """The stub runner raises NotImplementedError."""
-    probe = EquipmentProbe.__new__(EquipmentProbe)
-    with pytest.raises(NotImplementedError):
-        execute_equipment_probe_session(
-            probe,
-            max_targets=3,
-            initial_sync_timeout_ms=30000,
-            map_sync_timeout_ms=30000,
-            teleport_timeout_ms=30000,
-            radar_timeout_ms=15000,
-            pickup_timeout_ms=10000,
-            settle_delay_ms=500,
-        )
