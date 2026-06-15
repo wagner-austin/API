@@ -108,7 +108,7 @@ class TestBotWithCDP:
         # Build XOR table from known keys
         static_key = "A" * 100
         magic = "B" * 20
-        bot._xor_table = build_xor_table(static_key, magic)
+        bot._commands.xor_table = build_xor_table(static_key, magic)
 
         # Build raw move command: [len_lo, len_hi, '!', type=4, cmd=0x70, x, y]
         raw = build_move_command(50, 60)
@@ -135,7 +135,7 @@ class TestBotWithCDP:
         bot._on_magic_captured("test_magic_key_12345")
 
         # XOR table should be 1000 bytes (matching fake static key length)
-        xor_table = bot._xor_table
+        xor_table = bot._commands.xor_table
         assert type(xor_table) is bytes
         assert len(xor_table) == 1000
 

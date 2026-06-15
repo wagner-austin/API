@@ -15,13 +15,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
-from tankpit_bot.bot.command_sender import send_command_bytes
-from tankpit_bot.bot.commands import (
-    encode_move_command,
-    encode_pickup_equipment_command,
-    encode_pickup_fuel_command,
-    encode_teleport_command,
-)
+from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.bot.states import (
     BotStateDataDict,
     InFlightActionDict,
@@ -31,12 +25,6 @@ from tankpit_bot.bot.states import (
     make_no_action,
     transition_to,
     validate_transition,
-)
-from tankpit_bot.bot.types import (
-    make_move_command,
-    make_pickup_equipment_command,
-    make_pickup_fuel_command,
-    make_teleport_command,
 )
 from tankpit_bot.bot.vision import (
     VisionStateDict,
@@ -58,15 +46,6 @@ from tankpit_bot.protocol.codec import (
     DEFAULT_STATIC_KEY_PATH,
     build_xor_table,
     load_static_key,
-)
-from tankpit_bot.protocol.commands import (
-    CMD_ENTER_GAME,
-    CMD_MAP_OPEN,
-    CMD_NEAREST_ENEMY,
-    CMD_RADAR,
-    build_query_command,
-    build_shoot_command,
-    build_toggle_equipment_command,
 )
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
@@ -160,8 +139,7 @@ class Bot(BrowserSession):
         self._page: _test_hooks.PageProtocol | None = None
         self._state_data: BotStateDataDict = make_initial_state_data()
         self._ai_state: AIStateDict = make_initial_ai_state()
-        # XOR encoding table for outgoing commands
-        self._xor_table: bytes | None = None
+        self._commands = CommandService(send_ws_bytes=self._send_websocket_bytes)
         # Vision state for fallback tracking
         self._vision_state: VisionStateDict = make_empty_vision_state()
         # CDP message buffer — received payloads for tick loop sync
@@ -248,7 +226,7 @@ class Bot(BrowserSession):
         """
         init_trackers_with_magic(magic)
         static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
-        self._xor_table = build_xor_table(static_key, magic)
+        self._commands.xor_table = build_xor_table(static_key, magic)
         log.info("Built XOR table for command encoding")
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
@@ -577,26 +555,18 @@ class Bot(BrowserSession):
         Returns:
             True if sent, False if CDP session not available.
         """
-        return send_command_bytes(
-            self._cdp,
-            self._xor_table,
-            data,
-            cmd_name,
-            self._send_websocket_bytes,
-        )
+        self._commands.cdp = self._cdp
+        return self._commands.send_bytes(data, cmd_name)
 
     def enter_game(self) -> bool:
         """Send CMD_ENTER_GAME to activate the tank in the game world.
 
-        Must be sent after joining a room and before any movement or combat
-        commands. Without this, the server rejects actions with "You can't
-        do this".
-
         Returns:
             True if command was sent.
         """
-        encoded = build_query_command(CMD_ENTER_GAME)
-        return self._send_bytes(encoded, "enter_game")
+        from tankpit_bot.protocol.commands import CMD_ENTER_GAME, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_ENTER_GAME), "enter_game")
 
     def move_to(self, x: int, y: int) -> bool:
         """Send move command and transition to MOVING state.
@@ -608,8 +578,10 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        cmd = make_move_command(x, y)
-        if not self._send_bytes(encode_move_command(cmd), "move"):
+        from tankpit_bot.bot.commands import encode_move_command
+        from tankpit_bot.bot.types import make_move_command
+
+        if not self._send_bytes(encode_move_command(make_move_command(x, y)), "move"):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -628,8 +600,12 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        cmd = make_pickup_fuel_command(x, y)
-        if not self._send_bytes(encode_pickup_fuel_command(cmd), "pickup_fuel"):
+        from tankpit_bot.bot.commands import encode_pickup_fuel_command
+        from tankpit_bot.bot.types import make_pickup_fuel_command
+
+        if not self._send_bytes(
+            encode_pickup_fuel_command(make_pickup_fuel_command(x, y)), "pickup_fuel"
+        ):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -648,8 +624,12 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        cmd = make_pickup_equipment_command(x, y)
-        if not self._send_bytes(encode_pickup_equipment_command(cmd), "pickup_equipment"):
+        from tankpit_bot.bot.commands import encode_pickup_equipment_command
+        from tankpit_bot.bot.types import make_pickup_equipment_command
+
+        if not self._send_bytes(
+            encode_pickup_equipment_command(make_pickup_equipment_command(x, y)), "pickup_equipment"
+        ):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -676,8 +656,12 @@ class Bot(BrowserSession):
         # ack from a previous teleport cannot complete this new action early.
         check_and_clear_teleport_landed(get_world_service())
 
-        cmd = make_teleport_command(x, y)
-        if not self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})"):
+        from tankpit_bot.bot.commands import encode_teleport_command
+        from tankpit_bot.bot.types import make_teleport_command
+
+        if not self._send_bytes(
+            encode_teleport_command(make_teleport_command(x, y)), f"teleport({x},{y})"
+        ):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -701,8 +685,11 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent, False if CDP unavailable.
         """
-        encoded = build_shoot_command(x, y, target_id)
-        if not self._send_bytes(encoded, f"shoot({x},{y},id={target_id})"):
+        from tankpit_bot.protocol.commands import build_shoot_command
+
+        if not self._send_bytes(
+            build_shoot_command(x, y, target_id), f"shoot({x},{y},id={target_id})"
+        ):
             return False
         self._capture_shot_screenshot(x, y, target_id)
         now = get_current_time_ms()
@@ -752,8 +739,9 @@ class Bot(BrowserSession):
             uses_extra=uses_extra,
             extra_radar_count=inventory["extra_radars"]["count"],
         )
-        encoded = build_query_command(CMD_RADAR)
-        if not self._send_bytes(encoded, "radar"):
+        from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
+
+        if not self._send_bytes(build_query_command(CMD_RADAR), "radar"):
             return False
         now = get_current_time_ms()
         self._transition(
@@ -772,8 +760,9 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        encoded = build_query_command(CMD_NEAREST_ENEMY)
-        return self._send_bytes(encoded, "nearest_enemy")
+        from tankpit_bot.protocol.commands import CMD_NEAREST_ENEMY, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
     # =========================================================================
     # Equipment Management
@@ -788,12 +777,15 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
+        from tankpit_bot.protocol.commands import build_toggle_equipment_command
+
         if slot < 1 or slot > 5:
             log.warning("Invalid equipment slot: %d (must be 1-5)", slot)
             return False
-        encoded = build_toggle_equipment_command(slot)
         slot_names = ["armor", "dual", "missile", "homing", "radar"]
-        return self._send_bytes(encoded, f"toggle_{slot_names[slot - 1]}")
+        return self._send_bytes(
+            build_toggle_equipment_command(slot), f"toggle_{slot_names[slot - 1]}"
+        )
 
     def enable_equipment(self, slot: int) -> bool:
         """Enable equipment slot if not already enabled.
@@ -901,8 +893,9 @@ class Bot(BrowserSession):
         Returns:
             True if the command was sent.
         """
-        encoded = build_query_command(CMD_MAP_OPEN)
-        if self._send_bytes(encoded, "map_open"):
+        from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
+
+        if self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open"):
             now = get_current_time_ms()
             action = make_in_flight_action("map_open", 0, 0, now)
             self._state_data = transition_to(
