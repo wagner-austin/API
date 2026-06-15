@@ -7,6 +7,7 @@ for the terminal_result propagation path (line 375).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal
 
 import pytest
@@ -15,6 +16,7 @@ from typing_extensions import Unpack
 from tankpit_bot.action_lab import (
     equipment_collection_phase as ecp_module,
 )
+from tankpit_bot.action_lab import equipment_target_phase as _etp_mod
 from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseCycleDict,
     ActionPhaseOverlapDict,
@@ -26,13 +28,16 @@ from tankpit_bot.action_lab.equipment_probe_types import (
     EquipmentProbeAttemptResultDict,
 )
 from tankpit_bot.action_lab.equipment_target_phase import (
+    BlockedEquipmentRepositionResult,
     EquipmentTargetPhaseProbeProtocol,
+    _run_blocked_equipment_reposition,
     resolve_equipment_target_after_radar,
 )
 from tankpit_bot.action_lab.session import (
     BufferedWorldStateProviderProtocol,
     WaitPageProtocol,
 )
+from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterKwargs
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
@@ -500,6 +505,345 @@ def test_collection_propagates_terminal_result() -> None:
             unexpected_missing_target_message="missing",
         )
         assert result["status"] == "no_equipment_visible"
+    finally:
+        ecp_module.run_radar_phase = original_radar
+        ecp_module.resolve_equipment_target_phase = original_resolve
+
+
+# =========================================================================
+# Additional coverage — lines 227, 261-262, 287, 289, 377, 494->496
+# =========================================================================
+
+
+_TP_TIMEOUT = TeleportAttemptResultDict(
+    target=_TARGET,
+    teleport_cycle_id=1,
+    status="teleport_timeout",
+    map_open_started_ms=1000,
+    map_sync_timestamp_ms=1100,
+    teleport_started_ms=1200,
+    completion_timestamp_ms=1500,
+    map_sync_elapsed_ms=100,
+    teleport_elapsed_ms=300,
+    fuel_before=700,
+    fuel_after=690,
+    world_timestamp_before=1100,
+    world_timestamp_after=1450,
+    landed_signal_received=False,
+    landed_x=None,
+    landed_y=None,
+    message_start_index=0,
+    message_end_index=0,
+    page_snapshots=[],
+)
+
+
+def _has_land(
+    p: EquipmentTargetPhaseProbeProtocol,
+    c: ContainerStateDict,
+) -> tuple[int, int] | None:
+    """Landing tile available."""
+    return (15, 25)
+
+
+def _yes_repo(
+    p: EquipmentTargetPhaseProbeProtocol,
+    c: ContainerStateDict,
+) -> bool:
+    """Reposition required."""
+    return True
+
+
+_CYCLE = ActionPhaseCycleDict(phase="teleport", cycle_id=1, started_ms=1000)
+
+
+def _make_tracked(
+    *,
+    sync_ts: int | None = 1100,
+    tp_result: TeleportAttemptResultDict | None = _TP_RESULT,
+    tp_started: int | None = 1200,
+) -> TrackedTeleportAttempt:
+    """Build a TrackedTeleportAttempt for reposition stubs."""
+    from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
+
+    def _snap(
+        label: Literal[
+            "before_map_open",
+            "before_teleport",
+            "after_map_data",
+            "landed",
+            "timeout",
+        ],
+    ) -> TeleportPageSnapshotDict:
+        return TeleportPageSnapshotDict(
+            phase=label,
+            timestamp_ms=1000,
+            client_present=True,
+            map_visible=False,
+            client_state=0,
+            client_busy=False,
+            pending_actions=0,
+            heartbeat_age_ms=0,
+            last_page_client_send_age_ms=0,
+            last_bot_send_age_ms=0,
+            ws_ready_state=1,
+            current_send_label=None,
+            sent_frame_meta_queue_length=0,
+            self_fields={},
+            world_fields={},
+            map_fields={},
+            world_collections={},
+        )
+
+    return TrackedTeleportAttempt(
+        message_start_index=0,
+        teleport_cycle=_CYCLE,
+        acquisition_started_ms=1000,
+        acquisition_sync_timestamp_ms=sync_ts,
+        page_snapshots=[],
+        capture_page_snapshot=_snap,
+        teleport_result=tp_result,
+        teleport_started_ms=tp_started,
+    )
+
+
+def _common_reposition_call(
+    *,
+    find_landing: Callable[
+        [EquipmentTargetPhaseProbeProtocol, ContainerStateDict],
+        tuple[int, int] | None,
+    ] = _has_land,
+    strategy: Literal[
+        "sync_before_teleport", "immediate_after_map_open"
+    ] = "immediate_after_map_open",
+) -> BlockedEquipmentRepositionResult:
+    """Call _run_blocked_equipment_reposition with common args."""
+    return _run_blocked_equipment_reposition(
+        page=_Page(),
+        probe=_Probe(),
+        cdp=None,
+        target=_TARGET,
+        equipment_target=make_container_state(
+            x=10,
+            y=20,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=1000,
+        ),
+        map_open_started_ms=1000,
+        map_sync_timestamp_ms=1100,
+        teleport_started_ms=1200,
+        radar_started_ms=1300,
+        radar_sync_timestamp_ms=1400,
+        map_sync_timeout_ms=30000,
+        teleport_timeout_ms=30000,
+        inventory_count_before=0,
+        teleport_result=_TP_RESULT,
+        message_start_index=0,
+        teleport_cycle_ids=[1],
+        radar_cycle_id=2,
+        teleport_strategy=strategy,
+        wait_for_teleport_outcome=_waiter,
+        teleport_strategy_requires_map_sync=_sync_policy,
+        find_landing_tile=find_landing,
+        get_phase_overlaps=lambda: [],
+        build_reposition_map_sync_timeout_result=_build_repo_map,
+        build_reposition_teleport_timeout_result=_build_repo_tp,
+        make_reposition_target=lambda x, y: _TARGET,
+        dispatch_failure_error=RuntimeError,
+        unavailable_error=RuntimeError,
+        unexpected_result_error=RuntimeError,
+        no_landing_tile_error=RuntimeError,
+        unavailable_message="u",
+        no_landing_tile_message="no landing",
+        impossible_result_message="i",
+        acquisition_dispatch_failure_message="m",
+        teleport_dispatch_failure_message="t",
+    )
+
+
+def test_no_landing_tile_raises() -> None:
+    """equipment_target_phase.py line 227."""
+    with pytest.raises(RuntimeError, match="no landing"):
+        _common_reposition_call(find_landing=_no_land)
+
+
+def test_reposition_map_sync_timeout() -> None:
+    """equipment_target_phase.py lines 261-262."""
+    original = _etp_mod.run_equipment_reposition_attempt
+    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+        sync_ts=None, tp_result=None, tp_started=None
+    )
+    try:
+        result = _common_reposition_call(strategy="sync_before_teleport")
+        if result.terminal_result is None:
+            raise AssertionError("expected terminal result")
+    finally:
+        _etp_mod.run_equipment_reposition_attempt = original
+
+
+def test_reposition_dispatch_failure_raises() -> None:
+    """equipment_target_phase.py line 287."""
+    original = _etp_mod.run_equipment_reposition_attempt
+    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+        sync_ts=2100, tp_result=None, tp_started=None
+    )
+    try:
+        with pytest.raises(RuntimeError):
+            _common_reposition_call()
+    finally:
+        _etp_mod.run_equipment_reposition_attempt = original
+
+
+def test_reposition_teleport_timeout() -> None:
+    """equipment_target_phase.py line 289."""
+    original = _etp_mod.run_equipment_reposition_attempt
+    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+        sync_ts=2100, tp_result=_TP_TIMEOUT, tp_started=2200
+    )
+    try:
+        result = _common_reposition_call()
+        if result.terminal_result is None:
+            raise AssertionError("expected terminal result")
+    finally:
+        _etp_mod.run_equipment_reposition_attempt = original
+
+
+def test_reposition_success_propagates_teleport() -> None:
+    """equipment_target_phase.py branch 494->496."""
+    original = _etp_mod.run_equipment_reposition_attempt
+    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+        sync_ts=2100, tp_result=_TP_RESULT, tp_started=2200
+    )
+    try:
+        r = resolve_equipment_target_after_radar(
+            page=_Page(),
+            probe=_Probe(),
+            cdp=None,
+            target=_TARGET,
+            map_open_started_ms=1000,
+            map_sync_timestamp_ms=1100,
+            teleport_started_ms=1200,
+            radar_started_ms=1300,
+            radar_sync_timestamp_ms=1400,
+            map_sync_timeout_ms=30000,
+            teleport_timeout_ms=30000,
+            inventory_count_before=0,
+            teleport_result=_TP_RESULT,
+            message_start_index=0,
+            teleport_cycle_ids=[1],
+            radar_cycle_id=2,
+            teleport_strategy="immediate_after_map_open",
+            terrain_provider=lambda: None,
+            find_visible_target=_found,
+            requires_reposition=_yes_repo,
+            find_landing_tile=_has_land,
+            get_phase_overlaps=lambda: [],
+            build_no_equipment_visible_result=_build_no_vis,
+            build_reposition_map_sync_timeout_result=_build_repo_map,
+            build_reposition_teleport_timeout_result=_build_repo_tp,
+            make_reposition_target=lambda x, y: _TARGET,
+            wait_for_teleport_outcome=_waiter,
+            teleport_strategy_requires_map_sync=_sync_policy,
+            no_landing_tile_error=RuntimeError,
+            dispatch_failure_error=RuntimeError,
+            unavailable_error=RuntimeError,
+            unexpected_result_error=RuntimeError,
+            unavailable_message="u",
+            no_landing_tile_message="nl",
+            impossible_result_message="i",
+            acquisition_dispatch_failure_message="m",
+            teleport_dispatch_failure_message="t",
+        )
+        if r.teleport_result is None:
+            raise AssertionError("expected teleport result")
+        assert r.teleport_result["status"] == "landed_exact"
+    finally:
+        _etp_mod.run_equipment_reposition_attempt = original
+
+
+def test_collection_impossible_missing_target() -> None:
+    """equipment_collection_phase.py line 377."""
+    from tankpit_bot.action_lab.equipment_target_phase import EquipmentTargetResolution
+
+    original_radar = ecp_module.run_radar_phase
+    original_resolve = ecp_module.resolve_equipment_target_phase
+
+    def fake_radar(
+        page: WaitPageProtocol,
+        probe: ecp_module.EquipmentCollectionPhaseProbeProtocol,
+        *,
+        attempt_label: str,
+        timeout_ms: int,
+        dispatch_failure_error: type[Exception],
+        dispatch_failure_message: str = "",
+    ) -> tuple[ActionPhaseCycleDict, int, int | None]:
+        return (
+            ActionPhaseCycleDict(phase="radar", cycle_id=99, started_ms=1300),
+            1300,
+            1400,
+        )
+
+    def fake_resolve(
+        *_args: WaitPageProtocol,
+        **_kwargs: int,
+    ) -> EquipmentTargetResolution:
+        return EquipmentTargetResolution(
+            equipment_target=None,
+            teleport_result=_TP_RESULT,
+            terminal_result=None,
+            reposition_map_open_started_ms=None,
+            reposition_map_sync_timestamp_ms=None,
+            reposition_teleport_started_ms=None,
+        )
+
+    ecp_module.run_radar_phase = fake_radar
+    resolve_attr = "resolve_equipment_target_phase"
+    setattr(ecp_module, resolve_attr, fake_resolve)
+    try:
+        with pytest.raises(RuntimeError, match="missing"):
+            run_tracked_equipment_collection_phase(
+                page=_Page(),
+                probe=_Probe(),
+                cdp=None,
+                target=_TARGET,
+                map_open_started_ms=1000,
+                map_sync_timestamp_ms=1100,
+                teleport_started_ms=1200,
+                map_sync_timeout_ms=30000,
+                teleport_timeout_ms=30000,
+                radar_timeout_ms=30000,
+                pickup_timeout_ms=10000,
+                inventory_count_before=0,
+                teleport_result=_TP_RESULT,
+                message_start_index=0,
+                teleport_cycle_ids=[1],
+                teleport_strategy="immediate_after_map_open",
+                terrain_provider=lambda: None,
+                find_visible_target=_no_find,
+                requires_reposition=_no_repo,
+                find_landing_tile=_no_land,
+                get_phase_overlaps=lambda: [],
+                build_radar_timeout_result=_build_radar_timeout,
+                build_no_equipment_visible_result=_build_no_vis,
+                build_reposition_map_sync_timeout_result=_build_repo_map,
+                build_reposition_teleport_timeout_result=_build_repo_tp,
+                run_pickup_attempt=_build_pickup,
+                make_reposition_target=lambda x, y: _TARGET,
+                wait_for_teleport_outcome=_waiter,
+                teleport_strategy_requires_map_sync=_sync_policy,
+                dispatch_failure_error=RuntimeError,
+                unexpected_result_error=RuntimeError,
+                unexpected_missing_target_error=RuntimeError,
+                no_landing_tile_error=RuntimeError,
+                unavailable_error=RuntimeError,
+                unavailable_message="u",
+                no_landing_tile_message="nl",
+                impossible_result_message="i",
+                acquisition_dispatch_failure_message="m",
+                teleport_dispatch_failure_message="t",
+                unexpected_missing_target_message="missing",
+            )
     finally:
         ecp_module.run_radar_phase = original_radar
         ecp_module.resolve_equipment_target_phase = original_resolve
