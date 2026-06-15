@@ -10,17 +10,19 @@ Submodules:
 - renderer: ASCII viewport rendering
 """
 
-from tankpit_bot.state.mutations import (
+from tankpit_bot.state.container_mutations import (
     add_mine,
     add_mine_from_radar,
-    mark_viewport_scanned,
     pickup_container,
     remove_container,
     remove_mine,
+    update_container_from_radar,
+)
+from tankpit_bot.state.mutations import (
+    mark_viewport_scanned,
     remove_tank,
     replace_map_fuel_dots,
     set_self_fuel,
-    update_container_from_radar,
     update_self_from_movement_response,
     update_self_fuel,
     update_self_position,
