@@ -14,6 +14,9 @@ from tankpit_bot.browser import get_current_time_ms as _real_get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete as _real_check_and_clear_radar_scan_complete,
 )
+from tankpit_bot.sniffer.world_state import (
+    get_world_service,
+)
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed as _real_check_and_clear_teleport_landed,
 )
@@ -38,8 +41,12 @@ class CheckAndClearTeleportLandedProtocol(Protocol):
         ...
 
 
+def _default_check_and_clear_teleport_landed() -> bool:
+    return _real_check_and_clear_teleport_landed(get_world_service())
+
+
 check_and_clear_teleport_landed: CheckAndClearTeleportLandedProtocol = (
-    _real_check_and_clear_teleport_landed
+    _default_check_and_clear_teleport_landed
 )
 
 

@@ -35,7 +35,7 @@ from tankpit_bot.bot.vision import (
     update_self_fuel_vision,
     update_tank_position,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 
 
 class TestFactoryFunctions:
@@ -368,7 +368,7 @@ class TestMergeFunctions:
         radar_containers: list[RadarContainerDict] = [
             {"x": 50, "y": 75, "volume": 500},
         ]
-        update_world_state_from_radar(radar_containers, [])
+        update_world_state_from_radar(get_world_service(), radar_containers, [])
 
         # Add same location to vision cache with different volume
         state = make_empty_vision_state()
@@ -384,7 +384,7 @@ class TestMergeFunctions:
         from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(1400)
+        update_world_state_from_fuel_total(get_world_service(), 1400)
 
         state = make_empty_vision_state()
         fuel = get_merged_fuel(state)

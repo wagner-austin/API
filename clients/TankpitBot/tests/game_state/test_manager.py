@@ -6,7 +6,7 @@ from tankpit_bot.browser import GameLogEntry, GameLogScraper
 from tankpit_bot.combat import CombatEvent
 from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.game_state import GameStateManager
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
 # =============================================================================
@@ -193,6 +193,7 @@ def test_game_state_manager_uses_binary_inventory() -> None:
     """Test snapshot reads inventory from binary protocol tracking."""
     reset_world_state()
     update_inventory_from_protocol(
+        get_world_service(),
         counts=[10, 5, 3, 2, 1],
         enabled=[True, False, True, True, False],
     )

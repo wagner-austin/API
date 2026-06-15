@@ -12,6 +12,7 @@ from tankpit_bot.bot.states import InFlightActionDict
 from tankpit_bot.bot.tick_loop import _clear_rejected_movement
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
+    get_world_service,
     mark_move_target_failed,
     reset_world_state,
     update_world_state_from_position,
@@ -198,7 +199,7 @@ class TestClearRejectedMovement:
         from tankpit_bot.bot import Bot
 
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        update_world_state_from_fuel_total(get_world_service(), 800)
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "COLLECTING"

@@ -52,7 +52,7 @@ from tankpit_bot.runtime_logging import (
     require_str_field,
 )
 from tankpit_bot.sniffer.world_state import (
-    mark_map_data_processed,
+    get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
@@ -133,7 +133,7 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         """``_clear_completed_map_open`` emits map_open completion via MAP_DATA."""
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
         artifacts = configure_bot_runtime_logging("20260331-230405")
 
         bot = _make_bot_with_in_flight(
@@ -143,7 +143,7 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
             target_y=0,
             started_ms=get_current_time_ms() - 1,
         )
-        mark_map_data_processed()
+        get_world_service().mark_map_data_processed()
 
         cleared = _has_in_flight_action(bot) is False
         assert cleared
@@ -227,7 +227,7 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
             fuel=900,
             leaderboard_position=1,
         )
-        mark_teleport_landed()
+        mark_teleport_landed(get_world_service())
 
         completed = bot._maybe_complete_teleport(landed_state)
 

@@ -1,15 +1,14 @@
 """Inventory tracking from binary protocol messages.
 
 Handles absolute inventory sync (0x49), equipment gains (0x67), and
-equipment toggles (0x74). All functions update the module-level
-inventory state in ``world_state``.
+equipment toggles (0x74). All functions update the inventory state
+on the ``WorldService`` instance.
 """
 
 from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-import tankpit_bot.sniffer.world_state as _ws
 from tankpit_bot.inventory import (
     InventoryChange,
     InventoryItem,
@@ -17,24 +16,22 @@ from tankpit_bot.inventory import (
     diff_inventory,
 )
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_service import WorldService
 
 log = get_logger(__name__)
 
 
-def _emit_inventory_sample(changes: list[InventoryChange]) -> None:
+def _emit_inventory_sample(ws: WorldService, changes: list[InventoryChange]) -> None:
     """Emit a structured inventory sample after any tracked change.
 
-    One ``inventory_sample`` diagnostic per change batch gives the
-    per-run audit an absolute count trajectory without parsing
-    free-text log lines.
-
     Args:
+        ws: World service instance.
         changes: Change batch that triggered the update; an empty batch
             emits nothing.
     """
     if not changes:
         return
-    state = _ws._inventory_state
+    state = ws.inventory_state
     emit_diagnostic(
         diagnostic_kind="inventory_sample",
         armor=state["armor_shields"]["count"],
@@ -46,53 +43,59 @@ def _emit_inventory_sample(changes: list[InventoryChange]) -> None:
     )
 
 
-def get_inventory_state() -> InventoryState:
+def get_inventory_state(ws: WorldService) -> InventoryState:
     """Get the current inventory state from binary protocol tracking.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         Current InventoryState with counts and enabled flags.
     """
-    return _ws._inventory_state
+    return ws.inventory_state
 
 
 def update_inventory_from_protocol(
+    ws: WorldService,
     counts: list[int],
     enabled: list[bool],
 ) -> list[InventoryChange]:
     """Set absolute inventory state from a 0x49 (Inventory) message.
 
     Args:
+        ws: World service instance.
         counts: List of 5 item counts [armor, dual, missile, homing, radar].
         enabled: List of 5 enabled flags matching the same order.
 
     Returns:
         List of inventory changes detected.
     """
-    old = _ws._inventory_state
-    _ws._inventory_state = InventoryState(
+    old = ws.inventory_state
+    ws.inventory_state = InventoryState(
         armor_shields=InventoryItem(count=counts[0], enabled=enabled[0]),
         dual_shots=InventoryItem(count=counts[1], enabled=enabled[1]),
         missile_shots=InventoryItem(count=counts[2], enabled=enabled[2]),
         homing_shots=InventoryItem(count=counts[3], enabled=enabled[3]),
         extra_radars=InventoryItem(count=counts[4], enabled=enabled[4]),
     )
-    changes = diff_inventory(old, _ws._inventory_state)
+    changes = diff_inventory(old, ws.inventory_state)
     _log_inventory_changes(changes)
-    _emit_inventory_sample(changes)
+    _emit_inventory_sample(ws, changes)
     return changes
 
 
-def update_inventory_from_gain(gained: list[int]) -> list[InventoryChange]:
+def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[InventoryChange]:
     """Apply equipment gain deltas from a 0x67 (EquipmentGain) message.
 
     Args:
+        ws: World service instance.
         gained: List of 5 gain amounts [armor, dual, missile, homing, radar].
 
     Returns:
         List of inventory changes detected.
     """
-    old = _ws._inventory_state
-    _ws._inventory_state = InventoryState(
+    old = ws.inventory_state
+    ws.inventory_state = InventoryState(
         armor_shields=InventoryItem(
             count=old["armor_shields"]["count"] + gained[0],
             enabled=old["armor_shields"]["enabled"],
@@ -114,7 +117,7 @@ def update_inventory_from_gain(gained: list[int]) -> list[InventoryChange]:
             enabled=old["extra_radars"]["enabled"],
         ),
     )
-    changes = diff_inventory(old, _ws._inventory_state)
+    changes = diff_inventory(old, ws.inventory_state)
     _log_inventory_changes(changes)
     emit_diagnostic(
         diagnostic_kind="equipment_gain",
@@ -124,30 +127,34 @@ def update_inventory_from_gain(gained: list[int]) -> list[InventoryChange]:
         homing=gained[3],
         radar=gained[4],
     )
-    _emit_inventory_sample(changes)
+    _emit_inventory_sample(ws, changes)
     return changes
 
 
-def update_inventory_from_toggle(enabled: list[bool]) -> list[InventoryChange]:
+def update_inventory_from_toggle(
+    ws: WorldService,
+    enabled: list[bool],
+) -> list[InventoryChange]:
     """Update enabled flags from a 0x74 (EquipmentToggle) message.
 
     Args:
+        ws: World service instance.
         enabled: List of 5 enabled flags [armor, dual, missile, homing, radar].
 
     Returns:
         List of inventory changes detected.
     """
-    old = _ws._inventory_state
-    _ws._inventory_state = InventoryState(
+    old = ws.inventory_state
+    ws.inventory_state = InventoryState(
         armor_shields=InventoryItem(count=old["armor_shields"]["count"], enabled=enabled[0]),
         dual_shots=InventoryItem(count=old["dual_shots"]["count"], enabled=enabled[1]),
         missile_shots=InventoryItem(count=old["missile_shots"]["count"], enabled=enabled[2]),
         homing_shots=InventoryItem(count=old["homing_shots"]["count"], enabled=enabled[3]),
         extra_radars=InventoryItem(count=old["extra_radars"]["count"], enabled=enabled[4]),
     )
-    changes = diff_inventory(old, _ws._inventory_state)
+    changes = diff_inventory(old, ws.inventory_state)
     _log_inventory_changes(changes)
-    _emit_inventory_sample(changes)
+    _emit_inventory_sample(ws, changes)
     return changes
 
 

@@ -22,6 +22,7 @@ from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
     configure_bot_runtime_logging,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 from tankpit_bot.state import make_empty_world_state
 from tankpit_bot.state.types import WorldStateDict, make_tank_state
@@ -74,7 +75,7 @@ def test_two_line_banner_registers_kill(fake_fs: FakeFileSystem) -> None:
     kills = register_kills_from_game_log(state["entries"], _world_with_tank(516, "purple-8"))
 
     assert kills == 1
-    assert drain_killed_tank_ids() == {516}
+    assert drain_killed_tank_ids(get_world_service()) == {516}
     records = _kill_records(artifacts["latest_events_path"])
     assert len(records) == 1
     assert records[0]["fields"] == {
@@ -96,7 +97,7 @@ def test_one_line_banner_registers_kill(fake_fs: FakeFileSystem) -> None:
     kills = register_kills_from_game_log(entries, _world_with_tank(512, "red-8"))
 
     assert kills == 1
-    assert drain_killed_tank_ids() == {512}
+    assert drain_killed_tank_ids(get_world_service()) == {512}
     assert len(_kill_records(artifacts["latest_events_path"])) == 1
 
 
@@ -112,7 +113,7 @@ def test_unresolved_victim_name_emits_but_does_not_mark(
     kills = register_kills_from_game_log(entries, _world_with_tank(512, "red-8"))
 
     assert kills == 1
-    assert drain_killed_tank_ids() == set()
+    assert drain_killed_tank_ids(get_world_service()) == set()
     records = _kill_records(artifacts["latest_events_path"])
     assert records[0]["fields"]["victim_id"] == -1
     assert records[0]["fields"]["victim_name"] == "ghost-9"
@@ -131,7 +132,7 @@ def test_non_kill_entries_register_nothing(fake_fs: FakeFileSystem) -> None:
     kills = register_kills_from_game_log(entries, _world_with_tank(516, "purple-8"))
 
     assert kills == 0
-    assert drain_killed_tank_ids() == set()
+    assert drain_killed_tank_ids(get_world_service()) == set()
 
 
 def test_suffix_as_first_entry_has_no_victim(fake_fs: FakeFileSystem) -> None:
@@ -144,4 +145,4 @@ def test_suffix_as_first_entry_has_no_victim(fake_fs: FakeFileSystem) -> None:
     kills = register_kills_from_game_log(entries, _world_with_tank(516, "purple-8"))
 
     assert kills == 0
-    assert drain_killed_tank_ids() == set()
+    assert drain_killed_tank_ids(get_world_service()) == set()

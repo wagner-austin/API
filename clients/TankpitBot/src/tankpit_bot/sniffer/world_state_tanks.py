@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-import tankpit_bot.sniffer.world_state as _ws
 from tankpit_bot import browser
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.viewport import get_viewport_left
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     remove_tank,
     update_tank_damage,
@@ -22,16 +22,22 @@ from tankpit_bot.state.types import WorldStateDict
 log = get_logger(__name__)
 
 
-def update_world_state_from_tank_entry(tank_id: int, x: int, y: int, name: str) -> None:
-    """Add or update tank from TankEntry (0x28) — has position but no team."""
+def update_world_state_from_tank_entry(
+    ws: WorldService,
+    tank_id: int,
+    x: int,
+    y: int,
+    name: str,
+) -> None:
+    """Add or update tank from TankEntry (0x28) -- has position but no team."""
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
+    existing = ws.world_state["tanks"].get(key)
     team = existing["team"] if existing else 0
     rank = existing["rank"] if existing else 0
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -45,14 +51,19 @@ def update_world_state_from_tank_entry(tank_id: int, x: int, y: int, name: str) 
     )
 
 
-def update_world_state_from_tank_info(tank_id: int, team: int, name: str) -> None:
+def update_world_state_from_tank_info(
+    ws: WorldService,
+    tank_id: int,
+    team: int,
+    name: str,
+) -> None:
     """Store/update tank from TankInfo (0x21)."""
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    existing = ws.world_state["tanks"].get(key)
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -67,6 +78,7 @@ def update_world_state_from_tank_info(tank_id: int, team: int, name: str) -> Non
 
 
 def update_world_state_from_tank_status(
+    ws: WorldService,
     tank_id: int,
     team: int,
     rank: int,
@@ -76,9 +88,9 @@ def update_world_state_from_tank_status(
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    existing = ws.world_state["tanks"].get(key)
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -93,6 +105,7 @@ def update_world_state_from_tank_status(
 
 
 def update_world_state_from_tank_registry(
+    ws: WorldService,
     tank_id: int,
     name: str,
     team_str: str,
@@ -106,6 +119,7 @@ def update_world_state_from_tank_registry(
     Computes absolute X from viewport_left + viewport_x.
 
     Args:
+        ws: World service instance.
         tank_id: Tank ID.
         name: Tank name.
         team_str: Team name string ("red", "purple", "blue", "orange").
@@ -117,7 +131,6 @@ def update_world_state_from_tank_registry(
 
     from tankpit_bot.protocol.constants import TEAM_NAMES
 
-    # Convert team string to int
     team = TEAM_NAMES.index(team_str) if team_str in TEAM_NAMES else 0
 
     viewport_left = get_viewport_left()
@@ -132,8 +145,8 @@ def update_world_state_from_tank_registry(
     tank_x = viewport_left + tank_viewport_x
 
     ts = browser.get_current_time_ms()
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -148,6 +161,7 @@ def update_world_state_from_tank_registry(
 
 
 def update_world_state_from_move_response_full(
+    ws: WorldService,
     tank_id: int,
     x: int,
     y: int,
@@ -156,10 +170,8 @@ def update_world_state_from_move_response_full(
 ) -> None:
     """Update self_state and tank position from MovementResponse (0x3D).
 
-    The first 0x3D received establishes the bot's identity (tank_id, team, rank).
-    All 0x3D messages update the corresponding tank's position.
-
     Args:
+        ws: World service instance.
         tank_id: Tank ID.
         x: Absolute X coordinate.
         y: Absolute Y coordinate.
@@ -169,12 +181,11 @@ def update_world_state_from_move_response_full(
 
     ts = browser.get_current_time_ms()
 
-    # Update self_state with real identity data
-    self_state = _ws._world_state["self_state"]
+    self_state = ws.world_state["self_state"]
     if self_state is None or self_state["tank_id"] == 0:
         from tankpit_bot.state.types import SelfStateDict
 
-        _ws._world_state = WorldStateDict(
+        ws.world_state = WorldStateDict(
             self_state=SelfStateDict(
                 tank_id=tank_id,
                 x=x,
@@ -184,26 +195,24 @@ def update_world_state_from_move_response_full(
                 fuel=self_state["fuel"] if self_state else 0,
                 leaderboard_position=0,
             ),
-            tanks=_ws._world_state["tanks"],
-            containers=_ws._world_state["containers"],
-            mines=_ws._world_state["mines"],
-            terrain=_ws._world_state["terrain"],
-            viewport=_ws._world_state["viewport"],
-            scanned_viewports=_ws._world_state["scanned_viewports"],
-            map_fuel_dots=_ws._world_state["map_fuel_dots"],
+            tanks=ws.world_state["tanks"],
+            containers=ws.world_state["containers"],
+            mines=ws.world_state["mines"],
+            terrain=ws.world_state["terrain"],
+            viewport=ws.world_state["viewport"],
+            scanned_viewports=ws.world_state["scanned_viewports"],
+            map_fuel_dots=ws.world_state["map_fuel_dots"],
             timestamp_ms=ts,
         )
     elif self_state["tank_id"] == tank_id:
-        # Update self position
-        _ws.update_world_state_from_position(x, y)
+        ws.update_world_state_from_position(x, y)
 
-    # Update the tank in the tank list
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
+    existing = ws.world_state["tanks"].get(key)
     name = existing["name"] if existing else ""
     is_bot = existing["is_bot"] if existing else False
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -218,6 +227,7 @@ def update_world_state_from_move_response_full(
 
 
 def update_world_state_from_client_registry(
+    ws: WorldService,
     tank_id: int,
     name: str,
     team: int,
@@ -226,29 +236,22 @@ def update_world_state_from_client_registry(
 ) -> bool:
     """Refine a WIRE-KNOWN tank's position from the client registry.
 
-    The wire vouches for presence; the registry only refines. The tank
-    timestamp is wire provenance and is deliberately PRESERVED here --
-    when registry refreshes bumped it, stale afterimage entries looked
-    eternally fresh and run 20260611-103309 shot one 52 times. Unknown
-    tank ids are skipped for the same reason: a tank the wire never
-    announced is not in the viewport (raw-capture measurement: in-fight
-    tanks emit ~one wire message per 3.3s; afterimages are silent).
-
     Args:
+        ws: World service instance.
         tank_id: Tank ID (shared with the wire ID space).
         name: Tank name from the registry entry.
         team: Team ID from the verified ``h`` field.
-        x: Absolute X coordinate (already mapped from render coords).
-        y: Absolute Y coordinate (already mapped from render coords).
+        x: Absolute X coordinate.
+        y: Absolute Y coordinate.
 
     Returns:
         True when a wire-known tank was refined; False for unknown ids.
     """
-    existing = _ws._world_state["tanks"].get(str(tank_id))
+    existing = ws.world_state["tanks"].get(str(tank_id))
     if existing is None:
         return False
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,
@@ -264,6 +267,7 @@ def update_world_state_from_client_registry(
 
 
 def update_world_state_from_tank_damage(
+    ws: WorldService,
     tank_id: int,
     damage_state: int,
     *,
@@ -271,27 +275,17 @@ def update_world_state_from_tank_damage(
 ) -> None:
     """Update tank damage from TankStatusSync (0x2E) or registry truth.
 
-    A damage-tier transition is the only wire evidence that an outgoing
-    homing shot connected -- the game log prints just the launch marker
-    (``You fire``) and the combat message carries only the weapon type
-    -- so the transition is emitted as a DIAGNOSTIC instead of being
-    consumed silently (run 20260610-223x had zero artifact evidence of
-    27 homing shots' effect).
-
     Args:
+        ws: World service instance.
         tank_id: Tank whose damage tier is being synced.
         damage_state: New damage tier.
-        refresh_wire_timestamp: True for wire-sourced updates. The
-            registry tier push passes False: the tank timestamp is
-            wire-presence provenance, and registry refreshes bumping it
-            made stale afterimage entries look eternally fresh (run
-            20260611-103309 shot one 52 times).
+        refresh_wire_timestamp: True for wire-sourced updates.
     """
-    previous = _ws._world_state["tanks"].get(str(tank_id))
+    previous = ws.world_state["tanks"].get(str(tank_id))
     if previous is None:
         return
     ts = browser.get_current_time_ms() if refresh_wire_timestamp else previous["timestamp_ms"]
-    _ws._world_state = update_tank_damage(_ws._world_state, tank_id, damage_state, ts)
+    ws.world_state = update_tank_damage(ws.world_state, tank_id, damage_state, ts)
     if previous["damage_state"] != damage_state:
         emit_diagnostic(
             diagnostic_kind="tank_damage_changed",
@@ -302,18 +296,17 @@ def update_world_state_from_tank_damage(
         )
 
 
-def update_world_state_from_tank_exit(tank_id: int) -> None:
+def update_world_state_from_tank_exit(ws: WorldService, tank_id: int) -> None:
     """Remove tank from world state on TankExit (0x58)."""
 
-    _ws._world_state = remove_tank(_ws._world_state, tank_id, browser.get_current_time_ms())
+    ws.world_state = remove_tank(ws.world_state, tank_id, browser.get_current_time_ms())
 
 
-def _update_tank_position(tank_id: int, x: int, y: int) -> None:
+def _update_tank_position(ws: WorldService, tank_id: int, x: int, y: int) -> None:
     """Update any tank's position from a position-carrying message.
 
-    Creates the tank if it doesn't exist yet, preserving existing metadata.
-
     Args:
+        ws: World service instance.
         tank_id: Tank ID.
         x: Absolute X coordinate.
         y: Absolute Y coordinate.
@@ -321,9 +314,9 @@ def _update_tank_position(tank_id: int, x: int, y: int) -> None:
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    existing = ws.world_state["tanks"].get(key)
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         existing["team"] if existing else 0,
         existing["name"] if existing else "",
@@ -337,18 +330,18 @@ def _update_tank_position(tank_id: int, x: int, y: int) -> None:
     )
 
 
-def _update_enemy_from_detection(tank_id: int, x: int, y: int, team: int, rank: int) -> None:
+def _update_enemy_from_detection(
+    ws: WorldService,
+    tank_id: int,
+    x: int,
+    y: int,
+    team: int,
+    rank: int,
+) -> None:
     """Update enemy tank position from EnemyDetection (0x48) response.
 
-    Sent by server in response to CMD_NEAREST_ENEMY ('e' key).
-    Contains absolute x,y for the nearest enemy. The query reports the
-    server's nearest known enemy anywhere on the map -- which may be
-    outside the viewport -- so it refines position for acquisition but is
-    NOT in-view wire-presence evidence: ``wire_present=False`` preserves
-    ``last_wire_seen_ms`` so a detection-only enemy never becomes
-    shoot-eligible until a genuine in-view source vouches for it.
-
     Args:
+        ws: World service instance.
         tank_id: Enemy tank ID.
         x: Absolute X coordinate.
         y: Absolute Y coordinate.
@@ -358,11 +351,11 @@ def _update_enemy_from_detection(tank_id: int, x: int, y: int, team: int, rank: 
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
-    existing = _ws._world_state["tanks"].get(key)
+    existing = ws.world_state["tanks"].get(key)
     name = existing["name"] if existing else ""
     is_bot = existing["is_bot"] if existing else False
-    _ws._world_state = update_tank_from_registry(
-        _ws._world_state,
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
         tank_id,
         team,
         name,

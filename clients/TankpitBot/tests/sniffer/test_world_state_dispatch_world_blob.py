@@ -5,8 +5,8 @@ from __future__ import annotations
 from tankpit_bot.container import WorldStateDict as WorldStateBlobDict
 from tankpit_bot.sniffer import (
     dispatch_world_state_update,
+    get_world_service,
     reset_world_state,
-    world_state,
 )
 
 
@@ -68,9 +68,9 @@ class TestWorldStateBlobParsing:
                 (134, 121, 1229, 3, 0),  # purple, recruit (our bot)
             ],
         )
-        dispatch_world_state_update(self._make_msg(blob))
+        dispatch_world_state_update(get_world_service(), self._make_msg(blob))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "500" in state["tanks"]
         assert state["tanks"]["500"]["x"] == 100
         assert state["tanks"]["500"]["y"] == 120
@@ -91,32 +91,32 @@ class TestWorldStateBlobParsing:
         """Blob update preserves existing name and is_bot fields."""
         from tankpit_bot.sniffer.world_state_tanks import update_world_state_from_tank_info
 
-        update_world_state_from_tank_info(500, team=1, name="EnemyBot")
+        update_world_state_from_tank_info(get_world_service(), 500, team=1, name="EnemyBot")
 
         blob = self._build_world_state_blob(
             dot_section=b"\xff" * 5,
             tank_entries=[(150, 80, 500, 1, 3)],
         )
-        dispatch_world_state_update(self._make_msg(blob))
+        dispatch_world_state_update(get_world_service(), self._make_msg(blob))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["tanks"]["500"]["name"] == "EnemyBot"
         assert state["tanks"]["500"]["x"] == 150
         assert state["tanks"]["500"]["y"] == 80
 
     def test_empty_blob_no_crash(self) -> None:
         """Too-short blob is handled gracefully."""
-        dispatch_world_state_update(self._make_msg(b"\x00"))
+        dispatch_world_state_update(get_world_service(), self._make_msg(b"\x00"))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert len(state["tanks"]) == 0
 
     def test_zero_tanks_after_terrain(self) -> None:
         """Blob with terrain but no tank entries is handled gracefully."""
         blob = self._build_world_state_blob(dot_section=b"\xff" * 50, tank_entries=[])
-        dispatch_world_state_update(self._make_msg(blob))
+        dispatch_world_state_update(get_world_service(), self._make_msg(blob))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert len(state["tanks"]) == 0
 
     def test_large_terrain_count(self) -> None:
@@ -128,9 +128,9 @@ class TestWorldStateBlobParsing:
                 (134, 121, 1229, 3, 0),  # purple, recruit
             ],
         )
-        dispatch_world_state_update(self._make_msg(blob))
+        dispatch_world_state_update(get_world_service(), self._make_msg(blob))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "504" in state["tanks"]
         assert state["tanks"]["504"]["x"] == 9
         assert state["tanks"]["504"]["y"] == 33
@@ -141,7 +141,7 @@ class TestWorldStateBlobParsing:
         """Blob with terrain_count larger than data is handled gracefully."""
         # terrain_count=1000 but blob only has 10 bytes total
         data = (1000).to_bytes(2, "little") + b"\x00" * 8
-        dispatch_world_state_update(self._make_msg(bytes(data)))
+        dispatch_world_state_update(get_world_service(), self._make_msg(bytes(data)))
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert len(state["tanks"]) == 0

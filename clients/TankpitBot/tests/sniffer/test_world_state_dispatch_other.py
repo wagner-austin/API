@@ -5,11 +5,11 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer import (
     dispatch_world_state_update,
+    get_world_service,
     reset_world_state,
     update_world_state_from_fuel_total,
     update_world_state_from_position,
     update_world_state_from_radar,
-    world_state,
 )
 
 
@@ -30,13 +30,13 @@ class TestDispatchOther:
         """Test dispatch ignores non-radar/movement messages."""
         from tankpit_bot.protocol import SyncDict
 
-        initial_self = world_state._world_state["self_state"]
+        initial_self = get_world_service().world_state["self_state"]
 
         msg = SyncDict(msg_type=0x3F)
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        assert world_state._world_state["self_state"] == initial_self
+        assert get_world_service().world_state["self_state"] == initial_self
 
     def test_dispatch_tank_registry_container(self) -> None:
         """Tank-registry container messages do not populate resource truth."""
@@ -62,9 +62,9 @@ class TestDispatchOther:
             tank_y=None,
             tank_viewport_x=None,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "203,75" not in state["containers"]
 
         viewport.reset_viewport_tracking()
@@ -77,9 +77,9 @@ class TestDispatchOther:
         update_world_state_from_position(100, 100)
 
         msg = FuelGainDict(msg_type=0x44, fuel_total=25, is_free=False)
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # fuel_total is an absolute value, not a delta
@@ -93,9 +93,9 @@ class TestDispatchOther:
         update_world_state_from_position(100, 100)
 
         msg = FuelDepositDict(msg_type=0x64, fuel_total=30)
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # fuel_total is an absolute value, not a delta
@@ -118,9 +118,9 @@ class TestDispatchOther:
             leaderboard_position=8,
             fuel=1400,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["fuel"] == 1400
@@ -131,7 +131,7 @@ class TestDispatchOther:
 
         update_world_state_from_position(100, 100)
         # Set fuel to a known value first
-        update_world_state_from_fuel_total(500)
+        update_world_state_from_fuel_total(get_world_service(), 500)
 
         msg = TankStatusSyncDict(
             msg_type=0x2E,
@@ -143,9 +143,9 @@ class TestDispatchOther:
             leaderboard_position=0,
             fuel=None,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         # Fuel unchanged — short-format TankStatusSync has no fuel
@@ -165,15 +165,15 @@ class TestDispatchOther:
         # Add a container via radar
         containers: list[RadarContainerDict] = [RadarContainerDict(x=80, y=90, volume=50)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "80,90" in state["containers"]
 
         # Dispatch container pickup
         msg = ContainerPickupDict(msg_type="container_pickup", x=80, y=90, volume=50, is_fuel=True)
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         # Container should be removed
         assert "80,90" not in state["containers"]

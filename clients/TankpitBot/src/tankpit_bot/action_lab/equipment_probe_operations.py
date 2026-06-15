@@ -36,6 +36,7 @@ from tankpit_bot.action_lab.equipment_probe_results import (
 from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tankpit_bot.action_lab.teleport_phase import _log_command_dispatch_failure
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.state.types import ContainerStateDict
@@ -211,7 +212,7 @@ def build_map_sync_timeout_result_for_probe(
         map_open_started_ms=map_open_started_ms,
         completion_timestamp_ms=action_hooks.get_current_time_ms(),
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         self_state=probe._require_self_state(),
         message_start_index=message_start_index,
         message_end_index=len(probe.messages),
@@ -239,7 +240,7 @@ def build_teleport_timeout_result_for_probe(
         map_sync_timestamp_ms=map_sync_timestamp_ms,
         teleport_started_ms=teleport_started_ms,
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         teleport_result=teleport_result,
         message_start_index=message_start_index,
         message_end_index=len(probe.messages),
@@ -277,7 +278,7 @@ def build_reposition_map_sync_timeout_result_for_probe(
         reposition_map_open_started_ms=reposition_map_open_started_ms,
         completion_timestamp_ms=action_hooks.get_current_time_ms(),
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         teleport_result=teleport_result,
         equipment_target=equipment_target,
         message_start_index=message_start_index,
@@ -321,7 +322,7 @@ def build_reposition_teleport_timeout_result_for_probe(
         reposition_map_sync_timestamp_ms=reposition_map_sync_timestamp_ms,
         reposition_teleport_started_ms=reposition_teleport_started_ms,
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         teleport_result=teleport_result,
         equipment_target=equipment_target,
         message_start_index=message_start_index,
@@ -357,7 +358,7 @@ def build_radar_timeout_result_for_probe(
         radar_started_ms=radar_started_ms,
         completion_timestamp_ms=action_hooks.get_current_time_ms(),
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         teleport_result=teleport_result,
         message_start_index=message_start_index,
         message_end_index=len(probe.messages),
@@ -394,7 +395,7 @@ def build_no_equipment_visible_result_for_probe(
         radar_sync_timestamp_ms=radar_sync_timestamp_ms,
         completion_timestamp_ms=action_hooks.get_current_time_ms(),
         inventory_count_before=inventory_count_before,
-        inventory_count_after=total_inventory_count(get_inventory_state()),
+        inventory_count_after=total_inventory_count(get_inventory_state(get_world_service())),
         teleport_result=teleport_result,
         message_start_index=message_start_index,
         message_end_index=len(probe.messages),
@@ -459,7 +460,7 @@ def run_pickup_attempt_for_probe(
             failure.
     """
     self_state_before_pickup = probe._require_self_state()
-    inventory_count_before_pickup = total_inventory_count(get_inventory_state())
+    inventory_count_before_pickup = total_inventory_count(get_inventory_state(get_world_service()))
     pickup_started_ms = action_hooks.get_current_time_ms()
     move_cycle = probe._start_action_phase("move", attempt_label=target["label"])
     pickup_cycle = probe._start_action_phase("pickup", attempt_label=target["label"])

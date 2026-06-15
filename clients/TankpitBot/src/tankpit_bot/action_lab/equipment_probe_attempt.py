@@ -27,6 +27,7 @@ from tankpit_bot.action_lab.teleport_attempt import (
 )
 from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterProtocol
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 
@@ -331,7 +332,7 @@ def run_single_equipment_target_attempt(
     """
     page = probe._require_page()
     self_state_before = probe._require_self_state()
-    inventory_count_before = total_inventory_count(get_inventory_state())
+    inventory_count_before = total_inventory_count(get_inventory_state(get_world_service()))
     probe._reset_attempt_phase_overlaps()
     attempt = run_tracked_teleport_attempt(
         page,

@@ -228,13 +228,13 @@ class TestBotEquipmentState:
     def test_is_equipment_enabled_reads_from_inventory(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled reads from server inventory state."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         # Toggle some off via inventory update
-        update_inventory_from_toggle([False, True, False, True, False])
+        update_inventory_from_toggle(get_world_service(), [False, True, False, True, False])
         assert bot.is_equipment_enabled(1) is False
         assert bot.is_equipment_enabled(2) is True
         assert bot.is_equipment_enabled(3) is False
@@ -244,13 +244,13 @@ class TestBotEquipmentState:
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
         from tankpit_bot.bot import Bot
-        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         # Set slot 1 to enabled via protocol
-        update_inventory_from_toggle([True, False, False, False, False])
+        update_inventory_from_toggle(get_world_service(), [True, False, False, False, False])
         result = bot.enable_equipment(1)
         assert result is True
 

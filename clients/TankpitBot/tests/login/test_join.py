@@ -25,6 +25,7 @@ from tankpit_bot.browser.login import (
 )
 from tankpit_bot.protocol.framing import encode_frame
 from tankpit_bot.sniffer import world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tests.login.conftest import (
     FakeCDPLogin,
     FakeCDPLoginNonDictResult,
@@ -198,7 +199,7 @@ def test_register_room_entries_skips_missing_images() -> None:
         ]
     )
 
-    assert world_state._room_images["1"] == "field01.gif"
+    assert get_world_service().room_images["1"] == "field01.gif"
 
 
 def test_resolve_room_id_supports_prefix_match() -> None:

@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-import tankpit_bot.sniffer.world_state as _ws
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.sniffer.world_service import WEAPON_BYTE_TO_ITEM, WorldService
 
 log = get_logger(__name__)
 
 
-def mark_combat_hit(weapon_byte: int) -> None:
+def mark_combat_hit(ws: WorldService, weapon_byte: int) -> None:
     """Called when we receive a CombatHit where we are the attacker.
 
     Records that the server processed our shot. If weapon_byte > 0,
@@ -22,72 +22,86 @@ def mark_combat_hit(weapon_byte: int) -> None:
     inventory count is decremented.
 
     Args:
+        ws: World service instance.
         weapon_byte: Last byte of combat_data (0=single, 1=dual,
             2=missile, 3=homing).
     """
-    _ws._got_our_shot_response = True
+    ws.got_our_shot_response = True
     if weapon_byte > 0:
-        _ws._got_confirmed_hit = True
-        _decrement_ammo_for_weapon(weapon_byte)
+        ws.got_confirmed_hit = True
+        _decrement_ammo_for_weapon(ws, weapon_byte)
 
 
-def check_and_clear_combat_hit() -> bool:
+def check_and_clear_combat_hit(ws: WorldService) -> bool:
     """Check if our shot hit (special ammo was used), then clear.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         True if shot connected (weapon_byte > 0), False if miss.
     """
-    result = _ws._got_confirmed_hit
-    _ws._got_confirmed_hit = False
+    result = ws.got_confirmed_hit
+    ws.got_confirmed_hit = False
     return result
 
 
-def peek_combat_hit() -> bool:
+def peek_combat_hit(ws: WorldService) -> bool:
     """Return whether a confirmed outgoing hit is currently buffered.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         True if an outgoing hit has been observed and not yet consumed.
     """
-    return _ws._got_confirmed_hit
+    return ws.got_confirmed_hit
 
 
-def peek_our_shot_response() -> bool:
+def peek_our_shot_response(ws: WorldService) -> bool:
     """Return whether any CombatHit response for our shot is buffered.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         True if any shot response has been observed and not yet consumed.
     """
-    return _ws._got_our_shot_response
+    return ws.got_our_shot_response
 
 
-def check_and_clear_our_shot_response() -> bool:
+def check_and_clear_our_shot_response(ws: WorldService) -> bool:
     """Check if any CombatHit for our shot arrived, then clear.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         True if the server sent a CombatHit response for our shot.
     """
-    result = _ws._got_our_shot_response
-    _ws._got_our_shot_response = False
+    result = ws.got_our_shot_response
+    ws.got_our_shot_response = False
     return result
 
 
-def _decrement_ammo_for_weapon(weapon_byte: int) -> None:
+def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
     """Decrement inventory count for the ammo type consumed by a hit.
 
     Args:
+        ws: World service instance.
         weapon_byte: Weapon type from CombatHit (1=dual, 2=missile,
             3=homing).
     """
-    item_key = _ws._WEAPON_BYTE_TO_ITEM.get(weapon_byte)
+    item_key = WEAPON_BYTE_TO_ITEM.get(weapon_byte)
     if item_key is None:
         return
-    current = _ws._inventory_state[item_key]
+    current = ws.inventory_state[item_key]
     if current["count"] <= 0:
         return
     new_count = current["count"] - 1
     updated_item = InventoryItem(count=new_count, enabled=current["enabled"])
-    old = _ws._inventory_state
-    _ws._inventory_state = InventoryState(
+    old = ws.inventory_state
+    ws.inventory_state = InventoryState(
         armor_shields=updated_item if item_key == "armor_shields" else old["armor_shields"],
         dual_shots=updated_item if item_key == "dual_shots" else old["dual_shots"],
         missile_shots=updated_item if item_key == "missile_shots" else old["missile_shots"],
@@ -97,72 +111,80 @@ def _decrement_ammo_for_weapon(weapon_byte: int) -> None:
     log.info("AMMO: %s consumed by hit (%d -> %d)", item_key, current["count"], new_count)
 
 
-def mark_tank_killed(tank_id: int) -> None:
+def mark_tank_killed(ws: WorldService, tank_id: int) -> None:
     """Record a tank as killed via Deactivation protocol message.
 
     Also anchors the tank's current world-state position as its death
-    tile so the registry-truth module can suppress corpse re-ingestion
-    (the client registry keeps rendering deactivated sprites for minutes).
+    tile so the registry-truth module can suppress corpse re-ingestion.
 
     Args:
+        ws: World service instance.
         tank_id: The killed tank's ID.
     """
-    _ws._killed_tank_ids.add(tank_id)
-    existing = _ws._world_state["tanks"].get(str(tank_id))
+    ws.killed_tank_ids.add(tank_id)
+    existing = ws.world_state["tanks"].get(str(tank_id))
     if existing is not None:
-        _ws._tank_death_anchors[tank_id] = (existing["x"], existing["y"])
+        ws.tank_death_anchors[tank_id] = (existing["x"], existing["y"])
 
 
-def drain_killed_tank_ids() -> set[int]:
+def drain_killed_tank_ids(ws: WorldService) -> set[int]:
     """Get and clear all killed tank IDs since last drain.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         Set of tank IDs that were killed.
     """
-    result = _ws._killed_tank_ids
-    _ws._killed_tank_ids = set()
+    result = ws.killed_tank_ids
+    ws.killed_tank_ids = set()
     return result
 
 
-def get_death_anchor(tank_id: int) -> tuple[int, int] | None:
+def get_death_anchor(ws: WorldService, tank_id: int) -> tuple[int, int] | None:
     """Return the death-tile anchor for a killed tank.
 
     Args:
+        ws: World service instance.
         tank_id: Tank ID to look up.
 
     Returns:
         ``(x, y)`` tuple of the tile where the tank was last killed,
         or ``None`` if the tank has no death anchor.
     """
-    return _ws._tank_death_anchors.get(tank_id)
+    return ws.tank_death_anchors.get(tank_id)
 
 
-def clear_death_anchor(tank_id: int) -> None:
+def clear_death_anchor(ws: WorldService, tank_id: int) -> None:
     """Clear a tank's death-tile anchor after respawn evidence.
 
-    Called when a registry observation places the tank away from its
-    death tile -- proof that the tank respawned and its old corpse
-    sprite is gone.
-
     Args:
+        ws: World service instance.
         tank_id: Tank whose death anchor to clear.
     """
-    _ws._tank_death_anchors.pop(tank_id, None)
+    ws.tank_death_anchors.pop(tank_id, None)
 
 
-def mark_teleport_landed() -> None:
-    """Record that the server confirmed a teleport landing."""
-    _ws._teleport_landed = True
+def mark_teleport_landed(ws: WorldService) -> None:
+    """Record that the server confirmed a teleport landing.
+
+    Args:
+        ws: World service instance.
+    """
+    ws.teleport_landed = True
 
 
-def check_and_clear_teleport_landed() -> bool:
+def check_and_clear_teleport_landed(ws: WorldService) -> bool:
     """Check if a teleport landed since last check, then clear.
+
+    Args:
+        ws: World service instance.
 
     Returns:
         True if teleport landed confirmation was received.
     """
-    result = _ws._teleport_landed
-    _ws._teleport_landed = False
+    result = ws.teleport_landed
+    ws.teleport_landed = False
     return result
 
 

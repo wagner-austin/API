@@ -34,7 +34,7 @@ from tankpit_bot.runtime_logging import (
     configure_bot_runtime_logging,
 )
 from tankpit_bot.sniffer import world_state
-from tankpit_bot.sniffer.world_state import is_move_target_failed
+from tankpit_bot.sniffer.world_state import get_world_service, is_move_target_failed
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state import make_empty_world_state
 from tankpit_bot.state.types import WorldStateDict, make_self_state
@@ -59,7 +59,7 @@ def _seed_global_container(x: int, y: int, volume: int) -> None:
     """Track a fuel container in the global sniffer world state."""
     containers: list[RadarContainerDict] = [RadarContainerDict(x=x, y=y, volume=volume)]
     mines: list[RadarMineDict] = []
-    update_world_state_from_radar(containers, mines)
+    update_world_state_from_radar(get_world_service(), containers, mines)
 
 
 def _feedback_records(latest_events_path: str) -> list[RuntimeEventRecordDict]:

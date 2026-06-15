@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from tankpit_bot.protocol.types import RadarContainerDict
 from tankpit_bot.sniffer.world_state import (
-    _mark_pending_radar_cache_refresh,
-    _mark_pending_radar_empty_delta,
     check_and_clear_radar_scan_complete,
-    current_radar_uses_extra,
+    get_world_service,
     get_world_state,
     mark_scan_viewport_failed,
-    record_radar_command,
     reset_world_state,
     update_world_state_from_position,
 )
@@ -55,11 +52,9 @@ class TestContainersFromCurrentRadarCache:
         ]
         # update_terrain_from_viewport sets viewport to (92,92)
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
 
-        ws._world_state = updated
-
-        containers = _containers_from_current_radar_cache()
+        containers = _containers_from_current_radar_cache(get_world_service())
 
         assert len(containers) == 1
         assert containers[0]["x"] == 96
@@ -72,11 +67,9 @@ class TestContainersFromCurrentRadarCache:
             (3, 3, 0, -1, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
 
-        ws._world_state = updated
-
-        containers = _containers_from_current_radar_cache()
+        containers = _containers_from_current_radar_cache(get_world_service())
 
         assert len(containers) == 1
         assert containers[0]["volume"] == -1
@@ -90,11 +83,9 @@ class TestContainersFromCurrentRadarCache:
             (5, 5, 0, 0, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
 
-        ws._world_state = updated
-
-        containers = _containers_from_current_radar_cache()
+        containers = _containers_from_current_radar_cache(get_world_service())
 
         assert len(containers) == 2
         volumes = {c["volume"] for c in containers}
@@ -120,11 +111,9 @@ class TestContainersFromCurrentRadarCache:
             cache_value=999,
             overlay_value=255,
         )
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = WorldStateDict(**{**updated, "terrain": new_terrain})
 
-        ws._world_state = WorldStateDict(**{**updated, "terrain": new_terrain})
-
-        containers = _containers_from_current_radar_cache()
+        containers = _containers_from_current_radar_cache(get_world_service())
 
         # The tile at (200,200) is outside radar bounds and should be skipped
         for c in containers:
@@ -138,14 +127,12 @@ class TestContainersFromCurrentRadarCache:
             (9, 9, 0, 700, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
+        get_world_service().record_radar_command(use_extra_radar=False)
 
-        ws._world_state = updated
-        record_radar_command(use_extra_radar=False)
+        containers = _containers_from_current_radar_cache(get_world_service())
 
-        containers = _containers_from_current_radar_cache()
-
-        assert current_radar_uses_extra() is False
+        assert get_world_service().current_radar_uses_extra() is False
         assert coord_key(96, 96) not in {coord_key(c["x"], c["y"]) for c in containers}
         assert coord_key(100, 100) in {coord_key(c["x"], c["y"]) for c in containers}
 
@@ -169,11 +156,9 @@ class TestUpdateWorldStateFromRadarCache:
             (5, 5, 0, 400, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
 
-        ws._world_state = updated
-
-        update_world_state_from_radar_cache()
+        update_world_state_from_radar_cache(get_world_service())
 
         result = get_world_state()
         assert check_and_clear_radar_scan_complete() is True
@@ -188,46 +173,44 @@ class TestUpdateWorldStateFromRadarCache:
             (9, 9, 0, 400, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = WorldStateDict(**{**updated, "scanned_viewports": {}})
+        get_world_service().record_radar_command(use_extra_radar=False)
 
-        ws._world_state = WorldStateDict(**{**updated, "scanned_viewports": {}})
-        record_radar_command(use_extra_radar=False)
-
-        update_world_state_from_radar_cache()
+        update_world_state_from_radar_cache(get_world_service())
 
         result = get_world_state()
         assert result["scanned_viewports"] == {}
 
     def test_extra_radar_marks_viewport_scanned_on_explicit_radar_response(self) -> None:
         """Extra radar still marks the full viewport as scanned."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
 
-        ws._world_state = WorldStateDict(
-            **{**ws._world_state, "viewport": make_visible_viewport_state(92, 92)},
+        svc = get_world_service()
+        svc.world_state = WorldStateDict(
+            **{**svc.world_state, "viewport": make_visible_viewport_state(92, 92)},
         )
-        record_radar_command(use_extra_radar=True)
+        get_world_service().record_radar_command(use_extra_radar=True)
 
-        update_world_state_from_radar([RadarContainerDict(x=98, y=98, volume=500)], [])
+        update_world_state_from_radar(svc, [RadarContainerDict(x=98, y=98, volume=500)], [])
 
         result = get_world_state()
         assert "92,92" in result["scanned_viewports"]
 
     def test_regular_radar_response_does_not_mark_entire_viewport_scanned(self) -> None:
         """Built-in radar responses do not mark the whole viewport as scanned."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
 
-        ws._world_state = WorldStateDict(
+        svc = get_world_service()
+        svc.world_state = WorldStateDict(
             **{
-                **ws._world_state,
+                **svc.world_state,
                 "viewport": make_visible_viewport_state(92, 92),
                 "scanned_viewports": {},
             },
         )
-        record_radar_command(use_extra_radar=False)
+        get_world_service().record_radar_command(use_extra_radar=False)
 
-        update_world_state_from_radar([RadarContainerDict(x=100, y=100, volume=500)], [])
+        update_world_state_from_radar(svc, [RadarContainerDict(x=100, y=100, volume=500)], [])
 
         result = get_world_state()
         assert result["scanned_viewports"] == {}
@@ -247,16 +230,16 @@ class TestUpdateWorldStateFromRadarKnownResources:
 
     def test_preserves_existing_containers(self) -> None:
         """Zero-delta radar preserves known containers in viewport."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
 
-        ws._world_state = WorldStateDict(
-            **{**ws._world_state, "viewport": make_visible_viewport_state(92, 92)},
+        svc = get_world_service()
+        svc.world_state = WorldStateDict(
+            **{**svc.world_state, "viewport": make_visible_viewport_state(92, 92)},
         )
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(containers, [])
+        update_world_state_from_radar(svc, containers, [])
 
-        update_world_state_from_radar_known_resources()
+        update_world_state_from_radar_known_resources(svc)
 
         result = get_world_state()
         assert check_and_clear_radar_scan_complete() is True
@@ -266,12 +249,12 @@ class TestUpdateWorldStateFromRadarKnownResources:
 
     def test_regular_radar_known_resources_does_not_mark_entire_viewport_scanned(self) -> None:
         """Built-in zero-delta radar preserves resources without viewport-wide confirmation."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
 
-        ws._world_state = WorldStateDict(
+        svc = get_world_service()
+        svc.world_state = WorldStateDict(
             **{
-                **ws._world_state,
+                **svc.world_state,
                 "viewport": make_visible_viewport_state(92, 92),
                 "containers": {
                     coord_key(100, 100): make_container_state(
@@ -285,9 +268,9 @@ class TestUpdateWorldStateFromRadarKnownResources:
                 "scanned_viewports": {},
             },
         )
-        record_radar_command(use_extra_radar=False)
+        get_world_service().record_radar_command(use_extra_radar=False)
 
-        update_world_state_from_radar_known_resources()
+        update_world_state_from_radar_known_resources(svc)
 
         result = get_world_state()
         assert result["scanned_viewports"] == {}
@@ -312,22 +295,20 @@ class TestHandleRadarAck:
             (5, 5, 0, 300, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
+        get_world_service().mark_pending_radar_cache_refresh()
 
-        ws._world_state = updated
-        _mark_pending_radar_cache_refresh()
-
-        _handle_radar_ack(found=True)
+        _handle_radar_ack(get_world_service(), found=True)
 
         assert check_and_clear_radar_scan_complete() is True
 
     def test_empty_delta_found_true_preserves(self) -> None:
         """RadarAck(found=True) after empty delta preserves known resources."""
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(containers, [])
-        _mark_pending_radar_empty_delta()
+        update_world_state_from_radar(get_world_service(), containers, [])
+        get_world_service().mark_pending_radar_empty_delta()
 
-        _handle_radar_ack(found=True)
+        _handle_radar_ack(get_world_service(), found=True)
 
         result = get_world_state()
         assert coord_key(98, 98) in result["containers"]
@@ -340,12 +321,10 @@ class TestHandleRadarAck:
             (6, 5, 0, -1, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
+        get_world_service().world_state = updated
+        get_world_service().mark_pending_radar_empty_delta()
 
-        ws._world_state = updated
-        _mark_pending_radar_empty_delta()
-
-        _handle_radar_ack(found=True)
+        _handle_radar_ack(get_world_service(), found=True)
 
         result = get_world_state()
         assert check_and_clear_radar_scan_complete() is True
@@ -357,16 +336,16 @@ class TestHandleRadarAck:
     def test_empty_delta_found_false_clears(self) -> None:
         """RadarAck(found=False) after empty delta clears viewport."""
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(containers, [])
-        _mark_pending_radar_empty_delta()
+        update_world_state_from_radar(get_world_service(), containers, [])
+        get_world_service().mark_pending_radar_empty_delta()
 
-        _handle_radar_ack(found=False)
+        _handle_radar_ack(get_world_service(), found=False)
 
         assert check_and_clear_radar_scan_complete() is True
 
     def test_no_pending_marks_scan_complete(self) -> None:
         """RadarAck without pending cache or delta just marks scan done."""
-        _handle_radar_ack(found=True)
+        _handle_radar_ack(get_world_service(), found=True)
 
         assert check_and_clear_radar_scan_complete() is True
 
@@ -390,19 +369,17 @@ class TestClearContainerTileCache:
             (5, 5, 0, 700, 255),
         ]
         updated = update_terrain_from_viewport(world, 92, 92, entities, 100000)
-        import tankpit_bot.sniffer.world_state as ws
-
-        ws._world_state = updated
+        get_world_service().world_state = updated
         key = coord_key(96, 96)
-        assert ws._world_state["terrain"][key]["cache_value"] == 700
+        assert get_world_service().world_state["terrain"][key]["cache_value"] == 700
 
-        _clear_container_tile_cache(96, 96)
+        _clear_container_tile_cache(get_world_service(), 96, 96)
 
-        assert ws._world_state["terrain"][key]["cache_value"] == 0
+        assert get_world_service().world_state["terrain"][key]["cache_value"] == 0
 
     def test_no_op_for_missing_tile(self) -> None:
         """Clearing a tile that doesn't exist in terrain is a no-op."""
-        _clear_container_tile_cache(200, 200)
+        _clear_container_tile_cache(get_world_service(), 200, 200)
         # Should not raise
 
 
@@ -421,26 +398,26 @@ class TestReconcileRadarViewportResources:
     def test_removes_stale_containers_not_in_radar(self) -> None:
         """Containers in radar bounds but absent from new radar are removed."""
         # Set viewport so radar bounds cover (98,98)
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
 
-        ws._world_state = WorldStateDict(
-            **{**ws._world_state, "viewport": make_visible_viewport_state(92, 92)},
+        svc = get_world_service()
+        svc.world_state = WorldStateDict(
+            **{**svc.world_state, "viewport": make_visible_viewport_state(92, 92)},
         )
         stale = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(stale, [])
+        update_world_state_from_radar(svc, stale, [])
         assert coord_key(98, 98) in get_world_state()["containers"]
 
         # New radar shows different container, stale one should be reconciled
         fresh = [RadarContainerDict(x=99, y=99, volume=300)]
-        _reconcile_radar_viewport_resources(fresh, [])
+        _reconcile_radar_viewport_resources(svc, fresh, [])
 
         result = get_world_state()
         assert coord_key(98, 98) not in result["containers"]
 
     def test_reconcile_with_none_mines_skips_mine_removal(self) -> None:
         """Passing None for mines skips mine reconciliation."""
-        _reconcile_radar_viewport_resources([], None)
+        _reconcile_radar_viewport_resources(get_world_service(), [], None)
         # Should not raise or modify mines
 
 

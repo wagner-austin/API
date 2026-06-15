@@ -281,6 +281,7 @@ class TestBotGameLoopStates:
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
+            get_world_service,
             reset_world_state,
             update_world_state_from_position,
         )
@@ -289,7 +290,7 @@ class TestBotGameLoopStates:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        update_world_state_from_fuel_total(800)
+        update_world_state_from_fuel_total(get_world_service(), 800)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp

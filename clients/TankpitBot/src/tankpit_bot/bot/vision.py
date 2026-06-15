@@ -27,7 +27,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 from typing_extensions import TypedDict
 
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, get_world_state
 from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 from tankpit_bot.state import ContainerStateDict, coord_key, make_container_state
 
@@ -633,7 +633,7 @@ def render_vision_ascii() -> str | None:
     Returns:
         Multi-line ASCII string, or None if terrain map not loaded.
     """
-    return render_world_state_ascii()
+    return render_world_state_ascii(get_world_service())
 
 
 def render_vision_debug(vision_state: VisionStateDict) -> str:

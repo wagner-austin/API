@@ -358,6 +358,7 @@ class TestSnifferCoverageBranches:
         """Test dispatch_world_state_update processes radar_response."""
         from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
         from tankpit_bot.sniffer import world_state, world_state_dispatch
+        from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
         world_state.reset_world_state()
@@ -369,13 +370,14 @@ class TestSnifferCoverageBranches:
             mines=[RadarMineDict(x=30, y=40, team=0)],
         )
         # This should update world state
-        world_state_dispatch.dispatch_world_state_update(msg)
+        world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
         # No assertion needed - just verifying the code path runs without error
 
     def test_dispatch_world_state_update_movement_response_valid(self) -> None:
         """Test dispatch_world_state_update with valid MovementResponse updates position."""
         from tankpit_bot.protocol import MovementResponseDict
         from tankpit_bot.sniffer import world_state, world_state_dispatch
+        from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
         world_state.reset_world_state()
@@ -391,7 +393,7 @@ class TestSnifferCoverageBranches:
             leaderboard_position=5,
         )
         # This should update world state position
-        world_state_dispatch.dispatch_world_state_update(msg)
+        world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
         # No crash means success - position update occurred
 
     def test_process_received_message_with_result(self, fake_fs: FakeFileSystem) -> None:

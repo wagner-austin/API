@@ -23,7 +23,7 @@ from __future__ import annotations
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import GameLogEntry
 from tankpit_bot.runtime_logging import emit_diagnostic
-from tankpit_bot.sniffer.world_state import mark_move_target_failed
+from tankpit_bot.sniffer.world_state import get_world_service, mark_move_target_failed
 from tankpit_bot.sniffer.world_state_containers import remove_container_at
 from tankpit_bot.state.types import WorldStateDict
 
@@ -96,7 +96,7 @@ def _consume_empty_container() -> None:
     if _last_pickup_target is None:
         return
     x, y = _last_pickup_target
-    remove_container_at(x, y)
+    remove_container_at(get_world_service(), x, y)
     emit_diagnostic(
         diagnostic_kind="game_log_feedback",
         feedback="empty_container",

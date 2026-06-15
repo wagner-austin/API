@@ -10,6 +10,7 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
 )
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_teleport_landed,
     mark_combat_hit,
@@ -230,7 +231,7 @@ class TestBotWithCDP:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        mark_teleport_landed()
+        mark_teleport_landed(get_world_service())
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -241,7 +242,7 @@ class TestBotWithCDP:
         result = bot.teleport_to(200, 200)
 
         assert result is True
-        assert check_and_clear_teleport_landed() is False
+        assert check_and_clear_teleport_landed(get_world_service()) is False
 
     def test_shoot_at_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at succeeds with CDP session."""
@@ -489,8 +490,10 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(209, 79)
-        _update_fuel_total(345)
-        update_inventory_from_protocol([25, 25, 25, 25, 11], [False, True, False, False, True])
+        _update_fuel_total(get_world_service(), 345)
+        update_inventory_from_protocol(
+            get_world_service(), [25, 25, 25, 25, 11], [False, True, False, False, True]
+        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -514,8 +517,8 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -544,14 +547,13 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
 
         # Add a close, damaged enemy to trigger HUNT mode
-        import tankpit_bot.sniffer.world_state as ws
 
-        ws._world_state = update_tank_from_registry(
-            ws._world_state,
+        get_world_service().world_state = update_tank_from_registry(
+            get_world_service().world_state,
             tank_id=10,
             team=1,
             name="enemy",
@@ -576,9 +578,9 @@ class TestBotAIIntegration:
             is_self=False,
             timestamp_ms=get_current_time_ms(),
         )
-        new_tanks = dict(ws._world_state["tanks"])
+        new_tanks = dict(get_world_service().world_state["tanks"])
         new_tanks["10"] = tank
-        ws._world_state["tanks"] = new_tanks
+        get_world_service().world_state["tanks"] = new_tanks
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -600,8 +602,8 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -769,7 +771,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -788,7 +790,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -807,7 +809,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -826,7 +828,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -845,7 +847,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -864,7 +866,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False] * 5)
+        update_inventory_from_protocol(get_world_service(), counts, [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -884,7 +886,9 @@ class TestBotEquipmentManagement:
         reset_world_state()
         # Simulate: homing+dual+radar enabled, shields disabled
         counts = [10, 40, 20, 15, 5]
-        update_inventory_from_protocol(counts, [False, True, False, True, True])
+        update_inventory_from_protocol(
+            get_world_service(), counts, [False, True, False, True, True]
+        )
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -903,7 +907,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         # All counts zero, all disabled
-        update_inventory_from_protocol([0, 0, 0, 0, 0], [False] * 5)
+        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 0], [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
@@ -918,7 +922,7 @@ class TestBotEquipmentManagement:
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
         reset_world_state()
-        update_inventory_from_toggle([True, False, True, False, True])
+        update_inventory_from_toggle(get_world_service(), [True, False, True, False, True])
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.is_equipment_enabled(1) is True
         assert bot.is_equipment_enabled(2) is False
@@ -944,7 +948,7 @@ class TestBotEquipmentManagement:
         )
 
         reset_world_state()
-        update_inventory_from_protocol([0, 0, 10, 0, 0], [False] * 5)
+        update_inventory_from_protocol(get_world_service(), [0, 0, 10, 0, 0], [False] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot._has_equipment_stock(3) is True
 
@@ -969,8 +973,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(300)
-        update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
+        _update_fuel_total(get_world_service(), 300)
+        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -995,8 +999,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(300)
-        update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
+        _update_fuel_total(get_world_service(), 300)
+        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1014,7 +1018,6 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_in_flight_movement(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a walk is still resolving."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
@@ -1025,9 +1028,9 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
-        ws._terrain_map = InMemoryTerrainMap()
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
+        get_world_service().terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1051,8 +1054,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(196, 85)
-        _update_fuel_total(582)
-        update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
+        _update_fuel_total(get_world_service(), 582)
+        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1066,7 +1069,6 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_in_flight_collection(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while pickup movement is still resolving."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
@@ -1078,12 +1080,12 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(205, 79)
-        _update_fuel_total(580)
-        update_inventory_from_protocol([5, 5, 5, 5, 5], [False] * 5)
+        _update_fuel_total(get_world_service(), 580)
+        update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=80, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
-        ws._terrain_map = InMemoryTerrainMap()
+        _update_radar(get_world_service(), containers, mines)
+        get_world_service().terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1108,8 +1110,10 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(
+            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
+        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1132,7 +1136,6 @@ class TestBotEquipmentManagement:
     ) -> None:
         """Rejected shoots do not leak speculative feedback state into AI memory."""
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot._test_hooks import TerrainMapProtocol
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
@@ -1152,13 +1155,15 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(
+            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
+        )
         # The tracked tank sits at a different tile than the shoot command
         # targets, so the executor's structural re-check rejects the shoot
         # (the target drifted between decision and dispatch).
-        ws._world_state = update_tank_from_registry(
-            ws._world_state,
+        get_world_service().world_state = update_tank_from_registry(
+            get_world_service().world_state,
             tank_id=10,
             team=2,
             name="enemy",
@@ -1236,7 +1241,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1268,13 +1273,13 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([0, 3, 0, 10, 10], [False, True, False, True, True])
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(
+            get_world_service(), [0, 3, 0, 10, 10], [False, True, False, True, True]
+        )
 
-        import tankpit_bot.sniffer.world_state as ws
-
-        ws._world_state = update_tank_from_registry(
-            ws._world_state,
+        get_world_service().world_state = update_tank_from_registry(
+            get_world_service().world_state,
             tank_id=10,
             team=1,
             name="enemy",
@@ -1298,9 +1303,9 @@ class TestBotEquipmentManagement:
             is_self=False,
             timestamp_ms=get_current_time_ms(),
         )
-        new_tanks = dict(ws._world_state["tanks"])
+        new_tanks = dict(get_world_service().world_state["tanks"])
         new_tanks["10"] = enemy
-        ws._world_state["tanks"] = new_tanks
+        get_world_service().world_state["tanks"] = new_tanks
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1341,8 +1346,10 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
-        update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(
+            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
+        )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1363,7 +1370,6 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked walking clears MOVING so the bot can replan."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import (
@@ -1374,8 +1380,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(800)
-        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_fuel_total(get_world_service(), 800)
+        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1391,7 +1397,6 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_blocked_walk(self, fake_env: FakeEnv) -> None:
         """Blocked walking returns False from the in-flight gate after clearing state."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
@@ -1402,8 +1407,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(800)
-        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_fuel_total(get_world_service(), 800)
+        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1433,7 +1438,6 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_collection_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked collection clears COLLECTING so the bot can replan."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
@@ -1445,11 +1449,11 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(400)
+        _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
-        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_radar(get_world_service(), containers, mines)
+        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1468,7 +1472,6 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Reachable collection remains in flight when the viewport path is valid."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
@@ -1480,11 +1483,11 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(580)
+        _update_fuel_total(get_world_service(), 580)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
-        ws._terrain_map = InMemoryTerrainMap()
+        _update_radar(get_world_service(), containers, mines)
+        get_world_service().terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1500,7 +1503,6 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_blocked_collection(self, fake_env: FakeEnv) -> None:
         """Blocked collection returns False from the in-flight gate after clearing state."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
@@ -1512,11 +1514,11 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(400)
+        _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
-        ws._terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
+        _update_radar(get_world_service(), containers, mines)
+        get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1540,7 +1542,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(10, 10)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1567,10 +1569,10 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(64, 64)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=72, y=63, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
+        _update_radar(get_world_service(), containers, mines)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1596,7 +1598,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(64, 64)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1631,7 +1633,6 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """map_open waits until at least one fresh world sync arrives."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
@@ -1643,12 +1644,14 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         started_ms = get_current_time_ms()
         bot._state_data = _sba(bot._state_data, "IDLE", "map_open", 0, 0, started_ms=started_ms)
-        ws._world_state = WorldStateDict(**{**ws._world_state, "timestamp_ms": started_ms})
+        get_world_service().world_state = WorldStateDict(
+            **{**get_world_service().world_state, "timestamp_ms": started_ms}
+        )
 
         assert _has_in_flight_action(bot) is True
         assert bot._state_data["in_flight_action"]["kind"] == "map_open"
@@ -1665,12 +1668,10 @@ class TestBotEquipmentManagement:
         -- called by the dispatcher when a MAP_DATA blob is decoded -- is
         the legitimate completion signal.
         """
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
-            mark_map_data_processed,
             reset_world_state,
             update_world_state_from_position,
         )
@@ -1678,7 +1679,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         started_ms = get_current_time_ms()
@@ -1686,14 +1687,16 @@ class TestBotEquipmentManagement:
         # Bump world_state timestamp the way an unrelated sync would --
         # this MUST NOT clear the action; the old proxy gate would have
         # fired here.
-        ws._world_state = WorldStateDict(**{**ws._world_state, "timestamp_ms": started_ms + 1})
+        get_world_service().world_state = WorldStateDict(
+            **{**get_world_service().world_state, "timestamp_ms": started_ms + 1}
+        )
 
         assert _has_in_flight_action(bot) is True
         kind_before_signal = bot._state_data["in_flight_action"]["kind"]
         assert kind_before_signal == "map_open"
 
         # Now mark the authoritative MAP_DATA signal; the wait should clear.
-        mark_map_data_processed()
+        get_world_service().mark_map_data_processed()
 
         assert _has_in_flight_action(bot) is False
         kind_after_signal = bot._state_data["in_flight_action"]["kind"]
@@ -1710,7 +1713,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(1400)
+        _update_fuel_total(get_world_service(), 1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1772,7 +1775,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(1400)
+        _update_fuel_total(get_world_service(), 1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1801,7 +1804,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(1400)
+        _update_fuel_total(get_world_service(), 1400)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1819,7 +1822,6 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_collection_returns_false_when_adjacent(self, fake_env: FakeEnv) -> None:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.bot import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
@@ -1831,11 +1833,11 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(14, 10)
-        _update_fuel_total(400)
+        _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(containers, mines)
-        ws._terrain_map = InMemoryTerrainMap({(15, 10): "#"})
+        _update_radar(get_world_service(), containers, mines)
+        get_world_service().terrain_map = InMemoryTerrainMap({(15, 10): "#"})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1877,8 +1879,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(300)
-        update_inventory_from_protocol([0, 0, 0, 0, 5], [False] * 5)
+        _update_fuel_total(get_world_service(), 300)
+        update_inventory_from_protocol(get_world_service(), [0, 0, 0, 0, 5], [False] * 5)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -1901,8 +1903,8 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
-        mark_tank_killed(50)
-        mark_tank_killed(60)
+        mark_tank_killed(get_world_service(), 50)
+        mark_tank_killed(get_world_service(), 60)
         new_state = _merge_protocol_kills(bot._ai_state)
         assert "50" in new_state["killed_tank_ids"]
         assert "60" in new_state["killed_tank_ids"]
@@ -1924,7 +1926,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["combat_target_x"] = 71
         bot._ai_state["combat_target_y"] = 53
 
-        mark_tank_killed(50)
+        mark_tank_killed(get_world_service(), 50)
         new_state = _merge_protocol_kills(bot._ai_state)
 
         assert new_state["last_shot_target_id"] == -1
@@ -1959,7 +1961,9 @@ class TestBotEquipmentManagement:
         )
 
         reset_world_state()
-        update_inventory_from_protocol([0, 10, 0, 0, 0], [False, True, False, False, False])
+        update_inventory_from_protocol(
+            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
+        )
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
@@ -1996,7 +2000,7 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1)
         result = _get_combat_feedback(bot)
         assert result == "hit"
 
@@ -2080,7 +2084,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -2117,7 +2121,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -2134,13 +2138,14 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_inventory_from_protocol(
+            get_world_service(),
             [0, 10, 0, 0, 0],
             [False, True, False, False, False],
         )
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0)
         result = _get_combat_feedback(bot)
         assert result == "miss"
 
@@ -2157,13 +2162,14 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_inventory_from_protocol(
+            get_world_service(),
             [0, 0, 0, 0, 0],
             [False, False, False, False, False],
         )
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0)
         result = _get_combat_feedback(bot)
         assert result == ""
 
@@ -2180,6 +2186,7 @@ class TestBotEquipmentManagement:
 
         reset_world_state()
         update_inventory_from_protocol(
+            get_world_service(),
             [0, 1, 0, 0, 0],
             [False, True, False, False, False],
         )
@@ -2188,14 +2195,14 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_name"] = "Enemy"
 
         # First shot: hit with dual, depletes to 0
-        mark_combat_hit(weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1)
         result = _get_combat_feedback(bot)
         assert result == "hit"
-        assert get_inventory_state()["dual_shots"]["count"] == 0
+        assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
 
         # Second shot: weapon_byte=0, dual depleted → no feedback
         bot._ai_state["last_shot_target_id"] = 50
-        mark_combat_hit(weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0)
         result = _get_combat_feedback(bot)
         assert result == ""
 
@@ -2355,7 +2362,7 @@ class TestPageClientHealthGate:
 
         reset_world_state()
         update_world_state_from_position(50, 50)
-        _update_fuel_total(800)
+        _update_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"

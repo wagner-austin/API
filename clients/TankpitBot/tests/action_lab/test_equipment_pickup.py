@@ -25,6 +25,7 @@ from tankpit_bot.action_lab.equipment_pickup import (
     wait_for_equipment_pickup_outcome,
 )
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_gain
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
 from tankpit_bot.state.types import ViewportStateDict
@@ -202,7 +203,7 @@ def test_wait_polls_until_inventory_grows(real_inventory: None) -> None:
     def _grow_inventory_on_second_wait() -> None:
         wait_counter["count"] += 1
         if wait_counter["count"] == 2:
-            update_inventory_from_gain([0, 1, 0, 0, 0])
+            update_inventory_from_gain(get_world_service(), [0, 1, 0, 0, 0])
 
     probe = _FakeProbe(_make_world(1000))
     page = _FakePage(clock, hook=_grow_inventory_on_second_wait)

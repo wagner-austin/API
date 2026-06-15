@@ -33,6 +33,7 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.sniffer.world_state import (
+    get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
@@ -81,7 +82,7 @@ def _make_bot(fake_env: FakeEnv) -> tuple[Bot, FakeCDPSession]:
     """Create a Bot with FakeCDPSession in IDLE state."""
     reset_world_state()
     update_world_state_from_position(100, 100)
-    update_world_state_from_fuel_total(800)
+    update_world_state_from_fuel_total(get_world_service(), 800)
     bot = Bot("https://test.tankpit.com/", headless=True)
     fake_cdp = FakeCDPSession()
     bot._cdp = fake_cdp
@@ -98,9 +99,8 @@ def _store_tank(
     source: Literal["viewport", "radar", "world_state"],
 ) -> None:
     """Store a tracked tank directly into world state for executor tests."""
-    import tankpit_bot.sniffer.world_state as ws
 
-    new_tanks = dict(ws._world_state["tanks"])
+    new_tanks = dict(get_world_service().world_state["tanks"])
     new_tanks[str(tank_id)] = make_tank_state(
         tank_id=tank_id,
         x=x,
@@ -114,7 +114,7 @@ def _store_tank(
         source=source,
         timestamp_ms=1000,
     )
-    ws._world_state["tanks"] = new_tanks
+    get_world_service().world_state["tanks"] = new_tanks
 
 
 def _make_world() -> WorldStateDict:
@@ -216,9 +216,9 @@ class TestApplyEquipment:
 
         bot, fake_cdp = _make_bot(fake_env)
         # Give slot 2 (dual) stock so _has_equipment_stock returns True
-        update_inventory_from_gain([0, 5, 0, 0, 0])
+        update_inventory_from_gain(get_world_service(), [0, 5, 0, 0, 0])
         # Disable slot 2 via toggle so enable triggers a toggle command
-        update_inventory_from_toggle([True, False, True, True, True])
+        update_inventory_from_toggle(get_world_service(), [True, False, True, True, True])
         apply_equipment(bot, [2, 5])
         # slot 1: not desired, enabled → disable → toggle (1 CDP)
         # slot 2: desired, disabled, has stock → enable → toggle (1 CDP)
@@ -229,7 +229,7 @@ class TestApplyEquipment:
         """Disables combat slots not in desired list."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so we can test disabling
-        update_inventory_from_toggle([True, True, True, True, True])
+        update_inventory_from_toggle(get_world_service(), [True, True, True, True, True])
         apply_equipment(bot, [5])
         # Should disable slots 1, 2, 4 (3 CDP calls)
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
@@ -238,7 +238,7 @@ class TestApplyEquipment:
         """No toggles when equipment already matches desired state."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set inventory to match: 1=off, 2=on, 4=off, 5=on
-        update_inventory_from_toggle([False, True, True, False, True])
+        update_inventory_from_toggle(get_world_service(), [False, True, True, False, True])
         apply_equipment(bot, [2, 5])
         # slot 1: not in desired, already disabled → no toggle
         # slot 2: in desired, already enabled → no toggle
@@ -885,7 +885,7 @@ class TestExecute:
         """Execute applies equipment changes before dispatching command."""
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so execute needs to disable 1, 2, 4
-        update_inventory_from_toggle([True, True, True, True, True])
+        update_inventory_from_toggle(get_world_service(), [True, True, True, True, True])
         behavior = make_behavior_score("HUNT", 50, 100, 200, "patrol_waypoint")
         decision = make_tick_decision(
             command=make_move_command(100, 200),
@@ -966,10 +966,9 @@ class TestExecute:
     def test_execute_rejects_teleport_to_known_mine(self, fake_env: FakeEnv) -> None:
         """Execute drops teleports whose landing tile is a known mine."""
         bot, fake_cdp = _make_bot(fake_env)
-        import tankpit_bot.sniffer.world_state as ws
 
-        ws._world_state = add_mine_from_radar(
-            ws._world_state,
+        get_world_service().world_state = add_mine_from_radar(
+            get_world_service().world_state,
             x=200,
             y=200,
             team=1,

@@ -77,9 +77,9 @@ from tankpit_bot.runtime_logging import (
 from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
+    get_world_service,
     get_world_state,
     mark_move_target_failed,
-    record_radar_command,
 )
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_teleport_landed
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
@@ -372,7 +372,7 @@ class Bot(BrowserSession):
         if (
             self._state_data["state"] == "TELEPORTING"
             and self_state is not None
-            and check_and_clear_teleport_landed()
+            and check_and_clear_teleport_landed(get_world_service())
         ):
             action = self._state_data["in_flight_action"]
             tx, ty = action["target_x"], action["target_y"]
@@ -674,7 +674,7 @@ class Bot(BrowserSession):
         # TeleportLanded is a single buffered flag from the protocol layer.
         # Clear any stale landing ack before issuing a new teleport so a late
         # ack from a previous teleport cannot complete this new action early.
-        check_and_clear_teleport_landed()
+        check_and_clear_teleport_landed(get_world_service())
 
         cmd = make_teleport_command(x, y)
         if not self._send_bytes(encode_teleport_command(cmd), f"teleport({x},{y})"):
@@ -744,9 +744,9 @@ class Bot(BrowserSession):
         Returns:
             True if command was sent.
         """
-        inventory = get_inventory_state()
+        inventory = get_inventory_state(get_world_service())
         uses_extra = inventory["extra_radars"]["enabled"] and inventory["extra_radars"]["count"] > 0
-        record_radar_command(use_extra_radar=uses_extra)
+        get_world_service().record_radar_command(use_extra_radar=uses_extra)
         emit_diagnostic(
             diagnostic_kind="radar_dispatch",
             uses_extra=uses_extra,
@@ -844,7 +844,7 @@ class Bot(BrowserSession):
         Returns:
             True if equipment is available to use.
         """
-        inventory = get_inventory_state()
+        inventory = get_inventory_state(get_world_service())
         if slot == 1:
             item = inventory["armor_shields"]
         elif slot == 2:
@@ -871,7 +871,7 @@ class Bot(BrowserSession):
         Returns:
             True if enabled.
         """
-        inventory = get_inventory_state()
+        inventory = get_inventory_state(get_world_service())
         if slot == 1:
             return inventory["armor_shields"]["enabled"]
         if slot == 2:

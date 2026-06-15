@@ -12,6 +12,7 @@ from typing import Literal
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.inventory import InventoryState
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 _EQUIPMENT_PICKUP_POLL_INTERVAL_MS = 100.0
@@ -62,7 +63,7 @@ def get_completed_equipment_pickup_outcome(
         ``None``.
     """
     _ = (probe, target_x, target_y)
-    current_total = total_inventory_count(get_inventory_state())
+    current_total = total_inventory_count(get_inventory_state(get_world_service()))
     if current_total > inventory_count_before:
         return (
             "picked_up_equipment",
@@ -111,7 +112,7 @@ def wait_for_equipment_pickup_outcome(
     return (
         "pickup_timeout",
         action_hooks.get_current_time_ms(),
-        total_inventory_count(get_inventory_state()),
+        total_inventory_count(get_inventory_state(get_world_service())),
     )
 
 

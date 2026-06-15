@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer import (
     dispatch_world_state_update,
+    get_world_service,
     reset_world_state,
-    world_state,
 )
 from tests.conftest import FakeFileSystem
 
@@ -26,9 +26,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict
 
         msg = TankEntryDict(msg_type=0x28, tank_id=42, x=100, y=150, name="EnemyBot")
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "42" in state["tanks"]
         assert state["tanks"]["42"]["name"] == "EnemyBot"
         assert state["tanks"]["42"]["x"] == 100
@@ -48,9 +48,9 @@ class TestDispatchTankMessages:
             leaderboard_position=3,
             name="TopPlayer",
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "99" in state["tanks"]
         assert state["tanks"]["99"]["name"] == "TopPlayer"
         assert state["tanks"]["99"]["team"] == 2
@@ -62,13 +62,13 @@ class TestDispatchTankMessages:
 
         # First add a tank
         entry_msg = TankEntryDict(msg_type=0x28, tank_id=42, x=100, y=150, name="LeavingBot")
-        dispatch_world_state_update(entry_msg)
-        assert "42" in world_state._world_state["tanks"]
+        dispatch_world_state_update(get_world_service(), entry_msg)
+        assert "42" in get_world_service().world_state["tanks"]
 
         # Then remove it
         exit_msg = TankExitDict(msg_type=0x58, tank_id=42)
-        dispatch_world_state_update(exit_msg)
-        assert "42" not in world_state._world_state["tanks"]
+        dispatch_world_state_update(get_world_service(), exit_msg)
+        assert "42" not in get_world_service().world_state["tanks"]
 
     def test_dispatch_tank_registry_non_container(self) -> None:
         """Test dispatch handles tank_registry for actual tanks (not containers)."""
@@ -94,9 +94,9 @@ class TestDispatchTankMessages:
             tank_y=120,
             tank_viewport_x=5,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "7" in state["tanks"]
         assert state["tanks"]["7"]["name"] == "ScoutBot"
         # x = viewport_left(50) + tank_viewport_x(5) = 55
@@ -129,9 +129,9 @@ class TestDispatchTankMessages:
             tank_y=130,
             tank_viewport_x=6,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "9" not in state["tanks"]
 
     def test_dispatch_tank_registry_non_container_no_position(self) -> None:
@@ -155,10 +155,10 @@ class TestDispatchTankMessages:
             tank_y=None,
             tank_viewport_x=None,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Tank should NOT be added since position is None (match falls through)
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "8" not in state["tanks"]
 
     def test_dispatch_tank_update_compact_sets_position(self) -> None:
@@ -171,9 +171,9 @@ class TestDispatchTankMessages:
             tank_id=200,
             status_data=bytes([82, 26, 0x2B, 0x9B, 0xF7, 0x8B]),
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "200" in state["tanks"]
         assert state["tanks"]["200"]["x"] == 82
         assert state["tanks"]["200"]["y"] == 26
@@ -188,9 +188,9 @@ class TestDispatchTankMessages:
             tank_id=201,
             status_data=bytes([110, 55, 0, 0x1B, 0x11, 0x87, 0x9A, 0x3C, 0x24, 0x79]),
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "201" in state["tanks"]
         assert state["tanks"]["201"]["x"] == 110
         assert state["tanks"]["201"]["y"] == 55
@@ -205,9 +205,9 @@ class TestDispatchTankMessages:
             tank_id=202,
             status_data=bytes([84, 26, 0, 0x1B, 0x11, 0x87, 0x1C, 0x59, 0x64, 0x25, 0x25]),
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "202" in state["tanks"]
         assert state["tanks"]["202"]["x"] == 84
         assert state["tanks"]["202"]["y"] == 26
@@ -222,10 +222,10 @@ class TestDispatchTankMessages:
             tank_id=203,
             status_data=bytes([0x01]),
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Tank should NOT be created since status_data too short for position
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "203" not in state["tanks"]
 
     def test_dispatch_tank_update_compact_flag_cd_does_not_set_tank_position(self) -> None:
@@ -238,9 +238,9 @@ class TestDispatchTankMessages:
             tank_id=2308,
             status_data=bytes.fromhex("a50aa5000200"),
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "2308" not in state["tanks"]
 
     def test_dispatch_tunneled_terrain_update_sets_terrain_tile(self) -> None:
@@ -248,9 +248,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TerrainUpdateDict
 
         msg = TerrainUpdateDict(msg_type=0x4A, updates=[(8, 166, 2)])
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         tile = state["terrain"]["8,166"]
         assert tile["x"] == 8
         assert tile["y"] == 166
@@ -263,6 +263,7 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import MovementResponseDict
 
         dispatch_world_state_update(
+            get_world_service(),
             MovementResponseDict(
                 msg_type=0x3D,
                 team=2,
@@ -272,10 +273,11 @@ class TestDispatchTankMessages:
                 direction=8,
                 rank=1,
                 leaderboard_position=1313,
-            )
+            ),
         )
 
         dispatch_world_state_update(
+            get_world_service(),
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
@@ -287,10 +289,10 @@ class TestDispatchTankMessages:
                     (132, 126),
                     (132, 127),
                 ],
-            }
+            },
         )
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["mines"]["131,126"]["team"] == 2
         assert state["mines"]["131,126"]["tank_id"] == 1301
         assert state["mines"]["131,126"]["mine_type"] == 2
@@ -302,6 +304,7 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict, TankInfoDict
 
         dispatch_world_state_update(
+            get_world_service(),
             TankInfoDict(
                 msg_type=0x21,
                 tank_id=777,
@@ -309,29 +312,31 @@ class TestDispatchTankMessages:
                 team=3,
                 decoration_state=b"",
                 score=0,
-            )
+            ),
         )
 
         dispatch_world_state_update(
+            get_world_service(),
             TankEntryDict(
                 msg_type=0x28,
                 tank_id=777,
                 x=40,
                 y=41,
                 name="placer",
-            )
+            ),
         )
 
         dispatch_world_state_update(
+            get_world_service(),
             {
                 "msg_type": 0x4B,
                 "mine_type": 1,
                 "tank_id": 777,
                 "positions": [(40, 41), (40, 42)],
-            }
+            },
         )
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["mines"]["40,41"]["team"] == 3
         assert state["mines"]["40,42"]["team"] == 3
         assert state["mines"]["40,41"]["tank_id"] == 777
@@ -339,15 +344,16 @@ class TestDispatchTankMessages:
     def test_dispatch_tunneled_mine_placement_skips_unknown_team(self) -> None:
         """Test tunneled 0x4B does nothing when placer team is unknown."""
         dispatch_world_state_update(
+            get_world_service(),
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
                 "tank_id": 9999,
                 "positions": [(10, 11), (11, 11)],
-            }
+            },
         )
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["mines"] == {}
 
     def test_dispatch_tunneled_mine_detonation_removes_mines(self) -> None:
@@ -355,6 +361,7 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import MovementResponseDict
 
         dispatch_world_state_update(
+            get_world_service(),
             MovementResponseDict(
                 msg_type=0x3D,
                 team=2,
@@ -364,21 +371,24 @@ class TestDispatchTankMessages:
                 direction=8,
                 rank=1,
                 leaderboard_position=1313,
-            )
+            ),
         )
 
         dispatch_world_state_update(
+            get_world_service(),
             {
                 "msg_type": 0x4B,
                 "mine_type": 2,
                 "tank_id": 1301,
                 "positions": [(38, 52), (39, 53), (38, 54)],
-            }
+            },
         )
 
-        dispatch_world_state_update({"msg_type": 0x45, "positions": [(39, 53), (38, 54)]})
+        dispatch_world_state_update(
+            get_world_service(), {"msg_type": 0x45, "positions": [(39, 53), (38, 54)]}
+        )
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "38,52" in state["mines"]
         assert "39,53" not in state["mines"]
         assert "38,54" not in state["mines"]
@@ -390,7 +400,7 @@ class TestDispatchTankMessages:
 
         # First create a tank
         entry = TankEntryDict(msg_type=0x28, tank_id=300, x=50, y=60, name="Target")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         msg = TankStatusShortDict(
             msg_type="tank_status_short",
@@ -400,9 +410,9 @@ class TestDispatchTankMessages:
             rank=4,
             leaderboard_position=21,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "300" in state["tanks"]
         assert state["tanks"]["300"]["damage_state"] == 3
 
@@ -422,7 +432,7 @@ class TestDispatchTankMessages:
 
         artifacts = configure_bot_runtime_logging("20260610-230000")
         entry = TankEntryDict(msg_type=0x28, tank_id=300, x=50, y=60, name="Target")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         for repeated_damage_state in (2, 2):
             msg = TankStatusShortDict(
@@ -433,7 +443,7 @@ class TestDispatchTankMessages:
                 rank=4,
                 leaderboard_position=21,
             )
-            dispatch_world_state_update(msg)
+            dispatch_world_state_update(get_world_service(), msg)
 
         records = [
             record
@@ -466,7 +476,7 @@ class TestDispatchTankMessages:
             rank=4,
             leaderboard_position=21,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         records = [
             record
@@ -482,8 +492,8 @@ class TestDispatchTankMessages:
 
         # First create a tank
         entry = TankEntryDict(msg_type=0x28, tank_id=400, x=50, y=60, name="Leaving")
-        dispatch_world_state_update(entry)
-        assert "400" in world_state._world_state["tanks"]
+        dispatch_world_state_update(get_world_service(), entry)
+        assert "400" in get_world_service().world_state["tanks"]
 
         msg = TankLeaveDict(
             msg_type="tank_leave",
@@ -491,9 +501,9 @@ class TestDispatchTankMessages:
             flags=0x13,
             extra_data=b"\x42\x13",
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        assert "400" not in world_state._world_state["tanks"]
+        assert "400" not in get_world_service().world_state["tanks"]
 
     def test_dispatch_position_update_other_tank_updates_position(self) -> None:
         """Test dispatch updates enemy tank position from non-self position_update."""
@@ -507,9 +517,9 @@ class TestDispatchTankMessages:
             y=150,
             extra_data=b"\x08\x03\x01\x00\x48\xe2\x00",
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "539" in state["tanks"]
         assert state["tanks"]["539"]["x"] == 193
         assert state["tanks"]["539"]["y"] == 150
@@ -532,9 +542,9 @@ class TestDispatchTankMessages:
             waypoints="eeeesss",
             is_self=False,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "550" in state["tanks"]
         # Final position: (100+4, 80+3) = (104, 83)
         assert state["tanks"]["550"]["x"] == 104
@@ -568,9 +578,9 @@ class TestDispatchEnemyDetection:
             rank=3,
             team=2,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "555" in state["tanks"]
         assert state["tanks"]["555"]["x"] == 120
         assert state["tanks"]["555"]["y"] == 130
@@ -583,7 +593,7 @@ class TestDispatchEnemyDetection:
 
         # First create a tank with an old position
         entry = TankEntryDict(msg_type=0x28, tank_id=556, x=50, y=60, name="OldPos")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         # Detection updates to new position
         msg = EnemyDetectionDict(
@@ -594,8 +604,8 @@ class TestDispatchEnemyDetection:
             rank=5,
             team=1,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["tanks"]["556"]["x"] == 200
         assert state["tanks"]["556"]["y"] == 210

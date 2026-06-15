@@ -26,6 +26,7 @@ import re
 
 from tankpit_bot.browser.dom_scraper import GameLogEntry
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import mark_tank_killed
 from tankpit_bot.state.types import WorldStateDict
 
@@ -99,7 +100,7 @@ def register_kills_from_game_log(
             continue
         victim_id = _resolve_tank_id(world, victim_name)
         if victim_id > 0:
-            mark_tank_killed(victim_id)
+            mark_tank_killed(get_world_service(), victim_id)
         emit_diagnostic(
             diagnostic_kind="tank_deactivated",
             origin="game_log",

@@ -305,8 +305,9 @@ def _inject_self_state(x: int, y: int, fuel: int) -> None:
         y: Y coordinate.
         fuel: Fuel amount.
     """
-    import tankpit_bot.sniffer.world_state as ws
+    from tankpit_bot.sniffer.world_state import get_world_service
 
+    svc = get_world_service()
     self_state = SelfStateDict(
         x=x,
         y=y,
@@ -316,7 +317,7 @@ def _inject_self_state(x: int, y: int, fuel: int) -> None:
         rank=3,
         leaderboard_position=0,
     )
-    ws._world_state = WorldStateDict(**{**ws._world_state, "self_state": self_state})
+    svc.world_state = WorldStateDict(**{**svc.world_state, "self_state": self_state})
 
 
 class TestProcessTickBatch:
@@ -358,9 +359,9 @@ class TestProcessTickBatch:
     def test_merges_kills_into_ai_state(self) -> None:
         """_process_tick_batch merges killed tank IDs from protocol."""
         _cleanup()
-        import tankpit_bot.sniffer.world_state as ws
+        from tankpit_bot.sniffer.world_state import get_world_service
 
-        ws._killed_tank_ids.add(42)
+        get_world_service().killed_tank_ids.add(42)
         _inject_self_state(100, 120, 500)
         ai_state = make_initial_ai_state()
         result = _process_tick_batch([], ai_state, 0, 5000)
@@ -380,8 +381,8 @@ class TestReplaySessionMultiTick:
         during message processing so the planner runs.
         """
         _cleanup()
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.sniffer.decoders import process_received_message as real_prm
+        from tankpit_bot.sniffer.world_state import get_world_service
 
         call_count = 0
 
@@ -390,6 +391,7 @@ class TestReplaySessionMultiTick:
             real_prm(payload)
             call_count += 1
             if call_count == 1:
+                svc = get_world_service()
                 self_state = SelfStateDict(
                     x=70,
                     y=80,
@@ -399,8 +401,8 @@ class TestReplaySessionMultiTick:
                     rank=3,
                     leaderboard_position=0,
                 )
-                ws._world_state = WorldStateDict(
-                    **{**ws._world_state, "self_state": self_state},
+                svc.world_state = WorldStateDict(
+                    **{**svc.world_state, "self_state": self_state},
                 )
 
         from tankpit_bot import _test_hooks

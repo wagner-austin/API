@@ -32,7 +32,12 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.replay.types import ReplaySessionResultDict, ReplayTickTraceDict
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
-from tankpit_bot.sniffer.world_state import get_terrain_map, get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_state import (
+    get_terrain_map,
+    get_world_service,
+    get_world_state,
+    reset_world_state,
+)
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state
@@ -162,7 +167,7 @@ def _process_tick_batch(
         _test_hooks.process_received_message_hook(payload)
 
     # Merge kills from protocol into AI state
-    new_kills = drain_killed_tank_ids()
+    new_kills = drain_killed_tank_ids(get_world_service())
     if new_kills:
         merged_kills = dict(ai_state["killed_tank_ids"])
         for tank_id in new_kills:
@@ -174,7 +179,7 @@ def _process_tick_batch(
     if self_state is None:
         return (ai_state, None)
 
-    inventory = get_inventory_state()
+    inventory = get_inventory_state(get_world_service())
     terrain = get_terrain_map()
 
     decision = ai_strategy.decide(

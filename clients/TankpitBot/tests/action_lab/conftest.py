@@ -1,7 +1,7 @@
 """Shared fixtures for action_lab tests.
 
 Centralizes the "stop mocking the inventory tracker" pattern: tests should
-mutate the real ``_ws._inventory_state`` via the real ``update_inventory_*``
+mutate the real ``_get_world_service().inventory_state`` via the real ``update_inventory_*``
 codepaths (or replay real captured frames through ``process_received_message``)
 instead of patching ``get_inventory_state`` at one of the many module-level
 import bindings.
@@ -25,7 +25,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import (
     update_inventory_from_protocol,
 )
@@ -40,7 +40,7 @@ INVENTORY_GROWTH_FRAME_INDEX = 51
 """First received frame in fuel_probe.capture_session.json whose decode
 causes the real inventory tracker total to grow (0 -> 112 via a 0x49 sync).
 Discovered by replaying the capture through process_received_message and
-watching get_inventory_state()."""
+watching get_inventory_state(get_world_service())."""
 
 INVENTORY_TOTAL_AFTER_GROWTH = 112
 
@@ -84,7 +84,7 @@ def replay_pipeline() -> Generator[list[CapturedMessage], None, None]:
 def real_inventory() -> Generator[None, None, None]:
     """Reset world state before and after the test.
 
-    Tests use ``update_inventory_from_protocol([counts], [enabled])`` directly
+    Tests use ``update_inventory_from_protocol(get_world_service(), [counts], [enabled])`` directly
     to set a known inventory baseline via the real codepath, so every module
     binding of ``get_inventory_state`` returns the same real value.
     """
@@ -101,13 +101,13 @@ def restore_action_hooks() -> Generator[None, None, None]:
     ``action_hooks.get_current_time_ms``, ``action_hooks.check_and_clear_*``
     don't have to remember to restore — this autouse fixture does it.
     """
+    from tankpit_bot.action_lab._test_hooks import (
+        _default_check_and_clear_teleport_landed,
+    )
     from tankpit_bot.bot.world_sync import drain_messages as _real_drain
     from tankpit_bot.browser import get_current_time_ms as _real_clock
     from tankpit_bot.sniffer.world_state import (
         check_and_clear_radar_scan_complete as _real_clear_radar,
-    )
-    from tankpit_bot.sniffer.world_state_combat import (
-        check_and_clear_teleport_landed as _real_clear_teleport,
     )
 
     yield
@@ -115,7 +115,7 @@ def restore_action_hooks() -> Generator[None, None, None]:
     action_hooks.drain_buffered_messages = _real_drain
     action_hooks.get_current_time_ms = _real_clock
     action_hooks.check_and_clear_radar_scan_complete = _real_clear_radar
-    action_hooks.check_and_clear_teleport_landed = _real_clear_teleport
+    action_hooks.check_and_clear_teleport_landed = _default_check_and_clear_teleport_landed
 
 
 class Terrain:
@@ -197,6 +197,7 @@ def set_inventory_total(total: int) -> None:
     directly.
     """
     update_inventory_from_protocol(
+        get_world_service(),
         counts=[0, total, 0, 0, 0],
         enabled=[True, True, True, True, True],
     )

@@ -5,9 +5,9 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer import (
     dispatch_world_state_update,
+    get_world_service,
     reset_world_state,
     update_world_state_from_position,
-    world_state,
 )
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
 
@@ -40,9 +40,9 @@ class TestDispatchMovement:
             leaderboard_position=5,
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None after dispatch")
         assert self_state["x"] == 150
@@ -65,10 +65,11 @@ class TestDispatchMovement:
             rank=2,
             leaderboard_position=3,
         )
-        dispatch_world_state_update(first)
-        if world_state._world_state["self_state"] is None:
+        dispatch_world_state_update(get_world_service(), first)
+        self_state = get_world_service().world_state["self_state"]
+        if self_state is None:
             raise AssertionError("self_state should exist after first 0x3D")
-        assert world_state._world_state["self_state"]["tank_id"] == 5
+        assert self_state["tank_id"] == 5
 
         # Second dispatch with same tank_id hits the elif branch
         second = MovementResponseDict(
@@ -81,8 +82,8 @@ class TestDispatchMovement:
             rank=2,
             leaderboard_position=3,
         )
-        dispatch_world_state_update(second)
-        self_state = world_state._world_state["self_state"]
+        dispatch_world_state_update(get_world_service(), second)
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 200
@@ -109,9 +110,9 @@ class TestDispatchMovement:
             is_self=True,
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None after dispatch")
         # Final position after applying waypoints
@@ -139,10 +140,10 @@ class TestDispatchMovement:
             is_self=False,
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Position should remain unchanged
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 100
@@ -179,9 +180,9 @@ class TestDispatchPositionUpdate:
             extra_data=b"\x08\x03\x03\x00\x2e\x84\x00",
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None after dispatch")
         assert self_state["x"] == 202
@@ -207,10 +208,10 @@ class TestDispatchPositionUpdate:
             extra_data=b"\x08\x03\x01\x00\x48\xe2\x00",
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Position should remain unchanged
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 100
@@ -236,10 +237,10 @@ class TestDispatchPositionUpdate:
             extra_data=b"\x00\x2e\x85\x0a\x00\x0c\x05",
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Position should remain unchanged
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 100
@@ -265,10 +266,10 @@ class TestDispatchPositionUpdate:
             extra_data=b"\x00" * 7,
         )
 
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Position should remain unchanged
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 100
@@ -292,7 +293,7 @@ class TestDispatchProtocolMovement:
 
         # Register enemy tank at start position
         entry = TankEntryDict(msg_type=0x28, tank_id=600, x=80, y=90, name="Moving")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         # Movement from (80, 90) with waypoints leading to (82, 88)
         msg = MovementDict(
@@ -305,9 +306,9 @@ class TestDispatchProtocolMovement:
             leaderboard_position=10,
             waypoints=[(82, 88)],
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["tanks"]["600"]["x"] == 82
         assert state["tanks"]["600"]["y"] == 88
 
@@ -316,7 +317,7 @@ class TestDispatchProtocolMovement:
         from tankpit_bot.protocol import MovementDict, TankEntryDict
 
         entry = TankEntryDict(msg_type=0x28, tank_id=601, x=50, y=60, name="Stationary")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         msg = MovementDict(
             msg_type=0x47,
@@ -328,9 +329,9 @@ class TestDispatchProtocolMovement:
             leaderboard_position=0,
             waypoints=[],
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         # Position stays at start coords since no waypoints
         assert state["tanks"]["601"]["x"] == 50
         assert state["tanks"]["601"]["y"] == 60
@@ -350,7 +351,7 @@ class TestDispatchProtocolMovement:
             rank=2,
             leaderboard_position=5,
         )
-        dispatch_world_state_update(first)
+        dispatch_world_state_update(get_world_service(), first)
 
         # Movement from self's position — should skip _handle_waypoint_movement
         msg = MovementDict(
@@ -363,10 +364,10 @@ class TestDispatchProtocolMovement:
             leaderboard_position=5,
             waypoints=[(110, 110)],
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Self position updated to final waypoint destination
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 110
@@ -386,8 +387,8 @@ class TestDispatchProtocolMovement:
             rank=2,
             leaderboard_position=5,
         )
-        dispatch_world_state_update(first)
-        world_state.update_world_state_from_position(90, 90)
+        dispatch_world_state_update(get_world_service(), first)
+        update_world_state_from_position(90, 90)
 
         msg = MovementDict(
             msg_type=0x47,
@@ -399,9 +400,9 @@ class TestDispatchProtocolMovement:
             leaderboard_position=5,
             waypoints=[(110, 110)],
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 110
@@ -413,7 +414,7 @@ class TestDispatchProtocolMovement:
 
         # Tank at (50, 60) but movement starts at (200, 200)
         entry = TankEntryDict(msg_type=0x28, tank_id=610, x=50, y=60, name="Far")
-        dispatch_world_state_update(entry)
+        dispatch_world_state_update(get_world_service(), entry)
 
         msg = MovementDict(
             msg_type=0x47,
@@ -425,19 +426,19 @@ class TestDispatchProtocolMovement:
             leaderboard_position=0,
             waypoints=[(205, 205)],
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Tank position unchanged — start coords didn't match
-        assert world_state._world_state["tanks"]["610"]["x"] == 50
-        assert world_state._world_state["tanks"]["610"]["y"] == 60
+        assert get_world_service().world_state["tanks"]["610"]["x"] == 50
+        assert get_world_service().world_state["tanks"]["610"]["y"] == 60
 
     def test_dispatch_deactivate_invalidates_position(self) -> None:
         """Dispatch 0x41 invalidates position and records the kill."""
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
 
         entry = TankEntryDict(msg_type=0x28, tank_id=700, x=100, y=100, name="Victim")
-        dispatch_world_state_update(entry)
-        assert world_state._world_state["tanks"]["700"]["x"] == 100
+        dispatch_world_state_update(get_world_service(), entry)
+        assert get_world_service().world_state["tanks"]["700"]["x"] == 100
 
         msg = DeactivationDict(
             msg_type=0x41,
@@ -446,12 +447,12 @@ class TestDispatchProtocolMovement:
             rank=2,
             points=100,
         )
-        dispatch_world_state_update(msg)
+        dispatch_world_state_update(get_world_service(), msg)
 
         # Position invalidated to (0, 0)
-        assert world_state._world_state["tanks"]["700"]["x"] == 0
-        assert world_state._world_state["tanks"]["700"]["y"] == 0
-        assert drain_killed_tank_ids() == {700}
+        assert get_world_service().world_state["tanks"]["700"]["x"] == 0
+        assert get_world_service().world_state["tanks"]["700"]["y"] == 0
+        assert drain_killed_tank_ids(get_world_service()) == {700}
 
 
 class TestDispatchMoveResponseUpdatesSelf:
@@ -480,9 +481,9 @@ class TestDispatchMoveResponseUpdatesSelf:
             rank=2,
             leaderboard_position=3,
         )
-        dispatch_world_state_update(first)
+        dispatch_world_state_update(get_world_service(), first)
 
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["tank_id"] == 5
@@ -498,13 +499,13 @@ class TestDispatchMoveResponseUpdatesSelf:
             rank=3,
             leaderboard_position=10,
         )
-        dispatch_world_state_update(second)
+        dispatch_world_state_update(get_world_service(), second)
 
         # Self position unchanged
-        self_state = world_state._world_state["self_state"]
+        self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["x"] == 100
         assert self_state["y"] == 100
         # But tank 99 should be registered
-        assert "99" in world_state._world_state["tanks"]
+        assert "99" in get_world_service().world_state["tanks"]

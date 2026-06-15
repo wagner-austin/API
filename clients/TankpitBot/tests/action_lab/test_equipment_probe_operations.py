@@ -37,6 +37,7 @@ from tankpit_bot.action_lab.equipment_probe_operations import (
 )
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
 from tankpit_bot.sniffer.decoders import process_received_message
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import (
     SelfStateDict,
@@ -474,7 +475,7 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
         if msg["direction"] == "received":
             process_received_message(str(msg["payload"]))
 
-    assert total_inventory_count(get_inventory_state()) == 0
+    assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
     growth_frame = messages[INVENTORY_GROWTH_FRAME_INDEX]
     assert growth_frame["direction"] == "received"
@@ -516,7 +517,10 @@ def test_run_pickup_attempt_takes_fast_path_against_real_inventory_frame(
         dispatch_failure_message="dispatch failed",
     )
 
-    assert total_inventory_count(get_inventory_state()) == INVENTORY_TOTAL_AFTER_GROWTH
+    assert (
+        total_inventory_count(get_inventory_state(get_world_service()))
+        == INVENTORY_TOTAL_AFTER_GROWTH
+    )
     assert result["status"] == "picked_up_equipment"
     assert result["inventory_count_after"] == INVENTORY_TOTAL_AFTER_GROWTH
     assert probe.move_calls == []
@@ -539,7 +543,7 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
     for msg in messages[:INVENTORY_GROWTH_FRAME_INDEX]:
         if msg["direction"] == "received":
             process_received_message(str(msg["payload"]))
-    assert total_inventory_count(get_inventory_state()) == 0
+    assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
     growth_payload = messages[INVENTORY_GROWTH_FRAME_INDEX]["payload"]
     drain_queue: list[str | None] = [None, None, str(growth_payload)]
@@ -593,7 +597,10 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
         dispatch_failure_message="dispatch failed",
     )
 
-    assert total_inventory_count(get_inventory_state()) == INVENTORY_TOTAL_AFTER_GROWTH
+    assert (
+        total_inventory_count(get_inventory_state(get_world_service()))
+        == INVENTORY_TOTAL_AFTER_GROWTH
+    )
     assert result["status"] == "picked_up_equipment"
     assert result["inventory_count_after"] == INVENTORY_TOTAL_AFTER_GROWTH
     assert probe.move_calls == [(101, 100)]

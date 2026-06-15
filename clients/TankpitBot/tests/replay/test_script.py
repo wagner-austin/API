@@ -352,10 +352,9 @@ class TestMainCLI:
         """
         from scripts.replay_bot import main
 
-        import tankpit_bot.sniffer.world_state as ws
         from tankpit_bot.sniffer.decoders import process_received_message as real_prm
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
-        from tankpit_bot.sniffer.world_state import reset_world_state
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.xor import reset_xor_state
         from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 
@@ -366,6 +365,7 @@ class TestMainCLI:
             real_prm(payload)
             call_count += 1
             if call_count == 1:
+                svc = get_world_service()
                 self_state = SelfStateDict(
                     x=50,
                     y=60,
@@ -375,8 +375,8 @@ class TestMainCLI:
                     rank=3,
                     leaderboard_position=0,
                 )
-                ws._world_state = WorldStateDict(
-                    **{**ws._world_state, "self_state": self_state},
+                svc.world_state = WorldStateDict(
+                    **{**svc.world_state, "self_state": self_state},
                 )
 
         # Session with one message so final batch fires the planner

@@ -39,6 +39,7 @@ from tankpit_bot.inventory import (
     decode_inventory_state,
     encode_inventory_state,
 )
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
 log = get_logger(__name__)
@@ -342,7 +343,7 @@ class GameStateManager:
             GameStateSnapshot with all current state.
         """
         # Get inventory from binary protocol tracking
-        inventory: InventoryState = get_inventory_state()
+        inventory: InventoryState = get_inventory_state(get_world_service())
 
         # Get combat stats from tracker or use empty
         combat_stats: list[CombatStats]

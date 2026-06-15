@@ -235,7 +235,7 @@ def test_tick_once_emits_sample_from_live_world_state(
         SelfMapReportDict,
     )
     from tankpit_bot.diagnostics.self_map import build_self_map_report
-    from tankpit_bot.sniffer.world_state import update_world_state_from_position
+    from tankpit_bot.sniffer.world_state import get_world_service, update_world_state_from_position
     from tankpit_bot.sniffer.world_state_containers import (
         update_world_state_from_fuel_total,
     )
@@ -243,8 +243,8 @@ def test_tick_once_emits_sample_from_live_world_state(
 
     artifacts = configure_bot_runtime_logging("20260609-120000")
     update_world_state_from_position(100, 100)
-    update_world_state_from_fuel_total(800)
-    update_inventory_from_protocol([30, 30, 30, 30, 30], [True] * 5)
+    update_world_state_from_fuel_total(get_world_service(), 800)
+    update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
     bot = Bot("https://test.tankpit.com/", headless=True)
     bot._cdp = _SelfFieldsCDPSession()
     bot._state_data = bot._state_data.copy()

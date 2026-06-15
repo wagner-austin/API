@@ -40,8 +40,8 @@ from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outc
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_logging import emit_ai, emit_sync, emit_wire_complete
 from tankpit_bot.sniffer.world_state import (
-    check_and_clear_map_data_processed,
     get_terrain_map,
+    get_world_service,
     is_move_target_failed,
     mark_move_target_failed,
     mark_scan_viewport_failed,
@@ -175,7 +175,7 @@ def _tick_once(bot: Bot) -> None:
     combat_feedback = _get_combat_feedback(bot)
 
     # 6. DECIDE
-    inventory = get_inventory_state()
+    inventory = get_inventory_state(get_world_service())
     terrain = get_terrain_map()
 
     decision = ai_strategy.decide(
@@ -377,7 +377,7 @@ def _clear_rejected_movement(
         target_y=ty,
     )
     if kind == "collect":
-        increment_container_failed_pickups(tx, ty)
+        increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
@@ -420,7 +420,7 @@ def _clear_stalled_action(
         timeout_ms=timeout_ms,
     )
     if action["kind"] == "collect":
-        increment_container_failed_pickups(tx, ty)
+        increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if action["kind"] == "scan":
         _mark_current_viewport_scan_failed(bot, get_current_time_ms())
@@ -472,7 +472,7 @@ def _clear_completed_map_open(
         True if MAP_DATA was processed since the dispatch and the action
         was cleared.
     """
-    if not check_and_clear_map_data_processed():
+    if not get_world_service().check_and_clear_map_data_processed():
         return False
     started_ms = action["started_ms"]
     duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
@@ -593,7 +593,7 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
     Returns:
         Updated AI state with new kills merged.
     """
-    new_kills = drain_killed_tank_ids()
+    new_kills = drain_killed_tank_ids(get_world_service())
     if not new_kills:
         return ai_state
     now = get_current_time_ms()
@@ -629,9 +629,9 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
     target_id = bot._ai_state["last_shot_target_id"]
     if target_id == -1:
         return False
-    if peek_combat_hit():
+    if peek_combat_hit(get_world_service()):
         return False
-    if peek_our_shot_response():
+    if peek_our_shot_response(get_world_service()):
         return False
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
         return False
@@ -670,15 +670,15 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
     if bot._ai_state["last_shot_target_id"] == -1:
         log.info("FEEDBACK: no shot pending (last_shot_target_id=-1)")
         return ""
-    got_hit = check_and_clear_combat_hit()
-    got_response = check_and_clear_our_shot_response()
+    got_hit = check_and_clear_combat_hit(get_world_service())
+    got_response = check_and_clear_our_shot_response(get_world_service())
     if got_hit:
         log.info("FEEDBACK: hit confirmed")
         return "hit"
     if str(bot._ai_state["last_shot_target_id"]) in bot._ai_state["killed_tank_ids"]:
         log.info("FEEDBACK: kill confirmed")
         return "hit"
-    inventory = get_inventory_state()
+    inventory = get_inventory_state(get_world_service())
     dual_available = inventory["dual_shots"]["enabled"] and inventory["dual_shots"]["count"] > 0
     if got_response:
         if dual_available:

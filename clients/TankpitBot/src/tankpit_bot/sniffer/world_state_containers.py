@@ -8,11 +8,10 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-import tankpit_bot.sniffer.world_state as _ws
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.viewport import get_viewport_left
-from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     WorldStateDict,
     make_container_state,
@@ -24,14 +23,15 @@ from tankpit_bot.state import (
 log = get_logger(__name__)
 
 
-def update_world_state_from_fuel_dots(dots: list[tuple[int, int]]) -> None:
+def update_world_state_from_fuel_dots(ws: WorldService, dots: list[tuple[int, int]]) -> None:
     """Replace the map-wide fuel-dot atlas from a parsed MAP_DATA dot layer.
 
     Args:
+        ws: World service instance.
         dots: Decoded ``(x, y)`` world coordinates of every fuel dot.
     """
-    _ws._world_state = replace_map_fuel_dots(
-        _ws._world_state,
+    ws.world_state = replace_map_fuel_dots(
+        ws.world_state,
         dots,
         get_current_time_ms(),
     )
@@ -67,74 +67,82 @@ def update_world_state_from_tank_registry_container(
     )
 
 
-def update_world_state_from_fuel_total(fuel_total: int) -> None:
+def update_world_state_from_fuel_total(ws: WorldService, fuel_total: int) -> None:
     """Update world state with new absolute fuel level.
 
     Args:
+        ws: World service instance.
         fuel_total: New absolute fuel level.
     """
     ts = get_current_time_ms()
     old_fuel = (
-        _ws._world_state["self_state"]["fuel"] if _ws._world_state["self_state"] is not None else 0
+        ws.world_state["self_state"]["fuel"] if ws.world_state["self_state"] is not None else 0
     )
-    _ws._world_state = set_self_fuel(_ws._world_state, fuel_total, ts)
+    ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts)
     delta = fuel_total - old_fuel
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
 
 
-def update_world_state_from_container_pickup(x: int, y: int) -> None:
+def update_world_state_from_container_pickup(ws: WorldService, x: int, y: int) -> None:
     """Update world state when container is picked up.
 
     Args:
+        ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
     """
+    from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
+
     ts = get_current_time_ms()
-    _ws._world_state = pickup_container(_ws._world_state, x, y, ts)
-    clear_container_tile_cache(x, y)
+    ws.world_state = pickup_container(ws.world_state, x, y, ts)
+    clear_container_tile_cache(ws, x, y)
     emit_world("Picked up container at (%d, %d)", x, y)
 
 
-def remove_container_at(x: int, y: int) -> None:
+def remove_container_at(ws: WorldService, x: int, y: int) -> None:
     """Remove a container from world state at the given position.
 
     Used when the bot detects a container is unreachable (stuck timeout).
 
     Args:
+        ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
     """
+    from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
+
     key = f"{x},{y}"
-    if key in _ws._world_state["containers"]:
-        new_containers = dict(_ws._world_state["containers"])
+    if key in ws.world_state["containers"]:
+        new_containers = dict(ws.world_state["containers"])
         del new_containers[key]
-        _ws._world_state = WorldStateDict(
-            self_state=_ws._world_state["self_state"],
-            tanks=_ws._world_state["tanks"],
+        ws.world_state = WorldStateDict(
+            self_state=ws.world_state["self_state"],
+            tanks=ws.world_state["tanks"],
             containers=new_containers,
-            mines=_ws._world_state["mines"],
-            terrain=_ws._world_state["terrain"],
-            viewport=_ws._world_state["viewport"],
-            scanned_viewports=_ws._world_state["scanned_viewports"],
-            map_fuel_dots=_ws._world_state["map_fuel_dots"],
-            timestamp_ms=_ws._world_state["timestamp_ms"],
+            mines=ws.world_state["mines"],
+            terrain=ws.world_state["terrain"],
+            viewport=ws.world_state["viewport"],
+            scanned_viewports=ws.world_state["scanned_viewports"],
+            map_fuel_dots=ws.world_state["map_fuel_dots"],
+            timestamp_ms=ws.world_state["timestamp_ms"],
         )
-        clear_container_tile_cache(x, y)
+        clear_container_tile_cache(ws, x, y)
         log.info("Removed unreachable container at (%d, %d)", x, y)
 
 
-def increment_container_failed_pickups(x: int, y: int) -> None:
+def increment_container_failed_pickups(ws: WorldService, x: int, y: int) -> None:
     """Increment the failed_pickups counter on a container.
 
     Called when a pickup attempt stalls. The container stays in world
     state but is deprioritized by the planner.
 
     Args:
+        ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
     """
     key = f"{x},{y}"
-    container = _ws._world_state["containers"].get(key)
+    container = ws.world_state["containers"].get(key)
     if container is None:
         return
     new_container = make_container_state(
@@ -147,18 +155,18 @@ def increment_container_failed_pickups(x: int, y: int) -> None:
         timestamp_ms=container["timestamp_ms"],
         failed_pickups=container["failed_pickups"] + 1,
     )
-    new_containers = dict(_ws._world_state["containers"])
+    new_containers = dict(ws.world_state["containers"])
     new_containers[key] = new_container
-    _ws._world_state = WorldStateDict(
-        self_state=_ws._world_state["self_state"],
-        tanks=_ws._world_state["tanks"],
+    ws.world_state = WorldStateDict(
+        self_state=ws.world_state["self_state"],
+        tanks=ws.world_state["tanks"],
         containers=new_containers,
-        mines=_ws._world_state["mines"],
-        terrain=_ws._world_state["terrain"],
-        viewport=_ws._world_state["viewport"],
-        scanned_viewports=_ws._world_state["scanned_viewports"],
-        map_fuel_dots=_ws._world_state["map_fuel_dots"],
-        timestamp_ms=_ws._world_state["timestamp_ms"],
+        mines=ws.world_state["mines"],
+        terrain=ws.world_state["terrain"],
+        viewport=ws.world_state["viewport"],
+        scanned_viewports=ws.world_state["scanned_viewports"],
+        map_fuel_dots=ws.world_state["map_fuel_dots"],
+        timestamp_ms=ws.world_state["timestamp_ms"],
     )
     log.info(
         "Container (%d,%d) failed_pickups: %d -> %d",

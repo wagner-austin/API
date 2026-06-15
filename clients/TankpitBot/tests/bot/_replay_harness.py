@@ -33,7 +33,7 @@ from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.sniffer.world_state import get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CaptureSession, decode_capture_session
@@ -174,7 +174,7 @@ def _record_tick(
     """Snapshot the observable bot + world state at the end of one tick."""
     world = get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state()
+    inv = get_inventory_state(get_world_service())
     state_data = bot.get_state_data()
     ai = bot._ai_state
     resource_target = (

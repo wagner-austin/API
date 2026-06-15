@@ -99,7 +99,9 @@ from tankpit_bot.sniffer.viewport import (
     reset_viewport_tracking,
     update_viewport_origin,
 )
+from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
+    get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
@@ -130,6 +132,7 @@ __all__ = [
     "PlaywrightNotInstalledError",
     "SnifferError",
     "WebSocketSniffer",
+    "WorldService",
     "build_global_xor_table",
     "container_tracker",
     "damage_name",
@@ -171,6 +174,7 @@ __all__ = [
     "get_inventory_state",
     "get_tank_name",
     "get_viewport_left",
+    "get_world_service",
     "handle_tank_registry",
     "init_trackers_with_magic",
     "item_tracker",

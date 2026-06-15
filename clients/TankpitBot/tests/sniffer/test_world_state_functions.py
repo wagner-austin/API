@@ -7,9 +7,13 @@ from tankpit_bot.sniffer import (
     reset_world_state,
     update_world_state_from_position,
     update_world_state_from_radar,
-    world_state,
 )
-from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
+from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.state.viewport_geometry import (
+    make_visible_viewport_state,
+    viewport_radar_bounds,
+    viewport_visible_bounds,
+)
 
 
 class TestPlayerIdMapper:
@@ -104,10 +108,18 @@ class TestViewportGeometry:
 
     def test_radar_bounds_extend_visible_viewport_by_one_tile(self) -> None:
         """Radar bounds extend one tile beyond the visible viewport."""
-        world_state._world_state["viewport"] = make_visible_viewport_state(140, 149)
+        viewport = make_visible_viewport_state(140, 149)
+        get_world_service().world_state["viewport"] = viewport
 
-        assert world_state._viewport_bounds(world_state._world_state) == (140, 149, 155, 164)
-        assert world_state._radar_bounds(world_state._world_state) == (139, 148, 156, 165)
+        assert viewport_visible_bounds(viewport) == (140, 149, 155, 164)
+        assert viewport_radar_bounds(viewport) == (139, 148, 156, 165)
+
+    def test_viewport_bounds_delegates_to_geometry(self) -> None:
+        """WorldService.viewport_bounds() returns the visible viewport."""
+        viewport = make_visible_viewport_state(140, 149)
+        get_world_service().world_state["viewport"] = viewport
+
+        assert get_world_service().viewport_bounds() == (140, 149, 155, 164)
 
     def test_patch_coords_translate_from_radar_margin(self) -> None:
         """Patch col/row 0 is the radar margin; visible viewport starts at 1."""
@@ -255,7 +267,7 @@ class TestContainerUpdate:
 
         update_world_state_from_tank_registry_container(100, 5)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["containers"] == {}
 
     def test_update_world_state_from_tank_registry_container_with_viewport(self) -> None:
@@ -269,7 +281,7 @@ class TestContainerUpdate:
 
         update_world_state_from_tank_registry_container(50, 5)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "105,50" not in state["containers"]
 
         viewport.reset_viewport_tracking()
@@ -294,9 +306,9 @@ class TestFuelUpdate:
         update_world_state_from_position(100, 100)
 
         # Update fuel - sets to absolute value
-        update_world_state_from_fuel_total(50)
+        update_world_state_from_fuel_total(get_world_service(), 50)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         if state["self_state"] is None:
             raise AssertionError("self_state should not be None")
         assert state["self_state"]["fuel"] == 50
@@ -309,13 +321,13 @@ class TestFuelUpdate:
         reset_world_state()
 
         # Verify self_state is None
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["self_state"] is None
 
         # Update fuel - should do nothing since no self_state
-        update_world_state_from_fuel_total(50)
+        update_world_state_from_fuel_total(get_world_service(), 50)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert state["self_state"] is None
 
 
@@ -343,15 +355,15 @@ class TestContainerPickup:
         # Add a container via radar
         containers: list[RadarContainerDict] = [RadarContainerDict(x=50, y=60, volume=100)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         assert "50,60" in state["containers"]
 
         # Pick up the container
-        update_world_state_from_container_pickup(50, 60)
+        update_world_state_from_container_pickup(get_world_service(), 50, 60)
 
-        state = world_state._world_state
+        state = get_world_service().world_state
         # Container should be removed
         assert "50,60" not in state["containers"]
 
@@ -373,12 +385,13 @@ class TestRadarViewportReconciliation:
         from tankpit_bot.sniffer import viewport
 
         viewport.update_viewport_origin(100, 200)
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
 
-        update_world_state_from_radar([RadarContainerDict(x=101, y=201, volume=500)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [])
 
-        assert world_state._world_state["scanned_viewports"]["100,200"] > 0
+        assert ws.world_state["scanned_viewports"]["100,200"] > 0
 
     def test_radar_clears_failed_scan_mark_for_current_viewport(self) -> None:
         """Successful radar clears the recent failed-scan quarantine."""
@@ -388,13 +401,14 @@ class TestRadarViewportReconciliation:
             mark_scan_viewport_failed,
         )
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
         mark_scan_viewport_failed(100, 200, 1000)
 
         assert is_scan_viewport_failed(100, 200, 1001) is True
 
-        update_world_state_from_radar([RadarContainerDict(x=101, y=201, volume=500)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [])
 
         assert is_scan_viewport_failed(100, 200, 1001) is False
 
@@ -403,66 +417,69 @@ class TestRadarViewportReconciliation:
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.state.types import make_container_state
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
-        world_state._world_state["containers"]["101,201"] = make_container_state(
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
+        ws.world_state["containers"]["101,201"] = make_container_state(
             x=101,
             y=201,
             is_fuel=True,
             volume=500,
         )
-        world_state._world_state["containers"]["150,150"] = make_container_state(
+        ws.world_state["containers"]["150,150"] = make_container_state(
             x=150,
             y=150,
             is_fuel=True,
             volume=600,
         )
 
-        update_world_state_from_radar([RadarContainerDict(x=102, y=202, volume=700)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=102, y=202, volume=700)], [])
 
-        assert "101,201" not in world_state._world_state["containers"]
-        assert "102,202" in world_state._world_state["containers"]
-        assert "150,150" in world_state._world_state["containers"]
+        assert "101,201" not in ws.world_state["containers"]
+        assert "102,202" in ws.world_state["containers"]
+        assert "150,150" in ws.world_state["containers"]
 
     def test_radar_clears_multiple_missing_current_viewport_containers(self) -> None:
         """Radar removes each stale container after the first deletion snapshot."""
         from tankpit_bot.state.types import make_container_state
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
-        world_state._world_state["containers"]["101,201"] = make_container_state(
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
+        ws.world_state["containers"]["101,201"] = make_container_state(
             x=101,
             y=201,
             is_fuel=True,
             volume=500,
         )
-        world_state._world_state["containers"]["102,202"] = make_container_state(
+        ws.world_state["containers"]["102,202"] = make_container_state(
             x=102,
             y=202,
             is_fuel=True,
             volume=600,
         )
 
-        update_world_state_from_radar([], [])
+        update_world_state_from_radar(ws, [], [])
 
-        assert "101,201" not in world_state._world_state["containers"]
-        assert "102,202" not in world_state._world_state["containers"]
+        assert "101,201" not in ws.world_state["containers"]
+        assert "102,202" not in ws.world_state["containers"]
 
     def test_radar_clears_missing_current_viewport_mines(self) -> None:
         """Radar removes stale current-viewport mines not returned by the scan."""
         from tankpit_bot.container import RadarMineDict
         from tankpit_bot.state.types import make_mine_state
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
-        world_state._world_state["mines"]["101,201"] = make_mine_state(
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
+        ws.world_state["mines"]["101,201"] = make_mine_state(
             x=101,
             y=201,
             mine_type=1,
             tank_id=77,
             team=2,
         )
-        world_state._world_state["mines"]["150,150"] = make_mine_state(
+        ws.world_state["mines"]["150,150"] = make_mine_state(
             x=150,
             y=150,
             mine_type=1,
@@ -470,26 +487,27 @@ class TestRadarViewportReconciliation:
             team=3,
         )
 
-        update_world_state_from_radar([], [RadarMineDict(x=102, y=202, team=1)])
+        update_world_state_from_radar(ws, [], [RadarMineDict(x=102, y=202, team=1)])
 
-        assert "101,201" not in world_state._world_state["mines"]
-        assert "102,202" in world_state._world_state["mines"]
-        assert "150,150" in world_state._world_state["mines"]
+        assert "101,201" not in ws.world_state["mines"]
+        assert "102,202" in ws.world_state["mines"]
+        assert "150,150" in ws.world_state["mines"]
 
     def test_radar_clears_multiple_missing_current_viewport_mines(self) -> None:
         """Radar removes each stale mine after the first deletion snapshot."""
         from tankpit_bot.state.types import make_mine_state
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
-        world_state._world_state["mines"]["101,201"] = make_mine_state(
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
+        ws.world_state["mines"]["101,201"] = make_mine_state(
             x=101,
             y=201,
             mine_type=1,
             tank_id=77,
             team=2,
         )
-        world_state._world_state["mines"]["102,202"] = make_mine_state(
+        ws.world_state["mines"]["102,202"] = make_mine_state(
             x=102,
             y=202,
             mine_type=1,
@@ -497,25 +515,26 @@ class TestRadarViewportReconciliation:
             team=3,
         )
 
-        update_world_state_from_radar([], [])
+        update_world_state_from_radar(ws, [], [])
 
-        assert "101,201" not in world_state._world_state["mines"]
-        assert "102,202" not in world_state._world_state["mines"]
+        assert "101,201" not in ws.world_state["mines"]
+        assert "102,202" not in ws.world_state["mines"]
 
     def test_radar_reconciliation_is_noop_when_viewport_already_matches(self) -> None:
         """Radar reconciliation preserves resources when scan exactly matches state."""
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.state.types import make_container_state, make_mine_state
 
-        world_state._world_state["viewport"]["left"] = 100
-        world_state._world_state["viewport"]["top"] = 200
-        world_state._world_state["containers"]["101,201"] = make_container_state(
+        ws = get_world_service()
+        ws.world_state["viewport"]["left"] = 100
+        ws.world_state["viewport"]["top"] = 200
+        ws.world_state["containers"]["101,201"] = make_container_state(
             x=101,
             y=201,
             is_fuel=True,
             volume=500,
         )
-        world_state._world_state["mines"]["102,202"] = make_mine_state(
+        ws.world_state["mines"]["102,202"] = make_mine_state(
             x=102,
             y=202,
             mine_type=1,
@@ -524,9 +543,10 @@ class TestRadarViewportReconciliation:
         )
 
         update_world_state_from_radar(
+            ws,
             [RadarContainerDict(x=101, y=201, volume=500)],
             [RadarMineDict(x=102, y=202, team=2)],
         )
 
-        assert "101,201" in world_state._world_state["containers"]
-        assert "102,202" in world_state._world_state["mines"]
+        assert "101,201" in ws.world_state["containers"]
+        assert "102,202" in ws.world_state["mines"]

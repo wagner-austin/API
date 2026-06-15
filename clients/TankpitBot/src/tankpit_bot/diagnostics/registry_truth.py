@@ -33,6 +33,7 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.runtime_logging import emit_diagnostic
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import (
     clear_death_anchor,
     get_death_anchor,
@@ -140,12 +141,14 @@ def _ingest_one_registry_entry(
         return "skip"
     world_x = viewport["left"] + tank["drawn_col"] + _RENDER_ORIGIN_OFFSET
     world_y = viewport["top"] + tank["drawn_row"] + _RENDER_ORIGIN_OFFSET
-    death_tile = get_death_anchor(tank["tank_id"])
+    ws = get_world_service()
+    death_tile = get_death_anchor(ws, tank["tank_id"])
     if death_tile is not None:
         if (world_x, world_y) == death_tile:
             return "corpse"
-        clear_death_anchor(tank["tank_id"])
+        clear_death_anchor(ws, tank["tank_id"])
     refined = update_world_state_from_client_registry(
+        ws,
         tank["tank_id"],
         tank["name"],
         tank["team"],
@@ -156,6 +159,7 @@ def _ingest_one_registry_entry(
         return "skip"
     if tank["damage_tier"] != 0:
         update_world_state_from_tank_damage(
+            ws,
             tank["tank_id"],
             tank["damage_tier"],
             refresh_wire_timestamp=False,

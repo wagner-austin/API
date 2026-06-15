@@ -18,6 +18,7 @@ from tankpit_bot.protocol.constants import RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_state import (
+    get_world_service,
     register_room_image,
     set_selected_room,
 )
@@ -180,7 +181,7 @@ def _process_single_message(body: bytes) -> None:
     if min_len is not None and len(decoded_data) >= min_len:
         binary_decoded = protocol.decode_message(msg_type, decoded_data)
         _log_protocol_line(f"[RECEIVED] {format_decoded_message(msg_type, binary_decoded)}")
-        dispatch_world_state_update(binary_decoded)
+        dispatch_world_state_update(get_world_service(), binary_decoded)
         return
     msg_char = chr(msg_type) if 32 <= msg_type < 127 else "?"
     _log_protocol_line(f"[RECEIVED] type=0x{msg_type:02X} '{msg_char}' len={len(body)}")
@@ -218,8 +219,7 @@ def try_decode_binary(msg_type: int, data: bytes, raw_body: bytes) -> str:
     # so decode_message always succeeds for known types with sufficient data.
     binary_decoded = protocol.decode_message(msg_type, data)
 
-    # Update world state from decoded message
-    dispatch_world_state_update(binary_decoded)
+    dispatch_world_state_update(get_world_service(), binary_decoded)
 
     return format_decoded_message(msg_type, binary_decoded)
 

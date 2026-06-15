@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tests.conftest import FakeEnv
@@ -52,7 +53,7 @@ class TestBotWithWorldState:
 
         reset_world_state()
         update_world_state_from_position(50, 75)
-        update_world_state_from_fuel_total(500)
+        update_world_state_from_fuel_total(get_world_service(), 500)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel = bot.get_fuel()
         # fuel_total sets absolute value
@@ -71,7 +72,7 @@ class TestBotWithWorldState:
             RadarContainerDict(x=10, y=20, volume=100),
             RadarContainerDict(x=30, y=40, volume=200),
         ]
-        update_world_state_from_radar(containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [])
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel_containers = bot.get_fuel_containers()
         assert len(fuel_containers) == 2
@@ -92,7 +93,7 @@ class TestBotWithWorldState:
             RadarContainerDict(x=60, y=60, volume=200),  # Distance: 20
             RadarContainerDict(x=100, y=100, volume=300),  # Distance: 100
         ]
-        update_world_state_from_radar(containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [])
         bot = Bot("https://test.tankpit.com/", headless=True)
         nearest = bot.get_nearest_fuel_container()
         # Type guard: fail test if None

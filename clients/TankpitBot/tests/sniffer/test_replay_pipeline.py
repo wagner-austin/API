@@ -24,7 +24,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.sniffer.decoders import process_received_message
-from tankpit_bot.sniffer.world_state import get_world_state, reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, get_world_state, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.sniffer.xor import build_global_xor_table
 from tankpit_bot.types import CaptureSession, decode_capture_session
@@ -102,7 +102,7 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     received = _replay_all_received(session)
 
     world = get_world_state()
-    inv = get_inventory_state()
+    inv = get_inventory_state(get_world_service())
     self_state = world["self_state"]
 
     assert received == 119
@@ -150,7 +150,7 @@ def test_fuel_probe_inventory_zero_until_first_sync_frame() -> None:
     received = _replay_through(session, stop_at_index=51)
 
     assert received > 0
-    assert total_inventory_count(get_inventory_state()) == 0
+    assert total_inventory_count(get_inventory_state(get_world_service())) == 0
 
 
 @pytest.mark.usefixtures("_isolate_world_state")
@@ -163,7 +163,7 @@ def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
     session = _load(REPO_ROOT / "fuel_probe.capture_session.json")
     _replay_through(session, stop_at_index=52)
 
-    inv = get_inventory_state()
+    inv = get_inventory_state(get_world_service())
     assert total_inventory_count(inv) == 112
     assert inv["armor_shields"]["count"] == 25
     assert inv["dual_shots"]["count"] == 25
@@ -195,7 +195,7 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     assert len(world["tanks"]) == 37
     assert len(world["containers"]) == 0
     assert len(world["mines"]) == 0
-    assert total_inventory_count(get_inventory_state()) == 124
+    assert total_inventory_count(get_inventory_state(get_world_service())) == 124
 
 
 @pytest.mark.usefixtures("_isolate_world_state")
@@ -206,7 +206,7 @@ def test_enemy_teleport_probe_capture_replays_to_observed_terminal_state() -> No
 
     world = get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state()
+    inv = get_inventory_state(get_world_service())
 
     assert received == 71
     if self_state is None:
@@ -239,7 +239,7 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
     assert (self_state["x"], self_state["y"]) == (131, 118)
     assert self_state["fuel"] == 1076
     assert len(world["containers"]) == 0
-    assert total_inventory_count(get_inventory_state()) == 125
+    assert total_inventory_count(get_inventory_state(get_world_service())) == 125
 
 
 @pytest.mark.usefixtures("_isolate_world_state")
@@ -255,7 +255,7 @@ def test_root_capture_session_replays_to_observed_terminal_state() -> None:
 
     world = get_world_state()
     self_state = world["self_state"]
-    inv = get_inventory_state()
+    inv = get_inventory_state(get_world_service())
 
     assert received == 118
     if self_state is None:
@@ -296,7 +296,7 @@ def test_fuel_probe_radar_uses_decrement_extra_radars_individually() -> None:
             if msg["direction"] == "received":
                 process_received_message(msg["payload"])
 
-        inv = get_inventory_state()
+        inv = get_inventory_state(get_world_service())
         assert inv["extra_radars"]["count"] == expected_radar, (
             f"after frame {stop_index} expected radar={expected_radar} "
             f"got {inv['extra_radars']['count']}"

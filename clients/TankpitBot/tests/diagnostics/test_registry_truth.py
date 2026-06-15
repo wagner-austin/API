@@ -26,6 +26,7 @@ from tankpit_bot.runtime_logging import (
     configure_bot_runtime_logging,
 )
 from tankpit_bot.sniffer import world_state
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import mark_tank_killed
 from tankpit_bot.sniffer.world_state_tanks import (
     update_world_state_from_tank_damage,
@@ -117,7 +118,7 @@ def _world_with_self_and_viewport() -> WorldStateDict:
 
 def _announce_tank_via_wire(tank_id: int, x: int, y: int, name: str) -> None:
     """Establish a tank as wire-known by simulating a TankEntry message."""
-    update_world_state_from_tank_entry(tank_id, x, y, name)
+    update_world_state_from_tank_entry(get_world_service(), tank_id, x, y, name)
 
 
 def _ingest_records(latest_events_path: str) -> list[RuntimeEventRecordDict]:
@@ -229,7 +230,7 @@ def test_register_zero_tier_never_downgrades_known_tier(fake_fs: FakeFileSystem)
     world = _world_with_self_and_viewport()
     _announce_tank_via_wire(511, 135, 125, "purple-3")
     register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    update_world_state_from_tank_damage(511, 1)
+    update_world_state_from_tank_damage(get_world_service(), 511, 1)
     snapshot = _make_snapshot({"P.j": [{**_PURPLE_3, "u": 0}]})
 
     ingested = register_tank_truth_from_page_snapshot(snapshot, world)
@@ -268,7 +269,7 @@ def test_register_skips_corpse_at_death_tile(fake_fs: FakeFileSystem) -> None:
     # The tank is wire-known, ingested live at (137,126), then killed there.
     _announce_tank_via_wire(511, 135, 125, "purple-3")
     register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    mark_tank_killed(511)
+    mark_tank_killed(get_world_service(), 511)
 
     ingested = register_tank_truth_from_page_snapshot(
         _make_snapshot({"P.j": [_PURPLE_3]}),
@@ -294,7 +295,7 @@ def test_register_respawn_at_new_tile_clears_death_anchor(fake_fs: FakeFileSyste
     world = _world_with_self_and_viewport()
     _announce_tank_via_wire(511, 135, 125, "purple-3")
     register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [_PURPLE_3]}), world)
-    mark_tank_killed(511)
+    mark_tank_killed(get_world_service(), 511)
 
     respawned = {**_PURPLE_3, "j": 5, "i": 4}
     assert register_tank_truth_from_page_snapshot(_make_snapshot({"P.j": [respawned]}), world) == 1
