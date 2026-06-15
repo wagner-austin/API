@@ -18,7 +18,8 @@ from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.browser.accounts import resolve_account
 from tankpit_bot.browser.session import get_captured_raw_messages, send_websocket_bytes
-from tankpit_bot.parser import RoomInfo, is_room_info_text, parse_room_info
+from tankpit_bot.parser import RoomInfo, is_room_info_text
+from tankpit_bot.parser_messages import parse_room_info
 from tankpit_bot.protocol.codec import ProtocolCodec
 from tankpit_bot.protocol.framing import decode_frame
 from tankpit_bot.protocol.lobby import (
