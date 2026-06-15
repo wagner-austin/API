@@ -78,6 +78,18 @@ def test_pickup_timeout_with_equipment_visible() -> None:
     assert result.attempt["status"] == "pickup_timeout"
 
 
+def test_teleport_timeout_with_sync_strategy() -> None:
+    """sync_before_teleport strategy with tiny teleport timeout produces teleport_timeout."""
+    result = replay_equipment_attempt(
+        CAPTURE,
+        TARGET,
+        teleport_strategy="sync_before_teleport",
+        map_sync_timeout_ms=600_000,
+        teleport_timeout_ms=1,
+    )
+    assert result.attempt["status"] == "teleport_timeout"
+
+
 def test_full_pipeline_reaches_collection_phase() -> None:
     """Full pipeline with generous timeouts reaches equipment collection."""
     result = replay_equipment_attempt(
@@ -91,4 +103,23 @@ def test_full_pipeline_reaches_collection_phase() -> None:
         "picked_up_equipment",
         "no_equipment_visible",
         "pickup_timeout",
+    )
+
+
+def test_full_pipeline_with_sync_strategy() -> None:
+    """Full pipeline with sync_before_teleport strategy completes."""
+    result = replay_equipment_attempt(
+        CAPTURE,
+        TARGET,
+        teleport_strategy="sync_before_teleport",
+        map_sync_timeout_ms=600_000,
+        teleport_timeout_ms=600_000,
+        radar_timeout_ms=600_000,
+        pickup_timeout_ms=600_000,
+    )
+    assert result.attempt["status"] in (
+        "picked_up_equipment",
+        "no_equipment_visible",
+        "pickup_timeout",
+        "radar_timeout",
     )
