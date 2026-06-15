@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: help lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play download-fields decode discover analyze-viewport
+.PHONY: help lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
 
 help:
 	@Write-Host ""
@@ -176,6 +176,11 @@ play: install
 	@Write-Host ""
 	@Write-Host "==> play (human session capture)" -ForegroundColor Cyan
 	poetry run tankpit-sniff
+
+queue-probe: install
+	@Write-Host ""
+	@Write-Host "==> queue-probe (test server command queue)" -ForegroundColor Cyan
+	poetry run python -m scripts.queue_probe
 
 download-fields: install
 	@Write-Host ""
