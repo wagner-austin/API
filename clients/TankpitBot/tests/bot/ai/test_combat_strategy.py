@@ -13,7 +13,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import EnemyThreatDict
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.state.types import TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -665,3 +665,31 @@ class TestFindCombatPickup:
         if secondary is None:
             raise AssertionError("expected secondary pickup command")
         assert secondary["cmd_type"] == "pickup_fuel"
+
+    def test_returns_none_when_self_state_none(self) -> None:
+        """Line 429: self_state is None guard."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+
+        world, self_state = make_world(fuel=800)
+        world_no_self = WorldStateDict(
+            self_state=None,
+            tanks=world["tanks"],
+            containers=world["containers"],
+            mines=world["mines"],
+            terrain=world["terrain"],
+            viewport=world["viewport"],
+            scanned_viewports=world["scanned_viewports"],
+            map_fuel_dots=world["map_fuel_dots"],
+            timestamp_ms=world["timestamp_ms"],
+        )
+        ctx = DecideCtx(
+            world_no_self,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        ctx.world = world_no_self
+        assert _find_combat_pickup(ctx) is None

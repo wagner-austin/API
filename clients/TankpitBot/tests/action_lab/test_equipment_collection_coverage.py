@@ -762,6 +762,59 @@ def test_reposition_success_propagates_teleport() -> None:
         _etp_mod.run_equipment_reposition_attempt = original
 
 
+def test_reposition_timeout_preserves_original_teleport() -> None:
+    """equipment_target_phase.py branch 494->496 False path."""
+    original = _etp_mod.run_equipment_reposition_attempt
+    _etp_mod.run_equipment_reposition_attempt = lambda *_a, **_kw: _make_tracked(
+        sync_ts=2100, tp_result=_TP_TIMEOUT, tp_started=2200
+    )
+    try:
+        r = resolve_equipment_target_after_radar(
+            page=_Page(),
+            probe=_Probe(),
+            cdp=None,
+            target=_TARGET,
+            map_open_started_ms=1000,
+            map_sync_timestamp_ms=1100,
+            teleport_started_ms=1200,
+            radar_started_ms=1300,
+            radar_sync_timestamp_ms=1400,
+            map_sync_timeout_ms=30000,
+            teleport_timeout_ms=30000,
+            inventory_count_before=0,
+            teleport_result=_TP_RESULT,
+            message_start_index=0,
+            teleport_cycle_ids=[1],
+            radar_cycle_id=2,
+            teleport_strategy="immediate_after_map_open",
+            terrain_provider=lambda: None,
+            find_visible_target=_found,
+            requires_reposition=_yes_repo,
+            find_landing_tile=_has_land,
+            get_phase_overlaps=lambda: [],
+            build_no_equipment_visible_result=_build_no_vis,
+            build_reposition_map_sync_timeout_result=_build_repo_map,
+            build_reposition_teleport_timeout_result=_build_repo_tp,
+            make_reposition_target=lambda x, y: _TARGET,
+            wait_for_teleport_outcome=_waiter,
+            teleport_strategy_requires_map_sync=_sync_policy,
+            no_landing_tile_error=RuntimeError,
+            dispatch_failure_error=RuntimeError,
+            unavailable_error=RuntimeError,
+            unexpected_result_error=RuntimeError,
+            unavailable_message="u",
+            no_landing_tile_message="nl",
+            impossible_result_message="i",
+            acquisition_dispatch_failure_message="m",
+            teleport_dispatch_failure_message="t",
+        )
+        assert r.teleport_result["status"] == "landed_exact"
+        if r.terminal_result is None:
+            raise AssertionError("expected terminal result from timeout")
+    finally:
+        _etp_mod.run_equipment_reposition_attempt = original
+
+
 def test_collection_impossible_missing_target() -> None:
     """equipment_collection_phase.py line 377."""
     from tankpit_bot.action_lab.equipment_target_phase import EquipmentTargetResolution
