@@ -55,12 +55,12 @@ from tankpit_bot.action_lab.pickup_phase import (
 from tankpit_bot.action_lab.pickup_phase import (
     wait_for_pickup_outcome as _shared_wait_for_pickup_outcome,
 )
+from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.radar_phase import (
     clear_stale_radar_completion as _shared_clear_stale_radar_completion,
 )
 from tankpit_bot.action_lab.teleport import (
     DEFAULT_TELEPORT_STRATEGY,
-    TeleportProbe,
 )
 from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt as _shared_run_tracked_teleport_attempt,
@@ -93,7 +93,7 @@ class FuelProbeError(Exception):
 
 
 def _log_fuel_target_diagnostic(
-    probe: TeleportProbe,
+    probe: ProbeBase,
     *,
     radar_cycle_id: int,
     fuel_target: ContainerStateDict | None,
@@ -289,7 +289,7 @@ def format_fuel_probe_summary(session: FuelProbeSessionDict) -> str:
     return _shared_format_fuel_probe_summary(session)
 
 
-class FuelProbe(TeleportProbe):
+class FuelProbe(ProbeBase):
     """Live teleport-radar-fuel probe."""
 
     def _build_attempt_result(

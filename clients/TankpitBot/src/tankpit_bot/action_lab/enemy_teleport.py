@@ -18,6 +18,7 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
 )
+from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
 )
@@ -26,9 +27,6 @@ from tankpit_bot.action_lab.probe_runtime import (
     execute_live_probe_bootstrap,
 )
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
-from tankpit_bot.action_lab.teleport import (
-    TeleportProbe,
-)
 from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
@@ -50,7 +48,7 @@ log = get_logger(__name__)
 
 
 def _require_fresh_enemy_threat(
-    probe: TeleportProbe,
+    probe: ProbeBase,
     started_ms: int,
     excluded_tank_ids: frozenset[int],
 ) -> EnemyThreatDict | None:
@@ -69,7 +67,7 @@ def _require_fresh_enemy_threat(
     return find_closest_threat(fresh)
 
 
-def _enemy_by_id(probe: TeleportProbe, tank_id: int) -> EnemyThreatDict | None:
+def _enemy_by_id(probe: ProbeBase, tank_id: int) -> EnemyThreatDict | None:
     """Return the current threat snapshot for a specific tank id."""
     self_state = probe.get_self_state()
     if self_state is None:
@@ -182,7 +180,7 @@ def format_enemy_teleport_probe_summary(session: EnemyTeleportProbeSessionDict) 
     )
 
 
-class EnemyTeleportProbe(TeleportProbe):
+class EnemyTeleportProbe(ProbeBase):
     """Live enemy-directed teleport probe for combat acquisition timing."""
 
     def _send_enemy_acquisition(

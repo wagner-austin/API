@@ -10,6 +10,7 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
+from tankpit_bot.action_lab.probe_base import ProbeError
 from tankpit_bot.action_lab.teleport_acquisition import (
     start_teleport_page_snapshots as _shared_start_teleport_page_snapshots,
 )
@@ -29,7 +30,7 @@ log = get_logger(__name__)
 _TELEPORT_POLL_INTERVAL_MS = 100.0
 
 
-class TeleportProbeError(Exception):
+class TeleportProbeError(ProbeError):
     """Raised when the teleport probe cannot proceed."""
 
 

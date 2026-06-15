@@ -755,17 +755,21 @@ def test_probe_helpers_cover_guards_and_clear_action() -> None:
     assert probe.get_state() == "IDLE"
 
     probe._self_state = None
-    with pytest.raises(TeleportProbeError, match="self state is unavailable"):
+    from tankpit_bot.action_lab.probe_base import ProbeError
+
+    with pytest.raises(ProbeError, match="self state is unavailable"):
         probe._require_self_state()
 
     probe = _ProbeMissingPageHarness()
-    with pytest.raises(TeleportProbeError, match="page is unavailable"):
+    with pytest.raises(ProbeError, match="page is unavailable"):
         probe._require_page()
 
 
 def test_base_require_page_returns_page_and_raises_when_missing() -> None:
+    from tankpit_bot.action_lab.probe_base import ProbeError
+
     probe = TeleportProbe("https://tankpit.com/play", headless=True, prefer_account=False)
-    with pytest.raises(TeleportProbeError, match="page is unavailable"):
+    with pytest.raises(ProbeError, match="page is unavailable"):
         probe._require_page()
     fake_page = ClockAdvancingPage(
         ReplayClock(1000),

@@ -24,6 +24,7 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     PageClientSnapshotDict,
     capture_page_client_snapshot,
 )
+from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.probe_entrypoint import (
     run_and_save_standard_probe_session,
 )
@@ -33,9 +34,6 @@ from tankpit_bot.action_lab.probe_runtime import (
 )
 from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.radar_phase import run_tracked_radar_phase
-from tankpit_bot.action_lab.teleport import (
-    TeleportProbe,
-)
 from tankpit_bot.action_lab.teleport_acquisition import run_tracked_acquisition_phase
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
@@ -180,7 +178,7 @@ def format_fuel_dot_probe_summary(session: FuelDotProbeSessionDict) -> str:
     )
 
 
-class FuelDotProbe(TeleportProbe):
+class FuelDotProbe(ProbeBase):
     """Live fuel-dot verification probe."""
 
     def _finish_dot_attempt_without_radar(

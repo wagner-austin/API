@@ -28,9 +28,9 @@ from tankpit_bot.action_lab.equipment_targeting import (
     find_visible_equipment_target,
     visible_equipment_requires_reposition,
 )
+from tankpit_bot.action_lab.probe_base import ProbeBase
 from tankpit_bot.action_lab.teleport import (
     DEFAULT_TELEPORT_STRATEGY,
-    TeleportProbe,
 )
 from tankpit_bot.action_lab.teleport_attempt import (
     run_tracked_teleport_attempt as _shared_run_tracked_teleport_attempt,
@@ -98,7 +98,7 @@ def _clear_stale_radar_completion() -> None:
     """Drain any leaked radar-complete signals before starting a new scan."""
 
 
-class EquipmentProbe(TeleportProbe):
+class EquipmentProbe(ProbeBase):
     """Live teleport-radar-equipment probe."""
 
     def _build_attempt_result(
