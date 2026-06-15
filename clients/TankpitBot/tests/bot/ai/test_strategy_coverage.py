@@ -173,7 +173,7 @@ class TestLockedFuelTarget:
     def test_continues_locked_fuel_target(self) -> None:
         """Locked fuel target is continued when still actionable."""
         containers = {"105,105": _c(105, 105, 700, True)}
-        world, self_state = _make_world(fuel=400, containers=containers)
+        world, self_state = _make_world(fuel=250, containers=containers)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -355,8 +355,7 @@ class TestCriticalEquipmentLockedTarget:
                 "resource_target_y": 105,
             },
         )
-        # default_count=5: below break (12) → critical path
-        inventory = _make_inventory(default_count=5)
+        inventory = _make_inventory(default_count=3)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
@@ -410,7 +409,7 @@ class TestFuelSearchFallbacks:
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
-        world, self_state = _make_world(fuel=400, containers=containers)
+        world, self_state = _make_world(fuel=250, containers=containers)
         terrain_data: dict[tuple[int, int], str] = {
             (105, 105): "W",
             (104, 105): "W",
@@ -436,7 +435,7 @@ class TestFuelSearchFallbacks:
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when scanned but no fuel found."""
-        world, self_state = _make_world(fuel=400, scanned=True)
+        world, self_state = _make_world(fuel=300, scanned=True)
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 

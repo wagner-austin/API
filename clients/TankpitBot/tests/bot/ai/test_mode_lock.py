@@ -53,7 +53,7 @@ def test_hunt_mode_switches_to_recover_fuel_when_recovery_takes_priority() -> No
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=400, containers=containers)
+    world, self_state = make_world(fuel=250, containers=containers)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -106,7 +106,7 @@ def test_invalid_mode_state_reselects_recover_fuel_when_low_fuel_demands_it() ->
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=400, containers=containers)
+    world, self_state = make_world(fuel=250, containers=containers)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -226,7 +226,7 @@ def test_unset_mode_enters_recover_fuel_after_fuel_decision() -> None:
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=400, containers=containers)
+    world, self_state = make_world(fuel=250, containers=containers)
     ai_state = make_scanned_ai_state()
     inventory = make_inventory()
 

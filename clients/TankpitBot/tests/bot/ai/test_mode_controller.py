@@ -165,9 +165,9 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
 
 def test_should_enter_recover_fuel_uses_low_threshold() -> None:
     """Fuel recovery entry uses the configured low threshold."""
-    assert should_enter_recover_fuel(_make_ctx(fuel=400)) is True
-    assert should_enter_recover_fuel(_make_ctx(fuel=500)) is True
-    assert should_enter_recover_fuel(_make_ctx(fuel=800)) is False
+    assert should_enter_recover_fuel(_make_ctx(fuel=250)) is True
+    assert should_enter_recover_fuel(_make_ctx(fuel=300)) is True
+    assert should_enter_recover_fuel(_make_ctx(fuel=500)) is False
 
 
 def test_should_exit_recover_fuel_uses_full_threshold() -> None:
@@ -223,14 +223,14 @@ def test_exit_recover_equipment_requires_radar_resume() -> None:
 
 def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:
     """HUNT owns the tick only when no recovery mode has stronger entry rules."""
-    assert should_enter_hunt(_make_ctx(fuel=800, dual_count=30, radar_count=30)) is True
-    assert should_enter_hunt(_make_ctx(fuel=400, dual_count=30, radar_count=30)) is False
+    assert should_enter_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is True
+    assert should_enter_hunt(_make_ctx(fuel=250, dual_count=30, radar_count=30)) is False
 
 
 def test_should_exit_hunt_when_recovery_takes_priority() -> None:
     """HUNT exits when recovery conditions become active."""
-    assert should_exit_hunt(_make_ctx(fuel=800, dual_count=30, radar_count=30)) is False
-    assert should_exit_hunt(_make_ctx(fuel=400, dual_count=30, radar_count=30)) is True
+    assert should_exit_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is False
+    assert should_exit_hunt(_make_ctx(fuel=250, dual_count=30, radar_count=30)) is True
 
 
 def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> None:

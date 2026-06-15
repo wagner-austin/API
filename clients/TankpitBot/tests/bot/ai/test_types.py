@@ -197,8 +197,8 @@ class TestAIConfig:
     def test_make_default_ai_config(self) -> None:
         """Default config has sensible values."""
         config = make_default_ai_config()
-        assert config["fuel_critical_threshold"] == 500
-        assert config["fuel_low_threshold"] == 500
+        assert config["fuel_critical_threshold"] == 300
+        assert config["fuel_low_threshold"] == 300
         assert config["fuel_full_threshold"] == 1100
         assert config["hunt_min_fuel"] == 100
         assert config["combat_range"] == 20
@@ -208,7 +208,7 @@ class TestAIConfig:
         assert config["action_stall_timeout_ms"] == 10000
         assert "teleport_fuel_cost" not in config
         assert len(config["patrol_waypoints"]) == 4
-        assert config["dual_break_threshold"] == 12
+        assert config["dual_break_threshold"] == 4
         assert config["dual_resume_threshold"] == 20
         assert config["equip_search_hop_distance"] == 30
         assert config["equip_search_max_failures"] == 3
@@ -223,8 +223,8 @@ class TestAIConfig:
     def test_decode_invalid_waypoints_not_list_raises(self) -> None:
         """Decode rejects non-list patrol_waypoints."""
         data: JSONObject = {
-            "fuel_critical_threshold": 500,
-            "fuel_low_threshold": 500,
+            "fuel_critical_threshold": 300,
+            "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
@@ -234,7 +234,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
-            "dual_break_threshold": 12,
+            "dual_break_threshold": 4,
             "dual_resume_threshold": 20,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
@@ -246,8 +246,8 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_format_raises(self) -> None:
         """Decode rejects waypoints that are not [x, y] pairs."""
         data: JSONObject = {
-            "fuel_critical_threshold": 500,
-            "fuel_low_threshold": 500,
+            "fuel_critical_threshold": 300,
+            "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
@@ -257,7 +257,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
-            "dual_break_threshold": 12,
+            "dual_break_threshold": 4,
             "dual_resume_threshold": 20,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
@@ -269,8 +269,8 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_type_raises(self) -> None:
         """Decode rejects waypoints with non-int coordinates."""
         data: JSONObject = {
-            "fuel_critical_threshold": 500,
-            "fuel_low_threshold": 500,
+            "fuel_critical_threshold": 300,
+            "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
@@ -280,7 +280,7 @@ class TestAIConfig:
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
-            "dual_break_threshold": 12,
+            "dual_break_threshold": 4,
             "dual_resume_threshold": 20,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
@@ -291,7 +291,7 @@ class TestAIConfig:
 
     def test_decode_missing_field_raises(self) -> None:
         """Decode rejects missing required fields."""
-        data: JSONObject = {"fuel_low_threshold": 200}
+        data: JSONObject = {"fuel_low_threshold": 300}
         with pytest.raises(JSONTypeError):
             decode_ai_config(data)
 
@@ -314,8 +314,8 @@ class TestAIState:
         assert state["last_scan_ms"] == 1
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
-        assert state["config"]["fuel_critical_threshold"] == 500
-        assert state["config"]["fuel_low_threshold"] == 500
+        assert state["config"]["fuel_critical_threshold"] == 300
+        assert state["config"]["fuel_low_threshold"] == 300
 
     def test_make_initial_ai_state_custom_config(self) -> None:
         """Initial state accepts custom config."""

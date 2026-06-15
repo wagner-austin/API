@@ -265,7 +265,7 @@ class TestBuildTrace:
         self_state = SelfStateDict(
             x=100,
             y=100,
-            fuel=400,
+            fuel=250,
             team=0,
             tank_id=1,
             rank=3,
@@ -340,8 +340,8 @@ class TestProcessTickBatch:
         assert trace["self_y"] == 120
         assert trace["fuel"] == 500
         assert trace["tick_index"] == 0
-        assert trace["ai_mode"] == "RECOVER_FUEL"
-        assert trace["ai_mode_state"] == "SENSE"
+        assert trace["ai_mode"] == "RECOVER_EQUIPMENT"
+        assert trace["ai_mode_state"] == "APPROACH"
         assert trace["combat_target_id"] == -1
         _cleanup()
 
@@ -393,7 +393,7 @@ class TestReplaySessionMultiTick:
                 self_state = SelfStateDict(
                     x=70,
                     y=80,
-                    fuel=400,
+                    fuel=250,
                     team=0,
                     tank_id=1,
                     rank=3,

@@ -118,6 +118,8 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
     """
     if ctx.mode_state == "CONFIRM_KILL":
         return _decide_hunt_confirm_kill(ctx)
+    if ctx.mode_state == "SCAN_ON_LANDING":
+        return _decide_hunt_scan_on_landing(ctx)
     if ctx.mode_state == "ENGAGE":
         return _decide_hunt_engage(ctx)
     if ctx.mode_state == "CLOSE":
@@ -146,6 +148,15 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
     )
 
 
+def _decide_hunt_scan_on_landing(ctx: DecideCtx) -> TickDecisionDict:
+    """Engage the target after the combat-landing scan completed."""
+    threats = _visible_threats(ctx)
+    target = get_locked_target(ctx, threats)
+    if target is None:
+        return _decide_hunt_acquire(ctx)
+    return engage_target(ctx, target)
+
+
 def _decide_hunt_refresh(ctx: DecideCtx) -> TickDecisionDict:
     """Refresh target information before closing or engaging."""
     threats = _visible_threats(ctx)
@@ -163,6 +174,27 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
     target = get_locked_target(ctx, threats)
     if target is None:
         return _enter_confirm_kill(ctx)
+    if (
+        has_cardinal_combat_shot(ctx.self_state, target)
+        and can_use_radar(ctx)
+        and not is_current_viewport_scanned(ctx.filtered)
+    ):
+        emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
+        return make_decision(
+            make_radar_command(),
+            "HUNT",
+            800,
+            target["x"],
+            target["y"],
+            "scan_on_landing",
+            AIStateDict(
+                **{
+                    **ctx.base,
+                    "last_scan_ms": ctx.timestamp_ms,
+                }
+            ),
+            ctx.equip,
+        )
     return close_target(ctx, target)
 
 

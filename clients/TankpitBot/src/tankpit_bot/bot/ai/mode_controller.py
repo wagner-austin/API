@@ -231,6 +231,8 @@ def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:
     has_locked_target = decision["updated_ai_state"]["combat_target_id"] != -1
     if reason == "confirm_kill":
         return "CONFIRM_KILL"
+    if reason == "scan_on_landing":
+        return "SCAN_ON_LANDING"
     if command_type == "shoot":
         return "ENGAGE"
     if command_type in ("teleport", "move"):

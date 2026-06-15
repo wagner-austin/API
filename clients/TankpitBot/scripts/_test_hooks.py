@@ -148,13 +148,62 @@ def _real_setup_rich_logging(level: LogLevel) -> None:
 setup_rich_logging: SetupRichLoggingProtocol = _real_setup_rich_logging
 
 
+class HttpGetResponseProtocol(Protocol):
+    """Protocol for an HTTP GET response."""
+
+    @property
+    def status_code(self) -> int:
+        """HTTP status code."""
+        ...
+
+    @property
+    def content(self) -> bytes:
+        """Response body bytes."""
+        ...
+
+
+class HttpGetProtocol(Protocol):
+    """Protocol for performing HTTP GET requests."""
+
+    def __call__(self, url: str) -> HttpGetResponseProtocol:
+        """Perform an HTTP GET request.
+
+        Args:
+            url: URL to fetch.
+
+        Returns:
+            Response with status_code and content.
+        """
+        ...
+
+
+def _real_http_get(url: str) -> HttpGetResponseProtocol:
+    """Real implementation using httpx.
+
+    Args:
+        url: URL to fetch.
+
+    Returns:
+        httpx Response.
+    """
+    httpx_mod = __import__("httpx")
+    response: HttpGetResponseProtocol = httpx_mod.get(url, timeout=30.0, follow_redirects=True)
+    return response
+
+
+http_get: HttpGetProtocol = _real_http_get
+
+
 __all__ = [
+    "HttpGetProtocol",
+    "HttpGetResponseProtocol",
     "LoadAndDecodeSessionFunc",
     "LogLevel",
     "PathExistsProtocol",
     "ReadTextProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
+    "http_get",
     "load_and_decode_session",
     "path_exists",
     "read_text",

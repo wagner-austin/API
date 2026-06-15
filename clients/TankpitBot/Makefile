@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: help lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot decode discover analyze-viewport
+.PHONY: help lint test check install sniff probe teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play download-fields decode discover analyze-viewport
 
 help:
 	@Write-Host ""
@@ -27,6 +27,8 @@ help:
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
 	@Write-Host "  make bot                         live HFSM bot"
+	@Write-Host "  make run                         5-min timed session + scorecard"
+	@Write-Host "  make analyze                     issue report + cross-session stats"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
 	@Write-Host ""
 	@Write-Host "Offline tools:" -ForegroundColor Yellow
@@ -149,6 +151,36 @@ bot: install
 	@Write-Host ""
 	@Write-Host "==> bot (live HFSM)" -ForegroundColor Cyan
 	poetry run tankpit-bot
+
+run: install
+	@Write-Host ""
+	@Write-Host "==> run (5-min timed session)" -ForegroundColor Cyan
+	$$env:TANKPIT_BOT_SESSION_SECONDS = '300'; poetry run tankpit-bot
+	@Write-Host ""
+	@Write-Host "==> scorecard" -ForegroundColor Cyan
+	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
+
+analyze:
+	@Write-Host ""
+	@Write-Host "==> analyze (latest run)" -ForegroundColor Cyan
+	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
+	@Write-Host ""
+	poetry run tankpit-stats
+
+analyze-timing:
+	@Write-Host ""
+	@Write-Host "==> analyze-timing (command-response latencies)" -ForegroundColor Cyan
+	poetry run python -m scripts.analyze_session_timing
+
+play: install
+	@Write-Host ""
+	@Write-Host "==> play (human session capture)" -ForegroundColor Cyan
+	poetry run tankpit-sniff
+
+download-fields: install
+	@Write-Host ""
+	@Write-Host "==> download-fields" -ForegroundColor Cyan
+	poetry run python -m scripts.download_fields
 
 decode:
 	@Write-Host ""

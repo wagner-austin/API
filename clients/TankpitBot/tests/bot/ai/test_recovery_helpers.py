@@ -478,7 +478,7 @@ class TestRecoveryHelpers:
 
     def test_try_search_critical_equipment_returns_none_when_fuel_low(self) -> None:
         """Critical equipment search stops once fuel is already low."""
-        world, self_state = make_world(fuel=450)
+        world, self_state = make_world(fuel=250)
         ctx = DecideCtx(
             world,
             self_state,
@@ -570,7 +570,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_direct_pickup_on_open_ground(self) -> None:
         """Open-ground collection keeps pickup mode when the route is clear."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ctx = DecideCtx(
             world,
             self_state,
@@ -581,12 +581,12 @@ class TestRecoveryHelpers:
             "",
         )
 
-        result = walk_or_teleport(ctx, 107, 100, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
         if result is None:
             raise AssertionError("expected direct pickup command")
         assert result["cmd_type"] == "pickup_equipment"
-        assert result["target_x"] == 107
+        assert result["target_x"] == 103
         assert result["target_y"] == 100
 
     def test_walk_or_teleport_picks_up_mined_tile_with_terrain(self) -> None:
@@ -632,9 +632,9 @@ class TestRecoveryHelpers:
     def test_walk_or_teleport_picks_up_visible_edge_target(self) -> None:
         """Visible edge pickup targets are actionable without an approach step."""
         containers: dict[str, ContainerStateDict] = {
-            "71,63": make_container(71, 63, 0, False),
+            "66,63": make_container(66, 63, 0, False),
         }
-        world, self_state = make_world(self_x=64, self_y=64, fuel=300, containers=containers)
+        world, self_state = make_world(self_x=64, self_y=64, fuel=800, containers=containers)
         ctx = DecideCtx(
             world,
             self_state,
@@ -645,12 +645,12 @@ class TestRecoveryHelpers:
             "",
         )
 
-        result = walk_or_teleport(ctx, 71, 63, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, 66, 63, pickup_kind="equipment")
 
         if result is None:
             raise AssertionError("expected pickup command")
         assert result["cmd_type"] == "pickup_equipment"
-        assert result["target_x"] == 71
+        assert result["target_x"] == 66
         assert result["target_y"] == 63
 
     def test_walk_or_teleport_moves_to_visible_edge_target(self) -> None:
@@ -719,7 +719,7 @@ class TestRecoveryHelpers:
     def test_decide_picks_up_visible_edge_equipment(self) -> None:
         """Visible edge equipment is actionable without an approach step."""
         containers: dict[str, ContainerStateDict] = {
-            "71,63": make_container(71, 63, 0, False),
+            "66,63": make_container(66, 63, 0, False),
         }
         world, self_state = make_world(self_x=64, self_y=64, fuel=800, containers=containers)
         inventory = make_inventory(default_count=30)
@@ -737,7 +737,7 @@ class TestRecoveryHelpers:
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
-        assert decision["command"]["target_x"] == 71
+        assert decision["command"]["target_x"] == 66
         assert decision["command"]["target_y"] == 63
 
     def test_non_emergency_equipment_low_does_not_preempt_hunt(self) -> None:

@@ -23,7 +23,7 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 def test_recover_fuel_mode_continues_locked_fuel_target() -> None:
     """The durable owner keeps an executable locked fuel target."""
     world, self_state = make_world(
-        fuel=400,
+        fuel=250,
         containers={
             "105,105": make_container_state(
                 x=105,
@@ -59,7 +59,7 @@ def test_recover_fuel_mode_continues_locked_fuel_target() -> None:
 def test_recover_fuel_mode_clears_combat_lock_when_fuel_mode_owns_tick() -> None:
     """Fuel recovery drops stale combat ownership when taking control."""
     world, self_state = make_world(
-        fuel=400,
+        fuel=250,
         containers={
             "105,105": make_container_state(
                 x=105,
@@ -100,7 +100,7 @@ def test_recover_fuel_mode_grabs_adjacent_equipment_opportunistically() -> None:
     adjacent equipment containers because the mode only looked for fuel.
     """
     world, self_state = make_world(
-        fuel=400,
+        fuel=250,
         containers={
             "101,100": make_container_state(
                 x=101,
@@ -147,7 +147,7 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
     way.
     """
     world, self_state = make_world(
-        fuel=400,
+        fuel=250,
         containers={
             "107,107": make_container_state(
                 x=107,
@@ -192,7 +192,7 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
 def test_recover_fuel_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     """A candidate inside the anti-churn threshold does not break the lock."""
     world, self_state = make_world(
-        fuel=400,
+        fuel=250,
         containers={
             "104,104": make_container_state(
                 x=104,
@@ -235,7 +235,7 @@ def test_recover_fuel_mode_keeps_lock_against_marginally_closer_fuel() -> None:
 
 def test_recover_fuel_mode_uses_radar_when_viewport_needs_authoritative_scan() -> None:
     """The durable owner senses before repositioning in an unscanned viewport."""
-    world, self_state = make_world(fuel=400, scanned=False)
+    world, self_state = make_world(fuel=250, scanned=False)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -256,7 +256,7 @@ def test_recover_fuel_mode_uses_radar_when_viewport_needs_authoritative_scan() -
 
 def test_recover_fuel_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     """Fuel recovery still scans when extra radar stock is depleted."""
-    world, self_state = make_world(fuel=400, scanned=False)
+    world, self_state = make_world(fuel=250, scanned=False)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -391,7 +391,7 @@ def test_try_collect_critical_fuel_returns_recovery_decision_when_critical() -> 
 def test_try_collect_critical_fuel_triggers_at_exact_threshold() -> None:
     """Critical fuel helper still triggers at the exact threshold boundary."""
     world, self_state = make_world(
-        fuel=500,
+        fuel=300,
         containers={
             "101,100": make_container_state(
                 x=101,
@@ -443,7 +443,7 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
 def test_try_collect_fuel_triggers_at_exact_low_threshold() -> None:
     """Low-fuel helper still triggers at the exact low threshold boundary."""
     world, self_state = make_world(
-        fuel=500,
+        fuel=300,
         containers={
             "101,100": make_container_state(
                 x=101,
@@ -757,7 +757,7 @@ def test_decide_recover_fuel_mode_raises_when_plan_returns_none() -> None:
     the planner. The test swaps ``_plan_fuel_recovery`` at module level
     with a stub that returns None, then restores it.
     """
-    world, self_state = make_world(fuel=400)
+    world, self_state = make_world(fuel=250)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -780,3 +780,37 @@ def test_decide_recover_fuel_mode_raises_when_plan_returns_none() -> None:
             decide_recover_fuel_mode(ctx)
     finally:
         _rfm_module._plan_fuel_recovery = original
+
+
+def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
+    """When no fuel target exists but equipment is in the viewport, sweep it."""
+    containers = {
+        "102,100": make_container_state(
+            x=102,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(fuel=250, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "RECOVER_FUEL",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory()
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_recover_fuel_mode(ctx)
+
+    assert decision["behavior"]["reason"] == "sweep_equipment"
+    assert decision["command"]["cmd_type"] == "pickup_equipment"
+    assert decision["command"]["target_x"] == 102
+    assert decision["command"]["target_y"] == 100

@@ -109,3 +109,10 @@ def test_load_and_decode_session_hook_is_callable(tmp_path: Path) -> None:
 def test_setup_rich_logging_hook_is_callable() -> None:
     """setup_rich_logging hook is callable."""
     _test_hooks.setup_rich_logging("WARNING")
+
+
+def test_real_http_get_returns_response() -> None:
+    """_real_http_get returns a response with status_code and content."""
+    response = _test_hooks._real_http_get("https://tankpit.com/play/field01.gif")
+    assert response.status_code == 200
+    assert response.content != b""

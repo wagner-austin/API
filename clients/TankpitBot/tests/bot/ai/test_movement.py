@@ -170,18 +170,18 @@ class TestWalkOrTeleport:
 
     def test_uses_final_pickup_target_when_viewport_collection_path_exists(self) -> None:
         """In-viewport detours still issue the final pickup target."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = InMemoryTerrainMap({(102, 100): "#"})
+        terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, 104, 100, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
 
         if result is None:
             raise AssertionError("expected direct pickup for final viewport target")
         assert result["cmd_type"] == "pickup_equipment"
-        assert result["target_x"] == 104
+        assert result["target_x"] == 103
         assert result["target_y"] == 100
 
     def test_ignores_enemy_on_old_waypoint_tile(self) -> None:

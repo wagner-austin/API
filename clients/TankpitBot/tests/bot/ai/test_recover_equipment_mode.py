@@ -139,8 +139,8 @@ def test_try_search_critical_equipment_forages_radar_when_hop_is_unaffordable() 
         }
     )
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 5
-    inventory["homing_shots"]["count"] = 5
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
@@ -247,8 +247,8 @@ def test_try_search_critical_equipment_edge_walks_when_hop_is_unaffordable() -> 
         }
     )
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 5
-    inventory["homing_shots"]["count"] = 5
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
@@ -422,8 +422,8 @@ def test_try_search_critical_equipment_returns_radar_when_scan_is_needed() -> No
     """Emergency search helper senses the current viewport before teleport search."""
     world, self_state = make_world(fuel=800, scanned=False)
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 5
-    inventory["homing_shots"]["count"] = 5
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
     inventory["extra_radars"]["count"] = 5
     ctx = DecideCtx(
         world,
@@ -453,8 +453,8 @@ def test_try_search_critical_equipment_uses_regular_radar_when_extra_is_empty() 
     """
     world, self_state = make_world(fuel=800, scanned=False)
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 5
-    inventory["homing_shots"]["count"] = 5
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(
         world,
@@ -662,3 +662,73 @@ def test_known_equipment_skips_recently_attempted_target() -> None:
     decision = decide_recover_equipment_mode(ctx)
 
     assert decision["behavior"]["reason"] != "known_equipment"
+
+
+def test_blacklisted_container_is_skipped_by_select() -> None:
+    """A blacklisted container is excluded from equipment candidate selection."""
+    from tankpit_bot.bot.ai.recover_equipment_mode import (
+        _blacklist_container,
+        is_container_blacklisted,
+    )
+
+    _blacklist_container(105, 105)
+    assert is_container_blacklisted(105, 105) is True
+
+    containers = {
+        "105,105": make_container_state(
+            x=105,
+            y=105,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(fuel=800, containers=containers)
+    inventory = make_inventory(dual_count=3, default_count=30)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+
+    result = select_equipment_target(ctx, allow_unreachable=True)
+
+    assert result is None
+
+
+def test_blacklist_duplicate_does_not_re_emit_diagnostic() -> None:
+    """Blacklisting the same container twice skips the second diagnostic."""
+    from tankpit_bot.bot.ai.recover_equipment_mode import (
+        _blacklist_container,
+        is_container_blacklisted,
+    )
+
+    _blacklist_container(91, 65)
+    assert is_container_blacklisted(91, 65) is True
+    _blacklist_container(91, 65)
+    assert is_container_blacklisted(91, 65) is True
+
+
+def test_select_skips_previously_blacklisted_container() -> None:
+    """A previously blacklisted container is excluded from candidates."""
+    from tankpit_bot.bot.ai.recover_equipment_mode import (
+        _blacklist_container,
+        is_container_blacklisted,
+    )
+
+    containers = {
+        "102,100": make_container_state(
+            x=102,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    _blacklist_container(102, 100)
+    assert is_container_blacklisted(102, 100) is True
+
+    world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
+    inventory = make_inventory(dual_count=3, default_count=30)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+
+    result = select_equipment_target(ctx, allow_unreachable=True)
+    assert result is None

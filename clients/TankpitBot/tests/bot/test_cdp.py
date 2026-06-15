@@ -1269,7 +1269,7 @@ class TestBotEquipmentManagement:
         reset_world_state()
         update_world_state_from_position(100, 100)
         _update_fuel_total(800)
-        update_inventory_from_protocol([0, 10, 0, 10, 10], [False, True, False, True, True])
+        update_inventory_from_protocol([0, 3, 0, 10, 10], [False, True, False, True, True])
 
         import tankpit_bot.sniffer.world_state as ws
 
@@ -1320,7 +1320,7 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        # dual=10 < dual_break_threshold=12 → critical equipment preempts combat
+        # dual=3 < dual_break_threshold=4 → critical equipment preempts combat
         assert fake_cdp._sent_methods[0] == "Runtime.evaluate"
         assert "Input.dispatchKeyEvent" not in fake_cdp._sent_methods
         assert bot.get_state() == "SCANNING"

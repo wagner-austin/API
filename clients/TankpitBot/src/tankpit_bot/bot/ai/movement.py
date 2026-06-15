@@ -359,6 +359,9 @@ def _is_occupied_by_mine(ctx: DecideCtx, x: int, y: int) -> bool:
     return f"{x},{y}" in ctx.world["mines"]
 
 
+_WALK_DISTANCE_THRESHOLD = 3
+
+
 def _walk_or_teleport_with_terrain(
     ctx: DecideCtx,
     tx: int,
@@ -376,6 +379,21 @@ def _walk_or_teleport_with_terrain(
         return _make_pickup_command(pickup_kind, tx, ty)
     if not is_pickup_target_actionable(ctx, tx, ty):
         return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
+    manhattan = abs(sx - tx) + abs(sy - ty)
+    if (
+        pickup_kind is not None
+        and manhattan > _WALK_DISTANCE_THRESHOLD
+        and can_afford_teleport(ctx, tx, ty)
+    ):
+        teleport = _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
+        if teleport is not None:
+            emit_ai(
+                "teleporting to (%d,%d) instead of walking %d tiles",
+                tx,
+                ty,
+                manhattan,
+            )
+            return teleport
     if pickup_kind is not None and is_collection_reachable_in_viewport(
         ctx.world,
         terrain,

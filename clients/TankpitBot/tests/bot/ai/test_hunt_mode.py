@@ -501,4 +501,49 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
     assert decision["command"]["cmd_type"] == "map_open"
     assert decision["behavior"]["reason"] == "find Respawned"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
-    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
+def test_scan_on_landing_reacquires_when_target_gone() -> None:
+    """SCAN_ON_LANDING falls back to acquire when the locked target despawned."""
+    world, self_state = make_world(fuel=800)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "SCAN_ON_LANDING",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 120,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["behavior"]["reason"] == "find_enemies"
+
+
+def test_scan_on_landing_engages_when_target_present() -> None:
+    """SCAN_ON_LANDING transitions to ENGAGE when target is still visible."""
+    tanks: dict[str, TankStateDict] = {"50": _enemy_tank(x=101, y=100)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "SCAN_ON_LANDING",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 101,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "shoot"

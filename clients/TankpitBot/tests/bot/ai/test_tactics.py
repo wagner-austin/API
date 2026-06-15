@@ -59,23 +59,21 @@ class TestShouldProactiveRadar:
         """High fuel never triggers proactive radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        # fuel=800 > fuel_low_threshold=500 → no fuel need
-        result = should_proactive_radar(800, world, 0, 10000, config)
+        result = should_proactive_radar(500, world, 0, 10000, config)
         assert result is False
 
     def test_fuel_at_threshold_triggers(self) -> None:
         """Fuel at low threshold with no containers triggers radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        # fuel=500 <= fuel_low_threshold=500, no containers, cooldown elapsed
-        result = should_proactive_radar(500, world, 0, 10000, config)
+        result = should_proactive_radar(300, world, 0, 10000, config)
         assert result is True
 
     def test_fuel_below_threshold_triggers(self) -> None:
         """Fuel below low threshold with no containers triggers radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        result = should_proactive_radar(300, world, 0, 10000, config)
+        result = should_proactive_radar(200, world, 0, 10000, config)
         assert result is True
 
     def test_containers_visible_blocks_radar(self) -> None:
@@ -83,7 +81,7 @@ class TestShouldProactiveRadar:
         config = make_default_ai_config()
         world = _empty_world()
         world["containers"]["5,5"] = make_container_state(5, 5, is_fuel=True, volume=500)
-        result = should_proactive_radar(400, world, 0, 10000, config)
+        result = should_proactive_radar(250, world, 0, 10000, config)
         assert result is False
 
     def test_equipment_container_does_not_block_radar(self) -> None:
@@ -91,7 +89,7 @@ class TestShouldProactiveRadar:
         config = make_default_ai_config()
         world = _empty_world()
         world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=False, volume=0)
-        result = should_proactive_radar(400, world, 0, 10000, config)
+        result = should_proactive_radar(250, world, 0, 10000, config)
         assert result is True
 
     def test_off_viewport_fuel_container_does_not_block_radar(self) -> None:
@@ -101,7 +99,7 @@ class TestShouldProactiveRadar:
         world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=True, volume=500)
         world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
 
-        result = should_proactive_radar(400, world, 0, 10000, config)
+        result = should_proactive_radar(250, world, 0, 10000, config)
 
         assert result is True
 
@@ -109,8 +107,7 @@ class TestShouldProactiveRadar:
         """Recent scan prevents proactive radar."""
         config = make_default_ai_config()
         world = _empty_world()
-        # Scanned at 8000, now=10000 → age=2000 < cooldown=5000
-        result = should_proactive_radar(400, world, 8000, 10000, config)
+        result = should_proactive_radar(250, world, 8000, 10000, config)
         assert result is False
 
     def test_skips_self_and_invalidated_enemies(self) -> None:
@@ -158,7 +155,7 @@ class TestShouldProactiveRadar:
             timestamp_ms=0,
         )
         # No live visible enemies → radar triggers
-        result = should_proactive_radar(400, world, 0, 10000, config)
+        result = should_proactive_radar(250, world, 0, 10000, config)
         assert result is True
 
 

@@ -115,7 +115,7 @@ class TestRecoverEquipmentPriority:
     def test_equipment_at_break_threshold_relocates_in_scanned_viewport(self) -> None:
         """Break-threshold equipment depletion still enters recovery."""
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
-        inventory = make_inventory(dual_count=12, dual_enabled=True, default_count=30)
+        inventory = make_inventory(dual_count=3, dual_enabled=True, default_count=30)
         inventory["extra_radars"]["count"] = 30
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
@@ -134,7 +134,7 @@ class TestRecoverEquipmentPriority:
             tanks={"50": _enemy(x=120, y=100)},
         )
         inventory = make_inventory(default_count=30)
-        inventory["homing_shots"]["count"] = 5
+        inventory["homing_shots"]["count"] = 3
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
@@ -145,7 +145,7 @@ class TestRecoverEquipmentPriority:
         """Break-threshold homing count still enters equipment recovery."""
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
         inventory = make_inventory(default_count=30)
-        inventory["homing_shots"]["count"] = 12
+        inventory["homing_shots"]["count"] = 3
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
@@ -167,7 +167,7 @@ class TestRecoverEquipmentPriority:
                 "combat_target_y": 103,
             }
         )
-        inventory = make_inventory(default_count=5)
+        inventory = make_inventory(default_count=3)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
@@ -179,7 +179,7 @@ class TestRecoverEquipmentPriority:
         containers: dict[str, ContainerStateDict] = {
             "104,104": make_container(104, 104, 900, True),
         }
-        world, self_state = make_world(fuel=476, containers=containers, tanks={"50": _enemy()})
+        world, self_state = make_world(fuel=250, containers=containers, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -203,8 +203,8 @@ class TestRecoverEquipmentPriority:
         containers: dict[str, ContainerStateDict] = {
             "128,126": make_container(128, 126, 0, False),
         }
-        world, self_state = make_world(self_x=130, self_y=124, fuel=800, containers=containers)
-        inventory = make_inventory(default_count=5)
+        world, self_state = make_world(self_x=129, self_y=125, fuel=800, containers=containers)
+        inventory = make_inventory(default_count=3)
         terrain = InMemoryTerrainMap(
             terrain_data={
                 (128, 126): "W",
@@ -265,7 +265,7 @@ class TestRecoverEquipmentPriority:
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
         }
-        world, self_state = make_world(fuel=400, containers=containers, tanks={"50": _enemy()})
+        world, self_state = make_world(fuel=250, containers=containers, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -289,7 +289,7 @@ class TestRecoverEquipmentPriority:
             "101,100": make_container(101, 100, 700, True),
             "102,100": make_container(102, 100, 0, False),
         }
-        world, self_state = make_world(fuel=450, containers=containers)
+        world, self_state = make_world(fuel=250, containers=containers)
         inventory = make_inventory(dual_count=3, default_count=30)
         inventory["extra_radars"]["count"] = 4
 
@@ -398,7 +398,7 @@ class TestRecoverEquipmentSearch:
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers to fuel recovery when fuel is already low."""
-        world, self_state = make_world(fuel=450)
+        world, self_state = make_world(fuel=250)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -415,9 +415,9 @@ class TestRecoverEquipmentSearch:
     def test_reachable_container_behind_wall_uses_final_pickup_target(self) -> None:
         """In-viewport terrain detours preserve the final pickup target."""
         containers: dict[str, ContainerStateDict] = {
-            "104,100": make_container(104, 100, 700, True),
+            "103,100": make_container(103, 100, 700, True),
         }
-        world, self_state = make_world(fuel=450, containers=containers)
+        world, self_state = make_world(fuel=250, containers=containers)
         terrain = InMemoryTerrainMap({(102, 100): "#"})
 
         decision = decide(
@@ -430,7 +430,7 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["command"]["cmd_type"] == "pickup_fuel"
-        assert decision["command"]["target_x"] == 104
+        assert decision["command"]["target_x"] == 103
         assert decision["command"]["target_y"] == 100
 
     def test_low_fuel_without_targets_uses_radar(self) -> None:
@@ -602,7 +602,7 @@ class TestRecoverEquipmentSearch:
             "50": _enemy(timestamp_ms=100000),
             "60": _enemy(tank_id=60, x=105, y=105, name="Enemy2", timestamp_ms=100000),
         }
-        world, self_state = make_world(fuel=400, tanks=tanks, containers=containers)
+        world, self_state = make_world(fuel=250, tanks=tanks, containers=containers)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),

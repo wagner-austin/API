@@ -134,7 +134,7 @@ class TestReplayTickTrace:
             timestamp_ms=8000,
             self_x=100,
             self_y=100,
-            fuel=400,
+            fuel=250,
             behavior_mode="HUNT",
             behavior_score=950,
             behavior_reason="combat_shoot",

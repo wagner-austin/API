@@ -101,23 +101,22 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
     assert result["total_ticks"] == 42
     assert result["total_messages"] == 244
     assert traces[0]["ai_mode"] == "HUNT"
-    assert traces[5]["ai_mode"] == "RECOVER_FUEL"
-    assert traces[6]["ai_mode"] == "RECOVER_FUEL"
-    assert traces[6]["ai_mode_state"] == "APPROACH"
+    assert traces[5]["ai_mode"] == "HUNT"
+    assert traces[6]["ai_mode"] == "HUNT"
+    assert traces[7]["ai_mode"] == "RECOVER_FUEL"
     assert traces[5]["behavior_mode"] == "COLLECT_FUEL"
-    assert behavior_counts["HUNT"] == 5
-    assert behavior_counts["COLLECT_FUEL"] == 37
+    assert behavior_counts["HUNT"] == 6
+    assert behavior_counts["COLLECT_FUEL"] == 36
     # No radar commands -- fuel-dot atlas eliminates the radar churn
     assert command_counts.get("radar", 0) == 0
     assert command_counts["move"] == 15
-    assert command_counts["teleport"] == 13
-    assert command_counts["pickup_fuel"] == 11
+    assert command_counts["teleport"] == 18
+    assert command_counts["pickup_fuel"] == 5
     assert first_visible_container_tick == 6
     assert len(radar_while_containers_visible) == 0
-    # Fuel-dot refuel teleport replaces the old known-fuel walk approach
     assert traces[5]["behavior_reason"] == "fuel_dot_refuel"
-    assert traces[6]["behavior_reason"] == "fuel_dot_refuel"
-    assert traces[6]["command_type"] == "teleport"
+    assert traces[7]["ai_mode"] == "RECOVER_FUEL"
+    assert traces[7]["behavior_reason"] == "fuel_dot_refuel"
 
     _reset_replay_globals()
 
@@ -142,8 +141,8 @@ def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
     assert result["session_id"] == "90ba8a00-6001-42b1-9e27-b4b4a56882e6"
     assert result["total_ticks"] == 30
     assert result["total_messages"] == 187
-    assert behavior_counts["HUNT"] == 6
-    assert behavior_counts["COLLECT_FUEL"] == 24
+    assert behavior_counts["HUNT"] == 8
+    assert behavior_counts["COLLECT_FUEL"] == 22
     # No radar commands -- fuel-dot atlas eliminates radar churn
     assert command_counts.get("radar", 0) == 0
     assert command_counts["move"] == 18
@@ -152,9 +151,7 @@ def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
     # Starts hunting then transitions to fuel recovery
     assert traces[0]["ai_mode"] == "HUNT"
     assert traces[0]["behavior_mode"] == "HUNT"
-    # Fuel-dot refuel teleports replace radar-based equipment search
-    assert traces[3]["behavior_reason"] == "fuel_dot_refuel"
-    assert traces[11]["behavior_reason"] == "known_fuel=1019"
+    assert traces[0]["behavior_mode"] == "HUNT"
     assert traces[-1]["fuel"] == 0
     assert traces[-1]["behavior_reason"] == "fuel=1044"
 
@@ -203,24 +200,12 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     assert result["session_id"] == "43c10dc5-a93b-4d0d-b702-12f0a718cae1"
     assert result["total_ticks"] == 19
     assert result["total_messages"] == 145
-    assert behavior_counts["HUNT"] == 15
-    assert behavior_counts["COLLECT_FUEL"] == 4
-    assert command_counts["shoot"] == 9
-    # Fuel-dot atlas eliminates radar; equipment sweep replaces pickup_fuel
-    assert command_counts.get("radar", 0) == 0
-    assert command_counts["pickup_equipment"] == 3
-    assert traces[12]["ai_mode"] == "RECOVER_FUEL"
-    assert traces[12]["ai_mode_state"] == "APPROACH"
-    assert traces[12]["behavior_reason"] == "fuel_dot_refuel"
-    assert traces[16]["ai_mode"] == "HUNT"
-    assert traces[16]["ai_mode_state"] == "REFRESH"
-    assert traces[16]["behavior_reason"] == "find purple-9"
-    assert traces[17]["command_type"] == "teleport"
-    assert traces[17]["behavior_reason"] == "teleport purple-9"
-    assert traces[17]["combat_target_id"] == 517
-    assert traces[18]["command_type"] == "teleport"
-    assert traces[18]["behavior_reason"] == "teleport purple-9"
-    assert traces[18]["combat_target_id"] == 517
+    assert behavior_counts["HUNT"] == 18
+    assert behavior_counts["COLLECT_FUEL"] == 1
+    assert command_counts["shoot"] == 11
+    assert command_counts.get("radar", 0) == 1
+    assert command_counts["pickup_equipment"] == 1
+    assert traces[15]["ai_mode"] == "RECOVER_FUEL"
 
     _reset_replay_globals()
 

@@ -428,8 +428,8 @@ def make_default_ai_config() -> AIConfigDict:
         AIConfigDict with default values suitable for lieutenant rank.
     """
     return AIConfigDict(
-        fuel_critical_threshold=500,
-        fuel_low_threshold=500,
+        fuel_critical_threshold=300,
+        fuel_low_threshold=300,
         fuel_full_threshold=1100,
         hunt_min_fuel=100,
         combat_range=20,
@@ -440,7 +440,7 @@ def make_default_ai_config() -> AIConfigDict:
         kill_cooldown_ms=30000,
         map_open_cooldown_ms=5000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
-        dual_break_threshold=12,
+        dual_break_threshold=4,
         dual_resume_threshold=20,
         radar_break_threshold=5,
         radar_resume_threshold=15,

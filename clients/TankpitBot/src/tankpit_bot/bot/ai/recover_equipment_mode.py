@@ -45,6 +45,39 @@ from tankpit_bot.state.types import ContainerStateDict
 # skipped on the next pass.
 _EQUIPMENT_APPROACH_TTL_MS = 30000
 
+_blacklisted_container_keys: set[str] = set()
+
+
+def _blacklist_container(x: int, y: int) -> None:
+    """Permanently blacklist a container for the current session.
+
+    Args:
+        x: Container X coordinate.
+        y: Container Y coordinate.
+    """
+    key = f"{x},{y}"
+    if key not in _blacklisted_container_keys:
+        emit_diagnostic(diagnostic_kind="container_blacklisted", x=x, y=y)
+    _blacklisted_container_keys.add(key)
+
+
+def is_container_blacklisted(x: int, y: int) -> bool:
+    """Check if a container is permanently blacklisted.
+
+    Args:
+        x: Container X coordinate.
+        y: Container Y coordinate.
+
+    Returns:
+        True if the container has been blacklisted this session.
+    """
+    return f"{x},{y}" in _blacklisted_container_keys
+
+
+def reset_container_blacklist() -> None:
+    """Clear the container blacklist (called on death/respawn)."""
+    _blacklisted_container_keys.clear()
+
 
 def _is_equipment_target_attempted(ctx: DecideCtx, x: int, y: int) -> bool:
     """Return True when an equipment target carries a live approach mark.
@@ -142,6 +175,7 @@ def select_equipment_target(
             now_ms=ctx.timestamp_ms,
         )
         if not _is_equipment_target_attempted(ctx, container["x"], container["y"])
+        and not is_container_blacklisted(container["x"], container["y"])
     ]
     if not candidates:
         return None
@@ -563,6 +597,8 @@ def _plan_equipment_search(
 
 __all__ = [
     "decide_recover_equipment_mode",
+    "is_container_blacklisted",
+    "reset_container_blacklist",
     "select_equipment_target",
     "try_search_critical_equipment",
 ]

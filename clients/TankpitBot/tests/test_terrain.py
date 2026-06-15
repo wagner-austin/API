@@ -11,6 +11,12 @@ from tankpit_bot.terrain import TerrainMap, format_viewport
 
 _IMAGE = load_pillow_image_module()
 
+# Arbitrary test colors — the histogram classifier assigns terrain by
+# frequency, so these have no special meaning besides being distinct.
+_GROUND_COLOR = (60, 129, 85)
+_ROCK_COLOR = (140, 70, 30)
+_WATER_COLOR = (30, 80, 200)
+
 
 def create_test_gif(path: Path, pixels: list[tuple[int, int, int]]) -> None:
     """Create a 256x256 test GIF with specified pixels.
@@ -22,6 +28,29 @@ def create_test_gif(path: Path, pixels: list[tuple[int, int, int]]) -> None:
     img = _IMAGE.new("RGB", (256, 256))
     img.putdata(pixels)
     img.save(path)
+
+
+def _make_three_terrain_pixels() -> list[tuple[int, int, int]]:
+    """Build a 256x256 pixel list with rock border, water pocket, ground interior.
+
+    The border-based classifier identifies rock by checking the outermost
+    rows/columns, so rock MUST appear on the border for correct classification.
+
+    Returns:
+        List of 65536 RGB tuples with rock on border, water in a pocket,
+        and ground filling the rest.
+    """
+    pixels = [_GROUND_COLOR] * (256 * 256)
+    for x in range(256):
+        pixels[x] = _ROCK_COLOR
+        pixels[255 * 256 + x] = _ROCK_COLOR
+    for y in range(256):
+        pixels[y * 256] = _ROCK_COLOR
+        pixels[y * 256 + 255] = _ROCK_COLOR
+    for y in range(100, 110):
+        for x in range(100, 110):
+            pixels[y * 256 + x] = _WATER_COLOR
+    return pixels
 
 
 def make_uniform_pixels(color: tuple[int, int, int]) -> list[tuple[int, int, int]]:
@@ -42,27 +71,27 @@ def make_uniform_pixels(color: tuple[int, int, int]) -> list[tuple[int, int, int
 
 
 def test_terrain_map_loads_valid_gif(tmp_path: Path) -> None:
-    """Test TerrainMap loads a valid 256x256 GIF."""
+    """Histogram assigns sole color as ground."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     assert terrain.get_terrain(0, 0) == TerrainMap.GROUND
 
 
 def test_terrain_map_accepts_string_path(tmp_path: Path) -> None:
-    """Test TerrainMap accepts string path."""
+    """TerrainMap accepts string path."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(str(gif_path))
     assert terrain.get_terrain(0, 0) == TerrainMap.GROUND
 
 
 def test_terrain_map_raises_on_wrong_size(tmp_path: Path) -> None:
-    """Test TerrainMap raises ValueError for non-256x256 images."""
+    """TerrainMap raises ValueError for non-256x256 images."""
     gif_path = tmp_path / "small.gif"
-    img = _IMAGE.new("RGB", (128, 128), (60, 129, 85))
+    img = _IMAGE.new("RGB", (128, 128), _GROUND_COLOR)
     img.save(gif_path)
 
     with pytest.raises(ValueError, match="Expected 256x256 image, got \\(128, 128\\)"):
@@ -70,61 +99,102 @@ def test_terrain_map_raises_on_wrong_size(tmp_path: Path) -> None:
 
 
 # =============================================================================
+# Border-based terrain classification
+# =============================================================================
+
+
+def test_border_classifies_three_colors(tmp_path: Path) -> None:
+    """Rock on border, water in interior pocket, ground everywhere else."""
+    gif_path = tmp_path / "three.gif"
+    create_test_gif(gif_path, _make_three_terrain_pixels())
+
+    terrain = TerrainMap(gif_path)
+    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
+    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
+    assert terrain.get_terrain(105, 105) == TerrainMap.WATER
+
+
+def test_border_classifies_two_colors(tmp_path: Path) -> None:
+    """Rock on border, ground interior — no water present."""
+    pixels = [_GROUND_COLOR] * (256 * 256)
+    for x in range(256):
+        pixels[x] = _ROCK_COLOR
+        pixels[255 * 256 + x] = _ROCK_COLOR
+    for y in range(256):
+        pixels[y * 256] = _ROCK_COLOR
+        pixels[y * 256 + 255] = _ROCK_COLOR
+    gif_path = tmp_path / "two.gif"
+    create_test_gif(gif_path, pixels)
+
+    terrain = TerrainMap(gif_path)
+    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
+    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
+
+
+def test_border_single_color(tmp_path: Path) -> None:
+    """Single color: border and interior are the same, treated as ground."""
+    gif_path = tmp_path / "one.gif"
+    create_test_gif(gif_path, make_uniform_pixels((200, 150, 100)))
+
+    terrain = TerrainMap(gif_path)
+    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
+
+
+def test_unknown_color_returns_rock(tmp_path: Path) -> None:
+    """A color absent from the lookup defaults to rock."""
+    gif_path = tmp_path / "mostly_ground.gif"
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
+
+    terrain = TerrainMap(gif_path)
+    terrain._pixels[128 * 256 + 128] = (1, 2, 3)
+    assert terrain.get_terrain(128, 128) == TerrainMap.ROCK
+
+
+def test_gif_compression_variants_grouped_with_ground(tmp_path: Path) -> None:
+    """Near-identical colors from GIF compression are grouped with ground."""
+    pixels = [_GROUND_COLOR] * (256 * 256)
+    for x in range(256):
+        pixels[x] = _ROCK_COLOR
+        pixels[255 * 256 + x] = _ROCK_COLOR
+    for y in range(256):
+        pixels[y * 256] = _ROCK_COLOR
+        pixels[y * 256 + 255] = _ROCK_COLOR
+    # Inject a near-ground variant (±1 per channel) at an interior pixel
+    variant = (_GROUND_COLOR[0] + 1, _GROUND_COLOR[1] - 1, _GROUND_COLOR[2])
+    pixels[50 * 256 + 50] = variant
+    gif_path = tmp_path / "variant.gif"
+    create_test_gif(gif_path, pixels)
+
+    terrain = TerrainMap(gif_path)
+    assert terrain.get_terrain(50, 50) == TerrainMap.GROUND
+
+
+def test_real_field01_terrain_detection() -> None:
+    """Real field01_r.gif classifies ground, rock, and water correctly."""
+    terrain = TerrainMap(Path("field01_r.gif"))
+    assert terrain.get_terrain(131, 110) == TerrainMap.GROUND
+    assert terrain.get_terrain(125, 126) == TerrainMap.WATER
+    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
+
+
+def test_real_field42_terrain_detection() -> None:
+    """Real field42-r.gif classifies ground, rock, and water correctly."""
+    terrain = TerrainMap(Path("field42-r.gif"))
+    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
+    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
+    assert terrain.is_passable(128, 128) is True
+    assert terrain.is_passable(0, 0) is False
+
+
+# =============================================================================
 # TerrainMap.get_terrain Tests
 # =============================================================================
 
 
-def test_get_terrain_rock_detection(tmp_path: Path) -> None:
-    """Test get_terrain returns ROCK for exact rock color."""
-    gif_path = tmp_path / "rocks.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_ROCK_42))
-
-    terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(128, 128) == TerrainMap.ROCK
-
-
-def test_get_terrain_ground_detection(tmp_path: Path) -> None:
-    """Test get_terrain returns GROUND for exact ground colors."""
-    gif_path = tmp_path / "ground.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
-
-    terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
-
-
-def test_get_terrain_ground_variant_b(tmp_path: Path) -> None:
-    """Test get_terrain returns GROUND for alternate ground color."""
-    gif_path = tmp_path / "ground_b.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42B))
-
-    terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
-
-
-def test_get_terrain_water_detection(tmp_path: Path) -> None:
-    """Test get_terrain returns WATER for exact water color."""
-    gif_path = tmp_path / "water.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_WATER_42))
-
-    terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(128, 128) == TerrainMap.WATER
-
-
-def test_get_terrain_unknown_color_returns_rock(tmp_path: Path) -> None:
-    """Test get_terrain returns ROCK for unknown colors (safety fallback)."""
-    gif_path = tmp_path / "unknown.gif"
-    # Random color not matching any known terrain
-    unknown_color = (100, 100, 100)
-    create_test_gif(gif_path, make_uniform_pixels(unknown_color))
-
-    terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
-
-
 def test_get_terrain_out_of_bounds_returns_space(tmp_path: Path) -> None:
-    """Test get_terrain returns space for out-of-bounds coordinates."""
+    """get_terrain returns space for out-of-bounds coordinates."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     assert terrain.get_terrain(-1, 0) == " "
@@ -135,9 +205,9 @@ def test_get_terrain_out_of_bounds_returns_space(tmp_path: Path) -> None:
 
 
 def test_get_terrain_all_corners(tmp_path: Path) -> None:
-    """Test get_terrain works for all four corners."""
+    """get_terrain works for all four corners."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     assert terrain.get_terrain(0, 0) == TerrainMap.GROUND
@@ -147,21 +217,15 @@ def test_get_terrain_all_corners(tmp_path: Path) -> None:
 
 
 def test_get_terrain_pixel_mapping(tmp_path: Path) -> None:
-    """Test that specific pixel positions are correctly mapped."""
+    """Specific pixel positions correctly mapped via border classification."""
     gif_path = tmp_path / "mixed.gif"
-    pixels = make_uniform_pixels(TerrainMap.COLOR_GROUND_42A)
-
-    # Place a rock at (10, 5)
-    pixels[5 * 256 + 10] = TerrainMap.COLOR_ROCK_42
-    # Place water at (100, 50)
-    pixels[50 * 256 + 100] = TerrainMap.COLOR_WATER_42
-
+    pixels = _make_three_terrain_pixels()
     create_test_gif(gif_path, pixels)
 
     terrain = TerrainMap(gif_path)
-    assert terrain.get_terrain(10, 5) == TerrainMap.ROCK
-    assert terrain.get_terrain(100, 50) == TerrainMap.WATER
-    assert terrain.get_terrain(0, 0) == TerrainMap.GROUND
+    assert terrain.get_terrain(0, 0) == TerrainMap.ROCK
+    assert terrain.get_terrain(128, 128) == TerrainMap.GROUND
+    assert terrain.get_terrain(105, 105) == TerrainMap.WATER
 
 
 # =============================================================================
@@ -170,30 +234,30 @@ def test_get_terrain_pixel_mapping(tmp_path: Path) -> None:
 
 
 def test_is_passable_ground(tmp_path: Path) -> None:
-    """Test is_passable returns True for ground."""
+    """is_passable returns True for ground."""
     gif_path = tmp_path / "ground.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     assert terrain.is_passable(128, 128) is True
 
 
 def test_is_passable_rock(tmp_path: Path) -> None:
-    """Test is_passable returns False for rock."""
+    """is_passable returns False for rock (border tile)."""
     gif_path = tmp_path / "rocks.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_ROCK_42))
+    create_test_gif(gif_path, _make_three_terrain_pixels())
 
     terrain = TerrainMap(gif_path)
-    assert terrain.is_passable(128, 128) is False
+    assert terrain.is_passable(0, 0) is False
 
 
 def test_is_passable_water(tmp_path: Path) -> None:
-    """Test is_passable returns False for water."""
+    """is_passable returns False for water (interior pocket)."""
     gif_path = tmp_path / "water.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_WATER_42))
+    create_test_gif(gif_path, _make_three_terrain_pixels())
 
     terrain = TerrainMap(gif_path)
-    assert terrain.is_passable(128, 128) is False
+    assert terrain.is_passable(105, 105) is False
 
 
 # =============================================================================
@@ -202,9 +266,9 @@ def test_is_passable_water(tmp_path: Path) -> None:
 
 
 def test_render_viewport_default_size(tmp_path: Path) -> None:
-    """Test render_viewport returns 16x16 grid by default."""
+    """render_viewport returns 16x16 grid by default."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     grid = terrain.render_viewport(128, 128)
@@ -214,9 +278,9 @@ def test_render_viewport_default_size(tmp_path: Path) -> None:
 
 
 def test_render_viewport_custom_size(tmp_path: Path) -> None:
-    """Test render_viewport with custom dimensions."""
+    """render_viewport with custom dimensions."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     grid = terrain.render_viewport(128, 128, width=8, height=12)
@@ -226,35 +290,25 @@ def test_render_viewport_custom_size(tmp_path: Path) -> None:
 
 
 def test_render_viewport_centered_on_position(tmp_path: Path) -> None:
-    """Test render_viewport is correctly centered."""
+    """render_viewport is correctly centered."""
     gif_path = tmp_path / "mixed.gif"
-    pixels = make_uniform_pixels(TerrainMap.COLOR_GROUND_42A)
-
-    # Place a rock at (128, 128)
-    pixels[128 * 256 + 128] = TerrainMap.COLOR_ROCK_42
-
+    pixels = _make_three_terrain_pixels()
     create_test_gif(gif_path, pixels)
 
     terrain = TerrainMap(gif_path)
-    grid = terrain.render_viewport(128, 128, width=16, height=16)
-
-    # Center of 16x16 viewport centered on (128, 128) should be at grid[8][8]
-    # The viewport covers (120-135, 120-135)
-    # Position (128, 128) maps to grid index (8, 8)
-    assert grid[8][8] == TerrainMap.ROCK
+    # Water pocket at (100-109, 100-109) — center on (105,105) to see water at grid center
+    grid = terrain.render_viewport(105, 105, width=16, height=16)
+    assert grid[8][8] == TerrainMap.WATER
 
 
 def test_render_viewport_edge_positions(tmp_path: Path) -> None:
-    """Test render_viewport handles edge-of-map positions."""
+    """render_viewport handles edge-of-map positions."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
-
-    # Near corner - should include out-of-bounds spaces
     grid = terrain.render_viewport(5, 5, width=16, height=16)
     assert len(grid) == 16
-    # Top-left cells should be out-of-bounds (spaces)
     assert grid[0][0] == " "
 
 
@@ -264,9 +318,9 @@ def test_render_viewport_edge_positions(tmp_path: Path) -> None:
 
 
 def test_render_full_map_size(tmp_path: Path) -> None:
-    """Test render_full_map returns 256x256 grid."""
+    """render_full_map returns 256x256 grid."""
     gif_path = tmp_path / "test.gif"
-    create_test_gif(gif_path, make_uniform_pixels(TerrainMap.COLOR_GROUND_42A))
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
 
     terrain = TerrainMap(gif_path)
     grid = terrain.render_full_map()
@@ -276,22 +330,17 @@ def test_render_full_map_size(tmp_path: Path) -> None:
 
 
 def test_render_full_map_content(tmp_path: Path) -> None:
-    """Test render_full_map correctly renders all terrain types."""
+    """render_full_map correctly renders all terrain types."""
     gif_path = tmp_path / "mixed.gif"
-    pixels = make_uniform_pixels(TerrainMap.COLOR_GROUND_42A)
-
-    # Add rock and water
-    pixels[0] = TerrainMap.COLOR_ROCK_42  # Rock at (0, 0)
-    pixels[255] = TerrainMap.COLOR_WATER_42  # Water at (255, 0)
-
+    pixels = _make_three_terrain_pixels()
     create_test_gif(gif_path, pixels)
 
     terrain = TerrainMap(gif_path)
     grid = terrain.render_full_map()
 
     assert grid[0][0] == TerrainMap.ROCK
-    assert grid[0][255] == TerrainMap.WATER
     assert grid[128][128] == TerrainMap.GROUND
+    assert grid[105][105] == TerrainMap.WATER
 
 
 # =============================================================================
@@ -300,13 +349,13 @@ def test_render_full_map_content(tmp_path: Path) -> None:
 
 
 def test_format_viewport_empty_grid() -> None:
-    """Test format_viewport returns empty string for empty grid."""
+    """format_viewport returns empty string for empty grid."""
     result = format_viewport([])
     assert result == ""
 
 
 def test_format_viewport_basic_output() -> None:
-    """Test format_viewport produces correctly formatted output."""
+    """format_viewport produces correctly formatted output."""
     grid = [[".", ".", "#"], [".", "#", "."]]
 
     result = format_viewport(grid, viewport_left=10, viewport_top=20)
@@ -319,7 +368,7 @@ def test_format_viewport_basic_output() -> None:
 
 
 def test_format_viewport_with_player() -> None:
-    """Test format_viewport shows player at correct position."""
+    """format_viewport shows player at correct position."""
     grid = [[".", ".", "."], [".", ".", "."]]
 
     result = format_viewport(
@@ -331,12 +380,11 @@ def test_format_viewport_with_player() -> None:
     )
 
     lines = result.split("\n")
-    # Player should be at (11, 20) which is column 1, row 0 in viewport
     assert "@ " in lines[1]
 
 
 def test_format_viewport_with_entities() -> None:
-    """Test format_viewport shows entities at correct positions."""
+    """format_viewport shows entities at correct positions."""
     grid = [[".", ".", "."], [".", ".", "."]]
     entities = {(11, 20): "F", (12, 21): "E"}
 
@@ -353,7 +401,7 @@ def test_format_viewport_with_entities() -> None:
 
 
 def test_format_viewport_player_overrides_entity() -> None:
-    """Test format_viewport shows player even when entity exists at position."""
+    """format_viewport shows player even when entity exists at position."""
     grid = [[".", ".", "."]]
     entities = {(11, 20): "F"}
 
@@ -367,17 +415,15 @@ def test_format_viewport_player_overrides_entity() -> None:
     )
 
     lines = result.split("\n")
-    # Player @ should appear, not the entity F
     assert "@ " in lines[1]
     assert "F " not in lines[1]
 
 
 def test_format_viewport_column_headers() -> None:
-    """Test format_viewport shows correct column headers."""
+    """format_viewport shows correct column headers."""
     grid = [[".", ".", ".", "."]]
 
     result = format_viewport(grid, viewport_left=8, viewport_top=0)
 
     lines = result.split("\n")
-    # Headers should be 8 % 10, 9 % 10, 0, 1 = 8, 9, 0, 1
     assert "8 9 0 1" in lines[0]
