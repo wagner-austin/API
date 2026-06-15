@@ -5,11 +5,11 @@ from __future__ import annotations
 from tankpit_bot.bot import BotError, ProtocolNotDiscoveredError, main
 
 
-def test_main_is_base_main() -> None:
-    """Test main() is the real entry point from base module."""
-    from tankpit_bot.bot import base
+def test_main_is_entry_main() -> None:
+    """Test main() is the real entry point from entry module."""
+    from tankpit_bot.bot import entry
 
-    assert main is base.main
+    assert main is entry.main
 
 
 def test_bot_error_is_exception() -> None:

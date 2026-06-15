@@ -13,7 +13,7 @@ Submodules:
 
 from tankpit_bot.bot.ai import make_default_ai_config, make_initial_ai_state
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.bot.base import Bot, BotError, ProtocolNotDiscoveredError, main
+from tankpit_bot.bot.base import Bot, BotError, ProtocolNotDiscoveredError
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.commands import (
     encode_move_command,
@@ -23,6 +23,7 @@ from tankpit_bot.bot.commands import (
     encode_shoot_command,
     encode_teleport_command,
 )
+from tankpit_bot.bot.entry import main
 from tankpit_bot.bot.executor import apply_equipment, dispatch_command, execute
 from tankpit_bot.bot.states import (
     ACTION_KINDS,

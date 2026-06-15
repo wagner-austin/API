@@ -65,7 +65,7 @@ class TestResolveSessionSeconds:
 
     def test_help_flag_raises_system_exit_zero(self) -> None:
         """--help raises SystemExit(0) after writing usage."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         with pytest.raises(SystemExit) as exc_info:
             resolve_session_seconds(["--help"], None)
@@ -73,7 +73,7 @@ class TestResolveSessionSeconds:
 
     def test_h_flag_raises_system_exit_zero(self) -> None:
         """-h raises SystemExit(0) after writing usage."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         with pytest.raises(SystemExit) as exc_info:
             resolve_session_seconds(["-h"], None)
@@ -81,28 +81,28 @@ class TestResolveSessionSeconds:
 
     def test_seconds_flag_returns_value(self) -> None:
         """--seconds N returns the integer N."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         result = resolve_session_seconds(["--seconds", "300"], None)
         assert result == 300
 
     def test_no_argv_with_env_returns_env_value(self) -> None:
         """No CLI args with env_value returns int(env_value)."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         result = resolve_session_seconds([], "600")
         assert result == 600
 
     def test_no_argv_no_env_returns_zero(self) -> None:
         """No CLI args and no env_value returns 0 (run until stopped)."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         result = resolve_session_seconds([], None)
         assert result == 0
 
     def test_unrecognized_args_raises_system_exit_one(self) -> None:
         """Unrecognized argument shape raises SystemExit with usage."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         with pytest.raises(SystemExit) as exc_info:
             resolve_session_seconds(["--bogus"], None)
@@ -110,7 +110,7 @@ class TestResolveSessionSeconds:
 
     def test_seconds_alone_raises_system_exit(self) -> None:
         """--seconds without a value raises SystemExit."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         with pytest.raises(SystemExit):
             resolve_session_seconds(["--seconds"], None)

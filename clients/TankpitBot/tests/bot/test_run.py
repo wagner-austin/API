@@ -57,7 +57,7 @@ class TestBotGameLoop:
 
     def test_game_loop_invalid_session_seconds_raises(self, fake_env: FakeEnv) -> None:
         """A non-integer TANKPIT_BOT_SESSION_SECONDS propagates ValueError."""
-        from tankpit_bot.bot.base import resolve_session_seconds
+        from tankpit_bot.bot.entry import resolve_session_seconds
 
         with pytest.raises(ValueError):
             resolve_session_seconds([], "soon")
@@ -177,10 +177,10 @@ class TestBotBaseMain:
         _test_hooks.get_argv = lambda: ["tankpit-bot"]
 
         try:
-            from tankpit_bot.bot import base
+            from tankpit_bot.bot import entry
 
             with pytest.raises(KeyboardInterrupt):
-                base.main()
+                entry.main()
         finally:
             _test_hooks.sync_playwright = original_pw
             _test_hooks.get_argv = original_argv
@@ -231,10 +231,10 @@ class TestBotBaseMain:
         _test_hooks.get_sync_playwright = fake_get_sync_playwright
 
         try:
-            from tankpit_bot.bot import base
+            from tankpit_bot.bot import entry
 
             with pytest.raises(KeyboardInterrupt):
-                base.main()
+                entry.main()
         finally:
             _test_hooks.sync_playwright = original_pw
             _test_hooks.get_sync_playwright = original_get_pw

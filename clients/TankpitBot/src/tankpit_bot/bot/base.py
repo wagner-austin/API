@@ -9,7 +9,6 @@ This module provides the Bot class that extends WebSocketSniffer with:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -70,7 +69,6 @@ from tankpit_bot.protocol.commands import (
     build_toggle_equipment_command,
 )
 from tankpit_bot.runtime_logging import (
-    configure_bot_runtime_logging,
     emit_diagnostic,
     emit_state,
     emit_sync,
@@ -1184,96 +1182,8 @@ class Bot(BrowserSession):
         )
 
 
-_USAGE = (
-    "usage: tankpit-bot [--seconds N]\n"
-    "\n"
-    "Live HFSM bot. Runs for --seconds then shuts down gracefully\n"
-    "(capture saved, browser closed). Creating the stop file\n"
-    "(make bot-stop) ends a running session the same way.\n"
-    "\n"
-    "options:\n"
-    "  --seconds N  Bounded session length in seconds (0 = run until\n"
-    "               stopped). Defaults to TANKPIT_BOT_SESSION_SECONDS,\n"
-    "               then 0.\n"
-)
-
-
-def resolve_session_seconds(argv: list[str], env_value: str | None) -> int:
-    """Resolve the bounded session length from CLI args and environment.
-
-    The CLI flag wins over the environment variable; with neither the
-    session runs until externally stopped. Unknown arguments are a
-    hard error -- a typo must never silently launch an unbounded live
-    session (``tankpit-bot --help`` once started a 42-minute run
-    because no argument parsing existed).
-
-    Args:
-        argv: Process arguments without the program name.
-        env_value: Raw ``TANKPIT_BOT_SESSION_SECONDS`` value, or None.
-
-    Returns:
-        Session length in seconds; zero means run until stopped.
-
-    Raises:
-        SystemExit: On ``--help``/``-h`` (usage written to stdout,
-            exit code 0) or any unrecognized argument shape (usage in
-            the exit message, exit code 1).
-        ValueError: If the seconds value (CLI or environment) is not
-            an integer.
-    """
-    if argv and argv[0] in ("--help", "-h"):
-        sys.stdout.write(_USAGE)
-        raise SystemExit(0)
-    if not argv:
-        return int(env_value) if env_value is not None else 0
-    if len(argv) == 2 and argv[0] == "--seconds":
-        return int(argv[1])
-    raise SystemExit(f"tankpit-bot: unrecognized arguments: {' '.join(argv)}\n\n{_USAGE}")
-
-
-def main() -> None:
-    """Entry point for tankpit-bot command."""
-    from dotenv import load_dotenv
-
-    from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
-
-    load_dotenv()
-    session_seconds = resolve_session_seconds(
-        _test_hooks.get_argv()[1:],
-        _test_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"),
-    )
-    artifacts = configure_bot_runtime_logging()
-    set_protocol_frame_logging(False)
-    log.info("Bot latest log: %s", artifacts["latest_log_path"])
-    log.info("Bot latest events: %s", artifacts["latest_events_path"])
-    log.info("Bot latest capture: %s", artifacts["latest_capture_path"])
-    stop_file_path = Path(artifacts["latest_log_path"]).parent / "STOP"
-    _test_hooks.remove_file(stop_file_path)
-    log.info(
-        "Session bound: %s; stop file: %s",
-        f"{session_seconds}s" if session_seconds > 0 else "until stopped",
-        stop_file_path,
-    )
-
-    if _test_hooks.sync_playwright is None:
-        _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
-
-    target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/"
-    prefer_account_str = _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT")
-    prefer_account = prefer_account_str is not None and prefer_account_str.lower() in (
-        "true",
-        "1",
-        "yes",
-    )
-
-    bot = Bot(target_url, headless=False, prefer_account=prefer_account)
-    bot.run(session_seconds=session_seconds, stop_file_path=stop_file_path)
-
-
 __all__ = [
     "Bot",
     "BotError",
     "ProtocolNotDiscoveredError",
-    "main",
-    "resolve_session_seconds",
 ]
