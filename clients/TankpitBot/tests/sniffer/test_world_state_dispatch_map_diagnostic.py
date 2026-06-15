@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot.sniffer.world_state_dispatch import (
+from tankpit_bot.sniffer.world_state_dispatch_position import (
     MapPositionsParsedDiagnosticDict,
     decode_map_positions_parsed_diagnostic,
     encode_map_positions_parsed_diagnostic,
