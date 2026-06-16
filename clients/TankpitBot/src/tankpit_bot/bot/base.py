@@ -1,10 +1,13 @@
 """Bot base class for TankPit automation.
 
-This module provides the Bot class that extends WebSocketSniffer with:
+Bot owns CDPService and CommandService via composition (NOT inheritance).
+Browser lifecycle is handled by standalone functions from browser.lifecycle.
+
+Provides:
 - State machine for behavior control
-- Command sending capabilities (move, shoot, radar, etc.)
+- Command sending via CommandService
 - Fuel/HP tracking from world state
-- Convenience methods for finding containers
+- Convenience methods for game actions
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.bot.states import (
@@ -30,30 +34,32 @@ from tankpit_bot.bot.vision import (
     VisionStateDict,
     make_empty_vision_state,
 )
-from tankpit_bot.browser import BrowserSession, get_current_time_ms
+from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
     scrape_page_text,
 )
+from tankpit_bot.browser.lifecycle import (
+    cleanup_browser,
+    gather_intel,
+    navigate_and_login,
+    wait_for_game_ready,
+)
+from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.diagnostics.account_stats import (
     emit_account_stats_sample,
     parse_account_stats,
 )
 from tankpit_bot.diagnostics.combat_screenshot import save_screenshot
 from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
-from tankpit_bot.protocol.codec import (
-    DEFAULT_STATIC_KEY_PATH,
-    build_xor_table,
-    load_static_key,
-)
 from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_state,
     emit_sync,
     emit_wire_complete,
 )
-from tankpit_bot.sniffer.trackers import init_trackers_with_magic
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_service,
@@ -99,18 +105,12 @@ class ProtocolNotDiscoveredError(BotError):
     """
 
 
-class Bot(BrowserSession):
-    """Bot that can send commands and track game state with state machine.
+class Bot(SessionBase):
+    """Bot that sends commands and tracks game state with a state machine.
 
-    Extends BrowserSession with:
-    - State machine for behavior control
-    - Command sending via WebSocket
-    - Fuel/HP tracking from decoded messages
-    - Convenience methods for game actions
-
-    Attributes:
-        _cdp: CDP session for sending commands (set during run).
-        _state_data: Current state machine data.
+    Inherits CDPService + CommandService composition from SessionBase.
+    Adds state machine, AI strategy, vision tracking, game log scraping,
+    and the run loop.
     """
 
     def __init__(
@@ -119,6 +119,8 @@ class Bot(BrowserSession):
         *,
         headless: bool = False,
         prefer_account: bool = False,
+        cdp_service: CDPService | None = None,
+        command_service: CommandService | None = None,
     ) -> None:
         """Initialize the bot.
 
@@ -126,24 +128,22 @@ class Bot(BrowserSession):
             target_url: URL to navigate to.
             headless: Whether to run browser in headless mode.
             prefer_account: Skip guest login and use account credentials.
+            cdp_service: Injected CDPService. Created internally if None.
+            command_service: Injected CommandService. Created internally if None.
         """
         super().__init__(
             target_url,
             headless=headless,
             prefer_account=prefer_account,
+            cdp_service=cdp_service,
+            command_service=command_service,
         )
-        self._cdp: _test_hooks.CDPSessionProtocol | None = None
+        self._page: PageProtocol | None = None
         self._game_log_scraper: GameLogScraper | None = None
-        # Monotonic counter for opt-in per-shot screenshot filenames.
         self._shot_screenshot_seq: int = 0
-        self._page: _test_hooks.PageProtocol | None = None
         self._state_data: BotStateDataDict = make_initial_state_data()
         self._ai_state: AIStateDict = make_initial_ai_state()
-        self._commands = CommandService(send_ws_bytes=self._send_websocket_bytes)
-        # Vision state for fallback tracking
         self._vision_state: VisionStateDict = make_empty_vision_state()
-        # CDP message buffer — received payloads for tick loop sync
-        self._cdp_message_buffer: list[str] = []
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x
@@ -153,7 +153,17 @@ class Bot(BrowserSession):
         self._account_stats_captured = False
         self._account_stats_attempts = 0
 
-    def _require_cdp(self) -> _test_hooks.CDPSessionProtocol:
+    def _on_message_captured(self, message: CapturedMessage) -> None:
+        """Buffer received messages with debug logging.
+
+        Args:
+            message: The captured message.
+        """
+        super()._on_message_captured(message)
+        if message["direction"] == "received":
+            log.debug("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
+
+    def _require_cdp(self) -> CDPSessionProtocol:
         """Return the attached CDP session or raise.
 
         Used by tick-loop code that must read the live page-client state.
@@ -215,33 +225,8 @@ class Bot(BrowserSession):
         emit_state("%s -> %s", current_state, new_state)
 
     # =========================================================================
-    # Message Handling
+    # State Transitions
     # =========================================================================
-
-    def _on_magic_captured(self, magic: str) -> None:
-        """Initialize trackers and build XOR table when magic key is captured.
-
-        Args:
-            magic: The session magic string.
-        """
-        init_trackers_with_magic(magic)
-        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
-        self._commands.xor_table = build_xor_table(static_key, magic)
-        log.info("Built XOR table for command encoding")
-
-    def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Buffer received messages for tick loop sync phase.
-
-        Extracts magic key (via base class) and buffers received payloads.
-        The tick loop drains the buffer and decodes in batch.
-
-        Args:
-            message: The captured message.
-        """
-        super()._on_message_captured(message)
-        if message["direction"] == "received":
-            self._cdp_message_buffer.append(message["payload"])
-            log.debug("CDP_BUFFER: +1 (total=%d)", len(self._cdp_message_buffer))
 
     def _maybe_transition_from_initializing(self, self_state: SelfStateDict | None) -> bool:
         """Advance startup states when required bootstrap data is available.
@@ -544,19 +529,6 @@ class Bot(BrowserSession):
     # =========================================================================
     # Command Sending
     # =========================================================================
-
-    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
-        """XOR encode and send command bytes via WebSocket.
-
-        Args:
-            data: Framed command bytes (with 2-byte length header).
-            cmd_name: Command name for logging.
-
-        Returns:
-            True if sent, False if CDP session not available.
-        """
-        self._commands.cdp = self._cdp
-        return self._commands.send_bytes(data, cmd_name)
 
     def enter_game(self) -> bool:
         """Send CMD_ENTER_GAME to activate the tank in the game world.
@@ -949,7 +921,7 @@ class Bot(BrowserSession):
         log.info("Map: closed via local 'm' keyboard event (no wire byte sent)")
         return True
 
-    def _init_game_log_scraper(self, cdp: _test_hooks.CDPSessionProtocol) -> None:
+    def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
         """Create the game log scraper for server feedback visibility.
 
         Args:
@@ -1045,7 +1017,8 @@ class Bot(BrowserSession):
         Raises:
             RuntimeError: If Playwright is not installed.
         """
-        from tankpit_bot.browser import PlaywrightNotInstalledError, reset_cdp_time_offset
+        from tankpit_bot.browser.cdp_utils import reset_cdp_time_offset
+        from tankpit_bot.browser.types import PlaywrightNotInstalledError
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 
         if _test_hooks.sync_playwright is None:
@@ -1066,34 +1039,34 @@ class Bot(BrowserSession):
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 
-            # Store CDP session and page for command sending
             self._cdp = cdp
             self._page = page
 
-            # Reset session state
             reset_cdp_time_offset()
             reset_viewport_tracking()
 
-            # Set up handlers
             self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)
 
-            # Navigate and login
-            self._navigate_and_login(page, cdp, tank_name_prefix="Bot", auto_join_room=True)
+            navigate_and_login(
+                page,
+                cdp,
+                target_url=self._target_url,
+                prefer_account=self._prefer_account,
+                tank_name_prefix="Bot",
+                auto_join_room=True,
+            )
 
-            # Wait for game to be ready
-            self._wait_for_game_ready(page)
+            wait_for_game_ready(page, self._messages)
 
-            # Gather intel (saves tpclient.js for protocol analysis)
-            self._gather_intel(page, cdp)
+            self._cdp_service.log_websocket_urls()
+            self._static_key = gather_intel(page, cdp)
 
-            # Start game log scraper for server feedback visibility
             self._init_game_log_scraper(cdp)
 
             log.info("Bot started, entering game loop")
             emit_state("%s", self.get_state())
 
-            # Game loop
             try:
                 self._game_loop(
                     page,
@@ -1106,7 +1079,7 @@ class Bot(BrowserSession):
                 self._save_capture_session()
                 self._cdp = None
                 self._page = None
-                self._cleanup(cdp, page, context, browser)
+                cleanup_browser(browser)
 
     def _save_capture_session(self) -> None:
         """Save accumulated messages as a replayable capture session.
@@ -1151,7 +1124,7 @@ class Bot(BrowserSession):
 
     def _game_loop(
         self,
-        page: _test_hooks.PageProtocol,
+        page: PageProtocol,
         *,
         session_seconds: int,
         stop_file_path: Path,

@@ -4,16 +4,15 @@ Provides the base class for all live action lab probes. Each specific
 probe (TeleportProbe, FuelProbe, EquipmentProbe, MovementProbe,
 EnemyTeleportProbe) inherits from ProbeBase.
 
-ProbeBase owns its own state via composition (CDPService, CommandService)
-instead of inheriting from BrowserSession. Browser lifecycle is handled
-by standalone functions in browser.lifecycle, called through action_hooks.
+ProbeBase inherits CDPService + CommandService composition from
+SessionBase. Adds action tracking and probe-specific command methods.
+Browser lifecycle is handled by standalone functions called through
+action_hooks.
 """
 
 from __future__ import annotations
 
-import uuid
-
-from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
+from tankpit_bot._test_hooks import PageProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace import ActionCycleTracker, log_phase_overlaps
@@ -24,7 +23,7 @@ from tankpit_bot.action_lab.action_trace_types import (
 )
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser.cdp_service import CDPService
-from tankpit_bot.browser.cdp_utils import send_websocket_bytes
+from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -34,12 +33,12 @@ class ProbeError(Exception):
     """Raised when a probe cannot proceed."""
 
 
-class ProbeBase:
+class ProbeBase(SessionBase):
     """Shared infrastructure for all live action lab probes.
 
-    Owns CDPService and CommandService via composition. Does NOT inherit
-    from BrowserSession — browser lifecycle is handled by standalone
-    functions called through action_hooks.
+    Inherits CDPService + CommandService composition from SessionBase.
+    Adds action tracking, probe-specific commands, and convenience
+    properties for captured messages and magic key.
     """
 
     def __init__(
@@ -60,58 +59,16 @@ class ProbeBase:
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
         """
-        self._target_url = target_url
-        self._headless = headless
-        self._prefer_account = prefer_account
-        self._session_id = str(uuid.uuid4())
-        self._start_timestamp_ms = 0
-        self._cdp_service = cdp_service if cdp_service is not None else CDPService()
-        self._cdp_service.set_callbacks(
-            on_message_captured=self._on_message_captured,
-            on_magic_captured=self._on_magic_captured,
+        super().__init__(
+            target_url,
+            headless=headless,
+            prefer_account=prefer_account,
+            cdp_service=cdp_service,
+            command_service=command_service,
         )
-        self._cdp: CDPSessionProtocol | None = None
         self._page: PageProtocol | None = None
-        self._static_key: str | None = None
-        self._commands = (
-            command_service
-            if command_service is not None
-            else CommandService(send_ws_bytes=self._send_websocket_bytes)
-        )
-        self._cdp_message_buffer: list[str] = []
         self._action_cycle_tracker = ActionCycleTracker()
         self._attempt_phase_overlaps: list[ActionPhaseOverlapDict] = []
-
-    # -----------------------------------------------------------------
-    # Properties delegating to CDPService
-    # -----------------------------------------------------------------
-
-    @property
-    def _messages(self) -> list[CapturedMessage]:
-        """Delegate message storage to CDPService."""
-        return self._cdp_service.messages
-
-    @_messages.setter
-    def _messages(self, value: list[CapturedMessage]) -> None:
-        self._cdp_service.messages = value
-
-    @property
-    def _ws_urls(self) -> dict[str, str]:
-        """Delegate WebSocket URL storage to CDPService."""
-        return self._cdp_service.ws_urls
-
-    @_ws_urls.setter
-    def _ws_urls(self, value: dict[str, str]) -> None:
-        self._cdp_service.ws_urls = value
-
-    @property
-    def _magic(self) -> str | None:
-        """Delegate magic key storage to CDPService."""
-        return self._cdp_service.magic
-
-    @_magic.setter
-    def _magic(self, value: str | None) -> None:
-        self._cdp_service.magic = value
 
     @property
     def session_id(self) -> str:
@@ -127,72 +84,6 @@ class ProbeBase:
     def magic(self) -> str | None:
         """Get captured magic key."""
         return self._cdp_service.magic
-
-    def captured_message_count(self) -> int:
-        """Return how many WebSocket messages have been captured so far.
-
-        Returns:
-            Length of the session's captured-message list.
-        """
-        return len(self._cdp_service.messages)
-
-    # -----------------------------------------------------------------
-    # CDP setup (delegated to CDPService)
-    # -----------------------------------------------------------------
-
-    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
-        """Set up CDP event handlers for WebSocket capture.
-
-        Args:
-            cdp: CDP session.
-        """
-        self._cdp_service.setup_cdp_handlers(cdp)
-
-    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
-        """Set up console message listener.
-
-        Args:
-            cdp: CDP session.
-        """
-        self._cdp_service.setup_console_listener(cdp)
-
-    # -----------------------------------------------------------------
-    # Command dispatch
-    # -----------------------------------------------------------------
-
-    def _send_websocket_bytes(
-        self,
-        cdp: CDPSessionProtocol,
-        data: bytes,
-        label: str = "direct_send",
-    ) -> str:
-        """Send raw bytes via the captured WebSocket.
-
-        Args:
-            cdp: CDP session.
-            data: Raw bytes to send.
-            label: Bot-side label for outbound provenance logging.
-
-        Returns:
-            Status string from the browser-side send helper.
-        """
-        return send_websocket_bytes(cdp, data, label)
-
-    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
-        """XOR encode and send command bytes via WebSocket.
-
-        Subclasses (replay harnesses) override this to capture dispatched
-        commands without hitting the wire.
-
-        Args:
-            data: Framed command bytes.
-            cmd_name: Command name for logging.
-
-        Returns:
-            True if sent, False if CDP unavailable.
-        """
-        self._commands.cdp = self._cdp
-        return self._commands.send_bytes(data, cmd_name)
 
     def open_map(self) -> bool:
         """Send map open command.
@@ -307,36 +198,6 @@ class ProbeBase:
 
         cmd = make_pickup_equipment_command(x, y)
         return self._send_bytes(encode_pickup_equipment_command(cmd), "pickup_equipment")
-
-    # -----------------------------------------------------------------
-    # Lifecycle hooks (called by CDPService)
-    # -----------------------------------------------------------------
-
-    def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Buffer received messages for probe sync.
-
-        Args:
-            message: The captured message.
-        """
-        if message["direction"] == "received":
-            self._cdp_message_buffer.append(message["payload"])
-
-    def _on_magic_captured(self, magic: str) -> None:
-        """Build XOR table and init trackers when magic key is captured.
-
-        Args:
-            magic: The session magic string.
-        """
-        from tankpit_bot.protocol.codec import (
-            DEFAULT_STATIC_KEY_PATH,
-            build_xor_table,
-            load_static_key,
-        )
-        from tankpit_bot.sniffer.trackers import init_trackers_with_magic
-
-        init_trackers_with_magic(magic)
-        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
-        self._commands.xor_table = build_xor_table(static_key, magic)
 
     # -----------------------------------------------------------------
     # World state access

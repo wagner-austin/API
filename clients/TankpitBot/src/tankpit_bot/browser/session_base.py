@@ -1,0 +1,196 @@
+"""Shared CDPService composition base for Bot and ProbeBase.
+
+Owns CDPService + CommandService via composition, delegates message
+storage, magic key, and WebSocket URL state to CDPService via
+properties. Subclasses add domain-specific behavior (Bot adds state
+machine and HFSM; ProbeBase adds action tracking).
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from platform_core.logging import get_logger
+
+from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot.bot.command_service import CommandService
+from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.browser.cdp_utils import send_websocket_bytes
+from tankpit_bot.protocol.codec import (
+    DEFAULT_STATIC_KEY_PATH,
+    build_xor_table,
+    load_static_key,
+)
+from tankpit_bot.sniffer.trackers import init_trackers_with_magic
+from tankpit_bot.types import CapturedMessage
+
+log = get_logger(__name__)
+
+
+class SessionBase:
+    """Shared composition base owning CDPService and CommandService.
+
+    Provides property delegations, CDP setup, WebSocket send, and the
+    common magic/message callbacks. Bot and ProbeBase inherit this to
+    avoid duplicating the same 12 methods.
+    """
+
+    def __init__(
+        self,
+        target_url: str,
+        *,
+        headless: bool = False,
+        prefer_account: bool = False,
+        cdp_service: CDPService | None = None,
+        command_service: CommandService | None = None,
+    ) -> None:
+        """Initialize session base with composed services.
+
+        Args:
+            target_url: URL to navigate to.
+            headless: Whether to run browser in headless mode.
+            prefer_account: Whether to prefer account login.
+            cdp_service: Injected CDPService. Created internally if None.
+            command_service: Injected CommandService. Created internally if None.
+        """
+        self._target_url = target_url
+        self._headless = headless
+        self._prefer_account = prefer_account
+        self._session_id = str(uuid.uuid4())
+        self._start_timestamp_ms = 0
+        self._cdp_service = cdp_service if cdp_service is not None else CDPService()
+        self._cdp_service.set_callbacks(
+            on_message_captured=self._on_message_captured,
+            on_magic_captured=self._on_magic_captured,
+        )
+        self._cdp: CDPSessionProtocol | None = None
+        self._static_key: str | None = None
+        self._commands = (
+            command_service
+            if command_service is not None
+            else CommandService(send_ws_bytes=self._send_websocket_bytes)
+        )
+        self._cdp_message_buffer: list[str] = []
+
+    # -----------------------------------------------------------------
+    # Properties delegating to CDPService
+    # -----------------------------------------------------------------
+
+    @property
+    def _messages(self) -> list[CapturedMessage]:
+        """Delegate message storage to CDPService."""
+        return self._cdp_service.messages
+
+    @_messages.setter
+    def _messages(self, value: list[CapturedMessage]) -> None:
+        self._cdp_service.messages = value
+
+    @property
+    def _ws_urls(self) -> dict[str, str]:
+        """Delegate WebSocket URL storage to CDPService."""
+        return self._cdp_service.ws_urls
+
+    @_ws_urls.setter
+    def _ws_urls(self, value: dict[str, str]) -> None:
+        self._cdp_service.ws_urls = value
+
+    @property
+    def _magic(self) -> str | None:
+        """Delegate magic key storage to CDPService."""
+        return self._cdp_service.magic
+
+    @_magic.setter
+    def _magic(self, value: str | None) -> None:
+        self._cdp_service.magic = value
+
+    def captured_message_count(self) -> int:
+        """Return how many WebSocket messages have been captured so far.
+
+        Returns:
+            Length of the session's captured-message list.
+        """
+        return len(self._cdp_service.messages)
+
+    # -----------------------------------------------------------------
+    # CDP setup (delegated to CDPService)
+    # -----------------------------------------------------------------
+
+    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
+        """Set up CDP event handlers for WebSocket capture.
+
+        Args:
+            cdp: CDP session.
+        """
+        self._cdp_service.setup_cdp_handlers(cdp)
+
+    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
+        """Set up console message listener.
+
+        Args:
+            cdp: CDP session.
+        """
+        self._cdp_service.setup_console_listener(cdp)
+
+    # -----------------------------------------------------------------
+    # Command dispatch
+    # -----------------------------------------------------------------
+
+    def _send_websocket_bytes(
+        self,
+        cdp: CDPSessionProtocol,
+        data: bytes,
+        label: str = "direct_send",
+    ) -> str:
+        """Send raw bytes via the captured WebSocket.
+
+        Args:
+            cdp: CDP session.
+            data: Raw bytes to send.
+            label: Bot-side label for outbound provenance logging.
+
+        Returns:
+            Status string from the browser-side send helper.
+        """
+        return send_websocket_bytes(cdp, data, label)
+
+    def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+        """XOR encode and send command bytes via WebSocket.
+
+        Args:
+            data: Framed command bytes (with 2-byte length header).
+            cmd_name: Command name for logging.
+
+        Returns:
+            True if sent, False if CDP session not available.
+        """
+        self._commands.cdp = self._cdp
+        return self._commands.send_bytes(data, cmd_name)
+
+    # -----------------------------------------------------------------
+    # Lifecycle hooks (called by CDPService)
+    # -----------------------------------------------------------------
+
+    def _on_message_captured(self, message: CapturedMessage) -> None:
+        """Buffer received messages for sync.
+
+        Args:
+            message: The captured message.
+        """
+        if message["direction"] == "received":
+            self._cdp_message_buffer.append(message["payload"])
+
+    def _on_magic_captured(self, magic: str) -> None:
+        """Build XOR table and init trackers when magic key is captured.
+
+        Args:
+            magic: The session magic string.
+        """
+        init_trackers_with_magic(magic)
+        static_key = load_static_key(DEFAULT_STATIC_KEY_PATH)
+        self._commands.xor_table = build_xor_table(static_key, magic)
+        log.info("Built XOR table for command encoding")
+
+
+__all__ = [
+    "SessionBase",
+]

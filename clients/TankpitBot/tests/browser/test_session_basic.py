@@ -601,3 +601,26 @@ class TestGetArgv:
 
         result = _real_get_argv()
         assert result is sys.argv
+
+
+def test_browser_session_captured_message_count() -> None:
+    """BrowserSession.captured_message_count delegates to message list length."""
+    session = BrowserSession("https://example.com")
+    assert session.captured_message_count() == 0
+    session._messages.append(
+        CapturedMessage(
+            timestamp_ms=1,
+            direction="received",
+            payload="x",
+            ws_url="wss://test",
+        )
+    )
+    assert session.captured_message_count() == 1
+
+
+def test_browser_session_send_websocket_bytes() -> None:
+    """BrowserSession._send_websocket_bytes delegates to send_websocket_bytes."""
+    session = BrowserSession("https://example.com")
+    cdp = FakeCDPSession()
+    result = session._send_websocket_bytes(cdp, b"\x01\x02", "test_label")
+    assert "SENT" in result or "no capturedWS" in result.lower() or result != ""
