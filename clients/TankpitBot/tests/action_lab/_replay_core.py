@@ -585,8 +585,16 @@ class StubbedBootstrapMixin:
         ) -> None:
             _ = (page, messages)
 
+        def _bootstrap_gather_intel(
+            page: PageProtocol,
+            cdp: CDPSessionProtocol,
+        ) -> str | None:
+            _ = (page, cdp)
+            return None
+
         action_hooks.navigate_and_login = _bootstrap_navigate
         action_hooks.wait_for_game_ready = _bootstrap_wait_ready
+        action_hooks.gather_intel = _bootstrap_gather_intel
 
     def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
         """Skip real console-listener wiring."""
@@ -595,11 +603,6 @@ class StubbedBootstrapMixin:
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
         """Skip real CDP-handler wiring."""
         _ = cdp
-
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        """Skip real intel capture and set a stub magic key."""
-        _ = (page, cdp)
-        self._magic = "fake-magic"
 
 
 class WorldStateOverrideMixin:

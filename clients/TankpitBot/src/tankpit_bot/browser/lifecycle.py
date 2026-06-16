@@ -119,8 +119,131 @@ def cleanup_browser(browser: BrowserProtocol) -> None:
     log.info("Teardown: browser closed")
 
 
+def gather_intel(
+    page: PageProtocol,
+    cdp: CDPSessionProtocol,
+) -> str | None:
+    """Gather and log all available intel after login.
+
+    Args:
+        page: Playwright page.
+        cdp: CDP session.
+
+    Returns:
+        Captured static XOR key, or None if not found.
+    """
+    _debug_js_websocket(cdp)
+    _log_script_urls(page)
+    return _capture_static_key(page)
+
+
+def _debug_js_websocket(cdp: CDPSessionProtocol) -> None:
+    """Check for WebSocket instances in JavaScript and log findings.
+
+    Args:
+        cdp: CDP session.
+    """
+    debug_js = """
+    (() => {
+        let found = [];
+        for (let key in window) {
+            try {
+                if (window[key] instanceof WebSocket) {
+                    found.push('window.' + key + ' (state=' + window[key].readyState + ')');
+                }
+            } catch(e) {}
+        }
+        if (typeof tankpit !== 'undefined') {
+            for (let key in tankpit) {
+                try {
+                    if (tankpit[key] instanceof WebSocket) {
+                        let s = tankpit[key].readyState;
+                        found.push('tankpit.' + key + ' (state=' + s + ')');
+                    }
+                } catch(e) {}
+            }
+        }
+        if (window.__capturedWS) {
+            found.push('__capturedWS (state=' + window.__capturedWS.readyState + ')');
+        }
+        return found.length > 0 ? found.join(', ') : 'NO WebSocket found';
+    })()
+    """
+    debug_result = cdp.send("Runtime.evaluate", {"expression": debug_js, "returnByValue": True})
+    debug_obj = debug_result.get("result")
+    if isinstance(debug_obj, dict):
+        debug_val = debug_obj.get("value", "?")
+        log.info("JS WebSocket check: %s", debug_val)
+
+
+def _log_script_urls(page: PageProtocol) -> None:
+    """Log all loaded script URLs for protocol analysis.
+
+    Args:
+        page: Playwright page.
+    """
+    script_urls = page.evaluate(
+        "Array.from(document.querySelectorAll('script[src]')).map(s => s.src)"
+    )
+    if script_urls and isinstance(script_urls, list):
+        log.info("Loaded scripts (%d):", len(script_urls))
+        for url in script_urls:
+            if isinstance(url, str):
+                log.info("  - %s", url)
+
+
+def _capture_static_key(page: PageProtocol) -> str | None:
+    """Extract static XOR key from tpclient JS source.
+
+    Args:
+        page: Playwright page.
+
+    Returns:
+        Static key string, or None if not found.
+    """
+    import re
+
+    from tankpit_bot.browser.key_discovery import save_static_key
+
+    js_check_loaded = (
+        "Array.from(document.querySelectorAll('script[src]')).some(s => s.src.includes('tpclient'))"
+    )
+    page.wait_for_function(js_check_loaded, timeout=10000)
+
+    js_get_url = (
+        "Array.from(document.querySelectorAll('script[src]'))"
+        ".find(s => s.src.includes('tpclient'))?.src"
+    )
+    tpclient_url = page.evaluate(js_get_url)
+    if not isinstance(tpclient_url, str):
+        log.warning("Could not find tpclient script URL")
+        return None
+
+    js_content = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
+    if not isinstance(js_content, str):
+        log.warning("Could not fetch tpclient JS content")
+        return None
+
+    from pathlib import Path
+
+    js_path = Path("tpclient.js")
+    _test_hooks.write_text(js_path, js_content)
+    log.info("Saved tpclient JS to %s (%d bytes)", js_path, len(js_content))
+
+    match = re.search(r'"([^"]{1000})"', js_content)
+    if not match:
+        log.warning("Could not find static key in tpclient JS")
+        return None
+
+    static_key: str = match.group(1)
+    save_static_key(static_key)
+    log.info("Captured static key: %s...", static_key[:20])
+    return static_key
+
+
 __all__ = [
     "cleanup_browser",
+    "gather_intel",
     "navigate_and_login",
     "wait_for_game_ready",
 ]

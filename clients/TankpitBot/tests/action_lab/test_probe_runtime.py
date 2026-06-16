@@ -82,8 +82,19 @@ class _ProbeHarness:
             if self._clock is not None:
                 self._clock.advance(self.ready_advance_ms)
 
+        def _stub_gather_intel(
+            page: PageProtocol,
+            cdp: CDPSessionProtocol,
+        ) -> str | None:
+            _ = (page, cdp)
+            self.intel_calls += 1
+            if self._clock is not None:
+                self._clock.advance(self.intel_advance_ms)
+            return None
+
         action_hooks.navigate_and_login = _stub_navigate
         action_hooks.wait_for_game_ready = _stub_wait_ready
+        action_hooks.gather_intel = _stub_gather_intel
 
     def _reset_action_cycle_tracker(self) -> None:
         self.reset_calls += 1
@@ -115,13 +126,6 @@ class _ProbeHarness:
         self.ready_calls += 1
         if self._clock is not None:
             self._clock.advance(self.ready_advance_ms)
-
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        assert page is self._page
-        assert cdp is self._cdp
-        self.intel_calls += 1
-        if self._clock is not None:
-            self._clock.advance(self.intel_advance_ms)
 
     @property
     def messages(self) -> list[CapturedMessage]:
@@ -171,6 +175,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_sync_playwright = core_hooks.sync_playwright
     original_navigate = action_hooks.navigate_and_login
     original_wait_ready = action_hooks.wait_for_game_ready
+    original_gather_intel = action_hooks.gather_intel
     yield
     action_hooks.get_current_time_ms = original_get_time
     action_hooks.wait_for_initial_self_state = original_wait_initial
@@ -178,6 +183,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     core_hooks.sync_playwright = original_sync_playwright
     action_hooks.navigate_and_login = original_navigate
     action_hooks.wait_for_game_ready = original_wait_ready
+    action_hooks.gather_intel = original_gather_intel
 
 
 def test_initialize_live_probe_session_resets_runtime_state() -> None:

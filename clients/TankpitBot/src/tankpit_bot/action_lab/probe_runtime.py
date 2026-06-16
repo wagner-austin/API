@@ -50,9 +50,6 @@ class ProbeRuntimeStateProtocol(Protocol):
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
         """Install runtime CDP handlers."""
 
-    def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
-        """Capture runtime intel needed before issuing commands."""
-
 
 class ProbeCommandReadyProtocol(
     ProbeRuntimeStateProtocol,
@@ -162,7 +159,7 @@ def prepare_live_probe_runtime(
     )
     action_hooks.wait_for_game_ready(page, probe.messages)
     game_ready_timestamp_ms = action_hooks.get_current_time_ms()
-    probe._gather_intel(page, cdp)
+    action_hooks.gather_intel(page, cdp)
     intel_ready_timestamp_ms = action_hooks.get_current_time_ms()
     return game_ready_timestamp_ms, intel_ready_timestamp_ms
 
