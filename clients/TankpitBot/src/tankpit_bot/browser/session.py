@@ -9,14 +9,10 @@ Provides a base class that handles:
 
 from __future__ import annotations
 
-import base64
 import re
 import uuid
 from pathlib import Path
 
-from platform_core.json_utils import (
-    JSONObject,
-)
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
@@ -26,9 +22,8 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
     PageProtocol,
 )
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import (
-    _is_valid_base64,
-    _pop_sent_frame_metadata,
     cdp_timestamp_to_ms,
     get_current_time_ms,
     reset_cdp_time_offset,
@@ -39,7 +34,6 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.browser.fuel_probe import FuelProber, FuelProbeResult
-from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.browser.key_discovery import (
     extract_xor_first_bytes,
     find_best_static_byte,
@@ -54,12 +48,8 @@ from tankpit_bot.browser.types import (
 from tankpit_bot.combat import CombatEvent
 from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.inventory import InventoryChange, InventoryScraper
-from tankpit_bot.protocol.codec import extract_magic_from_auth_payload
 from tankpit_bot.types import (
     CapturedMessage,
-    MessageDirection,
-    decode_cdp_websocket_created_event,
-    decode_cdp_websocket_frame_event,
 )
 
 log = get_logger(__name__)
@@ -277,17 +267,46 @@ class BrowserSession:
         self._prefer_account = prefer_account
         self._session_id = str(uuid.uuid4())
         self._start_timestamp_ms = 0
-        self._messages: list[CapturedMessage] = []
-        self._ws_urls: dict[str, str] = {}  # requestId -> url mapping
+        self._cdp_service = CDPService()
+        self._cdp_service.set_callbacks(
+            on_message_captured=self._on_message_captured,
+            on_magic_captured=self._on_magic_captured,
+        )
         self._cdp: CDPSessionProtocol | None = None
         self._page: PageProtocol | None = None
-        self._magic: str | None = None
         self._static_key: str | None = None
         self._game_log_scraper: GameLogScraper | None = None
         self._inventory_scraper: InventoryScraper | None = None
         self._combat_tracker: CombatTracker | None = None
         self._fuel_prober: FuelProber | None = None
         self._last_fuel_result: FuelProbeResult | None = None
+
+    @property
+    def _messages(self) -> list[CapturedMessage]:
+        """Delegate message storage to CDPService."""
+        return self._cdp_service.messages
+
+    @_messages.setter
+    def _messages(self, value: list[CapturedMessage]) -> None:
+        self._cdp_service.messages = value
+
+    @property
+    def _ws_urls(self) -> dict[str, str]:
+        """Delegate WebSocket URL storage to CDPService."""
+        return self._cdp_service.ws_urls
+
+    @_ws_urls.setter
+    def _ws_urls(self, value: dict[str, str]) -> None:
+        self._cdp_service.ws_urls = value
+
+    @property
+    def _magic(self) -> str | None:
+        """Delegate magic key storage to CDPService."""
+        return self._cdp_service.magic
+
+    @_magic.setter
+    def _magic(self, value: str | None) -> None:
+        self._cdp_service.magic = value
 
     def captured_message_count(self) -> int:
         """Return how many WebSocket messages have been captured so far.
@@ -427,82 +446,18 @@ class BrowserSession:
         self._last_fuel_result = result
         return result
 
-    def _on_websocket_created(self, params: JSONObject) -> None:
-        """Handle Network.webSocketCreated CDP event.
-
-        Args:
-            params: CDP event parameters.
-        """
-        event = decode_cdp_websocket_created_event(params)
-        self._ws_urls[event["requestId"]] = event["url"]
-
-    def _on_websocket_frame_received(self, params: JSONObject) -> None:
-        """Handle Network.webSocketFrameReceived CDP event.
-
-        Args:
-            params: CDP event parameters.
-        """
-        self._record_frame(params, "received")
-
-    def _on_websocket_frame_sent(self, params: JSONObject) -> None:
-        """Handle Network.webSocketFrameSent CDP event.
-
-        Args:
-            params: CDP event parameters.
-        """
-        self._record_frame(params, "sent")
-
-    def _record_frame(self, params: JSONObject, direction: MessageDirection) -> None:
-        """Record a WebSocket frame.
-
-        Args:
-            params: CDP event parameters.
-            direction: Whether the frame was sent or received.
-        """
-        event = decode_cdp_websocket_frame_event(params)
-        request_id = event["requestId"]
-        ws_url = self._ws_urls.get(request_id, "unknown")
-        payload = event["response"]["payloadData"]
-
-        message = CapturedMessage(
-            timestamp_ms=cdp_timestamp_to_ms(event["timestamp"]),
-            direction=direction,
-            payload=payload,
-            ws_url=ws_url,
-        )
-        if direction == "sent" and self._cdp is not None:
-            metadata = _pop_sent_frame_metadata(self._cdp)
-            if metadata is not None:
-                message["sent_origin"] = metadata["origin"]
-                if metadata["label"]:
-                    message["sent_label"] = metadata["label"]
-                if metadata["stack"]:
-                    message["sent_stack"] = metadata["stack"]
-        self._messages.append(message)
-        self._on_message_captured(message)
-
     def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Extract magic key from AUTH messages and notify subclasses.
+        """Called by CDPService when a WebSocket message is captured.
 
-        Subclasses should call super()._on_message_captured(message) first,
-        then perform their own message processing.
+        Subclasses override to process captured messages (e.g.,
+        ProbeBase buffers received messages for world sync).
 
         Args:
             message: The captured message.
         """
-        if message["direction"] == "sent" and self._magic is None:
-            payload = message["payload"]
-            if not _is_valid_base64(payload):
-                return
-            data = base64.b64decode(payload)
-            magic = extract_magic_from_auth_payload(data)
-            if magic is not None:
-                self._magic = magic
-                log.info("Captured magic key: %s...", magic[:20])
-                self._on_magic_captured(magic)
 
     def _on_magic_captured(self, magic: str) -> None:
-        """Called when magic key is first captured from AUTH message.
+        """Called by CDPService when magic key is first extracted.
 
         Override in subclasses to perform setup that requires the magic key
         (e.g., initializing XOR tables, trackers).
@@ -514,59 +469,26 @@ class BrowserSession:
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
         """Set up CDP event handlers for WebSocket capture.
 
-        Also installs a WebSocket prototype hook to capture the game's
-        WebSocket instance for later command injection.
+        Delegates to CDPService for event wiring and frame capture.
 
         Args:
             cdp: CDP session.
         """
-        # Enable Page domain first - required for script injection to work
-        cdp.send("Page.enable")
-
-        # Install hooks BEFORE any page scripts load.
-        # Hooks EventTarget.prototype.addEventListener to intercept ALL
-        # WebSocket message handlers, capturing raw binary data as base64.
-        # Also hooks WebSocket.prototype.send for command injection.
-        cdp.send(
-            "Page.addScriptToEvaluateOnNewDocument",
-            {"source": BROWSER_HOOK_SOURCE},
-        )
-
-        # Enable Network domain for WebSocket frame capture
-        cdp.send("Network.enable")
-        cdp.on("Network.webSocketCreated", self._on_websocket_created)
-        cdp.on("Network.webSocketFrameReceived", self._on_websocket_frame_received)
-        cdp.on("Network.webSocketFrameSent", self._on_websocket_frame_sent)
+        self._cdp_service.setup_cdp_handlers(cdp)
 
     def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
         """Set up console message listener for WebSocket debug info.
 
-        Logs console messages containing 'WS', 'Hook', or 'WebSocket'.
+        Delegates to CDPService for console event wiring.
 
         Args:
             cdp: CDP session.
         """
-        cdp.send("Runtime.enable")
-
-        def on_console(params: JSONObject) -> None:
-            msg_type = params.get("type", "?")
-            args = params.get("args", [])
-            if isinstance(args, list):
-                texts = []
-                for a in args:
-                    if isinstance(a, dict):
-                        val = a.get("value", a.get("description", "?"))
-                        texts.append(str(val) if val is not None else "?")
-                text = " ".join(texts)
-                if "WS" in text or "Hook" in text or "WebSocket" in text:
-                    log.info("[Console %s] %s", msg_type, text)
-
-        cdp.on("Runtime.consoleAPICalled", on_console)
+        self._cdp_service.setup_console_listener(cdp)
 
     def _log_websocket_urls(self) -> None:
         """Log all captured WebSocket URLs."""
-        ws_urls = list(self._ws_urls.values())
-        log.info("Captured WebSocket URLs: %s", ws_urls)
+        self._cdp_service.log_websocket_urls()
 
     def _debug_js_websocket(self, cdp: CDPSessionProtocol) -> None:
         """Check for WebSocket instances in JavaScript and log findings.

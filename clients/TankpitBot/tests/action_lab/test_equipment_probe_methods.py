@@ -7,6 +7,7 @@ from tests.action_lab.conftest import set_inventory_total
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
 from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTargetDict
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
 from tankpit_bot.types import CapturedMessage
@@ -65,6 +66,7 @@ def _make_probe() -> EquipmentProbe:
     ``get_self_state``) returns a valid value.
     """
     probe = EquipmentProbe.__new__(EquipmentProbe)
+    probe._cdp_service = CDPService()
     probe._messages = [
         CapturedMessage(
             timestamp_ms=1000,

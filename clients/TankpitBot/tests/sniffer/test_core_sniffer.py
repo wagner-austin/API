@@ -10,6 +10,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import PlaywrightNotInstalledError
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.sniffer import SnifferError, WebSocketSniffer
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
@@ -118,6 +119,7 @@ class TestWebSocketSnifferMethods:
         # Create sniffer with minimal init - we'll call methods directly
         # Using object.__new__ to avoid full __init__
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
@@ -151,6 +153,7 @@ class TestWebSocketSnifferMethods:
 
         # Create sniffer with minimal init
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
         sniffer._output_path = None
@@ -185,6 +188,7 @@ class TestWebSocketSnifferMethods:
     def test_autosave_capture_no_output_path_is_noop(self) -> None:
         """Returns immediately when autosave is not configured."""
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
         sniffer._output_path = None
         sniffer._target_url = "https://tankpit.com"
         sniffer._session_id = "noop"
@@ -198,6 +202,7 @@ class TestWebSocketSnifferMethods:
     def test_on_message_captured_autosaves_capture(self, fake_fs: FakeFileSystem) -> None:
         """Autosaves the current capture snapshot after a message arrives."""
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
         sniffer._prefer_account = False
@@ -241,6 +246,7 @@ class TestWebSocketSnifferMethods:
         from tankpit_bot.browser import GameLogEntry
 
         sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
         sniffer._target_url = "https://tankpit.com"
         sniffer._headless = False
         sniffer._prefer_account = False

@@ -2403,7 +2403,7 @@ class TestBotMessageDecoding:
             timestamp_ms=1000,
             ws_url="wss://test.tankpit.com/ws",
         )
-        bot._on_message_captured(msg)
+        bot._cdp_service._extract_magic_and_notify(msg)
         assert bot._magic == "testmagickey1234"
 
     def test_on_message_captured_received_updates_world(self, fake_env: FakeEnv) -> None:

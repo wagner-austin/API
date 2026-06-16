@@ -76,7 +76,7 @@ def test_browser_session_on_websocket_created() -> None:
         "requestId": "req1",
         "url": "wss://example.com/ws",
     }
-    session._on_websocket_created(params)
+    session._cdp_service._on_websocket_created(params)
     assert session._ws_urls["req1"] == "wss://example.com/ws"
 
 
@@ -89,7 +89,7 @@ def test_browser_session_on_websocket_frame_received() -> None:
         "timestamp": 12345.678,
         "response": {"opcode": 1, "mask": False, "payloadData": "test_payload"},
     }
-    session._on_websocket_frame_received(params)
+    session._cdp_service._on_websocket_frame_received(params)
     assert len(session.messages) == 1
     msg = session.messages[0]
     assert msg["direction"] == "received"
@@ -100,7 +100,7 @@ def test_browser_session_on_websocket_frame_received() -> None:
 def test_browser_session_on_websocket_frame_sent() -> None:
     """Test _on_websocket_frame_sent records message."""
     session = BrowserSession("https://example.com")
-    session._cdp = _MetadataCDP(
+    session._cdp_service.cdp = _MetadataCDP(
         {
             "origin": "bot_injected",
             "label": "teleport(129,106)",
@@ -113,7 +113,7 @@ def test_browser_session_on_websocket_frame_sent() -> None:
         "timestamp": 12345.678,
         "response": {"opcode": 1, "mask": True, "payloadData": "sent_payload"},
     }
-    session._on_websocket_frame_sent(params)
+    session._cdp_service._on_websocket_frame_sent(params)
     assert len(session.messages) == 1
     msg = session.messages[0]
     assert msg["direction"] == "sent"
@@ -126,7 +126,7 @@ def test_browser_session_on_websocket_frame_sent() -> None:
 def test_browser_session_on_websocket_frame_sent_without_optional_metadata() -> None:
     """Test sent frame metadata omits empty label and stack values."""
     session = BrowserSession("https://example.com")
-    session._cdp = _MetadataCDP(
+    session._cdp_service.cdp = _MetadataCDP(
         {
             "origin": "page_client",
             "label": "",
@@ -140,7 +140,7 @@ def test_browser_session_on_websocket_frame_sent_without_optional_metadata() -> 
         "response": {"opcode": 1, "mask": True, "payloadData": "sent_payload"},
     }
 
-    session._on_websocket_frame_sent(params)
+    session._cdp_service._on_websocket_frame_sent(params)
 
     msg = session.messages[0]
     assert msg["sent_origin"] == "page_client"
@@ -185,7 +185,7 @@ def test_browser_session_on_message_captured_non_auth_sent() -> None:
         payload="test",
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert session._magic is None
 
 
@@ -198,7 +198,7 @@ def test_browser_session_on_message_captured_empty_payload() -> None:
         payload="",
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert session._magic is None
 
 
@@ -211,7 +211,7 @@ def test_browser_session_on_message_captured_invalid_base64() -> None:
         payload="not!valid@base64",
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert session._magic is None
 
 
@@ -231,7 +231,7 @@ def test_browser_session_on_message_captured_extracts_magic() -> None:
         payload=payload,
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert session._magic == "test_magic_key_12345"
 
 
@@ -251,7 +251,7 @@ def test_browser_session_on_message_captured_skips_received() -> None:
         payload=payload,
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert session._magic is None
 
 
@@ -279,8 +279,8 @@ def test_browser_session_on_message_captured_only_first_magic() -> None:
         payload=make_auth_payload("second_magic_key_1234"),
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg1)
-    session._on_message_captured(msg2)
+    session._cdp_service._extract_magic_and_notify(msg1)
+    session._cdp_service._extract_magic_and_notify(msg2)
     assert session._magic == "first_magic_key_12345"
 
 
@@ -306,7 +306,7 @@ def test_browser_session_on_magic_captured_called() -> None:
         payload=payload,
         ws_url="wss://example.com/ws",
     )
-    session._on_message_captured(msg)
+    session._cdp_service._extract_magic_and_notify(msg)
     assert captured_magics == ["test_magic_key_12345"]
 
 
@@ -416,7 +416,7 @@ def test_browser_session_launch_browser_success() -> None:
             "requestId": "test_req",
             "url": "wss://test.com/ws",
         }
-        session._on_websocket_created(ws_created_event)
+        session._cdp_service._on_websocket_created(ws_created_event)
         assert session._ws_urls["test_req"] == "wss://test.com/ws"
 
         # Simulate a WebSocket frame event to verify message capture works
@@ -425,7 +425,7 @@ def test_browser_session_launch_browser_success() -> None:
             "timestamp": 1000.0,
             "response": {"opcode": 1, "mask": False, "payloadData": "test_data"},
         }
-        session._on_websocket_frame_received(ws_frame_event)
+        session._cdp_service._on_websocket_frame_received(ws_frame_event)
         assert len(session.messages) == 1
         assert session.messages[0]["payload"] == "test_data"
         assert session.messages[0]["ws_url"] == "wss://test.com/ws"
