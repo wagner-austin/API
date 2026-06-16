@@ -552,12 +552,16 @@ class StubbedBootstrapMixin:
 
     def _init_bootstrap_stubs(self) -> None:
         """Install lifecycle hook stubs and initialize counters."""
-        from tankpit_bot.action_lab import _test_hooks as action_hooks
-        from tankpit_bot.types import CapturedMessage
 
         self.cleanup_calls = 0
 
-        def _stub_navigate(
+        from tankpit_bot.action_lab import _test_hooks as action_hooks
+        from tankpit_bot.browser.lifecycle import (
+            navigate_and_login as _real_navigate,
+        )
+        from tankpit_bot.types import CapturedMessage
+
+        def _bootstrap_navigate(
             page: PageProtocol,
             cdp: CDPSessionProtocol,
             *,
@@ -566,16 +570,23 @@ class StubbedBootstrapMixin:
             tank_name_prefix: str = "TP",
             auto_join_room: bool = True,
         ) -> None:
-            _ = (page, cdp, target_url, prefer_account, tank_name_prefix, auto_join_room)
+            _real_navigate(
+                page,
+                cdp,
+                target_url=target_url,
+                prefer_account=prefer_account,
+                tank_name_prefix=tank_name_prefix,
+                auto_join_room=False,
+            )
 
-        def _stub_wait_ready(
+        def _bootstrap_wait_ready(
             page: PageProtocol,
             messages: list[CapturedMessage],
         ) -> None:
             _ = (page, messages)
 
-        action_hooks.navigate_and_login = _stub_navigate
-        action_hooks.wait_for_game_ready = _stub_wait_ready
+        action_hooks.navigate_and_login = _bootstrap_navigate
+        action_hooks.wait_for_game_ready = _bootstrap_wait_ready
 
     def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
         """Skip real console-listener wiring."""
