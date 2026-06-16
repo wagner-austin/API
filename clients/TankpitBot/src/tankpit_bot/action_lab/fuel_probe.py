@@ -747,6 +747,25 @@ class FuelProbe(ProbeBase):
         )
 
 
+def _create_fuel_probe(
+    target_url: str,
+    *,
+    headless: bool,
+    prefer_account: bool,
+) -> FuelProbe:
+    """Factory for FuelProbe with injected services."""
+    from tankpit_bot.action_lab.probe_factory import create_probe
+
+    probe = create_probe(
+        FuelProbe,
+        target_url,
+        headless=headless,
+        prefer_account=prefer_account,
+    )
+    assert isinstance(probe, FuelProbe)
+    return probe
+
+
 def run_fuel_probe(
     target_url: str,
     output_path: str,
@@ -764,7 +783,7 @@ def run_fuel_probe(
 ) -> FuelProbeSessionDict:
     """Run a live fuel probe and save the session JSON."""
     return _shared_run_and_save_fuel_probe_session(
-        probe_factory=FuelProbe,
+        probe_factory=_create_fuel_probe,
         summary_formatter=format_fuel_probe_summary,
         target_url=target_url,
         output_path=output_path,

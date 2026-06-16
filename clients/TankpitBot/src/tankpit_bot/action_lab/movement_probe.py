@@ -147,12 +147,17 @@ def _create_movement_probe(
     headless: bool,
     prefer_account: bool,
 ) -> MovementProbe:
-    """Construct the concrete movement probe implementation."""
-    return MovementProbe(
+    """Factory for MovementProbe with injected services."""
+    from tankpit_bot.action_lab.probe_factory import create_probe
+
+    probe = create_probe(
+        MovementProbe,
         target_url,
         headless=headless,
         prefer_account=prefer_account,
     )
+    assert isinstance(probe, MovementProbe)
+    return probe
 
 
 def _get_probe_terrain_map() -> TerrainMapProtocol | None:

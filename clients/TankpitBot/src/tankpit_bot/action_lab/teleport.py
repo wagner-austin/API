@@ -247,6 +247,25 @@ class TeleportProbe(ProbeBase):
         )
 
 
+def _create_teleport_probe(
+    target_url: str,
+    *,
+    headless: bool,
+    prefer_account: bool,
+) -> TeleportProbe:
+    """Factory for TeleportProbe with injected services."""
+    from tankpit_bot.action_lab.probe_factory import create_probe
+
+    probe = create_probe(
+        TeleportProbe,
+        target_url,
+        headless=headless,
+        prefer_account=prefer_account,
+    )
+    assert isinstance(probe, TeleportProbe)
+    return probe
+
+
 def run_teleport_probe(
     target_url: str,
     output_path: str,
@@ -300,7 +319,7 @@ def run_teleport_probe(
         )
 
     return run_and_save_standard_probe_session(
-        probe_factory=TeleportProbe,
+        probe_factory=_create_teleport_probe,
         run_session=_run_session,
         encoder=encode_teleport_probe_session,
         summary_formatter=format_teleport_probe_summary,

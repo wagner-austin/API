@@ -66,7 +66,9 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportTargetDict,
 )
+from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser import PlaywrightNotInstalledError
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.state import (
     ContainerStateDict,
     SelfStateDict,
@@ -2065,8 +2067,22 @@ class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, FuelProbe)
 
 
 class _FakeFuelProbe(FuelProbe):
-    def __init__(self, target_url: str, *, headless: bool, prefer_account: bool) -> None:
-        super().__init__(target_url, headless=headless, prefer_account=prefer_account)
+    def __init__(
+        self,
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+        cdp_service: CDPService | None = None,
+        command_service: CommandService | None = None,
+    ) -> None:
+        super().__init__(
+            target_url,
+            headless=headless,
+            prefer_account=prefer_account,
+            cdp_service=cdp_service,
+            command_service=command_service,
+        )
 
     def execute_probe(
         self,

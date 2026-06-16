@@ -52,7 +52,9 @@ from tankpit_bot.action_lab.types import (
     TeleportTargetDict,
 )
 from tankpit_bot.action_lab.types_codecs import decode_teleport_probe_session
+from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.browser import PlaywrightNotInstalledError
+from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.state import (
     SelfStateDict,
     ViewportStateDict,
@@ -1305,7 +1307,16 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
 
 
 class _FakeTeleportProbe:
-    def __init__(self, target_url: str, *, headless: bool, prefer_account: bool) -> None:
+    def __init__(
+        self,
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+        cdp_service: CDPService | None = None,
+        command_service: CommandService | None = None,
+    ) -> None:
+        _ = (cdp_service, command_service)
         self.target_url = target_url
         self.headless = headless
         self.prefer_account = prefer_account
