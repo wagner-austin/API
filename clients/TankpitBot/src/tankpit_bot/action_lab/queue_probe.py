@@ -527,7 +527,7 @@ def _create_queue_probe(
     headless: bool,
     prefer_account: bool,
 ) -> QueueProbe:
-    """Factory for creating QueueProbe instances.
+    """Factory for creating QueueProbe instances with injected services.
 
     Args:
         target_url: Browser target URL.
@@ -535,9 +535,18 @@ def _create_queue_probe(
         prefer_account: Whether to prefer account login.
 
     Returns:
-        New QueueProbe instance.
+        New QueueProbe instance with factory-wired services.
     """
-    return QueueProbe(target_url, headless=headless, prefer_account=prefer_account)
+    from tankpit_bot.action_lab.probe_factory import create_probe
+
+    probe = create_probe(
+        QueueProbe,
+        target_url,
+        headless=headless,
+        prefer_account=prefer_account,
+    )
+    assert isinstance(probe, QueueProbe)
+    return probe
 
 
 def run_queue_probe(

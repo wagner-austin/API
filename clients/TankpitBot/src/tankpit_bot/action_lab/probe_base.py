@@ -48,6 +48,8 @@ class ProbeBase:
         *,
         headless: bool = False,
         prefer_account: bool = False,
+        cdp_service: CDPService | None = None,
+        command_service: CommandService | None = None,
     ) -> None:
         """Initialize the probe base.
 
@@ -55,13 +57,15 @@ class ProbeBase:
             target_url: URL to navigate to.
             headless: Whether to run browser in headless mode.
             prefer_account: Whether to prefer account login.
+            cdp_service: Injected CDPService. Created internally if None.
+            command_service: Injected CommandService. Created internally if None.
         """
         self._target_url = target_url
         self._headless = headless
         self._prefer_account = prefer_account
         self._session_id = str(uuid.uuid4())
         self._start_timestamp_ms = 0
-        self._cdp_service = CDPService()
+        self._cdp_service = cdp_service if cdp_service is not None else CDPService()
         self._cdp_service.set_callbacks(
             on_message_captured=self._on_message_captured,
             on_magic_captured=self._on_magic_captured,
@@ -69,7 +73,11 @@ class ProbeBase:
         self._cdp: CDPSessionProtocol | None = None
         self._page: PageProtocol | None = None
         self._static_key: str | None = None
-        self._commands = CommandService(send_ws_bytes=self._send_websocket_bytes)
+        self._commands = (
+            command_service
+            if command_service is not None
+            else CommandService(send_ws_bytes=self._send_websocket_bytes)
+        )
         self._cdp_message_buffer: list[str] = []
         self._action_cycle_tracker = ActionCycleTracker()
         self._attempt_phase_overlaps: list[ActionPhaseOverlapDict] = []
