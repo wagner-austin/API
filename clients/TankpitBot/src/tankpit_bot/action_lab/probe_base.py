@@ -2,18 +2,18 @@
 
 Provides the base class for all live action lab probes. Each specific
 probe (TeleportProbe, FuelProbe, EquipmentProbe, MovementProbe,
-EnemyTeleportProbe) inherits from ProbeBase instead of from each other.
+EnemyTeleportProbe) inherits from ProbeBase.
 
-ProbeBase owns:
-- CommandService for wire dispatch
-- CDP message buffer for world sync
-- Action phase cycle tracking
-- World state and self state access
-- Browser lifecycle hooks (magic capture, message buffering)
+ProbeBase owns its own state via composition (CDPService, CommandService)
+instead of inheriting from BrowserSession. Browser lifecycle is handled
+by standalone functions in browser.lifecycle, called through action_hooks.
 """
 
 from __future__ import annotations
 
+import uuid
+
+from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.action_trace import ActionCycleTracker, log_phase_overlaps
@@ -23,7 +23,8 @@ from tankpit_bot.action_lab.action_trace_types import (
     ActionPhaseOverlapDict,
 )
 from tankpit_bot.bot.command_service import CommandService
-from tankpit_bot.browser import BrowserSession
+from tankpit_bot.browser.cdp_service import CDPService
+from tankpit_bot.browser.cdp_utils import send_websocket_bytes
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -33,12 +34,12 @@ class ProbeError(Exception):
     """Raised when a probe cannot proceed."""
 
 
-class ProbeBase(BrowserSession):
+class ProbeBase:
     """Shared infrastructure for all live action lab probes.
 
-    Provides command dispatch via CommandService, world state access,
-    CDP message buffering, and action phase tracking. Specific probes
-    add their own execute() methods and result builders.
+    Owns CDPService and CommandService via composition. Does NOT inherit
+    from BrowserSession — browser lifecycle is handled by standalone
+    functions called through action_hooks.
     """
 
     def __init__(
@@ -55,19 +56,119 @@ class ProbeBase(BrowserSession):
             headless: Whether to run browser in headless mode.
             prefer_account: Whether to prefer account login.
         """
-        super().__init__(
-            target_url,
-            headless=headless,
-            prefer_account=prefer_account,
+        self._target_url = target_url
+        self._headless = headless
+        self._prefer_account = prefer_account
+        self._session_id = str(uuid.uuid4())
+        self._start_timestamp_ms = 0
+        self._cdp_service = CDPService()
+        self._cdp_service.set_callbacks(
+            on_message_captured=self._on_message_captured,
+            on_magic_captured=self._on_magic_captured,
         )
+        self._cdp: CDPSessionProtocol | None = None
+        self._page: PageProtocol | None = None
+        self._static_key: str | None = None
         self._commands = CommandService(send_ws_bytes=self._send_websocket_bytes)
         self._cdp_message_buffer: list[str] = []
         self._action_cycle_tracker = ActionCycleTracker()
         self._attempt_phase_overlaps: list[ActionPhaseOverlapDict] = []
 
     # -----------------------------------------------------------------
+    # Properties delegating to CDPService
+    # -----------------------------------------------------------------
+
+    @property
+    def _messages(self) -> list[CapturedMessage]:
+        """Delegate message storage to CDPService."""
+        return self._cdp_service.messages
+
+    @_messages.setter
+    def _messages(self, value: list[CapturedMessage]) -> None:
+        self._cdp_service.messages = value
+
+    @property
+    def _ws_urls(self) -> dict[str, str]:
+        """Delegate WebSocket URL storage to CDPService."""
+        return self._cdp_service.ws_urls
+
+    @_ws_urls.setter
+    def _ws_urls(self, value: dict[str, str]) -> None:
+        self._cdp_service.ws_urls = value
+
+    @property
+    def _magic(self) -> str | None:
+        """Delegate magic key storage to CDPService."""
+        return self._cdp_service.magic
+
+    @_magic.setter
+    def _magic(self, value: str | None) -> None:
+        self._cdp_service.magic = value
+
+    @property
+    def session_id(self) -> str:
+        """Get session ID."""
+        return self._session_id
+
+    @property
+    def messages(self) -> list[CapturedMessage]:
+        """Get captured messages."""
+        return self._cdp_service.messages
+
+    @property
+    def magic(self) -> str | None:
+        """Get captured magic key."""
+        return self._cdp_service.magic
+
+    def captured_message_count(self) -> int:
+        """Return how many WebSocket messages have been captured so far.
+
+        Returns:
+            Length of the session's captured-message list.
+        """
+        return len(self._cdp_service.messages)
+
+    # -----------------------------------------------------------------
+    # CDP setup (delegated to CDPService)
+    # -----------------------------------------------------------------
+
+    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
+        """Set up CDP event handlers for WebSocket capture.
+
+        Args:
+            cdp: CDP session.
+        """
+        self._cdp_service.setup_cdp_handlers(cdp)
+
+    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
+        """Set up console message listener.
+
+        Args:
+            cdp: CDP session.
+        """
+        self._cdp_service.setup_console_listener(cdp)
+
+    # -----------------------------------------------------------------
     # Command dispatch
     # -----------------------------------------------------------------
+
+    def _send_websocket_bytes(
+        self,
+        cdp: CDPSessionProtocol,
+        data: bytes,
+        label: str = "direct_send",
+    ) -> str:
+        """Send raw bytes via the captured WebSocket.
+
+        Args:
+            cdp: CDP session.
+            data: Raw bytes to send.
+            label: Bot-side label for outbound provenance logging.
+
+        Returns:
+            Status string from the browser-side send helper.
+        """
+        return send_websocket_bytes(cdp, data, label)
 
     def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
         """XOR encode and send command bytes via WebSocket.
@@ -200,7 +301,7 @@ class ProbeBase(BrowserSession):
         return self._send_bytes(encode_pickup_equipment_command(cmd), "pickup_equipment")
 
     # -----------------------------------------------------------------
-    # Lifecycle hooks
+    # Lifecycle hooks (called by CDPService)
     # -----------------------------------------------------------------
 
     def _on_message_captured(self, message: CapturedMessage) -> None:
@@ -209,7 +310,6 @@ class ProbeBase(BrowserSession):
         Args:
             message: The captured message.
         """
-        super()._on_message_captured(message)
         if message["direction"] == "received":
             self._cdp_message_buffer.append(message["payload"])
 
