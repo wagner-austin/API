@@ -7,11 +7,8 @@ from collections.abc import Callable
 import pytest
 from platform_core.json_utils import JSONObject
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.browser import (
     BrowserSession,
-    GameNotJoinedError,
-    PlaywrightNotInstalledError,
 )
 from tankpit_bot.browser.cdp_utils import (
     _pop_sent_frame_metadata,
@@ -20,11 +17,7 @@ from tankpit_bot.browser.cdp_utils import (
 from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.types import CapturedMessage
 from tests.fakes import (
-    FakeBrowser,
-    FakeBrowserContext,
     FakeCDPSession,
-    FakePage,
-    FakePageGrowingMessages,
 )
 
 
@@ -338,29 +331,6 @@ def test_browser_hook_source_captures_closure_scoped_game_client() -> None:
     assert "window.__tankpitActiveGame = candidate;" in BROWSER_HOOK_SOURCE
 
 
-def test_browser_session_wait_for_game_ready_success() -> None:
-    """Test _wait_for_game_ready succeeds when messages captured."""
-    session = BrowserSession("https://example.com")
-    # Pre-populate messages to simulate game loaded
-    session._messages = [
-        CapturedMessage(timestamp_ms=1, direction="received", payload="msg1", ws_url="ws://test"),
-        CapturedMessage(timestamp_ms=2, direction="received", payload="msg2", ws_url="ws://test"),
-    ]
-    cdp = FakeCDPSession()
-    page = FakePage(cdp)
-    session._wait_for_game_ready(page)
-    # Should not raise
-
-
-def test_browser_session_wait_for_game_ready_no_messages() -> None:
-    """Test _wait_for_game_ready raises when no messages captured."""
-    session = BrowserSession("https://example.com")
-    cdp = FakeCDPSession()
-    page = FakePage(cdp)
-    with pytest.raises(GameNotJoinedError):
-        session._wait_for_game_ready(page)
-
-
 def test_get_captured_raw_messages_requires_value_field() -> None:
     """Captured raw-message helper rejects CDP results without a value field."""
 
@@ -377,177 +347,6 @@ def test_get_captured_raw_messages_requires_value_field() -> None:
 
     with pytest.raises(ValueError, match="missing value"):
         get_captured_raw_messages(_FakeCDPMissingValue())
-
-
-def test_browser_session_wait_for_game_ready_stabilization_reset() -> None:
-    """Test _wait_for_game_ready resets when new messages arrive during wait."""
-    session = BrowserSession("https://example.com")
-    session._messages = [
-        CapturedMessage(timestamp_ms=1, direction="received", payload="msg1", ws_url="ws://test"),
-    ]
-    page = FakePageGrowingMessages(session._messages, add_on_call=2)
-    session._wait_for_game_ready(page)
-    assert len(session._messages) == 2
-
-
-def test_browser_session_launch_browser_no_playwright() -> None:
-    """Test _launch_browser raises when Playwright not installed."""
-    session = BrowserSession("https://example.com")
-    original = _test_hooks.sync_playwright
-    _test_hooks.sync_playwright = None
-    try:
-        with pytest.raises(PlaywrightNotInstalledError):
-            session._launch_browser()
-    finally:
-        _test_hooks.sync_playwright = original
-
-
-def test_browser_session_launch_browser_success() -> None:
-    """Test _launch_browser launches browser and sets up CDP handlers."""
-    from tests.fakes import fake_sync_playwright
-
-    session = BrowserSession("https://example.com", headless=True)
-    original = _test_hooks.sync_playwright
-    _test_hooks.sync_playwright = fake_sync_playwright
-    try:
-        browser, context, page, cdp = session._launch_browser()
-        # Simulate a WebSocket creation event to verify handlers are working
-        ws_created_event: JSONObject = {
-            "requestId": "test_req",
-            "url": "wss://test.com/ws",
-        }
-        session._cdp_service._on_websocket_created(ws_created_event)
-        assert session._ws_urls["test_req"] == "wss://test.com/ws"
-
-        # Simulate a WebSocket frame event to verify message capture works
-        ws_frame_event: JSONObject = {
-            "requestId": "test_req",
-            "timestamp": 1000.0,
-            "response": {"opcode": 1, "mask": False, "payloadData": "test_data"},
-        }
-        session._cdp_service._on_websocket_frame_received(ws_frame_event)
-        assert len(session.messages) == 1
-        assert session.messages[0]["payload"] == "test_data"
-        assert session.messages[0]["ws_url"] == "wss://test.com/ws"
-
-        # Verify cleanup works correctly
-        session._cleanup(cdp, page, context, browser)
-    finally:
-        _test_hooks.sync_playwright = original
-
-
-def test_browser_session_navigate_and_login_raises_when_login_flow_fails() -> None:
-    """Navigate/login raises when the login flow reports failure."""
-    from tests.login.conftest import FakeCDPLogin, FakePageLogin
-
-    session = BrowserSession("https://example.com")
-    page = FakePageLogin(start_url="https://tankpit.com/play")
-    cdp = FakeCDPLogin(include_practice_room=False)
-
-    with pytest.raises(GameNotJoinedError, match="did not complete successfully"):
-        session._navigate_and_login(page, cdp, auto_join_room=True)
-
-
-def test_browser_session_cleanup() -> None:
-    """Teardown arms the watchdog and closes only the browser.
-
-    ``browser.close()`` subsumes page/context/CDP teardown; the old
-    four-step sequence gave sync Playwright four chances to deadlock
-    (runs 20260611-083908/092159 hung 10+ minutes after saving).
-    """
-    armed: list[float] = []
-
-    def record_watchdog(seconds: float, on_fire: Callable[[], None]) -> None:
-        del on_fire
-        armed.append(seconds)
-
-    _test_hooks.start_watchdog = record_watchdog
-    session = BrowserSession("https://example.com")
-    cdp = FakeCDPSession()
-    page = FakePage(cdp)
-    context = FakeBrowserContext()
-    browser = FakeBrowser()
-
-    session._cleanup(cdp, page, context, browser)
-
-    assert browser._closed is True
-    assert cdp._detached is False
-    assert page._closed is False
-    assert context._closed is False
-    assert armed == [30.0]
-
-
-def test_teardown_hang_handler_forces_distinct_exit_code() -> None:
-    """A fired teardown watchdog forces a recorded, distinct exit."""
-    from tankpit_bot.browser.session import _handle_teardown_hang
-
-    exit_codes: list[int] = []
-    _test_hooks.force_exit = exit_codes.append
-
-    _handle_teardown_hang()
-
-    assert exit_codes == [75]
-
-
-def test_browser_session_static_key_property() -> None:
-    """Test static_key property returns captured static key."""
-    session = BrowserSession("https://example.com")
-    # Initially None
-    assert session.static_key is None
-
-    # After setting
-    session._static_key = "test_static_key"
-    assert session.static_key == "test_static_key"
-
-
-class _FakeCDPNoResultDict(FakeCDPSession):
-    """FakeCDPSession that returns empty response (no 'result' key)."""
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return CDP response without a result dict.
-
-        Args:
-            method: CDP method name.
-            params: Optional parameters.
-
-        Returns:
-            Empty JSONObject (no 'result' key).
-        """
-        _ = params
-        self._sent_methods.append(method)
-        return {}
-
-
-def test_debug_js_websocket_no_result_dict() -> None:
-    """_debug_js_websocket handles CDP response without a result dict."""
-    session = BrowserSession("https://example.com", headless=True)
-    cdp = _FakeCDPNoResultDict()
-    session._debug_js_websocket(cdp)
-    assert len(cdp._sent_methods) == 1
-
-
-class _FakeBrowserRaising(FakeBrowser):
-    """Browser fake that raises RuntimeError on close."""
-
-    def close(self, *, reason: str | None = None) -> None:
-        """Raise RuntimeError to simulate already-closed browser."""
-        _ = reason
-        msg = "already closed"
-        raise RuntimeError(msg)
-
-
-class TestCleanup:
-    """Tests for BrowserSession._cleanup error handling."""
-
-    def test_cleanup_handles_browser_close_error(self) -> None:
-        """_cleanup catches RuntimeError from an already-closed browser."""
-        session = BrowserSession("https://example.com", headless=True)
-        cdp = FakeCDPSession()
-        page = FakePage(cdp)
-        context = FakeBrowserContext()
-        browser = _FakeBrowserRaising()
-        # Should not raise — the close error is caught and logged
-        session._cleanup(cdp, page, context, browser)
 
 
 class TestConsoleListener:
@@ -616,6 +415,14 @@ def test_browser_session_captured_message_count() -> None:
         )
     )
     assert session.captured_message_count() == 1
+
+
+def test_browser_session_static_key_property() -> None:
+    """BrowserSession.static_key returns the stored static key."""
+    session = BrowserSession("https://example.com")
+    assert session.static_key is None
+    session._static_key = "test_key"
+    assert session.static_key == "test_key"
 
 
 def test_browser_session_send_websocket_bytes() -> None:

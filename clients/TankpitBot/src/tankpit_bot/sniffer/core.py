@@ -19,6 +19,11 @@ from tankpit_bot.browser import (
     get_current_time_ms,
     reset_cdp_time_offset,
 )
+from tankpit_bot.browser.lifecycle import (
+    cleanup_browser,
+    gather_intel,
+    navigate_and_login,
+)
 from tankpit_bot.capture.summary import build_session_summary
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
 from tankpit_bot.runtime_logging import (
@@ -285,15 +290,17 @@ class WebSocketSniffer(BrowserSession):
             self._setup_console_listener(cdp)
             self._setup_cdp_handlers(cdp)
 
-            # Navigate to target URL
-            page.goto(self._target_url, wait_until="domcontentloaded")
-            log.info("Landed on %s", page.url)
+            navigate_and_login(
+                page,
+                cdp,
+                target_url=self._target_url,
+                prefer_account=self._prefer_account,
+                tank_name_prefix="B",
+                auto_join_room=True,
+            )
 
-            # Handle login
-            self._navigate_and_login(page, cdp, tank_name_prefix="B", auto_join_room=True)
-
-            # Gather all available intel
-            self._gather_intel(page, cdp)
+            self._cdp_service.log_websocket_urls()
+            self._static_key = gather_intel(page, cdp)
 
             # Initialize DOM scraper for game log and combat tracker
             self._init_game_log_scraper(cdp)
@@ -312,7 +319,7 @@ class WebSocketSniffer(BrowserSession):
             else:
                 log.info("Waiting for %d ms...", capture_duration_ms)
                 page.wait_for_timeout(float(capture_duration_ms))
-                self._cleanup(cdp, page, context, browser)
+                cleanup_browser(browser)
 
         return self._build_capture_session()
 

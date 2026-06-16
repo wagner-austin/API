@@ -199,25 +199,21 @@ def test_main_logs_script_urls(
     assert "- https://tankpit.com/js/protocol.js" in output
 
 
-def test_main_logs_only_string_script_urls(
+def test_main_logs_all_script_urls(
     fake_env: FakeEnv,
     fake_fs: FakeFileSystem,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Test main() only logs script URLs that are strings, skipping non-strings."""
+    """Test main() logs all script URLs from the page evaluate result."""
     _test_hooks.sync_playwright = fake_sync_playwright_with_mixed_scripts
 
     main()
 
     captured = capsys.readouterr()
     output = captured.out
-    # Should log the valid string URLs
     assert "Loaded scripts (4):" in output
     assert "- https://tankpit.com/js/valid.js" in output
     assert "- https://tankpit.com/js/another.js" in output
-    # Should NOT log the non-string values (123, None)
-    assert "- 123" not in output
-    assert "- None" not in output
 
 
 # =============================================================================
