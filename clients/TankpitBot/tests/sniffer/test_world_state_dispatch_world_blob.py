@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 from tankpit_bot.container import WorldStateDict as WorldStateBlobDict
-from tankpit_bot.sniffer import (
-    dispatch_world_state_update,
-    get_world_service,
-    reset_world_state,
-)
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestWorldStateBlobParsing:

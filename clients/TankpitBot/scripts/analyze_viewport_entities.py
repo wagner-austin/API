@@ -11,7 +11,10 @@ from pathlib import Path
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from scripts import _test_hooks
-from tankpit_bot.capture import analyze_viewport_entities, format_viewport_entity_dump
+from tankpit_bot.capture.viewport_entities import (
+    analyze_viewport_entities,
+    format_viewport_entity_dump,
+)
 from tankpit_bot.types import decode_capture_session
 
 

@@ -10,7 +10,7 @@ class TestBotClass:
 
     def test_bot_init(self, fake_env: FakeEnv) -> None:
         """Test Bot.__init__ sets up state correctly."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.get_state() == "INITIALIZING"
@@ -19,7 +19,7 @@ class TestBotClass:
 
     def test_bot_get_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_state returns current state name."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         state = bot.get_state()
@@ -27,7 +27,7 @@ class TestBotClass:
 
     def test_bot_get_state_data(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_state_data returns full state dict."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         state_data = bot.get_state_data()
@@ -37,7 +37,7 @@ class TestBotClass:
 
     def test_bot_get_world_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_world_state returns world state from module."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -48,7 +48,7 @@ class TestBotClass:
 
     def test_bot_get_self_state_none(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_self_state returns None when not tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -58,7 +58,7 @@ class TestBotClass:
 
     def test_bot_get_fuel_when_no_self_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel returns 0 when self_state not tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -68,7 +68,7 @@ class TestBotClass:
 
     def test_bot_get_position_none(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_position returns None when not tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -78,7 +78,7 @@ class TestBotClass:
 
     def test_bot_get_containers_empty(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_containers returns empty dict when none tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -88,7 +88,7 @@ class TestBotClass:
 
     def test_bot_get_fuel_containers_empty(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel_containers returns empty list when none tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -98,7 +98,7 @@ class TestBotClass:
 
     def test_bot_get_nearest_fuel_container_no_position(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns None when no position."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -112,7 +112,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_move_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.move_to returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.move_to(100, 100)
@@ -120,7 +120,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_pickup_fuel_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.pickup_fuel_to returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.pickup_fuel_to(100, 100)
@@ -128,7 +128,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_pickup_equipment_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.pickup_equipment_to returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.pickup_equipment_to(100, 100)
@@ -136,7 +136,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_teleport_to_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.teleport_to returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.teleport_to(100, 100)
@@ -144,7 +144,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_shoot_at_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.shoot_at(100, 100)
@@ -152,7 +152,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_use_radar_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.use_radar returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.use_radar()
@@ -160,7 +160,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_toggle_equipment_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.toggle_equipment returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.toggle_equipment(1)
@@ -168,7 +168,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_toggle_equipment_invalid_slot(self, fake_env: FakeEnv) -> None:
         """Test Bot.toggle_equipment returns False for invalid slot."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.toggle_equipment(0)
@@ -178,7 +178,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_enable_equipment_invalid_slot(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns False for invalid slot."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.enable_equipment(0)
@@ -188,7 +188,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_request_nearest_enemy_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.request_nearest_enemy returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.request_nearest_enemy()
@@ -196,7 +196,7 @@ class TestBotCommandsWithoutCDP:
 
     def test_open_map_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.open_map returns False when CDP not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.open_map()
@@ -208,7 +208,7 @@ class TestBotEquipmentState:
 
     def test_is_equipment_enabled_false_by_default(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled returns False by default (inventory all disabled)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -219,7 +219,7 @@ class TestBotEquipmentState:
 
     def test_is_equipment_enabled_invalid_slot(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled returns False for invalid slot."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.is_equipment_enabled(0) is False
@@ -227,7 +227,7 @@ class TestBotEquipmentState:
 
     def test_is_equipment_enabled_reads_from_inventory(self, fake_env: FakeEnv) -> None:
         """Test Bot.is_equipment_enabled reads from server inventory state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
@@ -243,7 +243,7 @@ class TestBotEquipmentState:
 
     def test_enable_equipment_already_enabled(self, fake_env: FakeEnv) -> None:
         """Test Bot.enable_equipment returns True if already enabled."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
@@ -265,7 +265,7 @@ class TestBotMapState:
         keypress that actually closes the overlay client-side, so the
         method reports failure.
         """
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.close_map()

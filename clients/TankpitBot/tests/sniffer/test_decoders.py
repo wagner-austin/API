@@ -8,7 +8,7 @@ import logging
 import pytest
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer import (
+from tankpit_bot.sniffer.decoders import (
     decode_8byte_state,
     decode_command,
     decode_join_confirm,
@@ -17,8 +17,8 @@ from tankpit_bot.sniffer import (
     decode_state_message,
     decode_text_message,
     process_received_message,
+    set_protocol_frame_logging,
 )
-from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 from tests.conftest import FakeFileSystem
 from tests.sniffer.conftest import make_payload
 
@@ -390,7 +390,7 @@ class TestTryDecodeBinary:
 
     def test_try_decode_binary_unknown_type(self) -> None:
         """Test try_decode_binary returns UNKNOWN for unknown message types."""
-        from tankpit_bot.sniffer import try_decode_binary
+        from tankpit_bot.sniffer.decoders import try_decode_binary
 
         # Use message type 0x01 which is not in MSG_MIN_LENGTHS
         result = try_decode_binary(0x01, b"\x00\x01\x02\x03", b"\x01\x00\x01\x02\x03")
@@ -399,7 +399,7 @@ class TestTryDecodeBinary:
 
     def test_try_decode_binary_short_data(self) -> None:
         """Test try_decode_binary returns SHORT when data is too short."""
-        from tankpit_bot.sniffer import try_decode_binary
+        from tankpit_bot.sniffer.decoders import try_decode_binary
 
         # ShootEvent (ord('S')=0x53) needs 12 bytes minimum
         result = try_decode_binary(ord("S"), b"\x00\x01\x02", b"S\x00\x01\x02")
@@ -409,7 +409,7 @@ class TestTryDecodeBinary:
 
     def test_try_decode_binary_valid_shoot_event(self) -> None:
         """Test try_decode_binary decodes valid ShootEvent."""
-        from tankpit_bot.sniffer import try_decode_binary
+        from tankpit_bot.sniffer.decoders import try_decode_binary
 
         # ShootEvent needs 12 bytes: [0]=dir, [1-2]=tank_id, [3-4]=aid,
         # [5]=type, [6]=damage, [7-8]=x, [9-10]=y, [11]=flags
@@ -419,7 +419,7 @@ class TestTryDecodeBinary:
 
     def test_try_decode_binary_non_printable_char(self) -> None:
         """Test try_decode_binary shows '?' for non-printable message types."""
-        from tankpit_bot.sniffer import try_decode_binary
+        from tankpit_bot.sniffer.decoders import try_decode_binary
 
         # Use message type 0x00 which is not printable
         result = try_decode_binary(0x00, b"\x00\x01", b"\x00\x00\x01")
@@ -427,7 +427,7 @@ class TestTryDecodeBinary:
 
     def test_try_decode_binary_long_data_preview(self) -> None:
         """Test try_decode_binary truncates long data preview with ellipsis."""
-        from tankpit_bot.sniffer import try_decode_binary
+        from tankpit_bot.sniffer.decoders import try_decode_binary
 
         # Unknown type with more than 20 bytes of data
         long_data = bytes(range(30))
@@ -445,7 +445,7 @@ class TestTryDecodeReceived:
 
     def test_try_decode_received_text_message(self) -> None:
         """Test try_decode_received handles text messages."""
-        from tankpit_bot.sniffer import try_decode_received
+        from tankpit_bot.sniffer.decoders import try_decode_received
 
         # '+' (0x2B) is a text message type
         body = b"+field=42\n"
@@ -457,7 +457,7 @@ class TestTryDecodeReceived:
 
     def test_try_decode_received_binary_empty_decoded(self) -> None:
         """Test try_decode_received returns EMPTY for 1-byte binary body."""
-        from tankpit_bot.sniffer import try_decode_received
+        from tankpit_bot.sniffer.decoders import try_decode_received
 
         # 1-byte binary body → xor_decode strips msg_type → empty decoded data
         body = bytes([0x47])
@@ -470,7 +470,7 @@ class TestTryDecodeReceived:
 
     def test_try_decode_received_binary_multi_byte(self) -> None:
         """Test try_decode_received decodes multi-byte binary message."""
-        from tankpit_bot.sniffer import try_decode_received
+        from tankpit_bot.sniffer.decoders import try_decode_received
 
         # 2-byte body: msg_type 0x01 (unknown) + data byte
         # xor_decode produces 1-byte decoded data, type not in MSG_MIN_LENGTHS
@@ -484,7 +484,7 @@ class TestTryDecodeReceived:
 
     def test_try_decode_received_short_payload(self) -> None:
         """Test try_decode_received returns None for short payloads."""
-        from tankpit_bot.sniffer import try_decode_received
+        from tankpit_bot.sniffer.decoders import try_decode_received
 
         # Payload that decodes to less than 3 bytes
         payload = base64.b64encode(b"\x01\x00").decode()
@@ -493,7 +493,7 @@ class TestTryDecodeReceived:
 
     def test_try_decode_received_invalid_base64(self) -> None:
         """Test try_decode_received returns None for invalid base64."""
-        from tankpit_bot.sniffer import try_decode_received
+        from tankpit_bot.sniffer.decoders import try_decode_received
 
         result = try_decode_received("not valid base64!!!")
         assert result is None
@@ -509,7 +509,7 @@ class TestDecodeAndLogBinary:
 
     def test_decode_and_log_binary_logs_result(self) -> None:
         """Test decode_and_log_binary logs the decoded result."""
-        from tankpit_bot.sniffer import decode_and_log_binary
+        from tankpit_bot.sniffer.decoders import decode_and_log_binary
 
         # Use unknown type to ensure it logs UNKNOWN
         decode_and_log_binary(0x01, b"\x00\x01\x02", "RECEIVED", b"\x01\x00\x01\x02")

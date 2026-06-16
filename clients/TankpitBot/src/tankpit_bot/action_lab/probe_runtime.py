@@ -18,8 +18,9 @@ from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.browser import PlaywrightNotInstalledError, reset_cdp_time_offset
-from tankpit_bot.sniffer import reset_all_trackers, reset_world_state
+from tankpit_bot.sniffer.trackers import reset_all_trackers
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
+from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.types import CapturedMessage
 

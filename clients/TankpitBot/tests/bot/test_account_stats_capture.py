@@ -14,7 +14,7 @@ from platform_core.json_utils import JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
-from tankpit_bot.bot import Bot
+from tankpit_bot.bot.base import Bot
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,

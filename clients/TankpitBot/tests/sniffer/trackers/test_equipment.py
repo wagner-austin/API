@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from tankpit_bot.capture import EquipmentGainTracker, EquipmentToggleTracker
+from tankpit_bot.capture.trackers import EquipmentGainTracker, EquipmentToggleTracker
 from tests.conftest import FakeFileSystem
 from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
 

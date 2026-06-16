@@ -8,7 +8,7 @@ class TestBotCommandTypes:
 
     def test_make_move_command(self) -> None:
         """Test make_move_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_move_command
+        from tankpit_bot.bot.types import make_move_command
 
         cmd = make_move_command(100, 150)
         assert cmd["cmd_type"] == "move"
@@ -17,7 +17,7 @@ class TestBotCommandTypes:
 
     def test_make_shoot_command(self) -> None:
         """Test make_shoot_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_shoot_command
+        from tankpit_bot.bot.types import make_shoot_command
 
         cmd = make_shoot_command(50, 75)
         assert cmd["cmd_type"] == "shoot"
@@ -26,14 +26,14 @@ class TestBotCommandTypes:
 
     def test_make_radar_command(self) -> None:
         """Test make_radar_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_radar_command
+        from tankpit_bot.bot.types import make_radar_command
 
         cmd = make_radar_command()
         assert cmd["cmd_type"] == "radar"
 
     def test_make_pickup_fuel_command(self) -> None:
         """Test make_pickup_fuel_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_pickup_fuel_command
+        from tankpit_bot.bot.types import make_pickup_fuel_command
 
         cmd = make_pickup_fuel_command(200, 100)
         assert cmd["cmd_type"] == "pickup_fuel"
@@ -42,7 +42,7 @@ class TestBotCommandTypes:
 
     def test_make_pickup_equipment_command(self) -> None:
         """Test make_pickup_equipment_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_pickup_equipment_command
+        from tankpit_bot.bot.types import make_pickup_equipment_command
 
         cmd = make_pickup_equipment_command(200, 100)
         assert cmd["cmd_type"] == "pickup_equipment"
@@ -51,7 +51,7 @@ class TestBotCommandTypes:
 
     def test_make_teleport_command(self) -> None:
         """Test make_teleport_command creates correct TypedDict."""
-        from tankpit_bot.bot import make_teleport_command
+        from tankpit_bot.bot.types import make_teleport_command
 
         cmd = make_teleport_command(128, 64)
         assert cmd["cmd_type"] == "teleport"
@@ -64,7 +64,8 @@ class TestBotCommandEncoding:
 
     def test_encode_move_command(self) -> None:
         """Test encode_move_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_move_command, make_move_command
+        from tankpit_bot.bot.commands import encode_move_command
+        from tankpit_bot.bot.types import make_move_command
         from tankpit_bot.protocol.commands import build_move_command
 
         cmd = make_move_command(100, 150)
@@ -74,7 +75,8 @@ class TestBotCommandEncoding:
 
     def test_encode_shoot_command(self) -> None:
         """Test encode_shoot_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_shoot_command, make_shoot_command
+        from tankpit_bot.bot.commands import encode_shoot_command
+        from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.protocol.commands import build_shoot_command
 
         cmd = make_shoot_command(50, 75)
@@ -84,7 +86,8 @@ class TestBotCommandEncoding:
 
     def test_encode_radar_command(self) -> None:
         """Test encode_radar_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_radar_command, make_radar_command
+        from tankpit_bot.bot.commands import encode_radar_command
+        from tankpit_bot.bot.types import make_radar_command
         from tankpit_bot.protocol.commands import CMD_RADAR, build_query_command
 
         cmd = make_radar_command()
@@ -94,7 +97,8 @@ class TestBotCommandEncoding:
 
     def test_encode_pickup_fuel_command(self) -> None:
         """Test encode_pickup_fuel_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_pickup_fuel_command, make_pickup_fuel_command
+        from tankpit_bot.bot.commands import encode_pickup_fuel_command
+        from tankpit_bot.bot.types import make_pickup_fuel_command
         from tankpit_bot.protocol.commands import build_pickup_fuel_command
 
         cmd = make_pickup_fuel_command(200, 100)
@@ -104,7 +108,8 @@ class TestBotCommandEncoding:
 
     def test_encode_pickup_equipment_command(self) -> None:
         """Test encode_pickup_equipment_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_pickup_equipment_command, make_pickup_equipment_command
+        from tankpit_bot.bot.commands import encode_pickup_equipment_command
+        from tankpit_bot.bot.types import make_pickup_equipment_command
         from tankpit_bot.protocol.commands import build_pickup_equipment_command
 
         cmd = make_pickup_equipment_command(200, 100)
@@ -114,7 +119,8 @@ class TestBotCommandEncoding:
 
     def test_encode_teleport_command(self) -> None:
         """Test encode_teleport_command encodes command to expected bytes."""
-        from tankpit_bot.bot import encode_teleport_command, make_teleport_command
+        from tankpit_bot.bot.commands import encode_teleport_command
+        from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.protocol.commands import build_teleport_command
 
         cmd = make_teleport_command(128, 64)

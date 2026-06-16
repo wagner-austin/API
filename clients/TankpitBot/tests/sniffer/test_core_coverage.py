@@ -97,7 +97,7 @@ class TestSnifferCoverageBranches:
     def test_format_container_simple_container_pickup(self) -> None:
         """Test format_container_simple for container_pickup message."""
         from tankpit_bot.container.types import ContainerPickupDict
-        from tankpit_bot.sniffer import format_container_simple
+        from tankpit_bot.sniffer.formatters import format_container_simple
 
         msg = ContainerPickupDict(
             msg_type="container_pickup",
@@ -113,7 +113,7 @@ class TestSnifferCoverageBranches:
     def test_format_container_simple_radar_response(self) -> None:
         """Test format_container_simple for radar_response message."""
         from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
-        from tankpit_bot.sniffer import format_container_simple
+        from tankpit_bot.sniffer.formatters import format_container_simple
 
         msg = RadarResponseDict(
             msg_type="radar_response",
@@ -129,7 +129,7 @@ class TestSnifferCoverageBranches:
     def test_format_position_details_movement_response(self) -> None:
         """Test format_position_details for movement_response (0x3D)."""
         from tankpit_bot.protocol import MovementResponseDict
-        from tankpit_bot.sniffer import format_position_details
+        from tankpit_bot.sniffer.formatters import format_position_details
 
         msg = MovementResponseDict(
             msg_type=0x3D,
@@ -148,7 +148,7 @@ class TestSnifferCoverageBranches:
     def test_format_message_details_tank_type(self) -> None:
         """Test format_message_details routes tank types correctly."""
         from tankpit_bot.protocol import TankEntryDict
-        from tankpit_bot.sniffer import format_message_details
+        from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = TankEntryDict(
             msg_type=0x28,
@@ -165,7 +165,7 @@ class TestSnifferCoverageBranches:
     def test_format_message_details_resource_type(self) -> None:
         """Test format_message_details routes resource types correctly."""
         from tankpit_bot.protocol import FuelGainDict
-        from tankpit_bot.sniffer import format_message_details
+        from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = FuelGainDict(
             msg_type=0x44,
@@ -179,7 +179,7 @@ class TestSnifferCoverageBranches:
     def test_format_message_details_position_type(self) -> None:
         """Test format_message_details routes position types correctly."""
         from tankpit_bot.protocol import MinePlacementDict
-        from tankpit_bot.sniffer import format_message_details
+        from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = MinePlacementDict(
             msg_type=0x4B,
@@ -194,7 +194,7 @@ class TestSnifferCoverageBranches:
     def test_format_message_details_radar_type(self) -> None:
         """Test format_message_details routes radar types correctly."""
         from tankpit_bot.protocol import RadarResultDict
-        from tankpit_bot.sniffer import format_message_details
+        from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = RadarResultDict(
             msg_type=0x46,
@@ -209,7 +209,7 @@ class TestSnifferCoverageBranches:
     def test_format_message_details_misc_type(self) -> None:
         """Test format_message_details routes misc types correctly."""
         from tankpit_bot.protocol import EquipmentGainDict
-        from tankpit_bot.sniffer import format_message_details
+        from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = EquipmentGainDict(
             msg_type=0x67,
@@ -222,7 +222,7 @@ class TestSnifferCoverageBranches:
 
     def test_decode_8byte_state(self) -> None:
         """Test decode_state_message handles 8-byte state messages."""
-        from tankpit_bot.sniffer import decode_state_message
+        from tankpit_bot.sniffer.decoders import decode_state_message
 
         # 8-byte body triggers decode_8byte_state
         body = bytes([0x2E, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07])
@@ -231,7 +231,8 @@ class TestSnifferCoverageBranches:
 
     def test_handle_tank_registry_with_name_not_container(self) -> None:
         """Test handle_tank_registry stores name for non-container tanks."""
-        from tankpit_bot.sniffer import handle_tank_registry, player_tracking
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.formatters import handle_tank_registry
 
         # Reset tank names
         player_tracking._tank_names.clear()
@@ -252,7 +253,8 @@ class TestSnifferCoverageBranches:
 
     def test_handle_tank_registry_container_skips_name_storage(self) -> None:
         """Test handle_tank_registry does not store name for containers."""
-        from tankpit_bot.sniffer import handle_tank_registry, player_tracking
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.formatters import handle_tank_registry
 
         # Reset tank names
         player_tracking._tank_names.clear()
@@ -337,7 +339,7 @@ class TestSnifferCoverageBranches:
     def test_format_container_details_movement(self) -> None:
         """Test format_container_details for movement message."""
         from tankpit_bot.container.types import MovementDict
-        from tankpit_bot.sniffer import format_container_details
+        from tankpit_bot.sniffer.formatters import format_container_details
 
         msg = MovementDict(
             msg_type="movement",

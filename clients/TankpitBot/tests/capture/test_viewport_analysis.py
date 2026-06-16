@@ -7,19 +7,19 @@ import base64
 import pytest
 from platform_core.json_utils import JSONTypeError
 
-from tankpit_bot.capture import (
+from tankpit_bot.capture import viewport_analysis as va
+from tankpit_bot.capture.viewport_analysis import (
+    ViewportAnalysisDict,
+    ViewportShiftDict,
     analyze_capture_session,
-    build_xor_table,
     decode_viewport_analysis,
     encode_viewport_analysis,
     format_viewport_analysis,
 )
-from tankpit_bot.capture import viewport_analysis as va
-from tankpit_bot.capture.viewport_analysis import ViewportAnalysisDict, ViewportShiftDict
 from tankpit_bot.capture.viewport_analysis_types import (
     ViewportAnalysisStateDict,
 )
-from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 

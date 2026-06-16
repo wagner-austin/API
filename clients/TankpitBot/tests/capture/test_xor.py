@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.capture import (
-    decode_base64_safe,
-    xor_decode_body,
-)
-from tankpit_bot.capture.xor import is_valid_base64
+from tankpit_bot.capture.xor import decode_base64_safe, is_valid_base64, xor_decode_body
 
 
 class TestIsValidBase64:

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer import (
+from tankpit_bot.sniffer import viewport
+from tankpit_bot.sniffer.formatters import (
     format_container_pickup,
     format_movement,
     format_radar_response,
     format_tank_registry_details,
-    viewport,
 )
 
 

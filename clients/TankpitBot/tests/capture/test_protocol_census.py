@@ -10,16 +10,15 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot.capture import (
+from tankpit_bot.capture import protocol_census as pc
+from tankpit_bot.capture.protocol_census import (
+    ProtocolCensusDict,
     analyze_protocol_census,
-    build_xor_table,
     decode_protocol_census,
     encode_protocol_census,
     format_protocol_census,
 )
-from tankpit_bot.capture import protocol_census as pc
-from tankpit_bot.capture.protocol_census import ProtocolCensusDict
-from tankpit_bot.capture.xor import xor_decode_body
+from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
 from tankpit_bot.types.message import CapturedMessage
 from tankpit_bot.types.session import CaptureSession
 from tests.conftest import FakeFileSystem

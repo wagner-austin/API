@@ -6,7 +6,7 @@ types of WebSocket messages and extract game state information.
 
 from __future__ import annotations
 
-from tankpit_bot.capture import (
+from tankpit_bot.capture.trackers import (
     ContainerTracker,
     DeactivationTracker,
     EquipmentGainTracker,
@@ -19,8 +19,8 @@ from tankpit_bot.capture import (
     RadarTracker,
     TankExitTracker,
     TankTracker,
-    decode_base64_safe,
 )
+from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.protocol.codec import extract_magic_from_auth_payload
 from tankpit_bot.sniffer.xor import build_global_xor_table
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.capture import format_sig_key
-from tankpit_bot.sniffer import damage_name, rank_name, team_name
+from tankpit_bot.capture.signature import format_sig_key
+from tankpit_bot.sniffer.formatters import damage_name, rank_name, team_name
 
 # =============================================================================
 # Format Sig Key Tests

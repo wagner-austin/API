@@ -8,17 +8,19 @@ from tankpit_bot.protocol.types import (
     EquipmentToggleDict,
     InventoryDict,
 )
-from tankpit_bot.sniffer import (
-    get_inventory_state,
+from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
+    update_world_state_from_position,
+)
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.sniffer.world_state_inventory import (
+    get_inventory_state,
     update_inventory_from_gain,
     update_inventory_from_protocol,
     update_inventory_from_toggle,
-    update_world_state_from_position,
-    update_world_state_from_radar,
 )
-from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
@@ -154,8 +156,8 @@ class TestWorldStateRendering:
 
     def test_render_world_state_ascii_returns_none_without_terrain(self) -> None:
         """Test returns None when no terrain file exists."""
-        from tankpit_bot.sniffer import render_world_state_ascii
         from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
+        from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 
         register_room_image("1", "field01.gif")
         set_selected_room("1")
@@ -166,8 +168,8 @@ class TestWorldStateRendering:
 
     def test_render_world_state_ascii_with_terrain(self) -> None:
         """Test renders ASCII with terrain map."""
-        from tankpit_bot.sniffer import render_world_state_ascii
         from tankpit_bot.sniffer.world_state import register_room_image, set_selected_room
+        from tankpit_bot.sniffer.world_state_tiles import render_world_state_ascii
 
         fake_terrain = InMemoryTerrainMap()
         register_room_image("1", "field01.gif")

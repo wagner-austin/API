@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer import (
-    dispatch_world_state_update,
+from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
-    update_world_state_from_fuel_total,
     update_world_state_from_position,
-    update_world_state_from_radar,
 )
+from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
 
 class TestDispatchOther:

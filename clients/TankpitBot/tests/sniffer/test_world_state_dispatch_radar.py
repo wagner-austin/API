@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.container import RadarContainerDict
-from tankpit_bot.sniffer import (
-    dispatch_world_state_update,
+from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 

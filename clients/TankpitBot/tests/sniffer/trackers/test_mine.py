@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture import MineTracker
+from tankpit_bot.capture.trackers import MineTracker
 from tests.conftest import FakeFileSystem
 from tests.sniffer.trackers.conftest import build_test_xor_table, make_payload
 

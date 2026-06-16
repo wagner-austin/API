@@ -12,7 +12,7 @@ from pathlib import Path
 from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks, protocol
-from tankpit_bot.capture import decode_base64_safe
+from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.parser import is_room_info_text
 from tankpit_bot.protocol.constants import RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES

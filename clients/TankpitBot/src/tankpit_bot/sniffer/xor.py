@@ -6,7 +6,7 @@ for processing encrypted TankPit WebSocket messages.
 
 from __future__ import annotations
 
-from tankpit_bot.capture import build_xor_table, load_xor_static_key
+from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
 
 # Module-level XOR table for unified decoder
 _global_xor_table: bytes | None = None

@@ -5,13 +5,9 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture import (
-    build_message_stats,
-    build_xor_table,
-    empty_message_stats,
-    extract_message_signature,
-    load_xor_static_key,
-)
+from tankpit_bot.capture.signature import extract_message_signature
+from tankpit_bot.capture.stats import build_message_stats, empty_message_stats
+from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
 from tests.conftest import FakeFileSystem
 
 # =============================================================================
@@ -243,7 +239,7 @@ class TestBuildSessionSummary:
 
     def test_extracts_combat_events_from_game_log(self) -> None:
         """Test extracts combat events from game log."""
-        from tankpit_bot.capture import build_session_summary
+        from tankpit_bot.capture.summary import build_session_summary
         from tankpit_bot.types import CaptureSession, GameLogEntryWithTimestamp
 
         session = CaptureSession(
@@ -287,7 +283,7 @@ class TestBuildSessionSummary:
 
     def test_skips_non_combat_log_entries(self) -> None:
         """Test skips non-combat log entries."""
-        from tankpit_bot.capture import build_session_summary
+        from tankpit_bot.capture.summary import build_session_summary
         from tankpit_bot.types import CaptureSession, GameLogEntryWithTimestamp
 
         session = CaptureSession(

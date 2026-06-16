@@ -19,7 +19,7 @@ from tankpit_bot.browser import (
     get_current_time_ms,
     reset_cdp_time_offset,
 )
-from tankpit_bot.capture import build_session_summary
+from tankpit_bot.capture.summary import build_session_summary
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
 from tankpit_bot.runtime_logging import (
     configure_sniff_runtime_logging,

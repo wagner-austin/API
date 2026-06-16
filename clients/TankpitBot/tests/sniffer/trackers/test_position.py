@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture import PositionTracker
+from tankpit_bot.capture.trackers import PositionTracker
 from tests.conftest import FakeFileSystem
 from tests.sniffer.trackers.conftest import make_payload
 

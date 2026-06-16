@@ -11,12 +11,8 @@ from pathlib import Path
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from scripts import _test_hooks
-from tankpit_bot.capture import (
-    analyze_capture_session,
-    build_xor_table,
-    format_viewport_analysis,
-    load_xor_static_key,
-)
+from tankpit_bot.capture.viewport_analysis import analyze_capture_session, format_viewport_analysis
+from tankpit_bot.capture.xor import build_xor_table, load_xor_static_key
 from tankpit_bot.types import decode_capture_session
 
 

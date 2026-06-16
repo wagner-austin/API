@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer import (
+from tankpit_bot.sniffer.world_state import (
+    get_world_service,
     reset_world_state,
     update_world_state_from_position,
-    update_world_state_from_radar,
 )
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 from tankpit_bot.state.viewport_geometry import (
     make_visible_viewport_state,
     viewport_radar_bounds,
@@ -29,7 +29,8 @@ class TestPlayerIdMapper:
 
     def test_reset_player_id_mapper(self) -> None:
         """Test reset_player_id_mapper clears state."""
-        from tankpit_bot.sniffer import player_tracking, reset_player_id_mapper
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.player_tracking import reset_player_id_mapper
 
         # Add some data
         player_tracking._player_id_mapper._player_to_tank[1] = 100
@@ -42,7 +43,10 @@ class TestPlayerIdMapper:
 
     def test_resolve_movement_tank_no_mapping(self) -> None:
         """Test resolve_movement_tank returns pid when no mapping exists."""
-        from tankpit_bot.sniffer import reset_player_id_mapper, resolve_movement_tank
+        from tankpit_bot.sniffer.player_tracking import (
+            reset_player_id_mapper,
+            resolve_movement_tank,
+        )
 
         reset_player_id_mapper()
         result = resolve_movement_tank(42, 100, 100)
@@ -50,8 +54,8 @@ class TestPlayerIdMapper:
 
     def test_resolve_movement_tank_with_mapping(self) -> None:
         """Test resolve_movement_tank returns tank_id when mapped."""
-        from tankpit_bot.sniffer import (
-            player_tracking,
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.player_tracking import (
             reset_player_id_mapper,
             resolve_movement_tank,
         )
@@ -64,8 +68,8 @@ class TestPlayerIdMapper:
 
     def test_resolve_movement_tank_with_name(self) -> None:
         """Test resolve_movement_tank returns name when available."""
-        from tankpit_bot.sniffer import (
-            player_tracking,
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.player_tracking import (
             reset_player_id_mapper,
             resolve_movement_tank,
         )
@@ -79,8 +83,8 @@ class TestPlayerIdMapper:
 
     def test_resolve_movement_tank_position_correlation(self) -> None:
         """Test resolve_movement_tank uses position correlation."""
-        from tankpit_bot.sniffer import (
-            player_tracking,
+        from tankpit_bot.sniffer import player_tracking
+        from tankpit_bot.sniffer.player_tracking import (
             reset_player_id_mapper,
             resolve_movement_tank,
         )
@@ -135,7 +139,7 @@ class TestTextDecoding:
 
     def test_try_decode_received_text_invalid_base64_length(self) -> None:
         """Test try_decode_received_text returns None for invalid base64 length."""
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Length not multiple of 4
         result = try_decode_received_text("abc")
@@ -143,7 +147,7 @@ class TestTextDecoding:
 
     def test_try_decode_received_text_invalid_chars(self) -> None:
         """Test try_decode_received_text returns None for invalid chars."""
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Invalid character !
         result = try_decode_received_text("abc!")
@@ -153,7 +157,7 @@ class TestTextDecoding:
         """Test try_decode_received_text returns None for too short data."""
         import base64
 
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # Only 1 byte of data (less than 2)
         result = try_decode_received_text(base64.b64encode(b"x").decode())
@@ -163,7 +167,7 @@ class TestTextDecoding:
         """Test try_decode_received_text returns None for empty body."""
         import base64
 
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # 2 bytes header, no body
         result = try_decode_received_text(base64.b64encode(b"\x00\x00").decode())
@@ -173,7 +177,7 @@ class TestTextDecoding:
         """Test try_decode_received_text returns None for non-text message types."""
         import base64
 
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # First byte 0x00 is not a text message type
         result = try_decode_received_text(base64.b64encode(b"\x03\x00\x00data").decode())
@@ -183,7 +187,7 @@ class TestTextDecoding:
         """Test try_decode_received_text decodes valid join confirm."""
         import base64
 
-        from tankpit_bot.sniffer import try_decode_received_text
+        from tankpit_bot.sniffer.decoders import try_decode_received_text
 
         # '+' (0x2B) is a text message type for JOIN_CONFIRM
         body = b"+field=42\n"
@@ -197,7 +201,7 @@ class TestTextDecoding:
         """Test decode_received_text_message logs when result is not None."""
         import base64
 
-        from tankpit_bot.sniffer import decode_received_text_message
+        from tankpit_bot.sniffer.decoders import decode_received_text_message
 
         # This tests the logging branch when result is not None
         body = b"+field=42\n"
@@ -207,7 +211,7 @@ class TestTextDecoding:
 
     def test_decode_received_text_message_no_log_for_none(self) -> None:
         """Test decode_received_text_message does not log when result is None."""
-        from tankpit_bot.sniffer import decode_received_text_message
+        from tankpit_bot.sniffer.decoders import decode_received_text_message
 
         # Invalid payload, result is None, should not log
         decode_received_text_message("xxx")

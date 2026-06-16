@@ -10,7 +10,6 @@ Provides a base class that handles:
 from __future__ import annotations
 
 import re
-import uuid
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -22,12 +21,9 @@ from tankpit_bot._test_hooks import (
     CDPSessionProtocol,
     PageProtocol,
 )
-from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import (
-    cdp_timestamp_to_ms,
     get_current_time_ms,
     reset_cdp_time_offset,
-    send_websocket_bytes,
 )
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
@@ -40,6 +36,7 @@ from tankpit_bot.browser.key_discovery import (
     load_static_key,
     save_static_key,
 )
+from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.browser.types import (
     STATIC_KEY_PATH,
     GameNotJoinedError,
@@ -236,16 +233,12 @@ _BROWSER_HOOK_SOURCE = """
             """
 
 
-class BrowserSession:
+class BrowserSession(SessionBase):
     """Base class for browser-based WebSocket capture.
 
-    Handles common functionality:
-    - Browser/CDP setup
-    - WebSocket event handlers
-    - Message capture and storage
-    - Magic key capture
-
-    Subclasses implement specific behavior (passive sniffing vs active probing).
+    Inherits CDPService composition from SessionBase. Adds sniffer-specific
+    scrapers (game log, combat, inventory, fuel), browser lifecycle methods,
+    and intel gathering.
     """
 
     def __init__(
@@ -262,59 +255,13 @@ class BrowserSession:
             headless: Whether to run browser in headless mode.
             prefer_account: Skip guest login and use account credentials.
         """
-        self._target_url = target_url
-        self._headless = headless
-        self._prefer_account = prefer_account
-        self._session_id = str(uuid.uuid4())
-        self._start_timestamp_ms = 0
-        self._cdp_service = CDPService()
-        self._cdp_service.set_callbacks(
-            on_message_captured=self._on_message_captured,
-            on_magic_captured=self._on_magic_captured,
-        )
-        self._cdp: CDPSessionProtocol | None = None
+        super().__init__(target_url, headless=headless, prefer_account=prefer_account)
         self._page: PageProtocol | None = None
-        self._static_key: str | None = None
         self._game_log_scraper: GameLogScraper | None = None
         self._inventory_scraper: InventoryScraper | None = None
         self._combat_tracker: CombatTracker | None = None
         self._fuel_prober: FuelProber | None = None
         self._last_fuel_result: FuelProbeResult | None = None
-
-    @property
-    def _messages(self) -> list[CapturedMessage]:
-        """Delegate message storage to CDPService."""
-        return self._cdp_service.messages
-
-    @_messages.setter
-    def _messages(self, value: list[CapturedMessage]) -> None:
-        self._cdp_service.messages = value
-
-    @property
-    def _ws_urls(self) -> dict[str, str]:
-        """Delegate WebSocket URL storage to CDPService."""
-        return self._cdp_service.ws_urls
-
-    @_ws_urls.setter
-    def _ws_urls(self, value: dict[str, str]) -> None:
-        self._cdp_service.ws_urls = value
-
-    @property
-    def _magic(self) -> str | None:
-        """Delegate magic key storage to CDPService."""
-        return self._cdp_service.magic
-
-    @_magic.setter
-    def _magic(self, value: str | None) -> None:
-        self._cdp_service.magic = value
-
-    def captured_message_count(self) -> int:
-        """Return how many WebSocket messages have been captured so far.
-
-        Returns:
-            Length of the session's captured-message list.
-        """
-        return len(self._messages)
 
     @property
     def session_id(self) -> str:
@@ -445,46 +392,6 @@ class BrowserSession:
 
         self._last_fuel_result = result
         return result
-
-    def _on_message_captured(self, message: CapturedMessage) -> None:
-        """Called by CDPService when a WebSocket message is captured.
-
-        Subclasses override to process captured messages (e.g.,
-        ProbeBase buffers received messages for world sync).
-
-        Args:
-            message: The captured message.
-        """
-
-    def _on_magic_captured(self, magic: str) -> None:
-        """Called by CDPService when magic key is first extracted.
-
-        Override in subclasses to perform setup that requires the magic key
-        (e.g., initializing XOR tables, trackers).
-
-        Args:
-            magic: The session magic string.
-        """
-
-    def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
-        """Set up CDP event handlers for WebSocket capture.
-
-        Delegates to CDPService for event wiring and frame capture.
-
-        Args:
-            cdp: CDP session.
-        """
-        self._cdp_service.setup_cdp_handlers(cdp)
-
-    def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
-        """Set up console message listener for WebSocket debug info.
-
-        Delegates to CDPService for console event wiring.
-
-        Args:
-            cdp: CDP session.
-        """
-        self._cdp_service.setup_console_listener(cdp)
 
     def _log_websocket_urls(self) -> None:
         """Log all captured WebSocket URLs."""
@@ -648,27 +555,6 @@ class BrowserSession:
             save_static_key(new_key)
             log.info("Updated static key file: %s", STATIC_KEY_PATH)
 
-    def _send_websocket_bytes(
-        self,
-        cdp: CDPSessionProtocol,
-        data: bytes,
-        label: str = "direct_send",
-    ) -> str:
-        """Send raw bytes via the captured WebSocket.
-
-        Uses the WebSocket instance captured by the prototype hook installed
-        in _setup_cdp_handlers, with fallbacks to tankpit.ws and window.ws.
-
-        Args:
-            cdp: CDP session.
-            data: Raw bytes to send.
-            label: Bot-side label for outbound provenance logging.
-
-        Returns:
-            Status string: 'SENT_N_BYTES via URL' on success, error message otherwise.
-        """
-        return send_websocket_bytes(cdp, data, label)
-
     def _wait_for_game_ready(self, page: PageProtocol) -> None:
         """Wait for game to fully load (message flow stabilizes).
 
@@ -799,7 +685,6 @@ class BrowserSession:
 
 __all__ = [
     "BrowserSession",
-    "cdp_timestamp_to_ms",
     "get_current_time_ms",
     "reset_cdp_time_offset",
 ]

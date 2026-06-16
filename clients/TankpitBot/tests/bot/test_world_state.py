@@ -13,7 +13,7 @@ class TestBotWithWorldState:
 
     def test_get_position_with_self_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_position returns position when tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -27,7 +27,7 @@ class TestBotWithWorldState:
 
     def test_get_self_state_with_position(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_self_state returns state when tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -45,7 +45,7 @@ class TestBotWithWorldState:
 
     def test_get_fuel_with_self_state(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel returns fuel when tracked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -61,7 +61,7 @@ class TestBotWithWorldState:
 
     def test_get_fuel_containers_with_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel_containers returns fuel containers."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -79,7 +79,7 @@ class TestBotWithWorldState:
 
     def test_get_nearest_fuel_container_with_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns nearest container."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -104,7 +104,7 @@ class TestBotWithWorldState:
 
     def test_get_nearest_fuel_container_no_fuel_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns None when no fuel containers."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,

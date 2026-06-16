@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer import (
-    dispatch_world_state_update,
-    reset_world_state,
-)
-from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
@@ -16,6 +12,7 @@ from tankpit_bot.sniffer.world_state_combat import (
     peek_combat_hit,
     peek_our_shot_response,
 )
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_inventory import (
     get_inventory_state,
     update_inventory_from_protocol,

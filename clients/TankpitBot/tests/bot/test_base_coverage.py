@@ -13,7 +13,7 @@ class TestDispatchKeypressWithoutCDP:
 
     def test_raises_without_cdp(self, fake_env: FakeEnv) -> None:
         """_dispatch_keypress with no CDP session raises RuntimeError."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot._cdp is None
@@ -27,7 +27,7 @@ class TestMaybeCaptureAccountStatsOnce:
 
     def test_already_captured_returns_immediately(self, fake_env: FakeEnv) -> None:
         """When stats are already captured, no further attempts are made."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._account_stats_captured = True
@@ -47,8 +47,7 @@ class TestMaybeCaptureAccountStatsOnce:
         This exercises line 1036 -- the early return when
         ``_account_stats_attempts >= _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS``.
         """
-        from tankpit_bot.bot import Bot
-        from tankpit_bot.bot.base import _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS
+        from tankpit_bot.bot.base import _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS, Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._account_stats_attempts = _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS

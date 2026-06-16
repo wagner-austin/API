@@ -11,7 +11,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.browser.cdp_service import CDPService
-from tankpit_bot.sniffer import SnifferError, WebSocketSniffer
+from tankpit_bot.sniffer.core import SnifferError, WebSocketSniffer
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 from tests.conftest import FakeFileSystem
 from tests.fakes import (
@@ -216,6 +216,7 @@ class TestWebSocketSnifferMethods:
         sniffer._last_fuel_result = None
         sniffer._session_id = "autosave-test"
         sniffer._start_timestamp_ms = 1000
+        sniffer._cdp_message_buffer = []
         sniffer._messages = [
             CapturedMessage(
                 timestamp_ms=1100,

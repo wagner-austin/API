@@ -14,7 +14,7 @@ from pathlib import Path
 from platform_core.logging import get_logger, setup_rich_logging
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.capture import decode_base64_safe
+from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.sniffer.constants import TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.decoders import decode_text_message, try_decode_binary
 from tankpit_bot.sniffer.xor import build_global_xor_table, xor_decode

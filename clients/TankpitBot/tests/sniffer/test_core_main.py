@@ -7,7 +7,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import SyncPlaywrightFactoryProtocol
-from tankpit_bot.sniffer import main, run_sniffer
+from tankpit_bot.sniffer.core import main, run_sniffer
 from tankpit_bot.types import decode_capture_session
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import (

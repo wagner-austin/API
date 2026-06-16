@@ -100,7 +100,7 @@ class TestStopFileDetection:
         call exits early because self_state is None (no position), then
         the stop-file check triggers.
         """
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import run_tick_loop
 
         reset_world_state()
@@ -142,7 +142,7 @@ class TestClearRejectedMovement:
 
     def test_non_move_collect_kind_returns_false(self, fake_env: FakeEnv) -> None:
         """Actions other than move/collect are not affected by rejection."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         action = InFlightActionDict(
@@ -159,7 +159,7 @@ class TestClearRejectedMovement:
 
     def test_move_without_failure_returns_false(self, fake_env: FakeEnv) -> None:
         """A move whose target is NOT failed returns False."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -177,7 +177,7 @@ class TestClearRejectedMovement:
 
     def test_move_with_failed_target_clears_and_returns_true(self, fake_env: FakeEnv) -> None:
         """A move whose target was marked failed gets cleared (replan)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -203,7 +203,7 @@ class TestClearRejectedMovement:
 
     def test_collect_with_failed_target_increments_failed_pickups(self, fake_env: FakeEnv) -> None:
         """A collect whose target was marked failed also marks the container."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         update_world_state_from_position(100, 100)
         update_world_state_from_fuel_total(get_world_service(), 800)
@@ -242,7 +242,7 @@ class TestWaitForMapOpenAction:
 
     def test_wait_for_map_open_action_returns_true_while_waiting(self, fake_env: FakeEnv) -> None:
         """_wait_for_map_open_action returns True when map data hasn't arrived."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _wait_for_map_open_action
 
         update_world_state_from_position(100, 100)
@@ -276,7 +276,7 @@ class TestWaitForMovementActionRejected:
         self, fake_env: FakeEnv
     ) -> None:
         """_wait_for_movement_action returns False when the target was rejected."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _wait_for_movement_action
 
         update_world_state_from_position(100, 100)

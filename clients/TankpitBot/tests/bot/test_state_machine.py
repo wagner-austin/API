@@ -48,7 +48,7 @@ class TestBotStates:
 
     def test_bot_state_enum_values(self) -> None:
         """Test BotState enum has expected states."""
-        from tankpit_bot.bot import BotState
+        from tankpit_bot.bot.states import BotState
 
         # Verify key states have auto-generated int values
         assert BotState.INITIALIZING.value == 1
@@ -60,7 +60,7 @@ class TestBotStates:
 
     def test_make_initial_state_data(self) -> None:
         """Test make_initial_state_data creates proper state dict."""
-        from tankpit_bot.bot import make_initial_state_data
+        from tankpit_bot.bot.states import make_initial_state_data
 
         state = make_initial_state_data()
         assert state["state"] == "INITIALIZING"
@@ -71,38 +71,38 @@ class TestBotStates:
 
     def test_is_valid_transition_valid(self) -> None:
         """Test is_valid_transition returns True for valid transitions."""
-        from tankpit_bot.bot import is_valid_transition
+        from tankpit_bot.bot.states import is_valid_transition
 
         assert is_valid_transition("INITIALIZING", "WAITING_FOR_POSITION")
 
     def test_low_fuel_to_combat_is_valid(self) -> None:
         """LOW_FUEL -> COMBAT is valid for low-fuel defense scenarios."""
-        from tankpit_bot.bot import is_valid_transition
+        from tankpit_bot.bot.states import is_valid_transition
 
         assert is_valid_transition("LOW_FUEL", "COMBAT")
 
     def test_is_valid_transition_invalid(self) -> None:
         """Test is_valid_transition returns False for invalid transitions."""
-        from tankpit_bot.bot import is_valid_transition
+        from tankpit_bot.bot.states import is_valid_transition
 
         assert not is_valid_transition("IDLE", "INITIALIZING")
 
     def test_validate_transition_valid(self) -> None:
         """Test validate_transition does not raise for valid transitions."""
-        from tankpit_bot.bot import validate_transition
+        from tankpit_bot.bot.states import validate_transition
 
         validate_transition("INITIALIZING", "WAITING_FOR_POSITION")
 
     def test_validate_transition_invalid(self) -> None:
         """Test validate_transition raises for invalid transitions."""
-        from tankpit_bot.bot import validate_transition
+        from tankpit_bot.bot.states import validate_transition
 
         with pytest.raises(ValueError, match="Invalid transition"):
             validate_transition("IDLE", "INITIALIZING")
 
     def test_transition_to(self) -> None:
         """Test transition_to updates state."""
-        from tankpit_bot.bot import make_initial_state_data, transition_to
+        from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
         new_state = transition_to(state, "WAITING_FOR_POSITION")
@@ -110,7 +110,7 @@ class TestBotStates:
 
     def test_transition_to_with_action(self) -> None:
         """transition_to replaces in_flight_action when provided."""
-        from tankpit_bot.bot import make_initial_state_data, transition_to
+        from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
         action = make_in_flight_action("move", 10, 20, 5000)
@@ -127,7 +127,7 @@ class TestBotStates:
 
     def test_transition_to_inherits_action_when_none(self) -> None:
         """transition_to inherits current action when no new one given."""
-        from tankpit_bot.bot import make_initial_state_data, transition_to
+        from tankpit_bot.bot.states import make_initial_state_data, transition_to
 
         state = make_initial_state_data()
         action = make_in_flight_action("teleport", 50, 60, 1000)
@@ -142,7 +142,7 @@ class TestBotStates:
 
     def test_set_fuel_threshold(self) -> None:
         """Test set_fuel_threshold updates fuel threshold."""
-        from tankpit_bot.bot import make_initial_state_data, set_fuel_threshold
+        from tankpit_bot.bot.states import make_initial_state_data, set_fuel_threshold
 
         state = make_initial_state_data()
         new_state = set_fuel_threshold(state, 300)
@@ -216,7 +216,7 @@ class TestBotStateUpdates:
 
     def test_update_state_initializing_to_waiting(self, fake_env: FakeEnv) -> None:
         """Test transition from INITIALIZING to WAITING_FOR_POSITION."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         assert bot.get_state() == "INITIALIZING"
@@ -226,7 +226,7 @@ class TestBotStateUpdates:
 
     def test_update_state_waiting_to_idle(self, fake_env: FakeEnv) -> None:
         """Test transition from WAITING_FOR_POSITION to IDLE."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -242,7 +242,7 @@ class TestBotStateUpdates:
 
     def test_update_state_low_fuel(self, fake_env: FakeEnv) -> None:
         """Test transition to LOW_FUEL when fuel below threshold."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -262,7 +262,7 @@ class TestBotStateUpdates:
 
     def test_update_state_scanning_to_idle(self, fake_env: FakeEnv) -> None:
         """SCANNING completes when a radar response arrives."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -292,7 +292,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """SCANNING completes even when the radar finds zero containers."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -316,7 +316,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """MOVING completes when reaching target position."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -338,7 +338,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """COLLECTING completes when reaching target position."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -360,7 +360,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """COLLECTING completes when pickup removes the target container."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -392,7 +392,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """TELEPORTING completes when the server confirms landing."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -415,7 +415,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """Mismatched teleport landing blacklists the requested destination."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
@@ -444,7 +444,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """LOW_FUEL does not override an in-flight TELEPORTING state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -467,7 +467,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """LOW_FUEL does not override an in-flight COLLECTING state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.container import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -496,7 +496,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """LOW_FUEL does not override an in-flight SCANNING state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -519,7 +519,7 @@ class TestBotStateUpdates:
         fake_env: FakeEnv,
     ) -> None:
         """TELEPORTING completes to IDLE even when fuel is below threshold."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -547,7 +547,7 @@ class TestBotOnMessageCaptured:
         fake_env: FakeEnv,
     ) -> None:
         """_on_message_captured only extracts magic, no state transition."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.types import CapturedMessage
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -570,7 +570,7 @@ class TestBotStateUpdateBranches:
         fake_env: FakeEnv,
     ) -> None:
         """MOVING stays MOVING when not at target."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -592,7 +592,7 @@ class TestBotStateUpdateBranches:
         fake_env: FakeEnv,
     ) -> None:
         """TELEPORTING stays until landing is confirmed."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.sniffer import (
-    dispatch_world_state_update,
+from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_combat import drain_killed_tank_ids
+from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 
 
 class TestDispatchMovement:

@@ -11,7 +11,10 @@ from pathlib import Path
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from scripts import _test_hooks
-from tankpit_bot.capture import analyze_shot_viewport_correlation, format_shot_viewport_correlation
+from tankpit_bot.capture.shot_viewport_correlation import (
+    analyze_shot_viewport_correlation,
+    format_shot_viewport_correlation,
+)
 from tankpit_bot.types import decode_capture_session
 
 

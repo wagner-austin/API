@@ -227,8 +227,8 @@ def test_tick_once_emits_sample_from_live_world_state(
     real ``decode_page_client_snapshot`` -> tick-boundary emission -> real
     JSONL handler -> real ``build_self_map_report``.
     """
-    from tankpit_bot.bot import Bot
     from tankpit_bot.bot.ai.types import AIStateDict
+    from tankpit_bot.bot.base import Bot
     from tankpit_bot.bot.tick_loop import _tick_once
     from tankpit_bot.diagnostics.self_alignment_types import (
         SelfFieldCandidateDict,

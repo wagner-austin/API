@@ -85,7 +85,7 @@ class TestBotWithCDP:
 
     def test_send_bytes_success(self, fake_env: FakeEnv) -> None:
         """Test Bot._send_bytes succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -96,7 +96,7 @@ class TestBotWithCDP:
 
     def test_send_bytes_xor_encodes_commands(self, fake_env: FakeEnv) -> None:
         """Test Bot._send_bytes XOR encodes '!' commands when table is set."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.protocol.codec import build_xor_table
         from tankpit_bot.protocol.commands import build_move_command
         from tests.fakes import FakeCDPSession
@@ -128,7 +128,7 @@ class TestBotWithCDP:
 
     def test_on_magic_captured_builds_xor_table(self, fake_env: FakeEnv) -> None:
         """Test _on_magic_captured builds XOR table for command encoding."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
 
@@ -141,7 +141,7 @@ class TestBotWithCDP:
 
     def test_enter_game_sends_query_command(self, fake_env: FakeEnv) -> None:
         """Test enter_game sends CMD_ENTER_GAME (type=2, cmd=0x3f)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -153,7 +153,7 @@ class TestBotWithCDP:
 
     def test_enter_game_no_cdp_returns_false(self, fake_env: FakeEnv) -> None:
         """Test enter_game returns False when CDP session not available."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = bot.enter_game()
@@ -161,7 +161,7 @@ class TestBotWithCDP:
 
     def test_move_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.move_to succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -181,7 +181,7 @@ class TestBotWithCDP:
 
     def test_pickup_fuel_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.pickup_fuel_to succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -201,7 +201,7 @@ class TestBotWithCDP:
 
     def test_teleport_to_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.teleport_to succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -222,7 +222,7 @@ class TestBotWithCDP:
 
     def test_teleport_to_clears_stale_landed_flag(self, fake_env: FakeEnv) -> None:
         """A new teleport drains any stale TeleportLanded ack before sending."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -246,7 +246,7 @@ class TestBotWithCDP:
 
     def test_shoot_at_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -266,7 +266,7 @@ class TestBotWithCDP:
 
     def test_shoot_at_already_combat(self, fake_env: FakeEnv) -> None:
         """Test Bot.shoot_at stays in COMBAT if already in COMBAT."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -286,7 +286,7 @@ class TestBotWithCDP:
 
     def test_use_radar_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.use_radar succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -306,7 +306,7 @@ class TestBotWithCDP:
 
     def test_open_map_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.open_map succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -324,7 +324,7 @@ class TestBotWithCDP:
         toggle, so the bot dispatches an ``Input.dispatchKeyEvent`` keyDown
         and matching keyUp for the ``m`` key.
         """
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -339,7 +339,7 @@ class TestBotWithCDP:
 
     def test_toggle_equipment_success_with_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.toggle_equipment succeeds with CDP session."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -350,7 +350,7 @@ class TestBotWithCDP:
 
     def test_teleport_fails_if_send_fails(self, fake_env: FakeEnv) -> None:
         """Test teleport_to returns False if _send_bytes fails."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession, FakePage
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -364,7 +364,7 @@ class TestBotWithCDP:
 
     def test_teleport_fails_when_send_bytes_returns_false(self, fake_env: FakeEnv) -> None:
         """Test teleport_to returns False when command dispatch itself fails."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession, FakePage
 
         class FailingTeleportBot(Bot):
@@ -386,7 +386,7 @@ class TestBotTeleportBranches:
 
     def test_teleport_without_page(self, fake_env: FakeEnv) -> None:
         """Test teleport_to works when _page is None (skips waits)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -405,7 +405,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_no_self_state(self, fake_env: FakeEnv) -> None:
         """_tick_once returns early when self_state is None."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -417,7 +417,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_returns_if_self_state_disappears_after_sync(self, fake_env: FakeEnv) -> None:
         """_tick_once aborts when the refreshed world loses self_state mid-tick."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.state.types import SelfStateDict, ViewportStateDict, WorldStateDict
 
@@ -480,7 +480,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_waits_for_position_before_planning(self, fake_env: FakeEnv) -> None:
         """_tick_once does not execute AI commands while state is WAITING_FOR_POSITION."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -507,7 +507,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_nothing_to_do_opens_map(self, fake_env: FakeEnv) -> None:
         """_tick_once opens map when nothing to do (no enemies, no containers)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -535,7 +535,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_hunt_with_enemy(self, fake_env: FakeEnv) -> None:
         """_tick_once dispatches HUNT when enemy is nearby."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -592,7 +592,7 @@ class TestBotAIIntegration:
 
     def test_tick_once_updates_ai_state(self, fake_env: FakeEnv) -> None:
         """_tick_once persists updated AI state after tick."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -618,7 +618,7 @@ class TestBotAIIntegration:
 
     def test_dispatch_command_move(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches move to move_to."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_move_command
         from tankpit_bot.sniffer.world_state import (
@@ -639,7 +639,7 @@ class TestBotAIIntegration:
 
     def test_dispatch_command_pickup_fuel(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches pickup_fuel to pickup_fuel_to."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_pickup_fuel_command
         from tankpit_bot.sniffer.world_state import (
@@ -660,7 +660,7 @@ class TestBotAIIntegration:
 
     def test_dispatch_command_shoot(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches shoot to shoot_at."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_shoot_command
         from tankpit_bot.sniffer.world_state import (
@@ -681,7 +681,7 @@ class TestBotAIIntegration:
 
     def test_dispatch_command_radar(self, fake_env: FakeEnv) -> None:
         """executor.dispatch_command dispatches radar to use_radar."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_radar_command
         from tankpit_bot.sniffer.world_state import (
@@ -702,7 +702,7 @@ class TestBotAIIntegration:
 
     def test_dispatch_command_teleport(self, fake_env: FakeEnv) -> None:
         """With the map open, dispatch_command sends the teleport directly."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.sniffer.world_state import (
@@ -730,7 +730,7 @@ class TestBotAIIntegration:
         0/21 with the map already open), so the executor never sends
         both in one tick.
         """
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.sniffer.world_state import (
@@ -762,7 +762,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_hunt_critical_enemy(self, fake_env: FakeEnv) -> None:
         """HUNT with critically damaged enemy enables radar, dual, homing."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -781,7 +781,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_hunt_healthy_no_homing(self, fake_env: FakeEnv) -> None:
         """HUNT with healthy enemy enables radar and dual only."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -800,7 +800,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_defend_enables_armor(self, fake_env: FakeEnv) -> None:
         """DEFEND mode enables radar (5) and armor (1), disables dual+homing."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -819,7 +819,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_collect_fuel_critical_shields(self, fake_env: FakeEnv) -> None:
         """COLLECT_FUEL with critical fuel enables radar and shields."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -838,7 +838,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_collect_fuel_low_no_shields(self, fake_env: FakeEnv) -> None:
         """COLLECT_FUEL with low (not critical) fuel: radar only."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -857,7 +857,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_patrol_only_radar(self, fake_env: FakeEnv) -> None:
         """PATROL mode only enables extra radar (5)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -876,7 +876,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_disables_unneeded(self, fake_env: FakeEnv) -> None:
         """Disables combat equipment when switching from HUNT to PATROL."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -898,7 +898,7 @@ class TestBotEquipmentManagement:
 
     def test_apply_equipment_no_stock_skips_enable(self, fake_env: FakeEnv) -> None:
         """Does not enable equipment when stock is depleted."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.executor import apply_equipment
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -917,7 +917,7 @@ class TestBotEquipmentManagement:
 
     def test_is_equipment_enabled_all_slots(self, fake_env: FakeEnv) -> None:
         """is_equipment_enabled returns correct state for all 5 slots."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_toggle
 
@@ -932,7 +932,7 @@ class TestBotEquipmentManagement:
 
     def test_disable_equipment_invalid_slot(self, fake_env: FakeEnv) -> None:
         """disable_equipment returns False for out-of-range slot."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -942,7 +942,7 @@ class TestBotEquipmentManagement:
 
     def test_has_equipment_stock_missile_slot(self, fake_env: FakeEnv) -> None:
         """_has_equipment_stock returns True for slot 3 (missile) with stock."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
         )
@@ -954,7 +954,7 @@ class TestBotEquipmentManagement:
 
     def test_has_equipment_stock_invalid_slot(self, fake_env: FakeEnv) -> None:
         """_has_equipment_stock returns False for invalid slot number."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -963,7 +963,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_low_fuel_radars_for_fuel(self, fake_env: FakeEnv) -> None:
         """_tick_once uses radar when fuel low and no containers visible."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -988,7 +988,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_low_fuel_walks_to_edge(self, fake_env: FakeEnv) -> None:
         """_tick_once walks to viewport edge when fuel low and radar on cooldown."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1018,7 +1018,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_in_flight_movement(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a walk is still resolving."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1044,7 +1044,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_in_flight_teleport(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while a teleport is still resolving."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1069,7 +1069,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_in_flight_collection(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while pickup movement is still resolving."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1099,7 +1099,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_pending_shot_feedback(self, fake_env: FakeEnv) -> None:
         """_tick_once does not replan while the last shot outcome is still pending."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1137,8 +1137,8 @@ class TestBotEquipmentManagement:
         """Rejected shoots do not leak speculative feedback state into AI memory."""
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
-        from tankpit_bot.bot import Bot
         from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.combat_feedback import CombatFeedback
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
@@ -1231,7 +1231,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_tick_once scans first when regular radar is available at zero extra stock."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1261,7 +1261,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_tick_once searches for equipment when dual is below break threshold."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1335,7 +1335,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Killed-target replanning uses regular radar before broader search movement."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1370,7 +1370,7 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked walking clears MOVING so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1397,7 +1397,7 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_blocked_walk(self, fake_env: FakeEnv) -> None:
         """Blocked walking returns False from the in-flight gate after clearing state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1423,7 +1423,7 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_walk_returns_false_without_self_state(self, fake_env: FakeEnv) -> None:
         """Blocked-walk helper does nothing when self position is unknown."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1438,7 +1438,7 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_collection_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked collection clears COLLECTING so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1472,7 +1472,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Reachable collection remains in flight when the viewport path is valid."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1503,7 +1503,7 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_blocked_collection(self, fake_env: FakeEnv) -> None:
         """Blocked collection returns False from the in-flight gate after clearing state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1533,7 +1533,7 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_stalled_move(self, fake_env: FakeEnv) -> None:
         """Stalled movement times out so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1559,7 +1559,7 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_stalled_collection(self, fake_env: FakeEnv) -> None:
         """Stalled collection times out so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1589,7 +1589,7 @@ class TestBotEquipmentManagement:
 
     def test_has_in_flight_action_clears_stalled_teleport(self, fake_env: FakeEnv) -> None:
         """Stalled teleport times out so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1618,7 +1618,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Shoot actions are not blocking for replanning."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1633,7 +1633,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """map_open waits until at least one fresh world sync arrives."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1668,7 +1668,7 @@ class TestBotEquipmentManagement:
         -- called by the dispatcher when a MAP_DATA blob is decoded -- is
         the legitimate completion signal.
         """
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1704,7 +1704,7 @@ class TestBotEquipmentManagement:
 
     def test_stalled_map_open_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A map_open that stalls past timeout clears so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1733,7 +1733,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """A zero started_ms prevents the stall timeout from firing."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.states import InFlightActionDict
         from tankpit_bot.bot.tick_loop import _clear_stalled_action
         from tankpit_bot.sniffer.world_state import reset_world_state
@@ -1753,7 +1753,7 @@ class TestBotEquipmentManagement:
 
     def test_fresh_scan_does_not_trigger_stall_timeout(self, fake_env: FakeEnv) -> None:
         """A recently started scan does not trigger stall timeout."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_stalled_action
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1765,7 +1765,7 @@ class TestBotEquipmentManagement:
 
     def test_stalled_scan_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A scan that stalls past timeout clears so the bot can replan."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             is_scan_viewport_failed,
@@ -1793,7 +1793,7 @@ class TestBotEquipmentManagement:
 
     def test_stalled_move_marks_failed_move_target(self, fake_env: FakeEnv) -> None:
         """Stalled move records the destination as a failed move target."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
@@ -1822,7 +1822,7 @@ class TestBotEquipmentManagement:
 
     def test_clear_blocked_collection_returns_false_when_adjacent(self, fake_env: FakeEnv) -> None:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
@@ -1854,7 +1854,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Blocked-collection helper does nothing when self position is unknown."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _clear_blocked_collection
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1869,7 +1869,7 @@ class TestBotEquipmentManagement:
 
     def test_tick_once_waits_for_pending_scan(self, fake_env: FakeEnv) -> None:
         """_tick_once does not fire new commands while radar results are pending."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1897,7 +1897,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_merge_protocol_kills adds Deactivation kills to AI killed_tank_ids."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1914,7 +1914,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """Kill merge clears stale shot feedback and the matching combat lock."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1940,7 +1940,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_merge_protocol_kills returns unchanged state when no kills."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1954,7 +1954,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_get_combat_feedback returns 'miss' when dual active and no hit."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1975,7 +1975,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_get_combat_feedback returns '' when dual shots depleted."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -1991,7 +1991,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_get_combat_feedback returns 'hit' when CombatHit was received."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
@@ -2009,7 +2009,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_get_combat_feedback returns 'hit' when the tracked target was killed."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -2026,7 +2026,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_get_combat_feedback returns '' when no shot was fired."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -2040,7 +2040,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_has_pending_shot_feedback waits while a shot is still inside its timeout."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -2057,7 +2057,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_has_pending_shot_feedback stops waiting once the timeout expires."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -2074,7 +2074,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_has_pending_shot_feedback yields to feedback when a hit is already buffered."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
@@ -2093,7 +2093,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_has_pending_shot_feedback stops waiting when the target is already dead."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
 
@@ -2111,7 +2111,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """_has_pending_shot_feedback ends when weapon_byte=0 response arrives."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
         from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
@@ -2130,7 +2130,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """weapon_byte=0 with dual available is a miss (target was empty)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -2154,7 +2154,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """weapon_byte=0 without dual is '' (can't determine hit/miss)."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -2178,7 +2178,7 @@ class TestBotEquipmentManagement:
         fake_env: FakeEnv,
     ) -> None:
         """After dual depleted by hits, weapon_byte=0 gives '' not 'miss'."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -2219,7 +2219,7 @@ class TestRequireCdp:
         """
         import pytest
 
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         with pytest.raises(RuntimeError, match="no CDP session attached"):
@@ -2313,7 +2313,7 @@ class TestPageClientHealthGate:
         from platform_core.json_utils import JSONObject
 
         from tankpit_bot._test_hooks import CDPSessionProtocol
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -2386,7 +2386,7 @@ class TestBotMessageDecoding:
         """_on_message_captured extracts magic key from sent AUTH message."""
         import base64
 
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.types import CapturedMessage
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -2408,7 +2408,7 @@ class TestBotMessageDecoding:
 
     def test_on_message_captured_received_updates_world(self, fake_env: FakeEnv) -> None:
         """_on_message_captured decodes received messages to update world state."""
-        from tankpit_bot.bot import Bot
+        from tankpit_bot.bot.base import Bot
         from tankpit_bot.types import CapturedMessage
 
         bot = Bot("https://test.tankpit.com/", headless=True)

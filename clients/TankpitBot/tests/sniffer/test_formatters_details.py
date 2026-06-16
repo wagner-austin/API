@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer import (
+from tankpit_bot.sniffer.formatters import (
     format_combat_details,
     format_container_details,
     format_decoded_message,

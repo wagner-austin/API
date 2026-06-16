@@ -17,7 +17,7 @@ import pytest
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol
-from tankpit_bot.bot import Bot
+from tankpit_bot.bot.base import Bot
 
 _SHOT_ENV = "TANKPIT_SHOT_SCREENSHOTS"
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"

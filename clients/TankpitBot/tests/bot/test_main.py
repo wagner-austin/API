@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot import BotError, ProtocolNotDiscoveredError, main
+from tankpit_bot.bot.base import BotError, ProtocolNotDiscoveredError
+from tankpit_bot.bot.entry import main
 
 
 def test_main_is_entry_main() -> None:

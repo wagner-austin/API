@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer import reset_xor_state, xor_decode
+from tankpit_bot.sniffer.xor import reset_xor_state, xor_decode
 
 
 class TestXorDecode:
