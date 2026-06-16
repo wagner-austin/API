@@ -158,7 +158,6 @@ class TestWebSocketSnifferMethods:
         sniffer._magic = "testmagic"
         sniffer._output_path = None
         sniffer._game_log_scraper = None
-        sniffer._inventory_scraper = None
 
         # Initialize trackers with magic
         trackers.init_trackers_with_magic("testmagic")
@@ -211,9 +210,6 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._game_log_scraper = None
-        sniffer._inventory_scraper = None
-        sniffer._fuel_prober = None
-        sniffer._last_fuel_result = None
         sniffer._session_id = "autosave-test"
         sniffer._start_timestamp_ms = 1000
         sniffer._cdp_message_buffer = []
@@ -256,9 +252,6 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._game_log_scraper = None
-        sniffer._inventory_scraper = None
-        sniffer._fuel_prober = None
-        sniffer._last_fuel_result = None
         sniffer._session_id = "autosave-log-test"
         sniffer._start_timestamp_ms = 1000
         sniffer._messages = []

@@ -425,6 +425,48 @@ def test_browser_session_static_key_property() -> None:
     assert session.static_key == "test_key"
 
 
+def test_browser_session_poll_game_log_empty() -> None:
+    """BrowserSession._poll_game_log returns empty when no scraper."""
+    session = BrowserSession("https://example.com")
+    assert session._poll_game_log() == []
+
+
+def test_browser_session_process_game_log_entry_iterates_and_logs() -> None:
+    """BrowserSession._process_game_log_entry handles combat and non-combat."""
+    from tankpit_bot.browser.dom_scraper import GameLogEntry
+
+    session = BrowserSession("https://example.com")
+    session._init_combat_tracker()
+    combat = GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+    session._process_game_log_entry(combat)
+    unrecognized = GameLogEntry(text="unknown combat text xyz", category="combat")
+    session._process_game_log_entry(unrecognized)
+    non_combat = GameLogEntry(text="Zoom in", category="action")
+    session._process_game_log_entry(non_combat)
+
+
+def test_browser_session_poll_game_log_iterates_entries() -> None:
+    """BrowserSession._poll_game_log iterates and processes scraper results."""
+
+    class _GameLogCDP:
+        def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+            _ = params
+            if method == "Runtime.evaluate":
+                return {"result": {"value": "Game Log\nZoom in\nTank full"}}
+            return {"result": {"value": ""}}
+
+        def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+            _ = (event, handler)
+
+        def detach(self) -> None:
+            pass
+
+    session = BrowserSession("https://example.com")
+    session._init_game_log_scraper(_GameLogCDP())
+    entries = session._poll_game_log()
+    assert len(entries) == 3
+
+
 def test_browser_session_send_websocket_bytes() -> None:
     """BrowserSession._send_websocket_bytes delegates to send_websocket_bytes."""
     session = BrowserSession("https://example.com")
