@@ -11,6 +11,10 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.cdp_helpers import decode_captured_body, load_tpclient_static_key
 from tankpit_bot.browser.login import (
+    ensure_on_play_page,
+    handle_login_flow,
+)
+from tankpit_bot.browser.room_join import (
     _collect_room_entries,
     _has_enter_response,
     _has_join_confirm,
@@ -19,8 +23,6 @@ from tankpit_bot.browser.login import (
     _wait_for_enter_response,
     _wait_for_join_confirm,
     _wait_for_room_id,
-    ensure_on_play_page,
-    handle_login_flow,
     join_room,
 )
 from tankpit_bot.protocol.framing import encode_frame
