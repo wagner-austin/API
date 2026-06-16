@@ -13,11 +13,11 @@ from tankpit_bot.browser import (
     GameNotJoinedError,
     PlaywrightNotInstalledError,
 )
-from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
-from tankpit_bot.browser.session import (
+from tankpit_bot.browser.cdp_utils import (
     _pop_sent_frame_metadata,
     get_captured_raw_messages,
 )
+from tankpit_bot.browser.inject_script import BROWSER_HOOK_SOURCE
 from tankpit_bot.types import CapturedMessage
 from tests.fakes import (
     FakeBrowser,

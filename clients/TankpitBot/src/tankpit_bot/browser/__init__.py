@@ -24,6 +24,11 @@ from tankpit_bot.browser.accounts import (
     resolve_account,
     select_account,
 )
+from tankpit_bot.browser.cdp_utils import (
+    cdp_timestamp_to_ms,
+    get_current_time_ms,
+    reset_cdp_time_offset,
+)
 from tankpit_bot.browser.dom_scraper import (
     GameLogEntry,
     GameLogScraper,
@@ -51,12 +56,7 @@ from tankpit_bot.browser.login import (
     handle_guest_login,
     handle_login_flow,
 )
-from tankpit_bot.browser.session import (
-    BrowserSession,
-    cdp_timestamp_to_ms,
-    get_current_time_ms,
-    reset_cdp_time_offset,
-)
+from tankpit_bot.browser.session import BrowserSession
 from tankpit_bot.browser.types import (
     KNOWN_PROTOCOL_SIGNATURES,
     STATIC_KEY_LENGTH,

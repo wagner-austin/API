@@ -21,7 +21,7 @@ from tankpit_bot.browser.cdp_helpers import (
     get_tpclient_url,
     load_tpclient_static_key,
 )
-from tankpit_bot.browser.session import get_captured_raw_messages, send_websocket_bytes
+from tankpit_bot.browser.cdp_utils import get_captured_raw_messages, send_websocket_bytes
 from tankpit_bot.parser import RoomInfo, is_room_info_text
 from tankpit_bot.parser_messages import parse_room_info
 from tankpit_bot.protocol.codec import ProtocolCodec
