@@ -1371,7 +1371,7 @@ class TestBotEquipmentManagement:
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked walking clears MOVING so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_walk
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1398,7 +1398,7 @@ class TestBotEquipmentManagement:
     def test_has_in_flight_action_clears_blocked_walk(self, fake_env: FakeEnv) -> None:
         """Blocked walking returns False from the in-flight gate after clearing state."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1416,7 +1416,7 @@ class TestBotEquipmentManagement:
         bot._update_state_from_world()
         bot._state_data = _sba(bot._state_data, "MOVING", "move", 15, 10)
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1424,7 +1424,7 @@ class TestBotEquipmentManagement:
     def test_clear_blocked_walk_returns_false_without_self_state(self, fake_env: FakeEnv) -> None:
         """Blocked-walk helper does nothing when self position is unknown."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_walk
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_walk
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -1439,7 +1439,7 @@ class TestBotEquipmentManagement:
     def test_clear_blocked_collection_resets_state(self, fake_env: FakeEnv) -> None:
         """Blocked collection clears COLLECTING so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_collection
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1473,7 +1473,7 @@ class TestBotEquipmentManagement:
     ) -> None:
         """Reachable collection remains in flight when the viewport path is valid."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_collection
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1504,7 +1504,7 @@ class TestBotEquipmentManagement:
     def test_has_in_flight_action_clears_blocked_collection(self, fake_env: FakeEnv) -> None:
         """Blocked collection returns False from the in-flight gate after clearing state."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1526,7 +1526,7 @@ class TestBotEquipmentManagement:
         bot._update_state_from_world()
         bot._state_data = _sba(bot._state_data, "COLLECTING", "collect", 15, 10)
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1534,7 +1534,7 @@ class TestBotEquipmentManagement:
     def test_has_in_flight_action_clears_stalled_move(self, fake_env: FakeEnv) -> None:
         """Stalled movement times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1552,7 +1552,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1560,7 +1560,7 @@ class TestBotEquipmentManagement:
     def test_has_in_flight_action_clears_stalled_collection(self, fake_env: FakeEnv) -> None:
         """Stalled collection times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1582,7 +1582,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1590,7 +1590,7 @@ class TestBotEquipmentManagement:
     def test_has_in_flight_action_clears_stalled_teleport(self, fake_env: FakeEnv) -> None:
         """Stalled teleport times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1608,7 +1608,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1619,14 +1619,14 @@ class TestBotEquipmentManagement:
     ) -> None:
         """Shoot actions are not blocking for replanning."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = _sba(bot._state_data, "COMBAT", "shoot", 50, 50)
 
-        assert _has_in_flight_action(bot) is False
+        assert has_in_flight_action(bot) is False
 
     def test_has_in_flight_action_waits_for_pending_map_open_sync(
         self,
@@ -1634,7 +1634,7 @@ class TestBotEquipmentManagement:
     ) -> None:
         """map_open waits until at least one fresh world sync arrives."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1653,7 +1653,7 @@ class TestBotEquipmentManagement:
             **{**get_world_service().world_state, "timestamp_ms": started_ms}
         )
 
-        assert _has_in_flight_action(bot) is True
+        assert has_in_flight_action(bot) is True
         assert bot._state_data["in_flight_action"]["kind"] == "map_open"
 
     def test_has_in_flight_action_holds_map_open_until_map_data_processed(
@@ -1669,7 +1669,7 @@ class TestBotEquipmentManagement:
         the legitimate completion signal.
         """
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1691,21 +1691,21 @@ class TestBotEquipmentManagement:
             **{**get_world_service().world_state, "timestamp_ms": started_ms + 1}
         )
 
-        assert _has_in_flight_action(bot) is True
+        assert has_in_flight_action(bot) is True
         kind_before_signal = bot._state_data["in_flight_action"]["kind"]
         assert kind_before_signal == "map_open"
 
         # Now mark the authoritative MAP_DATA signal; the wait should clear.
         get_world_service().mark_map_data_processed()
 
-        assert _has_in_flight_action(bot) is False
+        assert has_in_flight_action(bot) is False
         kind_after_signal = bot._state_data["in_flight_action"]["kind"]
         assert kind_after_signal == "none"
 
     def test_stalled_map_open_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A map_open that stalls past timeout clears so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1723,7 +1723,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1735,7 +1735,7 @@ class TestBotEquipmentManagement:
         """A zero started_ms prevents the stall timeout from firing."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.states import InFlightActionDict
-        from tankpit_bot.bot.tick_loop import _clear_stalled_action
+        from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()
@@ -1754,7 +1754,7 @@ class TestBotEquipmentManagement:
     def test_fresh_scan_does_not_trigger_stall_timeout(self, fake_env: FakeEnv) -> None:
         """A recently started scan does not trigger stall timeout."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_stalled_action
+        from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._state_data = _sba(bot._state_data, "SCANNING", "scan", 0, 0)
@@ -1766,7 +1766,7 @@ class TestBotEquipmentManagement:
     def test_stalled_scan_clears_via_timeout(self, fake_env: FakeEnv) -> None:
         """A scan that stalls past timeout clears so the bot can replan."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.sniffer.world_state import (
             is_scan_viewport_failed,
             reset_world_state,
@@ -1785,7 +1785,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        waiting = _has_in_flight_action(bot)
+        waiting = has_in_flight_action(bot)
 
         assert waiting is False
         assert bot.get_state() == "IDLE"
@@ -1794,7 +1794,7 @@ class TestBotEquipmentManagement:
     def test_stalled_move_marks_failed_move_target(self, fake_env: FakeEnv) -> None:
         """Stalled move records the destination as a failed move target."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _has_in_flight_action
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
         from tankpit_bot.browser import get_current_time_ms
         from tankpit_bot.sniffer.world_state import (
             is_move_target_failed,
@@ -1814,7 +1814,7 @@ class TestBotEquipmentManagement:
         # Override started_ms=1 to trigger stall timeout
         bot._state_data["in_flight_action"]["started_ms"] = 1
 
-        _has_in_flight_action(bot)
+        has_in_flight_action(bot)
 
         now = get_current_time_ms()
         assert is_move_target_failed(73, 158, now) is True
@@ -1823,7 +1823,7 @@ class TestBotEquipmentManagement:
     def test_clear_blocked_collection_returns_false_when_adjacent(self, fake_env: FakeEnv) -> None:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_collection
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.container import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
@@ -1855,7 +1855,7 @@ class TestBotEquipmentManagement:
     ) -> None:
         """Blocked-collection helper does nothing when self position is unknown."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _clear_blocked_collection
+        from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
         from tankpit_bot.sniffer.world_state import reset_world_state
 
         reset_world_state()

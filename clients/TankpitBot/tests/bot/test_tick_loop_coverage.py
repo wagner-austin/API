@@ -10,7 +10,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.bot.states import InFlightActionDict
-from tankpit_bot.bot.tick_loop import _clear_rejected_movement
+from tankpit_bot.bot.tick_loop_actions import _clear_rejected_movement
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
@@ -243,7 +243,7 @@ class TestWaitForMapOpenAction:
     def test_wait_for_map_open_action_returns_true_while_waiting(self, fake_env: FakeEnv) -> None:
         """_wait_for_map_open_action returns True when map data hasn't arrived."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _wait_for_map_open_action
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
 
         update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -277,7 +277,7 @@ class TestWaitForMovementActionRejected:
     ) -> None:
         """_wait_for_movement_action returns False when the target was rejected."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.bot.tick_loop import _wait_for_movement_action
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
 
         update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True)

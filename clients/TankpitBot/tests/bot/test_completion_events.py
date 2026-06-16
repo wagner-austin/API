@@ -42,7 +42,7 @@ from tankpit_bot.bot.states import (
     make_in_flight_action,
     make_initial_state_data,
 )
-from tankpit_bot.bot.tick_loop import _clear_stalled_action, _has_in_flight_action
+from tankpit_bot.bot.tick_loop_actions import _clear_stalled_action, has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
@@ -145,7 +145,7 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         )
         get_world_service().mark_map_data_processed()
 
-        cleared = _has_in_flight_action(bot) is False
+        cleared = has_in_flight_action(bot) is False
         assert cleared
 
         events = _decode_wire_complete_lines(
