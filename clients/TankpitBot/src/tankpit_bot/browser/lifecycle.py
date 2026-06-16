@@ -170,10 +170,9 @@ def _debug_js_websocket(cdp: CDPSessionProtocol) -> None:
     })()
     """
     debug_result = cdp.send("Runtime.evaluate", {"expression": debug_js, "returnByValue": True})
-    debug_obj = debug_result.get("result")
-    if isinstance(debug_obj, dict):
-        debug_val = debug_obj.get("value", "?")
-        log.info("JS WebSocket check: %s", debug_val)
+    result_obj = debug_result.get("result", {})
+    debug_val = result_obj.get("value", "?") if isinstance(result_obj, dict) else "?"
+    log.info("JS WebSocket check: %s", debug_val)
 
 
 def _log_script_urls(page: PageProtocol) -> None:
@@ -185,11 +184,10 @@ def _log_script_urls(page: PageProtocol) -> None:
     script_urls = page.evaluate(
         "Array.from(document.querySelectorAll('script[src]')).map(s => s.src)"
     )
-    if script_urls and isinstance(script_urls, list):
+    if isinstance(script_urls, list) and script_urls:
         log.info("Loaded scripts (%d):", len(script_urls))
         for url in script_urls:
-            if isinstance(url, str):
-                log.info("  - %s", url)
+            log.info("  - %s", url)
 
 
 def _capture_static_key(page: PageProtocol) -> str | None:
@@ -219,10 +217,8 @@ def _capture_static_key(page: PageProtocol) -> str | None:
         log.warning("Could not find tpclient script URL")
         return None
 
-    js_content = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
-    if not isinstance(js_content, str):
-        log.warning("Could not fetch tpclient JS content")
-        return None
+    js_content_raw = page.evaluate(f"fetch('{tpclient_url}').then(r => r.text())")
+    js_content = str(js_content_raw) if js_content_raw is not None else ""
 
     from pathlib import Path
 
