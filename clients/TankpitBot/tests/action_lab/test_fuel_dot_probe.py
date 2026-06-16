@@ -279,18 +279,18 @@ class _FakeFuelDotProbe(FuelDotProbe):
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
-    original_wait_sync = action_session.wait_for_world_sync
-    original_wait_radar = action_session.wait_for_radar_sync
-    original_wait_initial = action_session.wait_for_initial_self_state
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_radar = action_hooks.wait_for_radar_sync
+    original_wait_initial = action_hooks.wait_for_initial_self_state
     original_check_radar = action_hooks.check_and_clear_radar_scan_complete
     original_wait_outcome = fuel_dot_module._wait_for_teleport_outcome
     original_probe_class = fuel_dot_module.FuelDotProbe
     original_sync_playwright = core_hooks.sync_playwright
     yield
     action_hooks.get_current_time_ms = original_get_time
-    action_session.wait_for_world_sync = original_wait_sync
-    action_session.wait_for_radar_sync = original_wait_radar
-    action_session.wait_for_initial_self_state = original_wait_initial
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_radar_sync = original_wait_radar
+    action_hooks.wait_for_initial_self_state = original_wait_initial
     action_hooks.check_and_clear_radar_scan_complete = original_check_radar
     fuel_dot_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_dot_module.FuelDotProbe = original_probe_class
@@ -633,7 +633,7 @@ def test_attempt_returns_acquisition_timeout() -> None:
     """A map-sync timeout terminates the attempt before any teleport."""
     probe = _ProbeHarness()
     probe._world_state = _dot_world()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: None
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: None
 
     result = probe._probe_single_dot_attempt(
         visited=frozenset(),
@@ -654,7 +654,7 @@ def test_attempt_returns_acquisition_timeout() -> None:
 def test_attempt_returns_none_when_no_dot_remains() -> None:
     """An exhausted atlas ends the session instead of recording an attempt."""
     probe = _ProbeHarness()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     result = probe._probe_single_dot_attempt(
         visited=frozenset(),
@@ -687,7 +687,7 @@ def test_attempt_records_teleport_timeout() -> None:
     """A teleport timeout records the dot but never radars."""
     probe = _ProbeHarness()
     probe._world_state = _dot_world()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
     fuel_dot_module._wait_for_teleport_outcome = _timeout_outcome()
 
     result = probe._probe_single_dot_attempt(
@@ -714,7 +714,7 @@ def test_attempt_raises_when_teleport_dispatch_fails() -> None:
     probe = _ProbeHarness()
     probe._world_state = _dot_world()
     probe.teleport_result = False
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     with pytest.raises(TeleportProbeError, match="teleport command dispatch failed"):
         probe._probe_single_dot_attempt(
@@ -732,8 +732,8 @@ def _arm_landed_radar_attempt(
     radar_sync: int | None,
 ) -> None:
     probe._world_state = _dot_world(containers)
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: radar_sync
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: radar_sync
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
     fuel_dot_module._wait_for_teleport_outcome = _landed_outcome(120, 110)
 
@@ -921,7 +921,7 @@ def test_execute_probe_collects_attempts_and_tracks_visited() -> None:
             ),
         )
 
-    action_session.wait_for_initial_self_state = _wait_initial
+    action_hooks.wait_for_initial_self_state = _wait_initial
 
     session = probe.execute_probe(
         max_dots=3,
@@ -971,7 +971,7 @@ def test_execute_probe_runs_to_max_dots_without_visiting_unselected_dots() -> No
             ),
         )
 
-    action_session.wait_for_initial_self_state = _wait_initial
+    action_hooks.wait_for_initial_self_state = _wait_initial
 
     session = probe.execute_probe(
         max_dots=2,

@@ -161,8 +161,8 @@ def _restore_action_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
     original_drain = action_hooks.drain_buffered_messages
     original_sync_playwright = core_hooks.sync_playwright
-    original_wait_for_initial_self_state = action_session.wait_for_initial_self_state
-    original_advance_startup_state = action_session.advance_startup_state
+    original_wait_for_initial_self_state = action_hooks.wait_for_initial_self_state
+    original_advance_startup_state = action_hooks.advance_startup_state
     original_get_terrain_map = movement_probe_module._get_probe_terrain_map
     original_build_targets = movement_probe_module._build_probe_targets
     original_wait_for_move_outcome = movement_probe_module._wait_for_move_outcome
@@ -170,8 +170,8 @@ def _restore_action_hooks() -> Generator[None, None, None]:
     action_hooks.get_current_time_ms = original_get_time
     action_hooks.drain_buffered_messages = original_drain
     core_hooks.sync_playwright = original_sync_playwright
-    action_session.wait_for_initial_self_state = original_wait_for_initial_self_state
-    action_session.advance_startup_state = original_advance_startup_state
+    action_hooks.wait_for_initial_self_state = original_wait_for_initial_self_state
+    action_hooks.advance_startup_state = original_advance_startup_state
     movement_probe_module._get_probe_terrain_map = original_get_terrain_map
     movement_probe_module._build_probe_targets = original_build_targets
     movement_probe_module._wait_for_move_outcome = original_wait_for_move_outcome
@@ -1097,8 +1097,8 @@ def test_execute_probe_runs_successfully_with_explicit_targets() -> None:
     action_hooks.get_current_time_ms = clock
     recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = recorded.sync_playwright_factory
-    action_session.wait_for_initial_self_state = _wait_for_initial_self_state_101_102
-    action_session.advance_startup_state = _advance_startup_state_stub
+    action_hooks.wait_for_initial_self_state = _wait_for_initial_self_state_101_102
+    action_hooks.advance_startup_state = _advance_startup_state_stub
 
     explicit_targets = [TeleportTargetDict(label="move_1", x=120, y=121)]
     session = harness.execute_probe(
@@ -1131,8 +1131,8 @@ def test_execute_probe_uses_default_targets_when_explicit_targets_are_absent() -
     action_hooks.get_current_time_ms = clock
     recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = recorded.sync_playwright_factory
-    action_session.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
-    action_session.advance_startup_state = _advance_startup_state_stub
+    action_hooks.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
+    action_hooks.advance_startup_state = _advance_startup_state_stub
 
     session = harness.execute_probe(
         explicit_targets=None,
@@ -1157,8 +1157,8 @@ def test_execute_probe_raises_when_target_builder_returns_empty_list() -> None:
     action_hooks.get_current_time_ms = clock
     recorded = RecordedChromiumSession.from_capture_path(harness, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = recorded.sync_playwright_factory
-    action_session.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
-    action_session.advance_startup_state = _advance_startup_state_stub
+    action_hooks.wait_for_initial_self_state = _wait_for_initial_self_state_103_104
+    action_hooks.advance_startup_state = _advance_startup_state_stub
 
     with pytest.raises(MovementProbeError, match="requires at least one target"):
         harness.execute_probe(

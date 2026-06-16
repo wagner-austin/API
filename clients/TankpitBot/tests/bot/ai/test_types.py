@@ -203,7 +203,6 @@ class TestAIConfig:
         assert config["hunt_min_fuel"] == 100
         assert config["combat_range"] == 20
         assert config["scan_cooldown_ms"] == 5000
-        assert config["shoot_cooldown_ms"] == 2000
         assert config["shot_feedback_timeout_ms"] == 4000
         assert config["action_stall_timeout_ms"] == 10000
         assert "teleport_fuel_cost" not in config
@@ -229,7 +228,6 @@ class TestAIConfig:
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
-            "shoot_cooldown_ms": 2000,
             "shot_feedback_timeout_ms": 4000,
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
@@ -252,7 +250,6 @@ class TestAIConfig:
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
-            "shoot_cooldown_ms": 2000,
             "shot_feedback_timeout_ms": 4000,
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
@@ -275,7 +272,6 @@ class TestAIConfig:
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
-            "shoot_cooldown_ms": 2000,
             "shot_feedback_timeout_ms": 4000,
             "action_stall_timeout_ms": 10000,
             "kill_cooldown_ms": 20000,
@@ -329,7 +325,6 @@ class TestAIState:
             hunt_min_fuel=config["hunt_min_fuel"],
             combat_range=config["combat_range"],
             scan_cooldown_ms=config["scan_cooldown_ms"],
-            shoot_cooldown_ms=config["shoot_cooldown_ms"],
             shot_feedback_timeout_ms=config["shot_feedback_timeout_ms"],
             action_stall_timeout_ms=config["action_stall_timeout_ms"],
             kill_cooldown_ms=config["kill_cooldown_ms"],

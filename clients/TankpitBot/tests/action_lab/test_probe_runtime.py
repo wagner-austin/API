@@ -142,13 +142,13 @@ def _spawn() -> SelfStateDict:
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
-    original_wait_initial = action_session.wait_for_initial_self_state
-    original_advance = action_session.advance_startup_state
+    original_wait_initial = action_hooks.wait_for_initial_self_state
+    original_advance = action_hooks.advance_startup_state
     original_sync_playwright = core_hooks.sync_playwright
     yield
     action_hooks.get_current_time_ms = original_get_time
-    action_session.wait_for_initial_self_state = original_wait_initial
-    action_session.advance_startup_state = original_advance
+    action_hooks.wait_for_initial_self_state = original_wait_initial
+    action_hooks.advance_startup_state = original_advance
     core_hooks.sync_playwright = original_sync_playwright
 
 
@@ -241,8 +241,8 @@ def test_wait_for_probe_command_ready_advances_startup_state() -> None:
 
     wait_attr = "wait_for_initial_self_state"
     advance_attr = "advance_startup_state"
-    setattr(action_session, wait_attr, _wait_initial)
-    setattr(action_session, advance_attr, _advance)
+    setattr(action_hooks, wait_attr, _wait_initial)
+    setattr(action_hooks, advance_attr, _advance)
 
     (
         initial_sync_started_ms,
@@ -322,8 +322,8 @@ def test_execute_live_probe_bootstrap_runs_ready_callback_and_cleans_up() -> Non
 
     wait_initial_name = "wait_for_initial_self_state"
     advance_name = "advance_startup_state"
-    setattr(action_session, wait_initial_name, _wait_initial)
-    setattr(action_session, advance_name, _advance)
+    setattr(action_hooks, wait_initial_name, _wait_initial)
+    setattr(action_hooks, advance_name, _advance)
 
     def _run_ready_session(context_dict: probe_runtime.ProbeCommandReadyContextDict) -> str:
         assert context_dict == probe_runtime.ProbeCommandReadyContextDict(

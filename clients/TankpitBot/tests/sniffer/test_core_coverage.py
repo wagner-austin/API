@@ -530,14 +530,14 @@ class TestSubmoduleCoverage:
         """Test get_global_xor_table returns table or None."""
         from tankpit_bot.sniffer import xor
 
+        original_table = xor._global_xor_table
         xor._global_xor_table = None
         assert xor.get_global_xor_table() is None
 
         xor._global_xor_table = b"test"
         assert xor.get_global_xor_table() == b"test"
 
-        # Clean up
-        xor._global_xor_table = None
+        xor._global_xor_table = original_table
 
     def test_reset_all_trackers(self) -> None:
         """Test reset_all_trackers clears all tracker state."""

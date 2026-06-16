@@ -71,7 +71,7 @@ def run_tracked_radar_phase(
         emit_command_dispatch_failure_diagnostic("radar", dispatch_failure_message)
         probe._end_action_phase(radar_cycle)
         raise dispatch_failure_error(dispatch_failure_message)
-    radar_sync_timestamp_ms = action_session.wait_for_radar_sync(
+    radar_sync_timestamp_ms = action_hooks.wait_for_radar_sync(
         page,
         probe,
         radar_started_ms,

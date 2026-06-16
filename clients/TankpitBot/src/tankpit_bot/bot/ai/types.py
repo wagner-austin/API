@@ -377,7 +377,6 @@ class AIConfigDict(TypedDict):
         hunt_min_fuel: Operating reserve for search/recovery teleport hops.
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
-        shoot_cooldown_ms: Minimum milliseconds between shots.
         shot_feedback_timeout_ms: Milliseconds to wait before treating a shot as a miss.
         action_stall_timeout_ms: Milliseconds to wait before abandoning a stuck move/pickup.
         kill_cooldown_ms: Milliseconds to ignore a killed tank (avoid targeting corpse).
@@ -407,7 +406,6 @@ class AIConfigDict(TypedDict):
     hunt_min_fuel: int
     combat_range: int
     scan_cooldown_ms: int
-    shoot_cooldown_ms: int
     shot_feedback_timeout_ms: int
     action_stall_timeout_ms: int
     kill_cooldown_ms: int
@@ -434,7 +432,6 @@ def make_default_ai_config() -> AIConfigDict:
         hunt_min_fuel=100,
         combat_range=20,
         scan_cooldown_ms=5000,
-        shoot_cooldown_ms=2000,
         shot_feedback_timeout_ms=4000,
         action_stall_timeout_ms=10000,
         kill_cooldown_ms=30000,
@@ -466,7 +463,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "hunt_min_fuel": config["hunt_min_fuel"],
         "combat_range": config["combat_range"],
         "scan_cooldown_ms": config["scan_cooldown_ms"],
-        "shoot_cooldown_ms": config["shoot_cooldown_ms"],
         "shot_feedback_timeout_ms": config["shot_feedback_timeout_ms"],
         "action_stall_timeout_ms": config["action_stall_timeout_ms"],
         "kill_cooldown_ms": config["kill_cooldown_ms"],
@@ -528,7 +524,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         hunt_min_fuel=require_int(data, "hunt_min_fuel"),
         combat_range=require_int(data, "combat_range"),
         scan_cooldown_ms=require_int(data, "scan_cooldown_ms"),
-        shoot_cooldown_ms=require_int(data, "shoot_cooldown_ms"),
         shot_feedback_timeout_ms=require_int(data, "shot_feedback_timeout_ms"),
         action_stall_timeout_ms=require_int(data, "action_stall_timeout_ms"),
         kill_cooldown_ms=require_int(data, "kill_cooldown_ms"),

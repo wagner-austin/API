@@ -199,13 +199,13 @@ def wait_for_probe_command_ready(
         command-ready timestamp.
     """
     initial_sync_started_ms = action_hooks.get_current_time_ms()
-    initial_world_timestamp_ms, spawn = action_session.wait_for_initial_self_state(
+    initial_world_timestamp_ms, spawn = action_hooks.wait_for_initial_self_state(
         page,
         probe,
         initial_sync_started_ms,
         initial_sync_timeout_ms,
     )
-    action_session.advance_startup_state(probe)
+    action_hooks.advance_startup_state(probe)
     command_ready_timestamp_ms = action_hooks.get_current_time_ms()
     return (
         initial_sync_started_ms,

@@ -131,7 +131,7 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
     wait_attr = "wait_for_world_sync"
     capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
-    original_wait = action_session.wait_for_world_sync
+    original_wait = action_hooks.wait_for_world_sync
     original_capture = action_session.capture_teleport_page_snapshot
     provider = _Provider()
     page = _Page()
@@ -163,7 +163,7 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
         return base
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_session, wait_attr, _wait_for_world_sync)
+    setattr(action_hooks, wait_attr, _wait_for_world_sync)
     setattr(action_session, capture_attr, _capture)
     try:
         started_ms, sync_timestamp_ms, snapshots, _capture_callback = (
@@ -184,7 +184,7 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
         )
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_session, wait_attr, original_wait)
+        setattr(action_hooks, wait_attr, original_wait)
         setattr(action_session, capture_attr, original_capture)
 
     assert started_ms == 2200
@@ -200,7 +200,7 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
     wait_attr = "wait_for_world_sync"
     capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
-    original_wait = action_session.wait_for_world_sync
+    original_wait = action_hooks.wait_for_world_sync
     original_capture = action_session.capture_teleport_page_snapshot
     provider = _Provider()
     page = _Page()
@@ -231,7 +231,7 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
         return _snapshot(phase)
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_session, wait_attr, _wait_for_world_sync)
+    setattr(action_hooks, wait_attr, _wait_for_world_sync)
     setattr(action_session, capture_attr, _capture)
     try:
         started_ms, sync_timestamp_ms, snapshots, capture_page_snapshot = (
@@ -253,7 +253,7 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
         assert capture_page_snapshot("timeout")["phase"] == "timeout"
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_session, wait_attr, original_wait)
+        setattr(action_hooks, wait_attr, original_wait)
         setattr(action_session, capture_attr, original_capture)
 
     assert started_ms == 1500
@@ -268,7 +268,7 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
     wait_attr = "wait_for_world_sync"
     capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
-    original_wait = action_session.wait_for_world_sync
+    original_wait = action_hooks.wait_for_world_sync
     original_capture = action_session.capture_teleport_page_snapshot
     provider = _Provider()
     page = _Page()
@@ -294,7 +294,7 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
         return _snapshot(phase)
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_session, wait_attr, _wait_for_world_sync)
+    setattr(action_hooks, wait_attr, _wait_for_world_sync)
     setattr(action_session, capture_attr, _capture)
     try:
         (
@@ -318,7 +318,7 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
         )
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_session, wait_attr, original_wait)
+        setattr(action_hooks, wait_attr, original_wait)
         setattr(action_session, capture_attr, original_capture)
 
     assert started_ms == 2500

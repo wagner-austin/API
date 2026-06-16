@@ -435,8 +435,8 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
     original_check_radar = action_hooks.check_and_clear_radar_scan_complete
     original_drain = action_hooks.drain_buffered_messages
-    original_wait_sync = action_session.wait_for_world_sync
-    original_wait_radar_sync = action_session.wait_for_radar_sync
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_radar_sync = action_hooks.wait_for_radar_sync
     original_get_terrain_map = fuel_probe_module.get_terrain_map
     original_targeting_terrain = fuel_targeting_module.get_terrain_map
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
@@ -449,8 +449,8 @@ def _restore_hooks() -> Generator[None, None, None]:
     action_hooks.get_current_time_ms = original_get_time
     action_hooks.check_and_clear_radar_scan_complete = original_check_radar
     action_hooks.drain_buffered_messages = original_drain
-    action_session.wait_for_world_sync = original_wait_sync
-    action_session.wait_for_radar_sync = original_wait_radar_sync
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module.get_terrain_map = original_get_terrain_map
     fuel_targeting_module.get_terrain_map = original_targeting_terrain
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
@@ -1208,8 +1208,8 @@ def _run_probe_single_target_scenario(
     ) -> int | None:
         return wait_for_world_sync(page, provider, started_ms, timeout_ms)
 
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _make_teleport_outcome_callback(teleport_status)
     fuel_probe_module._wait_for_pickup_outcome = _make_pickup_outcome_callback(pickup_status)
 
@@ -1336,8 +1336,8 @@ def test_probe_single_target_rejects_impossible_map_sync_timeout_teleport_outcom
     action_hooks.get_current_time_ms = clock
     probe = _ProbeHarness(clock)
     target = TeleportTargetDict(label="fuel_ground_124_100", x=124, y=100)
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
@@ -1766,8 +1766,8 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
         _ = (page, provider, started_ms, timeout_ms)
         return wait_results.pop(0)
 
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
@@ -1997,8 +1997,8 @@ def test_probe_single_target_skips_move_when_pickup_already_completed() -> None:
     probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
     fuel_probe_module.get_terrain_map = ground_terrain
     fuel_targeting_module.get_terrain_map = ground_terrain
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
     fuel_probe_module._wait_for_teleport_outcome = _teleport_outcome
     action_hooks.drain_buffered_messages = _pickup_before_move
 
@@ -2147,8 +2147,8 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
                 settle_delay_ms=0,
             )
 
-        action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-        action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+        action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+        action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
         probe = _ProbeHarness(clock)
         probe.teleport_result = False
         with pytest.raises(FuelProbeError, match="teleport command dispatch failed"):
@@ -2326,7 +2326,7 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     probe = _ExecuteHarness()
     session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = session_browser.sync_playwright_factory
-    action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
+    action_hooks.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
             tank_id=1,
@@ -2425,7 +2425,7 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
     probe = _ExecuteHarness()
     session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = session_browser.sync_playwright_factory
-    action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
+    action_hooks.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
             tank_id=1,
@@ -2534,7 +2534,7 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
     probe = _ExecuteHarness()
     session_browser = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     core_hooks.sync_playwright = session_browser.sync_playwright_factory
-    action_session.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
+    action_hooks.wait_for_initial_self_state = lambda page, provider, started_ms, timeout_ms: (
         1200,
         make_self_state(
             tank_id=1,

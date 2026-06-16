@@ -153,7 +153,7 @@ def run_tracked_acquisition_phase(
         return (started_ms, None, page_snapshots, capture_page_snapshot)
     return (
         started_ms,
-        action_session.wait_for_world_sync(
+        action_hooks.wait_for_world_sync(
             page,
             provider,
             started_ms,

@@ -321,8 +321,8 @@ class _FakeEnemyTeleportProbe(EnemyTeleportProbe):
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     original_get_time = action_hooks.get_current_time_ms
-    original_wait_sync = action_session.wait_for_world_sync
-    original_wait_initial = action_session.wait_for_initial_self_state
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_initial = action_hooks.wait_for_initial_self_state
     original_require_enemy = enemy_module._require_fresh_enemy_threat
     original_enemy_by_id = enemy_module._enemy_by_id
     original_choose_landing = enemy_module.choose_combat_landing_tile
@@ -331,8 +331,8 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_sync_playwright = core_hooks.sync_playwright
     yield
     action_hooks.get_current_time_ms = original_get_time
-    action_session.wait_for_world_sync = original_wait_sync
-    action_session.wait_for_initial_self_state = original_wait_initial
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_initial_self_state = original_wait_initial
     enemy_module._require_fresh_enemy_threat = original_require_enemy
     enemy_module._enemy_by_id = original_enemy_by_id
     enemy_module.choose_combat_landing_tile = original_choose_landing
@@ -592,7 +592,7 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
 def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: None
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: None
 
     result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",
@@ -610,7 +610,7 @@ def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
 def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _missing_enemy(
         probe: EnemyTeleportProbe,
@@ -636,7 +636,7 @@ def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
 def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _enemy_found(
         probe: EnemyTeleportProbe,
@@ -674,7 +674,7 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
     probe.teleport_result = False
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _enemy_found(
         probe: EnemyTeleportProbe,
@@ -709,7 +709,7 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
 def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
     action_hooks.get_current_time_ms = ReplayClock(1000)
     probe = _ProbeHarness()
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _enemy_found(
         probe: EnemyTeleportProbe,
@@ -815,7 +815,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         leaderboard_position=1,
     )
     probe._world_state = _make_world(1450, 119, 130, 820)
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _enemy_found(
         probe: EnemyTeleportProbe,
@@ -931,7 +931,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         leaderboard_position=1,
     )
     probe._world_state = _make_world(1450, 119, 130, 820)
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _enemy_found(
         probe: EnemyTeleportProbe,
@@ -1141,7 +1141,7 @@ def test_execute_probe_collects_attempts() -> None:
             ),
         )
 
-    action_session.wait_for_initial_self_state = _wait_initial
+    action_hooks.wait_for_initial_self_state = _wait_initial
 
     session = probe.execute_probe(
         acquisition_strategy="nearest_enemy",
@@ -1244,7 +1244,7 @@ def test_execute_probe_does_not_exclude_when_attempt_has_no_enemy() -> None:
             ),
         )
 
-    action_session.wait_for_initial_self_state = _wait_initial
+    action_hooks.wait_for_initial_self_state = _wait_initial
 
     session = probe.execute_probe(
         acquisition_strategy="map_open",

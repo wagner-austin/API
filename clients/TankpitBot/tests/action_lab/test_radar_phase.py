@@ -88,13 +88,13 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_clock = action_hooks.get_current_time_ms
     original_drain = action_hooks.drain_buffered_messages
     original_check = action_hooks.check_and_clear_radar_scan_complete
-    original_wait = action_session.wait_for_radar_sync
+    original_wait = action_hooks.wait_for_radar_sync
     wait_attr = "wait_for_radar_sync"
     yield
     action_hooks.get_current_time_ms = original_clock
     action_hooks.drain_buffered_messages = original_drain
     action_hooks.check_and_clear_radar_scan_complete = original_check
-    setattr(action_session, wait_attr, original_wait)
+    setattr(action_hooks, wait_attr, original_wait)
 
 
 def test_clear_stale_radar_completion_drains_all_pending_flags() -> None:
@@ -139,7 +139,7 @@ def test_run_tracked_radar_phase_waits_for_sync() -> None:
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = _drain
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
-    setattr(action_session, wait_attr, _wait_for_radar_sync)
+    setattr(action_hooks, wait_attr, _wait_for_radar_sync)
 
     radar_cycle, radar_started_ms, radar_sync_timestamp_ms = radar_phase.run_tracked_radar_phase(
         page,
@@ -176,7 +176,7 @@ def test_run_tracked_radar_phase_raises_on_dispatch_failure() -> None:
     action_hooks.get_current_time_ms = clock
     action_hooks.drain_buffered_messages = lambda source: 0
     action_hooks.check_and_clear_radar_scan_complete = lambda: False
-    setattr(action_session, wait_attr, _wait_for_radar_sync)
+    setattr(action_hooks, wait_attr, _wait_for_radar_sync)
 
     with pytest.raises(RuntimeError, match="radar command dispatch failed"):
         radar_phase.run_tracked_radar_phase(

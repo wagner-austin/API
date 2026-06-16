@@ -782,7 +782,7 @@ def test_base_require_page_returns_page_and_raises_when_missing() -> None:
 def test_probe_single_target_returns_map_sync_timeout_and_settles() -> None:
     probe = _ProbeMethodHarness()
     page = probe._fake_page
-    original_wait = action_session.wait_for_world_sync
+    original_wait = action_hooks.wait_for_world_sync
 
     def _wait_sync_timeout(
         page_arg: action_session.WaitPageProtocol,
@@ -794,7 +794,7 @@ def test_probe_single_target_returns_map_sync_timeout_and_settles() -> None:
         return None
 
     wait_sync_name = "wait_for_world_sync"
-    setattr(action_session, wait_sync_name, _wait_sync_timeout)
+    setattr(action_hooks, wait_sync_name, _wait_sync_timeout)
     try:
         result = probe._probe_single_target(
             TeleportTargetDict(label="target_0", x=150, y=171),
@@ -804,7 +804,7 @@ def test_probe_single_target_returns_map_sync_timeout_and_settles() -> None:
             settle_delay_ms=250,
         )
     finally:
-        setattr(action_session, wait_sync_name, original_wait)
+        setattr(action_hooks, wait_sync_name, original_wait)
     assert result["status"] == "map_sync_timeout"
     assert probe.teleport_calls == []
     assert result["message_start_index"] == 0
@@ -815,7 +815,7 @@ def test_probe_single_target_returns_map_sync_timeout_and_settles() -> None:
 def test_probe_single_target_returns_map_sync_timeout_without_settle() -> None:
     probe = _ProbeMethodHarness()
     page = probe._fake_page
-    original_wait = action_session.wait_for_world_sync
+    original_wait = action_hooks.wait_for_world_sync
 
     def _wait_sync_timeout(
         page_arg: action_session.WaitPageProtocol,
@@ -827,7 +827,7 @@ def test_probe_single_target_returns_map_sync_timeout_without_settle() -> None:
         return None
 
     wait_sync_name = "wait_for_world_sync"
-    setattr(action_session, wait_sync_name, _wait_sync_timeout)
+    setattr(action_hooks, wait_sync_name, _wait_sync_timeout)
     try:
         result = probe._probe_single_target(
             TeleportTargetDict(label="target_0", x=150, y=171),
@@ -837,7 +837,7 @@ def test_probe_single_target_returns_map_sync_timeout_without_settle() -> None:
             settle_delay_ms=0,
         )
     finally:
-        setattr(action_session, wait_sync_name, original_wait)
+        setattr(action_hooks, wait_sync_name, original_wait)
     assert result["status"] == "map_sync_timeout"
     assert page.waits == []
 
@@ -848,7 +848,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
     probe = _ProbeMethodHarness()
     page = probe._fake_page
     expected = _make_attempt("landed_exact")
-    original_wait_sync = action_session.wait_for_world_sync
+    original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
     def _wait_sync_success(
@@ -898,7 +898,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
 
     wait_sync_name = "wait_for_world_sync"
     wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_session, wait_sync_name, _wait_sync_success)
+    setattr(action_hooks, wait_sync_name, _wait_sync_success)
     setattr(teleport_module, wait_outcome_name, _wait_outcome)
     try:
         result = probe._probe_single_target(
@@ -909,7 +909,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
             settle_delay_ms=0,
         )
     finally:
-        setattr(action_session, wait_sync_name, original_wait_sync)
+        setattr(action_hooks, wait_sync_name, original_wait_sync)
         setattr(teleport_module, wait_outcome_name, original_wait_outcome)
     assert result == expected
     assert probe.teleport_calls == [(150, 171)]
@@ -1008,7 +1008,7 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
     probe = _ProbeMethodHarness()
     page = probe._fake_page
     expected = _make_attempt("landed_exact")
-    original_wait_sync = action_session.wait_for_world_sync
+    original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
     def _wait_sync_success(
@@ -1058,7 +1058,7 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
 
     wait_sync_name = "wait_for_world_sync"
     wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_session, wait_sync_name, _wait_sync_success)
+    setattr(action_hooks, wait_sync_name, _wait_sync_success)
     setattr(teleport_module, wait_outcome_name, _wait_outcome)
     try:
         result = probe._probe_single_target(
@@ -1069,7 +1069,7 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
             settle_delay_ms=250,
         )
     finally:
-        setattr(action_session, wait_sync_name, original_wait_sync)
+        setattr(action_hooks, wait_sync_name, original_wait_sync)
         setattr(teleport_module, wait_outcome_name, original_wait_outcome)
     assert result == expected
     assert result["message_start_index"] == 10
@@ -1082,7 +1082,7 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
 
     probe = _ProbeMethodHarness()
     expected = _make_attempt("landed_exact")
-    original_wait_sync = action_session.wait_for_world_sync
+    original_wait_sync = action_hooks.wait_for_world_sync
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
     wait_sync_calls: list[int] = []
 
@@ -1134,7 +1134,7 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
 
     wait_sync_name = "wait_for_world_sync"
     wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_session, wait_sync_name, _wait_sync_unexpected)
+    setattr(action_hooks, wait_sync_name, _wait_sync_unexpected)
     setattr(teleport_module, wait_outcome_name, _wait_outcome)
     try:
         result = probe._probe_single_target(
@@ -1145,7 +1145,7 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
             settle_delay_ms=0,
         )
     finally:
-        setattr(action_session, wait_sync_name, original_wait_sync)
+        setattr(action_hooks, wait_sync_name, original_wait_sync)
         setattr(teleport_module, wait_outcome_name, original_wait_outcome)
     assert result == expected
     assert wait_sync_calls == []
@@ -1208,7 +1208,7 @@ def test_execute_rejects_empty_explicit_targets_and_cleans_up() -> None:
     probe = _ExecuteHarness()
     recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     original_sync = core_hooks.sync_playwright
-    original_wait_initial = action_session.wait_for_initial_self_state
+    original_wait_initial = action_hooks.wait_for_initial_self_state
     core_hooks.sync_playwright = recorded.sync_playwright_factory
 
     def _wait_initial(
@@ -1229,7 +1229,7 @@ def test_execute_rejects_empty_explicit_targets_and_cleans_up() -> None:
         )
 
     wait_initial_name = "wait_for_initial_self_state"
-    setattr(action_session, wait_initial_name, _wait_initial)
+    setattr(action_hooks, wait_initial_name, _wait_initial)
     try:
         with pytest.raises(TeleportProbeError, match="requires at least one target"):
             probe.execute(
@@ -1245,7 +1245,7 @@ def test_execute_rejects_empty_explicit_targets_and_cleans_up() -> None:
             )
     finally:
         core_hooks.sync_playwright = original_sync
-        setattr(action_session, wait_initial_name, original_wait_initial)
+        setattr(action_hooks, wait_initial_name, original_wait_initial)
     assert probe.cleanup_calls == 1
     assert recorded.browser_type.launches == [False]
 
@@ -1257,7 +1257,7 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
     probe.result_attempts = [_make_attempt("landed_exact") for _ in range(10)]
     recorded = RecordedChromiumSession.from_capture_path(probe, _FUEL_CAPTURE_PATH)
     original_sync = core_hooks.sync_playwright
-    original_wait_initial = action_session.wait_for_initial_self_state
+    original_wait_initial = action_hooks.wait_for_initial_self_state
     core_hooks.sync_playwright = recorded.sync_playwright_factory
 
     def _wait_initial(
@@ -1278,7 +1278,7 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
         )
 
     wait_initial_name = "wait_for_initial_self_state"
-    setattr(action_session, wait_initial_name, _wait_initial)
+    setattr(action_hooks, wait_initial_name, _wait_initial)
     try:
         session = probe.execute(
             explicit_targets=None,
@@ -1293,7 +1293,7 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
         )
     finally:
         core_hooks.sync_playwright = original_sync
-        setattr(action_session, wait_initial_name, original_wait_initial)
+        setattr(action_hooks, wait_initial_name, original_wait_initial)
     assert len(session["targets"]) == 3
     assert len(session["attempts"]) == 3
     assert len(probe.probed_targets) == 3

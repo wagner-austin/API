@@ -149,6 +149,56 @@ class ProbeBase(BrowserSession):
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
+    def shoot(self, x: int, y: int, target_id: int = 0) -> bool:
+        """Send shoot command.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+            target_id: Target entity ID (0 if no specific target).
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import build_shoot_command
+
+        return self._send_bytes(
+            build_shoot_command(x, y, target_id),
+            f"shoot({x},{y},id={target_id})",
+        )
+
+    def pickup_fuel(self, x: int, y: int) -> bool:
+        """Send fuel pickup command.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.bot.commands import encode_pickup_fuel_command
+        from tankpit_bot.bot.types import make_pickup_fuel_command
+
+        cmd = make_pickup_fuel_command(x, y)
+        return self._send_bytes(encode_pickup_fuel_command(cmd), "pickup_fuel")
+
+    def pickup_equipment(self, x: int, y: int) -> bool:
+        """Send equipment pickup command.
+
+        Args:
+            x: Target X coordinate.
+            y: Target Y coordinate.
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.bot.commands import encode_pickup_equipment_command
+        from tankpit_bot.bot.types import make_pickup_equipment_command
+
+        cmd = make_pickup_equipment_command(x, y)
+        return self._send_bytes(encode_pickup_equipment_command(cmd), "pickup_equipment")
+
     # -----------------------------------------------------------------
     # Lifecycle hooks
     # -----------------------------------------------------------------

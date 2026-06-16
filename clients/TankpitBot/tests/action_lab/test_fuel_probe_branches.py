@@ -144,8 +144,8 @@ class _SequenceProbeHarness(_ProbeHarness):
 def _restore_hooks() -> Generator[None, None, None]:
     """Restore patched fuel probe hooks after each test."""
     original_get_time = action_hooks.get_current_time_ms
-    original_wait_sync = action_session.wait_for_world_sync
-    original_wait_radar_sync = action_session.wait_for_radar_sync
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_radar_sync = action_hooks.wait_for_radar_sync
     original_wait_outcome = fuel_probe_module._wait_for_teleport_outcome
     original_find_visible = fuel_probe_module._find_visible_fuel_target
     original_requires_reposition = fuel_probe_module._visible_fuel_requires_reposition
@@ -153,10 +153,11 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_targeting_requires_reposition = fuel_probe_module.visible_fuel_requires_reposition
     original_targeting_find_landing = fuel_probe_module.find_visible_fuel_landing_tile
     original_get_terrain_map = fuel_probe_module.get_terrain_map
+    original_targeting_terrain_map = fuel_targeting_module.get_terrain_map
     yield
     action_hooks.get_current_time_ms = original_get_time
-    action_session.wait_for_world_sync = original_wait_sync
-    action_session.wait_for_radar_sync = original_wait_radar_sync
+    action_hooks.wait_for_world_sync = original_wait_sync
+    action_hooks.wait_for_radar_sync = original_wait_radar_sync
     fuel_probe_module._wait_for_teleport_outcome = original_wait_outcome
     fuel_probe_module._find_visible_fuel_target = original_find_visible
     fuel_probe_module._visible_fuel_requires_reposition = original_requires_reposition
@@ -164,6 +165,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     fuel_probe_module.visible_fuel_requires_reposition = original_targeting_requires_reposition
     fuel_probe_module.find_visible_fuel_landing_tile = original_targeting_find_landing
     fuel_probe_module.get_terrain_map = original_get_terrain_map
+    fuel_targeting_module.get_terrain_map = original_targeting_terrain_map
 
 
 def _target() -> TeleportTargetDict:
@@ -366,8 +368,8 @@ def test_probe_single_target_raises_when_reposition_has_no_landing_tile() -> Non
     """Fuel probe rejects blocked visible fuel without a teleport landing tile."""
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
 
     def _teleport_outcome(
         page: action_session.WaitPageProtocol,
@@ -501,8 +503,8 @@ def test_probe_single_target_raises_when_reposition_map_open_dispatch_fails() ->
             page_snapshots=[],
         )
 
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
     harness = _SequenceProbeHarness(
         clock,
         open_map_results=[True, False],
@@ -589,8 +591,8 @@ def test_probe_single_target_raises_when_reposition_teleport_dispatch_fails() ->
             page_snapshots=[],
         )
 
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
     harness = _SequenceProbeHarness(
         clock,
         open_map_results=[True, True],
@@ -683,8 +685,8 @@ def test_probe_single_target_raises_when_reposition_teleport_reports_map_sync_ti
             page_snapshots=[],
         )
 
-    action_session.wait_for_world_sync = _wait_for_world_sync
-    action_session.wait_for_radar_sync = _wait_for_world_sync
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.wait_for_radar_sync = _wait_for_world_sync
     harness = _SequenceProbeHarness(
         clock,
         open_map_results=[True, True],
@@ -710,8 +712,8 @@ def test_probe_single_target_raises_when_visible_fuel_disappears_after_radar() -
     """Fuel probe rejects impossible loss of visible fuel after target resolution."""
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    action_session.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
-    action_session.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_world_sync = lambda page, provider, started_ms, timeout_ms: 1200
+    action_hooks.wait_for_radar_sync = lambda page, provider, started_ms, timeout_ms: 1200
     original_resolve_fuel_target_phase = fuel_collection_phase.resolve_fuel_target_phase
     fuel_probe_module.get_terrain_map = lambda: _terrain({(124, 100), (101, 100), (102, 100)})
 
