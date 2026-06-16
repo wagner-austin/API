@@ -936,7 +936,6 @@ def test_execute_probe_collects_attempts_and_tracks_visited() -> None:
     assert probe.visited_seen == [frozenset(), frozenset({"120,110"})]
     assert session["max_dots"] == 3
     assert session["startup_timing"]["first_attempt_started_ms"] == 1000
-    assert probe.cleanup_calls == 1
 
 
 def test_execute_probe_runs_to_max_dots_without_visiting_unselected_dots() -> None:

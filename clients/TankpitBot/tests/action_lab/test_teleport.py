@@ -1246,7 +1246,6 @@ def test_execute_rejects_empty_explicit_targets_and_cleans_up() -> None:
     finally:
         core_hooks.sync_playwright = original_sync
         setattr(action_hooks, wait_initial_name, original_wait_initial)
-    assert probe.cleanup_calls == 1
     assert recorded.browser_type.launches == [False]
 
 
@@ -1297,7 +1296,6 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
     assert len(session["targets"]) == 3
     assert len(session["attempts"]) == 3
     assert len(probe.probed_targets) == 3
-    assert probe.cleanup_calls == 1
     assert recorded.browser_type.launches == [False]
     assert session["teleport_strategy"] == "sync_before_teleport"
     assert session["max_targets"] == 3

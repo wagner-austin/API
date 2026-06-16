@@ -28,12 +28,18 @@ class ProbeRuntimeStateProtocol(Protocol):
     """Mutable probe state needed for shared runtime bootstrap."""
 
     _start_timestamp_ms: int
+    _target_url: str
+    _prefer_account: bool
     _messages: list[CapturedMessage]
     _ws_urls: dict[str, str]
     _magic: str | None
     _cdp_message_buffer: list[str]
     _cdp: CDPSessionProtocol | None
     _page: PageProtocol | None
+
+    @property
+    def messages(self) -> list[CapturedMessage]:
+        """Return captured messages."""
 
     def _reset_action_cycle_tracker(self) -> None:
         """Reset probe-local action phase tracking."""
@@ -43,19 +49,6 @@ class ProbeRuntimeStateProtocol(Protocol):
 
     def _setup_cdp_handlers(self, cdp: CDPSessionProtocol) -> None:
         """Install runtime CDP handlers."""
-
-    def _navigate_and_login(
-        self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
-        *,
-        tank_name_prefix: str = "TP",
-        auto_join_room: bool = True,
-    ) -> None:
-        """Navigate and log in to the live game session."""
-
-    def _wait_for_game_ready(self, page: PageProtocol) -> None:
-        """Wait until the game client is ready."""
 
     def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
         """Capture runtime intel needed before issuing commands."""
@@ -74,15 +67,6 @@ class ProbeSessionRunnerProtocol(ProbeCommandReadyProtocol, Protocol):
     """Probe protocol required for the shared live-session bootstrap shell."""
 
     _headless: bool
-
-    def _cleanup(
-        self,
-        cdp: CDPSessionProtocol,
-        page: PageProtocol,
-        context: BrowserContextProtocol,
-        browser: BrowserProtocol,
-    ) -> None:
-        """Clean up browser resources after the session."""
 
 
 class ProbeCommandReadyContextDict(TypedDict):
@@ -168,13 +152,15 @@ def prepare_live_probe_runtime(
     reset_viewport_tracking()
     probe._setup_console_listener(cdp)
     probe._setup_cdp_handlers(cdp)
-    probe._navigate_and_login(
+    action_hooks.navigate_and_login(
         page,
         cdp,
+        target_url=probe._target_url,
+        prefer_account=probe._prefer_account,
         tank_name_prefix=tank_name_prefix,
         auto_join_room=auto_join_room,
     )
-    probe._wait_for_game_ready(page)
+    action_hooks.wait_for_game_ready(page, probe.messages)
     game_ready_timestamp_ms = action_hooks.get_current_time_ms()
     probe._gather_intel(page, cdp)
     intel_ready_timestamp_ms = action_hooks.get_current_time_ms()
@@ -240,7 +226,7 @@ def execute_live_probe_bootstrap(
     probe._start_timestamp_ms = initialize_live_probe_session(probe)
 
     with _test_hooks.sync_playwright() as playwright:
-        browser, context, page, cdp = launch_probe_browser(
+        browser, _context, page, cdp = launch_probe_browser(
             playwright,
             headless=probe._headless,
         )
@@ -274,8 +260,10 @@ def execute_live_probe_bootstrap(
                 )
             )
         finally:
+            from tankpit_bot.browser.lifecycle import cleanup_browser
+
             clear_live_probe_runtime(probe)
-            probe._cleanup(cdp, page, context, browser)
+            cleanup_browser(browser)
 
 
 def build_probe_startup_timing(

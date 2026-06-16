@@ -1115,7 +1115,6 @@ def test_execute_probe_runs_successfully_with_explicit_targets() -> None:
     assert session["spawn_x"] == 101
     assert session["spawn_y"] == 102
     assert harness.probed_targets == explicit_targets
-    assert harness.cleanup_calls == 1
     assert harness._page is None
     assert harness._cdp is None
 

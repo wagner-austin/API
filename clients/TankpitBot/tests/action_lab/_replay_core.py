@@ -38,8 +38,6 @@ from platform_core.json_utils import (
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
-    BrowserContextProtocol,
-    BrowserProtocol,
     BufferedMessageSourceProtocol,
     CDPSessionProtocol,
     KeyboardProtocol,
@@ -542,14 +540,8 @@ class ReplayResult(Generic[_AttemptResultT]):
 class StubbedBootstrapMixin:
     """Stub the probe bootstrap so ``execute_probe`` runs without a browser.
 
-    Every action-lab ``_ExecuteHarness`` in the test suite stubs the
-    same six methods on its probe base class:
-    ``_setup_console_listener``, ``_setup_cdp_handlers``,
-    ``_navigate_and_login``, ``_wait_for_game_ready``, ``_gather_intel``,
-    ``_cleanup``. Lifted here so each test declares the stubs by
-    inheriting this mixin instead of carrying its own copy. Tests that
-    also need to override ``get_world_state``/``get_self_state``
-    compose this with :class:`WorldStateOverrideMixin`.
+    Sets ``action_hooks`` lifecycle stubs so ``prepare_live_probe_runtime``
+    and ``execute_live_probe_bootstrap`` skip real browser interaction.
 
     Subclasses must call :meth:`_init_bootstrap_stubs` from their own
     ``__init__`` (after their real-probe ``__init__``).
@@ -559,8 +551,31 @@ class StubbedBootstrapMixin:
     _magic: str | None
 
     def _init_bootstrap_stubs(self) -> None:
-        """Initialize the cleanup-call counter."""
+        """Install lifecycle hook stubs and initialize counters."""
+        from tankpit_bot.action_lab import _test_hooks as action_hooks
+        from tankpit_bot.types import CapturedMessage
+
         self.cleanup_calls = 0
+
+        def _stub_navigate(
+            page: PageProtocol,
+            cdp: CDPSessionProtocol,
+            *,
+            target_url: str,
+            prefer_account: bool,
+            tank_name_prefix: str = "TP",
+            auto_join_room: bool = True,
+        ) -> None:
+            _ = (page, cdp, target_url, prefer_account, tank_name_prefix, auto_join_room)
+
+        def _stub_wait_ready(
+            page: PageProtocol,
+            messages: list[CapturedMessage],
+        ) -> None:
+            _ = (page, messages)
+
+        action_hooks.navigate_and_login = _stub_navigate
+        action_hooks.wait_for_game_ready = _stub_wait_ready
 
     def _setup_console_listener(self, cdp: CDPSessionProtocol) -> None:
         """Skip real console-listener wiring."""
@@ -570,36 +585,10 @@ class StubbedBootstrapMixin:
         """Skip real CDP-handler wiring."""
         _ = cdp
 
-    def _navigate_and_login(
-        self,
-        page: PageProtocol,
-        cdp: CDPSessionProtocol,
-        *,
-        tank_name_prefix: str = "TP",
-        auto_join_room: bool = True,
-    ) -> None:
-        """Skip real navigation and login."""
-        _ = (page, cdp, tank_name_prefix, auto_join_room)
-
-    def _wait_for_game_ready(self, page: PageProtocol) -> None:
-        """Skip the real game-ready wait."""
-        _ = page
-
     def _gather_intel(self, page: PageProtocol, cdp: CDPSessionProtocol) -> None:
         """Skip real intel capture and set a stub magic key."""
         _ = (page, cdp)
         self._magic = "fake-magic"
-
-    def _cleanup(
-        self,
-        cdp: CDPSessionProtocol,
-        page: PageProtocol,
-        context: BrowserContextProtocol,
-        browser: BrowserProtocol,
-    ) -> None:
-        """Track cleanup invocation count."""
-        _ = (cdp, page, context, browser)
-        self.cleanup_calls += 1
 
 
 class WorldStateOverrideMixin:

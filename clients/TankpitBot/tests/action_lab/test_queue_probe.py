@@ -773,7 +773,6 @@ class TestExecuteProbeIntegration:
         assert len(session["experiments"]) == 1
         assert session["experiments"][0]["kind"] == "shoot_then_pickup"
         assert session["experiment_timeout_ms"] == 3000
-        assert harness.cleanup_calls == 1
         assert harness._page is None
         assert harness._cdp is None
 

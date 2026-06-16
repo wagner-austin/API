@@ -28,6 +28,12 @@ from tankpit_bot.action_lab.session import (
 )
 from tankpit_bot.bot.world_sync import drain_messages as _real_drain_buffered_messages
 from tankpit_bot.browser import get_current_time_ms as _real_get_current_time_ms
+from tankpit_bot.browser.lifecycle import (
+    navigate_and_login as _real_navigate_and_login,
+)
+from tankpit_bot.browser.lifecycle import (
+    wait_for_game_ready as _real_wait_for_game_ready,
+)
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete as _real_check_and_clear_radar_scan_complete,
 )
@@ -194,6 +200,15 @@ wait_for_initial_self_state: WaitForInitialSelfStateProtocol = _real_wait_for_in
 advance_startup_state: AdvanceStartupStateProtocol = _real_advance_startup_state
 
 
+# ---------------------------------------------------------------------------
+# Browser lifecycle hooks
+# ---------------------------------------------------------------------------
+
+
+navigate_and_login = _real_navigate_and_login
+wait_for_game_ready = _real_wait_for_game_ready
+
+
 __all__ = [
     "AdvanceStartupStateProtocol",
     "CheckAndClearRadarScanCompleteProtocol",
@@ -208,6 +223,8 @@ __all__ = [
     "check_and_clear_teleport_landed",
     "drain_buffered_messages",
     "get_current_time_ms",
+    "navigate_and_login",
+    "wait_for_game_ready",
     "wait_for_initial_self_state",
     "wait_for_radar_sync",
     "wait_for_world_sync",

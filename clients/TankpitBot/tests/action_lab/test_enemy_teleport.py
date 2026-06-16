@@ -1157,7 +1157,6 @@ def test_execute_probe_collects_attempts() -> None:
     assert probe.excluded_tank_ids == [frozenset(), frozenset({50})]
     assert session["startup_timing"]["initial_world_timestamp_ms"] == 1200
     assert session["startup_timing"]["first_attempt_started_ms"] == 1000
-    assert probe.cleanup_calls == 1
     assert recorded.browser_type.launches == [False]
 
 

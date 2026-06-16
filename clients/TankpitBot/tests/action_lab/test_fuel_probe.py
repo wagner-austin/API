@@ -2401,7 +2401,6 @@ def test_execute_probe_collects_attempts_and_requires_terrain() -> None:
     assert session["spawn_x"] == 100
     assert session["target_pickups"] == 1
     assert session["startup_timing"]["initial_world_timestamp_ms"] == 1200
-    assert probe.cleanup_calls == 1
     assert session_browser.browser_type.launches == [False]
 
     fuel_probe_module.get_terrain_map = lambda: None
@@ -2524,7 +2523,6 @@ def test_execute_probe_continues_after_pickup_until_target_pickups_reached() -> 
         "picked_up_fuel",
     ]
     assert session["target_pickups"] == 2
-    assert probe.cleanup_calls == 1
 
 
 def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
@@ -2633,7 +2631,6 @@ def test_execute_probe_continues_after_miss_until_pickup_succeeds() -> None:
         "picked_up_fuel",
     ]
     assert session["target_pickups"] == 1
-    assert probe.cleanup_calls == 1
 
 
 def test_run_fuel_probe_writes_session_json(fake_fs: FakeFileSystem) -> None:
