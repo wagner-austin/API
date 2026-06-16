@@ -14,8 +14,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.action_lab.types import (
-    TeleportStartupTimingDict,
+from tankpit_bot.action_lab.types import TeleportStartupTimingDict
+from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_startup_timing,
     encode_teleport_startup_timing,
 )

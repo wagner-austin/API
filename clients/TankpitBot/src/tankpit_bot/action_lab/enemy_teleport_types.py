@@ -21,6 +21,8 @@ from tankpit_bot.action_lab.page_client_snapshot import (
 from tankpit_bot.action_lab.types import (
     TeleportStartupTimingDict,
     TeleportTargetDict,
+)
+from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_startup_timing,
     decode_teleport_target,
     encode_teleport_startup_timing,

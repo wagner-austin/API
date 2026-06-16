@@ -33,8 +33,8 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportProbeSessionDict,
     TeleportTargetDict,
-    encode_teleport_probe_session,
 )
+from tankpit_bot.action_lab.types_codecs import encode_teleport_probe_session
 
 log = get_logger(__name__)
 DEFAULT_TELEPORT_STRATEGY: Literal["sync_before_teleport", "immediate_after_map_open"] = (

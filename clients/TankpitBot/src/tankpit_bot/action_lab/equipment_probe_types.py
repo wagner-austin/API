@@ -25,9 +25,8 @@ from tankpit_bot.action_lab.action_trace_types import (
     decode_action_phase_overlap,
     encode_action_phase_overlap,
 )
-from tankpit_bot.action_lab.types import (
-    TeleportStartupTimingDict,
-    TeleportTargetDict,
+from tankpit_bot.action_lab.types import TeleportStartupTimingDict, TeleportTargetDict
+from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_startup_timing,
     decode_teleport_target,
     encode_teleport_startup_timing,

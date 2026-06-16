@@ -160,7 +160,7 @@ class TestQueueProbeSession:
     """Tests for QueueProbeSessionDict encode/decode."""
 
     def _make_session(self) -> QueueProbeSessionDict:
-        from tankpit_bot.action_lab.types import (
+        from tankpit_bot.action_lab.types_codecs import (
             decode_teleport_startup_timing,
         )
 

@@ -13,6 +13,8 @@ from tankpit_bot.action_lab.types import (
     TeleportProbeSessionDict,
     TeleportStartupTimingDict,
     TeleportTargetDict,
+)
+from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_attempt_result,
     decode_teleport_page_snapshot,
     decode_teleport_probe_session,

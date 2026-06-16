@@ -50,8 +50,8 @@ from tankpit_bot.action_lab.types import (
     TeleportPageSnapshotDict,
     TeleportProbeSessionDict,
     TeleportTargetDict,
-    decode_teleport_probe_session,
 )
+from tankpit_bot.action_lab.types_codecs import decode_teleport_probe_session
 from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.state import (
     SelfStateDict,

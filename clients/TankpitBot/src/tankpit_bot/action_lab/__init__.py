@@ -92,6 +92,8 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportProbeSessionDict,
     TeleportTargetDict,
+)
+from tankpit_bot.action_lab.types_codecs import (
     decode_teleport_attempt_result,
     decode_teleport_probe_session,
     decode_teleport_target,
