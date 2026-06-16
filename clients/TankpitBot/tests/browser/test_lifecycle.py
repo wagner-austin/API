@@ -241,6 +241,48 @@ class TestGatherIntel:
         _test_hooks.write_text = orig_write
         assert result == static_key
 
+    def test_capture_static_key_no_key_in_content(self) -> None:
+        """Real browser: tpclient.js exists but has no 1000-char string."""
+        from tankpit_bot import _test_hooks
+        from tankpit_bot.browser.lifecycle import _capture_static_key
+        from tests.conftest import FakeFileSystem
+
+        sync_pw = _test_hooks.sync_playwright
+        if sync_pw is None:
+            sync_pw = _test_hooks.get_sync_playwright()
+        if sync_pw is None:
+            pytest.skip("Playwright not available")
+
+        fake_fs = FakeFileSystem()
+        orig_write = _test_hooks.write_text
+        _test_hooks.write_text = fake_fs.write_text
+
+        from tankpit_bot._test_hooks.cdp import RouteFulfillTarget
+
+        page_html = (
+            "<!DOCTYPE html><html><head>"
+            '<script src="/tpclient.js"></script>'
+            "</head><body></body></html>"
+        )
+
+        def _fulfill_page(route: RouteFulfillTarget) -> None:
+            route.fulfill(content_type="text/html", body=page_html)
+
+        def _fulfill_short_js(route: RouteFulfillTarget) -> None:
+            route.fulfill(content_type="application/javascript", body="var x = 1;")
+
+        with sync_pw() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_context().new_page()
+            page.route("**/test-page", _fulfill_page)
+            page.route("**/tpclient.js", _fulfill_short_js)
+            page.goto("http://localhost:9999/test-page")
+            result = _capture_static_key(page)
+            browser.close()
+
+        _test_hooks.write_text = orig_write
+        assert result is None
+
 
 class TestHandleTeardownHang:
     def test_calls_force_exit(self) -> None:
