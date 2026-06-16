@@ -422,7 +422,7 @@ def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
     Returns:
         A pickup command for the adjacent container, or None.
     """
-    from tankpit_bot.bot.ai.equipment import find_adjacent_container
+    from tankpit_bot.bot.ai.equipment_search import find_adjacent_container
 
     self_state = ctx.world["self_state"]
     if self_state is None:

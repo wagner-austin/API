@@ -12,13 +12,13 @@ from tankpit_bot.bot.ai.context import (
     set_resource_target,
     should_scan_resources_in_current_viewport,
 )
-from tankpit_bot.bot.ai.equipment import (
+from tankpit_bot.bot.ai.equipment import is_lock_release_warranted
+from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_adjacent_container,
     find_equipment_candidates,
     find_known_equipment_candidates,
     find_nearest_equipment,
-    is_lock_release_warranted,
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.movement import walk_or_teleport

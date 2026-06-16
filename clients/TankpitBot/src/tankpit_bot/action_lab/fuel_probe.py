@@ -74,7 +74,7 @@ from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
 )
-from tankpit_bot.bot.ai.equipment import find_best_fuel
+from tankpit_bot.bot.ai.equipment_search import find_best_fuel
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict
 

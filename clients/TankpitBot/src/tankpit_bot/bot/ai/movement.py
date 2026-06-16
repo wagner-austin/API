@@ -14,7 +14,8 @@ from tankpit_bot.bot.ai.context import (
     local_actionable_bounds,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.equipment import find_teleport_landing_tile, is_area_scanned
+from tankpit_bot.bot.ai.equipment import is_area_scanned
+from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
 from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,

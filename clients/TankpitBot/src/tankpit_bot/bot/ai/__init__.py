@@ -12,7 +12,7 @@ from tankpit_bot.bot.ai.combat_landing import (
     combat_landing_candidates,
     has_cardinal_enemy_adjacency,
 )
-from tankpit_bot.bot.ai.equipment import (
+from tankpit_bot.bot.ai.equipment_search import (
     find_best_fuel,
     find_nearest_deposit,
     find_nearest_equipment,

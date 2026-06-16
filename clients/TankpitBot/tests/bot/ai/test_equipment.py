@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.equipment import (
+from tankpit_bot.bot.ai.equipment import is_tile_scanned
+from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_best_fuel,
     find_known_equipment_candidates,
@@ -12,7 +13,6 @@ from tankpit_bot.bot.ai.equipment import (
     find_nearest_fuel,
     find_teleport_landing_tile,
     is_reachable,
-    is_tile_scanned,
 )
 from tankpit_bot.state.types import (
     MineStateDict,

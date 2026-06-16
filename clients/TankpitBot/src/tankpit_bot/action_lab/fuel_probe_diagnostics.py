@@ -14,7 +14,7 @@ from tankpit_bot.action_lab.action_trace import (
 )
 from tankpit_bot.action_lab.fuel_probe_types import FuelProbeSessionDict
 from tankpit_bot.action_lab.fuel_target_phase import FuelTargetPhaseProbeProtocol
-from tankpit_bot.bot.ai.equipment import describe_container_search
+from tankpit_bot.bot.ai.equipment_search import describe_container_search
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict
 

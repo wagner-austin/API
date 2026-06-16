@@ -14,9 +14,9 @@ from tankpit_bot.action_lab.action_trace_types import (
 )
 from tankpit_bot.bot.ai.equipment import (
     _CONTAINER_FRESHNESS_TTL_MS,
-    _describe_candidate_reason,
     _viewport_bounds,
 )
+from tankpit_bot.bot.ai.equipment_search import _describe_candidate_reason
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict, WorldStateDict
 

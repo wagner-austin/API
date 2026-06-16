@@ -16,11 +16,13 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.equipment import (
     SCAN_COVERAGE_TTL_MS,
+    is_lock_release_warranted,
+)
+from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_adjacent_container,
     find_best_fuel,
     find_known_fuel_candidates,
-    is_lock_release_warranted,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.recover_equipment_mode import select_equipment_target
