@@ -13,6 +13,7 @@ from pathlib import Path
 from platform_core.json_utils import JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.bot import Bot
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.runtime_logging import (
@@ -52,6 +53,12 @@ class _MinimalPage:
 
     def wait_for_timeout(self, timeout: float) -> None:
         """No-op wait."""
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """No-op wait for event."""

@@ -8,6 +8,7 @@ from platform_core.json_utils import JSONValue
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.bot.states import InFlightActionDict
 from tankpit_bot.bot.tick_loop import _clear_rejected_movement
 from tankpit_bot.browser import get_current_time_ms
@@ -51,6 +52,12 @@ class _FakePage:
 
     def wait_for_timeout(self, timeout: float) -> None:
         """No-op wait."""
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """No-op wait for event."""

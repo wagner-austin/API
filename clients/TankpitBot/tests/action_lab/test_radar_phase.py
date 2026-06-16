@@ -9,6 +9,7 @@ import pytest
 from tests.action_lab._replay_core import ReplayClock
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import radar_phase
 from tankpit_bot.action_lab import session as action_session
@@ -23,6 +24,12 @@ class _Page:
     def wait_for_timeout(self, timeout: float) -> None:
         """Ignore wait requests."""
         _ = timeout
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
 
 class _Probe:

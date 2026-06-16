@@ -9,6 +9,7 @@ import pytest
 from typing_extensions import Unpack
 
 from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab import teleport_attempt
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
@@ -87,6 +88,12 @@ class _Page:
     def wait_for_timeout(self, timeout: float) -> None:
         """Ignore wait requests."""
         _ = timeout
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
 
 def _target() -> TeleportTargetDict:

@@ -8,6 +8,7 @@ from typing import Literal
 import pytest
 from tests.action_lab._replay_core import ReplayClock
 
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab import teleport_phase
@@ -97,6 +98,12 @@ class _Page:
     def wait_for_timeout(self, timeout: float) -> None:
         """Record no-op waits."""
         _ = timeout
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
 
 class _SuccessfulWaitForOutcome(teleport_phase.TeleportOutcomeWaiterProtocol):

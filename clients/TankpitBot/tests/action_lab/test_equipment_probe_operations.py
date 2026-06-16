@@ -20,6 +20,7 @@ from tests.action_lab.conftest import (
 )
 
 from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict, ActionPhaseOverlapDict
 from tankpit_bot.action_lab.equipment_pickup import total_inventory_count
@@ -218,6 +219,12 @@ def test_finalize_attempt_delay_skips_zero_delay() -> None:
         def wait_for_timeout(self, timeout: float) -> None:
             self.calls += 1
             _ = timeout
+
+        def set_content(self, html: str, *, timeout: float | None = None) -> None:
+            _ = (html, timeout)
+
+        def route(self, url: str, handler: RouteFulfillHandler) -> None:
+            _ = (url, handler)
 
     page = _Page()
     finalize_attempt_delay(page, settle_delay_ms=0)
@@ -572,6 +579,12 @@ def test_run_pickup_attempt_dispatches_move_and_polls_against_real_inventory_fra
         def wait_for_timeout(self, timeout: float) -> None:
             self.waits.append(timeout)
             clock.advance(int(timeout))
+
+        def set_content(self, html: str, *, timeout: float | None = None) -> None:
+            _ = (html, timeout)
+
+        def route(self, url: str, handler: RouteFulfillHandler) -> None:
+            _ = (url, handler)
 
     page = _AdvancingPage()
     result = run_pickup_attempt_for_probe(

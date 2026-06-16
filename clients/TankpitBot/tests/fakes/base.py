@@ -25,6 +25,7 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.protocol.commands import CMD_ENTER_GAME, build_query_command
 from tankpit_bot.protocol.framing import decode_frame, encode_frame
 from tankpit_bot.types import CapturedMessage
@@ -675,6 +676,12 @@ class FakePage:
         )
         self._cdp_session._raw_messages_ready = True
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - also emit WebSocket events like wait_for_timeout."""
         _ = (event, timeout)
@@ -772,6 +779,12 @@ class FakePageNoMessages:
         """Wait without emitting any WebSocket events."""
         _ = timeout
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
@@ -861,6 +874,12 @@ class FakePageGrowingMessages:
                     ws_url="ws://test",
                 ),
             )
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""

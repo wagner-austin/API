@@ -22,6 +22,7 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.protocol.framing import decode_frame
 from tests.fakes.base import (
     _FAKE_MAGIC,
@@ -327,6 +328,12 @@ class FakePageProbe:
                 },
             )
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""
         _ = (event, timeout)
@@ -394,6 +401,12 @@ class FakePageProbeNoMessages:
     def wait_for_timeout(self, timeout: float) -> None:
         """Wait without emitting any WebSocket events."""
         _ = timeout
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""

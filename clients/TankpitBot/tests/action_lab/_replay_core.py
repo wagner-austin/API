@@ -44,6 +44,7 @@ from tankpit_bot._test_hooks import (
     PageProtocol,
     ResponseProtocol,
 )
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.types import CaptureSession, decode_capture_session
@@ -191,6 +192,12 @@ class ClockAdvancingPage:
         if self.on_wait is not None:
             self.on_wait()
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Absorb an event-wait request."""
         _ = (event, timeout)
@@ -291,6 +298,12 @@ class ReplayPage:
             return
         self._probe._cdp_message_buffer.extend(batch)
         self.frames_fed += len(batch)
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Absorb an event-wait request without blocking."""

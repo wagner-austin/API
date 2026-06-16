@@ -7,6 +7,7 @@ from collections.abc import Callable
 from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.browser.login import handle_account_login
 from tests.login.conftest import FakeCDPLogin, FakePageLogin
 from tests.no_op_keyboard import NoOpKeyboard
@@ -106,6 +107,12 @@ class FakePageLoginTimeout:
         self._wait_count += 1
         # Never transition to /play - causes timeout
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event."""
         _ = (event, timeout)
@@ -197,6 +204,12 @@ class FakePageLoginIntermediateUrl:
         """Wait for timeout."""
         _ = timeout
         self._wait_count += 1
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event."""

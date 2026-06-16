@@ -9,6 +9,7 @@ import pytest
 from platform_core.json_utils import JSONValue
 
 from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.browser import (
     BrowserSession,
     extract_xor_first_bytes,
@@ -227,6 +228,12 @@ class FakePageWithStaticKey:
         """Wait for timeout."""
         _ = timeout
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for event."""
         _ = (event, timeout)
@@ -288,6 +295,12 @@ class FakePageNoKey:
         """Wait for timeout."""
         _ = timeout
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
+
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for event."""
         _ = (event, timeout)
@@ -341,6 +354,12 @@ class FakePageFetchFails:
     def wait_for_timeout(self, timeout: float) -> None:
         """Wait for timeout."""
         _ = timeout
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for event."""

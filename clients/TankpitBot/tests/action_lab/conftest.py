@@ -24,6 +24,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_inventory import (
@@ -57,6 +58,12 @@ class FailIfWaitedPage:
         raise AssertionError(
             f"wait_for_timeout({timeout}) called — fast path did not trigger, test would have hung"
         )
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
 
 @pytest.fixture()

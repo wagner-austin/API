@@ -13,6 +13,7 @@ from typing import Literal
 import pytest
 from typing_extensions import Unpack
 
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.action_lab import (
     equipment_collection_phase as ecp_module,
 )
@@ -139,6 +140,12 @@ class _Page:
 
     def wait_for_timeout(self, timeout: float) -> None:
         """No-op."""
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
 
 class _Probe:

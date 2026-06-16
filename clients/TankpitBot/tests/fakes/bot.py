@@ -21,6 +21,7 @@ from tankpit_bot._test_hooks import (
     ResponseProtocol,
     SyncPlaywrightContextManagerProtocol,
 )
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tests.fakes.base import (
     _FAKE_MAGIC,
     _FAKE_STATIC_KEY,
@@ -79,6 +80,12 @@ class FakePageInterrupting:
         self._wait_count += 1
         if self._wait_count > self._interrupt_after:
             raise KeyboardInterrupt
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event."""
@@ -258,6 +265,12 @@ class FakePageBot:
 
         if self._wait_count > self._interrupt_after:
             raise KeyboardInterrupt
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for event."""

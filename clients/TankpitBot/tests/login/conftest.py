@@ -9,6 +9,7 @@ from collections.abc import Callable
 from platform_core.json_utils import JSONObject, JSONValue
 
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
+from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
 from tankpit_bot.protocol.framing import decode_frame, encode_frame
 from tests.no_op_keyboard import NoOpKeyboard
 
@@ -234,6 +235,12 @@ class FakePageLogin:
             and "before-playing" in self._url
         ):
             self._url = "https://tankpit.com/play"
+
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        _ = (html, timeout)
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        _ = (url, handler)
 
     def wait_for_event(self, event: str, *, timeout: float | None = None) -> None:
         """Wait for an event - returns immediately in tests."""

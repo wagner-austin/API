@@ -180,6 +180,46 @@ class PageProtocol(Protocol):
         """
         ...
 
+    def set_content(self, html: str, *, timeout: float | None = None) -> None:
+        """Set the page content from an HTML string.
+
+        Args:
+            html: HTML markup to set as the page content.
+            timeout: Maximum operation time in milliseconds.
+        """
+        ...
+
+    def route(self, url: str, handler: RouteFulfillHandler) -> None:
+        """Register a route handler for URL interception.
+
+        Args:
+            url: URL glob pattern to match.
+            handler: Handler called for matching requests.
+        """
+        ...
+
+
+class RouteFulfillHandler(Protocol):
+    """Protocol for route fulfillment handlers."""
+
+    def __call__(self, route: RouteFulfillTarget) -> None:
+        """Handle an intercepted route."""
+        ...
+
+
+class RouteFulfillTarget(Protocol):
+    """Protocol for route.fulfill() target."""
+
+    def fulfill(
+        self,
+        *,
+        status: int = ...,
+        content_type: str = ...,
+        body: str = ...,
+    ) -> None:
+        """Fulfill the intercepted request with a response."""
+        ...
+
 
 __all__ = [
     "CDPSessionProtocol",
