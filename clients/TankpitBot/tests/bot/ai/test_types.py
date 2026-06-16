@@ -7,6 +7,13 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from tankpit_bot.bot.ai.types import (
     BEHAVIOR_MODES,
+    make_behavior_score,
+    make_default_ai_config,
+    make_enemy_threat,
+    make_initial_ai_state,
+    make_path_step,
+)
+from tankpit_bot.bot.ai.types_codecs import (
     decode_ai_config,
     decode_ai_state,
     decode_behavior_score,
@@ -17,11 +24,6 @@ from tankpit_bot.bot.ai.types import (
     encode_behavior_score,
     encode_enemy_threat,
     encode_path_step,
-    make_behavior_score,
-    make_default_ai_config,
-    make_enemy_threat,
-    make_initial_ai_state,
-    make_path_step,
 )
 
 # =============================================================================

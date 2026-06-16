@@ -9,21 +9,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from platform_core.json_utils import (
-    JSONObject,
-    JSONValue,
-    require_bool,
-    require_int,
-    require_str,
-)
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.modes import (
     AIMode,
     AIModeState,
-    is_valid_ai_mode_state,
-    require_ai_mode,
-    require_ai_mode_state,
 )
 
 # =============================================================================
@@ -41,31 +31,6 @@ BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
     "COLLECT_FUEL",
     "COLLECT_EQUIPMENT",
 )
-
-
-# =============================================================================
-# Combat Phase — explicit FSM replacing opaque ticks_in_mode counter
-# =============================================================================
-
-
-def _require_behavior_mode(data: JSONObject, key: str) -> BehaviorMode:
-    """Validate and extract a BehaviorMode from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Validated BehaviorMode value.
-
-    Raises:
-        ValueError: If value is not a valid BehaviorMode.
-    """
-    raw = require_str(data, key)
-    for mode in BEHAVIOR_MODES:
-        if raw == mode:
-            return mode
-    raise ValueError(f"{key} must be one of {BEHAVIOR_MODES}, got {raw!r}")
 
 
 # =============================================================================
@@ -121,48 +86,6 @@ def make_behavior_score(
         target_y=target_y,
         target_id=target_id,
         reason=reason,
-    )
-
-
-def encode_behavior_score(score: BehaviorScoreDict) -> JSONObject:
-    """Encode BehaviorScoreDict to JSON-serializable dict.
-
-    Args:
-        score: BehaviorScoreDict to encode.
-
-    Returns:
-        JSON-serializable dict representation.
-    """
-    return {
-        "mode": score["mode"],
-        "score": score["score"],
-        "target_x": score["target_x"],
-        "target_y": score["target_y"],
-        "target_id": score["target_id"],
-        "reason": score["reason"],
-    }
-
-
-def decode_behavior_score(data: JSONObject) -> BehaviorScoreDict:
-    """Decode BehaviorScoreDict from JSON with validation.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated BehaviorScoreDict.
-
-    Raises:
-        ValueError: If mode is not a valid BehaviorMode.
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    return BehaviorScoreDict(
-        mode=_require_behavior_mode(data, "mode"),
-        score=require_int(data, "score"),
-        target_x=require_int(data, "target_x"),
-        target_y=require_int(data, "target_y"),
-        target_id=require_int(data, "target_id"),
-        reason=require_str(data, "reason"),
     )
 
 
@@ -252,57 +175,6 @@ def make_enemy_threat(
     )
 
 
-def encode_enemy_threat(threat: EnemyThreatDict) -> JSONObject:
-    """Encode EnemyThreatDict to JSON-serializable dict.
-
-    Args:
-        threat: EnemyThreatDict to encode.
-
-    Returns:
-        JSON-serializable dict representation.
-    """
-    return {
-        "tank_id": threat["tank_id"],
-        "x": threat["x"],
-        "y": threat["y"],
-        "distance": threat["distance"],
-        "damage_state": threat["damage_state"],
-        "rank": threat["rank"],
-        "team": threat["team"],
-        "name": threat["name"],
-        "is_bot": threat["is_bot"],
-        "timestamp_ms": threat["timestamp_ms"],
-        "last_wire_seen_ms": threat["last_wire_seen_ms"],
-    }
-
-
-def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
-    """Decode EnemyThreatDict from JSON with validation.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated EnemyThreatDict.
-
-    Raises:
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    return EnemyThreatDict(
-        tank_id=require_int(data, "tank_id"),
-        x=require_int(data, "x"),
-        y=require_int(data, "y"),
-        distance=require_int(data, "distance"),
-        damage_state=require_int(data, "damage_state"),
-        rank=require_int(data, "rank"),
-        team=require_int(data, "team"),
-        name=require_str(data, "name"),
-        is_bot=require_bool(data, "is_bot"),
-        timestamp_ms=require_int(data, "timestamp_ms"),
-        last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
-    )
-
-
 # =============================================================================
 # PathStepDict
 # =============================================================================
@@ -331,33 +203,6 @@ def make_path_step(x: int, y: int) -> PathStepDict:
         PathStepDict with the provided values.
     """
     return PathStepDict(x=x, y=y)
-
-
-def encode_path_step(step: PathStepDict) -> JSONObject:
-    """Encode PathStepDict to JSON-serializable dict.
-
-    Args:
-        step: PathStepDict to encode.
-
-    Returns:
-        JSON-serializable dict representation.
-    """
-    return {"x": step["x"], "y": step["y"]}
-
-
-def decode_path_step(data: JSONObject) -> PathStepDict:
-    """Decode PathStepDict from JSON with validation.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated PathStepDict.
-
-    Raises:
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    return PathStepDict(x=require_int(data, "x"), y=require_int(data, "y"))
 
 
 # =============================================================================
@@ -444,103 +289,6 @@ def make_default_ai_config() -> AIConfigDict:
         equip_search_hop_distance=30,
         equip_search_max_failures=3,
     )
-
-
-def encode_ai_config(config: AIConfigDict) -> JSONObject:
-    """Encode AIConfigDict to JSON-serializable dict.
-
-    Args:
-        config: AIConfigDict to encode.
-
-    Returns:
-        JSON-serializable dict representation.
-    """
-    waypoints: list[JSONValue] = [[x, y] for x, y in config["patrol_waypoints"]]
-    return {
-        "fuel_critical_threshold": config["fuel_critical_threshold"],
-        "fuel_low_threshold": config["fuel_low_threshold"],
-        "fuel_full_threshold": config["fuel_full_threshold"],
-        "hunt_min_fuel": config["hunt_min_fuel"],
-        "combat_range": config["combat_range"],
-        "scan_cooldown_ms": config["scan_cooldown_ms"],
-        "shot_feedback_timeout_ms": config["shot_feedback_timeout_ms"],
-        "action_stall_timeout_ms": config["action_stall_timeout_ms"],
-        "kill_cooldown_ms": config["kill_cooldown_ms"],
-        "map_open_cooldown_ms": config["map_open_cooldown_ms"],
-        "patrol_waypoints": waypoints,
-        "dual_break_threshold": config["dual_break_threshold"],
-        "dual_resume_threshold": config["dual_resume_threshold"],
-        "radar_break_threshold": config["radar_break_threshold"],
-        "radar_resume_threshold": config["radar_resume_threshold"],
-        "equip_search_hop_distance": config["equip_search_hop_distance"],
-        "equip_search_max_failures": config["equip_search_max_failures"],
-    }
-
-
-def _decode_patrol_waypoints(data: JSONObject) -> list[tuple[int, int]]:
-    """Decode patrol waypoints from JSON.
-
-    Args:
-        data: JSON object containing patrol_waypoints field.
-
-    Returns:
-        List of (x, y) waypoint tuples.
-
-    Raises:
-        ValueError: If waypoints format is invalid.
-    """
-    raw = data.get("patrol_waypoints")
-    if not isinstance(raw, list):
-        raise ValueError("patrol_waypoints must be a list")
-    result: list[tuple[int, int]] = []
-    for item in raw:
-        if not isinstance(item, list) or len(item) != 2:
-            raise ValueError(f"Each waypoint must be [x, y], got {item!r}")
-        x_val = item[0]
-        y_val = item[1]
-        if not isinstance(x_val, int) or not isinstance(y_val, int):
-            raise ValueError(f"Waypoint coords must be int, got {item!r}")
-        result.append((x_val, y_val))
-    return result
-
-
-def decode_ai_config(data: JSONObject) -> AIConfigDict:
-    """Decode AIConfigDict from JSON with validation.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated AIConfigDict.
-
-    Raises:
-        ValueError: If waypoints format is invalid.
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    return AIConfigDict(
-        fuel_critical_threshold=require_int(data, "fuel_critical_threshold"),
-        fuel_low_threshold=require_int(data, "fuel_low_threshold"),
-        fuel_full_threshold=require_int(data, "fuel_full_threshold"),
-        hunt_min_fuel=require_int(data, "hunt_min_fuel"),
-        combat_range=require_int(data, "combat_range"),
-        scan_cooldown_ms=require_int(data, "scan_cooldown_ms"),
-        shot_feedback_timeout_ms=require_int(data, "shot_feedback_timeout_ms"),
-        action_stall_timeout_ms=require_int(data, "action_stall_timeout_ms"),
-        kill_cooldown_ms=require_int(data, "kill_cooldown_ms"),
-        map_open_cooldown_ms=require_int(data, "map_open_cooldown_ms"),
-        patrol_waypoints=_decode_patrol_waypoints(data),
-        dual_break_threshold=require_int(data, "dual_break_threshold"),
-        dual_resume_threshold=require_int(data, "dual_resume_threshold"),
-        radar_break_threshold=require_int(data, "radar_break_threshold"),
-        radar_resume_threshold=require_int(data, "radar_resume_threshold"),
-        equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
-        equip_search_max_failures=require_int(data, "equip_search_max_failures"),
-    )
-
-
-# =============================================================================
-# AIStateDict
-# =============================================================================
 
 
 class AIStateDict(TypedDict):
@@ -641,133 +389,6 @@ def make_initial_ai_state(
     )
 
 
-def encode_ai_state(state: AIStateDict) -> JSONObject:
-    """Encode AIStateDict to JSON-serializable dict.
-
-    Args:
-        state: AIStateDict to encode.
-
-    Returns:
-        JSON-serializable dict representation.
-    """
-    killed: JSONValue = dict(state["killed_tank_ids"])
-    return {
-        "config": encode_ai_config(state["config"]),
-        "mode": state["mode"],
-        "mode_state": state["mode_state"],
-        "mode_started_ms": state["mode_started_ms"],
-        "patrol_waypoint_index": state["patrol_waypoint_index"],
-        "last_scan_ms": state["last_scan_ms"],
-        "last_shoot_ms": state["last_shoot_ms"],
-        "last_map_open_ms": state["last_map_open_ms"],
-        "combat_target_id": state["combat_target_id"],
-        "combat_target_x": state["combat_target_x"],
-        "combat_target_y": state["combat_target_y"],
-        "killed_tank_ids": killed,
-        "blocked_combat_targets": dict(state["blocked_combat_targets"]),
-        "last_shot_target_id": state["last_shot_target_id"],
-        "last_shot_target_name": state["last_shot_target_name"],
-        "equipment_search_failures": state["equipment_search_failures"],
-        "resource_target_kind": state["resource_target_kind"],
-        "resource_target_x": state["resource_target_x"],
-        "resource_target_y": state["resource_target_y"],
-        "local_scan_cells": dict(state["local_scan_cells"]),
-        "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
-        "attempted_fuel_dots": dict(state["attempted_fuel_dots"]),
-    }
-
-
-def _decode_killed_tank_ids(data: JSONObject) -> dict[str, int]:
-    """Decode killed_tank_ids from JSON.
-
-    Args:
-        data: JSON object containing killed_tank_ids field.
-
-    Returns:
-        Dict mapping str(tank_id) to timestamp_ms.
-
-    Raises:
-        ValueError: If format is invalid.
-    """
-    return _require_str_int_mapping(data, "killed_tank_ids")
-
-
-def _require_str_int_mapping(data: JSONObject, key: str) -> dict[str, int]:
-    """Decode a dict[str, int] field from JSON.
-
-    Args:
-        data: JSON object containing the field.
-        key: Key to extract.
-
-    Returns:
-        Dict mapping string keys to int values.
-
-    Raises:
-        ValueError: If format is invalid.
-    """
-    raw = data.get(key)
-    if not isinstance(raw, dict):
-        raise ValueError(f"{key} must be an object")
-    result: dict[str, int] = {}
-    for k, v in raw.items():
-        if not isinstance(v, int):
-            raise ValueError(f"{key} values must be int, got {type(v).__name__}")
-        result[k] = v
-    return result
-
-
-def decode_ai_state(data: JSONObject) -> AIStateDict:
-    """Decode AIStateDict from JSON with validation.
-
-    Args:
-        data: JSON object to decode.
-
-    Returns:
-        Validated AIStateDict.
-
-    Raises:
-        ValueError: If mode or config values are invalid.
-        JSONTypeError: If required fields are missing or invalid.
-    """
-    config_raw = data.get("config")
-    if not isinstance(config_raw, dict):
-        raise ValueError("config must be an object")
-    mode = require_ai_mode(data, "mode")
-    mode_state = require_ai_mode_state(data, "mode_state")
-    if not is_valid_ai_mode_state(mode, mode_state):
-        raise ValueError(f"mode_state {mode_state!r} is invalid for mode {mode!r}")
-    return AIStateDict(
-        config=decode_ai_config(config_raw),
-        mode=mode,
-        mode_state=mode_state,
-        mode_started_ms=require_int(data, "mode_started_ms"),
-        patrol_waypoint_index=require_int(data, "patrol_waypoint_index"),
-        last_scan_ms=require_int(data, "last_scan_ms"),
-        last_shoot_ms=require_int(data, "last_shoot_ms"),
-        last_map_open_ms=require_int(data, "last_map_open_ms"),
-        combat_target_id=require_int(data, "combat_target_id"),
-        combat_target_x=require_int(data, "combat_target_x"),
-        combat_target_y=require_int(data, "combat_target_y"),
-        killed_tank_ids=_decode_killed_tank_ids(data),
-        blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
-        last_shot_target_id=require_int(data, "last_shot_target_id"),
-        last_shot_target_name=require_str(data, "last_shot_target_name"),
-        equipment_search_failures=require_int(data, "equipment_search_failures"),
-        resource_target_kind=require_str(data, "resource_target_kind"),
-        resource_target_x=require_int(data, "resource_target_x"),
-        resource_target_y=require_int(data, "resource_target_y"),
-        local_scan_cells=_require_str_int_mapping(data, "local_scan_cells")
-        if "local_scan_cells" in data
-        else {},
-        attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
-        if "attempted_equipment_targets" in data
-        else {},
-        attempted_fuel_dots=_require_str_int_mapping(data, "attempted_fuel_dots")
-        if "attempted_fuel_dots" in data
-        else {},
-    )
-
-
 __all__ = [
     "BEHAVIOR_MODES",
     "AIConfigDict",
@@ -776,16 +397,6 @@ __all__ = [
     "BehaviorScoreDict",
     "EnemyThreatDict",
     "PathStepDict",
-    "decode_ai_config",
-    "decode_ai_state",
-    "decode_behavior_score",
-    "decode_enemy_threat",
-    "decode_path_step",
-    "encode_ai_config",
-    "encode_ai_state",
-    "encode_behavior_score",
-    "encode_enemy_threat",
-    "encode_path_step",
     "make_behavior_score",
     "make_default_ai_config",
     "make_enemy_threat",

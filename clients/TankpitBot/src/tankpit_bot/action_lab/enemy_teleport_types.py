@@ -26,11 +26,8 @@ from tankpit_bot.action_lab.types import (
     encode_teleport_startup_timing,
     encode_teleport_target,
 )
-from tankpit_bot.bot.ai.types import (
-    EnemyThreatDict,
-    decode_enemy_threat,
-    encode_enemy_threat,
-)
+from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
 
 
 class EnemyTeleportAttemptResultDict(TypedDict):

@@ -15,11 +15,8 @@ from tankpit_bot.bot.ai.modes import (
     require_ai_mode,
     require_ai_mode_state,
 )
-from tankpit_bot.bot.ai.types import (
-    EnemyThreatDict,
-    decode_enemy_threat,
-    encode_enemy_threat,
-)
+from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.types_codecs import decode_enemy_threat, encode_enemy_threat
 
 
 class ReplayTickTraceDict(TypedDict):

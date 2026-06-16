@@ -17,6 +17,8 @@ from typing_extensions import TypedDict
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     BehaviorScoreDict,
+)
+from tankpit_bot.bot.ai.types_codecs import (
     decode_ai_state,
     decode_behavior_score,
     encode_ai_state,
