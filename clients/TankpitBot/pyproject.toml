@@ -26,8 +26,8 @@ monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
 
 [tool.poetry.scripts]
-tankpit-sniff = "tankpit_bot.sniffer:main"
-tankpit-bot = "tankpit_bot.bot:main"
+tankpit-sniff = "tankpit_bot.sniffer.core:main"
+tankpit-bot = "tankpit_bot.bot.entry:main"
 tankpit-teleport-probe = "scripts.teleport_probe:main"
 tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
 tankpit-fuel-probe = "scripts.fuel_probe:main"
