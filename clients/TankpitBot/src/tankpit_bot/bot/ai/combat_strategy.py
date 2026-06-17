@@ -356,7 +356,14 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             ctx.config["fuel_low_threshold"],
         )
         return _refuel_for_hunt(ctx)
-    emit_ai("teleport near %s to (%d,%d)", target["name"], landing_x, landing_y)
+    emit_ai(
+        "teleport near %s to (%d,%d) (target at %d,%d)",
+        target["name"],
+        landing_x,
+        landing_y,
+        target["x"],
+        target["y"],
+    )
     return make_decision(
         make_teleport_command(landing_x, landing_y),
         "HUNT",
@@ -388,10 +395,13 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     if has_cardinal_combat_shot(ctx.self_state, target):
         return _combat_shoot(ctx, target)
     emit_ai(
-        "not in cardinal firing position for %s from (%d,%d); re-closing",
+        "not in cardinal firing position for %s from (%d,%d) target=(%d,%d) dist=%d; re-closing",
         target["name"],
         ctx.self_state["x"],
         ctx.self_state["y"],
+        target["x"],
+        target["y"],
+        abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"]),
     )
     return _combat_teleport(ctx, target)
 
