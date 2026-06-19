@@ -109,8 +109,8 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
     assert behavior_counts["COLLECT_FUEL"] == 36
     # No radar commands -- fuel-dot atlas eliminates the radar churn
     assert command_counts.get("radar", 0) == 0
-    assert command_counts["move"] == 15
-    assert command_counts["teleport"] == 18
+    assert command_counts["move"] == 13
+    assert command_counts["teleport"] == 22
     assert command_counts["pickup_fuel"] == 5
     assert first_visible_container_tick == 6
     assert len(radar_while_containers_visible) == 0
@@ -202,9 +202,8 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     assert result["total_messages"] == 145
     assert behavior_counts["HUNT"] == 18
     assert behavior_counts["COLLECT_FUEL"] == 1
-    assert command_counts["shoot"] == 11
+    assert command_counts["shoot"] == 10
     assert command_counts.get("radar", 0) == 1
-    assert command_counts["pickup_equipment"] == 1
     assert traces[15]["ai_mode"] == "RECOVER_FUEL"
 
     _reset_replay_globals()

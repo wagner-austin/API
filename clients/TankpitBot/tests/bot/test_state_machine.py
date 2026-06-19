@@ -276,7 +276,7 @@ class TestBotStateUpdates:
         _sm_update_fuel(get_world_service(), 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
 
         update_world_state_from_radar(
             get_world_service(),
@@ -361,7 +361,7 @@ class TestBotStateUpdates:
     ) -> None:
         """COLLECTING completes when pickup removes the target container."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -468,7 +468,7 @@ class TestBotStateUpdates:
     ) -> None:
         """LOW_FUEL does not override an in-flight COLLECTING state."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,

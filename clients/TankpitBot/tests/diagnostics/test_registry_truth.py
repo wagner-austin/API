@@ -78,12 +78,14 @@ _SELF_ARTAX: _RegistryItem = {
 
 def _make_snapshot(
     collections: dict[str, list[dict[str, int | float | bool | str | None]]],
+    *,
+    map_visible: bool = False,
 ) -> PageClientSnapshotDict:
     """Return a healthy live-client snapshot carrying ``collections``."""
     return PageClientSnapshotDict(
         timestamp_ms=1000,
         client_present=True,
-        map_visible=False,
+        map_visible=map_visible,
         client_state=1,
         client_busy=False,
         pending_actions=0,
@@ -118,7 +120,7 @@ def _world_with_self_and_viewport() -> WorldStateDict:
 
 def _announce_tank_via_wire(tank_id: int, x: int, y: int, name: str) -> None:
     """Establish a tank as wire-known by simulating a TankEntry message."""
-    update_world_state_from_tank_entry(get_world_service(), tank_id, x, y, name)
+    update_world_state_from_tank_entry(get_world_service(), tank_id, 0, 0, x, y)
 
 
 def _ingest_records(latest_events_path: str) -> list[RuntimeEventRecordDict]:
@@ -349,3 +351,21 @@ def test_register_skips_partial_entries(fake_fs: FakeFileSystem) -> None:
     assert tanks["513"]["y"] == 126
     assert tanks["511"]["x"] == 135
     assert tanks["511"]["y"] == 125
+
+
+def test_register_skips_when_map_visible(tmp_path: Path) -> None:
+    """Registry truth is skipped when the map overlay is open."""
+    world_state.reset_world_state()
+    snapshot = _make_snapshot(
+        collections={
+            "ya": [
+                {"id": 513, "h": 1, "j": 10, "i": 10, "u": 0, "s": 100, "P": 0},
+            ]
+        },
+        map_visible=True,
+    )
+    ws = get_world_service()
+
+    count = register_tank_truth_from_page_snapshot(snapshot, ws.world_state)
+
+    assert count == 0

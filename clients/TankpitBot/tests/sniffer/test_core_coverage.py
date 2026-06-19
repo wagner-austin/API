@@ -111,18 +111,19 @@ class TestSnifferCoverageBranches:
         assert result == "pos=(10,20) FUEL vol=500"
 
     def test_format_container_simple_radar_response(self) -> None:
-        """Test format_container_simple for radar_response message."""
-        from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
+        """Format the protocol-layer RadarScanResult (0x4F)."""
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
         from tankpit_bot.sniffer.formatters import format_container_simple
 
-        msg = RadarResponseDict(
-            msg_type="radar_response",
-            container_count=2,
-            containers=[RadarContainerDict(x=10, y=20, volume=100)],
+        msg = RadarScanResultDict(
+            msg_type=0x4F,
+            containers=[
+                RadarContainerDict(x=10, y=20, volume=100),
+                RadarContainerDict(x=11, y=21, volume=-1),
+            ],
             mines=[RadarMineDict(x=30, y=40, team=0)],
         )
         result = format_container_simple(msg)
-        # radar_response returns formatted container/mine count
         assert "2 containers" in str(result)
         assert "1 mines" in str(result)
 
@@ -138,8 +139,10 @@ class TestSnifferCoverageBranches:
             x=10,
             y=20,
             direction=0,
+            damage_state=0,
             rank=3,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         result = format_position_details(msg)
         # MovementResponseDict returns empty string (no match in format_position_details)
@@ -152,15 +155,18 @@ class TestSnifferCoverageBranches:
 
         msg = TankEntryDict(
             msg_type=0x28,
+            team=0,
             tank_id=100,
+            rank=0,
+            damage_state=0,
+            score=0,
             x=50,
             y=60,
-            name="Test",
         )
         result = format_message_details(msg)
-        # TankEntry should include name and tank_id
-        assert "Test" in result
-        assert "100" in result
+        # TankEntry should include tank_id and team
+        assert "tank=100" in result
+        assert "team=0" in result
 
     def test_format_message_details_resource_type(self) -> None:
         """Test format_message_details routes resource types correctly."""
@@ -178,7 +184,7 @@ class TestSnifferCoverageBranches:
 
     def test_format_message_details_position_type(self) -> None:
         """Test format_message_details routes position types correctly."""
-        from tankpit_bot.protocol import MinePlacementDict
+        from tankpit_bot.container import MinePlacementDict
         from tankpit_bot.sniffer.formatters import format_message_details
 
         msg = MinePlacementDict(
@@ -336,44 +342,25 @@ class TestSnifferCoverageBranches:
         result = extract_magic_from_auth(payload)
         assert result is None
 
-    def test_format_container_details_movement(self) -> None:
-        """Test format_container_details for movement message."""
-        from tankpit_bot.container.types import MovementDict
-        from tankpit_bot.sniffer.formatters import format_container_details
-
-        msg = MovementDict(
-            msg_type="movement",
-            flags=0x7E,
-            start_x=50,
-            start_y=60,
-            player_id=100,
-            tank_id=None,
-            waypoints="nnee",
-            is_self=True,
-        )
-        result = format_container_details(msg)
-        # movement returns formatted position and waypoints
-        assert "(50,60)" in result
-        assert "nnee" in result
+    # format_container_details for container Movement was deleted
+    # 2026-06-19. The protocol 0x47 MovementDict formatter test lives
+    # in tests/sniffer/test_formatters_details.py.
 
     def test_dispatch_world_state_update_radar_response(self) -> None:
         """Test dispatch_world_state_update processes radar_response."""
-        from tankpit_bot.container.types import RadarContainerDict, RadarMineDict, RadarResponseDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
         from tankpit_bot.sniffer import world_state, world_state_dispatch
         from tankpit_bot.sniffer.world_state import get_world_service
 
         # Reset world state
         world_state.reset_world_state()
 
-        msg = RadarResponseDict(
-            msg_type="radar_response",
-            container_count=1,
+        msg = RadarScanResultDict(
+            msg_type=0x4F,
             containers=[RadarContainerDict(x=10, y=20, volume=100)],
             mines=[RadarMineDict(x=30, y=40, team=0)],
         )
-        # This should update world state
         world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
-        # No assertion needed - just verifying the code path runs without error
 
     def test_dispatch_world_state_update_movement_response_valid(self) -> None:
         """Test dispatch_world_state_update with valid MovementResponse updates position."""
@@ -391,8 +378,10 @@ class TestSnifferCoverageBranches:
             x=50,
             y=60,
             direction=0,
+            damage_state=0,
             rank=3,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         # This should update world state position
         world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)

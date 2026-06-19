@@ -69,11 +69,10 @@ def _hop_target_for_cycle(ctx: DecideCtx, cycle: int) -> tuple[int, int]:
 def _is_worthwhile_hop(ctx: DecideCtx, target_x: int, target_y: int) -> bool:
     """Return True when a hop target reveals ground worth scanning.
 
-    Two degenerate cases are rejected. A map-edge clamp can collapse
-    the target onto the current position (live run 20260610: corner at
-    (1,254) cycled hops to (1,254)/(3,254)/(5,254) forever). And a
-    target whose viewport is already covered by a fresh scan re-radars
-    ground the bot just saw.
+    Rejected when: the hop barely moves (map-edge clamp), the landing
+    viewport is already scanned, or terrain says the landing tile is
+    impassable (water/rock — the server would displace us and the
+    scan covers water, wasting an extra radar).
 
     Args:
         ctx: Decision context.
@@ -81,15 +80,46 @@ def _is_worthwhile_hop(ctx: DecideCtx, target_x: int, target_y: int) -> bool:
         target_y: Clamped hop target Y coordinate.
 
     Returns:
-        True when the hop moves far enough and lands on uncovered ground.
+        True when the hop moves far enough, lands on passable ground,
+        and covers unscanned territory.
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     if abs(target_x - sx) + abs(target_y - sy) < _MIN_HOP_DISPLACEMENT:
+        return False
+    if ctx.terrain is not None and not ctx.terrain.is_passable(target_x, target_y):
         return False
     viewport = ctx.world["viewport"]
     landing_left = target_x - viewport["width"] // 2
     landing_top = target_y - viewport["height"] // 2
     return not is_area_scanned(ctx.world, landing_left, landing_top, ctx.timestamp_ms)
+
+
+_SHORT_HOP_DISTANCE = 8
+
+
+def _short_hop_fallback(ctx: DecideCtx) -> tuple[int, int] | None:
+    """Try a cheap short hop when the standard search hop is unaffordable.
+
+    Cycles through the four cardinal directions at a fixed short distance
+    and returns the first affordable, worthwhile target. Returns None only
+    when even the shortest hop is unaffordable.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Target coordinates for the short hop, or None.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    for dx, dy in _CARDINAL_DIRECTIONS:
+        tx = max(1, min(254, sx + dx * _SHORT_HOP_DISTANCE))
+        ty = max(1, min(254, sy + dy * _SHORT_HOP_DISTANCE))
+        if abs(tx - sx) + abs(ty - sy) < _MIN_HOP_DISPLACEMENT:
+            continue
+        if not can_afford_teleport_search(ctx, tx, ty):
+            continue
+        return (tx, ty)
+    return None
 
 
 def local_resource_search_hop(ctx: DecideCtx) -> tuple[int, int, int]:
@@ -305,16 +335,28 @@ def make_resource_search_hop(
     else:
         target_x, target_y, next_index = local_resource_search_hop(ctx)
     if not can_afford_teleport_search(ctx, target_x, target_y):
-        emit_ai(
-            "cannot afford %s hop to (%d,%d) (fuel=%d cost=%d reserve=%d)",
-            reason,
-            target_x,
-            target_y,
-            ctx.fuel,
-            teleport_fuel_cost_to(ctx, target_x, target_y),
-            ctx.config["hunt_min_fuel"],
-        )
-        return None
+        short = _short_hop_fallback(ctx)
+        if short is not None:
+            target_x, target_y = short
+            next_index = ctx.ai_state["patrol_waypoint_index"]
+            emit_ai(
+                "standard hop unaffordable, short hop to (%d,%d) (fuel=%d cost=%d)",
+                target_x,
+                target_y,
+                ctx.fuel,
+                teleport_fuel_cost_to(ctx, target_x, target_y),
+            )
+        else:
+            emit_ai(
+                "cannot afford %s hop to (%d,%d) (fuel=%d cost=%d reserve=%d)",
+                reason,
+                target_x,
+                target_y,
+                ctx.fuel,
+                teleport_fuel_cost_to(ctx, target_x, target_y),
+                ctx.config["hunt_min_fuel"],
+            )
+            return None
 
     base_state = ctx.base if ai_state is None else ai_state
     cleared = clear_resource_target(base_state)

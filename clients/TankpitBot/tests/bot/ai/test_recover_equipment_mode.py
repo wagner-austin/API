@@ -153,14 +153,48 @@ def test_try_search_critical_equipment_forages_radar_when_hop_is_unaffordable() 
     assert decision["command"]["cmd_type"] == "radar"
 
 
-def test_recover_equipment_mode_edge_walks_when_search_hop_is_unaffordable() -> None:
-    """The durable owner edge-walks when forage is exhausted and no hop is affordable.
+def test_recover_equipment_mode_short_hops_when_standard_hop_unaffordable() -> None:
+    """The durable owner does a short hop when the standard hop is unaffordable.
 
-    With the forage grid fully swept and the search hop unaffordable,
-    the recovery fallback produces a cheap edge walk so the bot
-    keeps making progress instead of stalling.
+    With the forage grid fully swept and the standard 150-tile hop
+    unaffordable at fuel=800, the bot tries a short 8-tile hop instead
+    of falling back to a useless edge walk.
     """
     world, self_state = make_world(fuel=800, scanned=True)
+    base_state = make_scanned_ai_state()
+    ai_state = AIStateDict(
+        **{
+            **base_state,
+            "config": {
+                **base_state["config"],
+                "equip_search_hop_distance": 150,
+            },
+            "mode": "RECOVER_EQUIPMENT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "local_scan_cells": _exhausted_forage_cells(100, 100, 100000),
+        }
+    )
+    inventory = make_inventory(default_count=30)
+    inventory["dual_shots"]["count"] = 15
+    inventory["homing_shots"]["count"] = 15
+    inventory["extra_radars"]["count"] = 0
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_recover_equipment_mode(ctx)
+
+    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+    assert decision["behavior"]["reason"] == "search_equipment_local"
+    assert decision["command"]["cmd_type"] == "teleport"
+
+
+def test_recover_equipment_mode_edge_walks_when_all_hops_unaffordable() -> None:
+    """The durable owner edge-walks only when even a short hop is unaffordable.
+
+    At fuel=120, even the cheapest 8-tile hop (cost ~48 + 100 reserve)
+    exceeds available fuel, so the edge walk is the last resort.
+    """
+    world, self_state = make_world(fuel=120, scanned=True)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -228,11 +262,11 @@ def test_recover_equipment_mode_opens_map_when_fully_boxed_in() -> None:
     assert decision["command"]["cmd_type"] == "map_open"
 
 
-def test_try_search_critical_equipment_edge_walks_when_hop_is_unaffordable() -> None:
-    """The emergency search helper edge-walks when forage is exhausted.
+def test_try_search_critical_equipment_short_hops_when_standard_unaffordable() -> None:
+    """The emergency search helper does a short hop when the standard is unaffordable.
 
-    With the forage grid fully swept and the hop unaffordable, the
-    emergency helper degrades to a cheap edge walk rather than raising.
+    With the forage grid fully swept and the 150-tile hop unaffordable,
+    the emergency helper uses a cheap short hop to keep searching.
     """
     world, self_state = make_world(fuel=800, scanned=True)
     base_state = make_scanned_ai_state()
@@ -255,10 +289,10 @@ def test_try_search_critical_equipment_edge_walks_when_hop_is_unaffordable() -> 
     decision = try_search_critical_equipment(ctx)
 
     if decision is None:
-        raise AssertionError("expected edge-walk fallback decision")
+        raise AssertionError("expected short-hop decision")
     assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["behavior"]["reason"] == "edge_for_equipment"
-    assert decision["command"]["cmd_type"] == "move"
+    assert decision["behavior"]["reason"] == "search_equipment_local"
+    assert decision["command"]["cmd_type"] == "teleport"
 
 
 def test_recover_equipment_mode_grabs_adjacent_fuel_opportunistically() -> None:
@@ -472,6 +506,54 @@ def test_try_search_critical_equipment_uses_regular_radar_when_extra_is_empty() 
         raise AssertionError("expected built-in-radar forage decision")
     assert decision["command"]["cmd_type"] == "radar"
     assert decision["behavior"]["reason"] == "forage_radar"
+
+
+def test_recover_equipment_skips_water_locked_known_equipment_when_boxed() -> None:
+    """Water-locked known equipment is skipped when the bot is fully boxed in."""
+    terrain_data: dict[tuple[int, int], str] = {}
+    for x in range(92, 108):
+        for y in range(92, 108):
+            terrain_data[(x, y)] = "W"
+    terrain_data[(100, 100)] = InMemoryTerrainMap.GROUND
+    terrain_data[(120, 100)] = "W"
+    terrain_data[(121, 100)] = "W"
+    terrain_data[(119, 100)] = "W"
+    terrain_data[(120, 101)] = "W"
+    terrain_data[(120, 99)] = "W"
+    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=800,
+        scanned=True,
+        containers={
+            "120,100": make_container_state(
+                x=120,
+                y=100,
+                is_fuel=False,
+                volume=0,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            )
+        },
+    )
+    inventory = make_inventory(default_count=30)
+    inventory["dual_shots"]["count"] = 12
+    inventory["homing_shots"]["count"] = 12
+    inventory["extra_radars"]["count"] = 12
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "RECOVER_EQUIPMENT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+    decision = decide_recover_equipment_mode(ctx)
+
+    assert decision["behavior"]["reason"] != "known_equipment"
 
 
 def test_select_equipment_target_returns_none_when_teleport_is_unaffordable() -> None:

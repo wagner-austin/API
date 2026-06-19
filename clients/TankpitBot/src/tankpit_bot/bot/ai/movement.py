@@ -61,7 +61,7 @@ def walk_or_teleport(
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
 
-    if pickup_kind is None and is_move_target_failed(tx, ty, ctx.timestamp_ms):
+    if is_move_target_failed(tx, ty, ctx.timestamp_ms):
         emit_ai("skipping failed move target (%d,%d)", tx, ty)
         return None
 
@@ -386,15 +386,13 @@ def _walk_or_teleport_with_terrain(
         and manhattan > _WALK_DISTANCE_THRESHOLD
         and can_afford_teleport(ctx, tx, ty)
     ):
-        teleport = _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
-        if teleport is not None:
-            emit_ai(
-                "teleporting to (%d,%d) instead of walking %d tiles",
-                tx,
-                ty,
-                manhattan,
-            )
-            return teleport
+        emit_ai(
+            "teleporting to (%d,%d) instead of walking %d tiles",
+            tx,
+            ty,
+            manhattan,
+        )
+        return make_teleport_command(tx, ty)
     if pickup_kind is not None and is_collection_reachable_in_viewport(
         ctx.world,
         terrain,
@@ -592,10 +590,15 @@ def _teleport_fallback_command(
     ty: int,
     blocked_mines: dict[str, MineStateDict],
 ) -> BotCommand | None:
-    """Return a teleport command for a terrain-blocked target when possible."""
+    """Return a teleport command for a terrain-blocked target when possible.
+
+    The server handles displacement when the landing tile is occupied or
+    impassable, so ``find_teleport_landing_tile`` always returns the goal
+    for in-bounds targets. The only rejection is when the teleport is
+    unaffordable.
+    """
     landing = find_teleport_landing_tile(terrain, sx, sy, tx, ty, blocked_mines)
     if landing is None:
-        emit_ai("blocked target at (%d,%d) has no passable landing tile", tx, ty)
         return None
     lx, ly = landing
     if not can_afford_teleport(ctx, lx, ly):
@@ -609,7 +612,7 @@ def _teleport_fallback_command(
             teleport_fuel_cost_to(ctx, lx, ly),
         )
         return None
-    emit_ai("terrain blocked, teleporting near target to (%d,%d)", lx, ly)
+    emit_ai("terrain blocked, teleporting to target at (%d,%d)", lx, ly)
     return make_teleport_command(lx, ly)
 
 

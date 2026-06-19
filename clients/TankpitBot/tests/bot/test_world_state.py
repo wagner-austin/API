@@ -62,7 +62,7 @@ class TestBotWithWorldState:
     def test_get_fuel_containers_with_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_fuel_containers returns fuel containers."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
         )
@@ -80,7 +80,7 @@ class TestBotWithWorldState:
     def test_get_nearest_fuel_container_with_containers(self, fake_env: FakeEnv) -> None:
         """Test Bot.get_nearest_fuel_container returns nearest container."""
         from tankpit_bot.bot.base import Bot
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,

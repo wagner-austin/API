@@ -321,25 +321,6 @@ def combat_reserve_restored(ctx: DecideCtx) -> bool:
     )
 
 
-def equipment_reserve_restored(ctx: DecideCtx) -> bool:
-    """Check if every tracked reserve (radars included) is comfortable.
-
-    Used to gate opportunistic topping (pre-departure sweeps), NOT
-    recovery exit: sweeps are cheap and local, so they fire whenever
-    anything -- including radars -- is below the resume threshold.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if all combat reserves are above the resume threshold.
-    """
-    return (
-        combat_reserve_restored(ctx)
-        and ctx.inventory["extra_radars"]["count"] >= ctx.config["dual_resume_threshold"]
-    )
-
-
 # =============================================================================
 # Kill and combat helpers
 # =============================================================================
@@ -590,7 +571,6 @@ __all__ = [
     "can_use_radar",
     "clear_resource_target",
     "compute_equipment",
-    "equipment_reserve_restored",
     "expire_kills",
     "filter_killed_tanks",
     "has_recent_map_snapshot",

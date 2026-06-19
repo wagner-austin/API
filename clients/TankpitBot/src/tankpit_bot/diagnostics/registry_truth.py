@@ -202,6 +202,8 @@ def register_tank_truth_from_page_snapshot(
     Returns:
         Number of tanks ingested this tick.
     """
+    if snapshot["map_visible"] is True:
+        return 0
     self_state = world["self_state"]
     if self_state is None:
         return 0

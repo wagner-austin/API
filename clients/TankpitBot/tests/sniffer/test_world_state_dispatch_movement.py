@@ -36,8 +36,10 @@ class TestDispatchMovement:
             x=150,
             y=160,
             direction=0,
+            damage_state=0,
             rank=1,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
 
         dispatch_world_state_update(get_world_service(), msg)
@@ -62,8 +64,10 @@ class TestDispatchMovement:
             x=100,
             y=100,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=3,
+            lb_score=3,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), first)
         self_state = get_world_service().world_state["self_state"]
@@ -79,8 +83,10 @@ class TestDispatchMovement:
             x=200,
             y=210,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=3,
+            lb_score=3,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), second)
         self_state = get_world_service().world_state["self_state"]
@@ -89,65 +95,9 @@ class TestDispatchMovement:
         assert self_state["x"] == 200
         assert self_state["y"] == 210
 
-    def test_dispatch_movement_updates_self_position(self) -> None:
-        """Test dispatch handles movement message for self.
-
-        Movement messages have absolute start_x, start_y coordinates.
-        Final position is calculated by applying waypoints to start position.
-        Path: eeeessssssseeeeeeeeennnnnnn = 4e + 7s + 9e + 7n
-        Final: (162 + 4 + 9, 111 + 7 - 7) = (175, 111)
-        """
-        from tankpit_bot.container import MovementDict
-
-        msg = MovementDict(
-            msg_type="movement",
-            flags=0x7E,
-            start_x=162,
-            start_y=111,
-            player_id=230446,
-            tank_id=None,
-            waypoints="eeeessssssseeeeeeeeennnnnnn",
-            is_self=True,
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None after dispatch")
-        # Final position after applying waypoints
-        assert self_state["x"] == 175
-        assert self_state["y"] == 111
-
-    def test_dispatch_movement_ignores_enemy(self) -> None:
-        """Test dispatch ignores movement message for enemies.
-
-        Movement messages with is_self=False should not update self position.
-        """
-        from tankpit_bot.container import MovementDict
-
-        # First set a known position
-        update_world_state_from_position(100, 100)
-
-        msg = MovementDict(
-            msg_type="movement",
-            flags=0x1E,
-            start_x=200,
-            start_y=200,
-            player_id=12345,
-            tank_id=None,
-            waypoints="nnnn",
-            is_self=False,
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Position should remain unchanged
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None")
-        assert self_state["x"] == 100
-        assert self_state["y"] == 100
+    # Container-path Movement dispatch tests were deleted 2026-06-19
+    # along with the container MovementDict. Protocol-path 0x47
+    # Movement is covered by TestDispatchProtocolMovement below.
 
 
 class TestDispatchPositionUpdate:
@@ -292,7 +242,9 @@ class TestDispatchProtocolMovement:
         from tankpit_bot.protocol import MovementDict, TankEntryDict
 
         # Register enemy tank at start position
-        entry = TankEntryDict(msg_type=0x28, tank_id=600, x=80, y=90, name="Moving")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=600, rank=0, damage_state=0, score=0, x=80, y=90
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Movement from (80, 90) with waypoints leading to (82, 88)
@@ -303,7 +255,10 @@ class TestDispatchProtocolMovement:
             start_y=90,
             direction=1,
             flag=0,
-            leaderboard_position=10,
+            lb_score=10,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[(82, 88)],
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -316,7 +271,9 @@ class TestDispatchProtocolMovement:
         """Dispatch 0x47 movement without waypoints uses start position."""
         from tankpit_bot.protocol import MovementDict, TankEntryDict
 
-        entry = TankEntryDict(msg_type=0x28, tank_id=601, x=50, y=60, name="Stationary")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=601, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         msg = MovementDict(
@@ -326,7 +283,10 @@ class TestDispatchProtocolMovement:
             start_y=60,
             direction=0,
             flag=0,
-            leaderboard_position=0,
+            lb_score=0,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[],
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -348,8 +308,10 @@ class TestDispatchProtocolMovement:
             x=100,
             y=100,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), first)
 
@@ -361,7 +323,10 @@ class TestDispatchProtocolMovement:
             start_y=100,
             direction=1,
             flag=0,
-            leaderboard_position=5,
+            lb_score=5,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[(110, 110)],
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -384,8 +349,10 @@ class TestDispatchProtocolMovement:
             x=100,
             y=100,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), first)
         update_world_state_from_position(90, 90)
@@ -397,7 +364,10 @@ class TestDispatchProtocolMovement:
             start_y=100,
             direction=1,
             flag=0,
-            leaderboard_position=5,
+            lb_score=5,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[(110, 110)],
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -413,7 +383,9 @@ class TestDispatchProtocolMovement:
         from tankpit_bot.protocol import MovementDict, TankEntryDict
 
         # Tank at (50, 60) but movement starts at (200, 200)
-        entry = TankEntryDict(msg_type=0x28, tank_id=610, x=50, y=60, name="Far")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=610, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         msg = MovementDict(
@@ -423,7 +395,10 @@ class TestDispatchProtocolMovement:
             start_y=200,
             direction=0,
             flag=0,
-            leaderboard_position=0,
+            lb_score=0,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[(205, 205)],
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -436,16 +411,19 @@ class TestDispatchProtocolMovement:
         """Dispatch 0x41 invalidates position and records the kill."""
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
 
-        entry = TankEntryDict(msg_type=0x28, tank_id=700, x=100, y=100, name="Victim")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=700, rank=0, damage_state=0, score=0, x=100, y=100
+        )
         dispatch_world_state_update(get_world_service(), entry)
         assert get_world_service().world_state["tanks"]["700"]["x"] == 100
 
         msg = DeactivationDict(
             msg_type=0x41,
+            status=0,
             victim_id=700,
+            promo_eligible=False,
             killer_id=1,
-            rank=2,
-            points=100,
+            is_mine_kill=False,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -478,8 +456,10 @@ class TestDispatchMoveResponseUpdatesSelf:
             x=100,
             y=100,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=3,
+            lb_score=3,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), first)
 
@@ -496,8 +476,10 @@ class TestDispatchMoveResponseUpdatesSelf:
             x=200,
             y=200,
             direction=0,
+            damage_state=0,
             rank=3,
-            leaderboard_position=10,
+            lb_score=10,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), second)
 

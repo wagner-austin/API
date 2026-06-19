@@ -1,2 +1,8 @@
 runs/
 accounts.json
+
+# Analysis / diagnostic byproducts -- regenerated from runs/
+wire_byte_analysis.json
+combat_probe.json
+combat_probe.capture_session.json
+tpclient.pretty.js

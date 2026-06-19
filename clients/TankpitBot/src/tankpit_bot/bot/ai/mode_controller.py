@@ -111,13 +111,22 @@ def apply_mode_to_decision(
 def should_enter_recover_fuel(ctx: DecideCtx) -> bool:
     """Return True when fuel recovery should own planning.
 
+    Yields to equipment recovery when extra radars are depleted and
+    fuel is above critical — without radars, fuel recovery cannot scan
+    effectively, so rebuilding radar stock first is higher value.
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when fuel is below the low-threshold entry rule.
+        True when fuel is below the low-threshold entry rule and
+        radar-restock does not take priority.
     """
-    return ctx.fuel <= ctx.config["fuel_low_threshold"]
+    if ctx.fuel > ctx.config["fuel_low_threshold"]:
+        return False
+    no_extras = ctx.inventory["extra_radars"]["count"] == 0
+    above_critical = ctx.fuel > ctx.config["fuel_critical_threshold"]
+    return not (no_extras and above_critical)
 
 
 def should_exit_recover_fuel(ctx: DecideCtx) -> bool:
@@ -196,13 +205,22 @@ def should_exit_recover_equipment(ctx: DecideCtx) -> bool:
 def should_enter_hunt(ctx: DecideCtx) -> bool:
     """Return True when HUNT is the valid top-level owner.
 
+    The bot only hunts when properly stocked — weapon reserves above the
+    resume threshold and no fuel/equipment recovery needed. Starting a
+    fight with low ammo leads to abandoned kills when the break
+    threshold pulls the bot away mid-fight.
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when no recovery mode currently has stronger entry conditions.
+        True when combat-ready and no recovery mode has stronger entry.
     """
-    return not should_enter_recover_fuel(ctx) and not should_enter_recover_equipment(ctx)
+    if should_enter_recover_fuel(ctx):
+        return False
+    if should_enter_recover_equipment(ctx):
+        return False
+    return combat_reserve_restored(ctx)
 
 
 def should_exit_hunt(ctx: DecideCtx) -> bool:

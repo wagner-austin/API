@@ -100,7 +100,7 @@ class TestRadarRestockTrigger:
 
     def test_restock_releases_once_the_buffer_is_full(self) -> None:
         """At the resume buffer the bot leaves restock and may hunt again."""
-        assert should_exit_recover_equipment(_ctx(radars=15)) is True
+        assert should_exit_recover_equipment(_ctx(radars=20)) is True
 
     def test_restock_ignores_visible_threats(self) -> None:
         """Rebuilding the kit outranks chasing a wanderer it cannot beat.

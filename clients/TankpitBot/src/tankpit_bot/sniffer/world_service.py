@@ -88,6 +88,12 @@ class WorldService:
         self.inventory_state: InventoryState = _make_empty_inventory()
         self.got_confirmed_hit: bool = False
         self.got_our_shot_response: bool = False
+        # Tank id present on the target tile of our most recent shot, or
+        # -1 if the tile was empty. Set by mark_combat_hit; consumed by
+        # combat_feedback to distinguish hits on the intended target from
+        # incidental hits (e.g. homing seeker locking onto a closer
+        # enemy than the bot commanded).
+        self.last_shot_victim_id: int = -1
         self.killed_tank_ids: set[int] = set()
         self.tank_death_anchors: dict[int, tuple[int, int]] = {}
         self.teleport_landed: bool = False
@@ -98,6 +104,7 @@ class WorldService:
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
         self.failed_scan_viewports: dict[str, int] = {}
+        self.last_command_error: int = -1
 
     # -----------------------------------------------------------------
     # World state accessors

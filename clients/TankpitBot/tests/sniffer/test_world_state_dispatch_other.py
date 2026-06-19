@@ -114,8 +114,7 @@ class TestDispatchOther:
             tank_id=1227,
             damage_state=2,
             rank=4,
-            flags=b"\x00\x22\x84",
-            leaderboard_position=8,
+            lb_score=8,
             fuel=1400,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -139,8 +138,7 @@ class TestDispatchOther:
             tank_id=1227,
             damage_state=2,
             rank=4,
-            flags=b"\x00\x22\x84",
-            leaderboard_position=0,
+            lb_score=0,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -153,11 +151,8 @@ class TestDispatchOther:
 
     def test_dispatch_container_pickup_message(self) -> None:
         """Test dispatch handles container_pickup message."""
-        from tankpit_bot.container import (
-            ContainerPickupDict,
-            RadarContainerDict,
-            RadarMineDict,
-        )
+        from tankpit_bot.container import ContainerPickupDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
         # First set up a position to create self_state
         update_world_state_from_position(100, 100)

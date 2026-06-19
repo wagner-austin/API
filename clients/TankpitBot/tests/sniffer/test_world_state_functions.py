@@ -16,8 +16,8 @@ from tankpit_bot.state.viewport_geometry import (
 )
 
 
-class TestPlayerIdMapper:
-    """Tests for player ID mapper functions."""
+class TestTankNameRegistry:
+    """Tests for the tank-name registry (PlayerIdMapper was deleted)."""
 
     def setup_method(self) -> None:
         """Reset world state before each test."""
@@ -27,76 +27,15 @@ class TestPlayerIdMapper:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_reset_player_id_mapper(self) -> None:
-        """Test reset_player_id_mapper clears state."""
+    def test_reset_player_id_mapper_clears_names(self) -> None:
+        """reset_player_id_mapper clears the tank-name registry."""
         from tankpit_bot.sniffer import player_tracking
         from tankpit_bot.sniffer.player_tracking import reset_player_id_mapper
 
-        # Add some data
-        player_tracking._player_id_mapper._player_to_tank[1] = 100
         player_tracking._tank_names[100] = "TestTank"
-
         reset_player_id_mapper()
 
-        assert len(player_tracking._player_id_mapper._player_to_tank) == 0
         assert len(player_tracking._tank_names) == 0
-
-    def test_resolve_movement_tank_no_mapping(self) -> None:
-        """Test resolve_movement_tank returns pid when no mapping exists."""
-        from tankpit_bot.sniffer.player_tracking import (
-            reset_player_id_mapper,
-            resolve_movement_tank,
-        )
-
-        reset_player_id_mapper()
-        result = resolve_movement_tank(42, 100, 100)
-        assert result == "pid=42"
-
-    def test_resolve_movement_tank_with_mapping(self) -> None:
-        """Test resolve_movement_tank returns tank_id when mapped."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.player_tracking import (
-            reset_player_id_mapper,
-            resolve_movement_tank,
-        )
-
-        reset_player_id_mapper()
-        player_tracking._player_id_mapper._player_to_tank[42] = 100
-
-        result = resolve_movement_tank(42, 100, 100)
-        assert result == "tank=100"
-
-    def test_resolve_movement_tank_with_name(self) -> None:
-        """Test resolve_movement_tank returns name when available."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.player_tracking import (
-            reset_player_id_mapper,
-            resolve_movement_tank,
-        )
-
-        reset_player_id_mapper()
-        player_tracking._player_id_mapper._player_to_tank[42] = 100
-        player_tracking._tank_names[100] = "CoolTank"
-
-        result = resolve_movement_tank(42, 100, 100)
-        assert result == '"CoolTank"'
-
-    def test_resolve_movement_tank_position_correlation(self) -> None:
-        """Test resolve_movement_tank uses position correlation."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.player_tracking import (
-            reset_player_id_mapper,
-            resolve_movement_tank,
-        )
-
-        reset_player_id_mapper()
-        # Set up position-to-tank mapping
-        player_tracking._player_id_mapper._position_to_tank[(50, 60)] = 200
-
-        result = resolve_movement_tank(42, 50, 60)
-        assert result == "tank=200"
-        # Verify mapping was cached
-        assert player_tracking._player_id_mapper._player_to_tank[42] == 200
 
 
 class TestViewportGeometry:
@@ -348,7 +287,7 @@ class TestContainerPickup:
 
     def test_update_world_state_from_container_pickup(self) -> None:
         """Test container pickup removes container and adds fuel."""
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state_containers import (
             update_world_state_from_container_pickup,
         )
@@ -385,7 +324,7 @@ class TestRadarViewportReconciliation:
 
     def test_radar_marks_current_viewport_as_scanned(self) -> None:
         """Radar records authoritative coverage for the current viewport origin."""
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer import viewport
 
         viewport.update_viewport_origin(100, 200)
@@ -399,7 +338,7 @@ class TestRadarViewportReconciliation:
 
     def test_radar_clears_failed_scan_mark_for_current_viewport(self) -> None:
         """Successful radar clears the recent failed-scan quarantine."""
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state import (
             is_scan_viewport_failed,
             mark_scan_viewport_failed,
@@ -418,7 +357,7 @@ class TestRadarViewportReconciliation:
 
     def test_radar_clears_missing_current_viewport_containers(self) -> None:
         """Radar removes stale current-viewport containers not returned by the scan."""
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.state.types import make_container_state
 
         ws = get_world_service()
@@ -470,7 +409,7 @@ class TestRadarViewportReconciliation:
 
     def test_radar_clears_missing_current_viewport_mines(self) -> None:
         """Radar removes stale current-viewport mines not returned by the scan."""
-        from tankpit_bot.container import RadarMineDict
+        from tankpit_bot.protocol import RadarMineDict
         from tankpit_bot.state.types import make_mine_state
 
         ws = get_world_service()
@@ -526,7 +465,7 @@ class TestRadarViewportReconciliation:
 
     def test_radar_reconciliation_is_noop_when_viewport_already_matches(self) -> None:
         """Radar reconciliation preserves resources when scan exactly matches state."""
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.state.types import make_container_state, make_mine_state
 
         ws = get_world_service()

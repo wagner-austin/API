@@ -311,6 +311,9 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "combat_target_x": state["combat_target_x"],
         "combat_target_y": state["combat_target_y"],
         "killed_tank_ids": killed,
+        "session_kill_count": state["session_kill_count"],
+        "session_hit_count": state["session_hit_count"],
+        "session_miss_count": state["session_miss_count"],
         "blocked_combat_targets": dict(state["blocked_combat_targets"]),
         "last_shot_target_id": state["last_shot_target_id"],
         "last_shot_target_name": state["last_shot_target_name"],
@@ -396,6 +399,15 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         combat_target_x=require_int(data, "combat_target_x"),
         combat_target_y=require_int(data, "combat_target_y"),
         killed_tank_ids=_decode_killed_tank_ids(data),
+        session_kill_count=require_int(data, "session_kill_count")
+        if "session_kill_count" in data
+        else 0,
+        session_hit_count=require_int(data, "session_hit_count")
+        if "session_hit_count" in data
+        else 0,
+        session_miss_count=require_int(data, "session_miss_count")
+        if "session_miss_count" in data
+        else 0,
         blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),

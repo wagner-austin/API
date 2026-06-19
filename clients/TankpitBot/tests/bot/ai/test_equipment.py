@@ -106,27 +106,36 @@ class TestIsReachable:
 class TestFindTeleportLandingTile:
     """Tests for blocked-target teleport landing selection."""
 
-    def test_returns_nearest_passable_adjacent_tile(self) -> None:
-        """Prefers the closest passable cardinal tile next to the target."""
-        terrain_data: dict[tuple[int, int], str] = {
-            (128, 126): "W",
-            (127, 126): "W",
-            (128, 127): "W",
-        }
-        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    def test_returns_target_when_passable(self) -> None:
+        """Returns target coordinates when the tile is passable ground."""
+        terrain = InMemoryTerrainMap()
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
 
-        assert result == (129, 126)
+        assert result == (128, 126)
 
-    def test_returns_none_when_all_adjacent_tiles_blocked(self) -> None:
-        """Returns None when no passable cardinal landing tile exists."""
+    def test_returns_adjacent_passable_when_target_is_water(self) -> None:
+        """Returns nearest passable cardinal neighbor when target is water."""
         terrain_data: dict[tuple[int, int], str] = {
             (128, 126): "W",
             (129, 126): "W",
             (127, 126): "W",
             (128, 127): "#",
-            (128, 125): "#",
+        }
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+
+        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
+
+        assert result == (128, 125)
+
+    def test_returns_none_when_all_adjacent_impassable(self) -> None:
+        """Returns None when target and all cardinal neighbors are impassable."""
+        terrain_data: dict[tuple[int, int], str] = {
+            (128, 126): "W",
+            (129, 126): "W",
+            (127, 126): "W",
+            (128, 127): "W",
+            (128, 125): "W",
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
@@ -134,20 +143,14 @@ class TestFindTeleportLandingTile:
 
         assert result is None
 
-    def test_skips_out_of_bounds_adjacent_tiles(self) -> None:
-        """Ignores adjacent coordinates that fall outside the map bounds."""
-        terrain_data: dict[tuple[int, int], str] = {
-            (0, 0): "W",
-            (0, 1): "W",
-        }
-        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    def test_returns_none_for_out_of_bounds(self) -> None:
+        """Returns None for out-of-bounds coordinates."""
+        terrain = InMemoryTerrainMap()
 
-        result = find_teleport_landing_tile(terrain, 10, 10, 0, 0)
+        assert find_teleport_landing_tile(terrain, 10, 10, 300, 300) is None
 
-        assert result == (1, 0)
-
-    def test_skips_mined_adjacent_tiles(self) -> None:
-        """Known mines are excluded from teleport landing candidates."""
+    def test_returns_target_coords_ignoring_mines(self) -> None:
+        """Returns target coords directly; server displaces around mines."""
         terrain = InMemoryTerrainMap()
         blocked_mines: dict[str, MineStateDict] = {
             "128,126": make_mine_state(
@@ -172,7 +175,7 @@ class TestFindTeleportLandingTile:
 
         result = find_teleport_landing_tile(terrain, 130, 124, 128, 126, blocked_mines)
 
-        assert result == (128, 125)
+        assert result == (128, 126)
 
 
 # =============================================================================
@@ -277,8 +280,8 @@ class TestFindNearestFuel:
         world["containers"]["15,10"] = expected
         assert find_nearest_fuel(world, state, terrain, allow_unreachable=True) == expected
 
-    def test_with_terrain_allow_unreachable_skips_target_without_landing_tile(self) -> None:
-        """allow_unreachable=True still rejects a blocked fuel target with no landing tile."""
+    def test_with_terrain_allow_unreachable_skips_water_locked_fuel(self) -> None:
+        """Water-locked fuel is skipped even with allow_unreachable=True."""
         world, state = _world_and_self(x=10, y=10)
         terrain_data: dict[tuple[int, int], str] = {
             (15, 10): "W",
@@ -639,8 +642,8 @@ class TestDescribeContainerSearch:
             "no_landing=0 low_volume=0 nearest=(101,100) actionable"
         )
 
-    def test_reports_blocked_equipment_without_landing(self) -> None:
-        """Summary explains when nearby equipment has no valid teleport landing tile."""
+    def test_reports_blocked_equipment_with_teleport_landing(self) -> None:
+        """Summary marks blocked equipment as actionable since server displaces on landing."""
         world, state = _world_and_self(x=10, y=10)
         world["containers"]["15,10"] = make_container_state(
             x=15,
@@ -666,8 +669,8 @@ class TestDescribeContainerSearch:
         )
 
         assert result == (
-            "equipment: total=1 nearby=1 actionable=0 blocked=1 "
-            "no_landing=1 low_volume=0 nearest=(15,10) blocked_no_landing"
+            "equipment: total=1 nearby=1 actionable=1 blocked=1 "
+            "no_landing=0 low_volume=0 nearest=(15,10) actionable"
         )
 
     def test_reports_low_volume_fuel_as_non_actionable(self) -> None:
@@ -996,8 +999,8 @@ class TestFindBestFuel:
         world["containers"]["8,10"] = make_container_state(x=8, y=10, is_fuel=True, volume=600)
         assert find_best_fuel(world, state, terrain, allow_unreachable=True) == expected
 
-    def test_with_terrain_allow_unreachable_skips_blocked_fuel_without_landing_tile(self) -> None:
-        """allow_unreachable=True rejects blocked fuel when no landing tile exists."""
+    def test_with_terrain_allow_unreachable_keeps_blocked_fuel_since_server_displaces(self) -> None:
+        """Water-locked fuel is skipped even with allow_unreachable=True."""
         world, state = _world_and_self(x=10, y=10)
         terrain_data: dict[tuple[int, int], str] = {
             (15, 10): "W",

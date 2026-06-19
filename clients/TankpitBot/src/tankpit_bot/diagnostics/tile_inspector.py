@@ -160,7 +160,13 @@ def inspect_tile(
         for direction, dx, dy in _COMPASS_OFFSETS
     ]
     landing_resolution = _resolve_landing_choice(terrain, target_x, target_y)
-    landing = find_teleport_landing_tile(terrain, from_x, from_y, target_x, target_y)
+    landing = find_teleport_landing_tile(
+        terrain,
+        from_x,
+        from_y,
+        target_x,
+        target_y,
+    )
     landing_tile_x = landing[0] if landing is not None else -1
     landing_tile_y = landing[1] if landing is not None else -1
     if from_x >= 0 and from_y >= 0 and _is_in_bounds(from_x, from_y) and target_in_bounds:

@@ -520,8 +520,8 @@ class TestRecoveryHelpers:
         assert command["target_x"] == 103
         assert command["target_y"] == 100
 
-    def test_walk_or_teleport_returns_none_when_no_landing_exists(self) -> None:
-        """Blocked targets with no legal landing tile are rejected."""
+    def test_walk_or_teleport_skips_water_locked_target(self) -> None:
+        """Water-locked targets return None (unreachable by teleport)."""
         containers: dict[str, ContainerStateDict] = {
             "107,107": make_container(107, 107, 0, False),
         }
@@ -545,7 +545,9 @@ class TestRecoveryHelpers:
             "",
         )
 
-        assert walk_or_teleport(ctx, 107, 107, pickup_kind=None) is None
+        result = walk_or_teleport(ctx, 107, 107, pickup_kind=None)
+
+        assert result is None
 
     def test_walk_or_teleport_direct_move_when_pickup_disabled(self) -> None:
         """Open-ground scouting uses a direct move when pickup mode is disabled."""
@@ -922,6 +924,30 @@ class TestRecoveryHelpers:
         )
 
         assert walk_or_teleport(ctx, 107, 100, pickup_kind=None) is None
+
+    def test_walk_or_teleport_returns_none_for_out_of_bounds_target(self) -> None:
+        """Out-of-bounds target returns None via teleport fallback (landing=None)."""
+        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        terrain = InMemoryTerrainMap(
+            terrain_data={
+                (100, 100): InMemoryTerrainMap.GROUND,
+                (101, 100): InMemoryTerrainMap.ROCK,
+                (100, 101): InMemoryTerrainMap.ROCK,
+                (99, 100): InMemoryTerrainMap.ROCK,
+                (100, 99): InMemoryTerrainMap.ROCK,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        assert walk_or_teleport(ctx, 300, 300, pickup_kind="fuel") is None
 
     def test_walk_or_teleport_rejects_mined_move_without_terrain(self) -> None:
         """Mine occupancy blocks direct moves without terrain."""

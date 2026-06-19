@@ -7,7 +7,7 @@ into human-readable strings for logging and display.
 from __future__ import annotations
 
 from tankpit_bot import protocol
-from tankpit_bot.container import RadarContainerDict, RadarMineDict
+from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 from tankpit_bot.sniffer.constants import (
     COMBAT_MSG_TYPES,
     DAMAGE_NAMES,
@@ -21,9 +21,7 @@ from tankpit_bot.sniffer.constants import (
     TEAM_NAMES,
 )
 from tankpit_bot.sniffer.player_tracking import (
-    record_movement_response,
     register_tank_name,
-    resolve_movement_tank,
 )
 from tankpit_bot.sniffer.viewport import get_viewport_left
 
@@ -99,10 +97,11 @@ def format_combat_details(d: protocol.BinaryMessage) -> str:
         Formatted combat details string.
     """
     if d["msg_type"] == 0x53:
+        src = f"src=({d['source_x']},{d['source_y']})"
         tgt = f"tgt=({d['target_x']},{d['target_y']})"
-        proj = f"proj=({d['projectile_x']},{d['projectile_y']})"
-        wpn = f"wpn={d['weapon']} ammo={d['ammo']}"
-        return f"shooter={d['shooter_id']} {tgt} {proj} {wpn}"
+        wpn_names = {0: "single", 1: "dual", 2: "missile", 3: "homing"}
+        wpn = wpn_names.get(d["weapon"], f"wpn{d['weapon']}")
+        return f"shooter={d['shooter_id']} team={d['team']} {src} {tgt} {wpn}"
     if d["msg_type"] == 0x41:
         return f"victim={d['victim_id']} killer={d['killer_id']}"
     return ""
@@ -118,15 +117,15 @@ def format_tank_details(d: protocol.BinaryMessage) -> str:
         Formatted tank details string.
     """
     if d["msg_type"] == 0x28:
-        # TankEntryDict: tank_id, x, y, name (no rank/team/damage)
-        return f"tank={d['tank_id']} at ({d['x']},{d['y']}) name={d['name']}"
+        # TankEntryDict: team, tank_id, rank, x, y (name from TankInfo)
+        return f"tank={d['tank_id']} team={d['team']} rank={d['rank']} at ({d['x']},{d['y']})"
     if d["msg_type"] == 0x58:
         return f"tank={d['tank_id']} left"
     if d["msg_type"] == 0x2E:
-        # TankStatusSyncDict: has damage_state and rank
+        # TankStatusSyncDict: damage_state (dual-purpose b.u field)
         rank = rank_name(d["rank"])
         dmg = damage_name(d["damage_state"])
-        return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['leaderboard_position']}"
+        return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['lb_score']}"
     if d["msg_type"] == 0x3E:
         # TankStatusDict: has leaderboard_score (position ranking)
         rank = rank_name(d["rank"])
@@ -137,14 +136,14 @@ def format_tank_details(d: protocol.BinaryMessage) -> str:
         team = team_name(d["team"])
         return f"tank={d['tank_id']} {team} name={d['name']}"
     if d["msg_type"] == 0x47:
-        # MovementDict: no rank, has leaderboard_position
+        # MovementDict: has rank, damage_state, lb_score
         x, y, dr = d["start_x"], d["start_y"], d["direction"]
-        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} lb={d['leaderboard_position']}"
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} rank={d['rank']} lb={d['lb_score']}"
     if d["msg_type"] == 0x3D:
-        # MovementResponseDict: has rank and leaderboard_position
+        # MovementResponseDict: has rank, damage_state, lb_score
         rank = rank_name(d["rank"])
         x, y, dr = d["x"], d["y"], d["direction"]
-        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} {rank} lb={d['leaderboard_position']}"
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} {rank} lb={d['lb_score']}"
     if d["msg_type"] == 0x48:
         rank = rank_name(d["rank"])
         return f"tank={d['tank_id']} at ({d['x']},{d['y']}) {rank}"
@@ -228,7 +227,7 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x56:
         return f"time={d['playtime_hours']}h{d['playtime_minutes']}m"
     if d["msg_type"] == 0x52:
-        return f"status={d['status']} data={d['data']}"
+        return f"reset={d['reset_action']} err={d['error_code']}"
     if d["msg_type"] == 0x4D:
         return f"sender={d['sender_id']} type={d['message_type']}"
     return ""
@@ -343,42 +342,7 @@ def format_position_update(tid: int, x: int, y: int, f: int, ed: bytes) -> str:
     Returns:
         Formatted position update string.
     """
-    record_movement_response(tank_id=tid, x=x, y=y)
     return f"tank={tid} pos=({x},{y}) flags=0x{f:02X} data={ed.hex()}"
-
-
-def format_movement(sx: int, sy: int, pid: int, waypoints: str, is_self: bool) -> str:
-    """Format movement details.
-
-    Args:
-        sx: Start X coordinate.
-        sy: Start Y coordinate.
-        pid: Player ID.
-        waypoints: Waypoint string.
-        is_self: Whether this is self movement.
-
-    Returns:
-        Formatted movement string.
-    """
-    tiles = len(waypoints)
-    who = "self" if is_self else "enemy"
-    tid_str = resolve_movement_tank(pid, sx, sy)
-    return f'{who} from=({sx},{sy}) {tid_str} path="{waypoints}" ({tiles} tiles)'
-
-
-def format_combat_hit(direction: int, aid: int, cd: bytes = b"") -> str:
-    """Format combat hit details.
-
-    Args:
-        direction: Hit direction.
-        aid: Attacker ID.
-        cd: Raw combat_data bytes.
-
-    Returns:
-        Formatted combat hit string.
-    """
-    dir_str = "out" if direction == 0x09 else "in"
-    return f"attacker={aid} dir={dir_str} data={cd.hex()}"
 
 
 def format_tank_status_short(tid: int, dmg: int, rank: int, lb: int) -> str:
@@ -442,8 +406,6 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
         Formatted string, or None if not handled.
     """
     match d:
-        case {"msg_type": "tank_status_sync", "sync_data": bytes(sd)}:
-            return f"data={sd.hex()}"
         case {
             "msg_type": "tank_status_short",
             "tank_id": int(tid),
@@ -470,13 +432,12 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
         }:
             return format_container_pickup(x, y, vol, is_fuel)
         case {
-            "msg_type": "radar_response",
-            "container_count": int(count),
+            "msg_type": 0x4F,
             "containers": list(containers),
             "mines": list(mines),
         }:
             details = format_radar_response(containers, mines)
-            return f"{count} containers, {len(mines)} mines: {details}"
+            return f"{len(containers)} containers, {len(mines)} mines: {details}"
     return None
 
 
@@ -495,13 +456,6 @@ def format_container_details(d: protocol.BinaryMessage) -> str:
         return simple
 
     match d:
-        case {
-            "msg_type": "combat_hit",
-            "direction": int(direction),
-            "attacker_id": int(aid),
-            "combat_data": bytes(cd),
-        }:
-            return format_combat_hit(direction, aid, cd)
         case {
             "msg_type": "tank_registry",
             "tank_id": int(tid),
@@ -525,15 +479,6 @@ def format_container_details(d: protocol.BinaryMessage) -> str:
                 container_y,
                 container_viewport_x,
             )
-        case {
-            "msg_type": "movement",
-            "start_x": int(sx),
-            "start_y": int(sy),
-            "player_id": int(pid),
-            "waypoints": str(waypoints),
-            "is_self": bool(is_self),
-        }:
-            return format_movement(sx, sy, pid, waypoints, is_self)
         case {
             "msg_type": "position_update",
             "tank_id": int(tid),
@@ -579,14 +524,12 @@ def format_message_details(d: protocol.BinaryMessage) -> str:
 __all__ = [
     "damage_name",
     "format_combat_details",
-    "format_combat_hit",
     "format_container_details",
     "format_container_pickup",
     "format_container_simple",
     "format_decoded_message",
     "format_message_details",
     "format_misc_details",
-    "format_movement",
     "format_position_details",
     "format_position_update",
     "format_radar_details",

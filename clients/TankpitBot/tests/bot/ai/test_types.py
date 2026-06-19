@@ -210,7 +210,7 @@ class TestAIConfig:
         assert "teleport_fuel_cost" not in config
         assert len(config["patrol_waypoints"]) == 4
         assert config["dual_break_threshold"] == 4
-        assert config["dual_resume_threshold"] == 20
+        assert config["dual_resume_threshold"] == 25
         assert config["equip_search_hop_distance"] == 30
         assert config["equip_search_max_failures"] == 3
 
@@ -235,7 +235,7 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 20,
+            "dual_resume_threshold": 25,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": "not_a_list",
@@ -257,7 +257,7 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 20,
+            "dual_resume_threshold": 25,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": [[1, 2, 3]],
@@ -279,7 +279,7 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 20,
+            "dual_resume_threshold": 25,
             "equip_search_hop_distance": 15,
             "equip_search_max_failures": 3,
             "patrol_waypoints": [["a", "b"]],

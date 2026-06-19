@@ -1071,7 +1071,7 @@ class TestBotEquipmentManagement:
         """_tick_once does not replan while pickup movement is still resolving."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1440,7 +1440,7 @@ class TestBotEquipmentManagement:
         """Blocked collection clears COLLECTING so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1474,7 +1474,7 @@ class TestBotEquipmentManagement:
         """Reachable collection remains in flight when the viewport path is valid."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1505,7 +1505,7 @@ class TestBotEquipmentManagement:
         """Blocked collection returns False from the in-flight gate after clearing state."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1561,7 +1561,7 @@ class TestBotEquipmentManagement:
         """Stalled collection times out so the bot can replan."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1824,7 +1824,7 @@ class TestBotEquipmentManagement:
         """Adjacent collection remains viable even if the target tile itself is blocked."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _clear_blocked_collection
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
         from tankpit_bot.sniffer.world_state import (
             reset_world_state,
             update_world_state_from_position,
@@ -1949,11 +1949,16 @@ class TestBotEquipmentManagement:
         result = _merge_protocol_kills(bot._ai_state)
         assert result is bot._ai_state
 
-    def test_get_combat_feedback_miss_when_dual_active(
+    def test_get_combat_feedback_empty_until_response(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_get_combat_feedback returns 'miss' when dual active and no hit."""
+        """_get_combat_feedback returns '' until a wire CombatHit arrives.
+
+        Old heuristic guessed 'miss' just because dual was available. The
+        tile-occupancy signal requires an actual wire response -- absent
+        a response we wait, never invent a miss.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
@@ -1968,7 +1973,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         result = _get_combat_feedback(bot)
-        assert result == "miss"
+        assert result == ""
 
     def test_get_combat_feedback_no_miss_without_dual(
         self,
@@ -2000,7 +2005,7 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         result = _get_combat_feedback(bot)
         assert result == "hit"
 
@@ -2084,7 +2089,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -2121,7 +2126,7 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
         bot._ai_state["last_shoot_ms"] = 1000
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
 
         assert _has_pending_shot_feedback(bot, 2000) is False
 
@@ -2145,15 +2150,20 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
         assert result == "miss"
 
-    def test_feedback_single_shot_without_dual_is_empty(
+    def test_feedback_single_shot_empty_tile_is_miss(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """weapon_byte=0 without dual is '' (can't determine hit/miss)."""
+        """weapon_byte=0 with empty target tile is 'miss' via tile-occupancy.
+
+        Old heuristic couldn't tell single from miss (weapon_byte=0 was
+        ambiguous). Tile-occupancy resolves it: empty tile = miss,
+        regardless of weapon type or inventory state.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
@@ -2169,15 +2179,15 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._ai_state["last_shot_target_id"] = 50
         bot._ai_state["last_shot_target_name"] = "Enemy"
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
-        assert result == ""
+        assert result == "miss"
 
-    def test_feedback_hit_decrements_dual_then_no_more_miss(
+    def test_feedback_hit_decrements_dual_then_miss_on_empty(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """After dual depleted by hits, weapon_byte=0 gives '' not 'miss'."""
+        """First hit decrements dual; next shot on empty tile is miss."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import (
@@ -2195,16 +2205,16 @@ class TestBotEquipmentManagement:
         bot._ai_state["last_shot_target_name"] = "Enemy"
 
         # First shot: hit with dual, depletes to 0
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         result = _get_combat_feedback(bot)
         assert result == "hit"
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
 
-        # Second shot: weapon_byte=0, dual depleted → no feedback
+        # Second shot: empty tile -> miss via tile-occupancy
         bot._ai_state["last_shot_target_id"] = 50
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         result = _get_combat_feedback(bot)
-        assert result == ""
+        assert result == "miss"
 
 
 class TestRequireCdp:

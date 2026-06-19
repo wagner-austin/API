@@ -123,11 +123,11 @@ class TestLockedEquipmentTarget:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_locked"
 
-    def test_locked_equipment_target_clears_when_unexecutable(self) -> None:
-        """Locked equipment target is cleared when walk_or_teleport fails."""
+    def test_locked_equipment_target_kept_when_on_water(self) -> None:
+        """Locked equipment target is kept since server handles displacement on teleport."""
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        # Target on water with all adjacent tiles also water — no landing
+        # Target on water with all adjacent tiles also water — server displaces on landing
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=800)
         terrain_data: dict[tuple[int, int], str] = {
@@ -154,7 +154,38 @@ class TestLockedEquipmentTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        # Should NOT keep equipment_locked — target is on water with no landing
+        # Target is kept locked — server displaces on teleport landing
+        assert decision["behavior"]["reason"] == "equipment_locked"
+
+    def test_locked_equipment_target_clears_when_teleport_unaffordable(self) -> None:
+        """Locked equipment target is cleared when teleport is unaffordable."""
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        # Far target outside viewport — all viewport tiles water so no walkable approach,
+        # and the direct teleport is unaffordable.
+        containers = {"200,200": _c(200, 200, 0, False)}
+        world, self_state = _make_world(containers=containers, fuel=550)
+        terrain_data: dict[tuple[int, int], str] = {
+            (x, y): "W" for x in range(92, 108) for y in range(92, 108)
+        }
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "RECOVER_EQUIPMENT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+                "resource_target_kind": "equipment",
+                "resource_target_x": 200,
+                "resource_target_y": 200,
+            },
+        )
+        # default_count=15: below low but above break
+        inventory = _make_inventory(default_count=15)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        # Locked target cleared — teleport to (200,200) costs 1200 fuel, only have 550
         assert decision["behavior"]["reason"] != "equipment_locked"
 
 
@@ -327,8 +358,8 @@ class TestEquipmentSearchHopFallback:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["behavior"]["reason"] == "edge_for_equipment"
-        assert decision["command"]["cmd_type"] == "move"
+        assert decision["behavior"]["reason"] == "search_equipment_local"
+        assert decision["command"]["cmd_type"] == "teleport"
 
 
 class TestCriticalEquipmentLockedTarget:
@@ -404,8 +435,8 @@ class TestFuelSearchFallbacks:
         """Reset world state."""
         reset_world_state()
 
-    def test_locked_fuel_clears_when_unexecutable(self) -> None:
-        """Locked fuel target is cleared when walk_or_teleport fails."""
+    def test_locked_fuel_kept_when_on_water(self) -> None:
+        """Locked fuel target is kept since server handles displacement on teleport."""
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
@@ -430,8 +461,8 @@ class TestFuelSearchFallbacks:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        # Fuel target was blocked — should clear and search
-        assert "fuel=700" not in decision["behavior"]["reason"]
+        # Fuel target is kept locked — server displaces on teleport landing
+        assert "fuel=700" in decision["behavior"]["reason"]
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when scanned but no fuel found."""

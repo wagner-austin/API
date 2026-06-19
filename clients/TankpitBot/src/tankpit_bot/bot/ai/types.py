@@ -283,9 +283,9 @@ def make_default_ai_config() -> AIConfigDict:
         map_open_cooldown_ms=5000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
         dual_break_threshold=4,
-        dual_resume_threshold=20,
+        dual_resume_threshold=25,
         radar_break_threshold=5,
-        radar_resume_threshold=15,
+        radar_resume_threshold=20,
         equip_search_hop_distance=30,
         equip_search_max_failures=3,
     )
@@ -340,6 +340,9 @@ class AIStateDict(TypedDict):
     combat_target_x: int
     combat_target_y: int
     killed_tank_ids: dict[str, int]
+    session_kill_count: int
+    session_hit_count: int
+    session_miss_count: int
     blocked_combat_targets: dict[str, int]
     last_shot_target_id: int
     last_shot_target_name: str
@@ -376,6 +379,9 @@ def make_initial_ai_state(
         combat_target_x=0,
         combat_target_y=0,
         killed_tank_ids={},
+        session_kill_count=0,
+        session_hit_count=0,
+        session_miss_count=0,
         blocked_combat_targets={},
         last_shot_target_id=-1,
         last_shot_target_name="",

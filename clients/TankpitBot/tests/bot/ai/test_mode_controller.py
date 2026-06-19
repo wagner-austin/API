@@ -184,7 +184,7 @@ def test_should_enter_recover_equipment_uses_break_threshold() -> None:
 
 def test_should_exit_recover_equipment_uses_resume_threshold() -> None:
     """Equipment recovery exit uses the configured resume threshold."""
-    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=20)) is True
+    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=25)) is True
     assert should_exit_recover_equipment(_make_ctx(dual_count=5, radar_count=5)) is False
 
 
@@ -216,9 +216,9 @@ def test_exit_recover_equipment_requires_radar_resume() -> None:
     the bot reaches a healthy stock before returning to the hunt
     instead of leaving at the first radar it scrapes together.
     """
-    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=5)) is False
-    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=14)) is False
-    assert should_exit_recover_equipment(_make_ctx(dual_count=20, radar_count=15)) is True
+    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=5)) is False
+    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=19)) is False
+    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=20)) is True
 
 
 def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:

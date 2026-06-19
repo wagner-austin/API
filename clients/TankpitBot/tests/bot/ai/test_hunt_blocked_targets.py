@@ -49,8 +49,8 @@ class TestDecideBlockedCombatTargets:
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["behavior"]["reason"] == "find_enemies"
 
-    def test_no_landing_tile_blocks_target_and_switches(self) -> None:
-        """Landing failure blocks the bad target and switches to a viable one."""
+    def test_boxed_target_is_teleported_to_directly(self) -> None:
+        """Boxed target is still teleported to directly; server handles displacement."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -84,6 +84,7 @@ class TestDecideBlockedCombatTargets:
                 "combat_target_id": 50,
                 "combat_target_x": 105,
                 "combat_target_y": 100,
+                "last_map_open_ms": 99500,
             }
         )
         inventory = make_inventory()
@@ -98,12 +99,13 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert "Reachable" in decision["behavior"]["reason"]
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 105
+        assert decision["command"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_failed_combat_landing_is_not_retried(self) -> None:
-        """Failed combat landings are remembered and not retried immediately."""
+    def test_failed_combat_landing_blocks_target_and_switches(self) -> None:
+        """Failed combat landing at the target's coords blocks and switches to viable one."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -140,7 +142,7 @@ class TestDecideBlockedCombatTargets:
             }
         )
         inventory = make_inventory()
-        mark_move_target_failed(119, 100, 99000)
+        mark_move_target_failed(120, 100, 99000)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
@@ -148,12 +150,11 @@ class TestDecideBlockedCombatTargets:
         assert "Reachable" in decision["behavior"]["reason"]
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
-    def test_walk_close_with_no_landing_tile_blocks_target(self) -> None:
-        """A walk-range target with no walkable adjacent tile is blocked.
+    def test_walk_close_ringed_target_is_teleported_to_directly(self) -> None:
+        """A walk-range target with water-ringed adjacent tiles is still teleported to.
 
-        The walk close uses the same landing-tile unviability rule as
-        the teleport close: water-ringed targets cannot be reached at
-        any range.
+        The server handles displacement when the player lands on an
+        occupied or impassable tile.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -176,6 +177,7 @@ class TestDecideBlockedCombatTargets:
                 "combat_target_id": 50,
                 "combat_target_x": 104,
                 "combat_target_y": 100,
+                "last_map_open_ms": 99500,
             }
         )
         inventory = make_inventory()
@@ -190,12 +192,13 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 104
+        assert decision["command"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_no_landing_tile_blocks_target_with_no_alternatives(self) -> None:
-        """Landing failure with no alternatives falls back to generic enemy search."""
+    def test_boxed_solo_target_is_teleported_to_directly(self) -> None:
+        """Boxed target with no alternatives is still teleported to; server displaces."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -217,6 +220,7 @@ class TestDecideBlockedCombatTargets:
                 "combat_target_id": 50,
                 "combat_target_x": 105,
                 "combat_target_y": 100,
+                "last_map_open_ms": 99500,
             }
         )
         inventory = make_inventory()
@@ -231,9 +235,10 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 105
+        assert decision["command"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_combat_landing_skips_dynamic_occupiers(self) -> None:
         """Combat landing avoids adjacent tiles occupied by containers."""
@@ -300,8 +305,8 @@ class TestDecideBlockedCombatTargets:
 
         assert landing != (104, 100)
 
-    def test_combat_landing_returns_none_when_all_adjacent_tiles_impassable(self) -> None:
-        """Combat landing fails when all adjacent terrain tiles are blocked."""
+    def test_combat_landing_returns_target_coords_when_all_adjacent_impassable(self) -> None:
+        """Combat landing returns target coords; server handles displacement."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -329,10 +334,10 @@ class TestDecideBlockedCombatTargets:
 
         landing = _combat_landing_tile(ctx, target)
 
-        assert landing == (-1, -1)
+        assert landing == (105, 100)
 
-    def test_combat_landing_returns_none_when_all_candidates_are_occupied(self) -> None:
-        """Combat landing fails when adjacent candidates are fully occupied."""
+    def test_combat_landing_returns_target_coords_when_all_adjacent_occupied(self) -> None:
+        """Combat landing returns target coords even when adjacent tiles occupied."""
         containers: dict[str, ContainerStateDict] = {
             "106,100": make_container(106, 100, 0, False),
             "104,100": make_container(104, 100, 0, False),
@@ -358,7 +363,7 @@ class TestDecideBlockedCombatTargets:
 
         landing = _combat_landing_tile(ctx, target)
 
-        assert landing == (-1, -1)
+        assert landing == (105, 100)
 
     def test_blocked_target_expires_after_ttl(self) -> None:
         """Blocked combat targets expire after the cooldown window."""

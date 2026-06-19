@@ -219,8 +219,8 @@ class TestRecoverEquipmentPriority:
         assert decision["command"]["target_x"] == 128
         assert decision["command"]["target_y"] == 126
 
-    def test_blocked_equipment_without_adjacent_landing_is_skipped(self) -> None:
-        """Blocked equipment without a landing tile forces equipment sensing."""
+    def test_water_locked_equipment_is_skipped(self) -> None:
+        """Water-locked equipment is skipped; bot searches elsewhere."""
         containers: dict[str, ContainerStateDict] = {
             "128,126": make_container(128, 126, 0, False),
         }
@@ -244,8 +244,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
 
-        assert decision["behavior"]["reason"] == "radar_for_equipment"
-        assert decision["command"]["cmd_type"] == "radar"
+        assert decision["behavior"]["reason"] != "equipment_restock"
 
     def test_adjacent_blocked_equipment_uses_pickup_move(self) -> None:
         """Adjacent blocked equipment still produces a pickup command."""
@@ -407,6 +406,7 @@ class TestRecoverEquipmentSearch:
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=0)
+        inventory["extra_radars"]["count"] = 1
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 

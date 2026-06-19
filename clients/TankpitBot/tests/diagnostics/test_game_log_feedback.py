@@ -19,7 +19,6 @@ from tests.conftest import FakeFileSystem
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import GameLogEntry
-from tankpit_bot.container import RadarContainerDict, RadarMineDict
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.game_log_feedback import (
     get_learned_fuel_capacity,
@@ -29,6 +28,7 @@ from tankpit_bot.diagnostics.game_log_feedback import (
     register_world_feedback_from_game_log,
     reset_game_log_feedback,
 )
+from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
     configure_bot_runtime_logging,

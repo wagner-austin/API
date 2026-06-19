@@ -10,38 +10,56 @@ import pytest
 from tankpit_bot.protocol import (
     DecodeError,
     decode_deactivation,
-    decode_hit_confirmation,
-    decode_mine_detonation,
-    decode_mine_placement,
     decode_shoot_event,
-    x24,
 )
 
 
 class TestDecodeShootEvent:
-    """Tests for decode_shoot_event function."""
+    """Tests for decode_shoot_event function.
 
-    def test_decodes_valid_shoot_event(self) -> None:
-        """Decodes valid shooting event."""
-        # shooter_id=0x0102, target=(10,20), proj=(15,25), fuel=0x030405, weapon=1, ammo=5, ff=0
-        data = bytes([0x02, 0x01, 10, 20, 15, 25, 0x03, 0x04, 0x05, 1, 5, 0])
+    Real wire bytes from runs/bot/bot-20260619-050303 capture, validated
+    three ways: enemy src tracking, homing target tile, wire damage
+    transitions. Field layout per tpclient.js Gg.h (V.S):
+      [team][shooter_id:2 LE][src_x][src_y][tgt_x][tgt_y][unk1][unk2][weapon]
+    """
+
+    def test_decodes_own_dual_shot(self) -> None:
+        """Own dual shot at orange-8 -- real bytes from t+35.48s."""
+        # Body after 0x53 opcode stripped:
+        # 02 15 05 9b 9a 9b 9b 9b 9b 01
+        data = bytes.fromhex("0215059b9a9b9b9b9b01")
         result = decode_shoot_event(data)
         assert result["msg_type"] == 0x53
-        assert result["shooter_id"] == 0x0102
-        assert result["target_x"] == 10
-        assert result["target_y"] == 20
-        assert result["projectile_x"] == 15
-        assert result["projectile_y"] == 25
-        assert result["fuel"] == x24(0x03, 0x04, 0x05)
-        assert result["weapon"] == 1
-        assert result["ammo"] == 5
-        assert result["friendly_fire"] is False
+        assert result["team"] == 2  # blue
+        assert result["shooter_id"] == 1301  # Artax
+        assert result["source_x"] == 155
+        assert result["source_y"] == 154
+        assert result["target_x"] == 155
+        assert result["target_y"] == 155
+        assert result["weapon"] == 1  # dual
 
-    def test_decodes_friendly_fire(self) -> None:
-        """Decodes friendly fire flag correctly."""
-        data = bytes([0x02, 0x01, 10, 20, 15, 25, 0x03, 0x04, 0x05, 1, 5, 1])
+    def test_decodes_enemy_single_shot(self) -> None:
+        """Enemy single shot at us -- orange-8 firing back from (155,155)."""
+        data = bytes.fromhex("0316029b9b9b9a9b9a00")
         result = decode_shoot_event(data)
-        assert result["friendly_fire"] is True
+        assert result["msg_type"] == 0x53
+        assert result["team"] == 3  # orange
+        assert result["shooter_id"] == 534  # orange-8
+        assert result["source_x"] == 155  # orange-8's tile
+        assert result["source_y"] == 155
+        assert result["target_x"] == 155  # our tile
+        assert result["target_y"] == 154
+        assert result["weapon"] == 0  # single
+
+    def test_decodes_homing_shot_landing_off_command(self) -> None:
+        """Homing seeker landed at (170,174) when bot fired toward (155,155)."""
+        data = bytes.fromhex("0215059b9aaaaeaaae03")
+        result = decode_shoot_event(data)
+        assert result["source_x"] == 155
+        assert result["source_y"] == 154
+        assert result["target_x"] == 170  # homing seeker's actual impact
+        assert result["target_y"] == 174
+        assert result["weapon"] == 3  # homing
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
@@ -49,51 +67,36 @@ class TestDecodeShootEvent:
             decode_shoot_event(bytes([1, 2, 3, 4, 5]))
 
 
-class TestDecodeHitConfirmation:
-    """Tests for decode_hit_confirmation function."""
-
-    def test_decodes_valid_hit_confirmation(self) -> None:
-        """Decodes valid hit confirmation."""
-        # 12 bytes starting with 0x2E
-        # After XOR decode: decoded[5]=target_y, decoded[6]=target_x
-        # data[6] -> decoded[5], data[7] -> decoded[6]
-        data = bytes([0x2E, 0x01, 0x02, 0x03, 0x04, 0x05, 0x35, 0x50, 0x08, 0x09, 0x0A, 0x0B])
-        xor_table = bytes([0x00] * 11)  # No-op XOR
-        result = decode_hit_confirmation(data, xor_table)
-        assert result["msg_type"] == 0x2E
-        assert result["target_y"] == 0x35  # decoded[5] = data[6]
-        assert result["target_x"] == 0x50  # decoded[6] = data[7]
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises DecodeError on wrong length."""
-        data = bytes([0x2E, 0x01, 0x02])
-        xor_table = bytes([0x00] * 3)
-        with pytest.raises(DecodeError):
-            decode_hit_confirmation(data, xor_table)
-
-    def test_raises_on_wrong_prefix(self) -> None:
-        """Raises DecodeError on wrong prefix."""
-        data = bytes([0x3E] + [0x00] * 11)
-        xor_table = bytes([0x00] * 11)
-        with pytest.raises(DecodeError) as exc:
-            decode_hit_confirmation(data, xor_table)
-        assert "expected 0x2E prefix" in str(exc.value)
+# decode_hit_confirmation was deleted 2026-06-19: it was a stranded
+# alternate decoder for 0x48 that never matched any JS handler. The
+# canonical 0x48 decoder is decode_enemy_detection (Tg.h / V.H, x/y/
+# team/rank/tank_id), wired via MSG_ENEMY_DETECT in routing.py.
 
 
 class TestDecodeDeactivation:
     """Tests for decode_deactivation function."""
 
     def test_decodes_deactivation(self) -> None:
-        """Decodes deactivation with pad-victim-pad-killer layout."""
-        # Layout: [pad:1] [victim_id:2 LE] [pad:1] [killer_id:2 LE]
-        # victim=x16(0x02,0x01)=0x0102, killer=x16(0x04,0x03)=0x0304
-        data = bytes([0x00, 0x02, 0x01, 0x00, 0x04, 0x03])
+        """Decodes deactivation with JS-verified layout."""
+        # [status:1] [victim_id:2 LE] [promo_eligible:1] [killer_id:2 LE]
+        data = bytes([0x05, 0x02, 0x01, 0x01, 0x04, 0x03])
         result = decode_deactivation(data)
         assert result["msg_type"] == 0x41
+        assert result["status"] == 5
         assert result["victim_id"] == 0x0102
+        assert result["promo_eligible"] is True
         assert result["killer_id"] == 0x0304
-        assert result["rank"] == 0
-        assert result["points"] == 0
+        assert result["is_mine_kill"] is False
+
+    def test_decodes_mine_kill(self) -> None:
+        """Decodes mine kill (killer_id >= 65530)."""
+        # killer_id = 65530 + 2 = 65532 → mine from team 2 (blue)
+        hi = (65532 >> 8) & 0xFF
+        lo = 65532 & 0xFF
+        data = bytes([0x00, 0x02, 0x01, 0x00, lo, hi])
+        result = decode_deactivation(data)
+        assert result["is_mine_kill"] is True
+        assert result["killer_id"] == 2
 
     def test_decodes_with_extra_bytes(self) -> None:
         """Decodes deactivation ignoring trailing bytes."""
@@ -102,48 +105,30 @@ class TestDecodeDeactivation:
         assert result["victim_id"] == 0x0102
         assert result["killer_id"] == 0x0304
 
+    def test_decodes_real_wire_kill(self) -> None:
+        """Real wire bytes from runs/bot/latest msg #89: Artax killed purple-8.
+
+        The wire 7-byte container body has opcode 0x41 stripped by the
+        protocol routing layer; this test decodes the remaining 6 bytes.
+        Confirms wire 0x41 fires for own kills (prior live runs missed
+        this because the routing min_len gate was too strict).
+        """
+        data = bytes.fromhex("01040201 1505".replace(" ", ""))
+        result = decode_deactivation(data)
+        assert result["msg_type"] == 0x41
+        assert result["status"] == 1
+        assert result["victim_id"] == 516  # purple-8
+        assert result["promo_eligible"] is True
+        assert result["killer_id"] == 1301  # Artax
+        assert result["is_mine_kill"] is False
+
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data (need 6 bytes)."""
         with pytest.raises(DecodeError):
             decode_deactivation(bytes([1, 2, 3, 4, 5]))
 
 
-class TestDecodeMinePlacement:
-    """Tests for decode_mine_placement function."""
-
-    def test_decodes_mine_placement(self) -> None:
-        """Decodes mine placement message."""
-        # type=1, tank_id=0x0102, count=2, positions=[(10,20), (30,40)]
-        data = bytes([1, 0x02, 0x01, 2, 10, 20, 30, 40])
-        result = decode_mine_placement(data)
-        assert result["msg_type"] == 0x4B
-        assert result["mine_type"] == 1
-        assert result["tank_id"] == 0x0102
-        assert result["positions"] == [(10, 20), (30, 40)]
-
-    def test_handles_truncated_positions(self) -> None:
-        """Handles truncated position data."""
-        data = bytes([1, 0x02, 0x01, 3, 10, 20])  # Claims 3 positions but only has 1
-        result = decode_mine_placement(data)
-        assert result["positions"] == [(10, 20)]
-
-    def test_raises_on_short_data(self) -> None:
-        """Raises DecodeError on insufficient data."""
-        with pytest.raises(DecodeError):
-            decode_mine_placement(bytes([1, 2]))
-
-
-class TestDecodeMineDetonation:
-    """Tests for decode_mine_detonation function."""
-
-    def test_decodes_mine_detonation(self) -> None:
-        """Decodes mine detonation message."""
-        data = bytes([10, 20, 30, 40])  # Two positions
-        result = decode_mine_detonation(data)
-        assert result["msg_type"] == 0x45
-        assert result["positions"] == [(10, 20), (30, 40)]
-
-    def test_handles_empty_data(self) -> None:
-        """Handles empty position data."""
-        result = decode_mine_detonation(b"")
-        assert result["positions"] == []
+# Protocol-layer mine_placement / mine_detonation decoders were deleted
+# 2026-06-19. Both wire formats arrive only as container subtypes; their
+# canonical decoders live in tankpit_bot.container.decoders.combat.
+# Coverage for those lives in tests/container/test_tank_decoders.py.

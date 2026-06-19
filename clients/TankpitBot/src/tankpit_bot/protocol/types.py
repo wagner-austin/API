@@ -52,52 +52,64 @@ class WorldInfoDict(TypedDict):
 
 
 class ShootEventDict(TypedDict):
-    """Shooting/hit event (S message)."""
+    """Shooting / hit event (0x53 'S' message).
+
+    Layout from tpclient.js Gg.h (V.S), re-verified 2026-06-19 against
+    real wire bytes from runs/bot/bot-20260619-050303 msg t+25.47s
+    `53 02 15 05 b2 7d b2 7e b2 7e 01`:
+      a[0]    = team byte (red=0, purple=1, blue=2, orange=3)
+      a[1:3]  = shooter_id (LE u16)  -- the tank that fired
+      a[3]    = source_x  -- shooter's tile X (live position)
+      a[4]    = source_y  -- shooter's tile Y
+      a[5]    = target_x  -- shot's landing tile X (homing's final tile)
+      a[6]    = target_y  -- shot's landing tile Y
+      a[7]    = unk1 (often duplicates target tile -- semantics TBD)
+      a[8]    = unk2
+      a[9]    = weapon (0=single, 1=dual, 2=missile, 3=homing)
+
+    Prior decoder named a[3,4] as target and a[5,6] as projectile_start
+    -- reversed. Prior names for a[7..9] as fuel/weapon/ammo were also
+    wrong. Three-way validation (enemy src tracking, homing tgt tile,
+    wire damage events) confirmed the corrected layout.
+
+    Hit detection per JS Gg.prototype.h case 18: shot landed on a named
+    tank tile -> hit. That tile lookup uses (target_x, target_y).
+    """
 
     msg_type: Literal[0x53]
+    team: int
     shooter_id: int
+    source_x: int
+    source_y: int
     target_x: int
     target_y: int
-    projectile_x: int
-    projectile_y: int
-    fuel: int
+    unk1: int
+    unk2: int
     weapon: int
-    ammo: int
-    friendly_fire: bool
-
-
-class HitConfirmationDict(TypedDict):
-    """Fire confirmation (0x2E len=12, subtype 0x7E)."""
-
-    msg_type: Literal[0x2E]
-    target_y: int
-    target_x: int
 
 
 class DeactivationDict(TypedDict):
-    """Kill/deactivation event (0x41 'A' message)."""
+    """Kill/deactivation event (0x41 'A' message).
+
+    Layout from tpclient.js Pg.h (V.A), verified 2026-06-19:
+      a[0]  = status byte
+      a[1:3] = victim_id (LE u16)
+      a[3]  = promo_eligible (1=earned extra points)
+      a[4:6] = killer_id (LE u16)
+      If killer_id >= 65530: mine kill (team = killer_id - 65530)
+    """
 
     msg_type: Literal[0x41]
+    status: int
     victim_id: int
+    promo_eligible: bool
     killer_id: int
-    rank: int
-    points: int
+    is_mine_kill: bool
 
 
-class MinePlacementDict(TypedDict):
-    """Mine placement (K message)."""
-
-    msg_type: Literal[0x4B]
-    mine_type: int
-    tank_id: int
-    positions: list[tuple[int, int]]
-
-
-class MineDetonationDict(TypedDict):
-    """Mine detonation (E message)."""
-
-    msg_type: Literal[0x45]
-    positions: list[tuple[int, int]]
+# 0x4B MinePlacement and 0x45 MineDetonation TypedDicts live in
+# tankpit_bot.container.types -- both are container-subtype messages
+# that never arrive standalone. Protocol versions deleted 2026-06-19.
 
 
 # =============================================================================
@@ -106,20 +118,48 @@ class MineDetonationDict(TypedDict):
 
 
 class MovementDict(TypedDict):
-    """Movement path (0x47 'G' message)."""
+    """Movement path (0x47 'G' message).
+
+    Layout from tpclient.js Lg.h (V.G), verified 2026-06-19:
+      a[0:2]  = tank_id (LE u16)
+      a[2]    = start_x
+      a[3]    = start_y
+      a[4]    = direction
+      a[5]    = damage_state (assigned to b.u in Lg.prototype.h; NOT damage_state)
+      a[6:9]  = lb_score (24-bit BE)
+      a[9]    = rank (assigned to b.l in Lg.prototype.h)
+      a[10]   = animation flag (passed to Re constructor, not tank state)
+      a[11]   = is_carrying (1=true)
+      a[12:]  = waypoints (direction chars)
+    """
 
     msg_type: Literal[0x47]
     tank_id: int
     start_x: int
     start_y: int
     direction: int
+    damage_state: int
+    lb_score: int
+    rank: int
     flag: int
-    leaderboard_position: int
+    is_carrying: bool
     waypoints: list[tuple[int, int]]
 
 
 class MovementResponseDict(TypedDict):
-    """Movement response (0x3D '=' binary message)."""
+    """Movement response (0x3D '=' binary message).
+
+    Layout from tpclient.js Mg.h (V["="]):
+      a[0]    = team
+      a[1:3]  = tank_id (LE u16)
+      a[3]    = x
+      a[4]    = y
+      a[5]    = direction
+      a[6]    = damage_state (assigned to b.u; NOT damage_state)
+      a[7]    = rank
+      a[8:11] = lb_score (24-bit BE)
+      a[11]   = carrying flag
+    """
 
     msg_type: Literal[0x3D]
     team: int
@@ -127,8 +167,10 @@ class MovementResponseDict(TypedDict):
     x: int
     y: int
     direction: int
+    damage_state: int
     rank: int
-    leaderboard_position: int
+    lb_score: int
+    carrying: int
 
 
 # =============================================================================
@@ -252,26 +294,44 @@ class RadarScanResultDict(TypedDict):
 class TankInfoDict(TypedDict):
     """Tank info (0x21 '!' message).
 
-    NOTE: This message does NOT contain the tank's current rank!
-    Use 0x3E TankStatus for own rank, or 0x2E short for other tanks.
+    Trace-verified from tpclient.js Tf.h (line 3896-3901):
+      a[0]    = team (a[0] & 255)
+      a[1:3]  = tank_id (LE u16)
+      a[3:7]  = decoration_state (4 bytes, decoded by yg() into 9 x 2-bit slots)
+      a[7:10] = persistent_tank_id (24-bit BE, sets a.aa for profile links)
+      a[10:]  = name (UTF-8 string)
+
+    NOTE: This message does NOT contain the tank's current rank.
     """
 
     msg_type: Literal[0x21]
     tank_id: int
     team: int
     decoration_state: bytes
-    score: int
+    persistent_tank_id: int
     name: str
 
 
 class TankEntryDict(TypedDict):
-    """Tank entry (( message)."""
+    """Tank entry (( message).
+
+    Layout from tpclient.js Uf.h (V["("]), verified 2026-06-19:
+      a[0]   = flags (255=known tank)
+      a[1:3] = tank_id (LE u16)
+      a[3]   = packed byte: team(bits 0-1), damage_state(bits 2-3), rank(bits 4-7)
+      a[4:7] = score (24-bit BE)
+      a[7]   = x position
+      a[8]   = y position
+    """
 
     msg_type: Literal[0x28]
+    team: int
     tank_id: int
+    rank: int
+    damage_state: int
+    score: int
     x: int
     y: int
-    name: str
 
 
 class TankExitDict(TypedDict):
@@ -284,9 +344,15 @@ class TankExitDict(TypedDict):
 class TankStatusSyncDict(TypedDict):
     """Tank status sync (0x2E message).
 
-    Long format (13 bytes, subtype 0x03) for self.
-    Short format (8 bytes, subtype 0x01) for other tanks.
-    The damage_state controls how dark the enemy tank name appears.
+    Layout from tpclient.js Og.h (V["."]), verified 2026-06-19:
+      a[0]    = team (subtype)
+      a[1:3]  = tank_id (LE u16)
+      a[3]    = damage_state (b.u; dual-purpose: rank_category on init, damage during gameplay)
+      a[4]    = rank (b.l)
+      a[5:8]  = lb_score (24-bit BE)
+      a[8]    = promo_state (if long form)
+      a[9]    = has_fuel_bar (if long form)
+      a[10:12] = fuel (LE u16, if long form)
     """
 
     msg_type: Literal[0x2E]
@@ -294,8 +360,7 @@ class TankStatusSyncDict(TypedDict):
     tank_id: int
     damage_state: int
     rank: int
-    flags: bytes
-    leaderboard_position: int
+    lb_score: int
     fuel: int | None
 
 
@@ -372,12 +437,18 @@ class TerrainUpdateDict(TypedDict):
 
 
 class SupervisorDict(TypedDict):
-    """Supervisor/promotion eligibility message (0x52 'R' message)."""
+    """Command failure response (0x52 'R' message).
+
+    Trace-verified from tpclient.js xg.h (line 4317-4322):
+      a[0] = reset_action (1=reset to idle)
+      a[1] = close_map (1=close map view)
+      a[2] = error_code (index into Gb[] error strings; 128+=custom text)
+    """
 
     msg_type: Literal[0x52]
-    status: int
-    reserved: int
-    data: int
+    reset_action: int
+    close_map: int
+    error_code: int
 
 
 # =============================================================================
@@ -434,11 +505,8 @@ __all__ = [
     "EquipmentToggleDict",
     "FuelDepositDict",
     "FuelGainDict",
-    "HitConfirmationDict",
     "InventoryDict",
     "JoinConfirmDict",
-    "MineDetonationDict",
-    "MinePlacementDict",
     "MovementDict",
     "MovementResponseDict",
     "OverlayUpdateDict",
@@ -479,8 +547,6 @@ BinaryMessage = (
     | InventoryDict
     | EquipmentGainDict
     | EquipmentToggleDict
-    | MinePlacementDict
-    | MineDetonationDict
     | RadarScanResultDict
     | MovementDict
     | TankInfoDict

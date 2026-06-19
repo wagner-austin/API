@@ -204,7 +204,7 @@ def test_hunt_refresh_engages_visible_adjacent_locked_target() -> None:
 
 
 def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() -> None:
-    """Refresh keeps progressing toward a visible target when closing is legal."""
+    """Refresh re-teleports to a visible non-adjacent target to close distance."""
     tanks: dict[str, TankStateDict] = {
         "50": _enemy_tank(),
     }
@@ -332,7 +332,7 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
 
 
 def test_hunt_close_returns_close_decision_for_visible_target() -> None:
-    """Close state continues issuing legal close actions while target is present."""
+    """Close state re-teleports to a non-adjacent target to close distance."""
     tanks: dict[str, TankStateDict] = {
         "50": _enemy_tank(),
     }
@@ -547,3 +547,26 @@ def test_scan_on_landing_engages_when_target_present() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
+
+
+def test_scan_on_landing_closes_when_target_not_adjacent() -> None:
+    """SCAN_ON_LANDING re-closes when the target is visible but not adjacent."""
+    tanks: dict[str, TankStateDict] = {"50": _enemy_tank(x=105, y=100)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "SCAN_ON_LANDING",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 105,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"

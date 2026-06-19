@@ -116,6 +116,50 @@ class TestBuildMessageStats:
         assert result["total_received"] == 1
         assert "len=08" in result["unknown"]
 
+    def test_tracks_decoded_known_structure(self, fake_fs: FakeFileSystem) -> None:
+        """Known container structures land in the decoded counter.
+
+        Use a 4-byte player_list_short body (subtype 0x79) -- the
+        identifier returns its name + level, exercising the decoded
+        branch in build_message_stats.
+        """
+        from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+
+        static_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "A" * 974
+        fake_fs.write_text(DEFAULT_STATIC_KEY_PATH, static_key)
+
+        magic = "testmagic123"
+        magic_bytes = magic.encode("utf-8")
+        xor_table = bytes(
+            ord(static_key[i]) ^ magic_bytes[i % len(magic_bytes)] for i in range(len(static_key))
+        )
+
+        # 4-byte body starting with 0x79 -> player_list_short
+        decoded_data = bytes([0x79, 0x99, 0x05, 0x07])
+        encoded = bytes(decoded_data[i] ^ xor_table[i] for i in range(len(decoded_data)))
+        body = bytes([0x2E]) + encoded
+        header = len(body).to_bytes(2, "little")
+        payload = base64.b64encode(header + body).decode()
+
+        session = CaptureSession(
+            session_id="test",
+            start_timestamp_ms=0,
+            end_timestamp_ms=1000,
+            base_url="test",
+            messages=[
+                CapturedMessage(
+                    timestamp_ms=100, direction="received", payload=payload, ws_url="wss://test"
+                ),
+            ],
+            magic=magic,
+            game_log=[],
+            tank_names={},
+        )
+
+        result = build_message_stats(session)
+        assert result["total_received"] == 1
+        assert "len=04 player_list_short" in result["decoded"]
+
     def test_unknown_samples_limited_to_3(self, fake_fs: FakeFileSystem) -> None:
         """Test unknown samples are limited to 3 per length key."""
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH

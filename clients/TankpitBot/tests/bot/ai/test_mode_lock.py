@@ -342,9 +342,9 @@ def test_recover_equipment_mode_switches_to_hunt_after_reserve_restored() -> Non
         }
     )
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 20
-    inventory["homing_shots"]["count"] = 20
-    inventory["extra_radars"]["count"] = 20
+    inventory["dual_shots"]["count"] = 25
+    inventory["homing_shots"]["count"] = 25
+    inventory["extra_radars"]["count"] = 25
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 

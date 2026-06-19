@@ -108,6 +108,11 @@ def is_player_list_short_structure(data: bytes) -> bool:
 
     Criteria:
     - Exactly 4 bytes
+    - First byte is 0x79 (player-list subtype, response to '/' key)
+
+    The subtype guard prevents this from silently absorbing any
+    future 4-byte container subtype (the prior length-only check
+    was the same bug class as the 0x41 deactivation_kill regression).
 
     Args:
         data: Decoded container body bytes.
@@ -115,7 +120,7 @@ def is_player_list_short_structure(data: bytes) -> bool:
     Returns:
         True if structure matches player list short pattern.
     """
-    return len(data) == 4
+    return len(data) == 4 and data[0] == 0x79
 
 
 def decode_player_list_short(data: bytes) -> PlayerListShortDict:
@@ -143,6 +148,14 @@ def is_player_list_extended_structure(data: bytes) -> bool:
 
     Criteria:
     - Exactly 7 bytes
+    - First byte is 0x79 (player-list subtype)
+
+    The subtype guard is critical: the prior length-only check silently
+    absorbed every 7-byte deactivation_kill message (0x41 subtype)
+    because is_deactivation_kill_structure wrongly required 5 bytes,
+    and identify_container_type fell through here. With both checks
+    fixed (deactivation_kill = 7 bytes, this requires 0x79) neither
+    can mask the other regardless of check order.
 
     Args:
         data: Decoded container body bytes.
@@ -150,7 +163,7 @@ def is_player_list_extended_structure(data: bytes) -> bool:
     Returns:
         True if structure matches player list extended pattern.
     """
-    return len(data) == 7
+    return len(data) == 7 and data[0] == 0x79
 
 
 def decode_player_list_extended(data: bytes) -> PlayerListExtendedDict:

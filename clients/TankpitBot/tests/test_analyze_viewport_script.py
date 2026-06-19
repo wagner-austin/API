@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str
-from scripts import _test_hooks as script_hooks
 from scripts.analyze_viewport import main
 
+from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
 from tests.conftest import FakeFileSystem
@@ -41,8 +41,8 @@ def _make_movement_response_payload(
     y: int,
     xor_table: bytes,
 ) -> str:
-    """Create a MovementResponse payload."""
-    decoded_data = bytes([1, tank_id & 0xFF, tank_id >> 8, x, y, 0, 0, 1, 0, 0, 5])
+    """Create a MovementResponse payload (12-byte body inc. carrying byte)."""
+    decoded_data = bytes([1, tank_id & 0xFF, tank_id >> 8, x, y, 0, 0, 1, 0, 0, 5, 0])
     return _encode_received_frame(0x3D, decoded_data, xor_table)
 
 

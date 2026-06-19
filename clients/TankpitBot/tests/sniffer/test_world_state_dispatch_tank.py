@@ -22,12 +22,14 @@ class TestDispatchTankMessages:
         """Test dispatch handles TankEntry (0x28) message."""
         from tankpit_bot.protocol import TankEntryDict
 
-        msg = TankEntryDict(msg_type=0x28, tank_id=42, x=100, y=150, name="EnemyBot")
+        msg = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
+        )
         dispatch_world_state_update(get_world_service(), msg)
 
         state = get_world_service().world_state
         assert "42" in state["tanks"]
-        assert state["tanks"]["42"]["name"] == "EnemyBot"
+        assert state["tanks"]["42"]["name"] == ""
         assert state["tanks"]["42"]["x"] == 100
         assert state["tanks"]["42"]["y"] == 150
 
@@ -58,7 +60,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict, TankExitDict
 
         # First add a tank
-        entry_msg = TankEntryDict(msg_type=0x28, tank_id=42, x=100, y=150, name="LeavingBot")
+        entry_msg = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
+        )
         dispatch_world_state_update(get_world_service(), entry_msg)
         assert "42" in get_world_service().world_state["tanks"]
 
@@ -268,8 +272,10 @@ class TestDispatchTankMessages:
                 x=131,
                 y=126,
                 direction=8,
+                damage_state=0,
                 rank=1,
-                leaderboard_position=1313,
+                lb_score=1313,
+                carrying=0,
             ),
         )
 
@@ -308,7 +314,7 @@ class TestDispatchTankMessages:
                 name="placer",
                 team=3,
                 decoration_state=b"",
-                score=0,
+                persistent_tank_id=0,
             ),
         )
 
@@ -316,10 +322,13 @@ class TestDispatchTankMessages:
             get_world_service(),
             TankEntryDict(
                 msg_type=0x28,
+                team=3,
                 tank_id=777,
+                rank=0,
+                damage_state=0,
+                score=0,
                 x=40,
                 y=41,
-                name="placer",
             ),
         )
 
@@ -366,8 +375,10 @@ class TestDispatchTankMessages:
                 x=38,
                 y=53,
                 direction=8,
+                damage_state=0,
                 rank=1,
-                leaderboard_position=1313,
+                lb_score=1313,
+                carrying=0,
             ),
         )
 
@@ -396,7 +407,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict
 
         # First create a tank
-        entry = TankEntryDict(msg_type=0x28, tank_id=300, x=50, y=60, name="Target")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=300, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         msg = TankStatusShortDict(
@@ -428,7 +441,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
         artifacts = configure_bot_runtime_logging("20260610-230000")
-        entry = TankEntryDict(msg_type=0x28, tank_id=300, x=50, y=60, name="Target")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=300, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         for repeated_damage_state in (2, 2):
@@ -451,7 +466,7 @@ class TestDispatchTankMessages:
         assert records[0]["fields"] == {
             "diagnostic_kind": "tank_damage_changed",
             "tank_id": 300,
-            "tank_name": "Target",
+            "tank_name": "",
             "previous_damage_state": 0,
             "damage_state": 2,
         }
@@ -488,7 +503,9 @@ class TestDispatchTankMessages:
         from tankpit_bot.protocol import TankEntryDict
 
         # First create a tank
-        entry = TankEntryDict(msg_type=0x28, tank_id=400, x=50, y=60, name="Leaving")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=400, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
         assert "400" in get_world_service().world_state["tanks"]
 
@@ -521,35 +538,9 @@ class TestDispatchTankMessages:
         assert state["tanks"]["539"]["x"] == 193
         assert state["tanks"]["539"]["y"] == 150
 
-    def test_dispatch_enemy_movement_with_resolved_player_id(self) -> None:
-        """Test dispatch updates enemy position from movement with resolved player_id."""
-        from tankpit_bot.container import MovementDict
-        from tankpit_bot.sniffer.player_tracking import _player_id_mapper
-
-        # Register a player_id -> tank_id mapping
-        _player_id_mapper._player_to_tank[99999] = 550
-
-        msg = MovementDict(
-            msg_type="movement",
-            flags=0x1E,
-            start_x=100,
-            start_y=80,
-            player_id=99999,
-            tank_id=None,
-            waypoints="eeeesss",
-            is_self=False,
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "550" in state["tanks"]
-        # Final position: (100+4, 80+3) = (104, 83)
-        assert state["tanks"]["550"]["x"] == 104
-        assert state["tanks"]["550"]["y"] == 83
-
-        # Clean up
-        _player_id_mapper._player_to_tank.clear()
-        _player_id_mapper._position_to_tank.clear()
+    # test_dispatch_enemy_movement_with_resolved_player_id deleted
+    # 2026-06-19: container Movement / PlayerIdMapper removed. Protocol
+    # 0x47 Movement carries tank_id directly per JS Lg.h.
 
 
 class TestDispatchEnemyDetection:
@@ -589,7 +580,9 @@ class TestDispatchEnemyDetection:
         from tankpit_bot.protocol import EnemyDetectionDict, TankEntryDict
 
         # First create a tank with an old position
-        entry = TankEntryDict(msg_type=0x28, tank_id=556, x=50, y=60, name="OldPos")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=556, rank=0, damage_state=0, score=0, x=50, y=60
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Detection updates to new position

@@ -33,13 +33,17 @@ class TestDispatchViewportUpdate:
             x=55,
             y=55,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
         # Place enemy tank at (58, 58) — inside viewport
-        entry = TankEntryDict(msg_type=0x28, tank_id=800, x=58, y=58, name="Ghost")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=800, rank=0, damage_state=0, score=0, x=58, y=58
+        )
         dispatch_world_state_update(get_world_service(), entry)
         assert get_world_service().world_state["tanks"]["800"]["x"] == 58
 
@@ -73,13 +77,17 @@ class TestDispatchViewportUpdate:
             x=55,
             y=55,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
         # Place enemy at (58, 58) — inside viewport
-        entry = TankEntryDict(msg_type=0x28, tank_id=815, x=58, y=58, name="Target")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=815, rank=0, damage_state=0, score=0, x=58, y=58
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Viewport update with cache_value=0 (no container cache)
@@ -116,7 +124,9 @@ class TestDispatchViewportUpdate:
         )
 
         # Tank 810 in viewport at (55, 55)
-        entry = TankEntryDict(msg_type=0x28, tank_id=810, x=55, y=55, name="Visible")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=810, rank=0, damage_state=0, score=0, x=55, y=55
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Viewport update with unrelated cache row leaves tracked tank untouched
@@ -163,13 +173,17 @@ class TestDispatchViewportUpdate:
             x=55,
             y=55,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
         # Create enemy already at (0, 0) — already invalidated
-        entry = TankEntryDict(msg_type=0x28, tank_id=821, x=0, y=0, name="Zeroed")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=821, rank=0, damage_state=0, score=0, x=0, y=0
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Viewport update with no entities — should skip self and zeroed tank
@@ -188,7 +202,9 @@ class TestDispatchViewportUpdate:
         from tankpit_bot.sniffer.viewport import get_viewport_left, get_viewport_top
 
         # Default viewport: left=0, top=0, width=18 is still a valid origin.
-        entry = TankEntryDict(msg_type=0x28, tank_id=801, x=5, y=5, name="Safe")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=801, rank=0, damage_state=0, score=0, x=5, y=5
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         msg = ViewportUpdateDict(
@@ -266,8 +282,10 @@ class TestViewportContainerExtraction:
             x=60,
             y=38,
             direction=0,
+            damage_state=0,
             rank=1,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
@@ -303,8 +321,10 @@ class TestViewportContainerExtraction:
             x=60,
             y=38,
             direction=0,
+            damage_state=0,
             rank=1,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
@@ -340,8 +360,10 @@ class TestViewportContainerExtraction:
             x=60,
             y=38,
             direction=0,
+            damage_state=0,
             rank=1,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
@@ -368,8 +390,11 @@ class TestViewportContainerExtraction:
 
     def test_empty_viewport_cache_does_not_override_radar_container(self) -> None:
         """A 0x5A cache clear does not override radar-confirmed container truth."""
-        from tankpit_bot.container import RadarContainerDict
-        from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
+        from tankpit_bot.protocol import (
+            MovementResponseDict,
+            RadarContainerDict,
+            ViewportUpdateDict,
+        )
         from tankpit_bot.protocol.types import ViewportEntityDict
         from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
@@ -382,8 +407,10 @@ class TestViewportContainerExtraction:
                 x=60,
                 y=38,
                 direction=0,
+                damage_state=0,
                 rank=1,
-                leaderboard_position=5,
+                lb_score=5,
+                carrying=0,
             ),
         )
         self_state = get_world_service().world_state["self_state"]
@@ -465,13 +492,17 @@ class TestViewportInvalidationEdgeCases:
             x=55,
             y=55,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
         # Place enemy already at (0,0) — already invalidated
-        entry = TankEntryDict(msg_type=0x28, tank_id=951, x=0, y=0, name="Zeroed")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=951, rank=0, damage_state=0, score=0, x=0, y=0
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Viewport update with only self
@@ -507,13 +538,17 @@ class TestViewportInvalidationEdgeCases:
             x=55,
             y=55,
             direction=0,
+            damage_state=0,
             rank=2,
-            leaderboard_position=5,
+            lb_score=5,
+            carrying=0,
         )
         dispatch_world_state_update(get_world_service(), self_msg)
 
         # Place enemy far away at (200, 200) — outside viewport
-        entry = TankEntryDict(msg_type=0x28, tank_id=961, x=200, y=200, name="FarAway")
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=961, rank=0, damage_state=0, score=0, x=200, y=200
+        )
         dispatch_world_state_update(get_world_service(), entry)
 
         # Viewport update with only self

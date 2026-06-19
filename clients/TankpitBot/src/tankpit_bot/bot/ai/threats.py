@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
+from tankpit_bot.state.types.constants import DIRECTION_DEAD_THRESHOLD
 
 
 def manhattan_distance(x1: int, y1: int, x2: int, y2: int) -> int:
@@ -100,6 +101,12 @@ def analyze_threats(
         # Skip dead tanks — deactivation sets position to (0, 0)
         if tank["x"] == 0 and tank["y"] == 0:
             continue
+        # Skip corpses — direction >= 32 is the dead/corpse sprite
+        # (tpclient.js Pg.prototype.h sets direction to 32 or 33 on
+        # deactivation; verified across 42 corpse transitions in
+        # capture data 2026-06-18).
+        if tank["direction"] >= DIRECTION_DEAD_THRESHOLD:
+            continue
         if now_ms - tank["timestamp_ms"] > WIRE_PRESENCE_TTL_MS:
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
@@ -167,30 +174,6 @@ def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int]:
 # joining the fight. The bot cannot win 1-vN exchanges (user-confirmed
 # tactical constraint), so targets with neighbors inside this radius
 # rank behind isolated ones.
-CLUSTER_RADIUS_TILES = 8
-
-
-def count_clustered_enemies(
-    threats: list[EnemyThreatDict],
-    target: EnemyThreatDict,
-    radius: int,
-) -> int:
-    """Count other enemies within a radius of a prospective target.
-
-    Args:
-        threats: Threat list to scan (the target itself is excluded).
-        target: Prospective combat target.
-        radius: Manhattan radius defining "would join the fight".
-
-    Returns:
-        Number of OTHER enemies within ``radius`` tiles of the target.
-    """
-    return sum(
-        1
-        for threat in threats
-        if threat["tank_id"] != target["tank_id"]
-        and manhattan_distance(threat["x"], threat["y"], target["x"], target["y"]) <= radius
-    )
 
 
 def find_closest_threat(
@@ -226,10 +209,8 @@ def threats_in_range(
 
 
 __all__ = [
-    "CLUSTER_RADIUS_TILES",
     "WIRE_PRESENCE_TTL_MS",
     "analyze_threats",
-    "count_clustered_enemies",
     "find_closest_threat",
     "is_wire_present",
     "manhattan_distance",

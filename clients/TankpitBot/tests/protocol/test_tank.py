@@ -17,8 +17,9 @@ from tankpit_bot.protocol import (
     decode_tank_info,
     decode_tank_status,
     decode_tank_status_sync,
-    supervisor_has_promo_kill,
-    supervisor_is_promo_eligible,
+    supervisor_error_code,
+    supervisor_is_cant_go,
+    supervisor_is_insufficient_fuel,
     x24,
 )
 
@@ -35,7 +36,7 @@ class TestDecodeTankInfo:
         assert result["team"] == 2
         assert result["tank_id"] == 0x0102
         assert result["decoration_state"] == bytes([0xDE, 0xAD, 0xBE, 0xEF])
-        assert result["score"] == x24(0x03, 0x04, 0x05)
+        assert result["persistent_tank_id"] == x24(0x03, 0x04, 0x05)
         assert result["name"] == "Test"
 
     def test_decodes_tank_info_without_name(self) -> None:
@@ -53,22 +54,23 @@ class TestDecodeTankInfo:
 class TestDecodeTankEntry:
     """Tests for decode_tank_entry function."""
 
-    def test_decodes_tank_entry_with_name(self) -> None:
-        """Decodes tank entry with name."""
-        # tank_id=5, x=0x0102, y=60, padding to 10 bytes, then name
-        data = bytes([5, 0x02, 0x01, 60, 0, 0, 0, 0, 0, 0]) + b"Tank"
+    def test_decodes_tank_entry(self) -> None:
+        """Decodes tank entry per JS Uf.h layout.
+
+        Wire: [flags, tank_id_lo, tank_id_hi, packed, score_hi, score_mid, score_lo, x, y]
+        packed: team=bits0-1, damage_state=bits2-3, rank=bits4-7
+        """
+        packed = 0b0010_01_10  # rank=2, damage_state=1, team=2
+        data = bytes([255, 5, 0, packed, 0, 0, 100, 80, 90])
         result = decode_tank_entry(data)
         assert result["msg_type"] == 0x28
         assert result["tank_id"] == 5
-        assert result["x"] == 0x0102
-        assert result["y"] == 60
-        assert result["name"] == "Tank"
-
-    def test_decodes_tank_entry_without_name(self) -> None:
-        """Decodes tank entry without name."""
-        data = bytes([5, 0x02, 0x01, 60, 0, 0, 0, 0, 0, 0])
-        result = decode_tank_entry(data)
-        assert result["name"] == ""
+        assert result["team"] == 2
+        assert result["rank"] == 2
+        assert result["damage_state"] == 1
+        assert result["score"] == 100
+        assert result["x"] == 80
+        assert result["y"] == 90
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
@@ -154,12 +156,12 @@ class TestDecodeSupervisor:
 
     def test_decodes_supervisor(self) -> None:
         """Decodes supervisor message."""
-        data = bytes([1, 0, 3])  # status=1, reserved=0, data=3
+        data = bytes([1, 0, 3])  # reset_action=1, close_map=0, error_code=3
         result = decode_supervisor(data)
         assert result["msg_type"] == 0x52
-        assert result["status"] == 1
-        assert result["reserved"] == 0
-        assert result["data"] == 3
+        assert result["reset_action"] == 1
+        assert result["close_map"] == 0
+        assert result["error_code"] == 3
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
@@ -168,21 +170,46 @@ class TestDecodeSupervisor:
 
 
 class TestSupervisorHelpers:
-    """Tests for supervisor helper functions."""
+    """Tests for supervisor error code helpers."""
 
-    def test_supervisor_is_promo_eligible(self) -> None:
-        """Checks promo eligibility correctly."""
-        eligible: SupervisorDict = {"msg_type": 0x52, "status": 1, "reserved": 0, "data": 0}
-        not_eligible: SupervisorDict = {"msg_type": 0x52, "status": 8, "reserved": 0, "data": 0}
-        assert supervisor_is_promo_eligible(eligible) is True
-        assert supervisor_is_promo_eligible(not_eligible) is False
+    def test_supervisor_error_code(self) -> None:
+        """Returns the data field as error code."""
+        msg: SupervisorDict = {"msg_type": 0x52, "reset_action": 1, "close_map": 0, "error_code": 8}
+        assert supervisor_error_code(msg) == 8
 
-    def test_supervisor_has_promo_kill(self) -> None:
-        """Checks promo kill correctly."""
-        has_kill: SupervisorDict = {"msg_type": 0x52, "status": 8, "reserved": 0, "data": 0}
-        no_kill: SupervisorDict = {"msg_type": 0x52, "status": 1, "reserved": 0, "data": 0}
-        assert supervisor_has_promo_kill(has_kill) is True
-        assert supervisor_has_promo_kill(no_kill) is False
+    def test_supervisor_is_cant_go(self) -> None:
+        """Detects 'You can't go there!' error (code 1)."""
+        cant_go: SupervisorDict = {
+            "msg_type": 0x52,
+            "reset_action": 1,
+            "close_map": 0,
+            "error_code": 1,
+        }
+        other: SupervisorDict = {
+            "msg_type": 0x52,
+            "reset_action": 1,
+            "close_map": 0,
+            "error_code": 5,
+        }
+        assert supervisor_is_cant_go(cant_go) is True
+        assert supervisor_is_cant_go(other) is False
+
+    def test_supervisor_is_insufficient_fuel(self) -> None:
+        """Detects 'Insufficient fuel' error (code 8)."""
+        low_fuel: SupervisorDict = {
+            "msg_type": 0x52,
+            "reset_action": 1,
+            "close_map": 1,
+            "error_code": 8,
+        }
+        other: SupervisorDict = {
+            "msg_type": 0x52,
+            "reset_action": 0,
+            "close_map": 0,
+            "error_code": 4,
+        }
+        assert supervisor_is_insufficient_fuel(low_fuel) is True
+        assert supervisor_is_insufficient_fuel(other) is False
 
 
 class TestDecodeActionDone:

@@ -61,6 +61,7 @@ from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_fuel_total as _update_fuel_total,
 )
 from tankpit_bot.state import make_self_state
+from tankpit_bot.state.types import make_tank_state
 from tests.conftest import FakeEnv, FakeFileSystem
 
 
@@ -243,6 +244,52 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         assert require_int_field(fields, "target_y") == 210
         assert require_int_field(fields, "landed_x") == 200
         assert require_int_field(fields, "landed_y") == 210
+
+    def test_teleport_enemy_displacement_does_not_mark_failed(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """Adjacent landing near an enemy is expected, not a failed target."""
+        reset_world_state()
+        update_world_state_from_position(50, 50)
+        configure_bot_runtime_logging("20260331-230405")
+        ws = get_world_service()
+        ws.world_state["tanks"]["50"] = make_tank_state(
+            tank_id=50,
+            x=200,
+            y=210,
+            team=1,
+            rank=1,
+            damage_state=0,
+            name="enemy-50",
+            is_bot=False,
+            is_self=False,
+            timestamp_ms=100000,
+        )
+
+        bot = _make_bot_with_in_flight(
+            state="TELEPORTING",
+            action_kind="teleport",
+            target_x=200,
+            target_y=210,
+            started_ms=get_current_time_ms() - 1,
+        )
+        landed_state = make_self_state(
+            tank_id=1,
+            x=199,
+            y=210,
+            team=2,
+            rank=1,
+            fuel=900,
+            leaderboard_position=1,
+        )
+        mark_teleport_landed(ws)
+
+        completed = bot._maybe_complete_teleport(landed_state)
+
+        assert completed is True
+        assert ws.failed_move_targets.get("200,210") is None
 
     def test_collection_completion_emits_event_with_position_reached_signal(
         self,

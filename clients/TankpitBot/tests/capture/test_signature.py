@@ -17,11 +17,21 @@ class TestIdentifyMessage:
         assert result is None
 
     def test_player_list_short_4_bytes(self) -> None:
-        """Test identifies 4-byte message as player_list_short."""
-        # 4 bytes matches player_list_short structure
-        data = bytes([0x01, 0x02, 0x03, 0x04])
+        """4-byte message with 0x79 subtype identifies as player_list_short.
+
+        Subtype guard was added to is_player_list_short_structure to
+        prevent silent absorption of unrelated 4-byte container subtypes
+        (same bug class as the 0x41 deactivation_kill regression).
+        """
+        data = bytes([0x79, 0x02, 0x03, 0x04])
         result = identify_message(data)
         assert result == ("player_list_short", 100)  # DecodeLevel.FULL = 100
+
+    def test_player_list_short_rejects_non_0x79_subtype(self) -> None:
+        """4-byte message with wrong subtype must not identify as player_list_short."""
+        data = bytes([0x01, 0x02, 0x03, 0x04])
+        result = identify_message(data)
+        assert result is None
 
     def test_position_update_13_bytes(self) -> None:
         """Test identifies 13-byte message as position_update."""

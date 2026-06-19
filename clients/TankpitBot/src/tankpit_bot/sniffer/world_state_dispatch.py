@@ -53,6 +53,127 @@ from tankpit_bot.state import add_mine, remove_mine
 log = get_logger(__name__)
 
 
+def _update_tank_from_position_status(
+    ws: WorldService,
+    tank_id: int,
+    x: int,
+    y: int,
+    direction: int,
+    damage_state: int,
+    rank: int,
+    team: int,
+) -> None:
+    """Update tank from 0x3D position+status container message.
+
+    Carries position, direction (alive/dead), damage, and rank for
+    every tank on the map. Direction >= 32 indicates a corpse.
+
+    Args:
+        ws: World service instance.
+        tank_id: Tank ID.
+        x: Map x position.
+        y: Map y position.
+        direction: Sprite direction (0-31 alive, 32-33 dead).
+        damage_state: Damage tier (0-3).
+        rank: Military rank (0-8).
+        team: Team ID (0-3).
+    """
+    ts = browser.get_current_time_ms()
+    key = str(tank_id)
+    existing = ws.world_state["tanks"].get(key)
+    name = existing["name"] if existing else ""
+    is_bot = existing["is_bot"] if existing else False
+    from tankpit_bot.state import update_tank_from_registry
+
+    ws.world_state = update_tank_from_registry(
+        ws.world_state,
+        tank_id,
+        team,
+        name,
+        rank,
+        is_bot,
+        x,
+        y,
+        "viewport",
+        ts,
+        wire_present=True,
+        direction=direction,
+    )
+    if existing is not None and existing["damage_state"] != damage_state:
+        from tankpit_bot.state import update_tank_damage
+
+        ws.world_state = update_tank_damage(
+            ws.world_state,
+            tank_id,
+            damage_state,
+            ts,
+        )
+
+
+def _dispatch_shoot_event(
+    ws: WorldService,
+    shooter_id: int,
+    sx: int,
+    sy: int,
+    tx: int,
+    ty: int,
+    weapon: int,
+) -> None:
+    """Apply a 0x53 ShootEvent to world state.
+
+    Own shot -> tile-occupancy hit detection: lookup tank at target tile,
+    record victim id. Enemy shot -> position update from source tile.
+
+    Args:
+        ws: World service instance.
+        shooter_id: Who fired the shot.
+        sx: Shooter source tile X.
+        sy: Shooter source tile Y.
+        tx: Shot target tile X.
+        ty: Shot target tile Y.
+        weapon: Weapon byte (0=single, 1=dual, 2=missile, 3=homing).
+    """
+    self_state = ws.world_state["self_state"]
+    own_tank_id = self_state["tank_id"] if self_state is not None else -1
+    if shooter_id == own_tank_id:
+        victim_id = _find_tank_at_tile(ws, tx, ty, exclude_id=own_tank_id)
+        log.info(
+            "OUR_SHOT: weapon=%d src=(%d,%d) tgt=(%d,%d) victim_id=%d",
+            weapon,
+            sx,
+            sy,
+            tx,
+            ty,
+            victim_id,
+        )
+        mark_combat_hit(ws, weapon, victim_id)
+    elif shooter_id > 0:
+        _update_tank_position(ws, shooter_id, sx, sy)
+
+
+def _find_tank_at_tile(ws: WorldService, x: int, y: int, exclude_id: int) -> int:
+    """Return the tank id occupying (x, y), or -1 if the tile is empty.
+
+    Used by the ShootEvent dispatch to determine whether our shot landed
+    on a tank (hit) or empty terrain (miss). Tile occupancy is the
+    authoritative wire-side hit signal per JS Gg.prototype.h.
+
+    Args:
+        ws: World service instance.
+        x: Tile x coordinate from CombatHit.target_x.
+        y: Tile y coordinate from CombatHit.target_y.
+        exclude_id: Tank id to skip (typically our own tank, since
+            the bot never shoots itself).
+
+    Returns:
+        Tank id at the tile, or -1 if no tracked tank occupies it.
+    """
+    for tid_str, tank in ws.world_state["tanks"].items():
+        if tank["x"] == x and tank["y"] == y and int(tid_str) != exclude_id:
+            return tank["tank_id"]
+    return -1
+
+
 # =============================================================================
 # Dispatch — resource / inventory
 # =============================================================================
@@ -109,8 +230,15 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
         True if the message was handled, False otherwise.
     """
     match decoded:
-        case {"msg_type": 0x28, "tank_id": int(tid), "x": int(tx), "y": int(ty), "name": str(name)}:
-            update_world_state_from_tank_entry(ws, tid, tx, ty, name)
+        case {
+            "msg_type": 0x28,
+            "tank_id": int(tid),
+            "team": int(team),
+            "rank": int(rank),
+            "x": int(tx),
+            "y": int(ty),
+        }:
+            update_world_state_from_tank_entry(ws, tid, team, rank, tx, ty)
             return True
         case {"msg_type": 0x21, "tank_id": int(tid), "team": int(team), "name": str(name)}:
             update_world_state_from_tank_info(ws, tid, team, name)
@@ -129,6 +257,17 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             return True
         case {"msg_type": 0x58, "tank_id": int(tid)}:
             update_world_state_from_tank_exit(ws, tid)
+            return True
+        case {
+            "msg_type": 0x53,
+            "shooter_id": int(shooter_id),
+            "source_x": int(sx),
+            "source_y": int(sy),
+            "target_x": int(tx),
+            "target_y": int(ty),
+            "weapon": int(weapon),
+        }:
+            _dispatch_shoot_event(ws, shooter_id, sx, sy, tx, ty, weapon)
             return True
         case {
             "msg_type": 0x48,
@@ -194,23 +333,6 @@ def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             return True
         case {"msg_type": "tank_leave", "tank_id": int(tid)}:
             update_world_state_from_tank_exit(ws, tid)
-            return True
-        case {"msg_type": "deactivation_kill", "victim_id": int(vid)}:
-            known_tanks = list(ws.world_state["tanks"].keys())
-            log.info(
-                "DEACTIVATION_KILL: victim_id=%d (0x%04X) known_tanks=%s",
-                vid,
-                vid,
-                known_tanks[:10],
-            )
-            mark_tank_killed(ws, vid)
-            _update_tank_position(ws, vid, 0, 0)
-            emit_diagnostic(
-                diagnostic_kind="tank_deactivated",
-                origin="container_kill",
-                victim_id=vid,
-                killer_id=-1,
-            )
             return True
         case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
             emit_diagnostic(
@@ -326,19 +448,6 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
             mark_teleport_landed(ws)
             return True
         case {
-            "msg_type": "combat_hit",
-            "attacker_id": int(aid),
-            "direction": int(),
-            "is_outgoing": bool(),
-            "combat_data": bytes(cdata),
-        }:
-            self_state = ws.world_state["self_state"]
-            if self_state is not None and aid == self_state["tank_id"]:
-                weapon_byte = cdata[-1] if len(cdata) > 0 else 0
-                log.info("OUR_SHOT: weapon_byte=%d data=%s", weapon_byte, cdata.hex())
-                mark_combat_hit(ws, weapon_byte)
-            return True
-        case {
             "msg_type": "tank_registry",
             "is_container": False,
             "tank_id": int(tid),
@@ -379,6 +488,13 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
         return
 
     match decoded:
+        case {"msg_type": 0x52, "reset_action": int(), "error_code": int(error_code)}:
+            ws.last_command_error = error_code
+            emit_diagnostic(
+                diagnostic_kind="command_error",
+                error_code=error_code,
+            )
+            return
         case {"msg_type": "world_state", "world_data": bytes(wd)}:
             _parse_world_state_blob(ws, wd)
             return
@@ -389,9 +505,6 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
                 update_world_state_from_radar(ws, containers, mines)
                 render_ascii_if_available(ws, "Radar")
             return
-        case {"msg_type": "radar_response", "containers": list(containers), "mines": list(mines)}:
-            update_world_state_from_radar(ws, containers, mines)
-            render_ascii_if_available(ws, "Radar")
 
 
 __all__ = [

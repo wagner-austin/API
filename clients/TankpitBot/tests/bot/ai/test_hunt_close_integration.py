@@ -90,7 +90,7 @@ class TestDecideTeleportToFarTarget:
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_recent_map_intel_teleports_without_reopening_map(self) -> None:
-        """Fresh map intel allows direct teleport into the close phase."""
+        """Fresh map intel allows direct teleport to enemy coordinates."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -112,12 +112,12 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["behavior"]["target_x"] == 129
+        assert decision["behavior"]["target_x"] == 130
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_locked_phase_one_target_teleports_to_existing_enemy(self) -> None:
-        """Locked targets keep their target identity during close teleports.
+        """Locked targets teleport directly to the enemy's coordinates.
 
         The locked enemy sits beyond combat_range (distance 30 > 20),
         so closing teleports instead of shooting; an in-range enemy is
@@ -164,7 +164,7 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["behavior"]["target_x"] == 129
+        assert decision["behavior"]["target_x"] == 130
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
@@ -212,8 +212,8 @@ class TestDecideTeleportToFarTarget:
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_locked_phase_one_target_uses_passable_adjacent_combat_landing(self) -> None:
-        """Close teleport selects the passable adjacent landing tile near the target."""
+    def test_locked_phase_one_target_teleports_directly_to_enemy(self) -> None:
+        """Close teleport goes directly to the enemy's coordinates; server displaces."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -250,11 +250,11 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 196
+        assert decision["command"]["target_x"] == 197
         assert decision["command"]["target_y"] == 86
 
-    def test_locked_phase_one_target_without_landing_tile_resets_target(self) -> None:
-        """When no adjacent landing exists, the target is cleared and reacquisition starts."""
+    def test_locked_phase_one_target_surrounded_by_terrain_is_still_teleported(self) -> None:
+        """Even when all adjacent tiles are blocked, teleport goes to target directly."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -291,11 +291,13 @@ class TestDecideTeleportToFarTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 197
+        assert decision["command"]["target_y"] == 86
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_combat_landing_tile_without_terrain_skips_out_of_bounds_candidates(self) -> None:
-        """Landing selection without terrain still respects world bounds."""
+    def test_combat_landing_tile_returns_target_coords_at_map_edge(self) -> None:
+        """Landing selection returns target coords directly; server handles edge placement."""
         world, self_state = make_world(self_x=10, self_y=10, fuel=800)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -316,7 +318,7 @@ class TestDecideTeleportToFarTarget:
 
         landing_x, landing_y = _combat_landing_tile(ctx, target)
 
-        assert (landing_x, landing_y) == (1, 0)
+        assert (landing_x, landing_y) == (0, 0)
 
     def test_missing_locked_target_confirms_before_reacquiring_new_enemy(self) -> None:
         """Missing locked targets clear stale combat state before reacquiring."""

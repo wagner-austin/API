@@ -7,7 +7,7 @@ confirmation, and stale resource reconciliation within the radar envelope.
 from __future__ import annotations
 
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.container import RadarContainerDict, RadarMineDict
+from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (

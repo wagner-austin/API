@@ -41,6 +41,13 @@ def decode_radar_result(data: bytes) -> RadarResultDict:
 def decode_enemy_detection(data: bytes) -> EnemyDetectionDict:
     """Decode enemy detection from XOR-decoded data.
 
+    Layout from tpclient.js Tg.h (V.H), trace-verified 2026-06-19:
+      a[0]   = x (world coordinate of detected enemy)
+      a[1]   = y (world coordinate of detected enemy)
+      a[2]   = team (this.j, used as color index)
+      a[3]   = rank (this.m, used with ec[] rank names)
+      a[4:6] = tank_id (LE u16)
+
     Args:
         data: XOR-decoded message body.
 
@@ -53,11 +60,11 @@ def decode_enemy_detection(data: bytes) -> EnemyDetectionDict:
     require_min_length(data, 6, "EnemyDetection")
     return EnemyDetectionDict(
         msg_type=0x48,
-        tank_id=x16(data[0], data[1]),
-        x=data[2],
-        y=data[3],
-        rank=data[4],
-        team=data[5],
+        x=data[0],
+        y=data[1],
+        team=data[2],
+        rank=data[3],
+        tank_id=x16(data[4], data[5]),
     )
 
 

@@ -36,26 +36,26 @@ class TestCombatHitTracking:
 
     def test_mark_and_check_returns_true(self) -> None:
         """mark_combat_hit sets flag, check_and_clear returns True then False."""
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert check_and_clear_combat_hit(get_world_service()) is True
         # Second call returns False (cleared)
         assert check_and_clear_combat_hit(get_world_service()) is False
 
     def test_mark_with_zero_weapon_byte_is_miss(self) -> None:
         """mark_combat_hit with weapon_byte=0 does not set hit flag."""
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         assert check_and_clear_combat_hit(get_world_service()) is False
 
     def test_zero_weapon_byte_sets_our_shot_response(self) -> None:
         """mark_combat_hit with weapon_byte=0 still sets the shot response flag."""
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         assert peek_our_shot_response(get_world_service()) is True
         assert check_and_clear_our_shot_response(get_world_service()) is True
         assert check_and_clear_our_shot_response(get_world_service()) is False
 
     def test_nonzero_weapon_byte_sets_our_shot_response(self) -> None:
         """mark_combat_hit with weapon_byte>0 sets both hit and response flags."""
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert peek_our_shot_response(get_world_service()) is True
         assert peek_combat_hit(get_world_service()) is True
 
@@ -71,7 +71,7 @@ class TestCombatHitTracking:
             [0, 7, 0, 0, 10],
             [False, True, False, False, True],
         )
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 6
         assert get_inventory_state(get_world_service())["dual_shots"]["enabled"] is True
 
@@ -82,7 +82,7 @@ class TestCombatHitTracking:
             [0, 0, 5, 0, 10],
             [False, False, True, False, True],
         )
-        mark_combat_hit(get_world_service(), weapon_byte=2)
+        mark_combat_hit(get_world_service(), weapon_byte=2, victim_id=999)
         assert get_inventory_state(get_world_service())["missile_shots"]["count"] == 4
 
     def test_homing_hit_decrements_homing_count(self) -> None:
@@ -92,8 +92,21 @@ class TestCombatHitTracking:
             [0, 0, 0, 3, 10],
             [False, False, False, True, True],
         )
-        mark_combat_hit(get_world_service(), weapon_byte=3)
+        mark_combat_hit(get_world_service(), weapon_byte=3, victim_id=999)
         assert get_inventory_state(get_world_service())["homing_shots"]["count"] == 2
+
+    def test_unknown_weapon_byte_decrements_nothing(self) -> None:
+        """weapon_byte outside 1-3 leaves all inventory counts untouched."""
+        update_inventory_from_protocol(
+            get_world_service(),
+            [0, 5, 5, 5, 10],
+            [False, True, True, True, True],
+        )
+        mark_combat_hit(get_world_service(), weapon_byte=99, victim_id=999)
+        inv = get_inventory_state(get_world_service())
+        assert inv["dual_shots"]["count"] == 5
+        assert inv["missile_shots"]["count"] == 5
+        assert inv["homing_shots"]["count"] == 5
 
     def test_hit_decrement_does_not_go_below_zero(self) -> None:
         """mark_combat_hit does not decrement below zero."""
@@ -102,7 +115,7 @@ class TestCombatHitTracking:
             [0, 0, 0, 0, 10],
             [False, True, False, False, True],
         )
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
 
     def test_consecutive_hits_deplete_dual(self) -> None:
@@ -112,19 +125,19 @@ class TestCombatHitTracking:
             [0, 3, 0, 0, 10],
             [False, True, False, False, True],
         )
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 2
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 1
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
         # Fourth hit: already at zero, stays at zero
-        mark_combat_hit(get_world_service(), weapon_byte=1)
+        mark_combat_hit(get_world_service(), weapon_byte=1, victim_id=999)
         assert get_inventory_state(get_world_service())["dual_shots"]["count"] == 0
 
     def test_reset_clears_our_shot_response(self) -> None:
         """reset_world_state clears the our_shot_response flag."""
-        mark_combat_hit(get_world_service(), weapon_byte=0)
+        mark_combat_hit(get_world_service(), weapon_byte=0, victim_id=-1)
         reset_world_state()
         assert peek_our_shot_response(get_world_service()) is False
 

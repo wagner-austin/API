@@ -107,7 +107,7 @@ class TestWorldStateCore:
 
     def test_update_world_state_from_radar_containers(self) -> None:
         """Test updates containers from radar."""
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
         containers: list[RadarContainerDict] = [
             RadarContainerDict(x=50, y=60, volume=100),  # fuel with 100 units
@@ -125,7 +125,7 @@ class TestWorldStateCore:
 
     def test_update_world_state_from_radar_mines(self) -> None:
         """Test updates mines from radar."""
-        from tankpit_bot.container import RadarContainerDict, RadarMineDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
         containers: list[RadarContainerDict] = []
         mines: list[RadarMineDict] = [

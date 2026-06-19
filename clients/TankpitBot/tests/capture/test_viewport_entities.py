@@ -208,7 +208,7 @@ class TestAnalyzeViewportEntities:
                             direction="received",
                             payload=_encode_received_frame(
                                 0x3D,
-                                bytes([1, 1, 0, 5, 6, 0, 0, 1, 0, 0, 0]),
+                                bytes([1, 1, 0, 5, 6, 0, 0, 1, 0, 0, 0, 0]),
                                 xor_table,
                             ),
                             ws_url="wss://test/ws",

@@ -8,7 +8,6 @@ from tankpit_bot.bot.ai.context import (
     can_afford_teleport,
     can_use_radar,
     clear_resource_target,
-    equipment_reserve_restored,
     locked_resource_target,
     make_decision,
     set_resource_target,
@@ -20,7 +19,6 @@ from tankpit_bot.bot.ai.equipment import (
 )
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
-    find_adjacent_container,
     find_best_fuel,
     find_known_fuel_candidates,
 )
@@ -40,7 +38,6 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
-    make_pickup_equipment_command,
     make_radar_command,
     make_teleport_command,
 )
@@ -164,12 +161,6 @@ def _sweep_equipment_before_leaving(
         ``(container, command)`` for a walkable equipment sweep, or
         ``None`` when reserves are comfortable or nothing local exists.
     """
-    if equipment_reserve_restored(ctx):
-        return None
-    # Locality is guaranteed by the selector's contract: visible
-    # candidates are in-viewport by construction (the same bounds gate
-    # candidacy and pickup actionability), so a sweep can never turn
-    # into a relocation.
     return select_equipment_target(ctx, allow_unreachable=False)
 
 
@@ -213,21 +204,20 @@ def _plan_fuel_recovery(
     """
     base_state, locked_target = locked_resource_target(ctx, "fuel")
     base_state = clear_combat_target(base_state)
-    adjacent_equipment = find_adjacent_container(
-        ctx.filtered,
-        ctx.self_state,
-        ctx.terrain,
-        want_fuel=False,
-        now_ms=ctx.timestamp_ms,
+    visible_equipment = (
+        select_equipment_target(ctx, allow_unreachable=False)
+        if ctx.fuel > ctx.config["fuel_critical_threshold"]
+        else None
     )
-    if adjacent_equipment is not None:
+    if visible_equipment is not None:
+        adjacent_equipment, equip_command = visible_equipment
         emit_ai(
             "opportunistic equipment pickup at (%d,%d) during fuel recovery",
             adjacent_equipment["x"],
             adjacent_equipment["y"],
         )
         return make_decision(
-            make_pickup_equipment_command(adjacent_equipment["x"], adjacent_equipment["y"]),
+            equip_command,
             "COLLECT_FUEL",
             900,
             adjacent_equipment["x"],

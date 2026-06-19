@@ -361,7 +361,7 @@ class TestMergeFunctions:
         assert containers == []
 
     def test_get_merged_fuel_containers_world_state_wins(self) -> None:
-        from tankpit_bot.container import RadarContainerDict
+        from tankpit_bot.protocol import RadarContainerDict
         from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
         # Add container at (50,75) to world state with volume 500

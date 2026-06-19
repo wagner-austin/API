@@ -22,7 +22,6 @@ from tankpit_bot.state.types import (
     MineStateDict,
     SelfStateDict,
     WorldStateDict,
-    coord_key,
 )
 
 log = get_logger(__name__)
@@ -43,6 +42,12 @@ def find_teleport_landing_tile(
 ) -> tuple[int, int] | None:
     """Find a legal teleport landing point for a container target.
 
+    Teleports directly to the target when it is on passable ground.
+    When the target is impassable (water, rock), checks cardinal
+    neighbors for a passable tile. Returns None when the target and
+    all neighbors are impassable (e.g. container in the middle of a
+    lake) — the caller should skip this container.
+
     Args:
         terrain: Terrain map for passability checks.
         start_x: Bot X coordinate before teleporting.
@@ -52,31 +57,20 @@ def find_teleport_landing_tile(
         blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
-        Tuple of landing coordinates, or None if no safe landing tile exists.
+        Tuple of landing coordinates, or None when unreachable.
     """
+    del start_x, start_y, blocked_mines
+    if not (_MAP_MIN <= goal_x <= _MAP_MAX and _MAP_MIN <= goal_y <= _MAP_MAX):
+        return None
     if terrain.is_passable(goal_x, goal_y):
-        target_key = coord_key(goal_x, goal_y)
-        if blocked_mines is None or target_key not in blocked_mines:
-            return (goal_x, goal_y)
-
-    best_tile: tuple[int, int] | None = None
-    best_dist = _MAX_DIST
-
+        return (goal_x, goal_y)
     for dx, dy in _ADJACENT_DIRECTIONS:
-        nx = goal_x + dx
-        ny = goal_y + dy
+        nx, ny = goal_x + dx, goal_y + dy
         if not (_MAP_MIN <= nx <= _MAP_MAX and _MAP_MIN <= ny <= _MAP_MAX):
             continue
-        if not terrain.is_passable(nx, ny):
-            continue
-        if blocked_mines is not None and coord_key(nx, ny) in blocked_mines:
-            continue
-        dist = manhattan_distance(start_x, start_y, nx, ny)
-        if dist < best_dist:
-            best_dist = dist
-            best_tile = (nx, ny)
-
-    return best_tile
+        if terrain.is_passable(nx, ny):
+            return (nx, ny)
+    return None
 
 
 def is_reachable(
@@ -473,7 +467,7 @@ def describe_container_search(
             continue
         nearby += 1
         dist = manhattan_distance(sx, sy, cx, cy)
-        reason, is_actionable, is_blocked, missing_landing, low_volume_target = (
+        reason, is_actionable, is_blocked, _missing_landing, low_volume_target = (
             _describe_candidate_reason(
                 world,
                 container,
@@ -488,8 +482,6 @@ def describe_container_search(
         )
         if is_blocked:
             blocked += 1
-        if missing_landing:
-            no_landing += 1
         if low_volume_target:
             low_volume += 1
         if is_actionable:
@@ -594,16 +586,8 @@ def _describe_candidate_reason(
         return ("actionable", True, False, False, False)
     if not allow_unreachable:
         return ("blocked_walk", False, True, False, False)
-    landing = find_teleport_landing_tile(
-        terrain,
-        start_x,
-        start_y,
-        container["x"],
-        container["y"],
-        blocked_mines,
-    )
-    if landing is None:
-        return ("blocked_no_landing", False, True, True, False)
+    # Server handles displacement on teleport landing, so in-bounds
+    # containers always have a valid landing tile.
     return ("actionable", True, True, False, False)
 
 

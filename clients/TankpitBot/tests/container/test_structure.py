@@ -7,19 +7,14 @@ from __future__ import annotations
 
 from tankpit_bot.container import (
     is_chunk_data_structure,
-    is_combat_hit_structure,
     is_container_pickup_structure,
     is_deactivation_death_structure,
-    is_deactivation_kill_structure,
-    is_movement_structure,
     is_player_list_extended_structure,
     is_player_list_short_structure,
     is_position_update_structure,
-    is_radar_response_structure,
     is_tank_leave_structure,
     is_tank_registry_structure,
     is_tank_status_short_structure,
-    is_tank_status_sync_structure,
     is_tank_update_compact_structure,
     is_tank_update_extended_structure,
     is_tank_update_full_structure,
@@ -31,12 +26,9 @@ from tests.container.test_data import (
     CHUNK_DATA_80,
     CHUNK_DATA_95,
     CHUNK_DATA_130,
-    COMBAT_HIT_11_INCOMING,
-    COMBAT_HIT_11_OUTGOING,
     CONTAINER_PICKUP_EQUIPMENT,
     CONTAINER_PICKUP_FUEL,
     DEACTIVATION_DEATH_7,
-    DEACTIVATION_KILL_5,
     MOVEMENT_16_SSSS,
     MOVEMENT_18_ENNNW,
     MOVEMENT_19_WWWWWW,
@@ -44,16 +36,11 @@ from tests.container.test_data import (
     PLAYER_LIST_EXTENDED_7,
     PLAYER_LIST_SHORT_4,
     POSITION_UPDATE_13,
-    RADAR_RESPONSE_1,
-    RADAR_RESPONSE_2,
-    RADAR_RESPONSE_5,
     TANK_LEAVE_6,
     TANK_LEAVE_LARGE_ID,
     TANK_REGISTRY_16,
     TANK_REGISTRY_20,
     TANK_STATUS_SHORT_9,
-    TANK_STATUS_SYNC_2,
-    TANK_STATUS_SYNC_3,
     TANK_UPDATE_COMPACT_10,
     TANK_UPDATE_EXTENDED_14,
     TANK_UPDATE_FULL_15,
@@ -64,21 +51,6 @@ from tests.container.test_data import (
     WORLD_STATE_500,
     WORLD_STATE_650,
 )
-
-
-class TestIsCombatHitStructure:
-    """Tests for combat hit structure detection."""
-
-    def test_matches_11_bytes(self) -> None:
-        """Matches exactly 11-byte message."""
-        assert is_combat_hit_structure(COMBAT_HIT_11_OUTGOING) is True
-        assert is_combat_hit_structure(COMBAT_HIT_11_INCOMING) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_combat_hit_structure(bytes([0x01] * 10)) is False
-        assert is_combat_hit_structure(bytes([0x01] * 12)) is False
-        assert is_combat_hit_structure(bytes([0x01] * 13)) is False
 
 
 class TestIsTankRegistryStructure:
@@ -147,50 +119,9 @@ class TestIsTankRegistryStructure:
         assert is_tank_registry_structure(data) is False
 
 
-class TestIsMovementStructure:
-    """Tests for movement structure detection."""
-
-    def test_matches_18_bytes_with_waypoint_tail(self) -> None:
-        """Matches 18-byte message with direction char tail (real capture)."""
-        assert is_movement_structure(MOVEMENT_18_ENNNW) is True
-
-    def test_matches_19_bytes_with_waypoint_tail(self) -> None:
-        """Matches 19-byte message with direction char tail (real capture)."""
-        assert is_movement_structure(MOVEMENT_19_WWWWWW) is True
-
-    def test_matches_16_bytes_at_minimum(self) -> None:
-        """Matches 16-byte message with direction char tail."""
-        assert is_movement_structure(MOVEMENT_16_SSSS) is True
-
-    def test_matches_20_bytes_at_boundary(self) -> None:
-        """Matches 20-byte message with direction char tail."""
-        assert is_movement_structure(MOVEMENT_20_NESW) is True
-
-    def test_rejects_too_short(self) -> None:
-        """Rejects messages shorter than 14 bytes."""
-        # 13 bytes ending with directions - still too short
-        data = bytes.fromhex("47010203040506070809737373")  # 13 bytes
-        assert len(data) == 13
-        assert is_movement_structure(data) is False
-
-    def test_rejects_non_direction_tail_without_movement_subtype(self) -> None:
-        """Rejects messages without Movement subtype where tail is not all directions.
-
-        Uses 0x00 subtype (not 0x47 'G') so subtype check fails, then tail check fails.
-        """
-        # 18 bytes with non-Movement subtype 0x00, tail has 'x' (0x78)
-        data = bytes.fromhex("007e026e5c0c03002e870300006565656578")
-        assert is_movement_structure(data) is False
-
-    def test_accepts_movement_subtype_regardless_of_tail(self) -> None:
-        """Accepts messages with Movement subtype 0x47 even with non-direction tail.
-
-        The subtype check (0x47 = 'G') takes precedence over tail pattern check.
-        This handles short movements where padding bytes appear at the end.
-        """
-        # 18 bytes with Movement subtype 0x47, tail has 'x' (0x78)
-        data = bytes.fromhex("477e026e5c0c03002e870300006565656578")
-        assert is_movement_structure(data) is True
+# is_movement_structure tests deleted 2026-06-19: container Movement
+# decoder removed. The unified `decode_0x2e_message` dispatches 0x47
+# Movement to the protocol decoder via subtype + length-gate matching.
 
 
 class TestIsPositionUpdateStructure:
@@ -228,18 +159,9 @@ class TestIsTankStatusShortStructure:
         assert is_tank_status_short_structure(bytes([0x01] * 10)) is False
 
 
-class TestIsTankStatusSyncStructure:
-    """Tests for tank status sync structure detection."""
-
-    def test_matches_2_or_3_bytes(self) -> None:
-        """Matches 2 or 3 byte messages."""
-        assert is_tank_status_sync_structure(TANK_STATUS_SYNC_2) is True
-        assert is_tank_status_sync_structure(TANK_STATUS_SYNC_3) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_tank_status_sync_structure(bytes([0x01])) is False
-        assert is_tank_status_sync_structure(bytes([0x01] * 4)) is False
+# Container TankStatusSync structure check was a 2-3 byte length-only
+# catch-all -- deleted 2026-06-19. Real 0x2E TankStatusSync (8+ bytes
+# per JS Og.h) is tested at the protocol layer.
 
 
 class TestIsTankUpdateCompactStructure:
@@ -332,36 +254,8 @@ class TestIsContainerPickupStructure:
         assert is_container_pickup_structure(bytes([0x43] * 6)) is False
 
 
-class TestIsRadarResponseStructure:
-    """Tests for radar response structure detection."""
-
-    def test_matches_minimum_7_bytes(self) -> None:
-        """Matches minimum 7-byte radar response (count=1)."""
-        assert is_radar_response_structure(RADAR_RESPONSE_1) is True
-
-    def test_matches_11_bytes_with_2_entries(self) -> None:
-        """Matches 11-byte radar response (count=2)."""
-        assert is_radar_response_structure(RADAR_RESPONSE_2) is True
-
-    def test_matches_realistic_23_bytes(self) -> None:
-        """Matches realistic 23-byte radar response (count=5)."""
-        assert is_radar_response_structure(RADAR_RESPONSE_5) is True
-
-    def test_rejects_too_short(self) -> None:
-        """Rejects messages shorter than 7 bytes."""
-        assert is_radar_response_structure(bytes([0x4F, 0x01, 0x00, 0x00, 0x00, 0x00])) is False
-
-    def test_rejects_wrong_subtype(self) -> None:
-        """Rejects messages without 0x4F subtype."""
-        # Same structure but different subtype
-        data = bytes.fromhex("50" + "0100" + "7b69ffff")
-        assert is_radar_response_structure(data) is False
-
-    def test_rejects_count_length_mismatch(self) -> None:
-        """Rejects when count doesn't match actual entry count."""
-        # Claims count=2 but only has data for 1 entry
-        invalid = bytes.fromhex("4f" + "0200" + "7b69ffff")
-        assert is_radar_response_structure(invalid) is False
+# 0x4F RadarResponse structure check moved to protocol layer
+# (decode_radar_scan_result handles structural validation inline).
 
 
 class TestIsPlayerListShortStructure:
@@ -390,22 +284,9 @@ class TestIsPlayerListExtendedStructure:
         assert is_player_list_extended_structure(bytes([0x79] * 8)) is False
 
 
-class TestIsDeactivationKillStructure:
-    """Tests for deactivation kill structure detection."""
-
-    def test_matches_5_bytes_with_0x41_subtype(self) -> None:
-        """Matches 5-byte message with 0x41 subtype."""
-        assert is_deactivation_kill_structure(DEACTIVATION_KILL_5) is True
-
-    def test_rejects_wrong_subtype(self) -> None:
-        """Rejects 5-byte message with wrong subtype."""
-        data = bytes([0x42, 0xBB, 0x62, 0x9C, 0x0E])
-        assert is_deactivation_kill_structure(data) is False
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_deactivation_kill_structure(bytes([0x41] * 4)) is False
-        assert is_deactivation_kill_structure(bytes([0x41] * 6)) is False
+# 0x41 DeactivationKill structure tests moved to the protocol layer
+# tests/protocol/test_combat.py:TestDecodeDeactivation -- container
+# path was deleted 2026-06-19.
 
 
 class TestIsDeactivationDeathStructure:

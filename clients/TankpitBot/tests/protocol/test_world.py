@@ -129,19 +129,32 @@ class TestDecodeChatMessage:
 class TestDecodeStatistics:
     """Tests for decode_statistics function."""
 
-    def test_decodes_statistics(self) -> None:
-        """Decodes statistics message."""
+    def test_decodes_statistics_long_format(self) -> None:
+        """Decodes long-format statistics (>12 bytes)."""
         data = (
             bytes([0x10, 0x00, 30, 45])  # hours=16, mins=30, secs=45
-            + (100).to_bytes(4, "little")  # destroyed
-            + (50).to_bytes(4, "little")  # deactivated
-            + (5000).to_bytes(4, "little")  # score
+            + (100).to_bytes(4, "big")  # destroyed (32-bit BE)
+            + bytes([50, 0x00])  # deactivated (LE u16 = 50)
+            + (5000).to_bytes(4, "big")  # promo_points (32-bit BE)
         )
         result = decode_statistics(data)
         assert result["msg_type"] == 0x56
         assert result["playtime_hours"] == 16
         assert result["playtime_minutes"] == 30
         assert result["playtime_seconds"] == 45
+        assert result["destroyed"] == 100
+        assert result["deactivated"] == 50
+        assert result["score"] == 5000
+
+    def test_decodes_statistics_short_format(self) -> None:
+        """Decodes short-format statistics (<=12 bytes)."""
+        data = (
+            bytes([0x10, 0x00, 30, 45])  # hours=16, mins=30, secs=45
+            + bytes([100, 0x00])  # destroyed (LE u16 = 100)
+            + bytes([50, 0x00])  # deactivated (LE u16 = 50)
+            + (5000).to_bytes(4, "big")  # promo_points (32-bit BE)
+        )
+        result = decode_statistics(data)
         assert result["destroyed"] == 100
         assert result["deactivated"] == 50
         assert result["score"] == 5000
@@ -336,8 +349,21 @@ class TestDecode0x2eMessage:
     """Tests for decode_0x2e_message function."""
 
     def test_dispatches_to_container_decoder(self) -> None:
-        """Dispatches to container decoder module."""
-        # 11 bytes = combat hit
-        data = bytes([0x59, 0x09, 0xCD, 0x07, 0x99, 0x84, 0x93, 0xCE, 0x9C, 0x80, 0x51])
+        """Dispatches to container length-fallback for 1-byte 0x54.
+
+        After unification (2026-06-19), `decode_0x2e_message` is the
+        single subtype-first + length-fallback entrypoint. Subtype 0x54
+        with empty inner falls through to length-based teleport_landed
+        (production captures confirm bare 0x54 bodies are teleport
+        confirmations, not ActionDone payloads).
+        """
+        data = bytes([0x54])
         result = decode_0x2e_message(data)
-        assert result["msg_type"] == "combat_hit"
+        assert result["msg_type"] == "teleport_landed"
+
+    def test_empty_data_raises(self) -> None:
+        """Empty body propagates ContainerDecodeError from the container path."""
+        from tankpit_bot.container.helpers import ContainerDecodeError
+
+        with pytest.raises(ContainerDecodeError):
+            decode_0x2e_message(b"")

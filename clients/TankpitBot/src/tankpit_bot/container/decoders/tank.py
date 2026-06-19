@@ -14,7 +14,6 @@ from tankpit_bot.container.types import (
     TankLeaveDict,
     TankRegistryDict,
     TankStatusShortDict,
-    TankStatusSyncDict,
     TankUpdateCompactDict,
     TankUpdateExtendedDict,
     TankUpdateFullDict,
@@ -363,39 +362,12 @@ def decode_tank_update_full(data: bytes) -> TankUpdateFullDict:
     )
 
 
-def is_tank_status_sync_structure(data: bytes) -> bool:
-    """Check if data matches tank status sync message structure.
-
-    Tank status sync criteria:
-    - Length 2-3 bytes
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if structure matches tank status sync pattern.
-    """
-    return 2 <= len(data) <= 3
-
-
-def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
-    """Decode tank status sync message from container body.
-
-    Args:
-        data: Decoded container body bytes (must pass is_tank_status_sync_structure).
-
-    Returns:
-        Decoded tank status sync data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_length_range(data, 2, 3, "TankStatusSync")
-
-    return TankStatusSyncDict(
-        msg_type="tank_status_sync",
-        sync_data=bytes(data[1:]),
-    )
+# Container TankStatusSync (2-3 byte catch-all) was deleted 2026-06-19:
+# it was a length-only catch-all with no subtype guard, misidentifying
+# any 2-3 byte container body (0x4F/0x46/0x58/0x3F shorts) as TankStatusSync.
+# The real 0x2E TankStatusSync is the 8+ byte protocol path (Og.h).
+# Short bodies that no longer match a known subtype fall through to
+# UNKNOWN_CONTAINER, which is honest.
 
 
 def is_tank_leave_structure(data: bytes) -> bool:
@@ -453,14 +425,12 @@ __all__ = [
     "decode_tank_leave",
     "decode_tank_registry",
     "decode_tank_status_short",
-    "decode_tank_status_sync",
     "decode_tank_update_compact",
     "decode_tank_update_extended",
     "decode_tank_update_full",
     "is_tank_leave_structure",
     "is_tank_registry_structure",
     "is_tank_status_short_structure",
-    "is_tank_status_sync_structure",
     "is_tank_update_compact_structure",
     "is_tank_update_extended_structure",
     "is_tank_update_full_structure",

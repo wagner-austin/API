@@ -30,16 +30,16 @@ from tankpit_bot.browser.overlay import OverlayStateDict, update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.game_log_feedback import register_world_feedback_from_game_log
 from tankpit_bot.diagnostics.game_log_kills import register_kills_from_game_log
-from tankpit_bot.diagnostics.registry_truth import register_tank_truth_from_page_snapshot
 from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.runtime_logging import emit_ai, emit_sync
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic, emit_sync
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
 )
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
+    check_and_clear_last_shot_victim_id,
     check_and_clear_our_shot_response,
     drain_killed_tank_ids,
     peek_combat_hit,
@@ -91,12 +91,66 @@ def run_tick_loop(
                 max_ticks,
                 session_seconds,
             )
+            _emit_session_scorecard(bot, ticks_done)
             return
         if _test_hooks.path_exists(stop_file_path):
             _test_hooks.remove_file(stop_file_path)
             log.info("Stop file %s detected, ending run", stop_file_path)
+            _emit_session_scorecard(bot, ticks_done)
             return
         page.wait_for_timeout(TICK_RATE_MS)
+
+
+def _emit_session_scorecard(bot: Bot, ticks: int) -> None:
+    """Emit a structured session summary at run end."""
+    ai = bot._ai_state
+    ws = get_world_service()
+    inv = get_inventory_state(ws)
+    self_state = ws.world_state.get("self_state")
+    fuel = self_state["fuel"] if self_state is not None else 0
+    kills = ai["session_kill_count"]
+    hits = ai["session_hit_count"]
+    misses = ai["session_miss_count"]
+    dual = inv["dual_shots"]["count"]
+    homing = inv["homing_shots"]["count"]
+    radar = inv["extra_radars"]["count"]
+    blocked = len(ai["blocked_combat_targets"])
+    mode = ai["mode"]
+    mode_state = ai["mode_state"]
+    emit_diagnostic(
+        diagnostic_kind="session_scorecard",
+        ticks=ticks,
+        kills=kills,
+        hits=hits,
+        misses=misses,
+        fuel_remaining=fuel,
+        dual_shots_remaining=dual,
+        homing_shots_remaining=homing,
+        extra_radars_remaining=radar,
+        targets_blocked=blocked,
+        ai_mode=mode,
+        ai_mode_state=mode_state,
+    )
+    shots = hits + misses
+    hit_rate = f"{hits * 100 // shots}%" if shots > 0 else "n/a"
+    summary = (
+        f"TANKPIT SESSION SUMMARY\n"
+        f"{'=' * 40}\n"
+        f"Ticks:    {ticks}\n"
+        f"Kills:    {kills}\n"
+        f"Shots:    {shots} ({hits} hits, {misses} misses)\n"
+        f"Hit rate: {hit_rate}\n"
+        f"Blocked:  {blocked}\n"
+        f"{'=' * 40}\n"
+        f"Fuel:     {fuel}\n"
+        f"Duals:    {dual}\n"
+        f"Homings:  {homing}\n"
+        f"Radars:   {radar}\n"
+        f"{'=' * 40}\n"
+        f"Mode:     {mode}/{mode_state}\n"
+    )
+    log.info("\n%s", summary)
+    _test_hooks.write_text(Path("runs/bot/latest.summary.txt"), summary)
 
 
 _WS_READY_STATE_OPEN = 1
@@ -154,15 +208,9 @@ def _tick_once(bot: Bot) -> None:
     if not _is_page_client_healthy(snapshot):
         return
 
-    # 4b. Re-anchor rendered tanks from the client registry. The wire is
-    # silent on enemy positions between movement messages; the registry
-    # gives every visible enemy's current tile each tick, so HUNT
-    # engages from live positions instead of stale map intel. World
-    # state is re-read because ingestion replaces the world dict.
-    register_tank_truth_from_page_snapshot(snapshot, world)
     world = bot.get_world_state()
 
-    # 5. Combat feedback
+    # 5. Combat feedback (counters incremented inside _get_combat_feedback)
     combat_feedback = _get_combat_feedback(bot)
 
     # 6. DECIDE
@@ -297,6 +345,7 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
         **{
             **ai_state,
             "killed_tank_ids": merged,
+            "session_kill_count": ai_state["session_kill_count"] + len(new_kills),
             "last_shot_target_id": -1 if clear_shot_target else ai_state["last_shot_target_id"],
             "last_shot_target_name": "" if clear_shot_target else ai_state["last_shot_target_name"],
             "combat_target_id": -1 if clear_combat_target else ai_state["combat_target_id"],
@@ -337,57 +386,83 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
 
 
 def _get_combat_feedback(bot: Bot) -> CombatFeedback:
-    """Get combat feedback from protocol weapon byte.
+    """Get combat feedback from the wire tile-occupancy signal.
 
-    Hit detection relies on the weapon byte in CombatHit responses:
-    - weapon_byte > 0: special ammo used = confirmed hit
-    - weapon_byte == 0 with dual enabled + stocked: miss (target empty)
-    - weapon_byte == 0 without dual: normal single shot, can't tell
-    - no response (timeout) with dual enabled + stocked: miss
-    - no response without dual: can't tell
+    The CombatHit decoder now extracts target_x, target_y from the wire
+    and the dispatcher looks up which tank (if any) was on that tile.
+    That tile-occupancy result is the authoritative hit signal per
+    tpclient.js Gg.prototype.h (case 18 -> "You hit X"), which the old
+    weapon_byte heuristic could not reliably reproduce -- weapon=0 is
+    indistinguishable from miss per the wiki.
 
-    Ammo count is decremented on each confirmed hit by mark_combat_hit.
-    Combat feedback never rewrites inventory counts — protocol messages
+    Outcomes:
+      - tile had any tank        -> "hit"
+      - target already in killed -> "hit" (kill confirmed)
+      - shot response, empty tile -> "miss"
+      - no response yet           -> ""  (keep waiting)
+
+    Ammo count is decremented in mark_combat_hit by weapon_byte. Combat
+    feedback never rewrites inventory counts -- protocol messages
     (0x49, 0x67, 0x74) are the sole authority for item counts.
 
     Args:
         bot: Bot instance.
 
     Returns:
-        "hit" if weapon byte > 0 or kill confirmed, "miss" if dual was
-        available but no hit detected, "" if feedback is indeterminate.
+        "hit", "miss", or "" when feedback is indeterminate.
     """
-    if bot._ai_state["last_shot_target_id"] == -1:
-        log.info("FEEDBACK: no shot pending (last_shot_target_id=-1)")
+    target_id = bot._ai_state["last_shot_target_id"]
+    target_name = bot._ai_state["last_shot_target_name"]
+    if target_id == -1:
         return ""
     got_hit = check_and_clear_combat_hit(get_world_service())
+    victim_id = check_and_clear_last_shot_victim_id(get_world_service())
     got_response = check_and_clear_our_shot_response(get_world_service())
-    if got_hit:
-        log.info("FEEDBACK: hit confirmed")
-        return "hit"
-    if str(bot._ai_state["last_shot_target_id"]) in bot._ai_state["killed_tank_ids"]:
-        log.info("FEEDBACK: kill confirmed")
-        return "hit"
-    inventory = get_inventory_state(get_world_service())
-    dual_available = inventory["dual_shots"]["enabled"] and inventory["dual_shots"]["count"] > 0
-    if got_response:
-        if dual_available:
-            log.info("FEEDBACK: miss (dual active, server used single)")
-            return "miss"
-        dual_count = inventory["dual_shots"]["count"]
-        log.info(
-            "FEEDBACK: single shot (no dual, count=%d)",
-            dual_count,
+
+    def _inc_hit() -> None:
+        bot._ai_state = AIStateDict(
+            **{**bot._ai_state, "session_hit_count": bot._ai_state["session_hit_count"] + 1}
         )
-        return ""
-    # No CombatHit response at all (timeout).
-    if dual_available:
-        log.info("FEEDBACK: miss (dual active, no combat hit)")
+
+    def _inc_miss() -> None:
+        bot._ai_state = AIStateDict(
+            **{**bot._ai_state, "session_miss_count": bot._ai_state["session_miss_count"] + 1}
+        )
+
+    if got_hit:
+        # Distinguish intended-target hit from incidental hit (e.g.
+        # homing seeker landed on a closer enemy than commanded).
+        on_intended = victim_id == target_id
+        emit_diagnostic(
+            diagnostic_kind="combat_feedback",
+            result="hit",
+            reason="tile_occupied",
+            target_name=target_name,
+            target_id=target_id,
+            actual_victim_id=victim_id,
+            on_intended_target=on_intended,
+        )
+        _inc_hit()
+        return "hit"
+    if str(target_id) in bot._ai_state["killed_tank_ids"]:
+        emit_diagnostic(
+            diagnostic_kind="combat_feedback",
+            result="kill",
+            target_name=target_name,
+            target_id=target_id,
+        )
+        _inc_hit()
+        return "hit"
+    if got_response:
+        emit_diagnostic(
+            diagnostic_kind="combat_feedback",
+            result="miss",
+            reason="tile_empty",
+            target_name=target_name,
+            target_id=target_id,
+        )
+        _inc_miss()
         return "miss"
-    log.info(
-        "FEEDBACK: no dual, ignoring (count=%d)",
-        inventory["dual_shots"]["count"],
-    )
     return ""
 
 

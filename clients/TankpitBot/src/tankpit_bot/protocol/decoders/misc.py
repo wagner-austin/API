@@ -52,6 +52,22 @@ def decode_chat_message(data: bytes) -> ChatMessageDict:
 def decode_statistics(data: bytes) -> StatisticsDict:
     """Decode statistics from XOR-decoded data.
 
+    Trace-verified from tpclient.js Wg.h (line 4617-4621):
+      Long format (len > 12):
+        a[0:2]  = hours (LE u16)
+        a[2]    = minutes
+        a[3]    = seconds
+        a[4:8]  = destroyed (32-bit BE)
+        a[8:10] = deactivated (LE u16)
+        a[10:14] = promo_points (32-bit BE)
+      Short format (len <= 12):
+        a[0:2]  = hours (LE u16)
+        a[2]    = minutes
+        a[3]    = seconds
+        a[4:6]  = destroyed (LE u16)
+        a[6:8]  = deactivated (LE u16)
+        a[8:12] = promo_points (32-bit BE)
+
     Args:
         data: XOR-decoded message body.
 
@@ -61,15 +77,23 @@ def decode_statistics(data: bytes) -> StatisticsDict:
     Raises:
         DecodeError: If decoding fails.
     """
-    require_min_length(data, 16, "Statistics")
+    require_min_length(data, 12, "Statistics")
+    if len(data) > 12:
+        destroyed = int.from_bytes(data[4:8], "big")
+        deactivated = x16(data[8], data[9])
+        score = int.from_bytes(data[10:14], "big")
+    else:
+        destroyed = x16(data[4], data[5])
+        deactivated = x16(data[6], data[7])
+        score = int.from_bytes(data[8:12], "big")
     return StatisticsDict(
         msg_type=0x56,
         playtime_hours=x16(data[0], data[1]),
         playtime_minutes=data[2],
         playtime_seconds=data[3],
-        destroyed=int.from_bytes(data[4:8], "little"),
-        deactivated=int.from_bytes(data[8:12], "little"),
-        score=int.from_bytes(data[12:16], "little"),
+        destroyed=destroyed,
+        deactivated=deactivated,
+        score=score,
     )
 
 

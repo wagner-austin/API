@@ -7,6 +7,7 @@ selection now lives in ``ai_strategy`` and ``hunt_mode``.
 
 from __future__ import annotations
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.combat_landing import (
     choose_combat_landing_tile,
 )
@@ -20,9 +21,7 @@ from tankpit_bot.bot.ai.context import (
     teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.threats import (
-    CLUSTER_RADIUS_TILES,
     analyze_threats,
-    count_clustered_enemies,
     is_wire_present,
 )
 from tankpit_bot.bot.ai.types import (
@@ -38,7 +37,7 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
-from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
 
@@ -85,20 +84,29 @@ def _set_combat_target(
     )
 
 
+def _has_passable_adjacent(
+    x: int,
+    y: int,
+    terrain: TerrainMapProtocol | None,
+) -> bool:
+    """Return True when at least one cardinal neighbor is passable ground."""
+    if terrain is None:
+        return True
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        nx, ny = x + dx, y + dy
+        if 0 <= nx <= 255 and 0 <= ny <= 255 and terrain.is_passable(nx, ny):
+            return True
+    return False
+
+
 def select_new_combat_target(
     ctx: DecideCtx,
     threats: list[EnemyThreatDict],
 ) -> EnemyThreatDict | None:
-    """Return the next viable new combat target, preferring isolated enemies.
+    """Return the next viable new combat target.
 
-    Viable threats are re-ranked by how many OTHER enemies sit within
-    :data:`CLUSTER_RADIUS_TILES` of them, before distance: the bot
-    cannot win 1-vN fights, so a farther isolated enemy beats a nearer
-    one with backup. When every viable threat is clustered, the least
-    clustered one is taken -- the ranking degrades, it never deadlocks.
-    Neighbor counts are computed against the full threat list (not just
-    viable ones): a blocked or cooldown-killed tank that is still alive
-    nearby can still join a fight.
+    Picks the closest viable enemy that is not blocked or on kill
+    cooldown and has reachable adjacent ground.
 
     Args:
         ctx: Decision context.
@@ -112,43 +120,29 @@ def select_new_combat_target(
         for threat in threats
         if str(threat["tank_id"]) not in ctx.blocked_targets
         and str(threat["tank_id"]) not in ctx.killed
+        and _has_passable_adjacent(threat["x"], threat["y"], ctx.terrain)
     ]
     if not viable:
         return None
-
-    def _cluster_rank(threat: EnemyThreatDict) -> tuple[int, int]:
-        """Rank a viable threat by backup count, then distance."""
-        return (
-            count_clustered_enemies(threats, threat, CLUSTER_RADIUS_TILES),
-            threat["distance"],
-        )
-
-    ranked = sorted(viable, key=_cluster_rank)
-    chosen = ranked[0]
-    if chosen["tank_id"] != viable[0]["tank_id"]:
-        emit_ai(
-            "preferring isolated %s at (%d,%d) over clustered %s (neighbors=%d)",
-            chosen["name"],
-            chosen["x"],
-            chosen["y"],
-            viable[0]["name"],
-            count_clustered_enemies(threats, viable[0], CLUSTER_RADIUS_TILES),
-        )
-    return chosen
+    return viable[0]
 
 
 def get_locked_target(
     ctx: DecideCtx,
     threats: list[EnemyThreatDict],
 ) -> EnemyThreatDict | None:
-    """Find the current combat target in the threat list.
+    """Find the current combat target in threats or world state.
+
+    Checks the threat list first (wire-present, viewport-visible).
+    Falls back to the world state tanks dict (map-known position)
+    so the bot can keep firing at a target that moved off-viewport.
 
     Args:
         ctx: Decision context.
         threats: Current threat list.
 
     Returns:
-        The locked target if it's still alive and in the world, or None.
+        The locked target if it's still tracked, or None.
     """
     target_id = ctx.ai_state["combat_target_id"]
     if target_id == -1:
@@ -156,7 +150,27 @@ def get_locked_target(
     for t in threats:
         if t["tank_id"] == target_id:
             return t
-    return None
+    key = str(target_id)
+    tank = ctx.world["tanks"].get(key)
+    if tank is None or (tank["x"] == 0 and tank["y"] == 0):
+        return None
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    from tankpit_bot.bot.ai.threats import manhattan_distance
+    from tankpit_bot.bot.ai.types import make_enemy_threat
+
+    return make_enemy_threat(
+        tank_id=tank["tank_id"],
+        x=tank["x"],
+        y=tank["y"],
+        distance=manhattan_distance(sx, sy, tank["x"], tank["y"]),
+        damage_state=tank["damage_state"],
+        rank=tank["rank"],
+        team=tank["team"],
+        name=tank["name"],
+        is_bot=tank["is_bot"],
+        timestamp_ms=tank["timestamp_ms"],
+        last_wire_seen_ms=ctx.timestamp_ms,
+    )
 
 
 def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, int]:
@@ -323,9 +337,6 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
 def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 1: Teleport to enemy."""
     landing_x, landing_y = combat_landing_tile(ctx, target)
-    if landing_x == -1 and landing_y == -1:
-        emit_ai("no combat landing tile for %s, blocking target", target["name"])
-        return block_combat_target_and_replan(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         emit_ai(
             "combat landing (%d,%d) for %s already failed, blocking target",
@@ -394,6 +405,7 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase closing: confirm geometry before shooting."""
     if has_cardinal_combat_shot(ctx.self_state, target):
         return _combat_shoot(ctx, target)
+    dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
     emit_ai(
         "not in cardinal firing position for %s from (%d,%d) target=(%d,%d) dist=%d; re-closing",
         target["name"],
@@ -401,7 +413,7 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         ctx.self_state["y"],
         target["x"],
         target["y"],
-        abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"]),
+        dist,
     )
     return _combat_teleport(ctx, target)
 
@@ -487,20 +499,42 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             target["name"],
             ctx.timestamp_ms - target["last_wire_seen_ms"],
         )
+        emit_diagnostic(
+            diagnostic_kind="combat_ghost_detected",
+            target_name=target["name"],
+            target_id=target["tank_id"],
+            target_x=target["x"],
+            target_y=target["y"],
+            self_x=ctx.self_state["x"],
+            self_y=ctx.self_state["y"],
+            wire_age_ms=ctx.timestamp_ms - target["last_wire_seen_ms"],
+        )
         return block_combat_target_and_replan(ctx, target)
 
     if ctx.combat_feedback == "miss":
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
-        if (target["x"], target["y"]) == last_shot_at:
-            emit_ai("miss on stationary %s at shot range - blocking and replanning", target["name"])
-            return block_combat_target_and_replan(ctx, target)
+        target_stationary = (target["x"], target["y"]) == last_shot_at
+        dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
+        emit_diagnostic(
+            diagnostic_kind="combat_miss",
+            target_name=target["name"],
+            target_id=target["tank_id"],
+            shot_x=last_shot_at[0],
+            shot_y=last_shot_at[1],
+            current_x=target["x"],
+            current_y=target["y"],
+            self_x=ctx.self_state["x"],
+            self_y=ctx.self_state["y"],
+            dist=dist,
+            target_moved=not target_stationary,
+        )
         emit_ai(
-            "miss but %s moved (%d,%d)->(%d,%d) - re-aiming",
+            "miss on %s at (%d,%d) dist=%d moved=%s - re-aiming",
             target["name"],
-            last_shot_at[0],
-            last_shot_at[1],
             target["x"],
             target["y"],
+            dist,
+            not target_stationary,
         )
 
     emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
@@ -555,12 +589,6 @@ def _combat_landing_candidates(
 # "hits" were homing shots, which track). Shots in range never miss --
 # and the range is adjacency, not the awareness-range combat_range.
 SHOT_RANGE_TILES = 2
-# Within this distance a stepping target is chased by WALKING: the
-# game queue re-paths every tick toward fresh positions with no
-# map-open deferral and no teleport fuel. Run 20260611-083908 chased
-# a moving enemy through 30 teleport hops (~4s each) without firing;
-# walking the last tiles is how the gap closes on a mover.
-CLOSE_WALK_RANGE_TILES = 6
 
 
 def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
@@ -599,7 +627,6 @@ def has_cardinal_combat_shot(
 
 
 __all__ = [
-    "CLOSE_WALK_RANGE_TILES",
     "SHOT_RANGE_TILES",
     "block_combat_target_and_replan",
     "clear_combat_target",

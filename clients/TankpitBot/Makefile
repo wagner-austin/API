@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe combat-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
 
 help:
 	@Write-Host ""
@@ -26,6 +26,7 @@ help:
 	@Write-Host "  make fuel-dot-probe              teleport to 6 map fuel dots, radar each"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
+	@Write-Host "  make combat-probe                3 combat engagements, 20 shots each"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make analyze                     issue report + cross-session stats"
@@ -141,6 +142,11 @@ movement-probe: install
 	@Write-Host ""
 	@Write-Host "==> movement-probe (3 targets)" -ForegroundColor Cyan
 	poetry run tankpit-movement-probe --max-targets 3
+
+combat-probe: install
+	@Write-Host ""
+	@Write-Host "==> combat-probe (3 engagements, 20 shots each)" -ForegroundColor Cyan
+	poetry run tankpit-combat-probe --max-engagements 3 --max-shots 20
 
 bot: install
 	@Write-Host ""

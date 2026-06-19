@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
     SHOT_RANGE_TILES,
     _combat_landing_candidates,
     engage_target,
+    get_locked_target,
     has_combat_shot,
     select_new_combat_target,
     teleport_to_target,
@@ -142,14 +143,8 @@ class TestCombatTargetSelection:
 
         assert result is None
 
-    def test_select_new_combat_target_prefers_isolated_over_clustered(self) -> None:
-        """A farther isolated enemy beats a nearer one with backup.
-
-        Targets 50 and 60 sit 4 tiles apart (each is the other's backup
-        inside the 8-tile cluster radius); target 70 is alone 30 tiles
-        out. The bot cannot win 1-vN fights, so 70 wins despite the
-        distance.
-        """
+    def test_select_new_combat_target_picks_closest(self) -> None:
+        """Target selection picks the closest viable enemy."""
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -164,24 +159,19 @@ class TestCombatTargetSelection:
         result = select_new_combat_target(
             ctx,
             [
-                _enemy_threat(tank_id=50, x=110, name="ClusteredNear"),
-                _enemy_threat(tank_id=60, x=114, name="ClusteredBuddy"),
-                _enemy_threat(tank_id=70, x=130, name="Isolated"),
+                _enemy_threat(tank_id=50, x=110, name="Nearest"),
+                _enemy_threat(tank_id=60, x=114, name="Middle"),
+                _enemy_threat(tank_id=70, x=130, name="Farthest"),
             ],
         )
 
         if result is None:
-            raise AssertionError("expected isolated combat target")
-        assert result["tank_id"] == 70
-        assert result["name"] == "Isolated"
+            raise AssertionError("expected nearest combat target")
+        assert result["tank_id"] == 50
+        assert result["name"] == "Nearest"
 
-    def test_select_new_combat_target_takes_least_clustered_when_all_have_backup(self) -> None:
-        """With no isolated option, the least-clustered nearest target wins.
-
-        Target 50 has two backups inside the radius; targets 60 and 61
-        back each other up (one each). The nearer of the one-backup pair
-        is taken -- the ranking degrades instead of deadlocking.
-        """
+    def test_select_new_combat_target_skips_blocked(self) -> None:
+        """Target selection skips blocked and killed targets, takes next closest."""
         world, self_state = make_world(fuel=800)
         ctx = DecideCtx(
             world,
@@ -192,22 +182,21 @@ class TestCombatTargetSelection:
             None,
             "",
         )
+        ctx.blocked_targets["50"] = 100000
 
         result = select_new_combat_target(
             ctx,
             [
-                _enemy_threat(tank_id=50, x=110, name="TripleCluster"),
-                _enemy_threat(tank_id=51, x=112, name="TripleBuddyA"),
-                _enemy_threat(tank_id=52, x=114, name="TripleBuddyB"),
-                _enemy_threat(tank_id=60, x=140, name="PairNear"),
-                _enemy_threat(tank_id=61, x=146, name="PairFar"),
+                _enemy_threat(tank_id=50, x=110, name="BlockedNearest"),
+                _enemy_threat(tank_id=60, x=140, name="NextClosest"),
+                _enemy_threat(tank_id=61, x=146, name="Farther"),
             ],
         )
 
         if result is None:
             raise AssertionError("expected least-clustered combat target")
         assert result["tank_id"] == 60
-        assert result["name"] == "PairNear"
+        assert result["name"] == "NextClosest"
 
     def test_select_new_combat_target_keeps_nearest_among_isolated(self) -> None:
         """Equal cluster counts fall back to the distance ordering."""
@@ -233,6 +222,131 @@ class TestCombatTargetSelection:
         if result is None:
             raise AssertionError("expected nearest isolated combat target")
         assert result["tank_id"] == 50
+
+    def test_select_new_combat_target_skips_impassable_adjacent(self) -> None:
+        """Targets with no passable adjacent tile are skipped."""
+        from tests.action_lab.conftest import Terrain
+
+        rocks = {
+            (111, 100): Terrain.ROCK,
+            (109, 100): Terrain.ROCK,
+            (110, 101): Terrain.ROCK,
+            (110, 99): Terrain.ROCK,
+        }
+        terrain = Terrain(overrides=rocks)
+
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = select_new_combat_target(
+            ctx,
+            [_enemy_threat(tank_id=50, x=110, y=100, name="Surrounded")],
+        )
+        assert result is None
+
+
+class TestGetLockedTargetWorldStateFallback:
+    """Tests for get_locked_target world-state fallback."""
+
+    def setup_method(self) -> None:
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        reset_world_state()
+
+    def test_returns_threat_when_in_threat_list(self) -> None:
+        """Threat-list match takes priority over world-state fallback."""
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        threats = [_enemy_threat(tank_id=50, x=101, y=100)]
+
+        result = get_locked_target(ctx, threats)
+
+        if result is None:
+            raise AssertionError("expected target from threat list")
+        assert result["tank_id"] == 50
+        assert result["x"] == 101
+
+    def test_falls_back_to_world_state_when_not_in_threats(self) -> None:
+        """Target found in world state tanks dict when absent from threats."""
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=130,
+                y=100,
+                team=2,
+                rank=1,
+                name="FarEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        result = get_locked_target(ctx, [])
+
+        if result is None:
+            raise AssertionError("expected target from world state fallback")
+        assert result["tank_id"] == 50
+        assert result["x"] == 130
+        assert result["name"] == "FarEnemy"
+        assert result["distance"] == 30
+
+    def test_returns_none_when_world_state_tank_at_origin(self) -> None:
+        """Tanks at (0,0) are treated as dead/despawned."""
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=0,
+                y=0,
+                team=2,
+                rank=1,
+                name="Dead",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert get_locked_target(ctx, []) is None
+
+    def test_returns_none_when_not_in_world_state(self) -> None:
+        """Truly absent target returns None."""
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 999
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert get_locked_target(ctx, []) is None
+
+    def test_returns_none_when_no_combat_target(self) -> None:
+        """No locked target (combat_target_id == -1) returns None."""
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert get_locked_target(ctx, []) is None
 
 
 def test_combat_landing_candidates_delegate_to_shared_helper() -> None:

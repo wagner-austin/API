@@ -8,9 +8,7 @@ subtype values.
 from __future__ import annotations
 
 from tankpit_bot.container.decoders.combat import (
-    is_combat_hit_structure,
     is_deactivation_death_structure,
-    is_deactivation_kill_structure,
     is_mine_detonation_structure,
     is_mine_placement_structure,
 )
@@ -23,16 +21,11 @@ from tankpit_bot.container.decoders.misc import (
     is_tip_notification_structure,
     is_world_state_structure,
 )
-from tankpit_bot.container.decoders.position import (
-    is_movement_structure,
-    is_position_update_structure,
-)
-from tankpit_bot.container.decoders.radar import is_radar_response_structure
+from tankpit_bot.container.decoders.position import is_position_update_structure
 from tankpit_bot.container.decoders.tank import (
     is_tank_leave_structure,
     is_tank_registry_structure,
     is_tank_status_short_structure,
-    is_tank_status_sync_structure,
     is_tank_update_compact_structure,
     is_tank_update_extended_structure,
     is_tank_update_full_structure,
@@ -84,18 +77,17 @@ def _identify_player_list_type(data: bytes) -> ContainerMessageType:
 
 
 def _identify_deactivation_type(data: bytes) -> ContainerMessageType:
-    """Identify deactivation message types by structure.
+    """Identify deactivation_death messages by structure.
+
+    0x41 DeactivationKill was deleted from the container path
+    2026-06-19; the protocol path is the single source of truth.
 
     Args:
         data: Decoded container body bytes.
 
     Returns:
-        Identified deactivation type, or UNKNOWN if not a deactivation.
+        DEACTIVATION_DEATH if matched, otherwise UNKNOWN.
     """
-    # Deactivation kill: 5 bytes
-    if is_deactivation_kill_structure(data):
-        return ContainerMessageType.DEACTIVATION_KILL
-    # Deactivation death: 7 bytes
     if is_deactivation_death_structure(data):
         return ContainerMessageType.DEACTIVATION_DEATH
     return ContainerMessageType.UNKNOWN
@@ -113,19 +105,18 @@ def _identify_single_length_type(data: bytes) -> ContainerMessageType:
     # Teleport landed: exactly 1 byte
     if is_teleport_landed_structure(data):
         return ContainerMessageType.TELEPORT_LANDED
-    # Tank status sync: 2-3 bytes
-    if is_tank_status_sync_structure(data):
-        return ContainerMessageType.TANK_STATUS_SYNC
+    # 2-3 byte short bodies are now UNKNOWN_CONTAINER (was a catch-all
+    # misidentifying them as TankStatusSync; the real TankStatusSync is
+    # 8+ bytes and lives on the protocol path).
     # Tank leave: 6 bytes
     if is_tank_leave_structure(data):
         return ContainerMessageType.TANK_LEAVE
     # Tank status short: exactly 9 bytes
     if is_tank_status_short_structure(data):
         return ContainerMessageType.TANK_STATUS_SHORT
-    # Combat hit: exactly 11 bytes
-    if is_combat_hit_structure(data):
-        return ContainerMessageType.COMBAT_HIT
-    # Position update: exactly 13 bytes
+    # 13-byte position update: subtype 0x24. The 13-byte 0x2E nested
+    # self-status form moved to the protocol path 2026-06-19 (handled
+    # as TankStatusSync with fuel in decode_tank_status_sync).
     if is_position_update_structure(data):
         return ContainerMessageType.POSITION_UPDATE
     return ContainerMessageType.UNKNOWN
@@ -151,8 +142,6 @@ def _identify_subtype_specific(data: bytes) -> ContainerMessageType:
     if is_container_pickup_structure(data):
         return ContainerMessageType.CONTAINER_PICKUP
     # Radar response: 7+ bytes with 0x4F subtype
-    if is_radar_response_structure(data):
-        return ContainerMessageType.RADAR_RESPONSE
     return ContainerMessageType.UNKNOWN
 
 
@@ -199,10 +188,8 @@ def identify_container_type(data: bytes) -> ContainerMessageType:
     single_type = _identify_single_length_type(data)
     if single_type != ContainerMessageType.UNKNOWN:
         return single_type
-    # Movement: 14+ bytes ending with waypoint directions (check BEFORE TankRegistry)
-    if is_movement_structure(data):
-        return ContainerMessageType.MOVEMENT
-    # Tank registry: 16-20 bytes (Movement already filtered out by waypoint check)
+    # 0x47 Movement handled by protocol tunnel path; falls through if
+    # the protocol min_len gate doesn't pass (rare). Tank registry next.
     if is_tank_registry_structure(data):
         return ContainerMessageType.TANK_REGISTRY
     # Tank update types (10, 14, 15 bytes)

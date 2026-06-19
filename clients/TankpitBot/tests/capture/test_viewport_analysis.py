@@ -71,6 +71,7 @@ def _make_movement_response_payload(
             0,
             0,
             5,
+            0,  # carrying byte (a[11]) per JS Mg.h
         ]
     )
     return _encode_received_frame(0x3D, decoded_data, xor_table)

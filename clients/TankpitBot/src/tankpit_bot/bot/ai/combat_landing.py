@@ -50,24 +50,22 @@ def choose_combat_landing_tile(
 ) -> tuple[int, int]:
     """Choose the tile to teleport to for combat.
 
+    Teleports directly to the enemy's coordinates. The server handles
+    displacement — when a tank occupies the tile, it places us on the
+    nearest open tile (typically cardinal adjacent). This is how human
+    players teleport: click on the enemy, let the server place you.
+
     Args:
-        world: Current world state.
-        self_state: Player state.
+        world: Current world state (unused — server is authoritative).
+        self_state: Player state (unused).
         target: Enemy threat currently being engaged.
-        terrain: Terrain map for passability checks, if available.
+        terrain: Terrain map (unused — server handles placement).
 
     Returns:
-        Tuple of landing coordinates, or ``(-1, -1)`` if no landing exists.
+        Tuple of landing coordinates (the target's position).
     """
-    candidates = combat_landing_candidates(world, self_state, target)
-    if not candidates:
-        return (-1, -1)
-    if terrain is None:
-        return candidates[0]
-    for candidate_x, candidate_y in candidates:
-        if terrain.is_passable(candidate_x, candidate_y):
-            return (candidate_x, candidate_y)
-    return (-1, -1)
+    del world, self_state, terrain
+    return (target["x"], target["y"])
 
 
 def has_cardinal_enemy_adjacency(

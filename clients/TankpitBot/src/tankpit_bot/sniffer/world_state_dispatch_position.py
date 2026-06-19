@@ -17,7 +17,6 @@ from tankpit_bot.sniffer.world_state_tanks import (
     update_world_state_from_move_response_full,
 )
 from tankpit_bot.sniffer.world_state_tiles import (
-    apply_waypoints,
     is_absolute_position,
     render_ascii_if_available,
     update_cache_tiles,
@@ -114,46 +113,6 @@ def _handle_waypoint_movement(
         if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
             _update_tank_position(ws, tank["tank_id"], final_x, final_y)
             break
-
-
-def _dispatch_container_movement(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
-    """Dispatch container-decoded movement messages (msg_type="movement").
-
-    Args:
-        ws: World service instance.
-        decoded: Decoded binary protocol message.
-
-    Returns:
-        True if the message was handled, False otherwise.
-    """
-    match decoded:
-        case {
-            "msg_type": "movement",
-            "start_x": int(sx),
-            "start_y": int(sy),
-            "waypoints": str(wps),
-            "is_self": True,
-        }:
-            fx, fy = apply_waypoints(sx, sy, wps)
-            ws.update_world_state_from_position(fx, fy)
-            render_ascii_if_available(ws, "SelfMovement")
-            return True
-        case {
-            "msg_type": "movement",
-            "start_x": int(sx),
-            "start_y": int(sy),
-            "player_id": int(pid),
-            "waypoints": str(wps),
-            "is_self": False,
-        }:
-            from tankpit_bot.sniffer.player_tracking import _player_id_mapper
-
-            resolved_tid = _player_id_mapper.get_tank_id(pid)
-            if resolved_tid is not None:
-                fx, fy = apply_waypoints(sx, sy, wps)
-                _update_tank_position(ws, resolved_tid, fx, fy)
-            return True
-    return False
 
 
 def _dispatch_binary_position_update(
@@ -298,14 +257,24 @@ def _dispatch_position_update(ws: WorldService, decoded: protocol.BinaryMessage)
             "y": int(y),
             "team": int(team),
             "rank": int(rank),
+            "direction": int(direction),
+            "damage_state": int(dmg),
         }:
+            # Protocol MovementResponse (0x3D) carries position +
+            # direction (alive/dead) + damage + rank for every tank on
+            # the map every ~2 seconds. Container's TankPositionStatus
+            # equivalent was deleted 2026-06-19 -- this case now
+            # surfaces all of the same fields plus the carrying byte.
+            from tankpit_bot.sniffer.world_state_dispatch import _update_tank_from_position_status
+
+            _update_tank_from_position_status(ws, tid, x, y, direction, dmg, rank, team)
             update_world_state_from_move_response_full(ws, tid, x, y, team, rank)
             render_ascii_if_available(ws, "MovementResponse")
             return True
         case _:
             if _dispatch_tile_patch_update(ws, decoded):
                 return True
-    return _dispatch_container_movement(ws, decoded)
+    return False
 
 
 # =============================================================================
@@ -410,6 +379,18 @@ def _update_map_tank(
     ts = browser.get_current_time_ms()
     key = str(tank_id)
     existing = ws.world_state["tanks"].get(key)
+    if existing and (existing["x"] != x or existing["y"] != y):
+        emit_diagnostic(
+            diagnostic_kind="map_tank_drift",
+            tank_name=existing["name"] or key,
+            tank_id=tank_id,
+            map_x=x,
+            map_y=y,
+            was_x=existing["x"],
+            was_y=existing["y"],
+            delta_x=x - existing["x"],
+            delta_y=y - existing["y"],
+        )
     ws.world_state = update_tank_from_registry(
         ws.world_state,
         tank_id,

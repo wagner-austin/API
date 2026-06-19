@@ -13,32 +13,12 @@ from tankpit_bot.container.helpers import (
     require_exact_length,
 )
 from tankpit_bot.container.types import (
-    CombatHitDict,
     DeactivationDeathDict,
-    DeactivationKillDict,
     MineDetonationDict,
     MinePlacementDict,
 )
 
 log = get_logger(__name__)
-
-
-def is_combat_hit_structure(data: bytes) -> bool:
-    """Check if data matches combat hit message structure.
-
-    Combat hit criteria:
-    - Exactly 11 bytes
-
-    Note: Terminator pattern (first==last) varies per session due to XOR encoding.
-    We identify solely by length since 11 bytes is unique to combat hits.
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if structure matches combat hit pattern.
-    """
-    return len(data) == 11
 
 
 def is_mine_placement_structure(data: bytes) -> bool:
@@ -106,86 +86,6 @@ def decode_mine_placement(data: bytes) -> MinePlacementDict:
     )
 
 
-def decode_combat_hit(data: bytes) -> CombatHitDict:
-    """Decode combat hit message from container body.
-
-    Structure (11 bytes):
-      [subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:7]
-
-    Args:
-        data: Decoded container body bytes (must be 11 bytes).
-
-    Returns:
-        Decoded combat hit data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 11, "CombatHit")
-
-    direction = data[1]
-    attacker_id = extract_uint16_le(data, 2, "CombatHit.attacker_id")
-    combat_data = bytes(data[4:11])  # Last 7 bytes
-    is_outgoing = direction == 0x09
-
-    return CombatHitDict(
-        msg_type="combat_hit",
-        direction=direction,
-        attacker_id=attacker_id,
-        combat_data=combat_data,
-        is_outgoing=is_outgoing,
-    )
-
-
-def is_deactivation_kill_structure(data: bytes) -> bool:
-    """Check if data matches deactivation kill message structure.
-
-    Criteria:
-    - Exactly 5 bytes
-    - First decoded byte is 0x41 ('A')
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if structure matches deactivation kill pattern.
-    """
-    return len(data) == 5 and data[0] == 0x41
-
-
-def decode_deactivation_kill(data: bytes) -> DeactivationKillDict:
-    """Decode deactivation kill message from container body.
-
-    Structure (5 bytes):
-      [subtype:1] [victim_id:2 LE] [killer_id:2 LE]
-
-    Args:
-        data: Decoded container body bytes (must be 5 bytes).
-
-    Returns:
-        Decoded deactivation kill data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 5, "DeactivationKill")
-
-    log.info(
-        "DEACTIVATION_KILL RAW: hex=%s bytes=[%s]",
-        data.hex(),
-        ", ".join(str(b) for b in data),
-    )
-
-    victim_id = extract_uint16_le(data, 1, "DeactivationKill.victim_id")
-    killer_id = extract_uint16_le(data, 3, "DeactivationKill.killer_id")
-
-    return DeactivationKillDict(
-        msg_type="deactivation_kill",
-        victim_id=victim_id,
-        killer_id=killer_id,
-    )
-
-
 def is_deactivation_death_structure(data: bytes) -> bool:
     """Check if data matches deactivation death message structure.
 
@@ -232,14 +132,10 @@ def decode_deactivation_death(data: bytes) -> DeactivationDeathDict:
 
 
 __all__ = [
-    "decode_combat_hit",
     "decode_deactivation_death",
-    "decode_deactivation_kill",
     "decode_mine_detonation",
     "decode_mine_placement",
-    "is_combat_hit_structure",
     "is_deactivation_death_structure",
-    "is_deactivation_kill_structure",
     "is_mine_detonation_structure",
     "is_mine_placement_structure",
 ]

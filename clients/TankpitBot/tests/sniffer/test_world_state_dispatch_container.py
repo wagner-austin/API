@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from tankpit_bot.container import RadarContainerDict
+from tankpit_bot.protocol import RadarContainerDict
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
-from tankpit_bot.sniffer.world_state_combat import check_and_clear_combat_hit
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
@@ -54,8 +53,7 @@ class TestDispatchTilePatchUpdates:
 
     def test_dispatch_cache_clear_does_not_override_radar_container(self) -> None:
         """A 0x43 cache clear does not erase radar-confirmed container truth."""
-        from tankpit_bot.container import RadarContainerDict
-        from tankpit_bot.protocol import CacheUpdateDict, MovementResponseDict
+        from tankpit_bot.protocol import CacheUpdateDict, MovementResponseDict, RadarContainerDict
         from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
         ws = get_world_service()
@@ -68,8 +66,10 @@ class TestDispatchTilePatchUpdates:
                 x=33,
                 y=44,
                 direction=0,
+                damage_state=0,
                 rank=1,
-                leaderboard_position=5,
+                lb_score=5,
+                carrying=0,
             ),
         )
         self_state = ws.world_state["self_state"]
@@ -110,8 +110,8 @@ class TestDispatchTilePatchUpdates:
         assert "90,91" not in ws.world_state["containers"]
 
 
-class TestDispatchContainerCombatEvents:
-    """Tests for container combat events: combat_hit, deactivation_kill, deactivation_death."""
+class TestDispatchShootEvent:
+    """Tests for 0x53 ShootEvent dispatch (protocol path)."""
 
     def setup_method(self) -> None:
         """Reset world state before each test."""
@@ -121,83 +121,224 @@ class TestDispatchContainerCombatEvents:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_dispatch_combat_hit_marks_hit_for_self(self) -> None:
-        """Dispatch combat_hit calls mark_combat_hit when attacker is self."""
-        from tankpit_bot.container import CombatHitDict
-        from tankpit_bot.protocol import MovementResponseDict
+    def test_own_shot_with_tank_at_target_marks_hit(self) -> None:
+        """Own shot landing on a tracked tank marks confirmed hit."""
+        from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
+        from tankpit_bot.sniffer.world_state_combat import check_and_clear_combat_hit
+        from tankpit_bot.state.types import make_tank_state
 
         ws = get_world_service()
-        # Set up self with tank_id=10
-        first = MovementResponseDict(
-            msg_type=0x3D,
-            team=1,
-            tank_id=10,
-            x=100,
-            y=100,
-            direction=0,
-            rank=2,
-            leaderboard_position=5,
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=155,
+                y=154,
+                direction=0,
+                damage_state=0,
+                rank=1,
+                lb_score=5,
+                carrying=0,
+            ),
         )
-        dispatch_world_state_update(ws, first)
+        ws.world_state["tanks"]["534"] = make_tank_state(
+            tank_id=534,
+            x=155,
+            y=155,
+            team=3,
+            rank=1,
+            name="orange-8",
+            is_self=False,
+            is_bot=False,
+            damage_state=0,
+            timestamp_ms=1000,
+        )
 
-        # combat_hit where attacker_id matches self
-        msg = CombatHitDict(
-            msg_type="combat_hit",
-            direction=0x09,
-            attacker_id=10,
-            combat_data=b"\x00\x01\x02\x03\x04\x05",
-            is_outgoing=True,
+        msg = ShootEventDict(
+            msg_type=0x53,
+            team=2,
+            shooter_id=1301,
+            source_x=155,
+            source_y=154,
+            target_x=155,
+            target_y=155,
+            unk1=155,
+            unk2=155,
+            weapon=1,
         )
         dispatch_world_state_update(ws, msg)
-
-        # Verify mark_combat_hit was called
         assert check_and_clear_combat_hit(ws) is True
+        assert ws.last_shot_victim_id == 534
 
-    def test_dispatch_combat_hit_ignores_other_attacker(self) -> None:
-        """Dispatch combat_hit does not mark hit when attacker is not self."""
-        from tankpit_bot.container import CombatHitDict
-        from tankpit_bot.protocol import MovementResponseDict
+    def test_own_shot_on_empty_tile_is_miss(self) -> None:
+        """Own shot landing on empty tile records no victim."""
+        from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
+        from tankpit_bot.sniffer.world_state_combat import (
+            check_and_clear_combat_hit,
+            check_and_clear_our_shot_response,
+        )
 
         ws = get_world_service()
-        # Set up self with tank_id=10
-        first = MovementResponseDict(
-            msg_type=0x3D,
-            team=1,
-            tank_id=10,
-            x=100,
-            y=100,
-            direction=0,
-            rank=2,
-            leaderboard_position=5,
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=155,
+                y=154,
+                direction=0,
+                damage_state=0,
+                rank=1,
+                lb_score=5,
+                carrying=0,
+            ),
         )
-        dispatch_world_state_update(ws, first)
 
-        # combat_hit from a different tank
-        msg = CombatHitDict(
-            msg_type="combat_hit",
-            direction=0x03,
-            attacker_id=99,
-            combat_data=b"\x00\x01\x02\x03\x04\x05",
-            is_outgoing=False,
+        msg = ShootEventDict(
+            msg_type=0x53,
+            team=2,
+            shooter_id=1301,
+            source_x=155,
+            source_y=154,
+            target_x=170,
+            target_y=174,
+            unk1=170,
+            unk2=174,
+            weapon=3,
         )
         dispatch_world_state_update(ws, msg)
-
-        # No hit recorded for self
         assert check_and_clear_combat_hit(ws) is False
+        assert check_and_clear_our_shot_response(ws) is True
 
-    def test_dispatch_deactivation_kill_invalidates_victim(self) -> None:
-        """Dispatch deactivation_kill invalidates victim tank position."""
-        from tankpit_bot.container import DeactivationKillDict
-        from tankpit_bot.protocol import TankEntryDict
+    def test_shooter_id_zero_is_ignored(self) -> None:
+        """shooter_id=0 (no real shooter) updates nothing."""
+        from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
+        from tankpit_bot.sniffer.world_state_combat import (
+            check_and_clear_combat_hit,
+            check_and_clear_our_shot_response,
+        )
 
         ws = get_world_service()
-        entry = TankEntryDict(msg_type=0x28, tank_id=900, x=100, y=100, name="Killed")
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=155,
+                y=154,
+                direction=0,
+                damage_state=0,
+                rank=1,
+                lb_score=5,
+                carrying=0,
+            ),
+        )
+
+        msg = ShootEventDict(
+            msg_type=0x53,
+            team=0,
+            shooter_id=0,
+            source_x=10,
+            source_y=10,
+            target_x=10,
+            target_y=10,
+            unk1=10,
+            unk2=10,
+            weapon=0,
+        )
+        dispatch_world_state_update(ws, msg)
+        # shooter_id 0 falls through neither branch
+        assert check_and_clear_combat_hit(ws) is False
+        assert check_and_clear_our_shot_response(ws) is False
+
+    def test_enemy_shot_updates_enemy_position(self) -> None:
+        """Enemy shot updates that enemy's tracked position from src tile."""
+        from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
+        from tankpit_bot.state.types import make_tank_state
+
+        ws = get_world_service()
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=155,
+                y=154,
+                direction=0,
+                damage_state=0,
+                rank=1,
+                lb_score=5,
+                carrying=0,
+            ),
+        )
+        ws.world_state["tanks"]["534"] = make_tank_state(
+            tank_id=534,
+            x=100,
+            y=100,  # stale belief
+            team=3,
+            rank=1,
+            name="orange-8",
+            is_self=False,
+            is_bot=False,
+            damage_state=0,
+            timestamp_ms=1000,
+        )
+
+        msg = ShootEventDict(
+            msg_type=0x53,
+            team=3,
+            shooter_id=534,
+            source_x=155,
+            source_y=155,
+            target_x=155,
+            target_y=154,
+            unk1=155,
+            unk2=154,
+            weapon=0,
+        )
+        dispatch_world_state_update(ws, msg)
+        # Position updated to where the enemy fired from
+        assert ws.world_state["tanks"]["534"]["x"] == 155
+        assert ws.world_state["tanks"]["534"]["y"] == 155
+
+
+class TestDispatchProtocolDeactivation:
+    """Tests for protocol-path 0x41 Deactivation dispatch.
+
+    0x41 moved out of container into the protocol layer 2026-06-19;
+    dispatch_world_state_update routes the integer msg_type 0x41.
+    """
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_dispatch_deactivation_invalidates_victim(self) -> None:
+        """Dispatch 0x41 deactivation invalidates victim tank position."""
+        from tankpit_bot.protocol import DeactivationDict, TankEntryDict
+
+        ws = get_world_service()
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=900, rank=0, damage_state=0, score=0, x=100, y=100
+        )
         dispatch_world_state_update(ws, entry)
 
-        msg = DeactivationKillDict(
-            msg_type="deactivation_kill",
+        msg = DeactivationDict(
+            msg_type=0x41,
+            status=0,
             victim_id=900,
+            promo_eligible=True,
             killer_id=1,
+            is_mine_kill=False,
         )
         dispatch_world_state_update(ws, msg)
 

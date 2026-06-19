@@ -25,17 +25,20 @@ log = get_logger(__name__)
 def update_world_state_from_tank_entry(
     ws: WorldService,
     tank_id: int,
+    team: int,
+    rank: int,
     x: int,
     y: int,
-    name: str,
 ) -> None:
-    """Add or update tank from TankEntry (0x28) -- has position but no team."""
+    """Add or update tank from TankEntry (0x28).
 
+    JS-verified 2026-06-19: this message carries team, rank, position,
+    rank_category, and score. Name comes from TankInfo (0x21) separately.
+    """
     ts = browser.get_current_time_ms()
     key = str(tank_id)
     existing = ws.world_state["tanks"].get(key)
-    team = existing["team"] if existing else 0
-    rank = existing["rank"] if existing else 0
+    name = existing["name"] if existing else ""
     ws.world_state = update_tank_from_registry(
         ws.world_state,
         tank_id,

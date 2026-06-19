@@ -101,7 +101,7 @@ def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
     assert combat_landing_candidates(world, self_state, target) == [(1, 0), (0, 1)]
 
 
-def test_choose_combat_landing_tile_prefers_first_passable_candidate() -> None:
+def test_choose_combat_landing_tile_returns_target_coords_with_terrain() -> None:
     world, self_state, target = _world()
     terrain = InMemoryTerrainMap(
         {
@@ -112,16 +112,17 @@ def test_choose_combat_landing_tile_prefers_first_passable_candidate() -> None:
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (105, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
 
 
-def test_choose_combat_landing_tile_returns_first_candidate_without_terrain() -> None:
+def test_choose_combat_landing_tile_returns_target_coords_without_terrain() -> None:
     world, self_state, target = _world()
 
-    assert choose_combat_landing_tile(world, self_state, target, None) == (103, 100)
+    assert choose_combat_landing_tile(world, self_state, target, None) == (104, 100)
 
 
-def test_choose_combat_landing_tile_returns_missing_when_all_candidates_impassable() -> None:
+def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() -> None:
+    """Server handles displacement when the target tile is occupied or impassable."""
     world, self_state, target = _world()
     terrain = InMemoryTerrainMap(
         {
@@ -132,7 +133,7 @@ def test_choose_combat_landing_tile_returns_missing_when_all_candidates_impassab
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (-1, -1)
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
 
 
 def test_has_cardinal_enemy_adjacency_matches_exact_distance_one() -> None:

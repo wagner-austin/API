@@ -5,7 +5,6 @@ from __future__ import annotations
 from tankpit_bot.sniffer import viewport
 from tankpit_bot.sniffer.formatters import (
     format_container_pickup,
-    format_movement,
     format_radar_response,
     format_tank_registry_details,
 )
@@ -71,19 +70,9 @@ class TestFormatFunctionsEdgeCases:
         )
         assert result == "container id=42"
 
-    def test_format_movement(self) -> None:
-        """Test format_movement formats movement details."""
-        result = format_movement(sx=10, sy=20, pid=1, waypoints="RRDD", is_self=True)
-        assert "self" in result
-        assert "from=(10,20)" in result
-        assert 'path="RRDD"' in result
-        assert "(4 tiles)" in result
-
-    def test_format_movement_enemy(self) -> None:
-        """Test format_movement formats enemy movement."""
-        result = format_movement(sx=30, sy=40, pid=2, waypoints="LL", is_self=False)
-        assert "enemy" in result
-        assert "from=(30,40)" in result
+    # format_movement was deleted 2026-06-19 along with the container
+    # MovementDict / PlayerIdMapper. Protocol 0x47 Movement is formatted
+    # by format_decoded_message via the 0x47 branch in format_combat_details.
 
     def test_format_radar_response_with_containers_and_mines(self) -> None:
         """Test format_radar_response formats both containers and mines."""

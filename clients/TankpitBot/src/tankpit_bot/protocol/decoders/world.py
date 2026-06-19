@@ -7,8 +7,8 @@ viewport updates, terrain updates, sync, containers.
 from __future__ import annotations
 
 from tankpit_bot.protocol.constants import (
-    SUPERVISOR_STATUS_PROMO_ELIGIBLE,
-    SUPERVISOR_STATUS_PROMO_KILL,
+    SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
 from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
@@ -279,34 +279,50 @@ def decode_supervisor(data: bytes) -> SupervisorDict:
     require_min_length(data, 3, "Supervisor")
     return SupervisorDict(
         msg_type=0x52,
-        status=data[0],
-        reserved=data[1],
-        data=data[2],
+        reset_action=data[0],
+        close_map=data[1],
+        error_code=data[2],
     )
 
 
-def supervisor_is_promo_eligible(supervisor: SupervisorDict) -> bool:
-    """Check if player is eligible for promotion.
+def supervisor_error_code(supervisor: SupervisorDict) -> int:
+    """Return the error code from a supervisor command-failure message.
+
+    The ``data`` field is an index into the game client's Gb[] error
+    string array (tpclient.js ``xg.h``). See ``SUPERVISOR_ERROR_*``
+    constants for the full mapping.
 
     Args:
         supervisor: Decoded supervisor message.
 
     Returns:
-        True if eligible for promotion.
+        Error code (0-10, or 128+ for custom text).
     """
-    return supervisor["status"] == SUPERVISOR_STATUS_PROMO_ELIGIBLE
+    return supervisor["error_code"]
 
 
-def supervisor_has_promo_kill(supervisor: SupervisorDict) -> bool:
-    """Check if player got a promotion kill.
+def supervisor_is_cant_go(supervisor: SupervisorDict) -> bool:
+    """Check if the server rejected a move command.
 
     Args:
         supervisor: Decoded supervisor message.
 
     Returns:
-        True if got promotion kill.
+        True if error is "You can't go there!".
     """
-    return supervisor["status"] == SUPERVISOR_STATUS_PROMO_KILL
+    return supervisor["error_code"] == SUPERVISOR_ERROR_CANT_GO
+
+
+def supervisor_is_insufficient_fuel(supervisor: SupervisorDict) -> bool:
+    """Check if the server rejected a command for insufficient fuel.
+
+    Args:
+        supervisor: Decoded supervisor message.
+
+    Returns:
+        True if error is "Insufficient fuel".
+    """
+    return supervisor["error_code"] == SUPERVISOR_ERROR_INSUFFICIENT_FUEL
 
 
 __all__ = [
@@ -317,8 +333,9 @@ __all__ = [
     "decode_sync",
     "decode_terrain_update",
     "decode_viewport_update",
-    "supervisor_has_promo_kill",
-    "supervisor_is_promo_eligible",
+    "supervisor_error_code",
+    "supervisor_is_cant_go",
+    "supervisor_is_insufficient_fuel",
     "viewport_entity_has_equipment_cache",
     "viewport_entity_has_fuel_cache",
     "viewport_entity_has_no_cache",

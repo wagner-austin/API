@@ -33,6 +33,7 @@ class TestDecodeTankState:
             "team": 2,
             "rank": 3,
             "damage_state": 1,
+            "direction": 8,
             "name": "Test",
             "is_bot": True,
             "is_self": False,
@@ -48,6 +49,7 @@ class TestDecodeTankState:
         assert tank["team"] == 2
         assert tank["rank"] == 3
         assert tank["damage_state"] == 1
+        assert tank["direction"] == 8
         assert tank["timestamp_ms"] == 5000
         assert tank["last_wire_seen_ms"] == 4200
         assert tank["source"] == "viewport"
@@ -70,11 +72,13 @@ class TestDecodeTankState:
             "team": 2,
             "rank": 3,
             "damage_state": 1,
+            "direction": 0,
             "name": "Test",
             "is_bot": True,
             "is_self": False,
             "source": "invalid",
             "timestamp_ms": 5000,
+            "last_wire_seen_ms": 0,
         }
         with pytest.raises(JSONTypeError, match="source must be one of"):
             decode_tank_state(data)
@@ -392,6 +396,7 @@ class TestDecodeWorldState:
                     "team": 0,
                     "rank": 2,
                     "damage_state": 0,
+                    "direction": 0,
                     "name": "TestTank",
                     "is_bot": False,
                     "is_self": False,

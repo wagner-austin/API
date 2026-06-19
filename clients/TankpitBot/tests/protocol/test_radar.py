@@ -50,16 +50,16 @@ class TestDecodeEnemyDetection:
     """Tests for decode_enemy_detection function."""
 
     def test_decodes_enemy_detection(self) -> None:
-        """Decodes enemy detection message."""
-        # tank_id=0x0102, x=50, y=60, rank=4, team=2
-        data = bytes([0x02, 0x01, 50, 60, 4, 2])
+        """Decodes enemy detection per trace-verified Tg.h: x,y,team,rank,tank_id."""
+        # x=50, y=60, team=2, rank=4, tank_id=0x0102
+        data = bytes([50, 60, 2, 4, 0x02, 0x01])
         result = decode_enemy_detection(data)
         assert result["msg_type"] == 0x48
-        assert result["tank_id"] == 0x0102
         assert result["x"] == 50
         assert result["y"] == 60
-        assert result["rank"] == 4
         assert result["team"] == 2
+        assert result["rank"] == 4
+        assert result["tank_id"] == 0x0102
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""

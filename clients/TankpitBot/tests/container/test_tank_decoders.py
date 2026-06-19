@@ -14,14 +14,12 @@ from tankpit_bot.container import (
     TankLeaveDict,
     TankRegistryDict,
     TankStatusShortDict,
-    TankStatusSyncDict,
     TankUpdateCompactDict,
     TankUpdateExtendedDict,
     TankUpdateFullDict,
     decode_tank_leave,
     decode_tank_registry,
     decode_tank_status_short,
-    decode_tank_status_sync,
     decode_tank_update_compact,
     decode_tank_update_extended,
     decode_tank_update_full,
@@ -40,8 +38,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_CONTAINER_GARBAGE,
     TANK_REGISTRY_CONTAINER_WASD,
     TANK_STATUS_SHORT_9,
-    TANK_STATUS_SYNC_2,
-    TANK_STATUS_SYNC_3,
     TANK_UPDATE_COMPACT_10,
     TANK_UPDATE_EXTENDED_14,
     TANK_UPDATE_FULL_15,
@@ -254,33 +250,9 @@ class TestDecodeTankStatusShort:
         assert result["leaderboard_position"] == 0x0015
 
 
-class TestDecodeTankStatusSync:
-    """Tests for tank status sync decoding."""
-
-    def test_decodes_2_byte_sync(self) -> None:
-        """Decodes 2-byte sync correctly."""
-        result = decode_tank_status_sync(TANK_STATUS_SYNC_2)
-        assert result["msg_type"] == "tank_status_sync"
-        assert result["sync_data"] == bytes([0x00])
-
-    def test_decodes_3_byte_sync(self) -> None:
-        """Decodes 3-byte sync correctly."""
-        result = decode_tank_status_sync(TANK_STATUS_SYNC_3)
-        assert result["msg_type"] == "tank_status_sync"
-        assert result["sync_data"] == bytes([0x01, 0x02])
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises on invalid length."""
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_status_sync(bytes([0x01]))
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_status_sync(bytes([0x01] * 4))
-
-    def test_tank_status_sync_dict_keys(self) -> None:
-        """TankStatusSyncDict has expected keys."""
-        result: TankStatusSyncDict = decode_tank_status_sync(TANK_STATUS_SYNC_2)
-        assert result["msg_type"] == "tank_status_sync"
-        assert result["sync_data"] == bytes([0x00])
+# Container TankStatusSync decoder was deleted 2026-06-19 (length-only
+# catch-all). Real 0x2E TankStatusSync (8+ bytes per JS Og.h) is tested
+# in tests/protocol/test_tank.py::TestDecodeTankStatusSync.
 
 
 class TestDecodeTankUpdateCompact:

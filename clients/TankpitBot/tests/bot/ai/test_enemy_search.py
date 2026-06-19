@@ -6,7 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import viewport_exploration_candidates
 from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -106,8 +106,8 @@ class TestDecideMapOpen:
         assert decision["command"]["cmd_type"] == "move"
         assert decision["behavior"]["reason"] == "edge_for_enemies"
 
-    def test_fallback_opens_map_when_edge_walk_blocked(self) -> None:
-        """Fallback reopens the map when exploration edges are fully blocked."""
+    def test_fallback_opens_map_when_walk_and_teleport_blocked(self) -> None:
+        """Water-locked exploration targets fall through to map open."""
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -129,6 +129,26 @@ class TestDecideMapOpen:
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+        assert decision["command"]["cmd_type"] == "map_open"
+
+    def test_fallback_opens_map_when_all_exploration_targets_failed(self) -> None:
+        """Fallback reopens the map when all exploration targets are recently failed."""
+        world, self_state = make_world(fuel=800)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "config": make_default_ai_config(),
+                "last_scan_ms": 99000,
+                "last_map_open_ms": 99000,
+            }
+        )
+        inventory = make_inventory()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
+            mark_move_target_failed(candidate_x, candidate_y, 99000)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason"] == "find_enemies"

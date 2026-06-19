@@ -145,6 +145,7 @@ def update_tank_from_registry(
     timestamp_ms: int,
     *,
     wire_present: bool = True,
+    direction: int = -1,
 ) -> WorldStateDict:
     """Update tank state from TankRegistry message.
 
@@ -163,6 +164,8 @@ def update_tank_from_registry(
             When True the tank's ``last_wire_seen_ms`` is stamped to
             *timestamp_ms*; when False the existing value is preserved
             (or 0 for a first-seen tank).
+        direction: Sprite direction byte. 0-31 = alive facing,
+            32-33 = dead corpse. -1 preserves the existing value.
 
     Returns:
         New WorldStateDict with updated tank.
@@ -175,6 +178,7 @@ def update_tank_from_registry(
         last_wire_seen_ms = timestamp_ms
     else:
         last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
+    resolved_direction = direction if direction >= 0 else (existing["direction"] if existing else 0)
 
     new_tank = make_tank_state(
         tank_id=tank_id,
@@ -183,6 +187,7 @@ def update_tank_from_registry(
         team=team,
         rank=rank,
         damage_state=damage_state,
+        direction=resolved_direction,
         name=name,
         is_bot=is_bot,
         is_self=is_self,
@@ -236,12 +241,13 @@ def update_tank_damage(
         team=existing["team"],
         rank=existing["rank"],
         damage_state=damage_state,
+        direction=existing["direction"],
         name=existing["name"],
         is_bot=existing["is_bot"],
         is_self=existing["is_self"],
         source=existing["source"],
         timestamp_ms=timestamp_ms,
-        last_wire_seen_ms=existing["last_wire_seen_ms"],
+        last_wire_seen_ms=timestamp_ms,
     )
 
     new_tanks = dict(state["tanks"])

@@ -25,7 +25,7 @@ from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.session_base import SessionBase
 from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
-from tankpit_bot.runtime_logging import emit_state, emit_sync, emit_wire_complete
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_state, emit_wire_complete
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_service,
@@ -224,15 +224,20 @@ class CompletionsMixin(SessionBase):
             action = self._state_data["in_flight_action"]
             tx, ty = action["target_x"], action["target_y"]
             if self_state["x"] != tx or self_state["y"] != ty:
-                now = get_current_time_ms()
-                mark_move_target_failed(tx, ty, now)
-                emit_sync(
-                    "teleport requested (%d,%d) but landed at (%d,%d); marked failed target",
-                    tx,
-                    ty,
-                    self_state["x"],
-                    self_state["y"],
-                )
+                dist = abs(self_state["x"] - tx) + abs(self_state["y"] - ty)
+                world = get_world_service().world_state
+                enemy_on_tile = any(t["x"] == tx and t["y"] == ty for t in world["tanks"].values())
+                if dist > 1 or not enemy_on_tile:
+                    now = get_current_time_ms()
+                    mark_move_target_failed(tx, ty, now)
+                    emit_diagnostic(
+                        diagnostic_kind="teleport_displacement",
+                        target_x=tx,
+                        target_y=ty,
+                        landed_x=self_state["x"],
+                        landed_y=self_state["y"],
+                        dist=dist,
+                    )
             self._emit_completion(
                 action_kind="teleport",
                 signal="teleport_landed",

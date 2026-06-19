@@ -86,25 +86,13 @@ class TestDecodeLevel:
 class TestGetDecodeLevel:
     """Tests for get_decode_level function."""
 
-    def test_full_level_for_combat_hit(self) -> None:
-        """Combat hit has FULL decode level."""
-        level = get_decode_level(ContainerMessageType.COMBAT_HIT)
-        assert level == DecodeLevel.FULL
-
-    def test_full_level_for_movement(self) -> None:
-        """Movement has FULL decode level."""
-        level = get_decode_level(ContainerMessageType.MOVEMENT)
-        assert level == DecodeLevel.FULL
-
     def test_full_level_for_container_pickup(self) -> None:
         """Container pickup has FULL decode level."""
         level = get_decode_level(ContainerMessageType.CONTAINER_PICKUP)
         assert level == DecodeLevel.FULL
 
-    def test_full_level_for_radar_response(self) -> None:
-        """Radar response has FULL decode level."""
-        level = get_decode_level(ContainerMessageType.RADAR_RESPONSE)
-        assert level == DecodeLevel.FULL
+    # RADAR_RESPONSE enum entry deleted 2026-06-19 with the rest of the
+    # container radar chain.
 
     def test_identified_level_for_tip_notification(self) -> None:
         """Tip notification has IDENTIFIED decode level."""

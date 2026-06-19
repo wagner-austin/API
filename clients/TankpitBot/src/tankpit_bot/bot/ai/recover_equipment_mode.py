@@ -208,9 +208,8 @@ def try_search_critical_equipment(ctx: DecideCtx) -> TickDecisionDict | None:
         else ctx.base
     )
     search_decision = _plan_equipment_sense_or_search(ctx, 925, base_state)
-    if search_decision is not None:
-        return search_decision
-    return _equipment_recovery_fallback(ctx, base_state)
+    assert search_decision is not None
+    return search_decision
 
 
 def decide_recover_equipment_mode(ctx: DecideCtx) -> TickDecisionDict:
@@ -518,16 +517,21 @@ def _plan_equipment_sense_or_search(
     Returns:
         Radar or teleport-search decision, or ``None`` when neither is legal.
     """
-    # At zero extra radars the viewport sweep is impossible, so grid-
-    # sweep the free built-in 5x5 to refill instead of scanning and
-    # ring-hopping blind. This is the single shared point so both the
-    # durable owner and the weapon-emergency helper forage. Above zero
-    # extras the existing viewport radar + ring hop runs.
     if ctx.inventory["extra_radars"]["count"] == 0:
         forage_decision = plan_forage_search(ctx, ai_state, score)
         if forage_decision is not None:
             return forage_decision
-    if can_use_radar(ctx) and should_scan_resources_in_current_viewport(ctx):
+    has_known = (
+        len(
+            find_known_equipment_candidates(
+                ctx.filtered,
+                ctx.self_state,
+                now_ms=ctx.timestamp_ms,
+            )
+        )
+        > 0
+    )
+    if can_use_radar(ctx) and should_scan_resources_in_current_viewport(ctx) and not has_known:
         emit_ai(
             "radar to find equipment (dual=%d homing=%d radar=%d)",
             ctx.inventory["dual_shots"]["count"],

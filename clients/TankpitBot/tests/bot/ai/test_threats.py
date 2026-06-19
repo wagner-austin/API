@@ -25,6 +25,7 @@ def _tank(
     y: int = 0,
     team: int = 1,
     damage_state: int = 0,
+    direction: int = 0,
     name: str = "",
     is_bot: bool = True,
     is_self: bool = False,
@@ -37,6 +38,7 @@ def _tank(
         y: Y coordinate.
         team: Team ID.
         damage_state: Damage state (0-3).
+        direction: Sprite direction (0-31 alive, 32-33 dead).
         name: Player name (defaults to "tank-{key}").
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
@@ -51,6 +53,7 @@ def _tank(
         team=team,
         rank=0,
         damage_state=damage_state,
+        direction=direction,
         name=name or f"tank-{key}",
         is_bot=is_bot,
         is_self=is_self,
@@ -247,6 +250,36 @@ class TestAnalyzeThreats:
         assert len(threats) == 2
         ids = {t["tank_id"] for t in threats}
         assert ids == {20, 40}
+
+    def test_filters_corpse_direction_32(self) -> None:
+        """Tanks with direction=32 (corpse sprite) are excluded."""
+        world = _world(
+            {
+                "10": _tank("10", x=110, y=100, team=1, direction=32),
+                "20": _tank("20", x=120, y=100, team=2, direction=4),
+            }
+        )
+        threats = analyze_threats(world, _self_at(), now_ms=0)
+        assert len(threats) == 1
+        assert threats[0]["tank_id"] == 20
+
+    def test_filters_corpse_direction_33(self) -> None:
+        """Tanks with direction=33 (alt corpse sprite) are excluded."""
+        world = _world({"10": _tank("10", x=110, y=100, team=1, direction=33)})
+        threats = analyze_threats(world, _self_at(), now_ms=0)
+        assert len(threats) == 0
+
+    def test_alive_direction_passes(self) -> None:
+        """Tanks with direction 0-31 pass through the corpse filter."""
+        world = _world(
+            {
+                "10": _tank("10", x=110, y=100, team=1, direction=0),
+                "20": _tank("20", x=120, y=100, team=2, direction=8),
+                "30": _tank("30", x=130, y=100, team=3, direction=31),
+            }
+        )
+        threats = analyze_threats(world, _self_at(), now_ms=0)
+        assert len(threats) == 3
 
 
 # =============================================================================

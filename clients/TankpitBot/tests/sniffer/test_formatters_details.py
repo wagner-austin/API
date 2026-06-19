@@ -18,24 +18,26 @@ class TestFormatFunctions:
     """Tests for message format functions using proper TypedDict instances."""
 
     def test_format_combat_details_shooting(self) -> None:
-        """Test format_combat_details for shooting message (0x53)."""
+        """Format shoot/hit message (0x53)."""
         from tankpit_bot.protocol import ShootEventDict
 
         msg = ShootEventDict(
             msg_type=0x53,
-            shooter_id=100,
-            target_x=50,
-            target_y=60,
-            projectile_x=0,
-            projectile_y=0,
-            fuel=0,
-            weapon=0,
-            ammo=0,
-            friendly_fire=False,
+            team=2,
+            shooter_id=1301,
+            source_x=155,
+            source_y=154,
+            target_x=155,
+            target_y=155,
+            unk1=155,
+            unk2=155,
+            weapon=1,
         )
         result = format_combat_details(msg)
-        assert "shooter=100" in result
-        assert "tgt=(50,60)" in result
+        assert "shooter=1301" in result
+        assert "src=(155,154)" in result
+        assert "tgt=(155,155)" in result
+        assert "dual" in result
 
     def test_format_combat_details_deactivation(self) -> None:
         """Test format_combat_details for deactivation message (0x41)."""
@@ -43,10 +45,11 @@ class TestFormatFunctions:
 
         msg = DeactivationDict(
             msg_type=0x41,
+            status=0,
             victim_id=50,
+            promo_eligible=False,
             killer_id=100,
-            rank=0,
-            points=0,
+            is_mine_kill=False,
         )
         result = format_combat_details(msg)
         assert "victim=50" in result
@@ -67,15 +70,18 @@ class TestFormatFunctions:
 
         msg = TankEntryDict(
             msg_type=0x28,
+            team=0,
             tank_id=100,
+            rank=0,
+            damage_state=0,
+            score=0,
             x=50,
             y=60,
-            name="TestTank",
         )
         result = format_tank_details(msg)
         assert "tank=100" in result
         assert "(50,60)" in result
-        assert "TestTank" in result
+        assert "team=0" in result
 
     def test_format_tank_details_exit(self) -> None:
         """Test format_tank_details for tank exit (0x58)."""
@@ -95,8 +101,7 @@ class TestFormatFunctions:
             tank_id=100,
             damage_state=1,
             rank=3,
-            flags=b"\x00\x00\x00",
-            leaderboard_position=5,
+            lb_score=5,
             fuel=None,
         )
         result = format_tank_details(msg)
@@ -135,7 +140,7 @@ class TestFormatFunctions:
             tank_id=100,
             team=1,
             decoration_state=b"\x00\x00\x00\x00",
-            score=0,
+            persistent_tank_id=0,
             name="InfoTank",
         )
         result = format_tank_details(msg)
@@ -154,7 +159,10 @@ class TestFormatFunctions:
             start_y=60,
             direction=2,
             flag=0,
-            leaderboard_position=500,
+            lb_score=500,
+            rank=1,
+            damage_state=0,
+            is_carrying=False,
             waypoints=[],
         )
         result = format_tank_details(msg)
@@ -174,8 +182,10 @@ class TestFormatFunctions:
             x=50,
             y=60,
             direction=2,
+            damage_state=0,
             rank=4,
-            leaderboard_position=10,
+            lb_score=10,
+            carrying=0,
         )
         result = format_tank_details(msg)
         assert "tank=100" in result
@@ -260,7 +270,7 @@ class TestFormatFunctions:
 
     def test_format_position_details_mine_placement(self) -> None:
         """Test format_position_details for mine placement (0x4B)."""
-        from tankpit_bot.protocol import MinePlacementDict
+        from tankpit_bot.container import MinePlacementDict
 
         msg = MinePlacementDict(
             msg_type=0x4B,
@@ -274,7 +284,7 @@ class TestFormatFunctions:
 
     def test_format_position_details_mine_detonation(self) -> None:
         """Test format_position_details for mine detonation (0x45)."""
-        from tankpit_bot.protocol import MineDetonationDict
+        from tankpit_bot.container import MineDetonationDict
 
         msg = MineDetonationDict(
             msg_type=0x45,
@@ -303,8 +313,7 @@ class TestFormatFunctions:
 
     def test_format_radar_details_radar_result(self) -> None:
         """Test format_radar_details for radar result (0x4F)."""
-        from tankpit_bot.container import RadarContainerDict
-        from tankpit_bot.protocol import RadarScanResultDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarScanResultDict
 
         container = RadarContainerDict(x=10, y=20, volume=100)
         msg = RadarScanResultDict(
@@ -400,10 +409,10 @@ class TestFormatFunctions:
         """Test format_misc_details for supervisor (0x52)."""
         from tankpit_bot.protocol import SupervisorDict
 
-        msg = SupervisorDict(msg_type=0x52, status=4, reserved=0, data=5)
+        msg = SupervisorDict(msg_type=0x52, reset_action=4, close_map=0, error_code=5)
         result = format_misc_details(msg)
-        assert "status=4" in result
-        assert "data=5" in result
+        assert "reset=4" in result
+        assert "err=5" in result
 
     def test_format_misc_details_player_msg(self) -> None:
         """Test format_misc_details for player message (0x4D)."""
@@ -424,29 +433,28 @@ class TestFormatFunctions:
         assert result == ""
 
     def test_format_decoded_message_container(self) -> None:
-        """Test format_decoded_message for container message."""
-        from tankpit_bot.container import TankStatusSyncDict
+        """Format a container TankLeave message."""
+        from tankpit_bot.container import TankLeaveDict
 
-        msg = TankStatusSyncDict(msg_type="tank_status_sync", sync_data=b"\x01\x02")
+        msg = TankLeaveDict(msg_type="tank_leave", tank_id=42, flags=0, extra_data=b"\x00" * 3)
         result = format_decoded_message(0x2E, msg)
-        assert "TankStatusSync" in result
-        assert "0102" in result
+        assert "TankLeave" in result
 
     def test_format_decoded_message_protocol(self) -> None:
-        """Test format_decoded_message for protocol message."""
+        """Format decoded ShootEvent (0x53) message."""
         from tankpit_bot.protocol import ShootEventDict
 
         msg = ShootEventDict(
             msg_type=0x53,
-            shooter_id=100,
-            target_x=50,
-            target_y=60,
-            projectile_x=0,
-            projectile_y=0,
-            fuel=0,
-            weapon=0,
-            ammo=0,
-            friendly_fire=False,
+            team=2,
+            shooter_id=1301,
+            source_x=155,
+            source_y=154,
+            target_x=155,
+            target_y=155,
+            unk1=155,
+            unk2=155,
+            weapon=1,
         )
         result = format_decoded_message(0x53, msg)
         assert "Shooting" in result or "Msg0x53" in result
@@ -459,36 +467,6 @@ class TestFormatFunctions:
         msg = SyncDict(msg_type=0x3F)
         result = format_decoded_message(0x3F, msg)
         assert "[" in result  # Just has type name in brackets
-
-    def test_format_container_details_combat_hit_outgoing(self) -> None:
-        """Test format_container_details for combat hit outgoing (direction 0x09)."""
-        from tankpit_bot.container import CombatHitDict
-
-        msg = CombatHitDict(
-            msg_type="combat_hit",
-            direction=0x09,
-            attacker_id=100,
-            combat_data=b"\x00\x00\x00\x00\x00\x00",
-            is_outgoing=True,
-        )
-        result = format_container_details(msg)
-        assert "attacker=100" in result
-        assert "dir=out" in result
-
-    def test_format_container_details_combat_hit_incoming(self) -> None:
-        """Test format_container_details for combat hit incoming."""
-        from tankpit_bot.container import CombatHitDict
-
-        msg = CombatHitDict(
-            msg_type="combat_hit",
-            direction=0x05,  # Not 0x09, so incoming
-            attacker_id=50,
-            combat_data=b"\x00\x00\x00\x00\x00\x00",
-            is_outgoing=False,
-        )
-        result = format_container_details(msg)
-        assert "attacker=50" in result
-        assert "dir=in" in result
 
     def test_format_container_details_tank_registry(self) -> None:
         """Test format_container_details for tank registry."""

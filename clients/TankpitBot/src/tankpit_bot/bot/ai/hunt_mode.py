@@ -154,7 +154,9 @@ def _decide_hunt_scan_on_landing(ctx: DecideCtx) -> TickDecisionDict:
     target = get_locked_target(ctx, threats)
     if target is None:
         return _decide_hunt_acquire(ctx)
-    return engage_target(ctx, target)
+    if has_cardinal_combat_shot(ctx.self_state, target):
+        return engage_target(ctx, target)
+    return close_target(ctx, target)
 
 
 def _decide_hunt_refresh(ctx: DecideCtx) -> TickDecisionDict:
@@ -204,7 +206,9 @@ def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
     target = get_locked_target(ctx, threats)
     if target is None:
         return _enter_confirm_kill(ctx)
-    return engage_target(ctx, target)
+    if has_cardinal_combat_shot(ctx.self_state, target):
+        return engage_target(ctx, target)
+    return close_target(ctx, target)
 
 
 def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:

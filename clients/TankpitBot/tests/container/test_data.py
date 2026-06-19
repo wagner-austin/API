@@ -11,8 +11,9 @@ from __future__ import annotations
 
 # Combat hit: 11 bytes
 # From "5953cd07998493ce9c8051" - session capture
-COMBAT_HIT_11_OUTGOING = bytes.fromhex("5909cd07998493ce9c8051")  # direction=0x09 (outgoing)
-COMBAT_HIT_11_INCOMING = bytes.fromhex("590bcd07998493ce9c8051")  # direction=0x0b (incoming)
+# 0x53 ShootEvent fixtures moved to tests/protocol/ -- container path
+# was deleted 2026-06-19. Real wire bytes used as protocol-layer test
+# data via tankpit_bot.protocol.decode_shoot_event.
 
 # =============================================================================
 # Tank Registry Test Data
@@ -134,8 +135,7 @@ TANK_LEAVE_LARGE_ID = bytes.fromhex("204a845d5201")
 # Unknown: 8 bytes (doesn't match any pattern - gap between 7 and 9)
 UNKNOWN_8_BYTES = bytes.fromhex("7e51460516112233")
 
-# Unknown: 12 bytes (doesn't match any known pattern)
-# 12 bytes is between combat_hit (11) and position_update (13)
+# Unknown: 12 bytes (doesn't match any known container pattern)
 UNKNOWN_12_BYTES = bytes.fromhex("010203040506070809101112")
 
 # =============================================================================
@@ -232,9 +232,9 @@ PLAYER_LIST_EXTENDED_7 = bytes.fromhex("79990507ce1144")
 # Deactivation Test Data
 # =============================================================================
 
-# Deactivation kill: 5 bytes [0x41, victim_lo, victim_hi, killer_lo, killer_hi]
-# From capture: "41bb629c0e" - you killed tank 25275, your tank is 3740
-DEACTIVATION_KILL_5 = bytes.fromhex("41bb629c0e")
+# 0x41 Deactivation moved to the protocol-layer test fixture set
+# (tests/protocol/test_combat.py) -- container path was deleted
+# 2026-06-19 along with the dual-path collapse.
 
 # Deactivation death: 7 bytes [0x43, flags, killer_lo, killer_hi, extra...]
 # From capture: "430786160c7f1f" - you were killed by tank 5766

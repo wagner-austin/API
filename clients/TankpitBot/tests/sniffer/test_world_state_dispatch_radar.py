@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.container import RadarContainerDict
+from tankpit_bot.protocol import RadarContainerDict
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
@@ -27,18 +27,13 @@ class TestDispatchRadar:
         _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
 
     def test_dispatch_radar_response(self) -> None:
-        """Test dispatch handles radar_response message."""
-        from tankpit_bot.container import (
-            RadarContainerDict,
-            RadarMineDict,
-            RadarResponseDict,
-        )
+        """Test dispatch handles 0x4F RadarScanResult message."""
+        from tankpit_bot.protocol import RadarContainerDict, RadarMineDict, RadarScanResultDict
 
         _test_hooks.path_exists = lambda path: False
 
-        msg = RadarResponseDict(
-            msg_type="radar_response",
-            container_count=1,
+        msg = RadarScanResultDict(
+            msg_type=0x4F,
             containers=[RadarContainerDict(x=100, y=100, volume=50)],
             mines=[RadarMineDict(x=110, y=110, team=0)],
         )
@@ -50,7 +45,7 @@ class TestDispatchRadar:
 
     def test_dispatch_radar_response_renders_ascii(self) -> None:
         """Test dispatch renders ASCII after radar update when terrain available."""
-        from tankpit_bot.container import RadarContainerDict, RadarResponseDict
+        from tankpit_bot.protocol import RadarContainerDict, RadarScanResultDict
 
         fake_terrain = InMemoryTerrainMap()
         _test_hooks.path_exists = lambda path: True
@@ -58,27 +53,11 @@ class TestDispatchRadar:
 
         update_world_state_from_position(128, 128)
 
-        msg = RadarResponseDict(
-            msg_type="radar_response",
-            container_count=1,
+        msg = RadarScanResultDict(
+            msg_type=0x4F,
             containers=[RadarContainerDict(x=128, y=128, volume=50)],
             mines=[],
         )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-    def test_dispatch_handles_empty_radar_response(self) -> None:
-        """Test dispatch handles radar_response with empty data."""
-        from tankpit_bot.container import RadarResponseDict
-
-        _test_hooks.path_exists = lambda path: False
-
-        msg: RadarResponseDict = {
-            "msg_type": "radar_response",
-            "container_count": 0,
-            "containers": [],
-            "mines": [],
-        }
 
         dispatch_world_state_update(get_world_service(), msg)
 

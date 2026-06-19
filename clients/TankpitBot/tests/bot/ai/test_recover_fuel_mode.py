@@ -94,13 +94,13 @@ def test_recover_fuel_mode_clears_combat_lock_when_fuel_mode_owns_tick() -> None
 
 
 def test_recover_fuel_mode_grabs_adjacent_equipment_opportunistically() -> None:
-    """Fuel recovery picks up equipment it is standing next to.
+    """Fuel recovery picks up visible equipment before chasing fuel.
 
     Regression guard for live run 20260610-011x: the bot walked past
-    adjacent equipment containers because the mode only looked for fuel.
+    equipment containers because the mode only looked for fuel.
     """
     world, self_state = make_world(
-        fuel=250,
+        fuel=400,
         containers={
             "101,100": make_container_state(
                 x=101,
@@ -255,7 +255,7 @@ def test_recover_fuel_mode_uses_radar_when_viewport_needs_authoritative_scan() -
 
 
 def test_recover_fuel_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
-    """Fuel recovery still scans when extra radar stock is depleted."""
+    """Fuel recovery still scans with free radar when extras are depleted."""
     world, self_state = make_world(fuel=250, scanned=False)
     ai_state = AIStateDict(
         **{
@@ -266,7 +266,7 @@ def test_recover_fuel_mode_uses_regular_radar_when_extra_charges_are_empty() -> 
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
     decision = decide_recover_fuel_mode(ctx)
@@ -292,7 +292,7 @@ def test_recover_fuel_mode_opens_map_when_no_recovery_action_is_legal() -> None:
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     terrain_data: dict[tuple[int, int], str] = {}
     for x in range(92, 108):
         for y in range(92, 108):
@@ -490,7 +490,7 @@ def test_try_collect_fuel_returns_none_when_non_owner_paths_are_blocked() -> Non
     """Non-owner fuel helper returns None instead of raising when no path exists."""
     world, self_state = make_world(fuel=140, scanned=True)
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     terrain_data: dict[tuple[int, int], str] = {}
     for x in range(92, 108):
         for y in range(92, 108):
@@ -569,7 +569,7 @@ def test_can_use_fuel_radar_keeps_operating_reserve() -> None:
 
     assert minimum_recovery_fuel_volume(healthy_ctx) == 100
 
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     uncharged_ctx = DecideCtx(
         world,
         self_state,
@@ -673,7 +673,7 @@ def test_recover_fuel_mode_plans_fuel_dot_escape() -> None:
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
     decision = decide_recover_fuel_mode(ctx)
@@ -702,7 +702,7 @@ def test_recover_fuel_mode_dot_walk_records_attempt_only_when_landing_on_dot() -
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
     decision = decide_recover_fuel_mode(ctx)
@@ -739,7 +739,7 @@ def test_recover_fuel_mode_dot_escape_skips_unaffordable_dot() -> None:
         }
     )
     inventory = make_inventory()
-    inventory["extra_radars"]["count"] = 0
+    inventory["extra_radars"]["count"] = 1
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
     decision = decide_recover_fuel_mode(ctx)
@@ -794,7 +794,41 @@ def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
             failed_pickups=0,
         ),
     }
-    world, self_state = make_world(fuel=250, scanned=True, containers=containers)
+    world, self_state = make_world(fuel=400, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "RECOVER_FUEL",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory()
+    inventory["dual_shots"]["count"] = 3
+    inventory["homing_shots"]["count"] = 3
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_recover_fuel_mode(ctx)
+
+    assert decision["behavior"]["reason"] == "opportunistic_equipment"
+    assert decision["command"]["cmd_type"] == "pickup_equipment"
+    assert decision["command"]["target_x"] == 102
+    assert decision["command"]["target_y"] == 100
+
+
+def test_fuel_recovery_sweeps_equipment_at_critical_fuel() -> None:
+    """Sweep fires when fuel is critical and no fuel containers exist."""
+    containers = {
+        "103,100": make_container_state(
+            x=103,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(fuel=200, scanned=True, containers=containers)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -811,6 +845,52 @@ def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
     decision = decide_recover_fuel_mode(ctx)
 
     assert decision["behavior"]["reason"] == "sweep_equipment"
-    assert decision["command"]["cmd_type"] == "pickup_equipment"
-    assert decision["command"]["target_x"] == 102
-    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["target_x"] == 103
+
+
+def test_locked_fuel_clears_when_water_locked() -> None:
+    """A locked fuel target on water clears when fully boxed in."""
+    terrain_data: dict[tuple[int, int], str] = {}
+    for x in range(92, 108):
+        for y in range(92, 108):
+            terrain_data[(x, y)] = "W"
+    terrain_data[(100, 100)] = InMemoryTerrainMap.GROUND
+    terrain_data[(120, 100)] = "W"
+    terrain_data[(121, 100)] = "W"
+    terrain_data[(119, 100)] = "W"
+    terrain_data[(120, 101)] = "W"
+    terrain_data[(120, 99)] = "W"
+    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=300,
+        scanned=True,
+        containers={
+            "120,100": make_container_state(
+                x=120,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "RECOVER_FUEL",
+            "mode_state": "",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 120,
+            "resource_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    inventory["extra_radars"]["count"] = 0
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+    decision = decide_recover_fuel_mode(ctx)
+
+    assert decision["updated_ai_state"]["resource_target_kind"] == ""

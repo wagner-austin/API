@@ -17,25 +17,20 @@ class ContainerMessageType(IntEnum):
     """
 
     UNKNOWN = 0
-    COMBAT_HIT = auto()
     MINE_DETONATION = auto()
     MINE_PLACEMENT = auto()
     TANK_REGISTRY = auto()
-    MOVEMENT = auto()
     POSITION_UPDATE = auto()
     TANK_STATUS_SHORT = auto()
     TANK_UPDATE_COMPACT = auto()
     TANK_UPDATE_EXTENDED = auto()
     TANK_UPDATE_FULL = auto()
-    TANK_STATUS_SYNC = auto()
     TANK_LEAVE = auto()
     PLAYER_LIST_SHORT = auto()
     PLAYER_LIST_EXTENDED = auto()
-    DEACTIVATION_KILL = auto()
     DEACTIVATION_DEATH = auto()
     TELEPORT_LANDED = auto()
     CONTAINER_PICKUP = auto()
-    RADAR_RESPONSE = auto()
     TIP_NOTIFICATION = auto()
     CHUNK_DATA = auto()
     WORLD_STATE = auto()
@@ -69,25 +64,20 @@ class DecodeLevel(IntEnum):
 MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.UNKNOWN: DecodeLevel.UNKNOWN,
     # Fully decoded message types (all fields understood)
-    ContainerMessageType.COMBAT_HIT: DecodeLevel.FULL,
     ContainerMessageType.MINE_DETONATION: DecodeLevel.FULL,
     ContainerMessageType.MINE_PLACEMENT: DecodeLevel.FULL,
     ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
-    ContainerMessageType.MOVEMENT: DecodeLevel.FULL,
     ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
     ContainerMessageType.TANK_STATUS_SHORT: DecodeLevel.FULL,
     ContainerMessageType.TANK_UPDATE_COMPACT: DecodeLevel.FULL,
     ContainerMessageType.TANK_UPDATE_EXTENDED: DecodeLevel.FULL,
     ContainerMessageType.TANK_UPDATE_FULL: DecodeLevel.FULL,
-    ContainerMessageType.TANK_STATUS_SYNC: DecodeLevel.FULL,
     ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_EXTENDED: DecodeLevel.FULL,
-    ContainerMessageType.DEACTIVATION_KILL: DecodeLevel.FULL,
     ContainerMessageType.DEACTIVATION_DEATH: DecodeLevel.FULL,
     ContainerMessageType.TELEPORT_LANDED: DecodeLevel.FULL,
     ContainerMessageType.CONTAINER_PICKUP: DecodeLevel.FULL,
-    ContainerMessageType.RADAR_RESPONSE: DecodeLevel.FULL,
     # Identified but not fully decoded (type known, structure partial)
     ContainerMessageType.TIP_NOTIFICATION: DecodeLevel.IDENTIFIED,
     ContainerMessageType.CHUNK_DATA: DecodeLevel.IDENTIFIED,
@@ -114,23 +104,10 @@ def get_decode_level(msg_type: ContainerMessageType) -> DecodeLevel:
 # =============================================================================
 # Combat Messages
 # =============================================================================
-
-
-class CombatHitDict(TypedDict):
-    """Combat hit event decoded from 0x2E container.
-
-    Structure (verified from captures):
-      [subtype:1] [direction:1] [attacker_id:2 LE] [combat_data:6-7] [terminator:1]
-
-    The subtype and terminator bytes are the same value (XOR-dependent).
-    Direction 0x09 indicates outgoing hit (you attacked), other values indicate incoming.
-    """
-
-    msg_type: Literal["combat_hit"]
-    direction: int
-    attacker_id: int
-    combat_data: bytes
-    is_outgoing: bool
+# 0x53 ShootEvent lives in tankpit_bot.protocol (ShootEventDict). The
+# container path is intentionally not duplicated -- the protocol path
+# is the single source of truth (re-verified 2026-06-19 against JS
+# Gg.h and capture bot-20260619-050303).
 
 
 class MineDetonationDict(TypedDict):
@@ -144,19 +121,10 @@ class MineDetonationDict(TypedDict):
     positions: list[tuple[int, int]]
 
 
-class DeactivationKillDict(TypedDict):
-    """Deactivation event when you killed another tank.
-
-    Structure (5 bytes, verified from captures):
-      [subtype:1] [victim_id:2 LE] [killer_id:2 LE]
-
-    Subtype is 0x41 ('A') after XOR decode.
-    Sent when another tank is deactivated by you.
-    """
-
-    msg_type: Literal["deactivation_kill"]
-    victim_id: int
-    killer_id: int
+# 0x41 Deactivation lives in tankpit_bot.protocol (DeactivationDict).
+# The container path was deleted 2026-06-19; routing min_len fix in
+# protocol/decoders/routing.py (7 -> 6) ensures the protocol path now
+# fires for the wire 6-byte body.
 
 
 class DeactivationDeathDict(TypedDict):
@@ -300,17 +268,9 @@ class TankUpdateFullDict(TypedDict):
     status_data: bytes
 
 
-class TankStatusSyncDict(TypedDict):
-    """Tank status sync/heartbeat decoded from 0x2E container.
-
-    Structure:
-      [subtype:1] [sync_data:1-2]
-
-    Short sync messages for keepalive or state confirmation.
-    """
-
-    msg_type: Literal["tank_status_sync"]
-    sync_data: bytes
+# Container TankStatusSync deleted 2026-06-19 (length-only catch-all
+# misidentifying short subtypes). Real 0x2E TankStatusSync lives in
+# tankpit_bot.protocol (TankStatusSyncDict, 8+ bytes per JS Og.h).
 
 
 class TankLeaveDict(TypedDict):
@@ -352,38 +312,11 @@ class PositionUpdateDict(TypedDict):
     extra_data: bytes
 
 
-class MovementDict(TypedDict):
-    """Movement/waypoint path decoded from 0x2E container.
-
-    Structure (variable length, 14-50+ bytes):
-      [0]     subtype (0x47 'G')
-      [1]     flags (0x7E=self, 0x1E=enemy - bits 5-6 differ)
-      [2-3]   packed_position: (start_x << 8) | low_byte
-      [4]     start_y: Y coordinate
-      [5-7]   unknown (often 0x08 0x01 0x00)
-      [8-11]  player_id: LE uint32 (session-specific, correlates with tank_id)
-      [12+]   waypoints: direction characters (w/s/n/e)
-
-    The waypoints are direction characters indicating the path:
-      - 'w' (0x77) = west
-      - 's' (0x73) = south
-      - 'n' (0x6e) = north
-      - 'e' (0x65) = east
-
-    Example: "eeenn" = move east, east, east, north, north (5 tiles).
-
-    Note: player_id is NOT the same as tank_id from TankRegistry/MovementResponse,
-    but correlates consistently per session. Use PlayerIdMapper to resolve tank_id.
-    """
-
-    msg_type: Literal["movement"]
-    flags: int
-    start_x: int
-    start_y: int
-    player_id: int
-    tank_id: int | None  # Resolved via PlayerIdMapper, None if unknown
-    waypoints: str
-    is_self: bool
+# 0x47 Movement lives in tankpit_bot.protocol (MovementDict). The
+# container path was deleted 2026-06-19: it had misinterpreted bytes
+# 8-11 as a "player_id" but tpclient.js Lg.h reads those bytes as
+# lb_score (24-bit BE at 6-8) + rank (a[9]). PlayerIdMapper was also
+# deleted -- the protocol decoder has tank_id directly.
 
 
 # =============================================================================
@@ -391,49 +324,9 @@ class MovementDict(TypedDict):
 # =============================================================================
 
 
-class RadarContainerDict(TypedDict):
-    """Single container entry in radar response.
-
-    volume: -1 for equipment, >=0 for fuel amount.
-    """
-
-    x: int
-    y: int
-    volume: int
-
-
-class RadarMineDict(TypedDict):
-    """Single mine entry in radar response.
-
-    team: 0=red, 1=purple, 2=blue, 3=orange.
-    """
-
-    x: int
-    y: int
-    team: int
-
-
-class RadarResponseDict(TypedDict):
-    """Radar response showing nearby containers and mines.
-
-    Structure:
-      [0x4F:1] [container_count:1] [flags:1]
-      [containers: count * 4 bytes] [mines: remaining / 3 bytes]
-
-    Container entry (4 bytes):
-      [x:1] [y:1] [volume:2 LE]
-      - volume = 0xFFFF: Equipment container (stored as -1)
-      - volume = other: Fuel container with that volume
-
-    Mine entry (3 bytes):
-      [x:1] [y:1] [team:1]
-      - team: 0=red, 1=purple, 2=blue, 3=orange
-    """
-
-    msg_type: Literal["radar_response"]
-    container_count: int
-    containers: list[RadarContainerDict]
-    mines: list[RadarMineDict]
+# RadarContainerDict, RadarMineDict, and the 0x4F RadarResponse decoder
+# all live in tankpit_bot.protocol (single source of truth). Their
+# container duplicates were deleted 2026-06-19.
 
 
 # =============================================================================
@@ -565,29 +458,40 @@ class UnknownContainerDict(TypedDict):
 
 
 # =============================================================================
+# Status Messages (0x3D position+status, 0x2E self-status)
+# =============================================================================
+
+
+# 0x3D TankPositionStatus moved to tankpit_bot.protocol.MovementResponseDict
+# 2026-06-19 (single source of truth, with the carrying byte at offset 11
+# restored after being dropped from the prior protocol decoder).
+
+
+# SelfStatusDict was deleted 2026-06-19. The 13-byte 0x2E-nested
+# self-status form (with fuel) is decoded by the protocol path's
+# TankStatusSync (decode_tank_status_sync), which handles both the short
+# 9-byte form and the 13-byte form with fuel at the tail.
+
+
+# =============================================================================
 # Union Types
 # =============================================================================
 
 ContainerMessage = (
-    CombatHitDict
-    | MineDetonationDict
+    MineDetonationDict
     | MinePlacementDict
     | TankRegistryDict
-    | MovementDict
     | PositionUpdateDict
     | TankStatusShortDict
     | TankUpdateCompactDict
     | TankUpdateExtendedDict
     | TankUpdateFullDict
-    | TankStatusSyncDict
     | TankLeaveDict
     | PlayerListShortDict
     | PlayerListExtendedDict
-    | DeactivationKillDict
     | DeactivationDeathDict
     | TeleportLandedDict
     | ContainerPickupDict
-    | RadarResponseDict
     | TipNotificationDict
     | ChunkDataDict
     | WorldStateDict
@@ -598,26 +502,19 @@ ContainerMessage = (
 __all__ = [
     "MESSAGE_TYPE_LEVELS",
     "ChunkDataDict",
-    "CombatHitDict",
     "ContainerMessage",
     "ContainerMessageType",
     "ContainerPickupDict",
     "DeactivationDeathDict",
-    "DeactivationKillDict",
     "DecodeLevel",
     "MineDetonationDict",
     "MinePlacementDict",
-    "MovementDict",
     "PlayerListExtendedDict",
     "PlayerListShortDict",
     "PositionUpdateDict",
-    "RadarContainerDict",
-    "RadarMineDict",
-    "RadarResponseDict",
     "TankLeaveDict",
     "TankRegistryDict",
     "TankStatusShortDict",
-    "TankStatusSyncDict",
     "TankUpdateCompactDict",
     "TankUpdateExtendedDict",
     "TankUpdateFullDict",

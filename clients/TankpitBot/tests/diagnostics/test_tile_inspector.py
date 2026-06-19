@@ -171,9 +171,13 @@ def test_render_tile_inspection_renders_reachability_section_when_origin_present
     assert "reachable=True" in rendered
 
 
-def test_inspect_tile_picks_passable_adjacent_when_target_impassable() -> None:
-    """When the target tile is water but a cardinal neighbor is ground, the
-    landing resolution names that neighbor (``adjacent:<DIR>``)."""
+def test_inspect_tile_lands_on_target_when_impassable() -> None:
+    """When the target tile is water, the landing tile is the target itself.
+
+    The server handles displacement to the nearest passable tile. The
+    landing resolution still describes the adjacent passable neighbor
+    for diagnostic purposes.
+    """
     # On field01 row 126 the western water column ends right before the
     # spawn ground column at x=131. (130,126) is water; its eastern
     # neighbor (131,126) is the passable spawn tile.

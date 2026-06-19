@@ -15,14 +15,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
-from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tests.action_lab._replay_core import (
     DispatchCaptureMixin,
     ReplayResult,
     prepare_probe_replay,
 )
 
+from tankpit_bot.action_lab.equipment_probe import EquipmentProbe
+from tankpit_bot.action_lab.equipment_probe_types import EquipmentProbeAttemptResultDict
 from tankpit_bot.action_lab.types import TeleportTargetDict
 from tankpit_bot.bot.world_sync import drain_messages
 from tankpit_bot.sniffer.world_state import reset_world_state

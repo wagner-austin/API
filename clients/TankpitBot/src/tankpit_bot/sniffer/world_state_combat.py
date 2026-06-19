@@ -14,35 +14,62 @@ from tankpit_bot.sniffer.world_service import WEAPON_BYTE_TO_ITEM, WorldService
 log = get_logger(__name__)
 
 
-def mark_combat_hit(ws: WorldService, weapon_byte: int) -> None:
+def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
     """Called when we receive a CombatHit where we are the attacker.
 
-    Records that the server processed our shot. If weapon_byte > 0,
-    special ammo was consumed (hit confirmed) and the corresponding
-    inventory count is decremented.
+    The authoritative hit signal is tile-occupancy: the JS Gg.prototype.h
+    switch case 18 prints "You hit X" exactly when the shot's target
+    tile contains a named tank. Translated here as ``victim_id > 0``.
+    Weapon byte is used only for ammo decrement -- it cannot
+    distinguish single shots from misses (wiki: weapon=0 is ambiguous).
 
     Args:
         ws: World service instance.
-        weapon_byte: Last byte of combat_data (0=single, 1=dual,
-            2=missile, 3=homing).
+        weapon_byte: target byte index 10 (0=single, 1=dual, 2=missile,
+            3=homing). Decrements that ammo type when > 0.
+        victim_id: Tank id present at the shot's target tile, or -1 if
+            the tile was empty (miss).
     """
     ws.got_our_shot_response = True
-    if weapon_byte > 0:
+    ws.last_shot_victim_id = victim_id
+    if victim_id > 0:
         ws.got_confirmed_hit = True
+    if weapon_byte > 0:
         _decrement_ammo_for_weapon(ws, weapon_byte)
 
 
 def check_and_clear_combat_hit(ws: WorldService) -> bool:
-    """Check if our shot hit (special ammo was used), then clear.
+    """Check if our most recent shot hit a tank, then clear.
+
+    Hit = any tank existed at the wire-reported target tile of our shot.
+    Authoritative per the JS shoot handler (case 18: "You hit X").
 
     Args:
         ws: World service instance.
 
     Returns:
-        True if shot connected (weapon_byte > 0), False if miss.
+        True if shot landed on an occupied tile, False if tile was empty.
     """
     result = ws.got_confirmed_hit
     ws.got_confirmed_hit = False
+    return result
+
+
+def check_and_clear_last_shot_victim_id(ws: WorldService) -> int:
+    """Return the tank id our last shot landed on, then clear.
+
+    Used by combat_feedback to tell intended-target hits apart from
+    incidental hits (homing seeker landing on a closer enemy than the
+    bot commanded).
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        Tank id of victim on target tile, or -1 if tile was empty.
+    """
+    result = ws.last_shot_victim_id
+    ws.last_shot_victim_id = -1
     return result
 
 
@@ -188,8 +215,32 @@ def check_and_clear_teleport_landed(ws: WorldService) -> bool:
     return result
 
 
+def check_and_clear_command_error(ws: WorldService) -> int:
+    """Return and clear the last command error code from a Supervisor message.
+
+    Error codes from tpclient.js Gb[] array:
+      0 = "You can't do this"
+      1 = "You can't go there!"
+      4 = "Empty container"
+      5 = "Tank full"
+      8 = "Insufficient fuel"
+     -1 = no error pending
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        Error code (0-10), or -1 if no error pending.
+    """
+    result = ws.last_command_error
+    ws.last_command_error = -1
+    return result
+
+
 __all__ = [
     "check_and_clear_combat_hit",
+    "check_and_clear_command_error",
+    "check_and_clear_last_shot_victim_id",
     "check_and_clear_our_shot_response",
     "check_and_clear_teleport_landed",
     "clear_death_anchor",

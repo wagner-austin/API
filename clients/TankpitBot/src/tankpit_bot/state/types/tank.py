@@ -23,6 +23,12 @@ class TankStateDict(TypedDict):
         team: Team ID (0=red, 1=purple, 2=blue, 3=orange).
         rank: Military rank (0-7).
         damage_state: Health state (0=full, 1=light, 2=medium, 3=critical).
+        direction: Sprite direction byte. Low nibble (0-15) = facing
+            heading, high nibble carries state flags. Bit 5 (value 32)
+            is the DEAD flag — the game client sets direction to 32 or
+            33 on deactivation (tpclient.js ``Pg.prototype.h``). Check
+            ``direction >= 32`` to detect dead/corpse tanks. Verified
+            across 42 corpse transitions in capture data (2026-06-18).
         name: Player name.
         is_bot: Whether this is a bot player.
         is_self: Whether this is the player's own tank.
@@ -50,6 +56,7 @@ class TankStateDict(TypedDict):
     team: int
     rank: int
     damage_state: int
+    direction: int
     name: str
     is_bot: bool
     is_self: bool
@@ -71,6 +78,7 @@ def make_tank_state(
     source: EntitySource = "viewport",
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
+    direction: int = 0,
 ) -> TankStateDict:
     """Create a tank state.
 
@@ -88,6 +96,8 @@ def make_tank_state(
         timestamp_ms: When this tank was last confirmed by any source.
         last_wire_seen_ms: When a wire-presence source last vouched for
             this tank's presence. Zero means never wire-confirmed.
+        direction: Sprite direction byte. 0-31 = alive facing,
+            32-33 = dead corpse.
 
     Returns:
         TankStateDict with the provided values.
@@ -99,6 +109,7 @@ def make_tank_state(
         team=team,
         rank=rank,
         damage_state=damage_state,
+        direction=direction,
         name=name,
         is_bot=is_bot,
         is_self=is_self,
@@ -124,6 +135,7 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "team": state["team"],
         "rank": state["rank"],
         "damage_state": state["damage_state"],
+        "direction": state["direction"],
         "name": state["name"],
         "is_bot": state["is_bot"],
         "is_self": state["is_self"],
@@ -152,6 +164,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         team=require_int(data, "team"),
         rank=require_int(data, "rank"),
         damage_state=require_int(data, "damage_state"),
+        direction=require_int(data, "direction"),
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
         is_self=require_bool(data, "is_self"),

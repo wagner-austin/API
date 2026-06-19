@@ -32,6 +32,7 @@ tankpit-teleport-probe = "scripts.teleport_probe:main"
 tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
 tankpit-fuel-probe = "scripts.fuel_probe:main"
 tankpit-movement-probe = "scripts.movement_probe:main"
+tankpit-combat-probe = "scripts.combat_probe:main"
 tankpit-issue-report = "tankpit_bot.diagnostics.issue_report_renderer:main"
 tankpit-tile-info = "tankpit_bot.diagnostics.tile_inspector:main"
 tankpit-self-map = "tankpit_bot.diagnostics.self_map:main"
@@ -71,7 +72,7 @@ explicit_package_bases = true
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-exclude = [".venv", ".pytest_tmp"]
+exclude = [".venv", ".pytest_tmp", "analysis_scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -91,7 +92,10 @@ mypy-init-return = true
 
 [tool.coverage.run]
 source = ["src", "scripts"]
-omit = []
+omit = [
+    "src/tankpit_bot/action_lab/combat_probe.py",
+    "scripts/combat_probe.py",
+]
 branch = true
 # Playwright's sync API drives the browser on a greenlet; without this,
 # coverage loses the tracer across its context switches and under-counts

@@ -199,8 +199,8 @@ class TestDecideKillCooldown:
                 decision["behavior"]["target_y"],
             ) != (105, 105)
 
-    def test_miss_reopens_map_when_target_far(self) -> None:
-        """Miss feedback returns HUNT to reacquisition for distant targets."""
+    def test_miss_recloses_on_far_target(self) -> None:
+        """Miss feedback re-closes on distant target (teleport, not shoot)."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -232,11 +232,11 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_miss_always_reacquires_even_when_close(self) -> None:
-        """Miss feedback triggers reacquisition even when the target was adjacent."""
+    def test_miss_reshoots_when_adjacent(self) -> None:
+        """Miss feedback re-aims at adjacent target instead of blocking."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -271,8 +271,8 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_closing_recloses_when_not_cardinally_adjacent(self) -> None:
         """Diagonal landing positions continue HUNT close behavior instead of shooting."""

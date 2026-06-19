@@ -21,8 +21,6 @@ from tankpit_bot.protocol import (
     MSG_FUEL_DEPOSIT,
     MSG_FUEL_GAIN,
     MSG_INVENTORY,
-    MSG_MINE_DETONATE,
-    MSG_MINE_PLACE,
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
     MSG_OVERLAY_UPDATE,
@@ -40,8 +38,8 @@ from tankpit_bot.protocol import (
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
     MSG_VIEWPORT,
-    SUPERVISOR_STATUS_PROMO_ELIGIBLE,
-    SUPERVISOR_STATUS_PROMO_KILL,
+    SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     TEXT_MSG_TYPES,
     DecodeError,
     decode_message,
@@ -86,15 +84,9 @@ class TestDecodeMessage:
         result = decode_message(MSG_DEACTIVATE, deactivation_data)
         assert result["msg_type"] == 0x41
 
-        # Mine placement
-        mine_place_data = bytes([1, 0x02, 0x01, 1, 10, 20])
-        result = decode_message(MSG_MINE_PLACE, mine_place_data)
-        assert result["msg_type"] == 0x4B
-
-        # Mine detonation
-        mine_det_data = bytes([10, 20])
-        result = decode_message(MSG_MINE_DETONATE, mine_det_data)
-        assert result["msg_type"] == 0x45
+        # 0x4B MinePlacement / 0x45 MineDetonation are container-only
+        # subtypes -- protocol-layer routing for them was deleted
+        # 2026-06-19. They're tested at the container layer.
 
     def test_dispatches_resource_messages(self) -> None:
         """Dispatches to resource message decoders."""
@@ -156,10 +148,12 @@ class TestDecodeMessage:
         result = decode_message(MSG_TANK_EXIT, exit_data)
         assert result["msg_type"] == 0x58
 
-        # Tank stats (0x2E) - uses container decoder
-        stats_data = bytes([0x59, 0x09, 0xCD, 0x07, 0x99, 0x84, 0x93, 0xCE, 0x9C, 0x80, 0x51])
-        result = decode_message(MSG_TANK_STATS, stats_data)
-        assert result["msg_type"] == "combat_hit"
+        # Tank stats (0x2E) - uses container decoder. 0x53 ShootEvent
+        # routes via the protocol tunnel path now; use teleport_landed
+        # (1-byte) as a stable container-path witness.
+        landed_data = bytes([0x54])
+        result = decode_message(MSG_TANK_STATS, landed_data)
+        assert result["msg_type"] == "teleport_landed"
 
         # Tunneled terrain/structure tile update inside 0x2E
         terrain_tunnel = bytes([MSG_TERRAIN_UPDATE, 8, 166, 2])
@@ -179,13 +173,13 @@ class TestDecodeMessage:
 
     def test_dispatches_movement_messages(self) -> None:
         """Dispatches to movement message decoders."""
-        # Movement
-        movement_data = bytes([0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05])
+        # Movement (12 bytes: tid(2)+pos(2)+dir+flag+lb(3)+rank+dmg+carry)
+        movement_data = bytes([0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05, 0, 0, 0])
         result = decode_message(MSG_MOVEMENT, movement_data)
         assert result["msg_type"] == 0x47
 
-        # Move response
-        response_data = bytes([1, 0x02, 0x01, 50, 60, 3, 0x00, 4, 0x05, 0x06, 0x07])
+        # Move response (12 bytes: team+tid(2)+pos(2)+dir+dmg+rank+lb(3)+carry)
+        response_data = bytes([1, 0x02, 0x01, 50, 60, 3, 0x00, 4, 0x05, 0x06, 0x07, 0])
         result = decode_message(MSG_MOVE_RESPONSE, response_data)
         assert result["msg_type"] == 0x3D
 
@@ -317,7 +311,7 @@ class TestTryDecodeBinaryMessage:
 
     def test_returns_movement_message(self) -> None:
         """Returns decoded movement message (MSG_MOVEMENT)."""
-        movement_data = bytes([0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05])
+        movement_data = bytes([0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05, 0, 0, 0])
         result = try_decode_binary_message(MSG_MOVEMENT, movement_data)
         expected = decode_message(MSG_MOVEMENT, movement_data)
         assert result == expected
@@ -409,13 +403,13 @@ class TestUnwrap0x2e:
 
     def test_unwraps_movement_from_0x2e(self) -> None:
         """Decodes tunneled 0x47 movement from inside 0x2E."""
-        data = bytes([MSG_MOVEMENT, 0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05])
+        data = bytes([MSG_MOVEMENT, 0x02, 0x01, 50, 60, 3, 1, 0x03, 0x04, 0x05, 0, 0, 0])
         result = decode_message(MSG_TANK_STATS, data)
         assert result["msg_type"] == 0x47
 
     def test_unwraps_move_response_from_0x2e(self) -> None:
-        """Decodes tunneled 0x3D move response from inside 0x2E."""
-        data = bytes([MSG_MOVE_RESPONSE, 1, 0x02, 0x01, 50, 60, 3, 0x00, 4, 0x05, 0x06, 0x07])
+        """Decodes tunneled 0x3D move response from inside 0x2E (12 inner bytes)."""
+        data = bytes([MSG_MOVE_RESPONSE, 1, 0x02, 0x01, 50, 60, 3, 0x00, 4, 0x05, 0x06, 0x07, 0])
         result = decode_message(MSG_TANK_STATS, data)
         assert result["msg_type"] == 0x3D
 
@@ -454,10 +448,14 @@ class TestUnwrap0x2e:
         assert result["fuel"] == 1400
 
     def test_nested_0x2e_short_falls_through_to_container(self) -> None:
-        """Nested 0x2E with < 9 bytes falls through to container decoder."""
+        """Nested 0x2E with < 9 bytes falls through to container decoder.
+
+        Container's TankStatusSync (2-3 byte catch-all) was deleted
+        2026-06-19; short bodies now resolve to unknown_container.
+        """
         data = bytes([MSG_TANK_STATS, 0x01])
         result = decode_message(MSG_TANK_STATS, data)
-        assert result["msg_type"] == "tank_status_sync"
+        assert result["msg_type"] == "unknown_container"
 
     def test_short_data_falls_through_to_container(self) -> None:
         """Single byte data is too short for unwrap, goes to container."""
@@ -470,22 +468,22 @@ class TestUnwrap0x2e:
         # 0x49 subtype but only 2 bytes total — too short for inventory
         data = bytes([MSG_INVENTORY, 0x01])
         result = decode_message(MSG_TANK_STATS, data)
-        assert result["msg_type"] == "tank_status_sync"
+        assert result["msg_type"] == "unknown_container"
 
     def test_unknown_subtype_falls_through_to_container(self) -> None:
         """Unknown subtype falls through to container structure matching."""
         data = bytes([0xFF, 0x01])
         result = decode_message(MSG_TANK_STATS, data)
-        assert result["msg_type"] == "tank_status_sync"
+        assert result["msg_type"] == "unknown_container"
 
     def test_tunneled_0x4f_with_bad_structure_falls_through(self) -> None:
         """Tunneled 0x4F with invalid radar scan structure falls through."""
         # 0x4F subtype but inner data has container_count=1 and only 3 bytes
         # (needs at least 2 + 4 = 6). Structural check fails → falls through
-        # to container identification which matches it as player_list_short.
+        # to container identification. Result is not the 0x4F radar type.
         data = bytes([0x4F, 0x01, 0x00, 0xAA])
         result = decode_message(MSG_TANK_STATS, data)
-        assert result["msg_type"] != "radar_response"
+        assert result["msg_type"] != 0x4F
 
     def test_tunneled_0x4f_with_valid_radar_structure_decodes(self) -> None:
         """Tunneled 0x4F with valid radar scan structure decodes as radar."""
@@ -506,7 +504,7 @@ class TestUnwrap0x2e:
         # 0x4F subtype but only 1 inner byte — too short for structural check.
         data = bytes([0x4F, 0x00])
         result = decode_message(MSG_TANK_STATS, data)
-        assert result["msg_type"] == "tank_status_sync"
+        assert result["msg_type"] == "unknown_container"
 
 
 class TestMessageConstants:
@@ -522,7 +520,7 @@ class TestMessageConstants:
         assert ord("C") == MSG_CACHE_UPDATE
         assert ord("Z") == MSG_VIEWPORT
 
-    def test_supervisor_status_constants(self) -> None:
-        """Supervisor status constants have expected values."""
-        assert SUPERVISOR_STATUS_PROMO_ELIGIBLE == 1
-        assert SUPERVISOR_STATUS_PROMO_KILL == 8
+    def test_supervisor_error_constants(self) -> None:
+        """Supervisor error code constants have expected values."""
+        assert SUPERVISOR_ERROR_CANT_GO == 1
+        assert SUPERVISOR_ERROR_INSUFFICIENT_FUEL == 8
