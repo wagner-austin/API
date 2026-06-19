@@ -1,0 +1,70 @@
+---
+title: Official Game Rules (How To Play Screens)
+tags: [game-mechanics, rules, official]
+related: [[shot-range]], [[radar-mechanics]], [[equipment-system]], [[teleport-mechanics]], [[ferry-mechanics]]
+sources: [see footnotes]
+fact_checked: 2026-06-16
+confidence: high
+---
+
+# Official Game Rules
+
+Transcribed from the five in-game "How To Play" screens.[^1]
+
+## Movement and combat
+
+- Click on a land tile and your tank will attempt to drive there
+- Move to fuel to pick it up — don't let your tank run out of fuel
+- **Click on an enemy tank to shoot it** — you target the enemy directly, not an adjacent tile
+- Click on enemy mines to blow them up
+- Click and hold to grab or drop an obstacle; tow it behind your tank to build a bridge or base
+- Enemy tanks are blocked and damaged if they drive into your mines
+- Click and hold to grab equipment
+- Use a ferry to drive on water
+
+## Map and teleport
+
+- **Open the map, then click on it to teleport** your tank to a new location
+- This confirms: you click the target position on the map (enemy, container, or tile) and the server places you
+
+## Equipment types
+
+| Type | Effect |
+|------|--------|
+| Armor shield | Protects from enemy fire and conserves fuel |
+| Dual shot | Inflicts double damage |
+| Missile shot | Fires OVER mountains, obstacles, or other tanks |
+| Homing shot | Follows an enemy as they drive or teleport away |
+| Extra radar | Scans the entire viewport instead of just the area around your tank |
+
+## Equipment capacity
+
+- Recruits hold **20** of each equipment type
+- Each higher rank holds **5 more** of each type than the previous rank
+- Equipment use can be enabled or disabled
+
+## Ranks and promotion
+
+| Rank | Points required | Additional requirement |
+|------|----------------|----------------------|
+| Recruit | 0 (starting) | — |
+| Private | 500 | — |
+| Corporal | 1,000 | — |
+| Sergeant | 4,000 | — |
+| Lieutenant | 10,000 | deactivate a corporal or higher |
+| Captain | 20,000 | deactivate a sergeant or higher |
+| Major | 30,000 | deactivate a lieutenant or higher |
+| Colonel | 40,000 | deactivate a captain or higher |
+| General | 50,000 | deactivate a colonel or higher |
+
+**Higher rank tanks hold more fuel, equipment, and have a larger radar.** This means the built-in radar radius may scale with rank — not just the 5x5 we measured at our rank. See [[radar-mechanics]].[^2]
+
+**Demotion:** if deactivated by an enemy, you lose one rank.
+
+## Fuel
+
+- If you run out of fuel, your tank will be deactivated
+- This is the death spiral: 0 fuel = instant deactivation, not just immobility
+
+[^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
+[^2]: "Higher rank tanks... have a larger radar" — official text; may mean built-in radar radius scales; our 5x5 measurement was at a specific rank; needs verification at higher ranks

@@ -1,0 +1,39 @@
+---
+title: Shot Range
+tags: [combat, shooting, geometry]
+related: [[shoot-event-format]], [[tank-registry]], [[combat-chase-bug]]
+sources: [see footnotes]
+fact_checked: 2026-06-16
+confidence: high
+---
+
+# Shot Range
+
+## Measured data (350 shots, 2026-06-11)
+
+| Manhattan distance | Hits | Misses | Rate |
+|-------------------|------|--------|------|
+| 1 | 255 | 0 | 100% |
+| 2 | 1 | 0 | 100% (single sample) |
+| 4+ | 0 | 80+ | 0% |
+
+Distance-15 "hits" in the raw data were homing shots (which track the target). Excluded from range measurement.[^1]
+
+## Rules
+
+- **Shots in range never miss** — the range is cardinal adjacency (Manhattan distance 1)[^1]
+- Distance 2 has only 1 sample — not enough to trust as reliable range[^2]
+- `SHOT_RANGE_TILES = 2` in `combat_strategy.py` but `has_cardinal_combat_shot` requires distance == 1 for the proven shot[^2]
+- Must be within the 18x18 viewport to hit; larger ranges miss because they're outside the viewport (`COMBAT_RANGE=8` is the awareness range, not shot range)[^3]
+
+## Cardinal adjacency
+
+The bot requires **Manhattan distance exactly 1** (same row or column, 1 tile apart) before firing. This is the only proven reliable geometry for a guaranteed hit.[^1]
+
+## Homing shots
+
+Homing shots track the target regardless of distance. They bypass normal range rules. See [[weapon-log-markers]] for detection.[^1]
+
+[^1]: 350 shots analyzed from run 20260611 — Manhattan 1 = 255/255, 4+ = ~0%, distance-15 were homing
+[^2]: current code uses SHOT_RANGE_TILES=2 but has_cardinal_combat_shot gates shooting on distance==1; distance-2 data insufficient
+[^3]: user (Austin), 2026-04-20 — "must be within 18x18 viewport to hit"

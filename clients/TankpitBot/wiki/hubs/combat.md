@@ -1,0 +1,11 @@
+# Combat
+
+Fighting strategy, weapon behavior, enemy AI patterns, and diagnosed combat bugs.
+
+[Shot Range](../pages/shot-range.md) -- Manhattan 1 proven (255/255), range 2 has 1 sample, 4+ all miss, cardinal adjacency required
+[Enemy Bot Behavior](../pages/enemy-bot-behavior.md) -- bots stand ground, only flee at low HP, never collect resources, never fight each other
+[Weapon Log Markers](../pages/weapon-log-markers.md) -- dual="You hit", homing="You fire", no miss lines in range
+[Weapon Selection](../pages/weapon-selection.md) -- server-side: dual at adjacent, homing when target moves same tick, single at empty ground
+[Combat Chase Bug](../pages/combat-chase-bug.md) -- teleport-chase loop diagnosed and fixed: teleport directly to target
+[Gameplay Loop](../pages/gameplay-loop.md) -- the full combat→refill→radar conservation cycle as played by a human
+[Equipment Refill Strategy](../pages/equipment-refill-strategy.md) -- low-radar grid walk, extra radar conservation, container randomness
