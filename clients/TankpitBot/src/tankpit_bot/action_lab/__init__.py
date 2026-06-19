@@ -6,6 +6,22 @@ package structure is intended to host additional live action probes over time.
 """
 
 from tankpit_bot.action_lab.capture import build_capture_output_path, save_capture_session
+from tankpit_bot.action_lab.combat_probe import (
+    CombatProbe,
+    format_combat_probe_summary,
+    run_combat_probe,
+)
+from tankpit_bot.action_lab.combat_probe_types import (
+    CombatEngagementDict,
+    CombatProbeSessionDict,
+    CombatShotResultDict,
+    decode_combat_engagement,
+    decode_combat_probe_session,
+    decode_combat_shot_result,
+    encode_combat_engagement,
+    encode_combat_probe_session,
+    encode_combat_shot_result,
+)
 from tankpit_bot.action_lab.enemy_teleport import (
     EnemyTeleportProbe,
     format_enemy_teleport_probe_summary,
@@ -105,6 +121,10 @@ from tankpit_bot.action_lab.types_codecs import (
 __all__ = [
     "DEFAULT_TELEPORT_STRATEGY",
     "ActionLabSessionError",
+    "CombatEngagementDict",
+    "CombatProbe",
+    "CombatProbeSessionDict",
+    "CombatShotResultDict",
     "EnemyTeleportAttemptResultDict",
     "EnemyTeleportProbe",
     "EnemyTeleportProbeSessionDict",
@@ -131,6 +151,9 @@ __all__ = [
     "build_box_targets",
     "build_capture_output_path",
     "build_distinct_ground_targets",
+    "decode_combat_engagement",
+    "decode_combat_probe_session",
+    "decode_combat_shot_result",
     "decode_enemy_teleport_attempt_result",
     "decode_enemy_teleport_probe_session",
     "decode_fuel_probe_attempt_result",
@@ -143,6 +166,9 @@ __all__ = [
     "decode_teleport_attempt_result",
     "decode_teleport_probe_session",
     "decode_teleport_target",
+    "encode_combat_engagement",
+    "encode_combat_probe_session",
+    "encode_combat_shot_result",
     "encode_enemy_teleport_attempt_result",
     "encode_enemy_teleport_probe_session",
     "encode_fuel_probe_attempt_result",
@@ -155,6 +181,7 @@ __all__ = [
     "encode_teleport_attempt_result",
     "encode_teleport_probe_session",
     "encode_teleport_target",
+    "format_combat_probe_summary",
     "format_enemy_teleport_probe_summary",
     "format_fuel_dot_probe_summary",
     "format_fuel_probe_summary",
@@ -162,6 +189,7 @@ __all__ = [
     "format_queue_probe_summary",
     "format_teleport_probe_summary",
     "parse_targets_arg",
+    "run_combat_probe",
     "run_enemy_teleport_probe",
     "run_fuel_dot_probe",
     "run_fuel_probe",
