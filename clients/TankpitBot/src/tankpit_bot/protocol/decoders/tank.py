@@ -307,6 +307,7 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         decode_deactivation,
         decode_shoot_event,
     )
+    from tankpit_bot.protocol.decoders.map_data import decode_map_data
     from tankpit_bot.protocol.decoders.radar import (
         decode_radar_result,
         decode_radar_scan_result,
@@ -326,6 +327,14 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         return decode_radar_result(inner)
     if subtype == 0x4A:
         return decode_terrain_update(inner)
+    if subtype == 0x4C and len(inner) >= 2:
+        # 2941 corpus samples were being mis-identified as
+        # length-based "WorldState" (500+ byte container blobs).
+        # They are tunneled 0x4C MapData (Ig.h): u16 LE RLE byte
+        # count + RLE fuel-dot section + 5-byte tank entries to
+        # body end. See analysis_scripts/crack_tank_update.py for
+        # the MapData layout proof.
+        return decode_map_data(inner)
     if subtype == 0x4F and _is_radar_scan_structure(inner):
         return decode_radar_scan_result(inner)
     if subtype == 0x52 and len(inner) >= 3:

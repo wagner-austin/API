@@ -529,6 +529,25 @@ class TestDecode0x2eMessage:
         # Short form: no fuel field
         assert result["fuel"] is None
 
+    def test_tunneled_map_data_routes_through_world(self) -> None:
+        """Tunneled 0x4C inside 0x2E decodes as MapData.
+
+        Verified against 2941 production samples in the 150-session
+        corpus -- previously misidentified as length-based
+        ``WorldState`` blobs because no tunneled 0x4C dispatch
+        existed. The bot's world_state was being broadcast at us with
+        full tank-position info on every map open and we were
+        ignoring it.
+        """
+        # Body: subtype 0x4C + LE u16 RLE count (=0, no dots) + one
+        # 5-byte tank entry at x=10,y=20,tid=0x0102,packed=0x12.
+        data = bytes.fromhex("4c0000" + "0a14" + "0201" + "12")
+        result = decode_0x2e_message(data)
+        assert result["msg_type"] == 0x4C
+        assert result["fuel_dots"] == []
+        assert len(result["tanks"]) == 1
+        assert result["tanks"][0]["tank_id"] == 0x0102
+
     def test_tunneled_build_pickup_routes_through_misc(self) -> None:
         """Tunneled 0x42 inside 0x2E decodes as a BuildPickup body.
 

@@ -101,6 +101,22 @@ class TestWorldStateBlobParsing:
         assert state["tanks"]["500"]["x"] == 150
         assert state["tanks"]["500"]["y"] == 80
 
+    def test_blob_with_nontrivial_dot_section(self) -> None:
+        """Blob with non-255 dot bytes emits dots into the cursor stream.
+
+        2026-06-19: all production traffic now routes via tunneled 0x4C
+        MapData; this synthetic test pins the dot-emission branch in
+        _decode_fuel_dot_layer until the legacy world_state blob path
+        is removed.
+        """
+        blob = self._build_world_state_blob(
+            dot_section=bytes([1, 2, 3]),
+            tank_entries=[(50, 60, 700, 0, 0)],
+        )
+        dispatch_world_state_update(get_world_service(), self._make_msg(blob))
+        state = get_world_service().world_state
+        assert "700" in state["tanks"]
+
     def test_empty_blob_no_crash(self) -> None:
         """Too-short blob is handled gracefully."""
         dispatch_world_state_update(get_world_service(), self._make_msg(b"\x00"))
