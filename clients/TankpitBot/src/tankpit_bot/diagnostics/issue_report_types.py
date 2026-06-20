@@ -198,6 +198,18 @@ class SessionScorecardDict(TypedDict):
         kills: Count of ``tank_deactivated`` DIAGNOSTIC events.
         shots: Count of ``WIRE`` events whose message starts with
             ``shoot(``.
+        combat_misses: Count of ``combat_miss`` DIAGNOSTIC events
+            (shot resolved with no tank at the target tile).
+        combat_ghosts_blocked: Count of ``combat_ghost_detected``
+            DIAGNOSTIC events (combat shot refused because the
+            target's last wire-presence stamp went stale).
+        combat_stale_positions_blocked: Count of
+            ``combat_stale_position`` DIAGNOSTIC events (combat shot
+            refused because the target's last wire-confirmed position
+            went stale -- the kill-shot gate added by the 2026-06-19
+            freshness refactor).
+        tank_damage_changes: Count of ``tank_damage_changed``
+            DIAGNOSTIC events.
         fuel_min: Lowest ``belief_fuel`` across
             ``self_alignment_sample`` events, or ``-1`` with no samples.
         fuel_last: Final ``belief_fuel`` sample, or ``-1`` with no
@@ -231,6 +243,10 @@ class SessionScorecardDict(TypedDict):
     state_budget: list[StateBudgetRecordDict]
     kills: int
     shots: int
+    combat_misses: int
+    combat_ghosts_blocked: int
+    combat_stale_positions_blocked: int
+    tank_damage_changes: int
     fuel_min: int
     fuel_last: int
     fuel_sample_count: int

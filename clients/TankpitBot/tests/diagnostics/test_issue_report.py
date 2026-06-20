@@ -568,6 +568,62 @@ def test_scorecard_counts_tank_deactivated_kills(fake_fs: FakeFileSystem) -> Non
     assert report["scorecard"]["kills"] == 2
 
 
+def test_scorecard_counts_combat_gate_diagnostics(fake_fs: FakeFileSystem) -> None:
+    """Combat-gate DIAGNOSTIC events each feed their dedicated scorecard counter.
+
+    Locks the wiring added 2026-06-19 alongside the freshness refactor.
+    Without these counters the issue report ignores ``combat_miss``,
+    ``combat_ghost_detected``, ``combat_stale_position``, and
+    ``tank_damage_changed`` -- regressing this test would re-blind the
+    report.
+    """
+    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
+    _emit_session_room("1", "field01.gif")
+    emit_diagnostic(
+        diagnostic_kind="combat_miss",
+        target_name="orange-8",
+        target_id=534,
+    )
+    emit_diagnostic(
+        diagnostic_kind="combat_miss",
+        target_name="red-3",
+        target_id=211,
+    )
+    emit_diagnostic(
+        diagnostic_kind="combat_ghost_detected",
+        target_name="purple-9",
+        target_id=517,
+        wire_age_ms=60000,
+    )
+    emit_diagnostic(
+        diagnostic_kind="combat_stale_position",
+        target_name="orange-8",
+        target_id=534,
+        position_age_ms=5000,
+    )
+    emit_diagnostic(
+        diagnostic_kind="tank_damage_changed",
+        tank_id=534,
+        tank_name="orange-8",
+        previous_damage_state=0,
+        damage_state=1,
+    )
+    emit_diagnostic(
+        diagnostic_kind="tank_damage_changed",
+        tank_id=211,
+        tank_name="red-3",
+        previous_damage_state=1,
+        damage_state=2,
+    )
+
+    report = build_issue_report(Path(artifacts["latest_events_path"]))
+
+    assert report["scorecard"]["combat_misses"] == 2
+    assert report["scorecard"]["combat_ghosts_blocked"] == 1
+    assert report["scorecard"]["combat_stale_positions_blocked"] == 1
+    assert report["scorecard"]["tank_damage_changes"] == 2
+
+
 def test_scorecard_tracks_self_alignment_fuel_samples(fake_fs: FakeFileSystem) -> None:
     """``self_alignment_sample`` DIAGNOSTIC events feed fuel_min and fuel_last."""
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")

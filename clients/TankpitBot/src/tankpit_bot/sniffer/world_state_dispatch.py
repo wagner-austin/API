@@ -63,51 +63,37 @@ def _update_tank_from_position_status(
     rank: int,
     team: int,
 ) -> None:
-    """Update tank from 0x3D position+status container message.
+    """Update tank from 0x3D MovementResponse: position + direction + damage + rank.
 
     Carries position, direction (alive/dead), damage, and rank for
     every tank on the map. Direction >= 32 indicates a corpse.
 
     Args:
         ws: World service instance.
-        tank_id: Tank ID.
+        tank_id: Tank id.
         x: Map x position.
         y: Map y position.
         direction: Sprite direction (0-31 alive, 32-33 dead).
         damage_state: Damage tier (0-3).
         rank: Military rank (0-8).
-        team: Team ID (0-3).
+        team: Team id (0-3).
     """
-    ts = browser.get_current_time_ms()
-    key = str(tank_id)
-    existing = ws.world_state["tanks"].get(key)
-    name = existing["name"] if existing else ""
-    is_bot = existing["is_bot"] if existing else False
-    from tankpit_bot.state import update_tank_from_registry
+    from tankpit_bot.state.mutations import apply_tank_observation
+    from tankpit_bot.state.types import make_tank_observation
 
-    ws.world_state = update_tank_from_registry(
-        ws.world_state,
-        tank_id,
-        team,
-        name,
-        rank,
-        is_bot,
-        x,
-        y,
-        "viewport",
-        ts,
-        wire_present=True,
+    ts = browser.get_current_time_ms()
+    obs = make_tank_observation(
+        tank_id=tank_id,
+        timestamp_ms=ts,
+        is_wire_sourced=True,
+        storage_source="viewport",
+        position=(x, y),
+        team=team,
+        rank=rank,
+        damage_state=damage_state,
         direction=direction,
     )
-    if existing is not None and existing["damage_state"] != damage_state:
-        from tankpit_bot.state import update_tank_damage
-
-        ws.world_state = update_tank_damage(
-            ws.world_state,
-            tank_id,
-            damage_state,
-            ts,
-        )
+    ws.world_state = apply_tank_observation(ws.world_state, obs)
 
 
 def _dispatch_shoot_event(
@@ -160,8 +146,8 @@ def _find_tank_at_tile(ws: WorldService, x: int, y: int, exclude_id: int) -> int
 
     Args:
         ws: World service instance.
-        x: Tile x coordinate from CombatHit.target_x.
-        y: Tile y coordinate from CombatHit.target_y.
+        x: Tile x coordinate from ShootEvent.target_x.
+        y: Tile y coordinate from ShootEvent.target_y.
         exclude_id: Tank id to skip (typically our own tank, since
             the bot never shoots itself).
 

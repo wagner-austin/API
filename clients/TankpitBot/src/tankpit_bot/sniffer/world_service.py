@@ -89,10 +89,12 @@ class WorldService:
         self.got_confirmed_hit: bool = False
         self.got_our_shot_response: bool = False
         # Tank id present on the target tile of our most recent shot, or
-        # -1 if the tile was empty. Set by mark_combat_hit; consumed by
-        # combat_feedback to distinguish hits on the intended target from
-        # incidental hits (e.g. homing seeker locking onto a closer
-        # enemy than the bot commanded).
+        # -1 if the tile was empty. Set by ``mark_combat_hit`` (legacy
+        # function name; now consumes 0x53 ShootEvent fields after the
+        # 2026-06-19 decoder unification). Consumed by combat_feedback
+        # to distinguish hits on the intended target from incidental
+        # hits (e.g. homing seeker locking onto a closer enemy than the
+        # bot commanded).
         self.last_shot_victim_id: int = -1
         self.killed_tank_ids: set[int] = set()
         self.tank_death_anchors: dict[int, tuple[int, int]] = {}

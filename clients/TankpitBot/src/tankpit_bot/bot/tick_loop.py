@@ -388,12 +388,12 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
 def _get_combat_feedback(bot: Bot) -> CombatFeedback:
     """Get combat feedback from the wire tile-occupancy signal.
 
-    The CombatHit decoder now extracts target_x, target_y from the wire
-    and the dispatcher looks up which tank (if any) was on that tile.
-    That tile-occupancy result is the authoritative hit signal per
-    tpclient.js Gg.prototype.h (case 18 -> "You hit X"), which the old
-    weapon_byte heuristic could not reliably reproduce -- weapon=0 is
-    indistinguishable from miss per the wiki.
+    The 0x53 ShootEvent decoder extracts ``target_x``, ``target_y``
+    from the wire and the dispatcher looks up which tank (if any) was
+    on that tile. That tile-occupancy result is the authoritative hit
+    signal per tpclient.js ``Gg.prototype.h`` (case 18 -> "You hit X"),
+    which the old weapon_byte heuristic could not reliably reproduce --
+    weapon=0 is indistinguishable from miss per the wiki.
 
     Outcomes:
       - tile had any tank        -> "hit"
@@ -401,9 +401,12 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
       - shot response, empty tile -> "miss"
       - no response yet           -> ""  (keep waiting)
 
-    Ammo count is decremented in mark_combat_hit by weapon_byte. Combat
-    feedback never rewrites inventory counts -- protocol messages
-    (0x49, 0x67, 0x74) are the sole authority for item counts.
+    Ammo count is decremented in ``mark_combat_hit`` (legacy function
+    name predating the 2026-06-19 decoder unification; the function
+    now consumes ShootEvent fields, not the deleted CombatHit
+    container). Combat feedback never rewrites inventory counts --
+    wire messages 0x49, 0x67, 0x74 are the sole authority for item
+    counts.
 
     Args:
         bot: Bot instance.

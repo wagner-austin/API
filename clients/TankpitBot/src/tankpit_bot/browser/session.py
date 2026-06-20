@@ -24,7 +24,6 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
 )
 from tankpit_bot.browser.session_base import SessionBase
-from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.types import (
     CapturedMessage,
 )
@@ -61,7 +60,6 @@ class BrowserSession(SessionBase):
         super().__init__(target_url, headless=headless, prefer_account=prefer_account)
         self._page: PageProtocol | None = None
         self._game_log_scraper: GameLogScraper | None = None
-        self._combat_tracker: CombatTracker | None = None
 
     @property
     def session_id(self) -> str:
@@ -93,10 +91,15 @@ class BrowserSession(SessionBase):
         log.info("Game log scraper initialized")
 
     def _poll_game_log(self) -> list[GameLogEntry]:
-        """Poll for new game log entries, log them, and process combat.
+        """Poll for new game log entries since the last call.
+
+        Each new entry is logged at INFO via ``_process_game_log_entry``;
+        subclasses override that hook (or override this method) to add
+        per-entry handling such as combat tracking or capture-session
+        persistence.
 
         Returns:
-            List of new entries found since last poll.
+            List of new entries found since last poll (in arrival order).
         """
         if self._game_log_scraper is None:
             return []
@@ -108,23 +111,16 @@ class BrowserSession(SessionBase):
     def _process_game_log_entry(self, entry: GameLogEntry) -> None:
         """Process a single game log entry.
 
+        Default behavior logs the entry at INFO with a category prefix.
+        Subclasses override to add session-specific handling (e.g. the
+        sniffer subclass records entries to the capture session and
+        feeds combat-category lines to its CombatTracker).
+
         Args:
             entry: The game log entry to process.
         """
         prefix = f"[GAME:{entry['category'].upper()}]"
         log.info("%s %s", prefix, entry["text"])
-        # Process combat events
-        if entry["category"] != "combat" or self._combat_tracker is None:
-            return
-        event = self._combat_tracker.process_log_line(entry["text"])
-        if event is None:
-            return
-        self._combat_tracker.log_event(event)
-
-    def _init_combat_tracker(self) -> None:
-        """Initialize the combat tracker."""
-        self._combat_tracker = CombatTracker()
-        log.info("Combat tracker initialized")
 
 
 __all__ = [

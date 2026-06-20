@@ -8,25 +8,29 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.inventory import InventoryItem, replace_inventory_slot
 from tankpit_bot.sniffer.world_service import WEAPON_BYTE_TO_ITEM, WorldService
 
 log = get_logger(__name__)
 
 
 def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
-    """Called when we receive a CombatHit where we are the attacker.
+    """Called when a 0x53 ShootEvent arrives where we are the attacker.
 
-    The authoritative hit signal is tile-occupancy: the JS Gg.prototype.h
-    switch case 18 prints "You hit X" exactly when the shot's target
-    tile contains a named tank. Translated here as ``victim_id > 0``.
-    Weapon byte is used only for ammo decrement -- it cannot
-    distinguish single shots from misses (wiki: weapon=0 is ambiguous).
+    The legacy function name predates the 2026-06-19 decoder
+    unification, which deleted the container ``CombatHit`` decoder and
+    consolidated shot resolution on the protocol-path ``ShootEvent``
+    (0x53). The semantics are unchanged: the authoritative hit signal
+    is tile-occupancy. JS ``Gg.prototype.h`` switch case 18 prints
+    "You hit X" exactly when the shot's target tile contains a named
+    tank; we translate that to ``victim_id > 0``. Weapon byte is used
+    only for ammo decrement -- it cannot distinguish single shots from
+    misses (wiki: weapon=0 is ambiguous).
 
     Args:
         ws: World service instance.
-        weapon_byte: target byte index 10 (0=single, 1=dual, 2=missile,
-            3=homing). Decrements that ammo type when > 0.
+        weapon_byte: ShootEvent ``weapon`` field (0=single, 1=dual,
+            2=missile, 3=homing). Decrements that ammo type when > 0.
         victim_id: Tank id present at the shot's target tile, or -1 if
             the tile was empty (miss).
     """
@@ -86,7 +90,7 @@ def peek_combat_hit(ws: WorldService) -> bool:
 
 
 def peek_our_shot_response(ws: WorldService) -> bool:
-    """Return whether any CombatHit response for our shot is buffered.
+    """Return whether any 0x53 ShootEvent response for our shot is buffered.
 
     Args:
         ws: World service instance.
@@ -98,13 +102,13 @@ def peek_our_shot_response(ws: WorldService) -> bool:
 
 
 def check_and_clear_our_shot_response(ws: WorldService) -> bool:
-    """Check if any CombatHit for our shot arrived, then clear.
+    """Check if any 0x53 ShootEvent for our shot arrived, then clear.
 
     Args:
         ws: World service instance.
 
     Returns:
-        True if the server sent a CombatHit response for our shot.
+        True if the server sent a ShootEvent response for our shot.
     """
     result = ws.got_our_shot_response
     ws.got_our_shot_response = False
@@ -116,8 +120,8 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
 
     Args:
         ws: World service instance.
-        weapon_byte: Weapon type from CombatHit (1=dual, 2=missile,
-            3=homing).
+        weapon_byte: 0x53 ShootEvent ``weapon`` field (1=dual,
+            2=missile, 3=homing).
     """
     item_key = WEAPON_BYTE_TO_ITEM.get(weapon_byte)
     if item_key is None:
@@ -126,14 +130,10 @@ def _decrement_ammo_for_weapon(ws: WorldService, weapon_byte: int) -> None:
     if current["count"] <= 0:
         return
     new_count = current["count"] - 1
-    updated_item = InventoryItem(count=new_count, enabled=current["enabled"])
-    old = ws.inventory_state
-    ws.inventory_state = InventoryState(
-        armor_shields=updated_item if item_key == "armor_shields" else old["armor_shields"],
-        dual_shots=updated_item if item_key == "dual_shots" else old["dual_shots"],
-        missile_shots=updated_item if item_key == "missile_shots" else old["missile_shots"],
-        homing_shots=updated_item if item_key == "homing_shots" else old["homing_shots"],
-        extra_radars=updated_item if item_key == "extra_radars" else old["extra_radars"],
+    ws.inventory_state = replace_inventory_slot(
+        ws.inventory_state,
+        item_key,
+        InventoryItem(count=new_count, enabled=current["enabled"]),
     )
     log.info("AMMO: %s consumed by hit (%d -> %d)", item_key, current["count"], new_count)
 

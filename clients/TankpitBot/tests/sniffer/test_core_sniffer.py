@@ -137,6 +137,98 @@ class TestWebSocketSnifferMethods:
         assert stored["category"] == "combat"
         assert isinstance(stored["timestamp_ms"], int) and stored["timestamp_ms"] > 0
 
+    def test_process_game_log_entry_feeds_combat_tracker_recognized_line(self) -> None:
+        """A recognized combat-category line records an event in the tracker.
+
+        Locks the contract that the sniffer's
+        ``_process_game_log_entry`` override forwards combat-category
+        entries to its ``CombatTracker`` after the parent has logged
+        them. The tracker is initialized via ``_init_combat_tracker``
+        (sniffer-only plumbing as of 2026-06-19).
+        """
+        from tankpit_bot.browser import GameLogEntry
+
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._live_decode = False
+        sniffer._output_path = None
+        sniffer._init_combat_tracker()
+
+        sniffer._process_game_log_entry(
+            GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+        )
+
+        if sniffer._combat_tracker is None:
+            raise AssertionError("combat tracker should be initialized")
+        events = sniffer._combat_tracker.get_events()
+        assert events, "combat tracker should have recorded at least one event"
+        assert events[0]["attacker"] == "player"
+        assert events[0]["target"] == "Tank123 for 50 damage"
+
+    def test_process_game_log_entry_ignores_combat_when_tracker_absent(self) -> None:
+        """Combat-category entries are skipped when the tracker is not initialized.
+
+        Locks the early-return that protects the sniffer when
+        ``_init_combat_tracker`` was never called -- the entry is still
+        recorded and logged by the parent path, but no tracker
+        interaction occurs.
+        """
+        from tankpit_bot.browser import GameLogEntry
+
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._live_decode = False
+        sniffer._output_path = None
+
+        sniffer._process_game_log_entry(
+            GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
+        )
+
+        assert sniffer._combat_tracker is None
+        assert sniffer._game_log_entries == [
+            {
+                "timestamp_ms": sniffer._game_log_entries[0]["timestamp_ms"],
+                "text": "You hit Tank123 for 50 damage",
+                "category": "combat",
+            }
+        ]
+
+    def test_process_game_log_entry_combat_tracker_ignores_unparseable_line(self) -> None:
+        """Unrecognized combat text yields no tracker event but is still stored.
+
+        Locks the second early-return in the sniffer's combat branch:
+        when ``CombatTracker.process_log_line`` returns ``None`` the
+        sniffer must not call ``log_event``.
+        """
+        from tankpit_bot.browser import GameLogEntry
+
+        sniffer = object.__new__(WebSocketSniffer)
+        sniffer._cdp_service = CDPService()
+        sniffer._game_log_entries = []
+        sniffer._combat_tracker = None
+        sniffer._live_decode = False
+        sniffer._output_path = None
+        sniffer._init_combat_tracker()
+
+        sniffer._process_game_log_entry(
+            GameLogEntry(text="some unparseable combat noise xyz", category="combat")
+        )
+
+        if sniffer._combat_tracker is None:
+            raise AssertionError("combat tracker should be initialized")
+        assert sniffer._combat_tracker.get_events() == []
+        assert sniffer._game_log_entries == [
+            {
+                "timestamp_ms": sniffer._game_log_entries[0]["timestamp_ms"],
+                "text": "some unparseable combat noise xyz",
+                "category": "combat",
+            }
+        ]
+
     def test_on_message_captured_sent_mine_status(self, fake_fs: FakeFileSystem) -> None:
         """Test _on_message_captured logs mine status for sent messages."""
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH

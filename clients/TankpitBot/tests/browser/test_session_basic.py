@@ -431,16 +431,18 @@ def test_browser_session_poll_game_log_empty() -> None:
     assert session._poll_game_log() == []
 
 
-def test_browser_session_process_game_log_entry_iterates_and_logs() -> None:
-    """BrowserSession._process_game_log_entry handles combat and non-combat."""
+def test_browser_session_process_game_log_entry_logs_each_entry() -> None:
+    """BrowserSession._process_game_log_entry logs every entry it receives.
+
+    Combat-tracker integration was moved into the sniffer subclass
+    2026-06-19 (only the sniffer needs per-capture forensic stats);
+    the base class now just logs each entry at INFO.
+    """
     from tankpit_bot.browser.dom_scraper import GameLogEntry
 
     session = BrowserSession("https://example.com")
-    session._init_combat_tracker()
     combat = GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
     session._process_game_log_entry(combat)
-    unrecognized = GameLogEntry(text="unknown combat text xyz", category="combat")
-    session._process_game_log_entry(unrecognized)
     non_combat = GameLogEntry(text="Zoom in", category="action")
     session._process_game_log_entry(non_combat)
 

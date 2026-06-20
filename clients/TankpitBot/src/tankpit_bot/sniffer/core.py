@@ -25,6 +25,7 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
 )
 from tankpit_bot.capture.summary import build_session_summary
+from tankpit_bot.combat_tracker import CombatTracker
 from tankpit_bot.runtime_artifacts import SniffRunArtifactsDict
 from tankpit_bot.runtime_logging import (
     configure_sniff_runtime_logging,
@@ -106,16 +107,30 @@ class WebSocketSniffer(BrowserSession):
         self._live_decode = live_decode
         self._output_path = Path(output_path) if output_path is not None else None
         self._game_log_entries: list[dict[str, str | int]] = []
+        self._combat_tracker: CombatTracker | None = None
+
+    def _init_combat_tracker(self) -> None:
+        """Initialize the per-capture combat tracker.
+
+        The combat tracker compiles per-target hit/miss/kill stats from
+        DOM game-log lines for offline forensic analysis of a capture
+        session. It is sniffer-only -- the live bot consumes wire 0x53
+        ShootEvent directly and does not rely on DOM combat parsing.
+        """
+        self._combat_tracker = CombatTracker()
+        log.info("Combat tracker initialized")
 
     def _process_game_log_entry(self, entry: GameLogEntry) -> None:
-        """Process a single game log entry and store it.
+        """Persist the game log entry and feed it to the combat tracker.
 
-        Overrides BrowserSession._process_game_log_entry to also save entries.
+        Overrides ``BrowserSession._process_game_log_entry`` to record
+        the entry in the capture session, autosave incrementally, log
+        it via ``super()``, and parse combat-category lines through the
+        sniffer-only ``CombatTracker``.
 
         Args:
             entry: The game log entry to process.
         """
-        # Store with timestamp
         self._game_log_entries.append(
             {
                 "timestamp_ms": get_current_time_ms(),
@@ -124,8 +139,13 @@ class WebSocketSniffer(BrowserSession):
             }
         )
         self._autosave_capture()
-        # Call parent to log and process combat
         super()._process_game_log_entry(entry)
+        if entry["category"] != "combat" or self._combat_tracker is None:
+            return
+        event = self._combat_tracker.process_log_line(entry["text"])
+        if event is None:
+            return
+        self._combat_tracker.log_event(event)
 
     def _build_capture_session(self) -> CaptureSession:
         """Build the current capture session snapshot.

@@ -57,6 +57,20 @@ class ScorecardAccumulatorDict(TypedDict):
         kills: Count of ``tank_deactivated`` DIAGNOSTIC events.
         shots: Count of ``WIRE`` events whose message starts with
             ``shoot(``.
+        combat_misses: Count of ``combat_miss`` DIAGNOSTIC events
+            (shot resolved with no tank at the target tile).
+        combat_ghosts_blocked: Count of ``combat_ghost_detected``
+            DIAGNOSTIC events (combat shot refused because
+            ``last_wire_seen_ms`` was stale).
+        combat_stale_positions_blocked: Count of
+            ``combat_stale_position`` DIAGNOSTIC events (combat shot
+            refused because ``last_position_update_ms`` was stale --
+            the kill-shot gate added with the 2026-06-19 freshness
+            refactor).
+        tank_damage_changes: Count of ``tank_damage_changed``
+            DIAGNOSTIC events (any tank's ``damage_state`` transitioned
+            via wire), useful for sanity-checking shots against damage
+            observations.
         fuel_samples: ``belief_fuel`` values from every
             ``self_alignment_sample`` event, in stream order.
         dot_hops: Every ``fuel_dot_hop`` event, in stream order.
@@ -76,6 +90,10 @@ class ScorecardAccumulatorDict(TypedDict):
     state_transitions: list[tuple[str, str]]
     kills: int
     shots: int
+    combat_misses: int
+    combat_ghosts_blocked: int
+    combat_stale_positions_blocked: int
+    tank_damage_changes: int
     fuel_samples: list[int]
     dot_hops: list[TargetedTeleportRecordDict]
     inventory_samples: list[InventoryCountsDict]
@@ -98,6 +116,10 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         state_transitions=[],
         kills=0,
         shots=0,
+        combat_misses=0,
+        combat_ghosts_blocked=0,
+        combat_stale_positions_blocked=0,
+        tank_damage_changes=0,
         fuel_samples=[],
         dot_hops=[],
         inventory_samples=[],
@@ -212,9 +234,9 @@ def _route_scorecard_diagnostic(
         accumulator: Scorecard accumulator to update in place.
     """
     kind = record["fields"].get("diagnostic_kind")
-    if kind == "tank_deactivated":
-        accumulator["kills"] += 1
-    elif kind == "self_alignment_sample":
+    if _route_combat_diagnostic(kind, accumulator):
+        return
+    if kind == "self_alignment_sample":
         accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
     elif kind == "fuel_dot_hop":
         accumulator["dot_hops"].append(_classify_targeted_teleport(record))
@@ -233,6 +255,44 @@ def _route_scorecard_diagnostic(
             accumulator["scans_extra"] += 1
         else:
             accumulator["scans_builtin"] += 1
+
+
+def _route_combat_diagnostic(
+    kind: str | int | float | bool | None,
+    accumulator: ScorecardAccumulatorDict,
+) -> bool:
+    """Increment the combat counters that the freshness gates emit.
+
+    Args:
+        kind: ``diagnostic_kind`` field value pulled from the record's
+            ``fields`` dict. The dict is typed
+            ``dict[str, str | int | float | bool]`` so the value
+            received here is one of those primitives or ``None`` when
+            the field is absent. Non-string values can never match the
+            string literals tested below, so they fall through and the
+            caller routes the record onward.
+        accumulator: Scorecard accumulator to update in place.
+
+    Returns:
+        True when ``kind`` matched a combat counter and was applied,
+        False otherwise. The caller routes non-matching kinds onward.
+    """
+    if kind == "tank_deactivated":
+        accumulator["kills"] += 1
+        return True
+    if kind == "combat_miss":
+        accumulator["combat_misses"] += 1
+        return True
+    if kind == "combat_ghost_detected":
+        accumulator["combat_ghosts_blocked"] += 1
+        return True
+    if kind == "combat_stale_position":
+        accumulator["combat_stale_positions_blocked"] += 1
+        return True
+    if kind == "tank_damage_changed":
+        accumulator["tank_damage_changes"] += 1
+        return True
+    return False
 
 
 def _budget_sort_key(record: StateBudgetRecordDict) -> tuple[int, str]:
@@ -305,6 +365,10 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         state_budget=_build_state_budget(accumulator["state_transitions"]),
         kills=accumulator["kills"],
         shots=accumulator["shots"],
+        combat_misses=accumulator["combat_misses"],
+        combat_ghosts_blocked=accumulator["combat_ghosts_blocked"],
+        combat_stale_positions_blocked=accumulator["combat_stale_positions_blocked"],
+        tank_damage_changes=accumulator["tank_damage_changes"],
         fuel_min=min(fuel_samples) if fuel_samples else -1,
         fuel_last=fuel_samples[-1] if fuel_samples else -1,
         fuel_sample_count=len(fuel_samples),

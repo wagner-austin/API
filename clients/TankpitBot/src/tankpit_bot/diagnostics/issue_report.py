@@ -225,6 +225,10 @@ class _ReportAccumulatorDict(TypedDict):
     state_transitions: list[tuple[str, str]]
     kills: int
     shots: int
+    combat_misses: int
+    combat_ghosts_blocked: int
+    combat_stale_positions_blocked: int
+    tank_damage_changes: int
     fuel_samples: list[int]
     dot_hops: list[TargetedTeleportRecordDict]
     first_timestamp: str
@@ -245,11 +249,54 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         state_transitions=[],
         kills=0,
         shots=0,
+        combat_misses=0,
+        combat_ghosts_blocked=0,
+        combat_stale_positions_blocked=0,
+        tank_damage_changes=0,
         fuel_samples=[],
         dot_hops=[],
         first_timestamp="",
         last_timestamp="",
     )
+
+
+def _route_combat_diagnostic_for_report(
+    kind: str,
+    accumulator: _ReportAccumulatorDict,
+) -> bool:
+    """Increment combat counters for the issue-report accumulator.
+
+    Mirror of :func:`session_scorecard._route_combat_diagnostic` for
+    the parallel ``_ReportAccumulatorDict`` accumulator. Kept as a
+    separate helper because the two accumulators are independent
+    TypedDicts; lifting them into a shared protocol would be a
+    deeper refactor than this counter wire-up.
+
+    Args:
+        kind: ``diagnostic_kind`` field value (already narrowed to
+            ``str`` by the caller).
+        accumulator: Report accumulator to update in place.
+
+    Returns:
+        True when ``kind`` matched a combat counter and was applied,
+        False otherwise.
+    """
+    if kind == "tank_deactivated":
+        accumulator["kills"] += 1
+        return True
+    if kind == "combat_miss":
+        accumulator["combat_misses"] += 1
+        return True
+    if kind == "combat_ghost_detected":
+        accumulator["combat_ghosts_blocked"] += 1
+        return True
+    if kind == "combat_stale_position":
+        accumulator["combat_stale_positions_blocked"] += 1
+        return True
+    if kind == "tank_damage_changed":
+        accumulator["tank_damage_changes"] += 1
+        return True
+    return False
 
 
 def _classify_diagnostic_record(
@@ -270,8 +317,8 @@ def _classify_diagnostic_record(
         accumulator["session_room"] = _classify_session_room(record)
     elif kind == "recovery_boxed_in":
         accumulator["recovery_boxed_in_count"] += 1
-    elif kind == "tank_deactivated":
-        accumulator["kills"] += 1
+    elif _route_combat_diagnostic_for_report(kind, accumulator):
+        return
     elif kind == "self_alignment_sample":
         accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
     elif kind == "fuel_dot_hop":
@@ -376,6 +423,10 @@ def _build_session_scorecard(accumulator: _ReportAccumulatorDict) -> SessionScor
         state_budget=_build_state_budget(accumulator["state_transitions"]),
         kills=accumulator["kills"],
         shots=accumulator["shots"],
+        combat_misses=accumulator["combat_misses"],
+        combat_ghosts_blocked=accumulator["combat_ghosts_blocked"],
+        combat_stale_positions_blocked=accumulator["combat_stale_positions_blocked"],
+        tank_damage_changes=accumulator["tank_damage_changes"],
         fuel_min=min(fuel_samples) if fuel_samples else -1,
         fuel_last=fuel_samples[-1] if fuel_samples else -1,
         fuel_sample_count=len(fuel_samples),

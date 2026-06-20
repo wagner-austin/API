@@ -215,6 +215,79 @@ class TestRouting:
             )
         ]
 
+    def test_routes_combat_gate_diagnostics(self) -> None:
+        """Combat-gate diagnostics each increment their dedicated counter.
+
+        Locks the wiring added 2026-06-19 alongside the freshness
+        refactor. Without these counters the combat gates (ghost,
+        stale-position) and the miss path emit DIAGNOSTIC events that
+        the scorecard ignores -- regression of this test would
+        re-blind the scorecard to those events.
+        """
+        accumulator = _routed(
+            [
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "combat_miss",
+                        "target_name": "orange-8",
+                        "target_id": 534,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "combat_miss",
+                        "target_name": "red-3",
+                        "target_id": 211,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "combat_ghost_detected",
+                        "target_name": "purple-9",
+                        "target_id": 517,
+                        "wire_age_ms": 60000,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "combat_stale_position",
+                        "target_name": "orange-8",
+                        "target_id": 534,
+                        "position_age_ms": 5000,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "tank_damage_changed",
+                        "tank_id": 534,
+                        "tank_name": "orange-8",
+                        "previous_damage_state": 0,
+                        "damage_state": 1,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "tank_damage_changed",
+                        "tank_id": 211,
+                        "tank_name": "red-3",
+                        "previous_damage_state": 1,
+                        "damage_state": 2,
+                    },
+                ),
+            ]
+        )
+
+        assert accumulator["combat_misses"] == 2
+        assert accumulator["combat_ghosts_blocked"] == 1
+        assert accumulator["combat_stale_positions_blocked"] == 1
+        assert accumulator["tank_damage_changes"] == 2
+
 
 class TestBuildScorecard:
     """Tests for build_session_scorecard."""
@@ -228,6 +301,10 @@ class TestBuildScorecard:
             state_budget=[],
             kills=0,
             shots=0,
+            combat_misses=0,
+            combat_ghosts_blocked=0,
+            combat_stale_positions_blocked=0,
+            tank_damage_changes=0,
             fuel_min=-1,
             fuel_last=-1,
             fuel_sample_count=0,
@@ -411,6 +488,10 @@ class TestRenderAndIssues:
             ),
             kills=kills,
             shots=shots,
+            combat_misses=0,
+            combat_ghosts_blocked=0,
+            combat_stale_positions_blocked=0,
+            tank_damage_changes=0,
             fuel_min=fuel_min,
             fuel_last=866,
             fuel_sample_count=fuel_sample_count,
