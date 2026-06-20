@@ -502,9 +502,14 @@ class TankStatusSyncDict(TypedDict):
       a[3]    = damage_state (b.u; dual-purpose: rank_category on init, damage during gameplay)
       a[4]    = rank (b.l)
       a[5:8]  = lb_score (24-bit BE)
-      a[8]    = promo_state (if long form)
+      a[8]    = promo_state -- present when the body is at least 9 bytes
       a[9]    = has_fuel_bar (if long form)
       a[10:12] = fuel (LE u16, if long form)
+
+    The 9-byte short form carries ``promo_state``; the 13-byte long
+    form carries ``fuel`` as well. Production corpus
+    (analysis_scripts/crack_tank_status_short.py) confirms 74/74
+    9-byte 0x2E bodies have promo_state in ``[0, 5]``.
     """
 
     msg_type: Literal[0x2E]
@@ -513,6 +518,7 @@ class TankStatusSyncDict(TypedDict):
     damage_state: int
     rank: int
     lb_score: int
+    promo_state: int | None
     fuel: int | None
 
 

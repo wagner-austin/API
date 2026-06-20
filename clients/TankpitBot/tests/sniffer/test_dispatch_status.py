@@ -186,6 +186,7 @@ class TestDispatchSelfStatus:
             damage_state=0,
             rank=1,
             lb_score=151,
+            promo_state=0,
             fuel=1100,
         )
         dispatch_world_state_update(ws, msg)

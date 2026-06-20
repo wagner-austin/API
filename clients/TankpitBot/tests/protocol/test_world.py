@@ -525,6 +525,7 @@ class TestDecode0x2eMessage:
         assert result["damage_state"] == 0
         assert result["rank"] == 0
         assert result["lb_score"] == 13086757
+        assert result["promo_state"] == 0
         # Short form: no fuel field
         assert result["fuel"] is None
 

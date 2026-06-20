@@ -149,9 +149,8 @@ class TestDecodeTankRemove:
 class TestDecodeTankStatusSync:
     """Tests for decode_tank_status_sync function."""
 
-    def test_decodes_short_format(self) -> None:
-        """Decodes 8-byte tank status sync."""
-        # subtype=1, tank_id=0x0102, damage=2, rank=4, flags, lb_pos
+    def test_decodes_short_format_no_promo_or_fuel(self) -> None:
+        """8-byte body has no promo_state or fuel."""
         data = bytes([1, 0x02, 0x01, 2, 4, 0, 0x10, 0x00])
         result = decode_tank_status_sync(data)
         assert result["msg_type"] == 0x2E
@@ -159,13 +158,26 @@ class TestDecodeTankStatusSync:
         assert result["tank_id"] == 0x0102
         assert result["damage_state"] == 2
         assert result["rank"] == 4
+        assert result["promo_state"] is None
+        assert result["fuel"] is None
+
+    def test_decodes_9byte_form_with_promo_state(self) -> None:
+        """9-byte body carries promo_state at byte 8.
+
+        Verified against the first production 9-byte 0x2E body:
+          a[8] = promo_state per JS Og.h's ``8 < a.length`` branch.
+        """
+        data = bytes([1, 0x02, 0x01, 2, 4, 0, 0x10, 0x00, 3])
+        result = decode_tank_status_sync(data)
+        assert result["promo_state"] == 3
         assert result["fuel"] is None
 
     def test_decodes_long_format(self) -> None:
-        """Decodes 12+ byte tank status sync with fuel."""
-        data = bytes([3, 0x02, 0x01, 0, 5, 0, 0x10, 0x00, 0, 0, 0xE8, 0x03])  # fuel=1000
+        """Decodes 12+ byte tank status sync with promo_state and fuel."""
+        data = bytes([3, 0x02, 0x01, 0, 5, 0, 0x10, 0x00, 7, 1, 0xE8, 0x03])  # fuel=1000, promo=7
         result = decode_tank_status_sync(data)
         assert result["subtype"] == 3
+        assert result["promo_state"] == 7
         assert result["fuel"] == 1000
 
     def test_raises_on_short_data(self) -> None:

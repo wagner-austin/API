@@ -135,6 +135,7 @@ class TestFormatFunctions:
             damage_state=1,
             rank=3,
             lb_score=5,
+            promo_state=0,
             fuel=None,
         )
         result = format_tank_details(msg)

@@ -154,12 +154,23 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
     #     a[8]  = promo_state
     #     a[9]  = has_fuel_bar
     #     a[10:12] = fuel (LE u16)
+    # Caveat (2026-06-19): when this decoder is reached via the
+    # subtype-first dispatcher for ``subtype == 0x2E`` (i.e. the
+    # outer 0x2E body's first byte happened to ALSO be 0x2E), the
+    # caller strips that byte and passes us ``inner`` = body[1:].
+    # That throws away one byte of payload, so ``promo_state`` ends
+    # up ``None`` for those samples even when the wire carried it.
+    # The 9-byte length shortcut in ``decode_0x2e_message`` passes
+    # the full body and recovers promo_state correctly. Crack
+    # confirmed: 74/74 ex-TankStatusShort 9-byte bodies route via
+    # the length shortcut with proper promo_state in [0, 5].
     subtype = data[0]
     tank_id = x16(data[1], data[2])
     damage_state = data[3]
     rank = data[4]
     lb_score = 256 * (256 * data[5] + data[6]) + data[7] if len(data) > 7 else 0
 
+    promo_state: int | None = data[8] if len(data) >= 9 else None
     if len(data) >= 12:
         fuel: int | None = x16(data[10], data[11])
     else:
@@ -172,6 +183,7 @@ def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
         damage_state=damage_state,
         rank=rank,
         lb_score=lb_score,
+        promo_state=promo_state,
         fuel=fuel,
     )
 

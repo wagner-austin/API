@@ -364,6 +364,7 @@ class TestDispatchTankMessages:
             damage_state=3,
             rank=4,
             lb_score=1234,
+            promo_state=0,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -399,6 +400,7 @@ class TestDispatchTankMessages:
                 damage_state=repeated_damage_state,
                 rank=4,
                 lb_score=1234,
+                promo_state=0,
                 fuel=None,
             )
             dispatch_world_state_update(get_world_service(), msg)
@@ -433,6 +435,7 @@ class TestDispatchTankMessages:
             damage_state=3,
             rank=4,
             lb_score=1234,
+            promo_state=0,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)

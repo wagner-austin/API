@@ -115,6 +115,7 @@ class TestDispatchOther:
             damage_state=2,
             rank=4,
             lb_score=8,
+            promo_state=0,
             fuel=1400,
         )
         dispatch_world_state_update(get_world_service(), msg)
@@ -139,6 +140,7 @@ class TestDispatchOther:
             damage_state=2,
             rank=4,
             lb_score=0,
+            promo_state=None,
             fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)

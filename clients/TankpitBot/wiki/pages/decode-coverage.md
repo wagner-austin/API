@@ -14,7 +14,7 @@ Complete mapping of every message type in the game client (`tpclient.js` V table
 
 ## Architecture (post-2026-06-19)
 
-Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`. The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4F, 0x53, 0x54, 0x5A, 0x64, 0x67, 0x74) and falls through to `container.decoders.decode_container_message` for container-only subtypes (0x24, 0x43, 0x45, 0x4B, 0x79) and length-based types (TipNotification, TankUpdate*, TeleportLanded, TankRegistry, TankStatusShort, TankLeave, ChunkData, WorldState). No more dual paths.
+Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`. The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x42, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4F, 0x53, 0x54, 0x56, 0x5A, 0x64, 0x67, 0x74). A length=9 shortcut routes any other 9-byte 0x2E body to Og.h short form. The remainder falls through to `container.decoders.decode_container_message` for container-only subtypes (0x24, 0x43, 0x45, 0x4B, 0x79) and length-based types (TipNotification, TeleportLanded, TankRegistry, TankLeave, ChunkData, WorldState). No more dual paths.
 
 ## Coverage Table
 
@@ -36,7 +36,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x3F | `?` | vg | Sync/heartbeat | FULL | — |
 | 0x40 | `@` | ah | OverlayUpdate: mine tile patches | FULL | — |
 | 0x41 | `A` | Pg | Deactivation: status, victim, promo_eligible, killer, is_mine_kill | FULL | — |
-| 0x42 | `B` | Jg | BuildPickup: tank_id, src x/y, drop x/y, direction, is_bridge, flag | FULL | — |
+| 0x42 | `B` | Jg | BuildPickup: tank_id, src x/y, drop x/y, direction, obstacle_type, flag | FULL | — |
 | 0x44 | `D` | Rg | FuelGain: absolute fuel total | FULL | — |
 | 0x45 | `E` | dh | MineDetonate: positions | FULL | — |
 | 0x46 | `F` | Fg | RadarAck: found flag | FULL | — |
